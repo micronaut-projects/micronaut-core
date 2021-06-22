@@ -37,20 +37,20 @@ import java.util.Map;
  */
 @Singleton
 @Requires(beans = BeansEndpoint.class)
-public class RxJavaBeanDefinitionDataCollector implements BeanDefinitionDataCollector<Map<String, Object>> {
+public class ReactiveJavaBeanDefinitionDataCollector implements BeanDefinitionDataCollector<Map<String, Object>> {
 
     private BeanDefinitionData beanDefinitionData;
 
     /**
      * @param beanDefinitionData The {@link BeanDefinitionData}
      */
-    RxJavaBeanDefinitionDataCollector(BeanDefinitionData beanDefinitionData) {
+    ReactiveJavaBeanDefinitionDataCollector(BeanDefinitionData beanDefinitionData) {
         this.beanDefinitionData = beanDefinitionData;
     }
 
     @Override
     public Publisher<Map<String, Object>> getData(Collection<BeanDefinition<?>> beanDefinitions) {
-        return getBeans(beanDefinitions).map(beans -> {
+        return Mono.from(getBeans(beanDefinitions)).map(beans -> {
             Map<String, Object> beanData = new LinkedHashMap<>(1);
             beanData.put("beans", beans);
             return beanData;
@@ -61,7 +61,7 @@ public class RxJavaBeanDefinitionDataCollector implements BeanDefinitionDataColl
      * @param definitions The bean definitions
      * @return A {@link Mono} that wraps a Map
      */
-    protected Mono<Map<String, Object>> getBeans(Collection<BeanDefinition<?>> definitions) {
+    protected Publisher<Map<String, Object>> getBeans(Collection<BeanDefinition<?>> definitions) {
         return Flux.fromIterable(definitions)
                 .collectMap(definition -> definition.getClass().getName(),
                         definition -> {

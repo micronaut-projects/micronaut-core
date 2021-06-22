@@ -30,21 +30,21 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * A RxJava route data collector.
+ * A Reactive route data collector.
  *
  * @author James Kleeh
  * @since 1.0
  */
 @Singleton
 @Requires(beans = RoutesEndpoint.class)
-public class RxJavaRouteDataCollector implements RouteDataCollector<Map<String, Object>> {
+public class ReactiveJavaRouteDataCollector implements RouteDataCollector<Map<String, Object>> {
 
     private final RouteData routeData;
 
     /**
      * @param routeData       The RouteData
      */
-    public RxJavaRouteDataCollector(RouteData routeData) {
+    public ReactiveJavaRouteDataCollector(RouteData routeData) {
         this.routeData = routeData;
     }
 

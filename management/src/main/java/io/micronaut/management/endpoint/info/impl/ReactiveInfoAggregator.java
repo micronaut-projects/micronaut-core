@@ -43,7 +43,7 @@ import java.util.Map;
  */
 @Singleton
 @Requires(beans = InfoEndpoint.class)
-public class RxInfoAggregator implements InfoAggregator<Map<String, Object>> {
+public class ReactiveInfoAggregator implements InfoAggregator<Map<String, Object>> {
 
     @Override
     public Publisher<Map<String, Object>> aggregate(InfoSource[] sources) {
