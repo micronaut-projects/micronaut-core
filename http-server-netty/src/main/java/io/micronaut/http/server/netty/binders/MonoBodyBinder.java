@@ -16,7 +16,6 @@
 package io.micronaut.http.server.netty.binders;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -27,10 +26,7 @@ import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
-
 import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
 
 /**
