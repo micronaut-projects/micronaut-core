@@ -19,6 +19,7 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
 import java.util.Collections;
@@ -51,7 +52,7 @@ public class BeansEndpoint {
      * @return A {@link org.reactivestreams.Publisher} with the beans
      */
     @Read
-    public Mono getBeans() {
+    public Publisher<?> getBeans() {
         List<BeanDefinition<?>> beanDefinitions = beanContext.getAllBeanDefinitions()
                 .stream()
                 .sorted(Comparator.comparing((BeanDefinition<?> bd) -> bd.getClass().getName()))
