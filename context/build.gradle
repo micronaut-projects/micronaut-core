@@ -7,7 +7,6 @@ dependencies {
     compileOnly dependencyVersion("reactive.streams")
     testCompileOnly project(":inject-groovy")
     testAnnotationProcessor project(":inject-java")
-    //testImplementation dependencyVersion("rxjava2")
     testImplementation project(":core-reactive")
     testImplementation project(":inject-java-test")
 }
