@@ -25,6 +25,8 @@ import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 
+import java.util.concurrent.Callable
+
 // end::imports[]
 
 // tag::class[]
@@ -34,11 +36,12 @@ class TraceService {
     private static final Logger LOG = LoggerFactory.getLogger(TraceService.class)
 
     Flux<Boolean> trace(HttpRequest<?> request) {
-        Mono.fromCallable({ ->  // <1>
+        Mono.fromCallable(() ->  {  // <1>
             LOG.debug('Tracing request: {}', request.uri)
             // trace logic here, potentially performing I/O <2>
             return true
-        }).subscribeOn(Schedulers.boundedElastic()) // <3>
+        }).flux().subscribeOn(Schedulers.boundedElastic()) // <3>
+
     }
 }
 // end::class[]
