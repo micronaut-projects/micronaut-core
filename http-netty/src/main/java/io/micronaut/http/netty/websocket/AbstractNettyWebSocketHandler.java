@@ -50,7 +50,6 @@ import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
-import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.reactivex.Flowable;
 import io.reactivex.functions.BiConsumer;
@@ -103,6 +102,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param request                    The originating request
      * @param uriVariables               The URI variables
      * @param version                    The websocket version being used
+     * @param subProtocol                The handler sub-protocol
      * @param webSocketSessionRepository The web socket repository if they are supported (like on the server), null otherwise
      */
     protected AbstractNettyWebSocketHandler(
