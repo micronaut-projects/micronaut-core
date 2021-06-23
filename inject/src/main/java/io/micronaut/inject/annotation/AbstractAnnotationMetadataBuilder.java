@@ -1184,7 +1184,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     protected abstract boolean isInheritedAnnotationType(@NonNull T annotationType);
 
-
     private void buildStereotypeHierarchy(
             List<String> parents,
             T element,
