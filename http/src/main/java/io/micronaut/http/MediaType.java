@@ -185,7 +185,6 @@ public class MediaType implements CharSequence {
      */
     public static final MediaType MICROSOFT_EXCEL_TYPE = new MediaType(MICROSOFT_EXCEL, EXTENSION_XLS);
 
-
     /**
      * XML: text/xml.
      */

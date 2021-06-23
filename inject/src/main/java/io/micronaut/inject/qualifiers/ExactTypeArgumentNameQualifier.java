@@ -106,4 +106,9 @@ final class ExactTypeArgumentNameQualifier<T> implements Qualifier<T> {
     public int hashCode() {
         return Objects.hash(generify(typeName));
     }
+
+    @Override
+    public String toString() {
+        return generify(typeName);
+    }
 }

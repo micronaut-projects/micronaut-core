@@ -374,6 +374,18 @@ public interface BeanDefinitionRegistry {
     @NonNull <T> Optional<BeanDefinition<T>> findProxyBeanDefinition(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
+     * Obtain the original {@link BeanDefinition} for a {@link io.micronaut.inject.ProxyBeanDefinition}.
+     *
+     * @param beanType  The type
+     * @param qualifier The qualifier
+     * @param <T>       The concrete type
+     * @return An {@link Optional} of the bean definition
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
+     *                                                                for the given type
+     */
+    @NonNull <T> Optional<BeanDefinition<T>> findProxyBeanDefinition(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier);
+
+    /**
      * <p>Registers a new singleton bean at runtime. This method expects that the bean definition data will have been
      * compiled ahead of time.</p>
      * <p>

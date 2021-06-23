@@ -41,6 +41,18 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
         super(context, rootDefinition);
     }
 
+    /**
+     * @param context        The bean context
+     * @param rootDefinition The bean root definition
+     * @param beansInCreation the beans in creation
+     */
+    public DefaultBeanResolutionContext(BeanContext context, BeanDefinition rootDefinition, Map<BeanIdentifier, Object> beansInCreation) {
+        super(context, rootDefinition);
+        if (beansInCreation != null) {
+            this.beansInCreation.putAll(beansInCreation);
+        }
+    }
+
     @Override
     public void close() {
         beansInCreation.clear();
