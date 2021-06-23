@@ -157,7 +157,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         this.isFactoryClass = annotationMetadata.hasStereotype(Factory)
         this.isAopProxyType = hasAroundStereotype(annotationMetadata) && !targetClassNode.isAbstract() && !concreteClassElement.isAssignable(Interceptor.class)
         this.aopSettings = isAopProxyType ? annotationMetadata.getValues(AROUND_TYPE, Boolean.class) : OptionalValues.<Boolean> empty()
-        this.isExecutableType = isAopProxyType || annotationMetadata.hasStereotype(Executable)
+        this.isExecutableType = isAopProxyType || annotationMetadata.hasDeclaredStereotype(Executable)
         this.isConfigurationProperties = configurationProperties != null ? configurationProperties : annotationMetadata.hasDeclaredStereotype(ConfigurationReader)
         if (isConfigurationProperties) {
             this.configurationMetadata = configurationMetadataBuilder.visitProperties(
@@ -168,10 +168,10 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
         if (isAopProxyType && Modifier.isFinal(targetClassNode.modifiers)) {
             addError("Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + targetClassNode.name, targetClassNode)
-        } else if (isFactoryClass || isConfigurationProperties || annotationMetadata.hasStereotype(Bean.getName(), AnnotationUtil.SCOPE)) {
+        } else if (isFactoryClass || isConfigurationProperties || annotationMetadata.hasDeclaredStereotype(Bean.getName(), AnnotationUtil.SCOPE)) {
             defineBeanDefinition(concreteClass)
         }
-        this.isDeclaredBean = isExecutableType || isConfigurationProperties || isFactoryClass || annotationMetadata.hasStereotype(AnnotationUtil.SCOPE) || annotationMetadata.hasStereotype(DefaultScope) || annotationMetadata.hasDeclaredStereotype(Bean) ||concreteClass.declaredConstructors.any {
+        this.isDeclaredBean = isExecutableType || isConfigurationProperties || isFactoryClass || annotationMetadata.hasDeclaredStereotype(AnnotationUtil.SCOPE) || annotationMetadata.hasStereotype(DefaultScope) || annotationMetadata.hasDeclaredStereotype(Bean) ||concreteClass.declaredConstructors.any {
             AnnotationMetadata constructorMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, it)
             constructorMetadata.hasStereotype(AnnotationUtil.INJECT)
         }
@@ -474,8 +474,14 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         final boolean isPublic = methodNode.isPublic()
 
         if (isFactoryClass && !isConstructor && methodAnnotationMetadata.hasDeclaredStereotype(Bean.getName(), AnnotationUtil.SCOPE)) {
-            methodAnnotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).buildForParent(methodNode.returnType, methodNode, true)
-            visitBeanFactoryElement(declaringClass, methodNode, methodAnnotationMetadata, methodName)
+            boolean isParent = declaringClass != concreteClass
+            MethodNode overriddenMethod = isParent ? concreteClass.getMethod(methodName, methodNode.parameters) : methodNode
+            boolean overridden = isParent && overriddenMethod.declaringClass != declaringClass
+            if (!overridden) {
+                methodAnnotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).buildForParent(methodNode.returnType, methodNode, true)
+
+                visitBeanFactoryElement(declaringClass, methodNode, methodAnnotationMetadata, methodName)
+            }
         } else if (methodAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT, ProcessedTypes.POST_CONSTRUCT, ProcessedTypes.PRE_DESTROY)) {
             if (isConstructor && methodAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT)) {
                 // constructor with explicit @Inject

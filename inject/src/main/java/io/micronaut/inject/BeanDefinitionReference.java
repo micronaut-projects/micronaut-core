@@ -21,6 +21,7 @@ import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.version.MetadataVersion;
 import jakarta.inject.Singleton;
 
 /**
@@ -59,6 +60,13 @@ public interface BeanDefinitionReference<T> extends BeanType<T> {
      * @return The loaded component definition or null if it shouldn't be loaded
      */
     BeanDefinition<T> load();
+
+    /**
+     * @return The version of the bean metadata.
+     */
+    default MetadataVersion getMetadataVersion() {
+        return MetadataVersion.V2;
+    }
 
     /**
      * Loads the bean definition for the current {@link BeanContext}.

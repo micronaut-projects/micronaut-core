@@ -87,7 +87,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
             return;
         }
 
-        List<AnnotationValue<Scheduled>> scheduledAnnotations = method.getAnnotationValuesByType(Scheduled.class);
+        List<AnnotationValue<Scheduled>> scheduledAnnotations = method.getDeclaredAnnotationValuesByType(Scheduled.class);
         for (AnnotationValue<Scheduled> scheduledAnnotation : scheduledAnnotations) {
             String fixedRate = scheduledAnnotation.get(MEMBER_FIXED_RATE, String.class).orElse(null);
 

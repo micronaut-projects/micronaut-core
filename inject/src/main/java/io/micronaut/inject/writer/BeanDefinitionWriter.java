@@ -35,6 +35,8 @@ import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Provided;
+import io.micronaut.context.annotation.Requirements;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
@@ -348,6 +350,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             this.providedBeanClassName = beanFullClassName;
             this.beanDefinitionName = getBeanDefinitionName(packageName, beanSimpleClassName);
         } else if (beanProducingElement instanceof MethodElement) {
+            // copy the requirements from the factory class to the method
+            inheritTypeLevelRequirements(beanProducingElement);
             autoApplyNamedToBeanProducingElement(beanProducingElement);
             MethodElement factoryMethodElement = (MethodElement) beanProducingElement;
             final ClassElement producedElement = factoryMethodElement.getGenericReturnType();
@@ -364,6 +368,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             final ClassElement declaringType = factoryMethodElement.getDeclaringType();
             this.beanDefinitionName = declaringType.getPackageName() + ".$" + declaringType.getSimpleName() + "$" + upperCaseMethodName + uniqueIdentifier + "Definition";
         } else if (beanProducingElement instanceof FieldElement) {
+            inheritTypeLevelRequirements(beanProducingElement);
             autoApplyNamedToBeanProducingElement(beanProducingElement);
             FieldElement factoryMethodElement = (FieldElement) beanProducingElement;
             final ClassElement producedElement = factoryMethodElement.getGenericField();
@@ -413,6 +418,16 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.isConfigurationProperties = annotationMetadata.hasDeclaredStereotype(ConfigurationProperties.class);
         validateExposedTypes(annotationMetadata, visitorContext);
 
+    }
+
+    private void inheritTypeLevelRequirements(Element beanProducingElement) {
+        final List<AnnotationValue<Requires>> requirements = ((MemberElement) beanProducingElement).getDeclaringType()
+                                                                        .getDeclaredAnnotationValuesByType(Requires.class);
+        if (!requirements.isEmpty()) {
+            beanProducingElement.annotate(Requirements.class, (builder) ->
+                    builder.member(AnnotationMetadata.VALUE_MEMBER, requirements.toArray(new AnnotationValue[0]))
+            );
+        }
     }
 
     @NonNull

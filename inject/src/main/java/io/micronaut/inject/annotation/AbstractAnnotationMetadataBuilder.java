@@ -822,7 +822,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                         annMirror,
                                         mappedAnnotationName,
                                         metadata,
-                                        isDeclared);
+                                        isDeclared,
+                                        isInheritedAnnotationType(annMirror));
 
                             });
                         }
@@ -1026,12 +1027,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         }
 
                         if (annotationMirror.isPresent()) {
+                            final T am = annotationMirror.get();
                             processAnnotationStereotype(
                                     Collections.singletonList(aliasedAnnotationName),
-                                    annotationMirror.get(),
+                                    am,
                                     aliasedAnnotationName,
                                     metadata,
-                                    isDeclared);
+                                    isDeclared,
+                                    isInheritedAnnotationType(am)
+                            );
                         } else {
                             processAnnotationStereotype(
                                     Collections.singletonList(aliasedAnnotationName),
@@ -1133,11 +1137,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     allowAliases
             );
 
-            if (isDeclared) {
+            if (isDeclared || isInheritedAnnotation(annotationMirror)) {
                 applyTransformations(
                         listIterator,
                         annotationMetadata,
-                        isDeclared,
+                        true,
                         annotationMirror,
                         annotationValues,
                         Collections.emptyList(),
@@ -1148,7 +1152,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 applyTransformations(
                         listIterator,
                         annotationMetadata,
-                        isDeclared,
+                        false,
                         annotationMirror,
                         annotationValues,
                         Collections.emptyList(),
@@ -1166,11 +1170,27 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
     }
 
+    /**
+     * Test whether the annotation mirror is inherited.
+     * @param annotationMirror The mirror
+     * @return True if it is
+     */
+    protected abstract boolean isInheritedAnnotation(@NonNull A annotationMirror);
+
+    /**
+     * Test whether the annotation mirror is inherited.
+     * @param annotationType The mirror
+     * @return True if it is
+     */
+    protected abstract boolean isInheritedAnnotationType(@NonNull T annotationType);
+
+
     private void buildStereotypeHierarchy(
             List<String> parents,
             T element,
             DefaultAnnotationMetadata metadata,
             boolean isDeclared,
+            boolean isInherited,
             boolean allowAliases,
             List<String> excludes) {
         List<? extends A> annotationMirrors = getAnnotationsForType(element);
@@ -1184,7 +1204,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             final ListIterator<? extends A> listIterator = annotationMirrors.listIterator();
             while (listIterator.hasNext()) {
                 A annotationMirror = listIterator.next();
-
                 String annotationName = getAnnotationTypeName(annotationMirror);
                 if (annotationName.equals(getElementName(element))) {
                     continue;
@@ -1235,12 +1254,16 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         }
                     }
 
-                    if (isDeclared) {
-                        applyTransformations(listIterator, metadata, isDeclared, annotationMirror, data, parents, interceptorBindings,
+                    if (isInherited) {
+                        applyTransformations(listIterator, metadata, true, annotationMirror, data, parents, interceptorBindings,
+                                (string, av) -> metadata.addDeclaredRepeatableStereotype(parents, string, av),
+                                (string, values, rp) -> metadata.addDeclaredStereotype(parents, string, values, rp));
+                    } else if (isDeclared) {
+                        applyTransformations(listIterator, metadata, true, annotationMirror, data, parents, interceptorBindings,
                                 (string, av) -> metadata.addDeclaredRepeatableStereotype(parents, string, av),
                                 (string, values, rp) -> metadata.addDeclaredStereotype(parents, string, values, rp));
                     } else {
-                        applyTransformations(listIterator, metadata, isDeclared, annotationMirror, data, parents, interceptorBindings,
+                        applyTransformations(listIterator, metadata, false, annotationMirror, data, parents, interceptorBindings,
                                 (string, av) -> metadata.addRepeatableStereotype(parents, string, av),
                                 (string, values, rp) -> metadata.addStereotype(parents, string, values, rp));
                     }
@@ -1250,7 +1273,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             topLevel.removeIf((a) -> !annotationMirrors.contains(a));
             // now add meta annotations
             for (A annotationMirror : topLevel) {
-                processAnnotationStereotype(parents, annotationMirror, metadata, isDeclared);
+                processAnnotationStereotype(
+                        parents,
+                        annotationMirror,
+                        metadata,
+                        isDeclared,
+                        isInheritedAnnotation(annotationMirror)
+                );
             }
         }
 
@@ -1390,11 +1419,17 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         T annotationType = getTypeForAnnotation(annotationMirror);
         String parentAnnotationName = getAnnotationTypeName(annotationMirror);
         if (!parentAnnotationName.endsWith(".Nullable")) {
-            processAnnotationStereotypes(annotationMetadata, isDeclared, annotationType, parentAnnotationName, Collections.emptyList());
+            processAnnotationStereotypes(annotationMetadata, isDeclared, isInheritedAnnotation(annotationMirror), annotationType, parentAnnotationName, Collections.emptyList());
         }
     }
 
-    private void processAnnotationStereotypes(DefaultAnnotationMetadata annotationMetadata, boolean isDeclared, T annotationType, String annotationName, List<String> excludes) {
+    private void processAnnotationStereotypes(
+            DefaultAnnotationMetadata annotationMetadata,
+            boolean isDeclared,
+            boolean isInherited,
+            T annotationType,
+            String annotationName,
+            List<String> excludes) {
         List<String> parentAnnotations = new ArrayList<>();
         parentAnnotations.add(annotationName);
         buildStereotypeHierarchy(
@@ -1402,6 +1437,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 annotationType,
                 annotationMetadata,
                 isDeclared,
+                isInherited,
                 true,
                 excludes
         );
@@ -1422,16 +1458,27 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         );
     }
 
-    private void processAnnotationStereotype(List<String> parents, A annotationMirror, DefaultAnnotationMetadata metadata, boolean isDeclared) {
+    private void processAnnotationStereotype(
+            List<String> parents,
+            A annotationMirror,
+            DefaultAnnotationMetadata metadata,
+            boolean isDeclared,
+            boolean isInherited) {
         T typeForAnnotation = getTypeForAnnotation(annotationMirror);
         String annotationTypeName = getAnnotationTypeName(annotationMirror);
-        processAnnotationStereotype(parents, typeForAnnotation, annotationTypeName, metadata, isDeclared);
+        processAnnotationStereotype(parents, typeForAnnotation, annotationTypeName, metadata, isDeclared, isInherited);
     }
 
-    private void processAnnotationStereotype(List<String> parents, T annotationType, String annotationTypeName, DefaultAnnotationMetadata metadata, boolean isDeclared) {
+    private void processAnnotationStereotype(
+            List<String> parents,
+            T annotationType,
+            String annotationTypeName,
+            DefaultAnnotationMetadata metadata,
+            boolean isDeclared,
+            boolean isInherited) {
         List<String> stereoTypeParents = new ArrayList<>(parents);
         stereoTypeParents.add(annotationTypeName);
-        buildStereotypeHierarchy(stereoTypeParents, annotationType, metadata, isDeclared, true, Collections.emptyList());
+        buildStereotypeHierarchy(stereoTypeParents, annotationType, metadata, isDeclared, isInherited, true, Collections.emptyList());
     }
 
     private void processAnnotationStereotype(List<String> parents, AnnotationValue<?> annotationType, DefaultAnnotationMetadata metadata, boolean isDeclared) {
@@ -1657,6 +1704,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 getAnnotationMirror(transformedAnnotationName).ifPresent(a -> processAnnotationStereotypes(
                         annotationMetadata,
                         isDeclared,
+                        false,
                         a,
                         transformedAnnotationName,
                         parents
@@ -1800,6 +1848,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 processAnnotationStereotypes(
                         defaultMetadata,
                         true,
+                        isInheritedAnnotationType(annotationMirror),
                         annotationMirror,
                         annotationName,
                         DEFAULT_ANNOTATE_EXCLUDES
@@ -1842,6 +1891,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 processAnnotationStereotypes(
                         newMetadata,
                         true,
+                        isInheritedAnnotationType(annotationMirror),
                         annotationMirror,
                         annotationName,
                         DEFAULT_ANNOTATE_EXCLUDES
@@ -1953,7 +2003,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         final boolean isHierarchy = annotationMetadata instanceof AnnotationMetadataHierarchy;
         AnnotationMetadata declaredMetadata = annotationMetadata;
         if (isHierarchy) {
-            declaredMetadata = ((AnnotationMetadataHierarchy) annotationMetadata).getDeclaredMetadata();
+            declaredMetadata = annotationMetadata.getDeclaredMetadata();
         }
         // if it is anything else other than DefaultAnnotationMetadata here it is probably empty
         // in which case nothing needs to be done

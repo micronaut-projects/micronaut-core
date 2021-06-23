@@ -155,6 +155,19 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         this.hasPropertyExpressions = hasPropertyExpressions;
     }
 
+    @NonNull
+    @Override
+    public AnnotationMetadata getDeclaredMetadata() {
+        return new DefaultAnnotationMetadata(
+                this.declaredAnnotations,
+                this.declaredStereotypes,
+                null,
+                null,
+                annotationsByStereotype,
+                hasPropertyExpressions
+        );
+    }
+
     @Override
     public boolean hasPropertyExpressions() {
         return hasPropertyExpressions;
@@ -1142,7 +1155,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             if (annotations != null) {
                 annotations = new ArrayList<>(annotations);
                 if (declaredAnnotations != null) {
-                    annotations.removeIf(s -> !declaredAnnotations.containsKey(s));
+                    annotations.removeIf(s -> !declaredAnnotations.containsKey(s) && !(declaredStereotypes != null && declaredStereotypes.containsKey(s)));
                     return Collections.unmodifiableList(annotations);
                 } else {
                     // no declared
@@ -1584,7 +1597,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 Map<String, Map<CharSequence, Object>> declaredStereotypes = getDeclaredStereotypesInternal();
                 Map<String, Map<CharSequence, Object>> allStereotypes = getAllStereotypes();
                 List<String> annotationList = getAnnotationsByStereotypeInternal(stereotype);
-                for (String parentAnnotation : parentAnnotations) {
+                if (!parentAnnotations.isEmpty()) {
+                    final String parentAnnotation = CollectionUtils.last(parentAnnotations);
                     if (!annotationList.contains(parentAnnotation)) {
                         annotationList.add(parentAnnotation);
                     }

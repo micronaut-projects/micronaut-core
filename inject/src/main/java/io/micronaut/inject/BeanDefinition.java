@@ -427,7 +427,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @return The qualifier or null if this isn't one
      */
     default @Nullable Qualifier<T> getDeclaredQualifier() {
-        final List<String> annotations = getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER);
+        final List<String> annotations = getDeclaredAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER);
         if (CollectionUtils.isNotEmpty(annotations)) {
             if (annotations.size() == 1) {
                 final String annotation = annotations.iterator().next();
@@ -448,7 +448,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
         } else {
             Qualifier<T> qualifier = resolveDynamicQualifier();
             if (qualifier == null) {
-                String name = stringValue(AnnotationUtil.NAMED).orElse(null);
+                String name = getDeclaredMetadata().stringValue(AnnotationUtil.NAMED).orElse(null);
                 qualifier = name != null ? Qualifiers.byAnnotation(this, name) : null;
             }
             return qualifier;

@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.version.MetadataVersion;
 import io.micronaut.inject.AdvisedBeanType;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
@@ -199,6 +200,16 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
             isContextScopeMethod.returnValue();
             isContextScopeMethod.visitMaxs(1, 1);
         }
+
+        // start method: Class getMetadataVersion()
+        GeneratorAdapter getMetadataVersion = startPublicFinalMethodZeroArgs(classWriter, MetadataVersion.class, "getMetadataVersion");
+        getMetadataVersion.getStatic(
+                Type.getType(MetadataVersion.class),
+                "V3",
+                Type.getType(MetadataVersion.class)
+        );
+        getMetadataVersion.returnValue();
+        getMetadataVersion.visitMaxs(2, 1);
 
         // start method: Class getBeanDefinitionType()
         GeneratorAdapter getBeanDefinitionType = startPublicMethodZeroArgs(classWriter, Class.class, "getBeanDefinitionType");

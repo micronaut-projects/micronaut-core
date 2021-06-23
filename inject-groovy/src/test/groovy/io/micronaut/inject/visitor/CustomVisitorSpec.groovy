@@ -24,7 +24,7 @@ class CustomVisitorSpec extends AbstractBeanDefinitionSpec {
         ControllerGetVisitor.clearVisited()
         AllElementsVisitor.clearVisited()
         AllClassesVisitor.clearVisited()
-        InjectVisitor.clearVisited()
+        TestInjectVisitor.clearVisited()
     }
 
     void cleanup() {
@@ -106,7 +106,7 @@ public class TestController {
         ControllerGetVisitor.getVisited().empty
         AllElementsVisitor.getVisited().empty
         AllClassesVisitor.getVisited() == ["test.TestController", "getMethod"]
-        InjectVisitor.getVisited() == ["test.TestController", "privateField"]
+        TestInjectVisitor.getVisited() == ["test.TestController", "privateField"]
     }
 
     void "test @Generated class is not visited by any visitor"() {
@@ -136,6 +136,6 @@ public class TestGenerated {
         ControllerGetVisitor.getVisited().empty
         AllElementsVisitor.getVisited().empty
         AllClassesVisitor.getVisited().empty
-        InjectVisitor.getVisited().empty
+        TestInjectVisitor.getVisited().empty
     }
 }

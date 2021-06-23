@@ -174,7 +174,7 @@ class Test {
 
         expect:
         metadata != null
-        metadata.getAnnotationNamesByStereotype(Around).contains(Refreshable.name)
+        !metadata.getAnnotationNamesByStereotype(Around).contains(Refreshable.name)
         metadata.getAnnotationNamesByStereotype(Around).contains(ScopedProxy.name)
     }
 

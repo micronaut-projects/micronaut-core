@@ -745,7 +745,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             // handle @Bean annotation for @Factory class
             JavaMethodElement javaMethodElement = elementFactory.newMethodElement(concreteClassElement, method, methodAnnotationMetadata);
             if (isFactoryType && javaMethodElement.hasDeclaredStereotype(Bean.class.getName(), AnnotationUtil.SCOPE) && !javaMethodElement.getReturnType().isPrimitive()) {
-                visitBeanFactoryElement(method);
+                if (!modelUtils.overridingOrHidingMethod(method, concreteClass, true).isPresent()) {
+                    visitBeanFactoryElement(method);
+                }
                 return null;
             }
 

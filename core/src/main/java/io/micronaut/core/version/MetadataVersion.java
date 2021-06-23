@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,19 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.annotation;
+package io.micronaut.core.version;
 
-import jakarta.inject.Scope;
-
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
-@Retention(RUNTIME)
-@Target({ElementType.TYPE})
-@ScopeOne
-@Scope
-public @interface ScopeTwo {
+/**
+ * The version of the metadata produced from the Micronaut compiler.
+ *
+ * @author graemerocher
+ * @since 3.0
+ */
+public enum MetadataVersion {
+    /**
+     * Micronaut 2 metadata.
+     */
+    V2,
+    /**
+     * Micronaut 3 metadata.
+     */
+    V3
 }
