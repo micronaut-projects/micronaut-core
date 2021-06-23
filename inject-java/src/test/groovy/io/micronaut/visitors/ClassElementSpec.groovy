@@ -17,17 +17,38 @@ package io.micronaut.visitors
 
 import io.micronaut.annotation.processing.visitor.JavaClassElement
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.EnumElement
 import io.micronaut.inject.ast.MethodElement
 import spock.lang.IgnoreIf
+import spock.lang.Issue
 import spock.util.environment.Jvm
 
 import java.util.function.Supplier
 
 class ClassElementSpec extends AbstractTypeElementSpec {
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/5611')
+    void 'test visit enum with custom annotation'() {
+        when:"An enum has an annotation that is visited by CustomAnnVisitor"
+        def context = buildContext('''
+package test;
+
+@io.micronaut.visitors.CustomAnn
+enum EnumTest {
+
+}
+''')
+
+        then:"No compilation error occurs"
+        context != null
+
+        cleanup:
+        context.close()
+    }
 
     void 'test find matching methods on abstract class'() {
         given:
