@@ -24,6 +24,7 @@ import java.util.function.Predicate;
 @ServerWebSocket("/chat/{topic}/{username}") // <1>
 public class ChatServerWebSocket {
     private WebSocketBroadcaster broadcaster;
+    private String subProtocol;
 
     public ChatServerWebSocket(WebSocketBroadcaster broadcaster) {
         this.broadcaster = broadcaster;
@@ -31,6 +32,7 @@ public class ChatServerWebSocket {
 
     @OnOpen // <2>
     public void onOpen(String topic, String username, WebSocketSession session) {
+        this.subProtocol = session.getSubprotocol().orElse(null);
         String msg = "[" + username + "] Joined!";
         broadcaster.broadcastSync(msg, isValid(topic, session));
     }
@@ -56,6 +58,10 @@ public class ChatServerWebSocket {
 
     private Predicate<WebSocketSession> isValid(String topic, WebSocketSession session) {
         return s -> s != session && topic.equalsIgnoreCase(s.getUriVariables().get("topic", String.class, null));
+    }
+
+    public String getSubProtocol() {
+        return subProtocol;
     }
 }
 //end::clazz[]
