@@ -205,7 +205,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
         GeneratorAdapter getMetadataVersion = startPublicFinalMethodZeroArgs(classWriter, MetadataVersion.class, "getMetadataVersion");
         getMetadataVersion.getStatic(
                 Type.getType(MetadataVersion.class),
-                "V3",
+                MetadataVersion.V3.name(), 
                 Type.getType(MetadataVersion.class)
         );
         getMetadataVersion.returnValue();
