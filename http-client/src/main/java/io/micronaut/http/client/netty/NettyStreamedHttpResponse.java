@@ -169,7 +169,7 @@ class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpR
     }
 
     @Override
-    public MutableHttpResponse<B> status(HttpStatus status, CharSequence message) {
+    public MutableHttpResponse<B> status(HttpStatus status) {
         this.status = Objects.requireNonNull(status, "Status is required");
         return this;
     }
