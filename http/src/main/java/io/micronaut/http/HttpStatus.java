@@ -15,6 +15,8 @@
  */
 package io.micronaut.http;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -92,6 +94,23 @@ public enum HttpStatus implements CharSequence {
     NETWORK_AUTHENTICATION_REQUIRED(511, "Network Authentication Required"),
     CONNECTION_TIMED_OUT(522, "Connection Timed Out"),
     CUSTOM_STATUS(0, "Custom Reason");
+
+    /**
+     * Standard status codes are a 3-digit integer. The first digit defines the
+     * class of the response, that class is considered here as the "generic reason".
+     *
+     * See: https://www.w3.org/Protocols/rfc2616/rfc2616-sec6.html#sec6.1.1
+     */
+    private static final Map<Integer, String> GENERIC_REASONS;
+
+    static {
+        GENERIC_REASONS = new HashMap<>();
+        GENERIC_REASONS.put(1, "Informational");
+        GENERIC_REASONS.put(2, "Success");
+        GENERIC_REASONS.put(3, "Redirection");
+        GENERIC_REASONS.put(4, "Client Error");
+        GENERIC_REASONS.put(5, "Server Error");
+    }
 
     private int code;
     private String reason;
@@ -273,34 +292,12 @@ public enum HttpStatus implements CharSequence {
         return CUSTOM_STATUS;
     }
 
-    /**
-     * Standard status codes are a 3-digit integer. The first digit defines the
-     * class of the response, that is the returned generic reason of this method.
-     *
-     * See: https://www.w3.org/Protocols/rfc2616/rfc2616-sec6.html#sec6.1.1
-     *
-     * @param statusCode status code
-     * @return class of response according to RFC
-     */
     private static String genericReason(int statusCode) {
         int firstDigit = statusCode / 100;
         String reason = "Unknown Status";
 
-        switch (firstDigit) {
-            case 1:
-                reason = "Informational";
-                break;
-            case 2:
-                reason = "Success";
-                break;
-            case 3:
-                reason = "Redirection";
-                break;
-            case 4:
-                reason = "Client Error";
-                break;
-            case 5:
-                reason = "Server Error";
+        if (GENERIC_REASONS.containsKey(firstDigit)) {
+            reason = GENERIC_REASONS.get(firstDigit);
         }
 
         return String.format("%s (%d)", reason, statusCode);
