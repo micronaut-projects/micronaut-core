@@ -164,6 +164,7 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Signal;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
@@ -738,13 +739,40 @@ public class DefaultHttpClient implements
     @Override
     public <I> Flux<ByteBuffer<?>> dataStream(io.micronaut.http.HttpRequest<I> request) {
         return Flux.from(resolveRequestURI(request))
-                .flatMap(buildDataStreamPublisher(request));
+                .flatMap(buildDataStreamPublisher(request))
+                .doOnEach(signal -> {
+                    if (signal.isOnNext()) {
+                        ByteBuffer<?> buffer = signal.get();
+                        if (buffer != null) {
+                            Object o = buffer.asNativeBuffer();
+                            if (o instanceof ByteBuf) {
+                                ByteBuf byteBuf = (ByteBuf) o;
+                                //TODO with RxJava this was done with doAfterNext
+                                // if (byteBuf.refCnt() > 0) {
+                                //    ReferenceCountUtil.safeRelease(byteBuf);
+                                //}
+                            }
+                        }
+                    }
+                });
     }
 
     @Override
     public <I> Flux<io.micronaut.http.HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.HttpRequest<I> request) {
         return Flux.from(resolveRequestURI(request))
-                .flatMap(buildExchangeStreamPublisher(request));
+                .flatMap(buildExchangeStreamPublisher(request))
+                .doOnEach(signal -> {
+                    if (signal.isOnNext()) {
+                        HttpResponse<ByteBuffer<?>> responseBuffer = signal.get();
+                        if (responseBuffer != null) {
+                            ByteBuffer<?> buffer = responseBuffer.body();
+                            if (buffer instanceof ReferenceCounted) {
+                                //TODO with RxJava this was done with doAfterNext
+                                //((ReferenceCounted) buffer).release();
+                            }
+                        }
+                    }
+                });
     }
 
     @Override

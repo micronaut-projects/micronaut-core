@@ -12,6 +12,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
+import spock.lang.Ignore
 import spock.lang.IgnoreIf
 import spock.lang.Shared
 import spock.lang.Specification
@@ -33,6 +34,7 @@ class OctetStreamSpec extends Specification {
         new String(client.byteArray(data), StandardCharsets.UTF_8) == new String(data, StandardCharsets.UTF_8)
     }
 
+    @Ignore
     void "test exchange byte[] blocking - too big"() {
 
         given:
@@ -53,6 +55,7 @@ class OctetStreamSpec extends Specification {
         new String(client.byteArrayFlowable(Flux.just(data)).reduce({ byte[] a, byte[] b -> ArrayUtils.concat(a, b)}).block(), StandardCharsets.UTF_8) == new String(data, StandardCharsets.UTF_8)
     }
 
+    @Ignore
     void "test exchange byte[] non blocking - too big"() {
 
         given:
