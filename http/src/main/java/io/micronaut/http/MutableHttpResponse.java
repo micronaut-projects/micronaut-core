@@ -72,9 +72,8 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
      * @param message The message
      * @return This response object
      */
-    // TODO: Why is this a CharSequence? Possible type migration to String
     default MutableHttpResponse<B> status(HttpStatus status, CharSequence message) {
-        return status(HttpStatus.custom(status.getCode(), (String) message));
+        return status(HttpStatus.custom(status.getCode(), message.toString()));
     }
 
     @Override
@@ -165,9 +164,8 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
      * @param message The message
      * @return This response object
      */
-    // TODO: Why is this a CharSequence? Possible type migration to String
     default MutableHttpResponse<B> status(int status, CharSequence message) {
-        return status(HttpStatus.custom(status, (String) message));
+        return status(HttpStatus.custom(status, message.toString()));
     }
 
     /**
