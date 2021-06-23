@@ -50,6 +50,7 @@ import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
+import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.reactivex.Flowable;
 import io.reactivex.functions.BiConsumer;
@@ -86,6 +87,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     protected final NettyRxWebSocketSession session;
     protected final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected final WebSocketVersion webSocketVersion;
+    protected final String subProtocol;
     protected final WebSocketSessionRepository webSocketSessionRepository;
     private final Argument<?> bodyArgument;
     private final AtomicBoolean closed = new AtomicBoolean(false);
@@ -111,7 +113,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             HttpRequest<?> request,
             Map<String, Object> uriVariables,
             WebSocketVersion version,
+            String subProtocol,
             WebSocketSessionRepository webSocketSessionRepository) {
+        this.subProtocol = subProtocol;
         this.webSocketSessionRepository = webSocketSessionRepository;
         this.webSocketBinder = new WebSocketStateBinderRegistry(binderRegistry);
         this.uriVariables = uriVariables;
