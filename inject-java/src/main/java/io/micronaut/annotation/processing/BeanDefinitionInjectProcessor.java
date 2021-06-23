@@ -834,9 +834,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         private boolean hasAroundStereotype(AnnotationMetadata annotationMetadata) {
-            if (annotationMetadata.hasStereotype(AROUND_TYPE)) {
+            if (annotationMetadata.hasDeclaredStereotype(AROUND_TYPE)) {
                 return true;
-            } else if (annotationMetadata.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
+            } else if (annotationMetadata.hasDeclaredStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
                 return annotationMetadata.getAnnotationValuesByType(InterceptorBinding.class)
                         .stream().anyMatch(av ->
                                 av.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND) == InterceptorKind.AROUND

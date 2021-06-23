@@ -1,9 +1,12 @@
 package io.micronaut.inject.annotation
 
+import groovy.test.NotYetImplemented
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.aop.Intercepted
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
 
@@ -104,6 +107,7 @@ class Parent {
         definition == null
     }
 
+
     void "test inherited scopes, qualifiers & requirements on types on bean"() {
         given:
         def definition = buildBeanDefinition('anntest.Test', '''
@@ -143,6 +147,166 @@ class Parent {
         and:"The requirements are not inherited"
         definition.getDeclaredAnnotationValuesByType(Requires).size() == 0
     }
+
+    void "test inherited AOP advice on types is not inherited when not annotated with @Inherited"() {
+        given:
+        def context = buildContext('anntest.Test', '''
+package anntest;
+
+import jakarta.inject.*;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.Prototype;
+import java.lang.annotation.*;
+
+@Prototype
+class Test extends Parent {}
+
+@Singleton
+@Named("test")
+@Requires(property="foo.bar")
+@Mutating("test")
+class Parent {
+}
+
+@io.micronaut.aop.Around
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+@interface Mutating {
+    String value();
+}
+''')
+        def bean = getBean(context, 'anntest.Test')
+
+        expect:"No AOP advice is applied because @Mutating is not annotated with @Inherited"
+        !(bean instanceof Intercepted)
+
+        cleanup:
+        context.close()
+    }
+
+    void "test inherited AOP advice on methods are not inherited when not annotated with @Inherited"() {
+        given:
+        def context = buildContext('anntest.Test', '''
+package anntest;
+
+import jakarta.inject.*;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.Prototype;
+import java.lang.annotation.*;
+
+@Prototype
+class Test extends Parent {
+    @Override
+    void test() {}
+}
+
+@Singleton
+@Named("test")
+@Requires(property="foo.bar")
+class Parent {
+
+    @Mutating("test")
+    void test() {
+    
+    }
+}
+
+@io.micronaut.aop.Around
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.METHOD)
+@interface Mutating {
+    String value();
+}
+''')
+        def bean = getBean(context, 'anntest.Test')
+
+        expect:"No AOP advice is applied because @Mutating is not annotated with @Inherited"
+        !(bean instanceof Intercepted)
+
+        cleanup:
+        context.close()
+    }
+
+    void "test inherited AOP advice on methods are inherited when annotated with @Inherited"() {
+        given:
+        def context = buildContext('anntest.Test', '''
+package anntest;
+
+import jakarta.inject.*;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.Prototype;
+import java.lang.annotation.*;
+
+@Prototype
+class Test extends Parent {
+    @Override
+    void test() {}
+}
+
+@Singleton
+@Named("test")
+@Requires(property="foo.bar")
+class Parent {
+
+    @Mutating("test")
+    void test() {
+    
+    }
+}
+@io.micronaut.aop.Around
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.METHOD)
+@Inherited
+@interface Mutating {
+    String value();
+}
+''')
+        def bean = getBean(context, 'anntest.Test')
+
+        expect:"AOP advice is applied since it is inherited through the method"
+        (bean instanceof Intercepted)
+
+        cleanup:
+        context.close()
+    }
+
+    void "test inherited AOP advice on types on bean - inherited"() {
+        given:
+        def context = buildContext('anntest.Test', '''
+package anntest;
+
+import jakarta.inject.*;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.Prototype;
+import java.lang.annotation.*;
+
+@Prototype
+class Test extends Parent {}
+
+@Singleton
+@Named("test")
+@Requires(property="foo.bar")
+@Mutating("test")
+class Parent {
+}
+
+@io.micronaut.aop.Around
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+@Inherited
+@interface Mutating {
+    String value();
+}
+''')
+        def bean = getBean(context, 'anntest.Test')
+
+        expect:"AOP advice is applied because the @Mutated annotation is annotated with @Inherited"
+        (bean instanceof Intercepted)
+
+        cleanup:
+        context.close()
+    }
+
 
     void "test inherited scopes, qualifiers & requirements with @Inherited on stereotype"() {
         given:
