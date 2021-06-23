@@ -254,6 +254,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             )
             populateProxyWriterConstructor(groovyClassElement, aopProxyWriter)
             beanDefinitionWriters.put(node, aopProxyWriter)
+            this.aopProxyWriter = aopProxyWriter
             visitIntroductionTypePublicMethods(aopProxyWriter, node)
             if (ArrayUtils.isNotEmpty(interfaceTypes)) {
                 List<AnnotationNode> annotationNodes = node.annotations
@@ -881,12 +882,17 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         AopProxyWriter proxyWriter = (AopProxyWriter) aopProxyWriter
         if (proxyWriter == null) {
 
-            proxyWriter = new AopProxyWriter(
-                    (BeanDefinitionWriter) getBeanWriter(),
-                    aopSettings,
-                    configurationMetadataBuilder,
-                    interceptorTypeReferences
-            )
+            if (getBeanWriter() instanceof BeanDefinitionWriter) {
+                proxyWriter = new AopProxyWriter(
+                        (BeanDefinitionWriter) getBeanWriter(),
+                        aopSettings,
+                        configurationMetadataBuilder,
+                        interceptorTypeReferences
+                )
+            } else {
+                // Unexpected: should be unreachable
+                throw new IllegalStateException("Internal Error: bean writer not an instance of BeanDefinitionWriter")
+            }
 
             populateProxyWriterConstructor(concreteClassElement, proxyWriter)
             String beanDefinitionName = getBeanWriter().getBeanDefinitionName()
