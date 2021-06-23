@@ -2380,7 +2380,14 @@ public class DefaultBeanContext implements BeanContext {
         if (qualifier instanceof AnyQualifier) {
             return candidates.iterator().next();
         } else {
-            throw new NonUniqueBeanException(beanType, candidates.iterator());
+            final List<BeanDefinition<T>> withoutAnyBeans =
+                    candidates.stream().filter(bd -> !bd.hasDeclaredAnnotation(Any.class))
+                    .collect(Collectors.toList());
+            if (withoutAnyBeans.size() == 1) {
+                return withoutAnyBeans.iterator().next();
+            } else {
+                throw new NonUniqueBeanException(beanType, candidates.iterator());
+            }
         }
     }
 
