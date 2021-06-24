@@ -1,11 +1,13 @@
 package io.micronaut.http.client
 
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.netty.FullNettyClientHttpResponse
 import io.micronaut.runtime.server.EmbeddedServer
@@ -19,27 +21,41 @@ class CustomResponseStatusSpec extends Specification {
     @Inject
     EmbeddedServer embeddedServer
 
+    final def GENERIC_REASONS = [
+            1: "Informational",
+            2: "Success",
+            3: "Redirection",
+            4: "Client Error",
+            5: "Server Error"
+    ]
+
+    private String formatGenericReason(int statusCode) {
+        int firstDigit = statusCode / 100 as int
+        "${GENERIC_REASONS.get(firstDigit)} (${statusCode})"
+    }
+
     void "test response status with custom code and generic reason"() {
         given:
+        int statusCode = 480
         HttpClient client = HttpClient.create(embeddedServer.getURL())
 
         when:
         HttpResponse response = client.toBlocking()
-                .exchange(HttpRequest.GET("/status-in-HttpResponse-no-reason"))
+                .exchange(HttpRequest.GET("/status-in-HttpResponse?code=${statusCode}"))
 
         then:
         HttpClientResponseException ex = thrown(HttpClientResponseException)
-        ex.getStatus().getCode() == 480
-        ex.getStatus().getReason() == 'Client Error (480)'
+        ex.getStatus().getCode() == statusCode
+        ex.getStatus().getReason() == formatGenericReason(statusCode)
 
         when:
         response = client.toBlocking()
-                .exchange(HttpRequest.GET("/status-in-MutableHttpResponse-no-reason"))
+                .exchange(HttpRequest.GET("/status-in-MutableHttpResponse?code=${statusCode}"))
 
         then:
         ex = thrown(HttpClientResponseException)
-        ex.getStatus().getCode() == 480
-        ex.getStatus().getReason() == "Client Error (480)"
+        ex.getStatus().getCode() == statusCode
+        ex.getStatus().getReason() == formatGenericReason(statusCode)
 
         cleanup:
         client.close()
@@ -71,24 +87,16 @@ class CustomResponseStatusSpec extends Specification {
 
     @Controller
     static class CustomStatusController {
-        @Get("/status-in-HttpResponse-no-reason")
-        HttpResponse customStatusHttpResponseNoReason() {
-            return HttpResponse.status(480)
+        @Get("/status-in-HttpResponse")
+        HttpResponse customStatusHttpResponse(@QueryValue int code,
+                                              @QueryValue(defaultValue = "") String reason) {
+            return reason.isEmpty() ? HttpResponse.status(code) : HttpResponse.status(code, reason)
         }
 
-        @Get("/status-in-HttpResponse-with-reason")
-        HttpResponse customStatusHttpResponseWithReason() {
-            return HttpResponse.status(380, "My Custom Reason")
-        }
-
-        @Get("/status-in-MutableHttpResponse-no-reason")
-        HttpResponse customStatusMutableHttpResponseNoReason() {
-            return HttpResponse.ok().status(480)
-        }
-
-        @Get("/status-in-MutableHttpResponse-with-reason")
-        HttpResponse customStatusMutableHttpResponseWithReason() {
-            return HttpResponse.ok().status(380, "My Custom Reason")
+        @Get("/status-in-MutableHttpResponse")
+        HttpResponse customStatusMutableHttpResponse(@QueryValue int code,
+                                                     @QueryValue(defaultValue = "") String reason) {
+            return reason.isEmpty() ? HttpResponse.ok().status(code) : HttpResponse.ok().status(code, reason)
         }
     }
 }
