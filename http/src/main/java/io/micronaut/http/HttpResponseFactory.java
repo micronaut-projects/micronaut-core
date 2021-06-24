@@ -15,8 +15,6 @@
  */
 package io.micronaut.http;
 
-import io.micronaut.http.simple.SimpleHttpResponseFactory;
-
 /**
  * A factory interface for creating {@link MutableHttpResponse} instances.
  *
@@ -28,7 +26,7 @@ public interface HttpResponseFactory {
     /**
      * The default {@link HttpResponseFactory} instance.
      */
-    HttpResponseFactory INSTANCE = /* new SimpleHttpResponseFactory(); */ DefaultHttpFactories.resolveDefaultResponseFactory();
+    HttpResponseFactory INSTANCE = DefaultHttpFactories.resolveDefaultResponseFactory();
 
     /**
      * Creates an {@link io.micronaut.http.HttpStatus#OK} response with a body.
