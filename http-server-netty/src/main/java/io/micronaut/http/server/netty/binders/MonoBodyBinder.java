@@ -31,9 +31,8 @@ import java.util.Optional;
 
 /**
  * Bindings {@link io.micronaut.http.annotation.Body} arguments of type {@link Mono}.
- *
- * @author Graeme Rocher
- * @since 1.0
+ * @author Sergio del Amo
+ * @since 3.0.0
  */
 @Internal
 public class MonoBodyBinder extends DefaultBodyAnnotationBinder<Mono> implements NonBlockingBodyArgumentBinder<Mono> {
