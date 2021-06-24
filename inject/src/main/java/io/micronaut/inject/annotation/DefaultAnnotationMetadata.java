@@ -1155,7 +1155,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             if (annotations != null) {
                 annotations = new ArrayList<>(annotations);
                 if (declaredAnnotations != null) {
-                    annotations.removeIf(s -> !declaredAnnotations.containsKey(s) && !(declaredStereotypes != null && declaredStereotypes.containsKey(s)));
+                    annotations.removeIf(s -> !declaredAnnotations.containsKey(s));
                     return Collections.unmodifiableList(annotations);
                 } else {
                     // no declared
