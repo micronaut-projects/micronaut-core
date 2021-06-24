@@ -16,7 +16,6 @@
 package io.micronaut.reactive.rxjava.http.client;
 
 import io.micronaut.http.client.ReactiveHttpClientFactory;
-import io.micronaut.http.client.StreamingHttpClient;
 
 /**
  * Factory interface for creating clients.
@@ -25,5 +24,5 @@ import io.micronaut.http.client.StreamingHttpClient;
  * @author Sergio del Amo
  * @since 2.0
  */
-public interface RxHttpClientFactory extends ReactiveHttpClientFactory<RxHttpClient, StreamingHttpClient> {
+public interface RxHttpClientFactory extends ReactiveHttpClientFactory<RxHttpClient, RxStreamingHttpClient> {
 }
