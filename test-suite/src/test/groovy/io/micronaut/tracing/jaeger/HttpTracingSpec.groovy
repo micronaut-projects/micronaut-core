@@ -82,7 +82,6 @@ class HttpTracingSpec extends Specification {
         }
     }
 
-    @Ignore(" https://github.com/micronaut-projects/micronaut-core/issues/5554")
     void "test basic http tracing - blocking controller method"() {
 
         when:
@@ -292,7 +291,6 @@ class HttpTracingSpec extends Specification {
         }
     }
 
-    @Ignore(" https://github.com/micronaut-projects/micronaut-core/issues/5554")
     void "test delayed http trace error"() {
         given:
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
@@ -373,7 +371,6 @@ class HttpTracingSpec extends Specification {
         client.close()
     }
 
-    @Ignore(" https://github.com/micronaut-projects/micronaut-core/issues/5554")
     void "tested continue http tracing - blocking controller method"() {
         given:
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
@@ -512,7 +509,6 @@ class HttpTracingSpec extends Specification {
         client.close()
     }
 
-    @Ignore(" https://github.com/micronaut-projects/micronaut-core/issues/5554")
     void "tested nested http tracing - blocking controller method"() {
         given:
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
@@ -700,7 +696,6 @@ class HttpTracingSpec extends Specification {
         client.close()
     }
 
-    @Ignore(" https://github.com/micronaut-projects/micronaut-core/issues/5554")
     void "tested customising span name - blocking controller method"() {
         given:
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
@@ -874,7 +869,7 @@ class HttpTracingSpec extends Specification {
         @Get("/delayed-error/{duration}")
         Mono<Object> delayedError(Duration duration) {
             Mono.error(new RuntimeException("delayed error"))
-                    .delayElement(Duration.of(duration.toMillis(), ChronoUnit.MILLIS))
+                    .delaySubscription(Duration.of(duration.toMillis(), ChronoUnit.MILLIS))
         }
 
         @Error(QuotaException)

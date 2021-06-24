@@ -91,7 +91,15 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.DefaultHttpContent;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValues;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
@@ -107,6 +115,7 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.MonoSink;
 import reactor.core.publisher.UnicastProcessor;
@@ -1312,47 +1321,23 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                                           AtomicReference<HttpRequest<?>> requestReference,
                                                                           RouteMatch<?> routeMatch,
                                                                           Executor executor) {
-        return new Publisher<MutableHttpResponse<?>>() {
-            @Override
-            public void subscribe(Subscriber<? super MutableHttpResponse<?>> subscriber) {
-                if (executor == null) {
-                    doSubscribe(subscriber);
-                } else {
-                    executor.execute(() -> {
-                        doSubscribe(subscriber);
-                    });
-                }
+
+        Flux<MutableHttpResponse<?>> reactiveSequence = Flux.create(emitter -> {
+            try {
+                ServerRequestContext.set(requestReference.get());
+                emitRouteResponse(emitter, request, requestReference, routeMatch);
+            } finally {
+                ServerRequestContext.set(null);
             }
+        });
+        if (executor != null) {
+            reactiveSequence = reactiveSequence.subscribeOn(Schedulers.fromExecutor(executor));
+        }
 
-            private void doSubscribe(Subscriber<? super MutableHttpResponse<?>> subscriber) {
-                subscriber.onSubscribe(new Subscription() {
-
-                    boolean done;
-
-                    @Override
-                    public void request(long n) {
-                        if (done) {
-                            return;
-                        }
-                        done = true;
-                        try {
-                            ServerRequestContext.set(requestReference.get());
-                            emitRouteResponse((Subscriber<MutableHttpResponse<?>>) subscriber, request, requestReference, routeMatch);
-                        } finally {
-                            ServerRequestContext.set(null);
-                        }
-                    }
-
-                    @Override
-                    public void cancel() {
-                    }
-
-                });
-            }
-        };
+        return reactiveSequence;
     }
 
-    private void emitRouteResponse(Subscriber<MutableHttpResponse<?>> subscriber,
+    private void emitRouteResponse(FluxSink<MutableHttpResponse<?>> subscriber,
                                    NettyHttpRequest<?> request,
                                    AtomicReference<HttpRequest<?>> requestReference,
                                    RouteMatch<?> routeMatch) {
@@ -1442,17 +1427,17 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                             @Override
                             public void doOnNext(MutableHttpResponse<?> mutableHttpResponse) {
-                                subscriber.onNext(mutableHttpResponse);
+                                subscriber.next(mutableHttpResponse);
                             }
 
                             @Override
                             public void doOnError(Throwable t) {
-                                subscriber.onError(t);
+                                subscriber.error(t);
                             }
 
                             @Override
                             public void doOnComplete() {
-                                subscriber.onComplete();
+                                subscriber.complete();
                             }
                         });
                         return;
@@ -1471,10 +1456,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             CompletableFuture<?> f = supplier.get();
                             f.whenComplete((o, throwable) -> {
                                 if (throwable != null) {
-                                    subscriber.onError(throwable);
+                                    subscriber.error(throwable);
                                 } else {
                                     if (o == null) {
-                                        subscriber.onNext(newNotFoundError(request));
+                                        subscriber.next(newNotFoundError(request));
                                     } else {
                                         MutableHttpResponse<?> response;
                                         if (o instanceof HttpResponse) {
@@ -1486,9 +1471,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                             }
                                         }
                                         response.setAttribute(HttpAttributes.ROUTE_MATCH, finalRoute);
-                                        subscriber.onNext(response);
+                                        subscriber.next(response);
                                     }
-                                    subscriber.onComplete();
+                                    subscriber.complete();
                                 }
                             });
                             return;
@@ -1528,10 +1513,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             }
             outgoingResponse.setAttribute(HttpAttributes.ROUTE_MATCH, finalRoute);
 
-            subscriber.onNext(outgoingResponse);
-            subscriber.onComplete();
+            subscriber.next(outgoingResponse);
+            subscriber.complete();
         } catch (Throwable e) {
-            subscriber.onError(e);
+            subscriber.error(e);
         }
     }
 
