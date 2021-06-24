@@ -38,7 +38,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
-import io.micronaut.core.version.MetadataVersion;
 import io.micronaut.core.version.SemanticVersion;
 import io.micronaut.core.version.VersionUtils;
 import io.micronaut.inject.BeanConfiguration;
@@ -93,19 +92,7 @@ public class RequiresCondition implements Condition {
         AnnotationMetadataProvider component = context.getComponent();
         boolean isBeanReference = component instanceof BeanDefinitionReference;
 
-        List<AnnotationValue<Requires>> requirements;
-
-        if (isBeanReference) {
-            final MetadataVersion metadataVersion = ((BeanDefinitionReference<?>) component).getMetadataVersion();
-            if (metadataVersion == MetadataVersion.V3) {
-                // requirements in metadata v3 are stored as declared annotations
-                requirements = annotationMetadata.getDeclaredAnnotationValuesByType(Requires.class);
-            } else {
-                requirements = annotationMetadata.getAnnotationValuesByType(Requires.class);
-            }
-        } else {
-            requirements = annotationMetadata.getDeclaredAnnotationValuesByType(Requires.class);
-        }
+        List<AnnotationValue<Requires>> requirements = annotationMetadata.getAnnotationValuesByType(Requires.class);
 
         if (!requirements.isEmpty()) {
             // here we use AnnotationMetadata to avoid loading the classes referenced in the annotations directly

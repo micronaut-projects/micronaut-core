@@ -70,6 +70,8 @@ class Test {
         AnnotationMetadata metadata = buildMethodArgumentAnnotationMetadata('''
 package test;
 
+import java.lang.annotation.*;
+
 @jakarta.inject.Singleton
 class Test implements TestApi {
 
@@ -82,17 +84,23 @@ class Test implements TestApi {
 
 interface TestApi {
 
-    void test(@jakarta.inject.Named("foo") String id);
+    void test(@MyAnn String id);
 
 }
+
+@Inherited
+@Retention(RetentionPolicy.RUNTIME)
+@jakarta.inject.Named("foo") 
+@interface MyAnn {}
 ''', 'test', 'id')
 
         expect:
         metadata != null
         !metadata.empty
         !metadata.hasDeclaredAnnotation(AnnotationUtil.NAMED)
-        metadata.hasAnnotation(AnnotationUtil.NAMED)
+        metadata.hasStereotype(AnnotationUtil.NAMED)
         metadata.getValue(AnnotationUtil.NAMED).get() == "foo"
+        metadata.stringValue(AnnotationUtil.NAMED).get() == "foo"
     }
 
 }

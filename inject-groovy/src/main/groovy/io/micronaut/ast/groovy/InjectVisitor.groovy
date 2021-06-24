@@ -157,7 +157,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         this.isFactoryClass = annotationMetadata.hasStereotype(Factory)
         this.isAopProxyType = hasAroundStereotype(annotationMetadata) && !targetClassNode.isAbstract() && !concreteClassElement.isAssignable(Interceptor.class)
         this.aopSettings = isAopProxyType ? annotationMetadata.getValues(AROUND_TYPE, Boolean.class) : OptionalValues.<Boolean> empty()
-        this.isExecutableType = isAopProxyType || annotationMetadata.hasDeclaredStereotype(Executable)
+        this.isExecutableType = isAopProxyType || annotationMetadata.hasStereotype(Executable)
         this.isConfigurationProperties = configurationProperties != null ? configurationProperties : annotationMetadata.hasDeclaredStereotype(ConfigurationReader)
         if (isConfigurationProperties) {
             this.configurationMetadata = configurationMetadataBuilder.visitProperties(
@@ -168,20 +168,21 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
         if (isAopProxyType && Modifier.isFinal(targetClassNode.modifiers)) {
             addError("Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + targetClassNode.name, targetClassNode)
-        } else if (isFactoryClass || isConfigurationProperties || annotationMetadata.hasDeclaredStereotype(Bean.getName(), AnnotationUtil.SCOPE)) {
-            defineBeanDefinition(concreteClass)
         }
-        this.isDeclaredBean = isExecutableType || isConfigurationProperties || isFactoryClass || annotationMetadata.hasDeclaredStereotype(AnnotationUtil.SCOPE) || annotationMetadata.hasStereotype(DefaultScope) || annotationMetadata.hasDeclaredStereotype(Bean) ||concreteClass.declaredConstructors.any {
+        this.isDeclaredBean = isExecutableType || isConfigurationProperties || isFactoryClass || annotationMetadata.hasStereotype(AnnotationUtil.SCOPE) || annotationMetadata.hasStereotype(DefaultScope) || annotationMetadata.hasDeclaredStereotype(Bean) || concreteClass.declaredConstructors.any {
             AnnotationMetadata constructorMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, it)
             constructorMetadata.hasStereotype(AnnotationUtil.INJECT)
+        }
+        if (isDeclaredBean) {
+            defineBeanDefinition(concreteClass)
         }
     }
 
     static boolean hasAroundStereotype(AnnotationMetadata annotationMetadata) {
-        if (annotationMetadata.hasDeclaredStereotype(AROUND_TYPE)) {
+        if (annotationMetadata.hasStereotype(AROUND_TYPE)) {
             return true
         } else {
-            if (annotationMetadata.hasDeclaredStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
+            if (annotationMetadata.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
                 return annotationMetadata.getAnnotationValuesByType(InterceptorBinding)
                     .stream().anyMatch{ av ->
                     av.enumValue("kind", InterceptorKind).orElse(InterceptorKind.AROUND) == InterceptorKind.AROUND
@@ -331,6 +332,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 AnnotationMetadata annotationMetadata
                 if (AstAnnotationUtils.isAnnotated(node.name, methodNode) || AstAnnotationUtils.hasAnnotation(methodNode, Override)) {
                     annotationMetadata = AstAnnotationUtils.newBuilder(source, unit).buildForParent(node.name, node, methodNode)
+                    annotationMetadata = new AnnotationMetadataHierarchy(concreteClassAnnotationMetadata, annotationMetadata)
                 } else {
                     annotationMetadata = new AnnotationMetadataReference(
                             aopProxyWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
@@ -348,6 +350,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         owningType,
                         concreteClassAnnotationMetadata
                 )
+
 
                 if (!annotationMetadata.hasStereotype("io.micronaut.validation.Validated") &&
                         isDeclaredBean) {

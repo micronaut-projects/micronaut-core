@@ -39,5 +39,6 @@ import java.lang.annotation.*;
 @Documented
 @Nonnull
 @TypeQualifierNickname
+@Inherited
 public @interface NonNull {
 }

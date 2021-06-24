@@ -557,15 +557,17 @@ class Test {
     void "test parse inherited from class method stereotype data"() {
 
         given:
-        AnnotationMetadata metadata = buildMethodAnnotationMetadata('''\
+        BeanDefinition beanDefinition = buildBeanDefinition('test.Test', '''\
 package test;
 
 
 @io.micronaut.context.annotation.Primary
 class Test {
+    @io.micronaut.context.annotation.Executable
     void testMethod() {}
 }
-''', 'testMethod')
+''')
+        def metadata = beanDefinition.getRequiredMethod("testMethod").getAnnotationMetadata()
 
         expect:
         metadata != null
@@ -582,7 +584,7 @@ class Test {
         AnnotationMetadata metadata = buildMethodAnnotationMetadata('''\
 package test;
 
-
+import java.lang.annotation.*;
 
 class Test implements ITest {
     @Override
@@ -590,16 +592,22 @@ class Test implements ITest {
 }
 
 interface ITest {
-    @io.micronaut.context.annotation.Primary
+    @MyAnn
     void testMethod(); 
 }
+
+@io.micronaut.context.annotation.Primary
+@Retention(RetentionPolicy.RUNTIME)
+@Inherited
+@interface MyAnn {}
 ''', 'testMethod')
 
         expect:
         metadata != null
         !metadata.hasDeclaredAnnotation(Primary)
         !metadata.hasDeclaredAnnotation(AnnotationUtil.SINGLETON)
-        metadata.hasAnnotation(Primary)
+        !metadata.hasAnnotation(Primary)
+        metadata.hasStereotype(Primary)
         metadata.hasStereotype(AnnotationUtil.QUALIFIER)
         !metadata.hasStereotype(AnnotationUtil.SINGLETON)
     }

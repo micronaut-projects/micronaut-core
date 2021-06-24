@@ -393,6 +393,8 @@ class Test {
         AnnotationMetadata metadata = buildFieldAnnotationMetadata("test.Test", '''
 package test;
 
+import java.lang.annotation.*;
+
 @javax.inject.Singleton
 class Test implements TestApi {
 
@@ -405,16 +407,21 @@ class Test implements TestApi {
 
 interface TestApi {
 
-    void test(@javax.inject.Named("foo") String id);
+    void test(@MyAnn String id);
 
 }
+
+@Inherited
+@Retention(RetentionPolicy.RUNTIME)
+@jakarta.inject.Named("foo") 
+@interface MyAnn {}
 ''', 'test', 'id')
 
         expect:
         metadata != null
         !metadata.empty
         !metadata.hasDeclaredAnnotation(Named)
-        metadata.hasAnnotation(Named)
+        metadata.hasStereotype(Named)
         metadata.getValue(Named).get() == "foo"
     }
 

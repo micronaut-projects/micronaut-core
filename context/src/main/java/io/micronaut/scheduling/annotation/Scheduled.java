@@ -23,6 +23,7 @@ import io.micronaut.scheduling.TaskExecutors;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
 import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
@@ -39,6 +40,7 @@ import java.lang.annotation.Target;
 @Executable(processOnStartup = true)
 @Repeatable(Schedules.class)
 @Parallel
+@Inherited
 public @interface Scheduled {
 
     /**

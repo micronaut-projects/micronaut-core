@@ -104,7 +104,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     @Internal
     protected DefaultAnnotationMetadata() {
-        hasPropertyExpressions = true;
+        hasPropertyExpressions = false;
     }
 
     /**
@@ -1277,7 +1277,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 declaredStereotypes != null ? new HashMap<>(declaredStereotypes) : null,
                 allStereotypes != null ? new HashMap<>(allStereotypes) : null,
                 allAnnotations != null ? new HashMap<>(allAnnotations) : null,
-                annotationsByStereotype != null ? new HashMap<>(annotationsByStereotype) : null
+                annotationsByStereotype != null ? new HashMap<>(annotationsByStereotype) : null,
+                hasPropertyExpressions
         );
     }
 
@@ -1533,7 +1534,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             } else {
                 Map<String, Map<CharSequence, Object>> allStereotypes = getAllStereotypes();
                 List<String> annotationList = getAnnotationsByStereotypeInternal(stereotype);
-                for (String parentAnnotation : parentAnnotations) {
+                if (!parentAnnotations.isEmpty()) {
+                    final String parentAnnotation = CollectionUtils.last(parentAnnotations);
                     if (!annotationList.contains(parentAnnotation)) {
                         annotationList.add(parentAnnotation);
                     }

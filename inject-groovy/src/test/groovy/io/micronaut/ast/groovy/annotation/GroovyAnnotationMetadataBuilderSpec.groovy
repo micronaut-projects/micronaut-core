@@ -18,6 +18,7 @@ package io.micronaut.ast.groovy.annotation
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.core.annotation.AnnotationClassValue
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.inject.annotation.MultipleAlias
 import io.micronaut.aop.Around
@@ -431,15 +432,17 @@ class Test {
     void "test parse inherited from class method stereotype data"() {
 
         given:
-        AnnotationMetadata metadata = buildMethodAnnotationMetadata("test.Test",'''\
+        AnnotationMetadata metadata = buildBeanDefinition("test.Test",'''\
 package test;
 
 
 @io.micronaut.context.annotation.Primary
+@io.micronaut.context.annotation.Bean
 class Test {
+    @io.micronaut.context.annotation.Executable
     void testMethod() {}
 }
-''', 'testMethod')
+''').getRequiredMethod("testMethod").getAnnotationMetadata()
 
         expect:
         metadata != null
@@ -456,27 +459,32 @@ class Test {
         AnnotationMetadata metadata = buildMethodAnnotationMetadata("test.Test",'''\
 package test;
 
+import java.lang.annotation.*;
+
 class Test implements ITest {
     @Override
     public void testMethod() {}
 }
 
 interface ITest {
-    @io.micronaut.context.annotation.Primary
+    @MyAnn
     void testMethod(); 
 }
+
+@io.micronaut.context.annotation.Primary
+@Retention(RetentionPolicy.RUNTIME)
+@Inherited
+@interface MyAnn {}
 ''', 'testMethod')
 
         expect:
         metadata != null
         !metadata.hasDeclaredAnnotation(Primary)
-        !metadata.hasDeclaredAnnotation(Singleton)
-        metadata.hasAnnotation(Primary)
-        metadata.hasStereotype(Qualifier)
+        !metadata.hasDeclaredAnnotation(AnnotationUtil.SINGLETON)
+        !metadata.hasAnnotation(Primary)
         metadata.hasStereotype(Primary)
-        !metadata.hasDeclaredStereotype(Primary)
-        !metadata.hasDeclaredStereotype(Qualifier)
-        !metadata.hasStereotype(Singleton)
+        metadata.hasStereotype(AnnotationUtil.QUALIFIER)
+        !metadata.hasStereotype(AnnotationUtil.SINGLETON)
     }
 
     void "test array annotation value"() {

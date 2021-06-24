@@ -1,12 +1,12 @@
 package io.micronaut.inject.annotation
 
-import groovy.test.NotYetImplemented
+
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.Intercepted
 import io.micronaut.context.annotation.Prototype
+import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.AnnotationUtil
-import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
 
@@ -28,9 +28,13 @@ class Test {
 ''')
         expect:
         definition.hasDeclaredAnnotation(AnnotationUtil.SINGLETON)
-        definition.hasDeclaredStereotype(AnnotationUtil.SCOPE)
         definition.hasDeclaredAnnotation(AnnotationUtil.NAMED)
+        definition.hasDeclaredStereotype(AnnotationUtil.SCOPE)
         definition.hasDeclaredStereotype(AnnotationUtil.QUALIFIER)
+        definition.hasAnnotation(AnnotationUtil.SINGLETON)
+        definition.hasAnnotation(AnnotationUtil.NAMED)
+        definition.hasStereotype(AnnotationUtil.SCOPE)
+        definition.hasStereotype(AnnotationUtil.QUALIFIER)
         definition.scopeName.isPresent()
         definition.scopeName.get() == AnnotationUtil.SINGLETON
         definition.declaredQualifier
@@ -80,7 +84,7 @@ class ParentFactory {
         !definition.scopeName.isPresent()
 
         and:"The requirements include the ones from the child factory and child method but not from the parent factory and parent method"
-        def requiresProperties = definition.getDeclaredAnnotationValuesByType(Requires)
+        def requiresProperties = definition.getAnnotationValuesByType(Requires)
                 .collect { it.stringValue("property").orElse(null) }
         requiresProperties.size() == 2
         requiresProperties.contains("test.method.bar")
@@ -136,6 +140,9 @@ class Parent {
         and:"But doesn't inherit the qualifier"
         !definition.hasDeclaredAnnotation(AnnotationUtil.NAMED)
         !definition.hasDeclaredStereotype(AnnotationUtil.QUALIFIER)
+        !definition.hasAnnotation(AnnotationUtil.NAMED)
+        !definition.hasAnnotation(AnnotationUtil.QUALIFIER)
+
 
         and:"The scope is correctly resolved"
         definition.scopeName.isPresent()
@@ -145,6 +152,7 @@ class Parent {
         definition.declaredQualifier == null
 
         and:"The requirements are not inherited"
+        !definition.hasAnnotation(Requirements)
         definition.getDeclaredAnnotationValuesByType(Requires).size() == 0
     }
 
@@ -307,11 +315,10 @@ class Parent {
         context.close()
     }
 
-
     void "test inherited scopes, qualifiers & requirements with @Inherited on stereotype"() {
         given:
-        def definition = buildBeanDefinition('anntest.Test', '''
-package anntest;
+        def definition = buildBeanDefinition('anntest5.Test', '''
+package anntest5;
 
 import jakarta.inject.*;
 import io.micronaut.context.annotation.Requires;
@@ -333,22 +340,29 @@ class Parent {
 @interface MyAnn {}
 ''')
         expect:"inherits the stereotype annotation as a declared annotation"
-        definition.hasDeclaredAnnotation('anntest.MyAnn')
+        definition.hasAnnotation('anntest5.MyAnn')
+        !definition.hasDeclaredAnnotation('anntest5.MyAnn')
 
-        and:"inherits any scopes as declared stereotypes"
-        definition.hasDeclaredStereotype(AnnotationUtil.SINGLETON)
-        definition.hasDeclaredStereotype(AnnotationUtil.SCOPE)
+        and:"inherits any scopes as annotation stereotypes"
+        definition.hasStereotype(AnnotationUtil.SINGLETON)
+        definition.hasStereotype(AnnotationUtil.SCOPE)
 
-        and:"but not as declared annotations"
+        and:"they are not declared annotation stereotypes"
+        !definition.hasDeclaredStereotype(AnnotationUtil.SINGLETON)
+        !definition.hasDeclaredStereotype(AnnotationUtil.SCOPE)
+
+        and:"and not declared annotations"
         !definition.hasDeclaredAnnotation(AnnotationUtil.SINGLETON)
 
-        and:"inherits any qualifiers as declared stereotypes"
-        definition.hasDeclaredStereotype(AnnotationUtil.NAMED)
-        definition.hasDeclaredStereotype(AnnotationUtil.QUALIFIER)
+        and:"inherits any qualifiers as stereotypes"
+        definition.hasStereotype(AnnotationUtil.NAMED)
+        definition.hasStereotype(AnnotationUtil.QUALIFIER)
 
-        and:"but not as declared annotations"
+        and:"but not as declared annotations or stereotyes"
         !definition.hasDeclaredAnnotation(AnnotationUtil.NAMED)
         !definition.hasDeclaredAnnotation(AnnotationUtil.QUALIFIER)
+        !definition.hasDeclaredStereotype(AnnotationUtil.NAMED)
+        !definition.hasDeclaredStereotype(AnnotationUtil.QUALIFIER)
 
         and:"The declared qualifier resolves correctly"
         definition.declaredQualifier
@@ -358,8 +372,11 @@ class Parent {
         definition.scopeName.isPresent()
         definition.scopeName.get() == AnnotationUtil.SINGLETON
 
-        and:"requirements are inherited from the stereotype as declared requirements"
-        definition.getDeclaredAnnotationValuesByType(Requires).size() == 1
+        and:"requirements are inherited from the stereotype as annotations"
+        definition.getAnnotationValuesByType(Requires).size() == 1
+
+        and:"and not as declared annotations"
+        definition.getDeclaredAnnotationValuesByType(Requires).size() == 0
     }
 
     void "test inherited scopes and qualifiers with @Inherited"() {
@@ -391,17 +408,23 @@ class Parent {
 @jakarta.inject.Scope
 @interface MyS {}
 ''')
-        expect:"inherits annotations declared @Inherited"
-        definition.hasDeclaredAnnotation("anntest.MyQ")
-        definition.hasDeclaredAnnotation("anntest.MyS")
+        expect:"inherits annotations with @Inherited"
+        definition.hasAnnotation("anntest.MyQ")
+        definition.hasAnnotation("anntest.MyS")
+        !definition.hasDeclaredAnnotation("anntest.MyQ")
+        !definition.hasDeclaredAnnotation("anntest.MyS")
 
         and:"inherits stereotypes on @Inherited annotations as declared stereotypes"
-        definition.hasDeclaredStereotype(AnnotationUtil.SCOPE)
-        definition.hasDeclaredStereotype(AnnotationUtil.QUALIFIER)
+        !definition.hasDeclaredStereotype(AnnotationUtil.SCOPE)
+        !definition.hasDeclaredStereotype(AnnotationUtil.QUALIFIER)
+        definition.hasStereotype(AnnotationUtil.SCOPE)
+        definition.hasStereotype(AnnotationUtil.QUALIFIER)
 
         and:"but not as declared annotations"
         !definition.hasDeclaredAnnotation(AnnotationUtil.SCOPE)
         !definition.hasDeclaredAnnotation(AnnotationUtil.QUALIFIER)
+        !definition.hasAnnotation(AnnotationUtil.SCOPE)
+        !definition.hasAnnotation(AnnotationUtil.QUALIFIER)
 
         and:"The declared qualifier resolves to the correct one"
         definition.declaredQualifier
@@ -413,6 +436,7 @@ class Parent {
 
         and:"Requirements are not inherited "
         definition.getDeclaredAnnotationValuesByType(Requires).size() == 0
+        definition.getAnnotationValuesByType(Requires).size() == 0
     }
 
 
@@ -460,16 +484,22 @@ class ParentFactory {
         BeanDefinition definition = classLoader.loadClass('anntest.$TestFactory$Test0Definition').newInstance()
 
         expect:"inherits annotations declared @Inherited"
-        definition.hasDeclaredAnnotation("anntest.MyQ")
-        definition.hasDeclaredAnnotation("anntest.MyS")
+        definition.hasAnnotation("anntest.MyQ")
+        definition.hasAnnotation("anntest.MyS")
+
+        and:"they are not declared annotations"
+        !definition.hasDeclaredAnnotation("anntest.MyQ")
+        !definition.hasDeclaredAnnotation("anntest.MyS")
 
         and:"inherits stereotypes on @Inherited annotations as declared stereotypes"
-        definition.hasDeclaredStereotype(AnnotationUtil.SCOPE)
-        definition.hasDeclaredStereotype(AnnotationUtil.QUALIFIER)
+        definition.hasStereotype(AnnotationUtil.SCOPE)
+        definition.hasStereotype(AnnotationUtil.QUALIFIER)
 
-        and:"but not as declared annotations"
+        and:"but not as declared annotations or stereotypes"
         !definition.hasDeclaredAnnotation(AnnotationUtil.SCOPE)
         !definition.hasDeclaredAnnotation(AnnotationUtil.QUALIFIER)
+        !definition.hasDeclaredStereotype(AnnotationUtil.SCOPE)
+        !definition.hasDeclaredStereotype(AnnotationUtil.QUALIFIER)
 
         and:"The declared qualifier resolves to the correct one"
         definition.declaredQualifier
@@ -480,7 +510,7 @@ class ParentFactory {
         definition.scopeName.get() == "anntest.MyS"
 
         and:"Requirements are not inherited "
-        definition.getDeclaredAnnotationValuesByType(Requires).size() == 0
+        definition.getAnnotationValuesByType(Requires).size() == 0
     }
 
     void "test inherited scopes, qualifiers & requirements with @Inherited on stereotype for factory method"() {
@@ -527,21 +557,26 @@ class ParentFactory {
 ''')
         BeanDefinition definition = classLoader.loadClass('anntest.$TestFactory$Test0Definition').newInstance()
 
-        expect:"inherits the stereotype annotation as a declared annotation"
-        definition.hasDeclaredAnnotation('anntest.MyAnn')
+        expect:"inherits the stereotype annotation as an annotation"
+        definition.hasAnnotation('anntest.MyAnn')
 
-        and:"inherits any scopes as declared stereotypes"
-        definition.hasDeclaredStereotype(AnnotationUtil.SINGLETON)
-        definition.hasDeclaredStereotype(AnnotationUtil.SCOPE)
+        and:"inherits any scopes as stereotypes"
+        definition.hasStereotype(AnnotationUtil.SINGLETON)
+        definition.hasStereotype(AnnotationUtil.SCOPE)
 
         and:"but not as declared annotations"
         !definition.hasDeclaredAnnotation(AnnotationUtil.SINGLETON)
+        !definition.hasDeclaredAnnotation('anntest.MyAnn')
+        !definition.hasDeclaredStereotype(AnnotationUtil.SINGLETON)
+        !definition.hasDeclaredStereotype(AnnotationUtil.SCOPE)
 
-        and:"inherits any qualifiers as declared stereotypes"
-        definition.hasDeclaredStereotype(AnnotationUtil.NAMED)
-        definition.hasDeclaredStereotype(AnnotationUtil.QUALIFIER)
+        and:"inherits any qualifiers as stereotypes"
+        definition.hasStereotype(AnnotationUtil.NAMED)
+        definition.hasStereotype(AnnotationUtil.QUALIFIER)
 
-        and:"but not as declared annotations"
+        and:"but not as declared annotations or stereotypes"
+        !definition.hasDeclaredStereotype(AnnotationUtil.NAMED)
+        !definition.hasDeclaredStereotype(AnnotationUtil.QUALIFIER)
         !definition.hasDeclaredAnnotation(AnnotationUtil.NAMED)
         !definition.hasDeclaredAnnotation(AnnotationUtil.QUALIFIER)
 
@@ -553,8 +588,9 @@ class ParentFactory {
         definition.scopeName.isPresent()
         definition.scopeName.get() == AnnotationUtil.SINGLETON
 
-        and:"requirements are inherited from the stereotype as declared requirements"
-        definition.getDeclaredAnnotationValuesByType(Requires).size() == 1
+        and:"requirements are inherited from the stereotype as requirements but not declared requirements"
+        definition.getAnnotationValuesByType(Requires).size() == 1
+        definition.getDeclaredAnnotationValuesByType(Requires).size() == 0
     }
 
     void "test inherited scopes, qualifiers & requirements on types on bean from factory method"() {
