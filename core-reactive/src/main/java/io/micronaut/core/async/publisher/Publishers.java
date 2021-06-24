@@ -63,7 +63,6 @@ public class Publishers {
         COMPLETABLE_TYPES.add(Completable.class);
         List<String> typeNames = Arrays.asList(
             "io.reactivex.Observable",
-            "reactor.core.publisher.Mono",
             "reactor.core.publisher.Flux",
             "kotlinx.coroutines.flow.Flow",
             "io.reactivex.rxjava3.core.Flowable",
