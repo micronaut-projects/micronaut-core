@@ -1109,14 +1109,15 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             if (StringUtils.isNotEmpty(destroyMethodName)) {
                                 TypeElement destroyMethodDeclaringClass = (TypeElement) typeUtils.asElement(producedType);
                                 ClassElement destroyMethodDeclaringElement = elementFactory.newClassElement(destroyMethodDeclaringClass, AnnotationMetadata.EMPTY_METADATA);
-                                final Optional<ExecutableElement> destroyMethodRef = modelUtils.findAccessibleNoArgumentInstanceMethod(destroyMethodDeclaringClass, destroyMethodName);
-                                if (destroyMethodRef.isPresent()) {
-                                    ExecutableElement executableElement = destroyMethodRef.get();
-                                    MethodElement destroyMethodElement = elementFactory.newMethodElement(
-                                            declaringClassElement,
-                                            executableElement,
-                                            AnnotationMetadata.EMPTY_METADATA
-                                    );
+                                final Optional<MethodElement> destroyMethod = destroyMethodDeclaringElement.getEnclosedElement(
+                                        ElementQuery.ALL_METHODS
+                                                .onlyAccessible(concreteClassElement)
+                                                .onlyInstance()
+                                                .named((name) -> name.equals(destroyMethodName))
+                                                .filter((e) -> !e.hasParameters())
+                                );
+                                if (destroyMethod.isPresent()) {
+                                    MethodElement destroyMethodElement = destroyMethod.get();
                                     beanMethodWriter.visitPreDestroyMethod(
                                             destroyMethodDeclaringElement,
                                             destroyMethodElement,

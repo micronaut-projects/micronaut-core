@@ -375,19 +375,6 @@ public class ModelUtils {
     }
 
     /**
-     * Finds a no argument method of the given name.
-     *
-     * @param classElement The class element
-     * @param methodName The method name
-     * @return The executable element
-     */
-    Optional<ExecutableElement> findAccessibleNoArgumentInstanceMethod(TypeElement classElement, String methodName) {
-        return ElementFilter.methodsIn(elementUtils.getAllMembers(classElement))
-                .stream().filter(m -> m.getSimpleName().toString().equals(methodName) && !isPrivate(m) && !isStatic(m))
-                .findFirst();
-    }
-
-    /**
      * Obtains the super type element for a given type element.
      *
      * @param element The type element
