@@ -15,15 +15,12 @@
  */
 package io.micronaut.reactive.rxjava2.http.client;
 
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.HttpClient;
 import io.reactivex.Flowable;
-
-import java.net.URL;
 
 /**
  * Extended version of {@link HttpClient} that exposes an RxJava 2.x specific interface.

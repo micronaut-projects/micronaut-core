@@ -30,7 +30,7 @@ import io.micronaut.http.client.sse.SseClient;
  * @author graemerocher
  * @since 2.0
  * @param <T> Reactive HTTP Client
- * @param <E> Reactive Server Side Event HTTP Client
+ * @param <E> Reactive Server Sent Events HTTP Client
  * @param <S> Reactive Streaming HTTP Client
  */
 @Internal

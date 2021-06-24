@@ -44,7 +44,8 @@ class BridgedRxHttpClient implements RxHttpClient, RxSseClient, RxStreamingHttpC
     /**
      * Default constructor.
      * @param httpClient The target client
-     * @param sseClient SseClient
+     * @param sseClient Server Sent Events HTTP Client
+     * @param streamingHttpClient Streaming HTTP Client
      */
     BridgedRxHttpClient(HttpClient httpClient,
                         SseClient sseClient,
