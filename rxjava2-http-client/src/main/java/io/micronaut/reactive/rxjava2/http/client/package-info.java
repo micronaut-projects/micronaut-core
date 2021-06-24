@@ -13,20 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.reactive.rxjava.http.client;
-
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.client.ProxyHttpClient;
-import io.reactivex.Flowable;
-
 /**
- * Extended version of {@link ProxyHttpClient} for RxJava 2.
+ * RxJava 2 HTTP Client related classes.
  *
  * @author graemerocher
- * @since 2.0.0
+ * @since 1.0
  */
-public interface RxProxyHttpClient extends ProxyHttpClient {
-    @Override
-    Flowable<MutableHttpResponse<?>> proxy(HttpRequest<?> request);
-}
+package io.micronaut.reactive.rxjava2.http.client;
+
