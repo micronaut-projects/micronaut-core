@@ -1,6 +1,7 @@
 package io.micronaut.http.client;
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
@@ -18,15 +19,13 @@ import spock.util.concurrent.PollingConditions
 import java.lang.reflect.Field
 
 @Retry
-@Ignore
+@Ignore(" https://github.com/micronaut-projects/micronaut-core/issues/5554")
 class IdleTimeoutSpec extends Specification {
 
-  @Shared
   @AutoCleanup
-  ApplicationContext context = ApplicationContext.run()
-
   @Shared
-  EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+  EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'IdleTimeoutSpec'])
+
 
   def "should close connection according to connection-pool-idle-timeout"() {
     setup:
