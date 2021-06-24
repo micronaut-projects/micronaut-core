@@ -164,7 +164,6 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.Signal;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
@@ -766,10 +765,10 @@ public class DefaultHttpClient implements
                         HttpResponse<ByteBuffer<?>> responseBuffer = signal.get();
                         if (responseBuffer != null) {
                             ByteBuffer<?> buffer = responseBuffer.body();
-                            if (buffer instanceof ReferenceCounted) {
+                            //if (buffer instanceof ReferenceCounted) {
                                 //TODO with RxJava this was done with doAfterNext
                                 //((ReferenceCounted) buffer).release();
-                            }
+                            //}
                         }
                     }
                 });
