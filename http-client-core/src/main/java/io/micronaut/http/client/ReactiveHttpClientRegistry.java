@@ -20,17 +20,21 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpVersion;
+import io.micronaut.http.client.sse.SseClient;
 
 /**
  * Internal interface for managing the construction and lifecycle of instances of reactive clients.
  * Classes which extends from {@link HttpClient}.
  *
+ * @author Sergio del Amo
  * @author graemerocher
  * @since 2.0
- * @param <ReactiveClient> Reactive HTTP Client
+ * @param <T> Reactive HTTP Client
+ * @param <E> Reactive Server Side Event HTTP Client
+ * @param <S> Reactive Streaming HTTP Client
  */
 @Internal
-public interface ReactiveHttpClientRegistry<ReactiveClient extends HttpClient> {
+public interface ReactiveHttpClientRegistry<T extends HttpClient, E extends SseClient, S extends StreamingHttpClient> {
 
     /**
      * Return the client for the client ID and path.
@@ -41,7 +45,7 @@ public interface ReactiveHttpClientRegistry<ReactiveClient extends HttpClient> {
      * @return The client
      */
     @NonNull
-    ReactiveClient getClient(HttpVersion httpVersion, @NonNull String clientId, @Nullable String path);
+    T getClient(HttpVersion httpVersion, @NonNull String clientId, @Nullable String path);
 
     /**
      * Return the client for the given annotation metadata.
@@ -50,7 +54,25 @@ public interface ReactiveHttpClientRegistry<ReactiveClient extends HttpClient> {
      * @return The client
      */
     @NonNull
-    ReactiveClient getClient(@NonNull AnnotationMetadata annotationMetadata);
+    T getClient(@NonNull AnnotationMetadata annotationMetadata);
+
+    /**
+     * Return the client for the given annotation metadata.
+     *
+     * @param annotationMetadata The annotation metadata.
+     * @return The client
+     */
+    @NonNull
+    E getSseClient(@NonNull AnnotationMetadata annotationMetadata);
+
+    /**
+     * Return the client for the given annotation metadata.
+     *
+     * @param annotationMetadata The annotation metadata.
+     * @return The client
+     */
+    @NonNull
+    S getStreamingClient(@NonNull AnnotationMetadata annotationMetadata);
 
     /**
      * Dispose of the client defined by the given metadata.
@@ -62,8 +84,21 @@ public interface ReactiveHttpClientRegistry<ReactiveClient extends HttpClient> {
     /**
      * @return Return the default HTTP client.
      */
-    default ReactiveClient getDefaultClient() {
+    default T getDefaultClient() {
         return getClient(AnnotationMetadata.EMPTY_METADATA);
     }
 
+    /**
+     * @return Return the default Sse HTTP client.
+     */
+    default E getDefaultSseClient() {
+        return getSseClient(AnnotationMetadata.EMPTY_METADATA);
+    }
+
+    /**
+     * @return Return the default Streaming HTTP client.
+     */
+    default S getDefaultStreamingClient() {
+        return getStreamingClient(AnnotationMetadata.EMPTY_METADATA);
+    }
 }

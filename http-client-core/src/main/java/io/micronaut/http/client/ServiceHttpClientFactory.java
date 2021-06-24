@@ -29,6 +29,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.client.sse.ReactorSseClient;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
 import io.micronaut.scheduling.TaskScheduler;
 import reactor.core.publisher.Flux;
@@ -51,7 +52,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class ServiceHttpClientFactory {
 
     private final TaskScheduler taskScheduler;
-    private final BeanProvider<ReactiveHttpClientRegistry<ReactorHttpClient>> clientFactory;
+    private final BeanProvider<ReactiveHttpClientRegistry<ReactorHttpClient, ReactorSseClient, ReactorStreamingHttpClient>> clientFactory;
 
     /**
      * Default constructor.
@@ -61,7 +62,7 @@ public class ServiceHttpClientFactory {
      */
     public ServiceHttpClientFactory(
             TaskScheduler taskScheduler,
-            BeanProvider<ReactiveHttpClientRegistry<ReactorHttpClient>> clientFactory) {
+            BeanProvider<ReactiveHttpClientRegistry<ReactorHttpClient, ReactorSseClient, ReactorStreamingHttpClient>> clientFactory) {
         this.taskScheduler = taskScheduler;
         this.clientFactory = clientFactory;
     }

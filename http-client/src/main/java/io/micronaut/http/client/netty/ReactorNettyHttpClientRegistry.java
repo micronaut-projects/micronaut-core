@@ -47,6 +47,7 @@ import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
+import io.micronaut.http.client.sse.ReactorSseClient;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
@@ -89,7 +90,7 @@ import java.util.concurrent.ThreadFactory;
 @Factory
 @BootstrapContextCompatible
 @Internal
-public class ReactorNettyHttpClientRegistry implements AutoCloseable, ReactiveHttpClientRegistry<ReactorHttpClient> {
+public class ReactorNettyHttpClientRegistry implements AutoCloseable, ReactiveHttpClientRegistry<ReactorHttpClient, ReactorSseClient, ReactorStreamingHttpClient> {
     private static final Logger LOG = LoggerFactory.getLogger(ReactorNettyHttpClientRegistry.class);
     private final Map<ClientKey, DefaultHttpClient> clients = new ConcurrentHashMap<>(10);
     private final LoadBalancerResolver loadBalancerResolver;
@@ -160,6 +161,18 @@ public class ReactorNettyHttpClientRegistry implements AutoCloseable, ReactiveHt
     public DefaultHttpClient getClient(@NonNull AnnotationMetadata metadata) {
         final ClientKey key = getClientKey(metadata);
         return getClient(key, beanContext, metadata);
+    }
+
+    @Override
+    @NonNull
+    public DefaultHttpClient getSseClient(@NonNull AnnotationMetadata metadata) {
+        return getClient(metadata);
+    }
+
+    @Override
+    @NonNull
+    public DefaultHttpClient getStreamingClient(@NonNull AnnotationMetadata metadata) {
+        return getClient(metadata);
     }
 
     @Override
