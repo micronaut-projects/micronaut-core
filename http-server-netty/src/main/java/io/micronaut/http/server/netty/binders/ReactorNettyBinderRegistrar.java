@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,6 @@
  */
 package io.micronaut.http.server.netty.binders;
 
-import io.micronaut.context.BeanLocator;
-import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
@@ -24,65 +22,40 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.bind.RequestBinderRegistry;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
-import io.micronaut.http.server.netty.multipart.MultipartBodyArgumentBinder;
 import jakarta.inject.Singleton;
-import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 /**
- * A binder registrar that requests Netty related binders.
- *
- * @author graemerocher
- * @since 2.0.0
+ * Adds  Project Reactor request argument binders.
+ * @author Sergio del Amo
+ * @since 3.0.0
  */
 @Singleton
 @Internal
-@Requires(classes = Flux.class)
-class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegistry> {
+@Requires(classes = Mono.class)
+class ReactorNettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegistry> {
     private final ConversionService<?> conversionService;
     private final HttpContentProcessorResolver httpContentProcessorResolver;
-    private final BeanLocator beanLocator;
-    private final BeanProvider<HttpServerConfiguration> httpServerConfiguration;
 
     /**
      * Default constructor.
      *
      * @param conversionService            The conversion service
      * @param httpContentProcessorResolver The processor resolver
-     * @param beanLocator                  The bean locator
-     * @param httpServerConfiguration      The server config
      */
-    NettyBinderRegistrar(
+    ReactorNettyBinderRegistrar(
             @Nullable ConversionService<?> conversionService,
-            HttpContentProcessorResolver httpContentProcessorResolver,
-            BeanLocator beanLocator,
-            BeanProvider<HttpServerConfiguration> httpServerConfiguration) {
+            HttpContentProcessorResolver httpContentProcessorResolver) {
         this.conversionService = conversionService == null ? ConversionService.SHARED : conversionService;
         this.httpContentProcessorResolver = httpContentProcessorResolver;
-        this.beanLocator = beanLocator;
-        this.httpServerConfiguration = httpServerConfiguration;
     }
 
     @Override
     public RequestBinderRegistry onCreated(BeanCreatedEvent<RequestBinderRegistry> event) {
         RequestBinderRegistry registry = event.getBean();
-        registry.addRequestArgumentBinder(
-                new BasicAuthArgumentBinder()
-        );
-        registry.addRequestArgumentBinder(new PublisherBodyBinder(
+        registry.addRequestArgumentBinder(new MonoBodyBinder(
                 conversionService,
-                httpContentProcessorResolver
-        ));
-        registry.addRequestArgumentBinder(new CompletableFutureBodyBinder(
-                httpContentProcessorResolver,
-                conversionService
-        ));
-        registry.addRequestArgumentBinder(new MultipartBodyArgumentBinder(
-                beanLocator,
-                httpServerConfiguration
-        ));
-        registry.addRequestArgumentBinder(new InputStreamBodyBinder(
                 httpContentProcessorResolver
         ));
         return registry;
