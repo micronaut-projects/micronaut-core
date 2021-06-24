@@ -12,7 +12,7 @@ class PreDestroyOnBeanAnnotationSpec extends AbstractTypeElementSpec {
     void "test pre destroy with method overloading"() {
         given:
         ApplicationContext context = buildContext('test.TestFactory$TestBean', '''\
-package test;
+package test5652;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
@@ -44,7 +44,7 @@ class Foo {}
 ''')
 
         when:
-        def bean = getBean(context, 'test.Test')
+        def bean = getBean(context, 'test5652.Test')
 
         then:
         bean != null
@@ -54,7 +54,7 @@ class Foo {}
 
         then:
         bean.closed
-        bean != getBean(context, 'test.Test')
+        bean != getBean(context, 'test5652.Test')
 
         cleanup:
         context.close()
