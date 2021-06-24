@@ -315,7 +315,7 @@ class UploadSpec extends AbstractMicronautSpec {
         result == 'data.json: 16'
     }
 
-    @Ignore("It does not throw an error anymore")
+    @Ignore("https://github.com/micronaut-projects/micronaut-core/issues/5554")
     void "test the error condition using a single"() {
         given:
         def data = '{"title":"Test"}'
