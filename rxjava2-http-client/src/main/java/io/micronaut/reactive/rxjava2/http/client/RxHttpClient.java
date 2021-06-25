@@ -34,7 +34,7 @@ import java.net.URL;
  */
 public interface RxHttpClient extends HttpClient {
 
-       @Override
+    @Override
     default <I, O> Flowable<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType) {
         return Flowable.fromPublisher(HttpClient.super.exchange(request, bodyType));
     }
@@ -99,7 +99,6 @@ public interface RxHttpClient extends HttpClient {
         );
     }
 
-
     /**
      * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of a
      * Micronaut application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead.
@@ -109,7 +108,6 @@ public interface RxHttpClient extends HttpClient {
      */
     static RxHttpClient create(@Nullable URL url) {
         return new BridgedRxHttpClient(HttpClient.create(url),
-                HttpClient.createSseClient(url),
                 HttpClient.createStreamingClient(url));
     }
 
@@ -124,7 +122,6 @@ public interface RxHttpClient extends HttpClient {
      */
     static RxHttpClient create(@Nullable URL url, HttpClientConfiguration configuration) {
         return new BridgedRxHttpClient(HttpClient.create(url, configuration),
-                HttpClient.createSseClient(url, configuration),
                 HttpClient.createStreamingClient(url, configuration));
     }
 }

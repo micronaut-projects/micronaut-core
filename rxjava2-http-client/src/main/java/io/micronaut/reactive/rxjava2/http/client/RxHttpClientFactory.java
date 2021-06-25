@@ -42,20 +42,47 @@ public class RxHttpClientFactory {
     }
 
     /**
-     * Injects a client at the given injection point.
+     * Injects a {@link RxHttpClient} client at the given injection point.
      * @param injectionPoint The injection point
      * @return The client
      */
     @Bean
     @Secondary
     protected RxHttpClient httpClient(@Nullable InjectionPoint<?> injectionPoint) {
+        return instantiateBridgedRxHttpClient(injectionPoint);
+    }
+
+    /**
+     * Injects a {@link RxStreamingHttpClient} client at the given injection point.
+     * @param injectionPoint The injection point
+     * @return The client
+     */
+    @Bean
+    @Secondary
+    protected RxStreamingHttpClient streamingHttpClient(@Nullable InjectionPoint<?> injectionPoint) {
+        return instantiateBridgedRxHttpClient(injectionPoint);
+    }
+
+    /**
+     * Injects a {@link RxStreamingHttpClient} client at the given injection point.
+     * @param injectionPoint The injection point
+     * @return The client
+     */
+    @Bean
+    @Secondary
+    protected RxSseClient sseHttpClient(@Nullable InjectionPoint<?> injectionPoint) {
+        if (injectionPoint != null) {
+            return new BridgedRxSseClient(clientRegistry.getSseClient(injectionPoint.getAnnotationMetadata()));
+        }
+        return new BridgedRxSseClient(clientRegistry.getDefaultSseClient());
+    }
+
+    private BridgedRxHttpClient instantiateBridgedRxHttpClient(@Nullable InjectionPoint<?> injectionPoint) {
         if (injectionPoint != null) {
             return new BridgedRxHttpClient(clientRegistry.getClient(injectionPoint.getAnnotationMetadata()),
-                    clientRegistry.getSseClient(injectionPoint.getAnnotationMetadata()),
                     clientRegistry.getStreamingClient(injectionPoint.getAnnotationMetadata()));
         }
         return new BridgedRxHttpClient(clientRegistry.getDefaultClient(),
-                    clientRegistry.getDefaultSseClient(),
-                    clientRegistry.getDefaultStreamingClient());
+                clientRegistry.getDefaultStreamingClient());
     }
 }

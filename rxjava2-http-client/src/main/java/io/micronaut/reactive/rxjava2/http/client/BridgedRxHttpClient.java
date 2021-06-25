@@ -23,37 +23,31 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.StreamingHttpClient;
-import io.micronaut.http.client.sse.SseClient;
-import io.micronaut.http.sse.Event;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
 import java.util.Map;
 
 /**
- * Internal bridge for the HTTP client.
+ * Internal bridge for the {@link HttpClient} and {@link StreamingHttpClient}.
  *
- * @author Serigo del Amo
+ * @author Sergio del Amo
  * @since 3.0.0
  */
 @Internal
-class BridgedRxHttpClient implements RxHttpClient, RxSseClient, RxStreamingHttpClient {
+class BridgedRxHttpClient implements RxHttpClient, RxStreamingHttpClient {
 
     private final HttpClient httpClient;
-    private final SseClient sseClient;
     private final StreamingHttpClient streamingHttpClient;
 
     /**
      * Default constructor.
      * @param httpClient The target client
-     * @param sseClient Server Sent Events HTTP Client
      * @param streamingHttpClient Streaming HTTP Client
      */
     BridgedRxHttpClient(HttpClient httpClient,
-                        SseClient sseClient,
                         StreamingHttpClient streamingHttpClient) {
         this.httpClient = httpClient;
-        this.sseClient = sseClient;
         this.streamingHttpClient = streamingHttpClient;
     }
 
@@ -120,31 +114,6 @@ class BridgedRxHttpClient implements RxHttpClient, RxSseClient, RxStreamingHttpC
     @Override
     public boolean isRunning() {
         return httpClient.isRunning();
-    }
-
-    @Override
-    public <I> Flowable<Event<ByteBuffer<?>>> eventStream(HttpRequest<I> request) {
-        return Flowable.fromPublisher(sseClient.eventStream(request));
-    }
-
-    @Override
-    public <I, B> Flowable<Event<B>> eventStream(HttpRequest<I> request, Argument<B> eventType) {
-        return Flowable.fromPublisher(sseClient.eventStream(request, eventType));
-    }
-
-    @Override
-    public <I, B> Flowable<Event<B>> eventStream(HttpRequest<I> request, Class<B> eventType) {
-        return Flowable.fromPublisher(sseClient.eventStream(request, eventType));
-    }
-
-    @Override
-    public <B> Flowable<Event<B>> eventStream(String uri, Class<B> eventType) {
-        return Flowable.fromPublisher(sseClient.eventStream(uri, eventType));
-    }
-
-    @Override
-    public <B> Flowable<Event<B>> eventStream(String uri, Argument<B> eventType) {
-        return Flowable.fromPublisher(sseClient.eventStream(uri, eventType));
     }
 
     @Override

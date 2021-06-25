@@ -16,7 +16,6 @@
 package io.micronaut.http.client;
 
 import io.micronaut.context.LifeCycle;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -40,7 +39,6 @@ import java.util.Optional;
  * @since 1.0
  */
 public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
-
     /**
      * The default error type.
      */
@@ -302,7 +300,4 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
     static StreamingHttpClient createStreamingClient(@Nullable URL url, HttpClientConfiguration configuration) {
         return HttpClientConfiguration.createStreamingClient(url, configuration);
     }
-
-
-
 }

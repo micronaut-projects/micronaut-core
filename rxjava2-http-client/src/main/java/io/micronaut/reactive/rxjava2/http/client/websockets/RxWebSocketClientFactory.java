@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.reactor.http.client;
+package io.micronaut.reactive.rxjava2.http.client.websockets;
 
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
@@ -23,51 +23,34 @@ import io.micronaut.http.client.ReactiveHttpClientRegistry;
 import io.micronaut.inject.InjectionPoint;
 
 /**
- * Factory interface for creating clients.
- *
+ * Factory interface for creating RxJava 2 {@link io.micronaut.websocket.WebSocketClient}.
+
  * @author Sergio del Amo
- * @since 2.0
+ * @since 3.0.0
  */
 @Factory
-public class ReactorHttpClientFactory {
-
+public class RxWebSocketClientFactory {
     private final ReactiveHttpClientRegistry<?, ?, ?, ?> clientRegistry;
 
     /**
      * Default constructor.
      * @param clientRegistry The client registry
      */
-    public ReactorHttpClientFactory(ReactiveHttpClientRegistry<?, ?, ?, ?> clientRegistry) {
+    public RxWebSocketClientFactory(ReactiveHttpClientRegistry<?, ?, ?, ?> clientRegistry) {
         this.clientRegistry = clientRegistry;
     }
 
     /**
-     * Injects a client at the given injection point.
+     * Injects a {@link RxWebSocketClient} client at the given injection point.
      * @param injectionPoint The injection point
      * @return The client
      */
     @Bean
     @Secondary
-    protected ReactorHttpClient httpClient(@Nullable InjectionPoint<?> injectionPoint) {
+    protected RxWebSocketClient webSocketClient(@Nullable InjectionPoint<?> injectionPoint) {
         if (injectionPoint != null) {
-            return new BridgedReactorHttpClient(clientRegistry.getClient(injectionPoint.getAnnotationMetadata()),
-                    clientRegistry.getStreamingClient(injectionPoint.getAnnotationMetadata()));
+            return new BridgedRxWebSocketClient(clientRegistry.getWebSocketClient(injectionPoint.getAnnotationMetadata()));
         }
-        return new BridgedReactorHttpClient(clientRegistry.getDefaultClient(),
-                    clientRegistry.getDefaultStreamingClient());
-    }
-
-    /**
-     * Injects a client at the given injection point.
-     * @param injectionPoint The injection point
-     * @return The client
-     */
-    @Bean
-    @Secondary
-    protected ReactorSseClient sseClient(@Nullable InjectionPoint<?> injectionPoint) {
-        if (injectionPoint != null) {
-            return new BridgedReactorSseClient(clientRegistry.getSseClient(injectionPoint.getAnnotationMetadata()));
-        }
-        return new BridgedReactorSseClient(clientRegistry.getDefaultSseClient());
+        return new BridgedRxWebSocketClient(clientRegistry.getDefaultWebSocketClient());
     }
 }

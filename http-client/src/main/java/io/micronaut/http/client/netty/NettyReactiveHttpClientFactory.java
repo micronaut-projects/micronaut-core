@@ -21,6 +21,7 @@ import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.ReactiveHttpClientFactory;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.sse.SseClient;
+import io.micronaut.websocket.WebSocketClient;
 
 import java.net.URL;
 
@@ -31,7 +32,7 @@ import java.net.URL;
  * @since 2.0
  */
 @Internal
-public class NettyReactiveHttpClientFactory implements ReactiveHttpClientFactory<HttpClient, SseClient, StreamingHttpClient> {
+public class NettyReactiveHttpClientFactory implements ReactiveHttpClientFactory<HttpClient, SseClient, StreamingHttpClient, WebSocketClient> {
     @Override
     public HttpClient createClient(URL url) {
         return new DefaultHttpClient(url);
@@ -59,6 +60,16 @@ public class NettyReactiveHttpClientFactory implements ReactiveHttpClientFactory
 
     @Override
     public SseClient createSseClient(URL url, HttpClientConfiguration configuration) {
+        return new DefaultHttpClient(url, configuration);
+    }
+
+    @Override
+    public WebSocketClient createWebSocketClient(URL url) {
+        return new DefaultHttpClient(url);
+    }
+
+    @Override
+    public WebSocketClient createWebSocketClient(URL url, HttpClientConfiguration configuration) {
         return new DefaultHttpClient(url, configuration);
     }
 }

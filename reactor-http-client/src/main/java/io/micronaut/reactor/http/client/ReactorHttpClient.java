@@ -15,7 +15,6 @@
  */
 package io.micronaut.reactor.http.client;
 
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
@@ -23,10 +22,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
-import io.micronaut.http.client.StreamingHttpClient;
-import io.micronaut.http.client.sse.SseClient;
 import reactor.core.publisher.Flux;
-
 import java.net.URL;
 
 /**
@@ -111,7 +107,6 @@ public interface ReactorHttpClient extends HttpClient {
      */
     static ReactorHttpClient create(@Nullable URL url) {
         return new BridgedReactorHttpClient(HttpClient.create(url),
-                HttpClient.createSseClient(url),
                 HttpClient.createStreamingClient(url));
     }
 
@@ -126,7 +121,6 @@ public interface ReactorHttpClient extends HttpClient {
      */
     static ReactorHttpClient create(@Nullable URL url, HttpClientConfiguration configuration) {
         return new BridgedReactorHttpClient(HttpClient.create(url, configuration),
-                HttpClient.createSseClient(url, configuration),
                 HttpClient.createStreamingClient(url, configuration));
     }
 }

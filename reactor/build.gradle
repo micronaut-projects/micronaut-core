@@ -2,7 +2,7 @@ group "io.micronaut.reactor"
 
 dependencies {
     annotationProcessor project(":inject-java")
+    api project(":runtime")
     api platform("io.projectreactor:reactor-bom:$reactorVersion")
     api 'io.projectreactor:reactor-core'
-    api project(":http-client-core")
 }

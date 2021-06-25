@@ -33,6 +33,7 @@ import io.micronaut.websocket.WebSocketClient;
  * @param <T> Reactive HTTP Client
  * @param <E> Reactive Server Sent Events HTTP Client
  * @param <S> Reactive Streaming HTTP Client
+ * @param <W> Web Socket Client
  */
 @Internal
 public interface ReactiveHttpClientRegistry<T extends HttpClient, E extends SseClient, S extends StreamingHttpClient, W extends WebSocketClient> {
@@ -110,5 +111,12 @@ public interface ReactiveHttpClientRegistry<T extends HttpClient, E extends SseC
      */
     default S getDefaultStreamingClient() {
         return getStreamingClient(AnnotationMetadata.EMPTY_METADATA);
+    }
+
+    /**
+     * @return Return the default Websocket HTTP client.
+     */
+    default W getDefaultWebSocketClient() {
+        return getWebSocketClient(AnnotationMetadata.EMPTY_METADATA);
     }
 }
