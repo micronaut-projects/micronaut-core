@@ -24,29 +24,33 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * Consumer to use with reactive sequence of {@link ByteBuffer} in combination with `Flux::onEach` to emulate `Flowable::doAfterNext`.
+ * Consumer to use with `Flux::onEach` to emulate `Flowable::doAfterNext`.
  *
  * @author Sergio del Amo
  * @since 3.0.0
  */
 @Experimental
 @Internal
-public class ByteBufferSafeReleaseConsumer implements Consumer<Signal<ByteBuffer<?>>> {
+public class DoAfterNextConsumer<T> implements Consumer<Signal<T>> {
 
-    private final List<ByteBuffer<?>> elements = new ArrayList<>();
+    private final List<T> elements = new ArrayList<>();
+
+    private final Consumer<? super T> action;
+
+    public DoAfterNextConsumer(Consumer<? super T> action) {
+        this.action = action;
+    }
 
     @Override
-    public void accept(Signal<ByteBuffer<?>> signal) {
+    public void accept(Signal<T> signal) {
         if (signal.isOnNext()) {
-            ByteBuffer<?> next = signal.get();
+            T next = signal.get();
             if (next != null) {
                 elements.add(next);
             }
         }
         if (signal.isOnComplete() || signal.isOnError()) {
-            for (ByteBuffer<?> buffer : elements) {
-                ByteBufferUtils.safeRelease(buffer);
-            }
+            elements.forEach(action);
         }
     }
 }

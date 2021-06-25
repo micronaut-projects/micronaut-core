@@ -736,7 +736,7 @@ public class DefaultHttpClient implements
 
     @Override
     public <I> Publisher<ByteBuffer<?>> dataStream(io.micronaut.http.HttpRequest<I> request) {
-        ByteBufferSafeReleaseConsumer doOnEachConsumer = new ByteBufferSafeReleaseConsumer();
+        DoAfterNextConsumer<ByteBuffer<?>> doOnEachConsumer = new DoAfterNextConsumer<>(ByteBufferUtils::safeRelease);
         return Flux.from(resolveRequestURI(request))
                 .flatMap(buildDataStreamPublisher(request))
                 .doOnEach(doOnEachConsumer);
@@ -744,7 +744,7 @@ public class DefaultHttpClient implements
 
     @Override
     public <I> Publisher<io.micronaut.http.HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.HttpRequest<I> request) {
-        HttpResponseByteBufferReleaseConsumer doOnEachConsumer = new HttpResponseByteBufferReleaseConsumer();
+        DoAfterNextConsumer<HttpResponse<ByteBuffer<?>>> doOnEachConsumer = new DoAfterNextConsumer<>(ByteBufferUtils::release);
         return Flux.from(resolveRequestURI(request))
                 .flatMap(buildExchangeStreamPublisher(request))
                 .doOnEach(doOnEachConsumer);
