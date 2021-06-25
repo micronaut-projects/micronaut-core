@@ -168,14 +168,14 @@ class StreamRequestSpec extends Specification {
     void "test json stream post request with POJOs flowable"() {
         when:
         int i = 0
-        List<Book> result = client.jsonStream(HttpRequest.POST('/stream/request/pojo-flowable', Flux.create(emitter -> {
+        List<Book> result = Flux.from(client.jsonStream(HttpRequest.POST('/stream/request/pojo-flowable', Flux.create(emitter -> {
                 while(i < 5) {
                     emitter.next(new Book(title:"Number ${i++}"))
                 }
                 emitter.complete()
         }, FluxSink.OverflowStrategy.BUFFER
 
-        )), Book).collectList().block()
+        )), Book)).collectList().block()
 
         then:
         result.size() == 5
@@ -185,14 +185,14 @@ class StreamRequestSpec extends Specification {
     void "test json stream post request with POJOs flowable error"() {
         when:
         int i = 0
-        List<Book> result = client.jsonStream(HttpRequest.POST('/stream/request/pojo-flowable-error', Flux.create(emitter -> {
+        List<Book> result = Flux.from(client.jsonStream(HttpRequest.POST('/stream/request/pojo-flowable-error', Flux.create(emitter -> {
                 while(i < 5) {
                     emitter.next(new Book(title:"Number ${i++}"))
                 }
                 emitter.complete()
         }, FluxSink.OverflowStrategy.BUFFER
 
-        )), Book).collectList().block()
+        )), Book)).collectList().block()
 
         then:
         def e= thrown(RuntimeException) // TODO: this should be HttpClientException

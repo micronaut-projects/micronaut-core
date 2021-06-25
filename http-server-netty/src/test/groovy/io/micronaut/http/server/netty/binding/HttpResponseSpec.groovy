@@ -167,7 +167,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
         when:
-        def resp = Flux.from(client.exchange(HttpRequest.GET('/test-header'))).blockFirst()
+        def resp = client.toBlocking().exchange(HttpRequest.GET('/test-header'))
 
         then:
         resp.header("Server") == "Foo!"
@@ -185,7 +185,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
         when:
-        def resp = Flux.from(client.exchange(HttpRequest.GET('/test-header'))).blockFirst()
+        def resp = client.toBlocking().exchange(HttpRequest.GET('/test-header'))
 
         then:
         !resp.header("Server")
@@ -203,7 +203,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
         when:
-        def resp = Flux.from(client.exchange(HttpRequest.GET('/test-header'))).blockFirst()
+        def resp = client.toBlocking().exchange(HttpRequest.GET('/test-header'))
 
         then:
         resp.header("Date")
@@ -221,7 +221,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
         when:
-        def resp = Flux.from(client.exchange(HttpRequest.GET('/test-header'))).blockFirst()
+        def resp = client.toBlocking().exchange(HttpRequest.GET('/test-header'))
 
         then:
         !resp.header("Date")

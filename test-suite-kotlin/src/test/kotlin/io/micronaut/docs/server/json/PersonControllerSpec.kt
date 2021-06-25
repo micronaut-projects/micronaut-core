@@ -54,13 +54,13 @@ class PersonControllerSpec: StringSpec() {
         }
 
         "test save"() {
-            var response = Flux.from(client.exchange(HttpRequest.POST("/people", "{\"firstName\":\"Fred\",\"lastName\":\"Flintstone\",\"age\":45}"), Person::class.java)).blockFirst()
+            var response = client.toBlocking().exchange(HttpRequest.POST("/people", "{\"firstName\":\"Fred\",\"lastName\":\"Flintstone\",\"age\":45}"), Person::class.java)
             var person = response.body.get()
 
             person.firstName shouldBe "Fred"
             response.status shouldBe HttpStatus.CREATED
 
-            response = Flux.from(client.exchange(HttpRequest.GET<Any>("/people/Fred"), Person::class.java)).blockFirst()
+            response = client.toBlocking().exchange(HttpRequest.GET<Any>("/people/Fred"), Person::class.java)
             person = response.body.get()
 
             person.firstName shouldBe "Fred"
@@ -68,7 +68,7 @@ class PersonControllerSpec: StringSpec() {
         }
 
         "test save reactive"() {
-            val response = Flux.from(client.exchange(HttpRequest.POST("/people/saveReactive", "{\"firstName\":\"Wilma\",\"lastName\":\"Flintstone\",\"age\":36}"), Person::class.java)).blockFirst()
+            val response = client.toBlocking().exchange(HttpRequest.POST("/people/saveReactive", "{\"firstName\":\"Wilma\",\"lastName\":\"Flintstone\",\"age\":36}"), Person::class.java)
             val person = response.body.get()
 
             person.firstName shouldBe "Wilma"
@@ -76,7 +76,7 @@ class PersonControllerSpec: StringSpec() {
         }
 
         "test save future"() {
-            val response = Flux.from(client!!.exchange(HttpRequest.POST("/people/saveFuture", "{\"firstName\":\"Pebbles\",\"lastName\":\"Flintstone\",\"age\":0}"), Person::class.java)).blockFirst()
+            val response = client!!.toBlocking().exchange(HttpRequest.POST("/people/saveFuture", "{\"firstName\":\"Pebbles\",\"lastName\":\"Flintstone\",\"age\":0}"), Person::class.java)
             val person = response.body.get()
 
             person.firstName shouldBe "Pebbles"
@@ -84,7 +84,7 @@ class PersonControllerSpec: StringSpec() {
         }
 
         "test save args"() {
-            val response = Flux.from(client!!.exchange(HttpRequest.POST("/people/saveWithArgs", "{\"firstName\":\"Dino\",\"lastName\":\"Flintstone\",\"age\":3}"), Person::class.java)).blockFirst()
+            val response = client!!.toBlocking().exchange(HttpRequest.POST("/people/saveWithArgs", "{\"firstName\":\"Dino\",\"lastName\":\"Flintstone\",\"age\":3}"), Person::class.java)
             val person = response.body.get()
 
             person.firstName shouldBe "Dino"
@@ -104,7 +104,7 @@ class PersonControllerSpec: StringSpec() {
 
         "test save invalid json"() {
             val e = shouldThrow<HttpClientResponseException> {
-                Flux.from(client.exchange<String, Person, Map<*, *>>(HttpRequest.POST("/people", "{\""), Argument.of(Person::class.java), Argument.of(Map::class.java))).blockFirst()
+                client.toBlocking().exchange(HttpRequest.POST("/people", "{\""), Argument.of(Person::class.java), Argument.of(Map::class.java))
             }
             val response = e.response as HttpResponse<Map<*, *>>
 

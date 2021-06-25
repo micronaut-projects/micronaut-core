@@ -21,7 +21,7 @@ class CacheControlSpec extends Specification {
         HttpClient rxClient = applicationContext.createBean(HttpClient, server)
 
         when:
-        def response = Flux.from(rxClient.exchange('/test/html', String)).blockFirst()
+        def response = rxClient.toBlocking().exchange('/test/html', String)
 
         then:
         response.header(CACHE_CONTROL) == "private, max-age=60"
@@ -41,7 +41,7 @@ class CacheControlSpec extends Specification {
         HttpClient rxClient = applicationContext.createBean(HttpClient, server)
 
         when:
-        def response = Flux.from(rxClient.exchange('/test/html', String)).blockFirst()
+        def response = rxClient.toBlocking().exchange('/test/html', String)
 
         then:
         response.header(CACHE_CONTROL) == "public, max-age=60"
@@ -61,7 +61,7 @@ class CacheControlSpec extends Specification {
         HttpClient rxClient = applicationContext.createBean(HttpClient, server)
 
         when:
-        def response = Flux.from(rxClient.exchange('/test/html', String)).blockFirst()
+        def response = rxClient.toBlocking().exchange('/test/html', String)
 
         then:
         response.header(CACHE_CONTROL) == "private, max-age=120"

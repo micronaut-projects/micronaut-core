@@ -44,7 +44,7 @@ class SimpleEndpointSpec extends Specification {
         HttpClient rxClient = server.applicationContext.createBean(HttpClient, server.getURL())
 
         when:
-        def response = Flux.from(rxClient.exchange("/simple", String)).blockFirst()
+        def response = rxClient.toBlocking().exchange("/simple", String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -62,7 +62,7 @@ class SimpleEndpointSpec extends Specification {
         HttpClient rxClient = server.applicationContext.createBean(HttpClient, server.getURL())
 
         when:
-        def response = Flux.from(rxClient.exchange(HttpRequest.HEAD("/simple"), String)).blockFirst()
+        def response = rxClient.toBlocking().exchange(HttpRequest.HEAD("/simple"), String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -82,7 +82,7 @@ class SimpleEndpointSpec extends Specification {
 
 
         when:
-        def response = Flux.from(rxClient.exchange("/simple/baz", String)).blockFirst()
+        def response = rxClient.toBlocking().exchange("/simple/baz", String)
 
 
         then:
@@ -102,13 +102,13 @@ class SimpleEndpointSpec extends Specification {
         HttpClient rxClient = server.applicationContext.createBean(HttpClient, server.getURL())
 
         when:
-        def response = Flux.from(rxClient.exchange(HttpRequest.POST("/simple", "bar").contentType("text/plain"), String)).blockFirst()
+        def response = rxClient.toBlocking().exchange(HttpRequest.POST("/simple", "bar").contentType("text/plain"), String)
 
         then:
         response.code() == HttpStatus.OK.code
 
         when:
-        response = Flux.from(rxClient.exchange("/simple", String)).blockFirst()
+        response = rxClient.toBlocking().exchange("/simple", String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -127,7 +127,7 @@ class SimpleEndpointSpec extends Specification {
         HttpClient rxClient = server.applicationContext.createBean(HttpClient, server.getURL())
 
         when:
-        Flux.from(rxClient.exchange("/simple", String)).blockFirst()
+        rxClient.toBlocking().exchange("/simple", String)
 
         then:
         HttpClientResponseException ex = thrown()

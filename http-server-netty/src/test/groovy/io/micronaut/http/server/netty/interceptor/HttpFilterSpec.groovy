@@ -50,7 +50,7 @@ class HttpFilterSpec extends Specification {
 
     void "test interceptor execution and order - write replacement"() {
         when:
-        Flux.from(rxClient.retrieve("/secure")).blockFirst()
+        rxClient.toBlocking().retrieve("/secure")
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -59,7 +59,7 @@ class HttpFilterSpec extends Specification {
 
     void "test interceptor execution and order - proceed"() {
         when:
-        HttpResponse<String> response = Flux.from(rxClient.exchange("/secure?username=fred", String)).blockFirst()
+        HttpResponse<String> response = rxClient.toBlocking().exchange("/secure?username=fred", String)
 
         then:
         response.status == HttpStatus.OK
@@ -70,7 +70,7 @@ class HttpFilterSpec extends Specification {
 
     void "test a filter on the root url"() {
         when:
-        HttpResponse response = Flux.from(rxClient.exchange("/")).blockFirst()
+        HttpResponse response = rxClient.toBlocking().exchange("/")
 
         then:
         response.status == HttpStatus.OK
@@ -80,7 +80,7 @@ class HttpFilterSpec extends Specification {
 
     void "test a filter on a reactive url"() {
         when:
-        HttpResponse response = Flux.from(rxClient.exchange("/reactive")).blockFirst()
+        HttpResponse response = rxClient.toBlocking().exchange("/reactive")
 
         then:
         response.status == HttpStatus.OK
@@ -90,7 +90,7 @@ class HttpFilterSpec extends Specification {
 
     void "test a filter on matched with filter matcher URI"() {
         when:
-        HttpResponse response = Flux.from(rxClient.exchange("/matched")).blockFirst()
+        HttpResponse response = rxClient.toBlocking().exchange("/matched")
 
         then:
         response.status == HttpStatus.OK
@@ -100,7 +100,7 @@ class HttpFilterSpec extends Specification {
 
     void "test two filters on matched with filter matcher URI"() {
         when:
-        HttpResponse response = Flux.from(rxClient.exchange("/matchedtwice")).blockFirst()
+        HttpResponse response = rxClient.toBlocking().exchange("/matchedtwice")
 
         then:
         response.status == HttpStatus.OK
@@ -111,7 +111,7 @@ class HttpFilterSpec extends Specification {
 
     void "test a filter on indirect matched with filter matcher URI"() {
         when:
-        HttpResponse response = Flux.from(rxClient.exchange("/indirectlymatched")).blockFirst()
+        HttpResponse response = rxClient.toBlocking().exchange("/indirectlymatched")
 
         then:
         response.status == HttpStatus.OK

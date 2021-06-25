@@ -71,13 +71,13 @@ public class PersonControllerSpec {
 
     @Test
     public void testSave() {
-        HttpResponse<Person> response = Flux.from(client.exchange(HttpRequest.POST("/people", "{\"firstName\":\"Fred\",\"lastName\":\"Flintstone\",\"age\":45}"), Person.class)).blockFirst();
+        HttpResponse<Person> response = client.toBlocking().exchange(HttpRequest.POST("/people", "{\"firstName\":\"Fred\",\"lastName\":\"Flintstone\",\"age\":45}"), Person.class);
         Person person = response.getBody().get();
 
         assertEquals("Fred", person.getFirstName());
         assertEquals(HttpStatus.CREATED, response.getStatus());
 
-        response = Flux.from(client.exchange(HttpRequest.GET("/people/Fred"), Person.class)).blockFirst();
+        response = client.toBlocking().exchange(HttpRequest.GET("/people/Fred"), Person.class);
         person = response.getBody().get();
 
         assertEquals("Fred", person.getFirstName());
@@ -86,7 +86,7 @@ public class PersonControllerSpec {
 
     @Test
     public void testSaveReactive() {
-        HttpResponse<Person> response = Flux.from(client.exchange(HttpRequest.POST("/people/saveReactive", "{\"firstName\":\"Wilma\",\"lastName\":\"Flintstone\",\"age\":36}"), Person.class)).blockFirst();
+        HttpResponse<Person> response = client.toBlocking().exchange(HttpRequest.POST("/people/saveReactive", "{\"firstName\":\"Wilma\",\"lastName\":\"Flintstone\",\"age\":36}"), Person.class);
         Person person = response.getBody().get();
 
         assertEquals("Wilma", person.getFirstName());
@@ -95,7 +95,7 @@ public class PersonControllerSpec {
 
     @Test
     public void testSaveFuture() {
-        HttpResponse<Person> response = Flux.from(client.exchange(HttpRequest.POST("/people/saveFuture", "{\"firstName\":\"Pebbles\",\"lastName\":\"Flintstone\",\"age\":0}"), Person.class)).blockFirst();
+        HttpResponse<Person> response = client.toBlocking().exchange(HttpRequest.POST("/people/saveFuture", "{\"firstName\":\"Pebbles\",\"lastName\":\"Flintstone\",\"age\":0}"), Person.class);
         Person person = response.getBody().get();
 
         assertEquals("Pebbles", person.getFirstName());
@@ -104,7 +104,7 @@ public class PersonControllerSpec {
 
     @Test
     public void testSaveArgs() {
-        HttpResponse<Person> response = Flux.from(client.exchange(HttpRequest.POST("/people/saveWithArgs", "{\"firstName\":\"Dino\",\"lastName\":\"Flintstone\",\"age\":3}"), Person.class)).blockFirst();
+        HttpResponse<Person> response = client.toBlocking().exchange(HttpRequest.POST("/people/saveWithArgs", "{\"firstName\":\"Dino\",\"lastName\":\"Flintstone\",\"age\":3}"), Person.class);
         Person person = response.getBody().get();
 
         assertEquals("Dino", person.getFirstName());
@@ -125,7 +125,7 @@ public class PersonControllerSpec {
     @Test
     public void testSaveInvalidJson() {
         HttpClientResponseException e = Assertions.assertThrows(HttpClientResponseException.class, () ->
-                Flux.from(client.exchange(HttpRequest.POST("/people", "{\""), Argument.of(Person.class), Argument.of(Map.class))).blockFirst());
+                client.toBlocking().exchange(HttpRequest.POST("/people", "{\""), Argument.of(Person.class), Argument.of(Map.class)));
         HttpResponse<Map> response = (HttpResponse<Map>) e.getResponse();
 
         assertTrue(response.getBody(Map.class).get().get("message").toString().startsWith("Invalid JSON: Unexpected end-of-input"));

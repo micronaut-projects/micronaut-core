@@ -39,7 +39,7 @@ public class CurrentDateEndpointSpec {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class);
         HttpClient rxClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
 
-        HttpResponse<String> response = Flux.from(rxClient.exchange("/date", String.class)).blockFirst();
+        HttpResponse<String> response = rxClient.toBlocking().exchange("/date", String.class);
 
         assertEquals(HttpStatus.OK.getCode(), response.code());
 
@@ -51,7 +51,7 @@ public class CurrentDateEndpointSpec {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class);
         HttpClient rxClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
 
-        HttpResponse<String> response = Flux.from(rxClient.exchange("/date/current_date_is", String.class)).blockFirst();
+        HttpResponse<String> response = rxClient.toBlocking().exchange("/date/current_date_is", String.class);
 
         assertEquals(HttpStatus.OK.getCode(), response.code());
         assertTrue(response.body().startsWith("current_date_is: "));
@@ -65,7 +65,7 @@ public class CurrentDateEndpointSpec {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class);
         HttpClient rxClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
 
-        HttpResponse<String> response = Flux.from(rxClient.exchange("/date/current_date_is", String.class)).blockFirst();
+        HttpResponse<String> response = rxClient.toBlocking().exchange("/date/current_date_is", String.class);
 
         assertEquals(MediaType.TEXT_PLAIN_TYPE, response.getContentType().get());
 
@@ -79,15 +79,15 @@ public class CurrentDateEndpointSpec {
         Date originalDate, resetDate;
         Map<String, Object> map = new HashMap<>();
 
-        HttpResponse<String> response = Flux.from(rxClient.exchange("/date", String.class)).blockFirst();
+        HttpResponse<String> response = rxClient.toBlocking().exchange("/date", String.class);
         originalDate = new Date(Long.parseLong(response.body()));
 
-        response = Flux.from(rxClient.exchange(HttpRequest.POST("/date", map), String.class)).blockFirst();
+        response = rxClient.toBlocking().exchange(HttpRequest.POST("/date", map), String.class);
 
         assertEquals(HttpStatus.OK.getCode(), response.code());
         assertEquals("Current date reset", response.body());
 
-        response = Flux.from(rxClient.exchange("/date", String.class)).blockFirst();
+        response = rxClient.toBlocking().exchange("/date", String.class);
         resetDate = new Date(Long.parseLong(response.body()));
 
         assert resetDate.getTime() > originalDate.getTime();
@@ -103,7 +103,7 @@ public class CurrentDateEndpointSpec {
         HttpClient rxClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
 
         try {
-            Flux.from(rxClient.exchange("/date", String.class)).blockFirst();
+            rxClient.toBlocking().exchange("/date", String.class);
         } catch (HttpClientResponseException ex) {
             assertEquals(HttpStatus.NOT_FOUND.getCode(), ex.getResponse().code());
         }

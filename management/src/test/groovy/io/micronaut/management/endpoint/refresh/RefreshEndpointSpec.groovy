@@ -45,7 +45,7 @@ class RefreshEndpointSpec extends Specification {
         HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        def response = Flux.from(rxClient.exchange("/refreshTest", String)).blockFirst()
+        def response = rxClient.toBlocking().exchange("/refreshTest", String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -53,7 +53,7 @@ class RefreshEndpointSpec extends Specification {
 
         when:
         System.setProperty("foo.bar", "changed")
-        response = Flux.from(rxClient.exchange(HttpRequest.POST("/refresh", new byte[0]), String)).blockFirst()
+        response = rxClient.toBlocking().exchange(HttpRequest.POST("/refresh", new byte[0]), String)
 
 
         then:
@@ -84,7 +84,7 @@ class RefreshEndpointSpec extends Specification {
         HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        def response = Flux.from(rxClient.exchange("/refreshTest/external", String)).blockFirst()
+        def response = rxClient.toBlocking().exchange("/refreshTest/external", String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -97,14 +97,14 @@ class RefreshEndpointSpec extends Specification {
         response.code() == HttpStatus.OK.code
 
         when:
-        response = Flux.from(rxClient.exchange("/refreshTest/external", String)).blockFirst()
+        response = rxClient.toBlocking().exchange("/refreshTest/external", String)
 
         then: "subsequent response does not change"
         response.code() == HttpStatus.OK.code
         response.body() == firstResponse
 
         when: "/refresh is called with `all` body parameter"
-        response = Flux.from(rxClient.exchange(HttpRequest.POST("/refresh", '{"force": true}'), String)).blockFirst()
+        response = rxClient.toBlocking().exchange(HttpRequest.POST("/refresh", '{"force": true}'), String)
 
         then:
         response.code() == HttpStatus.OK.code

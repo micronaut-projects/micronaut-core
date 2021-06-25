@@ -156,7 +156,7 @@ class HttpPatchSpec extends Specification {
 
     void "test http patch with empty body"() {
         when:
-        def res = Flux.from(client.exchange(HttpRequest.PATCH('/patch/emptyBody', null))).blockFirst();
+        def res = client.toBlocking().exchange(HttpRequest.PATCH('/patch/emptyBody', null));
 
         then:
         res.status == HttpStatus.NO_CONTENT

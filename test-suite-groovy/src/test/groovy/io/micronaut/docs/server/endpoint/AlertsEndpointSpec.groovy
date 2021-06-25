@@ -21,7 +21,7 @@ class AlertsEndpointSpec extends Specification {
         HttpClient client = server.getApplicationContext().createBean(HttpClient.class, server.getURL())
 
         when:
-        Flux.from(client.exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String.class)).blockFirst()
+        client.toBlocking().exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String.class)
 
         then:
         def ex = thrown(HttpClientResponseException)
@@ -39,13 +39,13 @@ class AlertsEndpointSpec extends Specification {
         HttpClient client = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
 
         when:
-        HttpResponse<?> response = Flux.from(client.exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String.class)).blockFirst();
+        HttpResponse<?> response = client.toBlocking().exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String.class);
 
         then:
         response.status() == HttpStatus.OK
 
         when:
-        List<String> alerts = Flux.from(client.retrieve(HttpRequest.GET("/alerts"), Argument.LIST_OF_STRING)).blockFirst();
+        List<String> alerts = client.toBlocking().retrieve(HttpRequest.GET("/alerts"), Argument.LIST_OF_STRING);
 
         then:
         alerts.get(0) == "First alert"
@@ -61,7 +61,7 @@ class AlertsEndpointSpec extends Specification {
         HttpClient client = server.getApplicationContext().createBean(HttpClient.class, server.getURL())
 
         when:
-        Flux.from(client.exchange(HttpRequest.DELETE("/alerts"), String.class)).blockFirst()
+        client.toBlocking().exchange(HttpRequest.DELETE("/alerts"), String.class)
 
         then:
         def ex = thrown(HttpClientResponseException)

@@ -41,7 +41,7 @@ class HeadlineFlowControllerSpec: StringSpec() {
 
         "test error route with Flow" {
             val ex = shouldThrowExactly<HttpClientResponseException> {
-                Flux.from(client.exchange(HttpRequest.GET<Any>("/streaming/illegal"), String::class.java)).blockFirst()
+                client.toBlocking().exchange(HttpRequest.GET<Any>("/streaming/illegal"), String::class.java)
             }
             val body = ex.response.getBody(String::class.java).get()
 

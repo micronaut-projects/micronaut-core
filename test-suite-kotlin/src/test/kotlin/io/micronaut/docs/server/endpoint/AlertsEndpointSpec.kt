@@ -19,7 +19,7 @@ class AlertsEndpointSpec: StringSpec() {
             var server = ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to AlertsEndpointSpec::class.simpleName))
             var client = server.applicationContext.createBean(HttpClient::class.java, server.url)
             try {
-                Flux.from(client.exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String::class.java)).blockFirst()
+                client.toBlocking().exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String::class.java)
             } catch (ex: HttpClientResponseException) {
                 ex.response.status() shouldBe HttpStatus.UNAUTHORIZED
             }
@@ -33,10 +33,10 @@ class AlertsEndpointSpec: StringSpec() {
             )
             var client = server.applicationContext.createBean(HttpClient::class.java, server.url)
 
-            val response = Flux.from(client.exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String::class.java)).blockFirst()
+            val response = client.toBlocking().exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String::class.java)
             response.status() shouldBe HttpStatus.OK
 
-            val alerts = Flux.from(client.retrieve(HttpRequest.GET<Any>("/alerts"), Argument.LIST_OF_STRING)).blockFirst()
+            val alerts = client.toBlocking().retrieve(HttpRequest.GET<Any>("/alerts"), Argument.LIST_OF_STRING)
             alerts[0] shouldBe "First alert"
 
             server.close()
@@ -46,7 +46,7 @@ class AlertsEndpointSpec: StringSpec() {
             var server = ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to AlertsEndpointSpec::class.simpleName))
             var client = server.applicationContext.createBean(HttpClient::class.java, server.url)
             try {
-                Flux.from(client.exchange(HttpRequest.DELETE<Any>("/alerts"), String::class.java)).blockFirst()
+                client.toBlocking().exchange(HttpRequest.DELETE<Any>("/alerts"), String::class.java)
             } catch (ex: HttpClientResponseException) {
                 ex.response.status() shouldBe HttpStatus.UNAUTHORIZED
             }

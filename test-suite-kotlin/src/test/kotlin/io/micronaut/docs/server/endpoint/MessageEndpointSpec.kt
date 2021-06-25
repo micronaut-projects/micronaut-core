@@ -26,7 +26,7 @@ class MessageEndpointSpec: StringSpec() {
 
     init {
         "test read message endpoint" {
-            val response = Flux.from(client.exchange("/message", String::class.java)).blockFirst()
+            val response = client.toBlocking().exchange("/message", String::class.java)
 
             response.code() shouldBe HttpStatus.OK.code
             response.body() shouldBe "default message"
@@ -40,19 +40,19 @@ class MessageEndpointSpec: StringSpec() {
             response.body() shouldBe "Message updated"
             response.contentType.get() shouldBe MediaType.TEXT_PLAIN_TYPE
 
-            response = Flux.from(client.exchange("/message", String::class.java)).blockFirst()
+            response = client.toBlocking().exchange("/message", String::class.java)
 
             response.body() shouldBe "A new message"
         }
 
         "test delete message endpoint" {
-            val response = Flux.from(client.exchange(HttpRequest.DELETE<Any>("/message"), String::class.java)).blockFirst()
+            val response = client.toBlocking().exchange(HttpRequest.DELETE<Any>("/message"), String::class.java)
 
             response.code() shouldBe HttpStatus.OK.code
             response.body() shouldBe "Message deleted"
 
             try {
-                Flux.from(client.exchange("/message", String::class.java)).blockFirst()
+                client.toBlocking().exchange("/message", String::class.java)
             } catch (e: HttpClientResponseException) {
                 e.status.code shouldBe 404
             } catch (e: Exception) {

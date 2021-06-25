@@ -37,7 +37,7 @@ class ConnectionTTLSpec extends Specification {
     HttpClient httpClient = clientContext.createBean(HttpClient, embeddedServer.getURL())
 
     when:"make first request"
-    Flux.from(httpClient.retrieve(HttpRequest.GET('/connectTTL/'),String)).blockFirst()
+    httpClient.toBlocking().retrieve(HttpRequest.GET('/connectTTL/'),String)
     Channel ch = getQueuedChannels(httpClient).first
 
     then:"ensure that connection is open as connect-ttl is not reached"
@@ -45,7 +45,7 @@ class ConnectionTTLSpec extends Specification {
     ch.isOpen()
 
     when:"make another request in which connect-ttl will exceed"
-    Flux.from(httpClient.retrieve(HttpRequest.GET('/connectTTL/slow'),String)).blockFirst()
+    httpClient.toBlocking().retrieve(HttpRequest.GET('/connectTTL/slow'),String)
 
     then:"ensure channel is closed"
     new PollingConditions().eventually {
@@ -66,7 +66,7 @@ class ConnectionTTLSpec extends Specification {
     HttpClient httpClient = clientContext.createBean(HttpClient, embeddedServer.getURL())
 
     when:"make first request"
-    Flux.from(httpClient.retrieve(HttpRequest.GET('/connectTTL/'),String)).blockFirst()
+    httpClient.toBlocking().retrieve(HttpRequest.GET('/connectTTL/'),String)
     Deque<Channel> deque = getQueuedChannels(httpClient)
 
     then:"ensure that connection is open as connect-ttl is not reached"
@@ -75,7 +75,7 @@ class ConnectionTTLSpec extends Specification {
     }
 
     when:"make another request"
-    Flux.from(httpClient.retrieve(HttpRequest.GET('/connectTTL/slow'),String)).blockFirst()
+    httpClient.toBlocking().retrieve(HttpRequest.GET('/connectTTL/slow'),String)
 
     then:"ensure channel is still open"
     new PollingConditions().eventually {

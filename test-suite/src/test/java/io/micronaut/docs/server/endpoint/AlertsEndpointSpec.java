@@ -44,7 +44,7 @@ public class AlertsEndpointSpec {
         HttpClient client = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
 
         try {
-            Flux.from(client.exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String.class)).blockFirst();
+            client.toBlocking().exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String.class);
         } catch (HttpClientResponseException e) {
             assertEquals(401, e.getStatus().getCode());
         } catch (Exception e) {
@@ -63,14 +63,14 @@ public class AlertsEndpointSpec {
         HttpClient client = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
 
         try {
-            HttpResponse<?> response = Flux.from(client.exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String.class)).blockFirst();
+            HttpResponse<?> response = client.toBlocking().exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String.class);
             assertEquals(response.status(), HttpStatus.OK);
         } catch (Exception e) {
             fail("Wrong exception thrown");
         }
 
         try {
-            HttpResponse<List<String>> response = Flux.from(client.exchange(HttpRequest.GET("/alerts"), Argument.LIST_OF_STRING)).blockFirst();
+            HttpResponse<List<String>> response = client.toBlocking().exchange(HttpRequest.GET("/alerts"), Argument.LIST_OF_STRING);
             assertEquals(response.status(), HttpStatus.OK);
             assertEquals(response.body().get(0), "First alert");
         } catch (Exception e) {
@@ -88,7 +88,7 @@ public class AlertsEndpointSpec {
         HttpClient rxClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
 
         try {
-            Flux.from(rxClient.exchange(HttpRequest.DELETE("/alerts"), String.class)).blockFirst();
+            rxClient.toBlocking().exchange(HttpRequest.DELETE("/alerts"), String.class);
         } catch (HttpClientResponseException e) {
             assertEquals(401, e.getStatus().getCode());
         } catch (Exception e) {

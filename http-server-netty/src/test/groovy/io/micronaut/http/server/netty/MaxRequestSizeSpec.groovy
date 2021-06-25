@@ -24,14 +24,14 @@ class MaxRequestSizeSpec extends Specification {
 
         when:
         byte[] kb10 = new byte[10240]
-        String result = Flux.from(client.retrieve(HttpRequest.POST("/test-max-size/text", new String(kb10)).contentType(MediaType.TEXT_PLAIN_TYPE))).blockFirst()
+        String result = client.toBlocking().retrieve(HttpRequest.POST("/test-max-size/text", new String(kb10)).contentType(MediaType.TEXT_PLAIN_TYPE))
 
         then:
         result == "OK"
 
         when:
         byte[] kb101 = new byte[10241]
-        Flux.from(client.retrieve(HttpRequest.POST("/test-max-size/text", new String(kb101)).contentType(MediaType.TEXT_PLAIN_TYPE))).blockFirst()
+        client.toBlocking().retrieve(HttpRequest.POST("/test-max-size/text", new String(kb101)).contentType(MediaType.TEXT_PLAIN_TYPE))
 
         then:
         def ex = thrown(HttpClientResponseException)
@@ -48,14 +48,14 @@ class MaxRequestSizeSpec extends Specification {
 
         when:
         String json = '{"x":"' + ('y' * (10240 - 8)) + '"}'
-        String result = Flux.from(client.retrieve(HttpRequest.POST("/test-max-size/json", json).contentType(MediaType.APPLICATION_JSON_TYPE))).blockFirst()
+        String result = client.toBlocking().retrieve(HttpRequest.POST("/test-max-size/json", json).contentType(MediaType.APPLICATION_JSON_TYPE))
 
         then:
         result == "OK"
 
         when:
         json = '{"x":"' + ('y' * (10240 - 7)) + '"}'
-        Flux.from(client.retrieve(HttpRequest.POST("/test-max-size/json", new String(json)).contentType(MediaType.APPLICATION_JSON_TYPE))).blockFirst()
+        client.toBlocking().retrieve(HttpRequest.POST("/test-max-size/json", new String(json)).contentType(MediaType.APPLICATION_JSON_TYPE))
 
         then:
         def ex = thrown(HttpClientResponseException)
@@ -80,7 +80,7 @@ class MaxRequestSizeSpec extends Specification {
                 .addPart("e", "e.pdf", new byte[1871])
                 .build()
 
-        String result = Flux.from(client.retrieve(HttpRequest.POST("/test-max-size/multipart", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE))).blockFirst()
+        String result = client.toBlocking().retrieve(HttpRequest.POST("/test-max-size/multipart", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE))
 
         then:
         result == "OK"
@@ -93,7 +93,7 @@ class MaxRequestSizeSpec extends Specification {
                 .addPart("d", "d.pdf", new byte[1871])
                 .addPart("e", "e.pdf", new byte[1872]) //One extra byte
                 .build()
-        Flux.from(client.retrieve(HttpRequest.POST("/test-max-size/multipart", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE))).blockFirst()
+        client.toBlocking().retrieve(HttpRequest.POST("/test-max-size/multipart", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE))
 
         then:
         def ex = thrown(HttpClientResponseException)
@@ -119,7 +119,7 @@ class MaxRequestSizeSpec extends Specification {
                 .addPart("e", "e.pdf", new byte[1024])
                 .build()
 
-        String result = Flux.from(client.retrieve(HttpRequest.POST("/test-max-size/multipart", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE))).blockFirst()
+        String result = client.toBlocking().retrieve(HttpRequest.POST("/test-max-size/multipart", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE))
 
         then:
         result == "OK"
@@ -132,7 +132,7 @@ class MaxRequestSizeSpec extends Specification {
                 .addPart("d", "d.pdf", new byte[1024])
                 .addPart("e", "e.pdf", new byte[1025]) //One extra byte
                 .build()
-        Flux.from(client.retrieve(HttpRequest.POST("/test-max-size/multipart", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE))).blockFirst()
+        client.toBlocking().retrieve(HttpRequest.POST("/test-max-size/multipart", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE))
 
         then:
         def ex = thrown(HttpClientResponseException)
@@ -158,7 +158,7 @@ class MaxRequestSizeSpec extends Specification {
                 .addPart("e", "e.pdf", new byte[1024])
                 .build()
 
-        String result = Flux.from(client.retrieve(HttpRequest.POST("/test-max-size/multipart-body", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE))).blockFirst()
+        String result = client.toBlocking().retrieve(HttpRequest.POST("/test-max-size/multipart-body", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE))
 
         then:
         result == "OK"
@@ -171,7 +171,7 @@ class MaxRequestSizeSpec extends Specification {
                 .addPart("d", "d.pdf", new byte[1024])
                 .addPart("e", "e.pdf", new byte[1025]) //One extra byte
                 .build()
-        Flux.from(client.retrieve(HttpRequest.POST("/test-max-size/multipart-body", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE))).blockFirst()
+        client.toBlocking().retrieve(HttpRequest.POST("/test-max-size/multipart-body", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE))
 
         then:
         def ex = thrown(HttpClientResponseException)

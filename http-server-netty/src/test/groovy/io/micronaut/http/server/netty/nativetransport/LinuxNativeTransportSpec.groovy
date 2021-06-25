@@ -13,7 +13,7 @@ class LinuxNativeTransportSpec extends AbstractMicronautSpec {
 
     void "test a basic request works with mac native transport"() {
         when:
-        String body = Flux.from(rxClient.retrieve(HttpRequest.GET("/native-transport"))).blockFirst()
+        String body = rxClient.toBlocking().retrieve(HttpRequest.GET("/native-transport"))
 
         then:
         noExceptionThrown()

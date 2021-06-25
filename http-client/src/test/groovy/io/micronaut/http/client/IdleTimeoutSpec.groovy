@@ -38,7 +38,7 @@ class IdleTimeoutSpec extends Specification {
     HttpClient httpClient = clientContext.createBean(HttpClient, embeddedServer.getURL())
 
     when:"make first request"
-    Flux.from(httpClient.retrieve(HttpRequest.GET('/idleTimeout/'),String)).blockFirst()
+    httpClient.toBlocking().retrieve(HttpRequest.GET('/idleTimeout/'),String)
     Deque<Channel> deque = getQueuedChannels(httpClient)
     Channel ch1 = deque.first
 
@@ -50,7 +50,7 @@ class IdleTimeoutSpec extends Specification {
     }
 
     when:"make another request"
-    Flux.from(httpClient.retrieve(HttpRequest.GET('/idleTimeout'),String)).blockFirst()
+    httpClient.toBlocking().retrieve(HttpRequest.GET('/idleTimeout'),String)
     Channel ch2 = deque.first
 
     then:"ensure channel 2 is open and channel 2 != channel 1"
@@ -75,7 +75,7 @@ class IdleTimeoutSpec extends Specification {
     HttpClient httpClient = clientContext.createBean(HttpClient, embeddedServer.getURL())
 
     when:"make first request"
-    Flux.from(httpClient.retrieve(HttpRequest.GET('/idleTimeout/'),String)).blockFirst()
+    httpClient.toBlocking().retrieve(HttpRequest.GET('/idleTimeout/'),String)
     Deque<Channel> deque = getQueuedChannels(httpClient)
     Channel ch1 = deque.first
 
@@ -86,7 +86,7 @@ class IdleTimeoutSpec extends Specification {
     }
 
     when:"make another request"
-    Flux.from(httpClient.retrieve(HttpRequest.GET('/idleTimeout'),String)).blockFirst()
+    httpClient.toBlocking().retrieve(HttpRequest.GET('/idleTimeout'),String)
     Channel ch2 = deque.first
 
     then:"ensure channel is still open"

@@ -45,11 +45,10 @@ class BasicAuthSpec extends Specification {
                 'spec.name': 'BasicAuthSpec'
         ])
         ApplicationContext ctx = server.applicationContext
-
         HttpClient httpClient = ctx.createBean(HttpClient, new URL("http://sherlock:password@localhost:${server.port}"))
-        Publisher<String> client = httpClient.retrieve("/basicauth")
+
         when:
-        String resp = Flux.from(client).blockFirst()
+        String resp = httpClient.toBlocking().retrieve("/basicauth")
 
         then:
         resp == "sherlock:password"

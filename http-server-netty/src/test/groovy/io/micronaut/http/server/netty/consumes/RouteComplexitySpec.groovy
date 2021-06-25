@@ -14,42 +14,42 @@ class RouteComplexitySpec extends AbstractMicronautSpec {
 
     void "test route complexity"() {
         when:
-        String body = Flux.from(rxClient.retrieve(HttpRequest.GET("/test-complexity/id/somefile.xls"))).blockFirst()
+        String body = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/id/somefile.xls"))
 
         then:
         noExceptionThrown()
         body == "fallback"
 
         when:
-        body = Flux.from(rxClient.retrieve(HttpRequest.GET("/test-complexity/id/somefile.csv"))).blockFirst()
+        body = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/id/somefile.csv"))
 
         then:
         noExceptionThrown()
         body == "csv"
 
         when:
-        body = Flux.from(rxClient.retrieve(HttpRequest.GET("/test-complexity/other/a/b/c/d"))).blockFirst()
+        body = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/other/a/b/c/d"))
 
         then:
         noExceptionThrown()
         body == "ab/c"
 
         when:
-        body = Flux.from(rxClient.retrieve(HttpRequest.GET("/test-complexity/other2/a/b/c"))).blockFirst()
+        body = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/other2/a/b/c"))
 
         then:
         noExceptionThrown()
         body == "ab/c"
 
         when:
-        body = Flux.from(rxClient.retrieve(HttpRequest.GET("/test-complexity/list"))).blockFirst()
+        body = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/list"))
 
         then:
         noExceptionThrown()
         body == "list"
 
         when:
-        body = Flux.from(rxClient.retrieve(HttpRequest.GET("/test-complexity/length/abc"))).blockFirst()
+        body = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/length/abc"))
 
         then:
         noExceptionThrown()
