@@ -433,7 +433,7 @@ public class UploadController {
         });
     }
 
-    @Post(uri = "/receive-multipart-body-as-single", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
+    @Post(uri = "/receive-multipart-body-as-mono", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
     Mono<String> multipartAsSingle(@Body io.micronaut.http.server.multipart.MultipartBody body) {
         //This will throw an exception because it caches the first result and does not emit it until
         //the publisher completes. By this time the data has been freed. The data is freed immediately

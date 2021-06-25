@@ -315,7 +315,7 @@ class UploadSpec extends AbstractMicronautSpec {
         result == 'data.json: 16'
     }
 
-    void "test the error condition using a single"() {
+    void "test the error condition using a mono"() {
         given:
         def data = '{"title":"Test"}'
         MultipartBody requestBody = MultipartBody.builder()
@@ -324,7 +324,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         when:
         HttpResponse<?> response = Flux.from(client.exchange(
-                HttpRequest.POST("/upload/receive-multipart-body-as-single", requestBody)
+                HttpRequest.POST("/upload/receive-multipart-body-as-mono", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 Argument.STRING,
@@ -338,6 +338,6 @@ class UploadSpec extends AbstractMicronautSpec {
 
         then:
         response.status() == HttpStatus.OK
-        response.getBody(Map).get().message == "Internal Server Error: The bytes have already been released"
+        response.getBody(String).get() == "OK"
     }
 }
