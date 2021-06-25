@@ -20,6 +20,7 @@ import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.ReactiveHttpClientFactory;
 import io.micronaut.http.client.StreamingHttpClient;
+import io.micronaut.http.client.sse.SseClient;
 
 import java.net.URL;
 
@@ -30,7 +31,7 @@ import java.net.URL;
  * @since 2.0
  */
 @Internal
-public class NettyReactiveHttpClientFactory implements ReactiveHttpClientFactory<HttpClient, StreamingHttpClient> {
+public class NettyReactiveHttpClientFactory implements ReactiveHttpClientFactory<HttpClient, SseClient, StreamingHttpClient> {
     @Override
     public HttpClient createClient(URL url) {
         return new DefaultHttpClient(url);
@@ -48,6 +49,16 @@ public class NettyReactiveHttpClientFactory implements ReactiveHttpClientFactory
 
     @Override
     public StreamingHttpClient createStreamingClient(URL url, HttpClientConfiguration configuration) {
+        return new DefaultHttpClient(url, configuration);
+    }
+
+    @Override
+    public SseClient createSseClient(URL url) {
+        return new DefaultHttpClient(url);
+    }
+
+    @Override
+    public SseClient createSseClient(URL url, HttpClientConfiguration configuration) {
         return new DefaultHttpClient(url, configuration);
     }
 }

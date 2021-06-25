@@ -16,6 +16,8 @@
 package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.client.sse.SseClient;
+
 import java.net.URL;
 
 /**
@@ -26,7 +28,7 @@ import java.net.URL;
  * @param <T> Reactive HTTP Client.
  * @param <S> Reactive Streaming HTTP Client.
  */
-public interface ReactiveHttpClientFactory<T extends HttpClient, S extends StreamingHttpClient> {
+public interface ReactiveHttpClientFactory<T extends HttpClient, E extends SseClient, S extends StreamingHttpClient> {
     /**
      * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
      * {@link jakarta.inject.Inject} to inject a client instead
@@ -66,5 +68,24 @@ public interface ReactiveHttpClientFactory<T extends HttpClient, S extends Strea
      * @since 2.2.0
      */
     S createStreamingClient(@Nullable URL url, HttpClientConfiguration configuration);
+
+    /**
+     * Create a new {@link SseClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
+     * {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @return The client
+     */
+    E createSseClient(@Nullable URL url);
+
+    /**
+     * Create a new {@link SseClient} with the specified configuration. Note that this method should only be used outside of the context of an application. Within Micronaut use
+     * {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @param configuration The client configuration
+     * @return The client
+     */
+    E createSseClient(@Nullable URL url,  HttpClientConfiguration configuration);
 }
 

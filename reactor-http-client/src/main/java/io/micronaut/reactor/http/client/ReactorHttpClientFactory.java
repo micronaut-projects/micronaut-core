@@ -48,7 +48,7 @@ public class ReactorHttpClientFactory {
      */
     @Bean
     @Secondary
-    protected BridgedReactorHttpClient httpClient(@Nullable InjectionPoint<?> injectionPoint) {
+    protected ReactorHttpClient httpClient(@Nullable InjectionPoint<?> injectionPoint) {
         if (injectionPoint != null) {
             return new BridgedReactorHttpClient(clientRegistry.getClient(injectionPoint.getAnnotationMetadata()),
                     clientRegistry.getSseClient(injectionPoint.getAnnotationMetadata()),

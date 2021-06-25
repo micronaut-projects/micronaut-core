@@ -48,7 +48,7 @@ public class RxHttpClientFactory {
      */
     @Bean
     @Secondary
-    protected BridgedRxHttpClient httpClient(@Nullable InjectionPoint<?> injectionPoint) {
+    protected RxHttpClient httpClient(@Nullable InjectionPoint<?> injectionPoint) {
         if (injectionPoint != null) {
             return new BridgedRxHttpClient(clientRegistry.getClient(injectionPoint.getAnnotationMetadata()),
                     clientRegistry.getSseClient(injectionPoint.getAnnotationMetadata()),

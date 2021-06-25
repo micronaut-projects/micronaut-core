@@ -15,12 +15,16 @@
  */
 package io.micronaut.reactive.rxjava2.http.client;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.client.HttpClientConfiguration;
 import io.reactivex.Flowable;
+
+import java.net.URL;
 
 /**
  * Extended version of {@link HttpClient} that exposes an RxJava 2.x specific interface.
@@ -93,5 +97,34 @@ public interface RxHttpClient extends HttpClient {
                 Argument.STRING,
                 DEFAULT_ERROR_TYPE
         );
+    }
+
+
+    /**
+     * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of a
+     * Micronaut application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead.
+     *
+     * @param url The base URL
+     * @return The client
+     */
+    static RxHttpClient create(@Nullable URL url) {
+        return new BridgedRxHttpClient(HttpClient.create(url),
+                HttpClient.createSseClient(url),
+                HttpClient.createStreamingClient(url));
+    }
+
+    /**
+     * Create a new {@link HttpClient} with the specified configuration. Note that this method should only be used
+     * outside of the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @param configuration the client configuration
+     * @return The client
+     * @since 2.2.0
+     */
+    static RxHttpClient create(@Nullable URL url, HttpClientConfiguration configuration) {
+        return new BridgedRxHttpClient(HttpClient.create(url, configuration),
+                HttpClient.createSseClient(url, configuration),
+                HttpClient.createStreamingClient(url, configuration));
     }
 }

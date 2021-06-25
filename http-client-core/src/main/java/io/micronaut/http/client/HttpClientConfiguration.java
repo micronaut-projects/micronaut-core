@@ -22,6 +22,7 @@ import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.HttpVersion;
+import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.logging.LogLevel;
@@ -659,6 +660,34 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * Create a new {@link SseClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
+     * {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @return The client
+     */
+    @Internal
+    static SseClient createSseClient(@Nullable URL url) {
+        ReactiveHttpClientFactory clientFactory = getReactiveHttpClientFactory();
+        return clientFactory.createSseClient(url);
+    }
+
+    /**
+     * Create a new {@link SseClient} with the specified configuration. Note that this method should only be used outside of the context of an application. Within Micronaut use
+     * {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @param configuration the client configuration
+     * @return The client
+     */
+    @Internal
+    static SseClient createSseClient(@Nullable URL url, HttpClientConfiguration configuration) {
+        ReactiveHttpClientFactory clientFactory = getReactiveHttpClientFactory();
+        return clientFactory.createSseClient(url);
+    }
+
+
+    /**
      * Create a new {@link HttpClient} with the specified configuration. Note that this method should only be used
      * outside of the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead
      *
@@ -682,8 +711,7 @@ public abstract class HttpClientConfiguration {
      * @return The client
      */
     @Internal
-    static StreamingHttpClient createStreamingClient(@NonNull URL url) {
-        ArgumentUtils.requireNonNull("url", url);
+    static StreamingHttpClient createStreamingClient(@Nullable URL url) {
         ReactiveHttpClientFactory clientFactory = getReactiveHttpClientFactory();
         return clientFactory.createStreamingClient(url);
     }
@@ -698,8 +726,7 @@ public abstract class HttpClientConfiguration {
      * @since 2.2.0
      */
     @Internal
-    static StreamingHttpClient createStreamingClient(@NonNull URL url, HttpClientConfiguration configuration) {
-        ArgumentUtils.requireNonNull("url", url);
+    static StreamingHttpClient createStreamingClient(@Nullable URL url, HttpClientConfiguration configuration) {
         ReactiveHttpClientFactory clientFactory = getReactiveHttpClientFactory();
         return clientFactory.createStreamingClient(url, configuration);
     }
