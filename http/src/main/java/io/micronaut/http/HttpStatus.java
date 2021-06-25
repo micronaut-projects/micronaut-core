@@ -95,12 +95,6 @@ public enum HttpStatus implements CharSequence {
     CONNECTION_TIMED_OUT(522, "Connection Timed Out"),
     CUSTOM_STATUS(0, "Custom Reason");
 
-    /**
-     * Standard status codes are a 3-digit integer. The first digit defines the
-     * class of the response, that class is considered here as the "generic reason".
-     *
-     * See: https://www.w3.org/Protocols/rfc2616/rfc2616-sec6.html#sec6.1.1
-     */
     private static final Map<Integer, String> GENERIC_REASONS;
 
     static {
@@ -140,7 +134,11 @@ public enum HttpStatus implements CharSequence {
     }
 
     /**
-     * The status for the given code.
+     * The status for the given code. If the code is non-standard a
+     * custom status is created with a generic reason phrase. The
+     * generic reason phrase is the class of the response.
+     *
+     * See: <a href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec6.html#sec6.1.1">RFC2616 Section 6.1.1</a>
      *
      * @param code The code
      * @return The value
@@ -286,7 +284,17 @@ public enum HttpStatus implements CharSequence {
         }
     }
 
+    /**
+     * The status for the given code and reason.
+     *
+     * @param statusCode The status code
+     * @param reason The reason. If null, a generic reason, same as {@link HttpStatus#valueOf(int)}, is provided
+     * @return The {@link HttpStatus}
+     */
     public static HttpStatus custom(int statusCode, String reason) {
+        if (Objects.isNull(reason)) {
+            return valueOf(statusCode);
+        }
         CUSTOM_STATUS.code = statusCode;
         CUSTOM_STATUS.reason = reason;
         return CUSTOM_STATUS;
