@@ -15,9 +15,8 @@ dependencies {
 
     implementation platform("io.projectreactor:reactor-bom:$reactorVersion")
     implementation 'io.projectreactor:reactor-core'
-    
+
     testImplementation project(":http-server-netty")
-    testImplementation project(":reactor-http-server-netty")
     testImplementation "com.github.tomakehurst:wiremock-jre8:2.27.2"
     testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-junit5"), {
         exclude module:'micronaut-runtime'
