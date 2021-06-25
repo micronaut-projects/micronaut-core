@@ -10,6 +10,7 @@ import io.micronaut.http.client.sse.SseClient
 import io.micronaut.http.sse.Event
 import io.micronaut.runtime.server.EmbeddedServer
 import org.opentest4j.AssertionFailedError
+import reactor.core.publisher.Flux
 
 import java.util.ArrayList
 
@@ -25,7 +26,7 @@ class HeadlineControllerSpec: StringSpec() {
 
             val events = ArrayList<Event<Headline>>()
 
-            client.eventStream(HttpRequest.GET<Any>("/headlines"), Headline::class.java).subscribe {
+            Flux.from(client.eventStream(HttpRequest.GET<Any>("/headlines"), Headline::class.java)).subscribe {
                 events.add(it)
             }
 

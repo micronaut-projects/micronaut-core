@@ -68,11 +68,11 @@ class SuspendMethodSpec {
 
     @Test
     fun testAsyncMethodReturnTypeString() {
-        val res = client
+        val res = Flux.from(client
             .retrieve(
                 HttpRequest.GET<String>("/async/string"),
                 Any::class.java
-            ).blockFirst()
+            )).blockFirst()
 
         assertEquals("async string", res)
     }

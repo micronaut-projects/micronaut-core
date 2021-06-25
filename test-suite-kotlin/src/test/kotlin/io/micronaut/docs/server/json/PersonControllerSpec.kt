@@ -29,6 +29,7 @@ import io.micronaut.runtime.server.EmbeddedServer
 import org.junit.jupiter.api.Assertions
 
 import org.junit.Assert.assertTrue
+import reactor.core.publisher.Flux
 
 class PersonControllerSpec: StringSpec() {
 
@@ -43,7 +44,7 @@ class PersonControllerSpec: StringSpec() {
     init {
         "test global error handler"() {
             val e = Assertions.assertThrows(HttpClientResponseException::class.java) {
-                client!!.exchange("/people/error", Map::class.java)
+                Flux.from(client!!.exchange("/people/error", Map::class.java))
                         .blockFirst()
             }
             val response = e.response as HttpResponse<Map<*, *>>
@@ -53,13 +54,13 @@ class PersonControllerSpec: StringSpec() {
         }
 
         "test save"() {
-            var response = client.exchange(HttpRequest.POST("/people", "{\"firstName\":\"Fred\",\"lastName\":\"Flintstone\",\"age\":45}"), Person::class.java).blockFirst()
+            var response = Flux.from(client.exchange(HttpRequest.POST("/people", "{\"firstName\":\"Fred\",\"lastName\":\"Flintstone\",\"age\":45}"), Person::class.java)).blockFirst()
             var person = response.body.get()
 
             person.firstName shouldBe "Fred"
             response.status shouldBe HttpStatus.CREATED
 
-            response = client.exchange(HttpRequest.GET<Any>("/people/Fred"), Person::class.java).blockFirst()
+            response = Flux.from(client.exchange(HttpRequest.GET<Any>("/people/Fred"), Person::class.java)).blockFirst()
             person = response.body.get()
 
             person.firstName shouldBe "Fred"
@@ -67,7 +68,7 @@ class PersonControllerSpec: StringSpec() {
         }
 
         "test save reactive"() {
-            val response = client.exchange(HttpRequest.POST("/people/saveReactive", "{\"firstName\":\"Wilma\",\"lastName\":\"Flintstone\",\"age\":36}"), Person::class.java).blockFirst()
+            val response = Flux.from(client.exchange(HttpRequest.POST("/people/saveReactive", "{\"firstName\":\"Wilma\",\"lastName\":\"Flintstone\",\"age\":36}"), Person::class.java)).blockFirst()
             val person = response.body.get()
 
             person.firstName shouldBe "Wilma"
@@ -75,7 +76,7 @@ class PersonControllerSpec: StringSpec() {
         }
 
         "test save future"() {
-            val response = client!!.exchange(HttpRequest.POST("/people/saveFuture", "{\"firstName\":\"Pebbles\",\"lastName\":\"Flintstone\",\"age\":0}"), Person::class.java).blockFirst()
+            val response = Flux.from(client!!.exchange(HttpRequest.POST("/people/saveFuture", "{\"firstName\":\"Pebbles\",\"lastName\":\"Flintstone\",\"age\":0}"), Person::class.java)).blockFirst()
             val person = response.body.get()
 
             person.firstName shouldBe "Pebbles"
@@ -83,7 +84,7 @@ class PersonControllerSpec: StringSpec() {
         }
 
         "test save args"() {
-            val response = client!!.exchange(HttpRequest.POST("/people/saveWithArgs", "{\"firstName\":\"Dino\",\"lastName\":\"Flintstone\",\"age\":3}"), Person::class.java).blockFirst()
+            val response = Flux.from(client!!.exchange(HttpRequest.POST("/people/saveWithArgs", "{\"firstName\":\"Dino\",\"lastName\":\"Flintstone\",\"age\":3}"), Person::class.java)).blockFirst()
             val person = response.body.get()
 
             person.firstName shouldBe "Dino"
@@ -92,7 +93,7 @@ class PersonControllerSpec: StringSpec() {
 
         "test person not found"() {
             val e = shouldThrow<HttpClientResponseException> {
-                client.exchange("/people/Sally", Map::class.java)
+                Flux.from(client.exchange("/people/Sally", Map::class.java))
                         .blockFirst()
             }
             val response = e.response as HttpResponse<Map<*, *>>
@@ -103,7 +104,7 @@ class PersonControllerSpec: StringSpec() {
 
         "test save invalid json"() {
             val e = shouldThrow<HttpClientResponseException> {
-                client.exchange<String, Person, Map<*, *>>(HttpRequest.POST("/people", "{\""), Argument.of(Person::class.java), Argument.of(Map::class.java)).blockFirst()
+                Flux.from(client.exchange<String, Person, Map<*, *>>(HttpRequest.POST("/people", "{\""), Argument.of(Person::class.java), Argument.of(Map::class.java))).blockFirst()
             }
             val response = e.response as HttpResponse<Map<*, *>>
 

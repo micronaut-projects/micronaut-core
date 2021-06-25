@@ -7,6 +7,7 @@ import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
+import reactor.core.publisher.Flux
 import kotlin.test.assertNotNull
 
 class ShoppingControllerSpec: StringSpec() {
@@ -22,7 +23,7 @@ class ShoppingControllerSpec: StringSpec() {
     init {
         "testSessionValueUsedOnReturnValue" {
             // tag::view[]
-            var response = client.exchange(HttpRequest.GET<Cart>("/shopping/cart"), Cart::class.java) // <1>
+            var response = Flux.from(client.exchange(HttpRequest.GET<Cart>("/shopping/cart"), Cart::class.java)) // <1>
                                  .blockFirst()
             var cart = response.body()
 
@@ -34,8 +35,8 @@ class ShoppingControllerSpec: StringSpec() {
             // tag::add[]
             val sessionId = response.header(HttpHeaders.AUTHORIZATION_INFO) // <1>
 
-            response = client.exchange(HttpRequest.POST("/shopping/cart/Apple", "")
-                             .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart::class.java) // <2>
+            response = Flux.from(client.exchange(HttpRequest.POST("/shopping/cart/Apple", "")
+                             .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart::class.java)) // <2>
                              .blockFirst()
             cart = response.body()
             // end::add[]
@@ -43,8 +44,8 @@ class ShoppingControllerSpec: StringSpec() {
             assertNotNull(cart)
             cart.items.size shouldBe 1
 
-            response = client.exchange(HttpRequest.GET<Any>("/shopping/cart")
-                             .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart::class.java)
+            response = Flux.from(client.exchange(HttpRequest.GET<Any>("/shopping/cart")
+                             .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart::class.java))
                              .blockFirst()
             cart = response.body()
 
