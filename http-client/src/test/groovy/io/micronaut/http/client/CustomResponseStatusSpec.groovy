@@ -84,7 +84,9 @@ class CustomResponseStatusSpec extends Specification {
         where:
         targetObject          | requiredCode | requiredReason | responseCode | responseReason
         'HttpResponse'        | 380          | 'My Reason'    | 380          | 'My Reason'
+        'HttpResponse'        | 380          | null           | 380          | 'Redirection (380)'
         'MutableHttpResponse' | 380          | 'My Reason'    | 380          | 'My Reason'
+        'MutableHttpResponse' | 380          | null           | 380          | 'Redirection (380)'
     }
 
     @Controller
