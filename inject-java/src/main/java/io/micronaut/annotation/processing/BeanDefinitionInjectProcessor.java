@@ -174,7 +174,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             return;
                         }
                         if (element.getKind() == ENUM) {
-                            error(element, "Enum types cannot be defined as beans");
+                            final AnnotationMetadata am = annotationUtils.getAnnotationMetadata(element);
+                            if (isDeclaredBeanInMetadata(am)) {
+                                error(element, "Enum types cannot be defined as beans");
+                            }
                             return;
                         }
                         // skip Groovy code, handled by InjectTransform. Required for GroovyEclipse compiler
@@ -351,10 +354,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         private boolean isDeclaredBean(@Nullable MethodElement constructor, boolean hasQualifier) {
+            final AnnotationMetadata concreteClassMetadata = this.concreteClassMetadata;
             return isExecutableType ||
-                    concreteClassElement.hasDeclaredStereotype(Bean.class) ||
-                    concreteClassMetadata.hasStereotype(AnnotationUtil.SCOPE) ||
-                    concreteClassMetadata.hasStereotype(DefaultScope.class) ||
+                    isDeclaredBeanInMetadata(concreteClassMetadata) ||
                     (constructor != null && constructor.hasStereotype(AnnotationUtil.INJECT)) || hasQualifier;
         }
 
@@ -2045,6 +2047,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             return shouldExclude(configurationMetadata.getIncludes(), configurationMetadata.getExcludes(), propertyName);
         }
 
+    }
+
+    private boolean isDeclaredBeanInMetadata(AnnotationMetadata concreteClassMetadata) {
+        return concreteClassMetadata.hasDeclaredStereotype(Bean.class) ||
+                concreteClassMetadata.hasStereotype(AnnotationUtil.SCOPE) ||
+                concreteClassMetadata.hasStereotype(DefaultScope.class);
     }
 
     /**

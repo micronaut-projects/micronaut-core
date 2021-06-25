@@ -17,8 +17,10 @@ package io.micronaut.http.server.netty.websocket;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -67,6 +69,7 @@ import reactor.core.scheduler.Schedulers;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -124,13 +127,14 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
 
     @Override
     public boolean acceptInboundMessage(Object msg) {
-        if (msg instanceof NettyHttpRequest) {
-            NettyHttpRequest<?> request = (NettyHttpRequest) msg;
-            if (request.getNativeRequest().headers().contains(HttpHeaderNames.CONNECTION.toString(), HttpHeaderValues.UPGRADE, true)) {
-                return request.getNativeRequest().headers().containsValue(HttpHeaderNames.UPGRADE, WEB_SOCKET_HEADER_VALUE, true);
-            }
-        }
-    return false;
+        return msg instanceof NettyHttpRequest && isWebSocketUpgrade((NettyHttpRequest<?>) msg);
+    }
+
+    private boolean isWebSocketUpgrade(@NonNull NettyHttpRequest<?> request) {
+        HttpHeaders headers = request.getHeaders();
+        String connectValue = headers.get(HttpHeaderNames.CONNECTION, String.class).orElse("").toLowerCase(Locale.ENGLISH);
+        return connectValue.contains(HttpHeaderValues.UPGRADE) &&
+                WEB_SOCKET_HEADER_VALUE.toString().equalsIgnoreCase(headers.get(HttpHeaderNames.UPGRADE));
     }
 
     @Override
