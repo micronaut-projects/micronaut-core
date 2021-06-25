@@ -37,16 +37,16 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
     @Unroll
     void "test bind HTTP parameters for URI #httpMethod #uri"() {
         given:
-        def req = httpMethod == HttpMethod.GET ? HttpRequest.GET(uri) : HttpRequest.POST(uri, '{}')
-        def exchange = rxClient.exchange(req, String)
-        def response = exchange.onErrorResume(t -> {
+        HttpRequest req = httpMethod == HttpMethod.GET ? HttpRequest.GET(uri) : HttpRequest.POST(uri, '{}')
+        Flux exchange = Flux.from(rxClient.exchange(req, String))
+        HttpResponse response = exchange.onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)
             }
             throw t
         }).blockFirst()
-        def status = response.status
-        def body = null
+        HttpStatus status = response.status
+        String body = null
         if (status == HttpStatus.OK) {
             body = response.body()
         }
@@ -93,9 +93,9 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
 
     void "test list to single error"() {
         given:
-        def req = HttpRequest.GET('/parameter/exploded?title=The%20Stand&age=20&age=30')
-        def exchange = rxClient.exchange(req, String)
-        def response = exchange.onErrorResume(t -> {
+        HttpRequest req = HttpRequest.GET('/parameter/exploded?title=The%20Stand&age=20&age=30')
+        Flux exchange = Flux.from(rxClient.exchange(req, String))
+        HttpResponse response = exchange.onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)
             }

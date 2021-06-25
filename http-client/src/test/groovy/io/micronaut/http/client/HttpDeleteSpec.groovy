@@ -47,7 +47,7 @@ class HttpDeleteSpec extends Specification {
 
     void "test http delete"() {
         when:
-        def res = Flux.from(client.exchange(HttpRequest.DELETE('/delete/simple'))).blockFirst()
+        HttpResponse<?> res = Flux.from(client.exchange(HttpRequest.DELETE('/delete/simple'))).blockFirst()
 
         then:
         res.status == HttpStatus.NO_CONTENT
@@ -55,7 +55,7 @@ class HttpDeleteSpec extends Specification {
 
     void "test http delete with blocking client"() {
         when:
-        def res = Flux.from(client.exchange(HttpRequest.DELETE('/delete/simple'))).blockFirst()
+        HttpResponse<?> res = Flux.from(client.exchange(HttpRequest.DELETE('/delete/simple'))).blockFirst()
 
         then:
         res.status == HttpStatus.NO_CONTENT
@@ -63,10 +63,11 @@ class HttpDeleteSpec extends Specification {
 
     void "test http delete with body"() {
         when:
-        def res = Flux.from(client.exchange(
+        HttpResponse<?> res = Flux.from(client.exchange(
                 HttpRequest.DELETE('/delete/body', 'test')
                            .contentType(MediaType.TEXT_PLAIN) , String)).blockFirst()
-        def body = res.body
+        Optional<String> body = res.body
+
         then:
         res.status == HttpStatus.ACCEPTED
         body.isPresent()

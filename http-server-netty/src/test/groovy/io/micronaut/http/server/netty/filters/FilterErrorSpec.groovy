@@ -5,12 +5,13 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.core.util.StringUtils
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
@@ -27,12 +28,12 @@ class FilterErrorSpec extends Specification {
     void "test errors emitted from filters interacting with exception handlers"() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': FilterErrorSpec.simpleName])
         def ctx = server.applicationContext
-        ReactorHttpClient client = ctx.createBean(ReactorHttpClient, server.getURL())
+        HttpClient client = ctx.createBean(HttpClient, server.getURL())
         First first = ctx.getBean(First)
         Next next = ctx.getBean(Next)
 
         when:
-        def response = client.exchange("/filter-error-spec", String)
+        HttpResponse<String> response = Flux.from(client.exchange("/filter-error-spec", String))
                 .onErrorResume(t -> {
                     if (t instanceof HttpClientResponseException) {
                         return Flux.just(((HttpClientResponseException) t).response)
@@ -49,7 +50,7 @@ class FilterErrorSpec extends Specification {
         next.executedCount.get() == 0
 
         when:
-        response = client.exchange(HttpRequest.GET("/filter-error-spec").header("X-Passthru", "true"), String)
+        response = Flux.from(client.exchange(HttpRequest.GET("/filter-error-spec").header("X-Passthru", "true"), String))
                 .onErrorResume(t -> {
                     if (t instanceof HttpClientResponseException) {
                         return Flux.just(((HttpClientResponseException)t).response)
@@ -74,11 +75,11 @@ class FilterErrorSpec extends Specification {
     void "test non once per request filter throwing error does not loop"() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': FilterErrorSpec.simpleName + '2'])
         def ctx = server.applicationContext
-        ReactorHttpClient client = ctx.createBean(ReactorHttpClient, server.getURL())
+        HttpClient client = ctx.createBean(HttpClient, server.getURL())
         FirstEvery filter = ctx.getBean(FirstEvery)
 
         when:
-        def response = client.exchange("/filter-error-spec", String)
+        HttpResponse<String> response = Flux.from(client.exchange("/filter-error-spec", String))
                 .onErrorResume(t -> {
                     if (t instanceof HttpClientResponseException) {
                         return Flux.just(((HttpClientResponseException) t).response)
@@ -100,11 +101,11 @@ class FilterErrorSpec extends Specification {
     void "test filter throwing exception handled by exception handler throwing exception"() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': FilterErrorSpec.simpleName + '3'])
         def ctx = server.applicationContext
-        ReactorHttpClient client = ctx.createBean(ReactorHttpClient, server.getURL())
+        HttpClient client = ctx.createBean(HttpClient, server.getURL())
         ExceptionException filter = ctx.getBean(ExceptionException)
 
         when:
-        def response = client.exchange("/filter-error-spec-3", String)
+        HttpResponse<String> response = Flux.from(client.exchange("/filter-error-spec-3", String))
                 .onErrorResume(t -> {
                     if (t instanceof HttpClientResponseException) {
                         return Flux.just(((HttpClientResponseException) t).response)

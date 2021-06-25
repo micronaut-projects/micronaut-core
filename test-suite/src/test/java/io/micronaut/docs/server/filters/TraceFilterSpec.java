@@ -20,7 +20,7 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.docs.server.intro.HelloControllerSpec;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.client.ReactorHttpClient;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -32,7 +32,7 @@ import static org.junit.Assert.assertEquals;
 
 public class TraceFilterSpec {
     private static EmbeddedServer server;
-    private static ReactorHttpClient client;
+    private static HttpClient client;
 
     @BeforeClass
     public static void setupServer() {
@@ -43,7 +43,7 @@ public class TraceFilterSpec {
         server = ApplicationContext.run(EmbeddedServer.class, map, Environment.TEST);
         client = server
                 .getApplicationContext()
-                .createBean(ReactorHttpClient.class, server.getURL());
+                .createBean(HttpClient.class, server.getURL());
     }
 
     @AfterClass

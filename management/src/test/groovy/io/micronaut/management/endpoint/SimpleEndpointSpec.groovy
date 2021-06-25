@@ -21,13 +21,14 @@ import io.micronaut.core.util.Toggleable
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.management.endpoint.annotation.Endpoint
 import io.micronaut.management.endpoint.annotation.Read
 import io.micronaut.management.endpoint.annotation.Selector
 import io.micronaut.management.endpoint.annotation.Write
 import io.micronaut.runtime.server.EmbeddedServer
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 /**
@@ -40,10 +41,10 @@ class SimpleEndpointSpec extends Specification {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
                 ['endpoints.simple.myValue':'foo'], Environment.TEST)
-        ReactorHttpClient rxClient = server.applicationContext.createBean(ReactorHttpClient, server.getURL())
+        HttpClient rxClient = server.applicationContext.createBean(HttpClient, server.getURL())
 
         when:
-        def response = rxClient.exchange("/simple", String).blockFirst()
+        def response = Flux.from(rxClient.exchange("/simple", String)).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -58,10 +59,10 @@ class SimpleEndpointSpec extends Specification {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
                 ['endpoints.simple.myValue':'foo'], Environment.TEST)
-        ReactorHttpClient rxClient = server.applicationContext.createBean(ReactorHttpClient, server.getURL())
+        HttpClient rxClient = server.applicationContext.createBean(HttpClient, server.getURL())
 
         when:
-        def response = rxClient.exchange(HttpRequest.HEAD("/simple"), String).blockFirst()
+        def response = Flux.from(rxClient.exchange(HttpRequest.HEAD("/simple"), String)).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -77,11 +78,11 @@ class SimpleEndpointSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
                 ['endpoints.simple.myValue':'foo']
         )
-        ReactorHttpClient rxClient = server.applicationContext.createBean(ReactorHttpClient, server.getURL())
+        HttpClient rxClient = server.applicationContext.createBean(HttpClient, server.getURL())
 
 
         when:
-        def response = rxClient.exchange("/simple/baz", String).blockFirst()
+        def response = Flux.from(rxClient.exchange("/simple/baz", String)).blockFirst()
 
 
         then:
@@ -98,16 +99,16 @@ class SimpleEndpointSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
                 ['endpoints.simple.myValue':'foo']
         )
-        ReactorHttpClient rxClient = server.applicationContext.createBean(ReactorHttpClient, server.getURL())
+        HttpClient rxClient = server.applicationContext.createBean(HttpClient, server.getURL())
 
         when:
-        def response = rxClient.exchange(HttpRequest.POST("/simple", "bar").contentType("text/plain"), String).blockFirst()
+        def response = Flux.from(rxClient.exchange(HttpRequest.POST("/simple", "bar").contentType("text/plain"), String)).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
 
         when:
-        response = rxClient.exchange("/simple", String).blockFirst()
+        response = Flux.from(rxClient.exchange("/simple", String)).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -123,10 +124,10 @@ class SimpleEndpointSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
                 ['endpoints.simple.enabled':false]
         )
-        ReactorHttpClient rxClient = server.applicationContext.createBean(ReactorHttpClient, server.getURL())
+        HttpClient rxClient = server.applicationContext.createBean(HttpClient, server.getURL())
 
         when:
-        rxClient.exchange("/simple", String).blockFirst()
+        Flux.from(rxClient.exchange("/simple", String)).blockFirst()
 
         then:
         HttpClientResponseException ex = thrown()

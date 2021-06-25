@@ -6,6 +6,7 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import reactor.core.publisher.Flux
 
 import javax.annotation.Nullable
 
@@ -13,42 +14,42 @@ class RouteComplexitySpec extends AbstractMicronautSpec {
 
     void "test route complexity"() {
         when:
-        String body = rxClient.retrieve(HttpRequest.GET("/test-complexity/id/somefile.xls")).blockFirst()
+        String body = Flux.from(rxClient.retrieve(HttpRequest.GET("/test-complexity/id/somefile.xls"))).blockFirst()
 
         then:
         noExceptionThrown()
         body == "fallback"
 
         when:
-        body = rxClient.retrieve(HttpRequest.GET("/test-complexity/id/somefile.csv")).blockFirst()
+        body = Flux.from(rxClient.retrieve(HttpRequest.GET("/test-complexity/id/somefile.csv"))).blockFirst()
 
         then:
         noExceptionThrown()
         body == "csv"
 
         when:
-        body = rxClient.retrieve(HttpRequest.GET("/test-complexity/other/a/b/c/d")).blockFirst()
+        body = Flux.from(rxClient.retrieve(HttpRequest.GET("/test-complexity/other/a/b/c/d"))).blockFirst()
 
         then:
         noExceptionThrown()
         body == "ab/c"
 
         when:
-        body = rxClient.retrieve(HttpRequest.GET("/test-complexity/other2/a/b/c")).blockFirst()
+        body = Flux.from(rxClient.retrieve(HttpRequest.GET("/test-complexity/other2/a/b/c"))).blockFirst()
 
         then:
         noExceptionThrown()
         body == "ab/c"
 
         when:
-        body = rxClient.retrieve(HttpRequest.GET("/test-complexity/list")).blockFirst()
+        body = Flux.from(rxClient.retrieve(HttpRequest.GET("/test-complexity/list"))).blockFirst()
 
         then:
         noExceptionThrown()
         body == "list"
 
         when:
-        body = rxClient.retrieve(HttpRequest.GET("/test-complexity/length/abc")).blockFirst()
+        body = Flux.from(rxClient.retrieve(HttpRequest.GET("/test-complexity/length/abc"))).blockFirst()
 
         then:
         noExceptionThrown()

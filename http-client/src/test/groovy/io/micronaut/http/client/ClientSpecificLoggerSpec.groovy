@@ -67,8 +67,7 @@ class ClientSpecificLoggerSpec extends Specification {
 
         @Inject
         @Client(value = "client-two", configuration = ClientTwoHttpConfiguration.class)
-        ReactorHttpClient rxHttpClient
-
+        HttpClient rxHttpClient
     }
 
     @Requires(property = 'spec.name', value = 'ClientSpecificLoggerSpec')

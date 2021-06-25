@@ -14,7 +14,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.DefaultHttpClientConfiguration
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.netty.DefaultHttpClient
@@ -33,7 +33,7 @@ import java.time.Duration
 class ProxyRequestSpec extends Specification {
     @Inject
     @Client("/")
-    ReactorHttpClient client
+    HttpClient client
 
     @Inject
     EmbeddedServer embeddedServer

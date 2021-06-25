@@ -19,7 +19,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -32,9 +32,9 @@ import spock.lang.Specification
 class ShoppingControllerSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-    @Shared @AutoCleanup ReactorHttpClient httpClient = embeddedServer
+    @Shared @AutoCleanup HttpClient httpClient = embeddedServer
                                                         .getApplicationContext()
-                                                        .createBean(ReactorHttpClient, embeddedServer.getURL())
+                                                        .createBean(HttpClient, embeddedServer.getURL())
 
     void "test session value used on return value"() {
 

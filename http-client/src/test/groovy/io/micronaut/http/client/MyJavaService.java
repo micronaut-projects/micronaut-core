@@ -26,13 +26,13 @@ public class MyJavaService {
     HttpClient client;
 
     @Inject @Client("/")
-    ReactorHttpClient rxHttpClient;
+    HttpClient reactiveHttpClient;
 
     public HttpClient getClient() {
         return client;
     }
 
-    public ReactorHttpClient getReactorHttpClient() {
-        return rxHttpClient;
+    public HttpClient getReactiveHttpClient() {
+        return reactiveHttpClient;
     }
 }

@@ -13,20 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.websocket;
+package io.micronaut.reactive.rxjava2.http.client.websockets;
 
 import io.micronaut.http.MediaType;
-import reactor.core.publisher.Flux;
+import io.micronaut.websocket.WebSocketSession;
+import io.reactivex.Flowable;
 
 import java.util.Set;
 
 /**
- * Generalization of the {@link WebSocketSession} interface for Project Reactor.
+ * Generalization of the {@link WebSocketSession} interface for RxJava.
  *
  * @author graemerocher
  * @since 1.0
  */
-public interface ReactorWebSocketSession extends WebSocketSession {
+public interface RxWebSocketSession extends WebSocketSession {
 
     /**
      * The current open sessions.
@@ -34,16 +35,16 @@ public interface ReactorWebSocketSession extends WebSocketSession {
      * @return The open sessions
      */
     @Override
-    Set<? extends ReactorWebSocketSession> getOpenSessions();
+    Set<? extends RxWebSocketSession> getOpenSessions();
 
     /**
-     * Broadcast a message and return a {@link Flux}.
+     * Broadcast a message and return a {@link Flowable}.
      *
      * @param message The message
      * @param mediaType The media type
      * @param <T> The message generic type
-     * @return The {@link Flux}
+     * @return The {@link Flowable}
      */
     @Override
-    <T> Flux<T> send(T message, MediaType mediaType);
+    <T> Flowable<T> send(T message, MediaType mediaType);
 }

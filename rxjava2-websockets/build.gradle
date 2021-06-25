@@ -1,5 +1,0 @@
-dependencies {
-    api project(":websocket")
-    api project(":runtime")
-    api dependencyVersion("rxjava2")
-}

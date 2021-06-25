@@ -3,8 +3,8 @@ package io.micronaut.http2
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.AppenderBase
 import ch.qos.logback.classic.Logger
-import io.micronaut.http.client.ReactorHttpClient
-import io.micronaut.http.client.ReactorStreamingHttpClient
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.StreamingHttpClient
 import org.slf4j.LoggerFactory
 
 import io.micronaut.context.ApplicationContext
@@ -39,7 +39,7 @@ class Http2AccessLoggerSpec extends Specification {
             "micronaut.server.netty.log-level" : "TRACE",
             'micronaut.server.netty.access-logger.enabled': true
     ])
-    ReactorHttpClient client = server.getApplicationContext().getBean(ReactorHttpClient)
+    HttpClient client = server.getApplicationContext().getBean(HttpClient)
     static MemoryAppender appender = new MemoryAppender()
 
     static {
@@ -51,7 +51,7 @@ class Http2AccessLoggerSpec extends Specification {
     void "test make HTTP/2 stream request with access logger enabled"() {
         when:"A non stream request is executed"
         appender.events.clear()
-        def people = ((ReactorStreamingHttpClient)client).jsonStream(HttpRequest.GET("${server.URL}/http2/personStream"), Person)
+        def people = Flux.from(((StreamingHttpClient)client).jsonStream(HttpRequest.GET("${server.URL}/http2/personStream"), Person))
                 .collectList().block()
 
         then:
@@ -59,7 +59,7 @@ class Http2AccessLoggerSpec extends Specification {
         appender.headLog(10)
 
         when:"posting a data"
-        def response = client.exchange(HttpRequest.POST("${server.URL}/http2/personStream", Object), Argument.listOf(Person))
+        def response = Flux.from(client.exchange(HttpRequest.POST("${server.URL}/http2/personStream", Object), Argument.listOf(Person)))
                 .blockFirst()
 
         then:
@@ -82,21 +82,21 @@ class Http2AccessLoggerSpec extends Specification {
     void "test make HTTP/2 request with access logger enabled - HTTPS"() {
         when:
         appender.events.clear()
-        def result = client.retrieve("${server.URL}/http2").blockFirst()
+        def result = Flux.from(client.retrieve("${server.URL}/http2")).blockFirst()
 
         then:
         result == 'Version: HTTP_2_0'
         appender.headLog(10)
 
         when:"operation repeated to use same connection"
-        result = client.retrieve("${server.URL}/http2").blockFirst()
+        result = Flux.from(client.retrieve("${server.URL}/http2")).blockFirst()
 
         then:
         result == 'Version: HTTP_2_0'
         appender.headLog(10)
 
         when:"A non stream request is executed"
-        client.retrieve(HttpRequest.GET("${server.URL}/http2/personStream"), Argument.listOf(Person))
+        Flux.from(client.retrieve(HttpRequest.GET("${server.URL}/http2/personStream"), Argument.listOf(Person)))
                 .blockFirst()
 
         then:
@@ -113,18 +113,18 @@ class Http2AccessLoggerSpec extends Specification {
                 "micronaut.server.netty.log-level" : "TRACE",
                 'micronaut.server.netty.access-logger.enabled': true
         ])
-        ReactorHttpClient client = server.getApplicationContext().getBean(ReactorHttpClient)
+        HttpClient client = server.getApplicationContext().getBean(HttpClient)
         appender.events.clear()
 
         when:
-        def result = client.retrieve("${server.URL}/http2").blockFirst()
+        String result = Flux.from(client.retrieve("${server.URL}/http2")).blockFirst()
 
         then:
         result == 'Version: HTTP_2_0'
         appender.headLog(10)
 
         when:"operation repeated to use same connection"
-        result = client.retrieve("${server.URL}/http2").blockFirst()
+        result = Flux.from(client.retrieve("${server.URL}/http2")).blockFirst()
 
         then:
         result == 'Version: HTTP_2_0'
@@ -145,9 +145,9 @@ class Http2AccessLoggerSpec extends Specification {
                 "micronaut.server.netty.log-level" : "TRACE",
                 'micronaut.server.netty.access-logger.enabled': true
         ])
-        ReactorHttpClient client = server.getApplicationContext().getBean(ReactorHttpClient)
+        HttpClient client = server.getApplicationContext().getBean(HttpClient)
         appender.events.clear()
-        def result = client.retrieve("${server.URL}/http2").blockFirst()
+        String result = Flux.from(client.retrieve("${server.URL}/http2")).blockFirst()
 
         expect:
         result == 'Version: HTTP_1_1'

@@ -9,6 +9,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.channel.Channel
 import io.netty.channel.pool.AbstractChannelPoolMap
+import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Ignore
 import spock.lang.Retry
@@ -34,10 +35,10 @@ class IdleTimeoutSpec extends Specification {
       'micronaut.http.client.connection-pool-idle-timeout':'800ms',
       'micronaut.http.client.pool.enabled':true
     )
-    ReactorHttpClient httpClient = clientContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+    HttpClient httpClient = clientContext.createBean(HttpClient, embeddedServer.getURL())
 
     when:"make first request"
-    httpClient.retrieve(HttpRequest.GET('/idleTimeout/'),String).blockFirst()
+    Flux.from(httpClient.retrieve(HttpRequest.GET('/idleTimeout/'),String)).blockFirst()
     Deque<Channel> deque = getQueuedChannels(httpClient)
     Channel ch1 = deque.first
 
@@ -49,7 +50,7 @@ class IdleTimeoutSpec extends Specification {
     }
 
     when:"make another request"
-    httpClient.retrieve(HttpRequest.GET('/idleTimeout'),String).blockFirst()
+    Flux.from(httpClient.retrieve(HttpRequest.GET('/idleTimeout'),String)).blockFirst()
     Channel ch2 = deque.first
 
     then:"ensure channel 2 is open and channel 2 != channel 1"
@@ -71,10 +72,10 @@ class IdleTimeoutSpec extends Specification {
       'my.port':embeddedServer.getPort(),
       'micronaut.http.client.pool.enabled':true
     )
-    ReactorHttpClient httpClient = clientContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+    HttpClient httpClient = clientContext.createBean(HttpClient, embeddedServer.getURL())
 
     when:"make first request"
-    httpClient.retrieve(HttpRequest.GET('/idleTimeout/'),String).blockFirst()
+    Flux.from(httpClient.retrieve(HttpRequest.GET('/idleTimeout/'),String)).blockFirst()
     Deque<Channel> deque = getQueuedChannels(httpClient)
     Channel ch1 = deque.first
 
@@ -85,7 +86,7 @@ class IdleTimeoutSpec extends Specification {
     }
 
     when:"make another request"
-    httpClient.retrieve(HttpRequest.GET('/idleTimeout'),String).blockFirst()
+    Flux.from(httpClient.retrieve(HttpRequest.GET('/idleTimeout'),String)).blockFirst()
     Channel ch2 = deque.first
 
     then:"ensure channel is still open"
@@ -100,7 +101,7 @@ class IdleTimeoutSpec extends Specification {
     clientContext.close()
   }
 
-  Deque getQueuedChannels(ReactorHttpClient client) {
+  Deque getQueuedChannels(HttpClient client) {
     AbstractChannelPoolMap poolMap = client.poolMap
     Field mapField = AbstractChannelPoolMap.getDeclaredField("map")
     mapField.setAccessible(true)

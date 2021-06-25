@@ -18,7 +18,7 @@ package io.micronaut.http.client.docs.binding;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.client.ReactorHttpClient;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.hamcrest.CoreMatchers;
@@ -44,18 +44,18 @@ public class BookControllerTest {
     @Test
     public void testPostInvalidFormData() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
-        ReactorHttpClient client = embeddedServer.getApplicationContext().createBean(ReactorHttpClient.class, embeddedServer.getURL());
+        HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL());
 
         // tag::postform[]
         Map<String, String> data = new LinkedHashMap<>();
         data.put("title", "The Stand");
         data.put("pages", "notnumber");
         data.put("url", "noturl");
-        Flux<HttpResponse<Book>> call = client.exchange(
+        Flux<HttpResponse<Book>> call = Flux.from(client.exchange(
                 POST("/binding/book", data)
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED),
                 Book.class
-        );
+        ));
         // end::postform[]
 
         thrown.expect(HttpClientResponseException.class);

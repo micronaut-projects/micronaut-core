@@ -26,6 +26,8 @@ import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.sse.Event;
 import io.reactivex.Flowable;
+import org.reactivestreams.Publisher;
+
 import java.util.Map;
 
 /**
@@ -62,57 +64,57 @@ class BridgedRxHttpClient implements RxHttpClient, RxSseClient, RxStreamingHttpC
 
     @Override
     public <I, O, E> Flowable<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
-        return Flowable.fromPublisher(((HttpClient) httpClient).exchange(request, bodyType, errorType));
+        return Flowable.fromPublisher(httpClient.exchange(request, bodyType, errorType));
     }
 
     @Override
     public <I, O> Flowable<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType) {
-        return Flowable.fromPublisher(((HttpClient) httpClient).exchange(request, bodyType));
+        return Flowable.fromPublisher(httpClient.exchange(request, bodyType));
     }
 
     @Override
     public <I, O, E> Flowable<O> retrieve(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
-        return Flowable.fromPublisher(((HttpClient) httpClient).retrieve(request, bodyType));
+        return Flowable.fromPublisher(httpClient.retrieve(request, bodyType));
     }
 
     @Override
     public <I> Flowable<HttpResponse<ByteBuffer>> exchange(HttpRequest<I> request) {
-        return Flowable.fromPublisher(((HttpClient) httpClient).exchange(request));
+        return Flowable.fromPublisher(httpClient.exchange(request));
     }
 
     @Override
     public Flowable<HttpResponse<ByteBuffer>> exchange(String uri) {
-        return Flowable.fromPublisher(((HttpClient) httpClient).exchange(uri));
+        return Flowable.fromPublisher(httpClient.exchange(uri));
     }
 
     @Override
     public <O> Flowable<HttpResponse<O>> exchange(String uri, Class<O> bodyType) {
-        return Flowable.fromPublisher(((HttpClient) httpClient).exchange(uri, bodyType));
+        return Flowable.fromPublisher(httpClient.exchange(uri, bodyType));
     }
 
     @Override
     public <I, O> Flowable<HttpResponse<O>> exchange(HttpRequest<I> request, Class<O> bodyType) {
-        return Flowable.fromPublisher(((HttpClient) httpClient).exchange(request, bodyType));
+        return Flowable.fromPublisher(httpClient.exchange(request, bodyType));
     }
 
     @Override
     public <I, O> Flowable<O> retrieve(HttpRequest<I> request, Argument<O> bodyType) {
-        return Flowable.fromPublisher(((HttpClient) httpClient).retrieve(request, bodyType));
+        return Flowable.fromPublisher(httpClient.retrieve(request, bodyType));
     }
 
     @Override
     public <I, O> Flowable<O> retrieve(HttpRequest<I> request, Class<O> bodyType) {
-        return Flowable.fromPublisher(((HttpClient) httpClient).retrieve(request, bodyType));
+        return Flowable.fromPublisher(httpClient.retrieve(request, bodyType));
     }
 
     @Override
     public <I> Flowable<String> retrieve(HttpRequest<I> request) {
-        return Flowable.fromPublisher(((HttpClient) httpClient).retrieve(request));
+        return Flowable.fromPublisher(httpClient.retrieve(request));
     }
 
     @Override
     public Flowable<String> retrieve(String uri) {
-        return Flowable.fromPublisher(((HttpClient) httpClient).retrieve(uri));
+        return Flowable.fromPublisher(httpClient.retrieve(uri));
     }
 
     @Override
@@ -122,51 +124,51 @@ class BridgedRxHttpClient implements RxHttpClient, RxSseClient, RxStreamingHttpC
 
     @Override
     public <I> Flowable<Event<ByteBuffer<?>>> eventStream(HttpRequest<I> request) {
-        return Flowable.fromPublisher(((SseClient) httpClient).eventStream(request));
+        return Flowable.fromPublisher(sseClient.eventStream(request));
     }
 
     @Override
     public <I, B> Flowable<Event<B>> eventStream(HttpRequest<I> request, Argument<B> eventType) {
-        return Flowable.fromPublisher(((SseClient) sseClient).eventStream(request, eventType));
+        return Flowable.fromPublisher(sseClient.eventStream(request, eventType));
     }
 
     @Override
     public <I, B> Flowable<Event<B>> eventStream(HttpRequest<I> request, Class<B> eventType) {
-        return Flowable.fromPublisher(((SseClient) sseClient).eventStream(request, eventType));
+        return Flowable.fromPublisher(sseClient.eventStream(request, eventType));
     }
 
     @Override
     public <B> Flowable<Event<B>> eventStream(String uri, Class<B> eventType) {
-        return Flowable.fromPublisher(((SseClient) sseClient).eventStream(uri, eventType));
+        return Flowable.fromPublisher(sseClient.eventStream(uri, eventType));
     }
 
     @Override
     public <B> Flowable<Event<B>> eventStream(String uri, Argument<B> eventType) {
-        return Flowable.fromPublisher(((SseClient) sseClient).eventStream(uri, eventType));
+        return Flowable.fromPublisher(sseClient.eventStream(uri, eventType));
     }
 
     @Override
     public <I> Flowable<ByteBuffer<?>> dataStream(HttpRequest<I> request) {
-        return Flowable.fromPublisher(((StreamingHttpClient) streamingHttpClient).dataStream(request));
+        return Flowable.fromPublisher(streamingHttpClient.dataStream(request));
     }
 
     @Override
     public <I> Flowable<HttpResponse<ByteBuffer<?>>> exchangeStream(HttpRequest<I> request) {
-        return Flowable.fromPublisher(((StreamingHttpClient) streamingHttpClient).exchangeStream(request));
+        return Flowable.fromPublisher(streamingHttpClient.exchangeStream(request));
     }
 
     @Override
-    public <I> Flowable<Map<String, Object>> jsonStream(HttpRequest<I> request) {
-        return Flowable.fromPublisher(((StreamingHttpClient) streamingHttpClient).jsonStream(request));
+    public <I> Publisher<Map<String, Object>> jsonStream(HttpRequest<I> request) {
+        return Flowable.fromPublisher(streamingHttpClient.jsonStream(request));
     }
 
     @Override
     public <I, O> Flowable<O> jsonStream(HttpRequest<I> request, Argument<O> type) {
-        return Flowable.fromPublisher(((StreamingHttpClient) streamingHttpClient).jsonStream(request, type));
+        return Flowable.fromPublisher(streamingHttpClient.jsonStream(request, type));
     }
 
     @Override
     public <I, O> Flowable<O> jsonStream(HttpRequest<I> request, Class<O> type) {
-        return Flowable.fromPublisher(((StreamingHttpClient) streamingHttpClient).jsonStream(request, type));
+        return Flowable.fromPublisher(streamingHttpClient.jsonStream(request, type));
     }
 }

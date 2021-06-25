@@ -21,7 +21,7 @@ import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
@@ -33,7 +33,7 @@ class InfoEndpointSpec extends Specification {
     void "test the info endpoint returns expected result"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.info.sensitive': false, 'info.test': 'foo'], Environment.TEST)
-        ReactorHttpClient rxClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         def response = rxClient.exchange(HttpRequest.GET("/info"), Map).blockFirst()
@@ -51,7 +51,7 @@ class InfoEndpointSpec extends Specification {
     void "test ordering of info sources"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.info.sensitive': false, 'info.ordered': 'second'], Environment.TEST)
-        ReactorHttpClient rxClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         def response = rxClient.exchange(HttpRequest.GET("/info"), Map).blockFirst()
@@ -68,7 +68,7 @@ class InfoEndpointSpec extends Specification {
     void "test info sources"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.info.sensitive': false], Environment.TEST)
-        ReactorHttpClient rxClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         def response = rxClient.exchange(HttpRequest.GET("/info"), Map).blockFirst()
@@ -94,7 +94,7 @@ class InfoEndpointSpec extends Specification {
     void "test the git endpoint with alternate location"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.info.sensitive': false, 'endpoints.info.git.location': 'othergit.properties'], Environment.TEST)
-        ReactorHttpClient rxClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         def response = rxClient.exchange(HttpRequest.GET("/info"), Map).blockFirst()

@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.websocket;
+package io.micronaut.reactive.rxjava2.http.client.websockets;
 
 import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.websocket.WebSocketClient;
 import io.reactivex.Flowable;
 
 import java.net.URI;

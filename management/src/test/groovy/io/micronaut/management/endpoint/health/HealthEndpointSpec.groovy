@@ -23,7 +23,7 @@ import io.micronaut.health.HealthStatus
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.management.health.aggregator.RxJavaHealthAggregator
 import io.micronaut.management.health.indicator.HealthIndicator
@@ -141,7 +141,7 @@ class HealthEndpointSpec extends Specification {
                 'datasources.two.url': 'jdbc:h2:mem:twoDb;MVCC=TRUE;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=FALSE'
         ])
         URL server = embeddedServer.getURL()
-        ReactorHttpClient rxClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, server)
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, server)
 
         when:
         def response = rxClient.exchange("/health", Map).blockFirst()
@@ -176,7 +176,7 @@ class HealthEndpointSpec extends Specification {
                 'endpoints.health.sensitive': false,
                 'endpoints.health.disk-space.threshold': '9999GB'])
         URL server = embeddedServer.getURL()
-        ReactorHttpClient rxClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, server)
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, server)
 
         when:
         def response = rxClient.exchange("/health", HealthResult)
@@ -206,7 +206,7 @@ class HealthEndpointSpec extends Specification {
                 'endpoints.health.status.http-mapping.DOWN': 200,
                 'endpoints.health.disk-space.threshold': '9999GB'])
         URL server = embeddedServer.getURL()
-        ReactorHttpClient rxClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, server)
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, server)
 
         when:
         def response = rxClient.exchange("/health", HealthResult)
@@ -233,7 +233,7 @@ class HealthEndpointSpec extends Specification {
                 'datasources.two.url': 'jdbc:mysql://localhost:59654/foo'
         ])
         URL server = embeddedServer.getURL()
-        ReactorHttpClient rxClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, server)
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, server)
 
         when:
         def response = rxClient.exchange("/health", Map).onErrorResume(throwable -> {
@@ -264,7 +264,7 @@ class HealthEndpointSpec extends Specification {
                 'endpoints.health.sensitive': false,
         ])
         URL server = embeddedServer.getURL()
-        ReactorHttpClient rxClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, server)
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, server)
         embeddedServer.applicationContext.createBean(TestLivenessHealthIndicator.class)
 
         when:
@@ -289,7 +289,7 @@ class HealthEndpointSpec extends Specification {
                 'endpoints.health.sensitive': false,
         ])
         URL server = embeddedServer.getURL()
-        ReactorHttpClient rxClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, server)
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, server)
         embeddedServer.applicationContext.createBean(TestReadinessHealthIndicator.class)
 
         when:
@@ -314,7 +314,7 @@ class HealthEndpointSpec extends Specification {
                 'endpoints.health.sensitive': false,
         ])
         URL server = embeddedServer.getURL()
-        ReactorHttpClient rxClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, server)
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, server)
         embeddedServer.applicationContext.createBean(TestReadinessHealthIndicator.class)
 
         when:
@@ -340,7 +340,7 @@ class HealthEndpointSpec extends Specification {
                 'endpoints.health.sensitive': false
         ])
         URL server = embeddedServer.getURL()
-        ReactorHttpClient rxClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, server)
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, server)
 
         when:
         def response = rxClient.exchange("/health/liveness", HealthResult)
@@ -367,7 +367,7 @@ class HealthEndpointSpec extends Specification {
                 'endpoints.health.sensitive': false
         ])
         URL server = embeddedServer.getURL()
-        ReactorHttpClient rxClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, server)
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, server)
 
         when:
         def response = rxClient.exchange("/health/readiness", HealthResult)
@@ -395,7 +395,7 @@ class HealthEndpointSpec extends Specification {
                 'endpoints.health.status.http-mapping.DOWN': 200
         ])
         URL server = embeddedServer.getURL()
-        ReactorHttpClient rxClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, server)
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, server)
 
         when:
         def response = rxClient.exchange("/health/readiness", HealthResult)
@@ -419,7 +419,7 @@ class HealthEndpointSpec extends Specification {
                 'endpoints.health.status.http-mapping.DOWN': 200
         ])
         URL server = embeddedServer.getURL()
-        ReactorHttpClient rxClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, server)
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, server)
 
         when:
         def response = rxClient.exchange("/health/liveness", HealthResult)

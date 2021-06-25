@@ -19,7 +19,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.client.ReactorHttpClient;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.Test;
 import reactor.core.publisher.Flux;
@@ -36,13 +36,13 @@ public class BookControllerTest {
     @Test
     public void testPostWithURITemplate() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
-        ReactorHttpClient client = embeddedServer.getApplicationContext().createBean(ReactorHttpClient.class, embeddedServer.getURL());
+        HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL());
 
         // tag::posturitemplate[]
-        Flux<HttpResponse<Book>> call = client.exchange(
+        Flux<HttpResponse<Book>> call = Flux.from(client.exchange(
                 POST("/amazon/book/{title}", new Book("The Stand")),
                 Book.class
-        );
+        ));
         // end::posturitemplate[]
 
         HttpResponse<Book> response = call.blockFirst();
@@ -66,14 +66,14 @@ public class BookControllerTest {
     @Test
     public void testPostFormData() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
-        ReactorHttpClient client = embeddedServer.getApplicationContext().createBean(ReactorHttpClient.class, embeddedServer.getURL());
+        HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL());
 
         // tag::postform[]
-        Flux<HttpResponse<Book>> call = client.exchange(
+        Flux<HttpResponse<Book>> call = Flux.from(client.exchange(
                 POST("/amazon/book/{title}", new Book("The Stand"))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED),
                 Book.class
-        );
+        ));
         // end::postform[]
 
         HttpResponse<Book> response = call.blockFirst();

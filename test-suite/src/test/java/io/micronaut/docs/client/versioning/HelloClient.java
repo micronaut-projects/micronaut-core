@@ -26,6 +26,7 @@ import reactor.core.publisher.Mono;
 @Client("/hello")
 @Version("1") // <1>
 public
+
 interface HelloClient {
 
     @Get("/greeting/{name}")

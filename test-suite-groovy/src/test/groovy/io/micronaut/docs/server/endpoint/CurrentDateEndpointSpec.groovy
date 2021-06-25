@@ -4,7 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Issue
@@ -15,7 +15,7 @@ class CurrentDateEndpointSpec extends Specification {
     void "test read custom date endpoint"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [:])
-        ReactorHttpClient rxClient = server.applicationContext.createBean(ReactorHttpClient, server.getURL())
+        HttpClient rxClient = server.applicationContext.createBean(HttpClient, server.getURL())
 
         when:
         def response = rxClient.exchange("/date", String).blockFirst()
@@ -31,7 +31,7 @@ class CurrentDateEndpointSpec extends Specification {
     void "test read custom date endpoint with argument"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [:])
-        ReactorHttpClient rxClient = server.applicationContext.createBean(ReactorHttpClient, server.getURL())
+        HttpClient rxClient = server.applicationContext.createBean(HttpClient, server.getURL())
 
         when:
         def response = rxClient.exchange("/date/current_date_is", String).blockFirst()
@@ -48,7 +48,7 @@ class CurrentDateEndpointSpec extends Specification {
     void "test read with produces"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [:])
-        ReactorHttpClient rxClient = server.applicationContext.createBean(ReactorHttpClient, server.getURL())
+        HttpClient rxClient = server.applicationContext.createBean(HttpClient, server.getURL())
 
         when:
         def response = rxClient.exchange("/date/current_date_is", String).blockFirst()
@@ -63,7 +63,7 @@ class CurrentDateEndpointSpec extends Specification {
     void "test write custom date endpoint"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [:])
-        ReactorHttpClient rxClient = server.applicationContext.createBean(ReactorHttpClient, server.getURL())
+        HttpClient rxClient = server.applicationContext.createBean(HttpClient, server.getURL())
         Date originalDate, resetDate
 
         when:
@@ -91,7 +91,7 @@ class CurrentDateEndpointSpec extends Specification {
     void "test disable endpoint"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['custom.date.enabled':false])
-        ReactorHttpClient rxClient = server.applicationContext.createBean(ReactorHttpClient, server.getURL())
+        HttpClient rxClient = server.applicationContext.createBean(HttpClient, server.getURL())
 
         when:
         rxClient.exchange("/date", String).blockFirst()

@@ -19,11 +19,12 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.client.ReactorHttpClient;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import reactor.core.publisher.Flux;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -32,14 +33,14 @@ import static org.junit.Assert.assertTrue;
 public class ShoppingControllerSpec {
 
     private static EmbeddedServer server;
-    private static ReactorHttpClient client;
+    private static HttpClient client;
 
     @BeforeClass
     public static void setupServer() {
         server = ApplicationContext.run(EmbeddedServer.class);
         client = server
                 .getApplicationContext()
-                .createBean(ReactorHttpClient.class, server.getURL());
+                .createBean(HttpClient.class, server.getURL());
     }
 
     @AfterClass
@@ -55,7 +56,7 @@ public class ShoppingControllerSpec {
     @Test
     public void testSessionValueUsedOnReturnValue() {
         // tag::view[]
-        HttpResponse<Cart> response = client.exchange(HttpRequest.GET("/shopping/cart"), Cart.class) // <1>
+        HttpResponse<Cart> response = Flux.from(client.exchange(HttpRequest.GET("/shopping/cart"), Cart.class)) // <1>
                                             .blockFirst();
         Cart cart = response.body();
 
@@ -67,8 +68,8 @@ public class ShoppingControllerSpec {
         // tag::add[]
         String sessionId = response.header(HttpHeaders.AUTHORIZATION_INFO); // <1>
 
-        response = client.exchange(HttpRequest.POST("/shopping/cart/Apple", "")
-                         .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart.class) // <2>
+        response = Flux.from(client.exchange(HttpRequest.POST("/shopping/cart/Apple", "")
+                         .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart.class)) // <2>
                          .blockFirst();
         cart = response.body();
         // end::add[]
@@ -76,8 +77,8 @@ public class ShoppingControllerSpec {
         assertNotNull(cart);
         assertEquals(1, cart.getItems().size());
 
-        response = client.exchange(HttpRequest.GET("/shopping/cart")
-                         .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart.class)
+        response = Flux.from(client.exchange(HttpRequest.GET("/shopping/cart")
+                         .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart.class))
                          .blockFirst();
         cart = response.body();
 

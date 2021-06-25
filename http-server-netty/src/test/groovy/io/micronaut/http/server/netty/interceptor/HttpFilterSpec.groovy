@@ -24,7 +24,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.FilterMatcher
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.filter.HttpServerFilter
@@ -46,11 +46,11 @@ class HttpFilterSpec extends Specification {
 
     @Inject
     @Client("/")
-    ReactorHttpClient rxClient
+    HttpClient rxClient
 
     void "test interceptor execution and order - write replacement"() {
         when:
-        rxClient.retrieve("/secure").blockFirst()
+        Flux.from(rxClient.retrieve("/secure")).blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -59,7 +59,7 @@ class HttpFilterSpec extends Specification {
 
     void "test interceptor execution and order - proceed"() {
         when:
-        HttpResponse<String> response = rxClient.exchange("/secure?username=fred", String).blockFirst()
+        HttpResponse<String> response = Flux.from(rxClient.exchange("/secure?username=fred", String)).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -70,7 +70,7 @@ class HttpFilterSpec extends Specification {
 
     void "test a filter on the root url"() {
         when:
-        HttpResponse response = rxClient.exchange("/").blockFirst()
+        HttpResponse response = Flux.from(rxClient.exchange("/")).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -80,7 +80,7 @@ class HttpFilterSpec extends Specification {
 
     void "test a filter on a reactive url"() {
         when:
-        HttpResponse response = rxClient.exchange("/reactive").blockFirst()
+        HttpResponse response = Flux.from(rxClient.exchange("/reactive")).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -90,7 +90,7 @@ class HttpFilterSpec extends Specification {
 
     void "test a filter on matched with filter matcher URI"() {
         when:
-        HttpResponse response = rxClient.exchange("/matched").blockFirst()
+        HttpResponse response = Flux.from(rxClient.exchange("/matched")).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -100,7 +100,7 @@ class HttpFilterSpec extends Specification {
 
     void "test two filters on matched with filter matcher URI"() {
         when:
-        HttpResponse response = rxClient.exchange("/matchedtwice").blockFirst()
+        HttpResponse response = Flux.from(rxClient.exchange("/matchedtwice")).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -111,7 +111,7 @@ class HttpFilterSpec extends Specification {
 
     void "test a filter on indirect matched with filter matcher URI"() {
         when:
-        HttpResponse response = rxClient.exchange("/indirectlymatched").blockFirst()
+        HttpResponse response = Flux.from(rxClient.exchange("/indirectlymatched")).blockFirst()
 
         then:
         response.status == HttpStatus.OK

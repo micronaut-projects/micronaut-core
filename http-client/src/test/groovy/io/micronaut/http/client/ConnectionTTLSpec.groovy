@@ -9,6 +9,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.channel.Channel
 import io.netty.channel.pool.AbstractChannelPoolMap
+import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Retry
 import spock.lang.Shared
@@ -26,10 +27,6 @@ class ConnectionTTLSpec extends Specification {
           'spec.name': 'ConnectionTTLSpec'
   ])
 
-  @Shared
-  ApplicationContext context = embeddedServer.applicationContext
-
-
   def "should close connection according to connect-ttl"() {
     setup:
     ApplicationContext clientContext = ApplicationContext.run(
@@ -37,10 +34,10 @@ class ConnectionTTLSpec extends Specification {
       'micronaut.http.client.connect-ttl':'1000ms',
       'micronaut.http.client.pool.enabled':true
     )
-    ReactorHttpClient httpClient = clientContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+    HttpClient httpClient = clientContext.createBean(HttpClient, embeddedServer.getURL())
 
     when:"make first request"
-    httpClient.retrieve(HttpRequest.GET('/connectTTL/'),String).blockFirst()
+    Flux.from(httpClient.retrieve(HttpRequest.GET('/connectTTL/'),String)).blockFirst()
     Channel ch = getQueuedChannels(httpClient).first
 
     then:"ensure that connection is open as connect-ttl is not reached"
@@ -48,7 +45,7 @@ class ConnectionTTLSpec extends Specification {
     ch.isOpen()
 
     when:"make another request in which connect-ttl will exceed"
-    httpClient.retrieve(HttpRequest.GET('/connectTTL/slow'),String).blockFirst()
+    Flux.from(httpClient.retrieve(HttpRequest.GET('/connectTTL/slow'),String)).blockFirst()
 
     then:"ensure channel is closed"
     new PollingConditions().eventually {
@@ -66,10 +63,10 @@ class ConnectionTTLSpec extends Specification {
       'my.port':embeddedServer.getPort(),
       'micronaut.http.client.pool.enabled':true
     )
-    ReactorHttpClient httpClient = clientContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+    HttpClient httpClient = clientContext.createBean(HttpClient, embeddedServer.getURL())
 
     when:"make first request"
-    httpClient.retrieve(HttpRequest.GET('/connectTTL/'),String).blockFirst()
+    Flux.from(httpClient.retrieve(HttpRequest.GET('/connectTTL/'),String)).blockFirst()
     Deque<Channel> deque = getQueuedChannels(httpClient)
 
     then:"ensure that connection is open as connect-ttl is not reached"
@@ -78,7 +75,7 @@ class ConnectionTTLSpec extends Specification {
     }
 
     when:"make another request"
-    httpClient.retrieve(HttpRequest.GET('/connectTTL/slow'),String).blockFirst()
+    Flux.from(httpClient.retrieve(HttpRequest.GET('/connectTTL/slow'),String)).blockFirst()
 
     then:"ensure channel is still open"
     new PollingConditions().eventually {
@@ -90,8 +87,7 @@ class ConnectionTTLSpec extends Specification {
     clientContext.close()
   }
 
-
-  Deque getQueuedChannels(ReactorHttpClient client) {
+  Deque getQueuedChannels(HttpClient client) {
     AbstractChannelPoolMap poolMap = client.poolMap
     Field mapField = AbstractChannelPoolMap.getDeclaredField("map")
     mapField.setAccessible(true)

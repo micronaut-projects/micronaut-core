@@ -4,7 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpRequestFactory
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Issue
@@ -19,7 +19,7 @@ class WebdavControllerSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    ReactorHttpClient client = embeddedServer.getApplicationContext().createBean(ReactorHttpClient.class, embeddedServer.getURL())
+    HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL())
 
     def "Simple get response without parameters should run fine"() {
         when:

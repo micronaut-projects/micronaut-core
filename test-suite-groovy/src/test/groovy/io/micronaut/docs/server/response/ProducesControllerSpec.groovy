@@ -21,7 +21,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -37,7 +37,7 @@ class ProducesControllerSpec extends Specification {
 
     @AutoCleanup
     @Shared
-    ReactorHttpClient rxClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+    HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
     def "@Produces allow you to change the Media Type of the response"() {
 

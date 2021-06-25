@@ -10,8 +10,9 @@ import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
+import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -20,13 +21,13 @@ class GenericsJacksonSerdeSpec extends Specification {
     @Shared @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
 
-    @Shared @AutoCleanup ReactorHttpClient client = embeddedServer.applicationContext
-                                                        .createBean(ReactorHttpClient, embeddedServer.getURL())
+    @Shared @AutoCleanup HttpClient client = embeddedServer.applicationContext
+                                                        .createBean(HttpClient, embeddedServer.getURL())
 
     void "test ser/deser body with generics"() {
 
         when:
-        def response = client.exchange(HttpRequest.POST("/generics-test", new WrappedData<Token>("1", new Token("test"))), Token)
+        def response = Flux.from(client.exchange(HttpRequest.POST("/generics-test", new WrappedData<Token>("1", new Token("test"))), Token))
                 .blockFirst()
 
         then:
@@ -36,7 +37,7 @@ class GenericsJacksonSerdeSpec extends Specification {
     void "test deser body controller with generics - Issue #3202"() {
 
                 when:
-                def response = client.exchange(HttpRequest.POST("/generics-inherited/body", new Demo("value")), Demo)
+                def response = Flux.from(client.exchange(HttpRequest.POST("/generics-inherited/body", new Demo("value")), Demo))
                         .blockFirst()
 
                 then:

@@ -20,7 +20,7 @@ import io.micronaut.context.env.Environment
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
@@ -37,7 +37,7 @@ class ConsumesControllerSpec extends Specification {
 
     @AutoCleanup
     @Shared
-    ReactorHttpClient rxClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+    HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
     def "@Consumes allow you to control which media type is accepted"() {
         given:

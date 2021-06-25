@@ -12,7 +12,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
@@ -37,7 +37,7 @@ class ThirdPartyClientFilterSpec: StringSpec() {
     )
 
     val client = autoClose(
-        embeddedServer.applicationContext.createBean(ReactorHttpClient::class.java, embeddedServer.url)
+        embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
     )
 
     init {
@@ -66,15 +66,15 @@ class ThirdPartyClientFilterSpec: StringSpec() {
 //tag::bintrayService[]
 @Singleton
 internal class BintrayService(
-    @param:Client(BintrayApi.URL) val client: ReactorHttpClient, // <1>
+    @param:Client(BintrayApi.URL) val client: HttpClient, // <1>
     @param:Value("\${bintray.organization}") val org: String) {
 
     fun fetchRepositories(): Flux<HttpResponse<String>> {
-        return client.exchange(HttpRequest.GET<Any>("/repos/$org"), String::class.java) // <2>
+        return Flux.from(client.exchange(HttpRequest.GET<Any>("/repos/$org"), String::class.java)) // <2>
     }
 
     fun fetchPackages(repo: String): Flux<HttpResponse<String>> {
-        return client.exchange(HttpRequest.GET<Any>("/repos/$org/$repo/packages"), String::class.java) // <2>
+        return Flux.from(client.exchange(HttpRequest.GET<Any>("/repos/$org/$repo/packages"), String::class.java)) // <2>
     }
 }
 //end::bintrayService[]

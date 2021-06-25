@@ -6,11 +6,12 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 
 import org.junit.Assert.fail
+import reactor.core.publisher.Flux
 
 class MessageEndpointSpec: StringSpec() {
 
@@ -20,38 +21,38 @@ class MessageEndpointSpec: StringSpec() {
     )
 
     val client = autoClose(
-            embeddedServer.applicationContext.createBean(ReactorHttpClient::class.java, embeddedServer.url)
+            embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
     )
 
     init {
         "test read message endpoint" {
-            val response = client.exchange("/message", String::class.java).blockFirst()
+            val response = Flux.from(client.exchange("/message", String::class.java)).blockFirst()
 
             response.code() shouldBe HttpStatus.OK.code
             response.body() shouldBe "default message"
         }
 
         "test write message endpoint" {
-            var response = client.exchange(HttpRequest.POST<Map<String, Any>>("/message", mapOf("newMessage" to "A new message"))
-                    .contentType(MediaType.APPLICATION_FORM_URLENCODED), String::class.java).blockFirst()
+            var response = Flux.from(client.exchange(HttpRequest.POST<Map<String, Any>>("/message", mapOf("newMessage" to "A new message"))
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED), String::class.java)).blockFirst()
 
             response.code() shouldBe HttpStatus.OK.code
             response.body() shouldBe "Message updated"
             response.contentType.get() shouldBe MediaType.TEXT_PLAIN_TYPE
 
-            response = client.exchange("/message", String::class.java).blockFirst()
+            response = Flux.from(client.exchange("/message", String::class.java)).blockFirst()
 
             response.body() shouldBe "A new message"
         }
 
         "test delete message endpoint" {
-            val response = client.exchange(HttpRequest.DELETE<Any>("/message"), String::class.java).blockFirst()
+            val response = Flux.from(client.exchange(HttpRequest.DELETE<Any>("/message"), String::class.java)).blockFirst()
 
             response.code() shouldBe HttpStatus.OK.code
             response.body() shouldBe "Message deleted"
 
             try {
-                client.exchange("/message", String::class.java).blockFirst()
+                Flux.from(client.exchange("/message", String::class.java)).blockFirst()
             } catch (e: HttpClientResponseException) {
                 e.status.code shouldBe 404
             } catch (e: Exception) {

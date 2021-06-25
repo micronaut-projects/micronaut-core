@@ -11,4 +11,4 @@
     <root level="info">
         <appender-ref ref="STDOUT" />
     </root>
-</configurations
+</configuration>

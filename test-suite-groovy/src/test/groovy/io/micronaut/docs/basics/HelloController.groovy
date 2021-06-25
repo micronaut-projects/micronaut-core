@@ -22,8 +22,9 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Status
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 
 import static io.micronaut.http.HttpRequest.GET
@@ -35,17 +36,16 @@ import static io.micronaut.http.MediaType.TEXT_PLAIN
 @Controller("/")
 class HelloController {
 
-    private final ReactorHttpClient httpClient
+    private final HttpClient httpClient
 
-    HelloController(@Client("/endpoint") ReactorHttpClient httpClient) {
+    HelloController(@Client("/endpoint") HttpClient httpClient) {
         this.httpClient = httpClient
     }
 
     // tag::nonblocking[]
     @Get("/hello/{name}")
     Mono<String> hello(String name) { // <1>
-        httpClient.retrieve( GET("/hello/" + name) )
-                  .next() // <2>
+        Mono.from(httpClient.retrieve( GET("/hello/" + name))) // <2>
     }
     // end::nonblocking[]
 

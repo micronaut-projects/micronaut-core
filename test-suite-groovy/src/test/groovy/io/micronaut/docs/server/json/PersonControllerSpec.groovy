@@ -5,7 +5,7 @@ import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
@@ -19,7 +19,7 @@ class PersonControllerSpec extends Specification {
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
             ApplicationContext.run(EmbeddedServer, ["spec.name": getClass().simpleName])
 
-    @Shared @AutoCleanup ReactorHttpClient client = ReactorHttpClient.create(embeddedServer.URL)
+    @Shared @AutoCleanup HttpClient client = HttpClient.create(embeddedServer.URL)
 
     void "test global error handler"() {
         when:

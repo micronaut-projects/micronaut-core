@@ -11,8 +11,8 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
-import io.micronaut.http.client.ReactorHttpClient
-import io.micronaut.http.client.ReactorStreamingHttpClient
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.sse.Event
 import io.micronaut.runtime.server.EmbeddedServer
@@ -41,25 +41,25 @@ class Http2RequestSpec extends Specification {
             "micronaut.http.client.log-level" : "TRACE",
             "micronaut.server.netty.log-level" : "TRACE"
     ])
-    ReactorHttpClient client = server.getApplicationContext().getBean(ReactorHttpClient)
+    HttpClient client = server.getApplicationContext().getBean(HttpClient)
 
     void "test make HTTP/2 stream request"() {
         when:"A non stream request is executed"
-        def people = ((ReactorStreamingHttpClient)client).jsonStream(HttpRequest.GET("${server.URL}/http2/personStream"), Person)
+        def people = Flux.from(((StreamingHttpClient)client).jsonStream(HttpRequest.GET("${server.URL}/http2/personStream"), Person))
                 .collectList().block()
 
         then:
         people == Http2Controller.people
 
         when:"posting a data"
-        def response = client.exchange(HttpRequest.POST("${server.URL}/http2/personStream", Http2Controller.people), Argument.listOf(Person))
+        def response = Flux.from(client.exchange(HttpRequest.POST("${server.URL}/http2/personStream", Http2Controller.people), Argument.listOf(Person)))
                 .blockFirst()
 
         then:"The response is correct"
         response.body() == Http2Controller.people
 
         when:"posting a data again"
-        response = client.exchange(HttpRequest.POST("${server.URL}/http2/personStream", Http2Controller.people), Argument.listOf(Person))
+        response = Flux.from(client.exchange(HttpRequest.POST("${server.URL}/http2/personStream", Http2Controller.people), Argument.listOf(Person)))
                 .blockFirst()
 
         then:"The response is correct"
@@ -81,19 +81,19 @@ class Http2RequestSpec extends Specification {
 
     void "test make HTTP/2 request - HTTPS"() {
         when:
-        def result = client.retrieve("${server.URL}/http2").blockFirst()
+        def result = Flux.from(client.retrieve("${server.URL}/http2")).blockFirst()
 
         then:
         result == 'Version: HTTP_2_0'
 
         when:"operation repeated to use same connection"
-        result = client.retrieve("${server.URL}/http2").blockFirst()
+        result = Flux.from(client.retrieve("${server.URL}/http2")).blockFirst()
 
         then:
         result == 'Version: HTTP_2_0'
 
         when:"A non stream request is executed"
-        List<Person> people = client.retrieve(HttpRequest.GET("${server.URL}/http2/personStream"), Argument.listOf(Person))
+        List<Person> people = Flux.from(client.retrieve(HttpRequest.GET("${server.URL}/http2/personStream"), Argument.listOf(Person)))
                 .blockFirst()
 
         then:
@@ -109,22 +109,22 @@ class Http2RequestSpec extends Specification {
                 "micronaut.http.client.log-level" : "TRACE",
                 "micronaut.server.netty.log-level" : "TRACE"
         ])
-        ReactorHttpClient client = server.getApplicationContext().getBean(ReactorHttpClient)
+        HttpClient client = server.getApplicationContext().getBean(HttpClient)
 
         when:
-        def result = client.retrieve("${server.URL}/http2").blockFirst()
+        def result = Flux.from(client.retrieve("${server.URL}/http2")).blockFirst()
 
         then:
         result == 'Version: HTTP_2_0'
 
         when:"operation repeated to use same connection"
-        result = client.retrieve("${server.URL}/http2").blockFirst()
+        result = Flux.from(client.retrieve("${server.URL}/http2")).blockFirst()
 
         then:
         result == 'Version: HTTP_2_0'
 
         when:"A post request is performed"
-        def response = client.exchange(HttpRequest.POST("${server.URL}/http2", "test").contentType(MediaType.TEXT_PLAIN), String.class)
+        def response = Flux.from(client.exchange(HttpRequest.POST("${server.URL}/http2", "test").contentType(MediaType.TEXT_PLAIN), String.class))
                 .blockFirst()
 
         then:
@@ -132,7 +132,7 @@ class Http2RequestSpec extends Specification {
         response.body() == 'Version: HTTP_2_0 test'
 
         when:"A post request is performed again"
-        response = client.exchange(HttpRequest.POST("${server.URL}/http2", "test").contentType(MediaType.TEXT_PLAIN), String.class)
+        response = Flux.from(client.exchange(HttpRequest.POST("${server.URL}/http2", "test").contentType(MediaType.TEXT_PLAIN), String.class))
                 .blockFirst()
 
         then:
@@ -154,8 +154,8 @@ class Http2RequestSpec extends Specification {
                 "micronaut.http.client.log-level" : "TRACE",
                 "micronaut.server.netty.log-level" : "TRACE"
         ])
-        ReactorHttpClient client = server.getApplicationContext().getBean(ReactorHttpClient)
-        def result = client.retrieve("${server.URL}/http2").blockFirst()
+        HttpClient client = server.getApplicationContext().getBean(HttpClient)
+        def result = Flux.from(client.retrieve("${server.URL}/http2")).blockFirst()
 
         expect:
         result == 'Version: HTTP_1_1'

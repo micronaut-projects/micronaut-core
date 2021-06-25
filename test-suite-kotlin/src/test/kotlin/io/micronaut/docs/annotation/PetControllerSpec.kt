@@ -3,7 +3,7 @@ package io.micronaut.docs.annotation
 import io.kotlintest.shouldBe
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 
 import javax.validation.ConstraintViolationException
@@ -17,7 +17,7 @@ class PetControllerSpec: StringSpec() {
     )
 
     val client = autoClose(
-            embeddedServer.applicationContext.createBean(ReactorHttpClient::class.java, embeddedServer.url)
+            embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
     )
 
     init {

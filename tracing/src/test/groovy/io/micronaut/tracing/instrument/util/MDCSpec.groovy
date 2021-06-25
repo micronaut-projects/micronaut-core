@@ -8,7 +8,7 @@ import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
@@ -31,7 +31,7 @@ class MDCSpec extends Specification {
     ])
 
     @Shared @AutoCleanup
-    ReactorHttpClient client = ReactorHttpClient.create(embeddedServer.URL)
+    HttpClient client = HttpClient.create(embeddedServer.URL)
 
     void "test MDC doesn't leak"() {
         given:

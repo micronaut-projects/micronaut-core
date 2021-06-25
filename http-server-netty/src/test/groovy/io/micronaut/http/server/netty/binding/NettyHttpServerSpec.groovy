@@ -25,13 +25,14 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Put
 import io.micronaut.http.client.DefaultHttpClientConfiguration
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.exceptions.ServerStartupException
 import io.micronaut.runtime.Micronaut
 import io.micronaut.runtime.event.annotation.EventListener
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Singleton
+import reactor.core.publisher.Flux
 import spock.lang.Retry
 import spock.lang.Specification
 import spock.lang.Stepwise
@@ -52,9 +53,9 @@ class NettyHttpServerSpec extends Specification {
         when:
         ApplicationContext applicationContext = Micronaut.run()
         EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
-        ReactorHttpClient client = applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
-        HttpResponse response = client.exchange('/person/Fred', String).blockFirst()
+        HttpResponse response = Flux.from(client.exchange('/person/Fred', String)).blockFirst()
         then:
         response.body() == "Person Named Fred"
 
@@ -68,8 +69,8 @@ class NettyHttpServerSpec extends Specification {
         PropertySource propertySource = PropertySource.of('micronaut.server.port':-1)
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, propertySource, Environment.TEST)
 
-        ReactorHttpClient client = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
-        HttpResponse response = client.exchange('/person/Fred', String).blockFirst()
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
+        HttpResponse response = Flux.from(client.exchange('/person/Fred', String)).blockFirst()
 
         then:
         response.body() == "Person Named Fred"
@@ -91,9 +92,9 @@ class NettyHttpServerSpec extends Specification {
         when:
         ApplicationContext applicationContext = Micronaut.run()
         EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
-        ReactorHttpClient client = applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
-        HttpResponse response = client.exchange('/person/Fred', String).blockFirst()
+        HttpResponse response = Flux.from(client.exchange('/person/Fred', String)).blockFirst()
         then:
         response.body() == "Person Named Fred"
 
@@ -107,9 +108,9 @@ class NettyHttpServerSpec extends Specification {
         int newPort = SocketUtils.findAvailableTcpPort()
         ApplicationContext applicationContext = Micronaut.run('-port',newPort.toString())
         EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
-        ReactorHttpClient client = applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
-        HttpResponse response = client.exchange('/person/Fred', String).blockFirst()
+        HttpResponse response = Flux.from(client.exchange('/person/Fred', String)).blockFirst()
 
         then:
         response.body() == "Person Named Fred"
@@ -124,9 +125,9 @@ class NettyHttpServerSpec extends Specification {
         int newPort = SocketUtils.findAvailableTcpPort()
         ApplicationContext applicationContext = Micronaut.run('-port',newPort.toString())
         EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
-        ReactorHttpClient client = applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
-        HttpResponse response = client.exchange('/person/another/job?id=10', String).blockFirst()
+        HttpResponse response = Flux.from(client.exchange('/person/another/job?id=10', String)).blockFirst()
 
         then:
         response.body() == "JOB ID 10"
@@ -141,9 +142,9 @@ class NettyHttpServerSpec extends Specification {
         int newPort = SocketUtils.findAvailableTcpPort()
         ApplicationContext applicationContext = Micronaut.run('-port',newPort.toString())
         EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
-        ReactorHttpClient client = applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
-        client.exchange('/person/another/job', String).blockFirst()
+        Flux.from(client.exchange('/person/another/job', String)).blockFirst()
 
         then:"A 400 is returned"
         def e = thrown(HttpClientResponseException)
@@ -159,12 +160,12 @@ class NettyHttpServerSpec extends Specification {
         int newPort = SocketUtils.findAvailableTcpPort()
         ApplicationContext applicationContext = Micronaut.run('-port',newPort.toString())
         EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
-        ReactorHttpClient client = applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
-        client.exchange(HttpRequest.POST('/person/job/test', '{}'), String).blockFirst()
+        Flux.from(client.exchange(HttpRequest.POST('/person/job/test', '{}'), String)).blockFirst()
 
         then:
-        def e = thrown(HttpClientResponseException)
+        HttpClientResponseException e = thrown()
         e.response.code() == HttpStatus.METHOD_NOT_ALLOWED.code
         e.response.header(HttpHeaders.ALLOW) == 'PUT'
 
@@ -183,10 +184,10 @@ class NettyHttpServerSpec extends Specification {
 
         ApplicationContext applicationContext = Micronaut.run()
         EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
-        ReactorHttpClient client = applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL(), config)
+        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL(), config)
 
         HttpRequest request = HttpRequest.create(HttpMethod.GET, '/person/Fred')
-        HttpResponse response = client.exchange(request, String).blockFirst()
+        HttpResponse response = Flux.from(client.exchange(request, String)).blockFirst()
         then:
         response.body() == "Person Named Fred"
         response.header(HttpHeaders.CONNECTION) == 'keep-alive'
@@ -207,11 +208,11 @@ class NettyHttpServerSpec extends Specification {
         )
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, propertySource, Environment.TEST)
 
-        def secureUrl = embeddedServer.getURL()
-        ReactorHttpClient httpsClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, secureUrl)
-        ReactorHttpClient httpClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, new URL("http://localhost:$httpPort"))
-        HttpResponse httpsResponse = httpsClient.exchange('/person/Fred', String).blockFirst()
-        HttpResponse httpResponse = httpClient.exchange('/person/Fred', String).blockFirst()
+        URL secureUrl = embeddedServer.getURL()
+        HttpClient httpsClient = embeddedServer.applicationContext.createBean(HttpClient, secureUrl)
+        HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, new URL("http://localhost:$httpPort"))
+        HttpResponse httpsResponse = Flux.from(httpsClient.exchange('/person/Fred', String)).blockFirst()
+        HttpResponse httpResponse = Flux.from(httpClient.exchange('/person/Fred', String)).blockFirst()
 
         then:
         httpsResponse.body() == "Person Named Fred"

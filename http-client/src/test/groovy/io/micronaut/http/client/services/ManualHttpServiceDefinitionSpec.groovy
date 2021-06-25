@@ -23,7 +23,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Put
 import io.micronaut.http.client.HttpClientConfiguration
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.ServiceHttpClientConfiguration
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.netty.DefaultHttpClient
@@ -35,6 +35,7 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.handler.ssl.SslHandler
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 import java.security.cert.X509Certificate
@@ -95,8 +96,8 @@ class ManualHttpServiceDefinitionSpec extends Specification {
 
 
         when:
-        ReactorHttpClient client = clientApp.getBean(TestBean).fooClient
-        String result = client.retrieve('/').blockFirst()
+        HttpClient client = clientApp.getBean(TestBean).fooClient
+        String result = Flux.from(client.retrieve('/')).blockFirst()
 
         then:
         client.configuration == config
@@ -116,7 +117,7 @@ class ManualHttpServiceDefinitionSpec extends Specification {
 
         when:
         client = clientApp.getBean(TestBean).barClient
-        result = client.retrieve(HttpRequest.POST('/', '')).blockFirst()
+        result = Flux.from(client.retrieve(HttpRequest.POST('/', ''))).blockFirst()
 
         then:
         client.configuration == config
@@ -177,7 +178,7 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         !config.getConnectionPoolConfiguration().isEnabled()
 
         when:
-        def opt = clientApp.findBean(ReactorHttpClient, Qualifiers.byName("foo"))
+        def opt = clientApp.findBean(HttpClient, Qualifiers.byName("foo"))
 
         then:
         !opt.isPresent()
@@ -235,18 +236,18 @@ class ManualHttpServiceDefinitionSpec extends Specification {
     static class TestBean {
         @Client(id = "foo")
         @Inject
-        ReactorHttpClient fooClient
+        HttpClient fooClient
 
         @Client(id = "bar")
         @Inject
-        ReactorHttpClient barClient
+        HttpClient barClient
     }
 
     @Singleton
     static class TestSslBean {
         @Client(id = "client1")
         @Inject
-        ReactorHttpClient client
+        HttpClient client
     }
 
     @Client(id = "foo")

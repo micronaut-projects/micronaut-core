@@ -11,7 +11,7 @@ import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.netty.buffer.ByteBuf
@@ -30,13 +30,13 @@ class ByteBufferSpec extends Specification {
 
     @Inject
     @Client("/")
-    ReactorHttpClient rxClient
+    HttpClient rxClient
 
     void "test reading the body with a publisher of bytebuffers"() {
         when:
-        String response = rxClient.retrieve(
+        String response = Flux.from(rxClient.retrieve(
                 HttpRequest.POST("/buffer-test", "hello")
-                        .contentType(MediaType.TEXT_PLAIN), String).blockFirst()
+                        .contentType(MediaType.TEXT_PLAIN), String)).blockFirst()
 
         then:
         response == "hello"
@@ -45,9 +45,9 @@ class ByteBufferSpec extends Specification {
     void "test reading a long body with a completable of bytebuffers"() {
         when:
         String body = "hello" * 1000
-        String response = rxClient.retrieve(
+        String response = Flux.from(rxClient.retrieve(
                 HttpRequest.POST("/buffer-completable", body)
-                        .contentType(MediaType.TEXT_PLAIN), String).blockFirst()
+                        .contentType(MediaType.TEXT_PLAIN), String)).blockFirst()
 
         then:
         response == body
@@ -55,7 +55,7 @@ class ByteBufferSpec extends Specification {
 
     void "test read bytes"() {
         when:
-        def bytes = rxClient.retrieve(HttpRequest.GET('/bytes'), byte[].class).blockFirst()
+        byte[] bytes = Flux.from(rxClient.retrieve(HttpRequest.GET('/bytes'), byte[].class)).blockFirst()
 
         then:
         new String(bytes) == 'blah'
@@ -64,7 +64,7 @@ class ByteBufferSpec extends Specification {
 
     void "test read byteBuffer"() {
         when:
-        def bytes = rxClient.retrieve(HttpRequest.GET('/byteBuffer'), byte[].class).blockFirst()
+        def bytes = Flux.from(rxClient.retrieve(HttpRequest.GET('/byteBuffer'), byte[].class)).blockFirst()
 
         then:
         new String(bytes) == 'blah'
@@ -72,7 +72,7 @@ class ByteBufferSpec extends Specification {
 
     void "test read byteBuf"() {
         when:
-        def bytes = rxClient.retrieve(HttpRequest.GET('/byteBuf'), byte[].class).blockFirst()
+        byte[] bytes = Flux.from(rxClient.retrieve(HttpRequest.GET('/byteBuf'), byte[].class)).blockFirst()
 
         then:
         new String(bytes) == 'blah'
@@ -80,7 +80,7 @@ class ByteBufferSpec extends Specification {
 
     void "test read single bytes flowable"() {
         when:
-        def bytes = rxClient.retrieve(HttpRequest.GET('/singleBytesFlowable'), byte[].class).blockFirst()
+        byte[] bytes = Flux.from(rxClient.retrieve(HttpRequest.GET('/singleBytesFlowable'), byte[].class)).blockFirst()
 
         then:
         new String(bytes) == 'blah'

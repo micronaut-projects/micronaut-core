@@ -1,0 +1,6 @@
+dependencies {
+    annotationProcessor project(":inject-java")
+    api platform("io.projectreactor:reactor-bom:$reactorVersion")
+    api 'io.projectreactor:reactor-core'
+    api project(":http-client-core")
+}

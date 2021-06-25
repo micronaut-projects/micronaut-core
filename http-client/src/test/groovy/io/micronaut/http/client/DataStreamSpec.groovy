@@ -57,7 +57,7 @@ class DataStreamSpec extends Specification {
 
     @Inject
     @Client("/")
-    ReactorStreamingHttpClient client
+    StreamingHttpClient client
 
     @Inject
     ByteBufferFactory bufferFactory
@@ -236,7 +236,7 @@ class DataStreamSpec extends Specification {
 
         @Inject
         @Client("/")
-        ReactorStreamingHttpClient client
+        StreamingHttpClient client
 
         @Get(uri = "/books", produces = MediaType.APPLICATION_JSON_STREAM)
         Publisher<byte[]> list() {

@@ -3,7 +3,8 @@ package io.micronaut.docs.http.server.netty.websocket
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.websocket.ReactorWebSocketClient
+import io.micronaut.websocket.WebSocketClient
+import reactor.core.publisher.Flux
 import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -20,10 +21,10 @@ class SimpleTextWebSocketSpec extends Specification {
         PollingConditions conditions = new PollingConditions(timeout: 15    , delay: 0.5)
 
         when: "a websocket connection is established"
-        ReactorWebSocketClient wsClient = embeddedServer.applicationContext.createBean(ReactorWebSocketClient, embeddedServer.getURI())
+        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
         ChatClientWebSocket fred = wsClient.connect(ChatClientWebSocket, "/chat/stuff/fred").blockFirst()
         Thread.sleep(50)
-        ChatClientWebSocket bob = wsClient.connect(ChatClientWebSocket, [topic:"stuff", username:"bob"]).blockFirst()
+        ChatClientWebSocket bob = Flux.from(wsClient.connect(ChatClientWebSocket, [topic:"stuff", username:"bob"])).blockFirst()
 
         then:"The connection is valid"
         fred.session != null
@@ -92,6 +93,6 @@ class SimpleTextWebSocketSpec extends Specification {
     static class MyBean {
         @Inject
         @Client("http://localhost:8080")
-        ReactorWebSocketClient myClient
+        WebSocketClient myClient
     }
 }

@@ -32,7 +32,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test non cors request"() {
         when:
-        def response = rxClient.exchange('/test').blockFirst()
+        HttpResponse response = Flux.from(rxClient.exchange('/test')).blockFirst()
         Set<String> headerNames = response.getHeaders().names()
 
         then:
@@ -44,10 +44,10 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test cors request without configuration"() {
         given:
-        def response = rxClient.exchange(
+        HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.GET('/test')
                            .header(ORIGIN, 'fooBar.com')
-        ).blockFirst()
+        )).blockFirst()
 
         when:
         Set<String> headerNames = response.headers.names()
@@ -60,10 +60,10 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test cors request with a controller that returns map"() {
         given:
-        def response = rxClient.exchange(
+        HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.GET('/test/arbitrary')
                         .header(ORIGIN, 'foo.com')
-        ).blockFirst()
+        )).blockFirst()
 
         when:
         Set<String> headerNames = response.headers.names()
@@ -81,10 +81,10 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test cors request with controlled method"() {
         given:
-        def response = rxClient.exchange(
+        HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.GET('/test')
                         .header(ORIGIN, 'foo.com')
-        ).blockFirst()
+        )).blockFirst()
 
         when:
         Set<String> headerNames = response.headers.names()
@@ -102,12 +102,12 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test cors request with controlled headers"() {
         given:
-        def response = rxClient.exchange(
+        HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.GET('/test')
                         .header(ORIGIN, 'bar.com')
                         .header(ACCEPT, 'application/json')
 
-        ).blockFirst()
+        )).blockFirst()
 
         when:
         Set<String> headerNames = response.headers.names()
@@ -125,11 +125,11 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test cors request with invalid method"() {
         given:
-        def response = rxClient.exchange(
+        HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.POST('/test', [:])
                         .header(ORIGIN, 'foo.com')
 
-        ) .onErrorResume(t -> {
+        )).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)
             }
@@ -146,12 +146,11 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test cors request with invalid header"() {
         given:
-        def response = rxClient.exchange(
+        HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.GET('/test')
                         .header(ORIGIN, 'bar.com')
                         .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Foo, Accept')
-
-        ).blockFirst()
+        )).blockFirst()
 
         expect: "it passes through because only preflight requests check allowed headers"
         response.code() == HttpStatus.NO_CONTENT.code
@@ -159,13 +158,12 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test preflight request with invalid header"() {
         given:
-        def response = rxClient.exchange(
+        HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.OPTIONS('/test')
                         .header(ACCESS_CONTROL_REQUEST_METHOD, 'GET')
                         .header(ORIGIN, 'bar.com')
                         .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Foo, Accept')
-
-        ) .onErrorResume(t -> {
+        )).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)
             }
@@ -178,12 +176,11 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test preflight request with invalid method"() {
         given:
-        def response = rxClient.exchange(
+        HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.OPTIONS('/test')
                         .header(ACCESS_CONTROL_REQUEST_METHOD, 'POST')
                         .header(ORIGIN, 'foo.com')
-
-        ) .onErrorResume(t -> {
+        )).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)
             }
@@ -196,15 +193,14 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test preflight request with controlled method"() {
         given:
-        def response = rxClient.exchange(
+        HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.OPTIONS('/test')
                         .header(ACCESS_CONTROL_REQUEST_METHOD, 'GET')
                         .header(ORIGIN, 'foo.com')
                         .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Foo, Bar')
+        )).blockFirst()
 
-        ).blockFirst()
-
-        def headerNames = response.headers.names()
+        Set<String> headerNames = response.headers.names()
 
         expect:
         response.code() == HttpStatus.OK.code
@@ -218,16 +214,15 @@ class NettyCorsSpec extends AbstractMicronautSpec {
     }
 
     void "test preflight request with controlled headers"() {
-
         given:
-        def response = rxClient.exchange(
+        HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.OPTIONS('/test')
                         .header(ACCESS_CONTROL_REQUEST_METHOD, 'POST')
                         .header(ORIGIN, 'bar.com')
                         .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Accept')
-        ).blockFirst()
+        )).blockFirst()
 
-        def headerNames = response.headers.names()
+        Set<String> headerNames = response.headers.names()
 
         expect:
         response.code() == HttpStatus.OK.code
@@ -242,13 +237,13 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test control headers are applied to error response routes"() {
         when:
-        rxClient.exchange(
+        Flux.from(rxClient.exchange(
                 HttpRequest.GET('/test/error')
                         .header(ORIGIN, 'foo.com')
-        ).blockFirst()
+        )).blockFirst()
 
         then:
-        def ex = thrown(HttpClientResponseException)
+        HttpClientResponseException ex = thrown()
         ex.response.status == HttpStatus.BAD_REQUEST
         ex.response.header(ACCESS_CONTROL_ALLOW_ORIGIN) == 'foo.com'
         ex.response.header(VARY) == ORIGIN
@@ -256,13 +251,13 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test control headers are applied to error responses with no handler"() {
         when:
-        rxClient.exchange(
+        Flux.from(rxClient.exchange(
                 HttpRequest.GET('/test/error-checked')
                         .header(ORIGIN, 'foo.com')
-        ).blockFirst()
+        )).blockFirst()
 
         then:
-        def ex = thrown(HttpClientResponseException)
+        HttpClientResponseException ex = thrown()
         ex.response.status == HttpStatus.INTERNAL_SERVER_ERROR
         ex.response.header(ACCESS_CONTROL_ALLOW_ORIGIN) == 'foo.com'
         ex.response.header(VARY) == ORIGIN
@@ -270,10 +265,10 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test control headers are applied to http error responses"() {
         when:
-        rxClient.exchange(
+        Flux.from(rxClient.exchange(
                 HttpRequest.GET('/test/error-response')
                         .header(ORIGIN, 'foo.com')
-        ).blockFirst()
+        )).blockFirst()
 
         then:
         def ex = thrown(HttpClientResponseException)

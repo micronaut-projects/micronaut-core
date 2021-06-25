@@ -23,7 +23,7 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
@@ -48,7 +48,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
     void "test custom HTTP response for java action #action"() {
 
         when:
-        def response = rxClient.exchange("/java/response/$action", String)
+        HttpResponse<?> response = Flux.from(rxClient.exchange("/java/response/$action", String))
                 .onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)
@@ -90,7 +90,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
     @Unroll
     void "test custom HTTP response for action #action"() {
         when:
-        def response = rxClient.exchange("/java/response/$action", String)
+        HttpResponse<?> response = Flux.from(rxClient.exchange("/java/response/$action", String))
                 .onErrorResume(t -> {
                     if (t instanceof HttpClientResponseException) {
                         return Flux.just(((HttpClientResponseException) t).response)
@@ -126,7 +126,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
     void "test content encoding"() {
         when:
-        def response = rxClient.exchange(HttpRequest.GET("/java/response/ok-with-body").header("Accept-Encoding", "gzip"), String)
+        HttpResponse<String> response = Flux.from(rxClient.exchange(HttpRequest.GET("/java/response/ok-with-body").header("Accept-Encoding", "gzip"), String))
                 .onErrorResume(t -> {
                     if (t instanceof HttpClientResponseException) {
                         return Flux.just(((HttpClientResponseException) t).response)
@@ -143,7 +143,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
     void "test custom headers"() {
         when:
-        def response = rxClient.exchange(HttpRequest.GET("/java/response/custom-headers"))
+        HttpResponse<?> response = Flux.from(rxClient.exchange(HttpRequest.GET("/java/response/custom-headers")))
                 .onErrorResume(t -> {
                     if (t instanceof HttpClientResponseException) {
                         return Flux.just(((HttpClientResponseException) t).response)
@@ -164,10 +164,10 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['micronaut.server.serverHeader': 'Foo!', (SPEC_NAME_PROPERTY):getClass().simpleName])
         def ctx = server.getApplicationContext()
-        ReactorHttpClient client = ctx.createBean(ReactorHttpClient, server.getURL())
+        HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
         when:
-        def resp = client.exchange(HttpRequest.GET('/test-header')).blockFirst()
+        def resp = Flux.from(client.exchange(HttpRequest.GET('/test-header'))).blockFirst()
 
         then:
         resp.header("Server") == "Foo!"
@@ -182,10 +182,10 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [(SPEC_NAME_PROPERTY):getClass().simpleName])
         def ctx = server.getApplicationContext()
-        ReactorHttpClient client = ctx.createBean(ReactorHttpClient, server.getURL())
+        HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
         when:
-        def resp = client.exchange(HttpRequest.GET('/test-header')).blockFirst()
+        def resp = Flux.from(client.exchange(HttpRequest.GET('/test-header'))).blockFirst()
 
         then:
         !resp.header("Server")
@@ -199,11 +199,11 @@ class HttpResponseSpec extends AbstractMicronautSpec {
     void "test default date header"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [(SPEC_NAME_PROPERTY):getClass().simpleName])
-        def ctx = server.getApplicationContext()
-        ReactorHttpClient client = ctx.createBean(ReactorHttpClient, server.getURL())
+        ApplicationContext ctx = server.getApplicationContext()
+        HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
         when:
-        def resp = client.exchange(HttpRequest.GET('/test-header')).blockFirst()
+        def resp = Flux.from(client.exchange(HttpRequest.GET('/test-header'))).blockFirst()
 
         then:
         resp.header("Date")
@@ -217,11 +217,11 @@ class HttpResponseSpec extends AbstractMicronautSpec {
     void "test date header turned off"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['micronaut.server.dateHeader': false, (SPEC_NAME_PROPERTY):getClass().simpleName])
-        def ctx = server.getApplicationContext()
-        ReactorHttpClient client = ctx.createBean(ReactorHttpClient, server.getURL())
+        ApplicationContext ctx = server.getApplicationContext()
+        HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
         when:
-        def resp = client.exchange(HttpRequest.GET('/test-header')).blockFirst()
+        def resp = Flux.from(client.exchange(HttpRequest.GET('/test-header'))).blockFirst()
 
         then:
         !resp.header("Date")
@@ -235,15 +235,15 @@ class HttpResponseSpec extends AbstractMicronautSpec {
     void "test keep alive connection header is not set by default for > 499 response"() {
         when:
         EmbeddedServer server = applicationContext.run(EmbeddedServer, [(SPEC_NAME_PROPERTY):getClass().simpleName])
-        def ctx = server.getApplicationContext()
-        ReactorHttpClient client = applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        ApplicationContext ctx = server.getApplicationContext()
+        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
-        client.exchange(
+        Flux.from(client.exchange(
           HttpRequest.GET('/test-header/fail')
-        ).blockFirst()
+        )).blockFirst()
 
         then:
-        def e = thrown(HttpClientResponseException)
+        HttpClientResponseException e = thrown()
         e.response.status == HttpStatus.INTERNAL_SERVER_ERROR
         e.response.header(HttpHeaders.CONNECTION) == 'close'
 
@@ -263,14 +263,14 @@ class HttpResponseSpec extends AbstractMicronautSpec {
           'micronaut.server.netty.keepAliveOnServerError':true
         ])
         def ctx = server.getApplicationContext()
-        ReactorHttpClient client = applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL(), config)
+        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL(), config)
 
-        client.exchange(
+        Flux.from(client.exchange(
           HttpRequest.GET('/test-header/fail')
-        ).blockFirst()
+        )).blockFirst()
 
         then:
-        def e = thrown(HttpClientResponseException)
+        HttpClientResponseException e = thrown()
         e.response.status == HttpStatus.INTERNAL_SERVER_ERROR
         e.response.header(HttpHeaders.CONNECTION) == 'keep-alive'
 

@@ -55,8 +55,8 @@ public interface StreamingHttpClient extends HttpClient {
      * <p>
      * <p>The downstream {@link org.reactivestreams.Subscriber} can regulate demand via the subscription</p>
      *
-     * @param request The {@link HttpRequest} to execute
      * @param <I>     The request body type
+     * @param request The {@link HttpRequest} to execute
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
     <I> Publisher<Map<String, Object>> jsonStream(HttpRequest<I> request);

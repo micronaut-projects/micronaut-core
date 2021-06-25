@@ -66,7 +66,7 @@ class ClientScopeSpec extends Specification {
         then:
         myService.get() == 'success'
         myJavaService.client == myService.client
-        myJavaService.rxHttpClient == myService.rxHttpClient
+        myJavaService.reactiveHttpClient == myService.reactiveHttpClient
 
         when:"test client scope annotation field injection"
         MyServiceField myServiceField = applicationContext.getBean(MyServiceField)
@@ -75,7 +75,7 @@ class ClientScopeSpec extends Specification {
         then:
         myServiceField.get() == 'success'
         myJavaService.client == myServiceField.client
-        myJavaService.rxHttpClient == myServiceField.rxHttpClient
+        myJavaService.reactiveHttpClient == myServiceField.reactiveHttpClient
 
         when:"test client scope annotation constructor injection"
         MyServiceConstructor serviceConstructor = applicationContext.getBean(MyServiceConstructor)
@@ -84,7 +84,7 @@ class ClientScopeSpec extends Specification {
         then:
         serviceConstructor.get() == 'success'
         myJavaService.client == serviceConstructor.client
-        myJavaService.rxHttpClient == serviceConstructor.rxHttpClient
+        myJavaService.reactiveHttpClient == serviceConstructor.reactiveHttpClient
 
 
         and:"test client scope with path in annotation"
@@ -120,7 +120,7 @@ class ClientScopeSpec extends Specification {
         ex.message == "Request URI specifies no host to connect to"
 
         when:"test no base path with client scope"
-        ReactorHttpClient noIdClient = myService.noIdClient
+        HttpClient noIdClient = myService.noIdClient
 
         then:
         noIdClient.toBlocking().retrieve("http://localhost:${embeddedServer.port}/scope") == "success"
@@ -173,16 +173,16 @@ class ClientScopeSpec extends Specification {
         HttpClient client
 
         @Inject @Client('${from.config}')
-        ReactorHttpClient rxHttpClient
+        HttpClient reactiveHttpClient
 
         @Inject @Client(id = 'myService', path = '/scope')
-        ReactorHttpClient pathClient
+        HttpClient pathClient
 
         @Inject @Client
-        ReactorHttpClient noIdClient
+        HttpClient noIdClient
 
         String get() {
-            rxHttpClient != null
+            reactiveHttpClient != null
             client.toBlocking().retrieve(
                     HttpRequest.GET('/scope'), String
             )
@@ -200,13 +200,13 @@ class ClientScopeSpec extends Specification {
         protected HttpClient client
 
         @Inject @Client('${from.config}')
-        protected ReactorHttpClient rxHttpClient
+        protected HttpClient reactiveHttpClient
 
         @Inject @Client(id = 'myService', path = '/scope')
-        protected ReactorHttpClient pathClient
+        protected HttpClient pathClient
 
         String get() {
-            rxHttpClient != null
+            reactiveHttpClient != null
             client.toBlocking().retrieve(
                     HttpRequest.GET('/scope'), String
             )
@@ -221,16 +221,16 @@ class ClientScopeSpec extends Specification {
     static class MyServiceConstructor {
 
         private final HttpClient client
-        private final ReactorHttpClient rxHttpClient
+        private final HttpClient reactiveHttpClient
 
         MyServiceConstructor(@Client('${from.config}')HttpClient client,
-                             @Client('${from.config}') ReactorHttpClient rxHttpClient) {
-            this.rxHttpClient = rxHttpClient
+                             @Client('${from.config}') HttpClient reactiveHttpClient) {
+            this.reactiveHttpClient = reactiveHttpClient
             this.client = client
         }
 
         String get() {
-            rxHttpClient != null
+            reactiveHttpClient != null
             client.toBlocking().retrieve(
                     HttpRequest.GET('/scope'), String
             )
@@ -265,7 +265,7 @@ class ClientScopeSpec extends Specification {
         protected HttpClient clientConfiguration2
 
         @Inject @Client('/')
-        protected ReactorHttpClient rxClient
+        protected HttpClient rxClient
     }
 
     @Singleton

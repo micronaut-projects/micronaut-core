@@ -4,7 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
@@ -16,8 +16,8 @@ import static io.micronaut.http.HttpRequest.POST
 class BookControllerSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-    @Shared @AutoCleanup ReactorHttpClient client = embeddedServer.applicationContext
-                                                             .createBean(ReactorHttpClient, embeddedServer.URL)
+    @Shared @AutoCleanup HttpClient client = embeddedServer.applicationContext
+                                                             .createBean(HttpClient, embeddedServer.URL)
 
     void "test post with uri template"() {
 

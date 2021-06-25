@@ -22,7 +22,7 @@ import io.micronaut.context.annotation.Property
 import io.micronaut.core.type.Argument
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
@@ -49,7 +49,7 @@ class HttpAccessLoggerSpec extends Specification {
 
     @Inject
     @Client("/")
-    ReactorHttpClient client
+    HttpClient client
 
     static MemoryAppender appender = new MemoryAppender()
 

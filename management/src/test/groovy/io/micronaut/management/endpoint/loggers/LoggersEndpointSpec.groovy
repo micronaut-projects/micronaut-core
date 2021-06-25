@@ -17,7 +17,7 @@ package io.micronaut.management.endpoint.loggers
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Shared
@@ -30,7 +30,7 @@ import static io.micronaut.http.HttpRequest.POST
 class LoggersEndpointSpec extends Specification {
 
     @Shared EmbeddedServer server
-    @Shared ReactorHttpClient client
+    @Shared HttpClient client
 
     // Constants matching LogLevel
     static final ALL = 'ALL'
@@ -63,7 +63,7 @@ class LoggersEndpointSpec extends Specification {
                 'endpoints.loggers.sensitive': false,
                 'endpoints.loggers.write-sensitive': false
         ])
-        client = server.applicationContext.createBean(ReactorHttpClient, server.URL)
+        client = server.applicationContext.createBean(HttpClient, server.URL)
     }
 
     void cleanup() {

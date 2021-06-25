@@ -8,7 +8,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.annotation.Filter
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
 import org.reactivestreams.Publisher
@@ -18,7 +18,7 @@ import java.net.URLEncoder
 @Requires(env = [Environment.GOOGLE_COMPUTE])
 @Filter(patterns = ["/google-auth/api/**"])
 class GoogleAuthFilter (
-    private val authClientProvider: BeanProvider<ReactorHttpClient>) : HttpClientFilter { // <1>
+    private val authClientProvider: BeanProvider<HttpClient>) : HttpClientFilter { // <1>
 
     override fun doFilter(request: MutableHttpRequest<*>,
                           chain: ClientFilterChain): Publisher<out HttpResponse<*>?> {

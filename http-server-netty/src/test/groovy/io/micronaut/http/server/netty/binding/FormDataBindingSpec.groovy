@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.binding
 
 import groovy.transform.EqualsAndHashCode
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
@@ -38,10 +39,10 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
 
     void "test simple string-based body parsing"() {
         when:
-        def response = rxClient.exchange(HttpRequest.POST('/form/simple', [
+        HttpResponse<?> response = Flux.from(rxClient.exchange(HttpRequest.POST('/form/simple', [
                 name:"Fred",
                 age:"10"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -51,11 +52,11 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
 
     void "test pojo body parsing"() {
         when:
-        def response = rxClient.exchange(HttpRequest.POST('/form/pojo', [
+        HttpResponse<?> response = Flux.from(rxClient.exchange(HttpRequest.POST('/form/pojo', [
                 name:"Fred",
                 age:"10",
                 something: "else"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -65,12 +66,12 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
 
     void "test simple string-based body parsing with missing data"() {
         when:
-        rxClient.exchange(HttpRequest.POST('/form/simple', [
+        Flux.from(rxClient.exchange(HttpRequest.POST('/form/simple', [
                 name:"Fred"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst()
 
         then:
-        def e = thrown(HttpClientResponseException)
+        HttpClientResponseException e = thrown()
         e.response.status == HttpStatus.BAD_REQUEST
     }
 
@@ -87,8 +88,8 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
     void "test POST SAML form multipart form data"() {
         given:
         MultipartBody body = MultipartBody.builder().addPart("SAMLResponse", SAML_DATA).build()
-        String data = rxClient.retrieve(HttpRequest.POST("/form/saml/test/form-data", body)
-                .contentType(MediaType.MULTIPART_FORM_DATA_TYPE), String).blockFirst()
+        String data = Flux.from(rxClient.retrieve(HttpRequest.POST("/form/saml/test/form-data", body)
+                .contentType(MediaType.MULTIPART_FORM_DATA_TYPE), String)).blockFirst()
 
         expect:
         data == SAML_DATA
@@ -129,10 +130,10 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/2263")
     void "test binding directly to a string"() {
         when:
-        def response = rxClient.exchange(HttpRequest.POST('/form/string', [
+        HttpResponse<String> response = Flux.from(rxClient.exchange(HttpRequest.POST('/form/string', [
                 name:"Fred",
                 age:"10"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -142,10 +143,10 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
 
     void "test binding directly to a reactive string"() {
         when:
-        def response = rxClient.exchange(HttpRequest.POST('/form/maybe-string', [
+        HttpResponse<String> response = Flux.from(rxClient.exchange(HttpRequest.POST('/form/maybe-string', [
                 name:"Fred",
                 age:"10"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst()
 
         then:
         response.status == HttpStatus.OK

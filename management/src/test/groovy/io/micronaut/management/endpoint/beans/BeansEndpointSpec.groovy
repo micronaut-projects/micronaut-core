@@ -17,9 +17,11 @@ package io.micronaut.management.endpoint.beans
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 class BeansEndpointSpec extends Specification {
@@ -31,10 +33,10 @@ class BeansEndpointSpec extends Specification {
     void "test beans endpoint"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.beans.sensitive': false], Environment.TEST)
-        ReactorHttpClient rxClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        def response = rxClient.exchange("/beans", Map).blockFirst()
+        HttpResponse<Map> response = Flux.from(rxClient.exchange("/beans", Map)).blockFirst()
         Map result = response.body()
         Map<String, Map<String, Object>> beans = result.beans
 

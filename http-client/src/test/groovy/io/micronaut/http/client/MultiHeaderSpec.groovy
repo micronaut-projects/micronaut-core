@@ -34,7 +34,7 @@ class MultiHeaderSpec extends Specification {
 
     @Inject
     @Client("/")
-    ReactorHttpClient asyncClient
+    HttpClient asyncClient
 
     void "test multi-valued header"() {
         given:

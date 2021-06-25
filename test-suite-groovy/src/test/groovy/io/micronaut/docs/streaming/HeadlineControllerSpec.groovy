@@ -1,7 +1,7 @@
 package io.micronaut.docs.streaming
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.client.ReactorStreamingHttpClient
+import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
@@ -39,12 +39,12 @@ class HeadlineControllerSpec extends Specification {
 
     void "test streaming client" () {
         when:
-        ReactorStreamingHttpClient client = embeddedServer.applicationContext
-                                                     .createBean(ReactorStreamingHttpClient, embeddedServer.URL)
+        StreamingHttpClient client = embeddedServer.applicationContext
+                                                     .createBean(StreamingHttpClient, embeddedServer.URL)
 
         // tag::streaming[]
-        Flux<Headline> headlineStream = client.jsonStream(
-                GET("/streaming/headlines"), Headline) // <1>
+        Flux<Headline> headlineStream = Flux.from(client.jsonStream(
+                GET("/streaming/headlines"), Headline)) // <1>
         CompletableFuture<Headline> future = new CompletableFuture<>() // <2>
         headlineStream.subscribe(new Subscriber<Headline>() {
             @Override

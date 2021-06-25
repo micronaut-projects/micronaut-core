@@ -51,8 +51,8 @@ import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.LoadBalancer;
-import io.micronaut.http.client.ReactorHttpClient;
-import io.micronaut.http.client.ReactorStreamingHttpClient;
+import io.micronaut.http.client.ProxyHttpClient;
+import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import io.micronaut.http.client.exceptions.HttpClientErrorDecoder;
 import io.micronaut.http.client.exceptions.HttpClientException;
@@ -66,6 +66,7 @@ import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.client.multipart.MultipartDataFactory;
 import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
 import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
+import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
@@ -97,13 +98,11 @@ import io.micronaut.jackson.ObjectMapperFactory;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 import io.micronaut.jackson.codec.JsonStreamMediaTypeCodec;
 import io.micronaut.jackson.parser.JacksonProcessor;
-import io.micronaut.http.client.ReactorProxyHttpClient;
-import io.micronaut.http.client.sse.ReactorSseClient;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
-import io.micronaut.websocket.ReactorWebSocketClient;
+import io.micronaut.websocket.WebSocketClient;
 import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.context.WebSocketBean;
@@ -206,11 +205,11 @@ import static io.micronaut.scheduling.instrument.InvocationInstrumenter.NOOP;
  */
 @Internal
 public class DefaultHttpClient implements
-        ReactorWebSocketClient,
-        ReactorHttpClient,
-        ReactorStreamingHttpClient,
-        ReactorSseClient,
-        ReactorProxyHttpClient,
+        WebSocketClient,
+        HttpClient,
+        StreamingHttpClient,
+        SseClient,
+        ProxyHttpClient,
         ChannelPipelineCustomizer,
         Closeable,
         AutoCloseable {
@@ -570,7 +569,7 @@ public class DefaultHttpClient implements
 
             @Override
             public <I, O, E> io.micronaut.http.HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
-                Flux<HttpResponse<O>> publisher = DefaultHttpClient.this.exchange(request, bodyType, errorType);
+                Flux<HttpResponse<O>> publisher = Flux.from(DefaultHttpClient.this.exchange(request, bodyType, errorType));
                 return publisher.doOnNext(res -> {
                     Optional<ByteBuf> byteBuf = res.getBody(ByteBuf.class);
                     byteBuf.ifPresent(bb -> {
@@ -588,7 +587,7 @@ public class DefaultHttpClient implements
 
     @SuppressWarnings("SubscriberImplementation")
     @Override
-    public <I> Flux<Event<ByteBuffer<?>>> eventStream(io.micronaut.http.HttpRequest<I> request) {
+    public <I> Publisher<Event<ByteBuffer<?>>> eventStream(io.micronaut.http.HttpRequest<I> request) {
 
         if (request instanceof MutableHttpRequest) {
             ((MutableHttpRequest) request).accept(MediaType.TEXT_EVENT_STREAM_TYPE);
@@ -715,8 +714,8 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public <I, B> Flux<Event<B>> eventStream(io.micronaut.http.HttpRequest<I> request, Argument<B> eventType) {
-        return eventStream(request).map(byteBufferEvent -> {
+    public <I, B> Publisher<Event<B>> eventStream(io.micronaut.http.HttpRequest<I> request, Argument<B> eventType) {
+        return Flux.from(eventStream(request)).map(byteBufferEvent -> {
             ByteBuffer<?> data = byteBufferEvent.getData();
             Optional<MediaTypeCodec> registeredCodec;
 
@@ -736,7 +735,7 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public <I> Flux<ByteBuffer<?>> dataStream(io.micronaut.http.HttpRequest<I> request) {
+    public <I> Publisher<ByteBuffer<?>> dataStream(io.micronaut.http.HttpRequest<I> request) {
         ByteBufferSafeReleaseConsumer doOnEachConsumer = new ByteBufferSafeReleaseConsumer();
         return Flux.from(resolveRequestURI(request))
                 .flatMap(buildDataStreamPublisher(request))
@@ -744,7 +743,7 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public <I> Flux<io.micronaut.http.HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.HttpRequest<I> request) {
+    public <I> Publisher<io.micronaut.http.HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.HttpRequest<I> request) {
         HttpResponseByteBufferReleaseConsumer doOnEachConsumer = new HttpResponseByteBufferReleaseConsumer();
         return Flux.from(resolveRequestURI(request))
                 .flatMap(buildExchangeStreamPublisher(request))
@@ -752,7 +751,7 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public <I, O> Flux<O> jsonStream(io.micronaut.http.HttpRequest<I> request, io.micronaut.core.type.Argument<O> type) {
+    public <I, O> Publisher<O> jsonStream(io.micronaut.http.HttpRequest<I> request, io.micronaut.core.type.Argument<O> type) {
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         return Flux.from(resolveRequestURI(request))
                 .flatMap(buildJsonStreamPublisher(parentRequest, request, type));
@@ -760,17 +759,17 @@ public class DefaultHttpClient implements
 
     @SuppressWarnings("unchecked")
     @Override
-    public <I> Flux<Map<String, Object>> jsonStream(io.micronaut.http.HttpRequest<I> request) {
-        return (Flux) jsonStream(request, Map.class);
+    public <I> Publisher<Map<String, Object>> jsonStream(io.micronaut.http.HttpRequest<I> request) {
+        return (Publisher) jsonStream(request, Map.class);
     }
 
     @Override
-    public <I, O> Flux<O> jsonStream(io.micronaut.http.HttpRequest<I> request, Class<O> type) {
+    public <I, O> Publisher<O> jsonStream(io.micronaut.http.HttpRequest<I> request, Class<O> type) {
         return jsonStream(request, io.micronaut.core.type.Argument.of(type));
     }
 
     @Override
-    public <I, O, E> Flux<io.micronaut.http.HttpResponse<O>> exchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
+    public <I, O, E> Publisher<io.micronaut.http.HttpResponse<O>> exchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         Publisher<URI> uriPublisher = resolveRequestURI(request);
         return Flux.from(uriPublisher)
@@ -778,14 +777,14 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public <T extends AutoCloseable> Flux<T> connect(Class<T> clientEndpointType, io.micronaut.http.MutableHttpRequest<?> request) {
+    public <T extends AutoCloseable> Publisher<T> connect(Class<T> clientEndpointType, io.micronaut.http.MutableHttpRequest<?> request) {
         Publisher<URI> uriPublisher = resolveRequestURI(request);
         return Flux.from(uriPublisher)
                 .switchMap(resolvedURI -> connectWebSocket(resolvedURI, request, clientEndpointType, null));
     }
 
     @Override
-    public <T extends AutoCloseable> Flux<T> connect(Class<T> clientEndpointType, Map<String, Object> parameters) {
+    public <T extends AutoCloseable> Publisher<T> connect(Class<T> clientEndpointType, Map<String, Object> parameters) {
         WebSocketBean<T> webSocketBean = webSocketRegistry.getWebSocket(clientEndpointType);
         String uri = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class).orElse("/ws");
         uri = UriTemplate.of(uri).expand(parameters);
@@ -2698,7 +2697,7 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public Flux<MutableHttpResponse<?>> proxy(io.micronaut.http.HttpRequest<?> request) {
+    public Publisher<MutableHttpResponse<?>> proxy(io.micronaut.http.HttpRequest<?> request) {
         return Flux.from(resolveRequestURI(request))
                 .flatMap(requestURI -> {
                     AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request);

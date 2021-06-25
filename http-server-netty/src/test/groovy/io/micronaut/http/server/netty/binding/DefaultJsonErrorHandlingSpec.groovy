@@ -8,6 +8,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import reactor.core.publisher.Flux
 
 class DefaultJsonErrorHandlingSpec extends AbstractMicronautSpec {
 
@@ -15,19 +16,18 @@ class DefaultJsonErrorHandlingSpec extends AbstractMicronautSpec {
 
         when:
         def json = '{"title":"The Stand"'
-        rxClient.exchange(
+        Flux.from(rxClient.exchange(
                 HttpRequest.POST('/errors/map', json), String
-        ).blockFirst()
-
+        )).blockFirst()
 
         then:
-        def e = thrown(HttpClientResponseException)
+        HttpClientResponseException e = thrown()
         e.message == """Invalid JSON: Unexpected end-of-input
  at [Source: UNKNOWN; line: 1, column: 21]"""
         e.response.status == HttpStatus.BAD_REQUEST
 
         when:
-        def body = e.response.getBody(String).orElse(null)
+        String body = e.response.getBody(String).orElse(null)
         def result = new JsonSlurper().parseText(body)
 
         then:

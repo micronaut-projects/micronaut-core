@@ -104,7 +104,7 @@ public abstract class HttpClientConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_EXCEPTION_ON_ERROR_STATUS = true;
 
-    private static ReactorHttpClientFactory clientFactory = null;
+    private static ReactiveHttpClientFactory clientFactory = null;
 
     private Map<String, Object> channelOptions = Collections.emptyMap();
 
@@ -653,9 +653,8 @@ public abstract class HttpClientConfiguration {
      * @return The client
      */
     @Internal
-    static ReactorHttpClient createClient(@Nullable URL url) {
-        ReactorHttpClientFactory clientFactory = getReactiveHttpClientFactory();
-
+    static HttpClient createClient(@Nullable URL url) {
+        ReactiveHttpClientFactory clientFactory = getReactiveHttpClientFactory();
         return clientFactory.createClient(url);
     }
 
@@ -669,8 +668,8 @@ public abstract class HttpClientConfiguration {
      * @since 2.2.0
      */
     @Internal
-    static ReactorHttpClient createClient(@Nullable URL url, HttpClientConfiguration configuration) {
-        ReactorHttpClientFactory clientFactory = getReactiveHttpClientFactory();
+    static HttpClient createClient(@Nullable URL url, HttpClientConfiguration configuration) {
+        ReactiveHttpClientFactory clientFactory = getReactiveHttpClientFactory();
 
         return clientFactory.createClient(url, configuration);
     }
@@ -683,9 +682,9 @@ public abstract class HttpClientConfiguration {
      * @return The client
      */
     @Internal
-    static ReactorStreamingHttpClient createStreamingClient(@NonNull URL url) {
+    static StreamingHttpClient createStreamingClient(@NonNull URL url) {
         ArgumentUtils.requireNonNull("url", url);
-        ReactorHttpClientFactory clientFactory = getReactiveHttpClientFactory();
+        ReactiveHttpClientFactory clientFactory = getReactiveHttpClientFactory();
         return clientFactory.createStreamingClient(url);
     }
 
@@ -699,14 +698,14 @@ public abstract class HttpClientConfiguration {
      * @since 2.2.0
      */
     @Internal
-    static ReactorStreamingHttpClient createStreamingClient(@NonNull URL url, HttpClientConfiguration configuration) {
+    static StreamingHttpClient createStreamingClient(@NonNull URL url, HttpClientConfiguration configuration) {
         ArgumentUtils.requireNonNull("url", url);
-        ReactorHttpClientFactory clientFactory = getReactiveHttpClientFactory();
+        ReactiveHttpClientFactory clientFactory = getReactiveHttpClientFactory();
         return clientFactory.createStreamingClient(url, configuration);
     }
 
-    private static ReactorHttpClientFactory getReactiveHttpClientFactory() {
-        ReactorHttpClientFactory clientFactory = HttpClientConfiguration.clientFactory;
+    private static ReactiveHttpClientFactory getReactiveHttpClientFactory() {
+        ReactiveHttpClientFactory clientFactory = HttpClientConfiguration.clientFactory;
         if (clientFactory == null) {
             synchronized (HttpClientConfiguration.class) { // double check
                 clientFactory = HttpClientConfiguration.clientFactory;
@@ -719,8 +718,8 @@ public abstract class HttpClientConfiguration {
         return clientFactory;
     }
 
-    private static ReactorHttpClientFactory resolveClientFactory() {
-        final Iterator<ReactorHttpClientFactory> i = ServiceLoader.load(ReactorHttpClientFactory.class).iterator();
+    private static ReactiveHttpClientFactory resolveClientFactory() {
+        final Iterator<ReactiveHttpClientFactory> i = ServiceLoader.load(ReactiveHttpClientFactory.class).iterator();
         if (i.hasNext()) {
             return i.next();
         }

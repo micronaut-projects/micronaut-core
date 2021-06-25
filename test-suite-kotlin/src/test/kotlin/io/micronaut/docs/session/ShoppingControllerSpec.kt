@@ -5,7 +5,7 @@ import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import kotlin.test.assertNotNull
 
@@ -16,7 +16,7 @@ class ShoppingControllerSpec: StringSpec() {
     )
 
     val client = autoClose(
-        embeddedServer.applicationContext.createBean(ReactorHttpClient::class.java, embeddedServer.url)
+        embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
     )
 
     init {

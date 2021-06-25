@@ -20,7 +20,7 @@ import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.*
 
@@ -33,7 +33,7 @@ class StatusControllerSpec extends Specification {
 
     @AutoCleanup
     @Shared
-    ReactorHttpClient client = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+    HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
     @Unroll("#description")
     void "verify default HTTP status and @Status override"() {

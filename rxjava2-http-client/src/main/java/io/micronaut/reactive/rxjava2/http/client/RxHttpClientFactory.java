@@ -16,6 +16,7 @@
 package io.micronaut.reactive.rxjava2.http.client;
 
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Secondary;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.client.ReactiveHttpClientRegistry;
@@ -27,15 +28,16 @@ import io.micronaut.inject.InjectionPoint;
  * @author Sergio del Amo
  * @since 2.0
  */
+@Factory
 public class RxHttpClientFactory {
 
-    private final ReactiveHttpClientRegistry<?, ?, ?> clientRegistry;
+    private final ReactiveHttpClientRegistry<?, ?, ?, ?> clientRegistry;
 
     /**
      * Default constructor.
      * @param clientRegistry The client registry
      */
-    public RxHttpClientFactory(ReactiveHttpClientRegistry<?, ?, ?> clientRegistry) {
+    public RxHttpClientFactory(ReactiveHttpClientRegistry<?, ?, ?, ?> clientRegistry) {
         this.clientRegistry = clientRegistry;
     }
 

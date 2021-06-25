@@ -8,7 +8,7 @@ import io.micronaut.http.HttpRequest.GET
 import io.micronaut.http.HttpRequest.POST
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.uri.UriBuilder
 import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Flux
@@ -21,7 +21,7 @@ class HelloControllerSpec: StringSpec() {
     )
 
     val client = autoClose(
-        embeddedServer.applicationContext.createBean(ReactorHttpClient::class.java, embeddedServer.url)
+        embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
     )
 
     init {
@@ -46,23 +46,23 @@ class HelloControllerSpec: StringSpec() {
             )
             // end::headers[]
 
-            response.blockFirst() shouldBe "Hello John"
+            Flux.from(response).blockFirst() shouldBe "Hello John"
         }
 
         "test retrieve with JSON" {
             // tag::jsonmap[]
-            var response: Flux<Map<*, *>> = client.retrieve(
+            var response: Flux<Map<*, *>> = Flux.from(client.retrieve(
                     GET<Any>("/greet/John"), Map::class.java
-            )
+            ))
             // end::jsonmap[]
 
             response.blockFirst()["text"] shouldBe "Hello John"
 
             // tag::jsonmaptypes[]
-            response = client.retrieve(
+            response = Flux.from(client.retrieve(
                     GET<Any>("/greet/John"),
                     Argument.of(Map::class.java, String::class.java, String::class.java) // <1>
-            )
+            ))
             // end::jsonmaptypes[]
 
             response.blockFirst()["text"] shouldBe "Hello John"
@@ -70,9 +70,9 @@ class HelloControllerSpec: StringSpec() {
 
         "test retrieve with POJO" {
             // tag::jsonpojo[]
-            val response = client.retrieve(
+            val response = Flux.from(client.retrieve(
                     GET<Any>("/greet/John"), Message::class.java
-            )
+            ))
 
             response.blockFirst().text shouldBe "Hello John"
             // end::jsonpojo[]
@@ -84,7 +84,7 @@ class HelloControllerSpec: StringSpec() {
                     GET<Any>("/greet/John"), Message::class.java // <1>
             )
 
-            val response = call.blockFirst()
+            val response = Flux.from(call).blockFirst()
             val message = response.getBody(Message::class.java) // <2>
             // check the status
             response.status shouldBe HttpStatus.OK // <3>
@@ -103,7 +103,7 @@ class HelloControllerSpec: StringSpec() {
             )
             // end::poststring[]
 
-            val response = call.blockFirst()
+            val response = Flux.from(call).blockFirst()
             val message = response.getBody(String::class.java) // <2>
             // check the status
             response.status shouldBe HttpStatus.CREATED // <3>
@@ -119,7 +119,7 @@ class HelloControllerSpec: StringSpec() {
             )
             // end::postpojo[]
 
-            val response = call.blockFirst()
+            val response = Flux.from(call).blockFirst()
             val message = response.getBody(Message::class.java) // <2>
             // check the status
             response.status shouldBe HttpStatus.CREATED // <3>

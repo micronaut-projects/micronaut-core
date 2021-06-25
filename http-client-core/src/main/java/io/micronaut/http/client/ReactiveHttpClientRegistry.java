@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.client.sse.SseClient;
+import io.micronaut.websocket.WebSocketClient;
 
 /**
  * Internal interface for managing the construction and lifecycle of instances of reactive clients.
@@ -34,7 +35,7 @@ import io.micronaut.http.client.sse.SseClient;
  * @param <S> Reactive Streaming HTTP Client
  */
 @Internal
-public interface ReactiveHttpClientRegistry<T extends HttpClient, E extends SseClient, S extends StreamingHttpClient> {
+public interface ReactiveHttpClientRegistry<T extends HttpClient, E extends SseClient, S extends StreamingHttpClient, W extends WebSocketClient> {
 
     /**
      * Return the client for the client ID and path.
@@ -73,6 +74,15 @@ public interface ReactiveHttpClientRegistry<T extends HttpClient, E extends SseC
      */
     @NonNull
     S getStreamingClient(@NonNull AnnotationMetadata annotationMetadata);
+
+    /**
+     * Return the client for the given annotation metadata.
+     *
+     * @param annotationMetadata The annotation metadata.
+     * @return The client
+     */
+    @NonNull
+    W getWebSocketClient(@NonNull AnnotationMetadata annotationMetadata);
 
     /**
      * Dispose of the client defined by the given metadata.

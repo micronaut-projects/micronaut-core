@@ -16,6 +16,7 @@ import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Produces
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -29,7 +30,7 @@ class ClientRedirectSpec extends Specification {
 
     void "test - client: full uri, direct"() {
         given:
-        ReactorHttpClient client = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange('/test/direct', String)
@@ -45,7 +46,7 @@ class ClientRedirectSpec extends Specification {
 
     void "test - client: full uri, redirect: absolute - follows correctly"() {
         given:
-        ReactorHttpClient client = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange('/test/redirect', String)
@@ -62,7 +63,7 @@ class ClientRedirectSpec extends Specification {
     @NotYetImplemented
     void "test - client: full uri, redirect: relative"() {
         given:
-        ReactorHttpClient client = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange('/test/redirect-relative', String)
@@ -78,7 +79,7 @@ class ClientRedirectSpec extends Specification {
 
     void "test - client: relative uri, direct"() {
         given:
-        ReactorHttpClient client = embeddedServer.applicationContext.createBean(ReactorHttpClient, new LoadBalancer() {
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, new LoadBalancer() {
             @Override
             Publisher<ServiceInstance> select(@Nullable Object discriminator) {
                 URL url = embeddedServer.getURL()
@@ -105,7 +106,7 @@ class ClientRedirectSpec extends Specification {
 
     void "test - client: relative uri - no slash"() {
         given:
-        ReactorHttpClient client = embeddedServer.applicationContext.createBean(ReactorHttpClient, new LoadBalancer() {
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, new LoadBalancer() {
             @Override
             Publisher<ServiceInstance> select(@Nullable Object discriminator) {
                 URL url = embeddedServer.getURL()
@@ -131,7 +132,7 @@ class ClientRedirectSpec extends Specification {
 
     void "test - client: relative uri, redirect: absolute "() {
         given:
-        ReactorHttpClient client = embeddedServer.applicationContext.createBean(ReactorHttpClient, new LoadBalancer() {
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, new LoadBalancer() {
             @Override
             Publisher<ServiceInstance> select(@Nullable Object discriminator) {
                 URL url = embeddedServer.getURL()
@@ -158,10 +159,10 @@ class ClientRedirectSpec extends Specification {
 
     void "test the host header is correct for redirect"() {
         EmbeddedServer otherServer = ApplicationContext.run(EmbeddedServer, ['redirect.server': true, 'spec.name': 'ClientRedirectSpec'])
-        ReactorHttpClient client = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        String result = client.retrieve(HttpRequest.GET("/test/redirect-host").header("redirect", "http://localhost:${otherServer.getPort()}/test/host-header")).blockFirst()
+        String result = Flux.from(client.retrieve(HttpRequest.GET("/test/redirect-host").header("redirect", "http://localhost:${otherServer.getPort()}/test/host-header"))).blockFirst()
 
         then:
         result == "localhost:${otherServer.getPort()}"

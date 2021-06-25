@@ -31,8 +31,8 @@ import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.BlockingHttpClient
 import io.micronaut.http.client.HttpPostSpec
-import io.micronaut.http.client.ReactorHttpClient
-import io.micronaut.http.client.ReactorStreamingHttpClient
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Flux
@@ -61,11 +61,11 @@ class RxHttpPostSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    ReactorHttpClient client = context.createBean(ReactorHttpClient, embeddedServer.getURL())
+    HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
     @Shared
     @AutoCleanup
-    ReactorStreamingHttpClient streamingHttpClient = context.createBean(ReactorStreamingHttpClient, embeddedServer.getURL())
+    StreamingHttpClient streamingHttpClient = context.createBean(StreamingHttpClient, embeddedServer.getURL())
 
     void "test simple post exchange request with JSON"() {
         when:
@@ -90,13 +90,13 @@ class RxHttpPostSpec extends Specification {
 
     void "test simple post retrieve request with JSON"() {
         when:
-        Flux<HttpPostSpec.Book> flowable = client.retrieve(
+        Flux<HttpPostSpec.Book> flowable = Flux.from(client.retrieve(
                 HttpRequest.POST("/post/simple", new HttpPostSpec.Book(title: "The Stand", pages: 1000))
                         .accept(MediaType.APPLICATION_JSON_TYPE)
                         .header("X-My-Header", "Foo"),
 
                 HttpPostSpec.Book
-        )
+        ))
         HttpPostSpec.Book book = flowable.blockFirst()
 
         then:
@@ -120,12 +120,12 @@ class RxHttpPostSpec extends Specification {
 
     void "test reactive Mono post retrieve request with JSON"() {
         when:
-        Flux<HttpPostSpec.Book> flowable = client.retrieve(
+        Flux<HttpPostSpec.Book> flowable = Flux.from(client.retrieve(
                 HttpRequest.POST("/reactive/post/single", Mono.just(new HttpPostSpec.Book(title: "The Stand", pages: 1000)))
                         .accept(MediaType.APPLICATION_JSON_TYPE),
 
                 HttpPostSpec.Book
-        )
+        ))
         HttpPostSpec.Book book = flowable.blockFirst()
 
         then:
@@ -134,12 +134,12 @@ class RxHttpPostSpec extends Specification {
 
     void "test reactive maybe post retrieve request with JSON"() {
         when:
-        Flux<HttpPostSpec.Book> flowable = client.retrieve(
+        Flux<HttpPostSpec.Book> flowable = Flux.from(client.retrieve(
                 HttpRequest.POST("/reactive/post/maybe", Mono.just(new HttpPostSpec.Book(title: "The Stand", pages: 1000)))
                         .accept(MediaType.APPLICATION_JSON_TYPE),
 
                 HttpPostSpec.Book
-        )
+        ))
         HttpPostSpec.Book book = flowable.blockFirst()
 
         then:
@@ -148,12 +148,12 @@ class RxHttpPostSpec extends Specification {
 
     void "test reactive post with unserializable data"() {
         when:
-        Flux<User> flowable = client.retrieve(
+        Flux<User> flowable = Flux.from(client.retrieve(
                 HttpRequest.POST("/reactive/post/user", '{"userName" : "edwin","movies" : [ {"imdbId" : "tt1285016","inCollection": "true"},{"imdbId" : "tt0100502","inCollection" : "false"} ]}')
                         .accept(MediaType.APPLICATION_JSON_TYPE),
 
                 User
-        )
+        ))
         User user = flowable.blockFirst()
 
         then:
@@ -163,12 +163,12 @@ class RxHttpPostSpec extends Specification {
 
     void "test reactive post error handling"() {
         when:
-        Flux<User> flowable = client.retrieve(
+        Flux<User> flowable = Flux.from(client.retrieve(
                 HttpRequest.POST("/reactive/post/user-error", '{"userName":"edwin","movies":[]}')
                         .accept(MediaType.APPLICATION_JSON_TYPE),
                 Argument.of(User),
                 Argument.of(User)
-        )
+        ))
         User user = flowable.onErrorResume((Function){ t ->
             Flux.just(((HttpClientResponseException) t).response.getBody(User).get())
         }).blockFirst()
@@ -181,12 +181,12 @@ class RxHttpPostSpec extends Specification {
     // investigate intermitten issues with this test on Github Actions
     void "test reactive post error handling without specifying error body type"() {
         when:
-        Flux<User> flowable = client.retrieve(
+        Flux<User> flowable = Flux.from(client.retrieve(
                 HttpRequest.POST("/reactive/post/user-error", '{"userName":"edwin","movies":[]}')
                         .accept(MediaType.APPLICATION_JSON_TYPE),
 
                 Argument.of(User)
-        )
+        ))
         User user = flowable.onErrorResume((Function){ t ->
             if (t instanceof HttpClientResponseException) {
                 try {
@@ -204,10 +204,10 @@ class RxHttpPostSpec extends Specification {
     }
 
     void "test posting an array of simple types"() {
-        List<Boolean> booleans = streamingHttpClient.jsonStream(
+        List<Boolean> booleans = Flux.from(streamingHttpClient.jsonStream(
                 HttpRequest.POST("/reactive/post/booleans", "[true, true, false]"),
                 Boolean.class
-        ).collectList().block()
+        )).collectList().block()
 
         expect:
         booleans[0] == true
@@ -216,13 +216,13 @@ class RxHttpPostSpec extends Specification {
     }
 
     void "test creating a person"() {
-        Flux<Person> flowable = client.retrieve(
+        Flux<Person> flowable = Flux.from(client.retrieve(
                 HttpRequest.POST("/reactive/post/person", 'firstName=John')
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .accept(MediaType.APPLICATION_JSON_TYPE),
 
                 Argument.of(Person)
-        )
+        ))
 
         when:
         Person person = flowable.blockFirst()
@@ -232,11 +232,11 @@ class RxHttpPostSpec extends Specification {
     }
 
     void "test a local error handler that returns a single"() {
-        Flux<Person> flowable = client.retrieve(
+        Flux<Person> flowable = Flux.from(client.retrieve(
                 HttpRequest.POST("/reactive/post/error", '{"firstName": "John"}'),
                 Argument.of(Person),
                 Argument.of(String)
-        )
+        ))
 
         when:
         flowable.blockFirst()

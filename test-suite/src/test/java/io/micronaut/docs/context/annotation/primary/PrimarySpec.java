@@ -20,7 +20,7 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.client.ReactorHttpClient;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -34,7 +34,7 @@ public class PrimarySpec {
 
     private static EmbeddedServer embeddedServer;
 
-    private static ReactorHttpClient client;
+    private static HttpClient client;
 
 
     @BeforeClass
@@ -43,7 +43,7 @@ public class PrimarySpec {
             put("spec.name", "primaryspec");
             put("spec.lang", "java");
         }}, Environment.TEST);
-        client = embeddedServer.getApplicationContext().createBean(ReactorHttpClient.class, embeddedServer.getURL());
+        client = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL());
     }
     @AfterClass
     public static void teardown(){

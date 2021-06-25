@@ -4,7 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
@@ -16,7 +16,7 @@ class MessageEndpointSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
                 ['spec.name': MessageEndpointSpec.simpleName,
                  'endpoints.message.enabled': true])
-        ReactorHttpClient rxClient = server.applicationContext.createBean(ReactorHttpClient, server.getURL())
+        HttpClient rxClient = server.applicationContext.createBean(HttpClient, server.getURL())
 
         when:
         def response = rxClient.exchange("/message", String).blockFirst()
@@ -34,7 +34,7 @@ class MessageEndpointSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
                 ['spec.name': MessageEndpointSpec.simpleName,
                  'endpoints.message.enabled': true])
-        ReactorHttpClient rxClient = server.applicationContext.createBean(ReactorHttpClient, server.getURL())
+        HttpClient rxClient = server.applicationContext.createBean(HttpClient, server.getURL())
 
         when:
         def response = rxClient.exchange(HttpRequest.POST("/message", [newMessage: "A new message"])
@@ -61,7 +61,7 @@ class MessageEndpointSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
                 ['spec.name': MessageEndpointSpec.simpleName,
                  'endpoints.message.enabled': true])
-        ReactorHttpClient rxClient = server.applicationContext.createBean(ReactorHttpClient, server.getURL())
+        HttpClient rxClient = server.applicationContext.createBean(HttpClient, server.getURL())
 
         when:
         def response = rxClient.exchange(HttpRequest.DELETE("/message"), String).blockFirst()

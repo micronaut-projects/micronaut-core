@@ -40,10 +40,9 @@ class ErrorSpec extends AbstractMicronautSpec {
 
     void "test 500 server error"() {
         given:
-        def response = rxClient.exchange(
+        HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.GET('/errors/server-error')
-
-        ) .onErrorResume(t -> {
+        )).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)
             }
@@ -58,10 +57,10 @@ class ErrorSpec extends AbstractMicronautSpec {
 
     void "test 500 server error IOException"() {
         given:
-        def response = rxClient.exchange(
+        HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.GET('/errors/io-error')
 
-        ) .onErrorResume(t -> {
+        )).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)
             }
@@ -76,10 +75,9 @@ class ErrorSpec extends AbstractMicronautSpec {
 
     void "test 404 error"() {
         when:
-        def response = rxClient.exchange(
+        HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.GET('/errors/blah')
-
-        ) .onErrorResume(t -> {
+        )).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)
             }
@@ -100,10 +98,9 @@ class ErrorSpec extends AbstractMicronautSpec {
 
     void "test 405 error"() {
         when:
-        def response = rxClient.exchange(
+        HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.POST('/errors/server-error', 'blah')
-
-        ) .onErrorResume(t -> {
+        )).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)
             }
@@ -124,10 +121,9 @@ class ErrorSpec extends AbstractMicronautSpec {
 
     void "test content type for error handler"() {
         given:
-        def response = rxClient.exchange(
+        HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.GET('/errors/handler-content-type-error')
-
-        ) .onErrorResume(t -> {
+        )).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)
             }
@@ -142,10 +138,9 @@ class ErrorSpec extends AbstractMicronautSpec {
 
     void "test calling a controller that fails to inject with a local error handler"() {
         given:
-        def response = rxClient.exchange(
+        HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.GET('/errors/injection')
-
-        ) .onErrorResume(t -> {
+        )).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)
             }

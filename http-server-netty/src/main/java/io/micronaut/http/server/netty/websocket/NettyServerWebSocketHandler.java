@@ -31,7 +31,7 @@ import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.websocket.CloseReason;
-import io.micronaut.websocket.ReactorWebSocketSession;
+import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.context.WebSocketBean;
 import io.micronaut.websocket.event.WebSocketMessageProcessedEvent;
 import io.micronaut.websocket.event.WebSocketSessionClosedEvent;
@@ -157,8 +157,8 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             }
 
             @Override
-            public Set<? extends ReactorWebSocketSession> getOpenSessions() {
-                return webSocketSessionRepository.getChannelGroup().stream().flatMap((Function<Channel, Stream<ReactorWebSocketSession>>) ch -> {
+            public Set<? extends WebSocketSession> getOpenSessions() {
+                return webSocketSessionRepository.getChannelGroup().stream().flatMap((Function<Channel, Stream<WebSocketSession>>) ch -> {
                     NettyReactorWebSocketSession s = ch.attr(NettyReactorWebSocketSession.WEB_SOCKET_SESSION_KEY).get();
                     if (s != null && s.isOpen()) {
                         return Stream.of(s);

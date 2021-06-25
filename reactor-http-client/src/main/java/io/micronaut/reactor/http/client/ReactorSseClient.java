@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.sse;
+package io.micronaut.reactor.http.client;
 
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.sse.Event;
 import reactor.core.publisher.Flux;
 

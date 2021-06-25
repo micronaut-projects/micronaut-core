@@ -5,8 +5,8 @@ import io.kotlintest.shouldNotBe
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest.GET
-import io.micronaut.http.client.ReactorHttpClient
-import io.micronaut.http.client.ReactorStreamingHttpClient
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import org.junit.Assert.fail
 import org.reactivestreams.Subscriber
@@ -21,7 +21,7 @@ class HeadlineControllerSpec: StringSpec() {
     )
 
     val client = autoClose(
-        embeddedServer.applicationContext.createBean(ReactorHttpClient::class.java, embeddedServer.url)
+        embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
     )
 
     init {
@@ -42,7 +42,7 @@ class HeadlineControllerSpec: StringSpec() {
 
         "test streaming client" {
             val client = embeddedServer.applicationContext.createBean(
-                ReactorStreamingHttpClient::class.java, embeddedServer.url)
+                StreamingHttpClient::class.java, embeddedServer.url)
 
             // tag::streaming[]
             val headlineStream = client.jsonStream(

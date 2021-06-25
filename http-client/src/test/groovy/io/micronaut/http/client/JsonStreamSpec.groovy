@@ -66,12 +66,12 @@ class JsonStreamSpec  extends Specification {
 
     void "test read JSON stream demand all"() {
         given:
-        ReactorStreamingHttpClient client = context.createBean(ReactorStreamingHttpClient, embeddedServer.getURL())
+        StreamingHttpClient client = context.createBean(StreamingHttpClient, embeddedServer.getURL())
 
         when:
-        List<Map> jsonObjects = client.jsonStream(HttpRequest.GET(
+        List<Map> jsonObjects = Flux.from(client.jsonStream(HttpRequest.GET(
                 '/jsonstream/books'
-        )).collectList().block()
+        ))).collectList().block()
 
         then:
         jsonObjects.size() == 2
@@ -86,17 +86,17 @@ class JsonStreamSpec  extends Specification {
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1864')
     void "test read JSON stream raw data and demand all"() {
         given:
-        ReactorStreamingHttpClient client = context.createBean(ReactorStreamingHttpClient, embeddedServer.getURL())
+        StreamingHttpClient client = context.createBean(StreamingHttpClient, embeddedServer.getURL())
 
         when:
-        List<Chunk> jsonObjects = client.jsonStream(
+        List<Chunk> jsonObjects = Flux.from(client.jsonStream(
                 HttpRequest.POST('/jsonstream/books/raw', '''
 {"type":"ADDED"}
 {"type":"ADDED"}
 {"type":"ADDED"}
 {"type":"ADDED"}
 ''').contentType(MediaType.APPLICATION_JSON_STREAM_TYPE)
-    .accept(MediaType.APPLICATION_JSON_STREAM_TYPE), Chunk).collectList().block()
+    .accept(MediaType.APPLICATION_JSON_STREAM_TYPE), Chunk)).collectList().block()
 
         then:
         jsonObjects.size() == 4
@@ -108,12 +108,12 @@ class JsonStreamSpec  extends Specification {
 
     void "test read JSON stream demand all POJO"() {
         given:
-        ReactorStreamingHttpClient client = context.createBean(ReactorStreamingHttpClient, embeddedServer.getURL())
+        StreamingHttpClient client = context.createBean(StreamingHttpClient, embeddedServer.getURL())
 
         when:
-        List<Book> jsonObjects = client.jsonStream(HttpRequest.GET(
+        List<Book> jsonObjects = Flux.from(client.jsonStream(HttpRequest.GET(
                 '/jsonstream/books'
-        ), Book).collectList().block()
+        ), Book)).collectList().block()
 
         then:
         jsonObjects.size() == 2
@@ -124,12 +124,12 @@ class JsonStreamSpec  extends Specification {
 
     void "test read JSON stream demand one"() {
         given:
-        ReactorStreamingHttpClient client = context.createBean(ReactorStreamingHttpClient, embeddedServer.getURL())
+        StreamingHttpClient client = context.createBean(StreamingHttpClient, embeddedServer.getURL())
 
         when:
-        def stream = client.jsonStream(HttpRequest.GET(
+        Flux stream = Flux.from(client.jsonStream(HttpRequest.GET(
                 '/jsonstream/books'
-        ))
+        )))
         Map json
 
         stream.subscribe(new Subscriber<Map<String, Object>>() {
@@ -165,18 +165,18 @@ class JsonStreamSpec  extends Specification {
 
     void "we can stream books to the server"() {
         given:
-        ReactorStreamingHttpClient client = context.createBean(ReactorStreamingHttpClient, embeddedServer.getURL())
+        StreamingHttpClient client = context.createBean(StreamingHttpClient, embeddedServer.getURL())
         signal = new Semaphore(1)
         when:
         // Funny request flow which required the server to release the semaphore so we can keep sending stuff
-        def stream = client.jsonStream(HttpRequest.POST(
+        Flux stream = Flux.from(client.jsonStream(HttpRequest.POST(
                 '/jsonstream/books/count',
                 Mono.fromCallable {
                     JsonStreamSpec.signal.acquire()
                     new Book(title: "Micronaut for dummies")
                 }
                 .repeat(9)
-                ).contentType(MediaType.APPLICATION_JSON_STREAM_TYPE).accept(MediaType.APPLICATION_JSON_STREAM_TYPE))
+                ).contentType(MediaType.APPLICATION_JSON_STREAM_TYPE).accept(MediaType.APPLICATION_JSON_STREAM_TYPE)))
 
         then:
         stream.timeout(Duration.of(5, ChronoUnit.SECONDS)).blockFirst().bookCount == 10
@@ -220,7 +220,7 @@ class JsonStreamSpec  extends Specification {
     static class BookController {
 
         @Get(produces = MediaType.APPLICATION_JSON_STREAM)
-        Publisher<Book> list() {
+        Flux<Book> list() {
             return Flux.just(new Book(title: "The Stand"), new Book(title: "The Shining"))
         }
 

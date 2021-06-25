@@ -6,9 +6,10 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType
-import io.micronaut.http.client.ReactorHttpClient;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 class AlertsEndpointSpec extends Specification {
@@ -17,10 +18,10 @@ class AlertsEndpointSpec extends Specification {
         Map<String, Object> map = new HashMap<>()
         map.put("spec.name", AlertsEndpointSpec.simpleName)
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map)
-        ReactorHttpClient client = server.getApplicationContext().createBean(ReactorHttpClient.class, server.getURL())
+        HttpClient client = server.getApplicationContext().createBean(HttpClient.class, server.getURL())
 
         when:
-        client.exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String.class).blockFirst()
+        Flux.from(client.exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String.class)).blockFirst()
 
         then:
         def ex = thrown(HttpClientResponseException)
@@ -35,16 +36,16 @@ class AlertsEndpointSpec extends Specification {
         map.put("spec.name", AlertsEndpointSpec.class.getSimpleName());
         map.put("endpoints.alerts.add.sensitive", false);
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map);
-        ReactorHttpClient client = server.getApplicationContext().createBean(ReactorHttpClient.class, server.getURL());
+        HttpClient client = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
 
         when:
-        HttpResponse<?> response = client.exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String.class).blockFirst();
+        HttpResponse<?> response = Flux.from(client.exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String.class)).blockFirst();
 
         then:
         response.status() == HttpStatus.OK
 
         when:
-        List<String> alerts = client.retrieve(HttpRequest.GET("/alerts"), Argument.LIST_OF_STRING).blockFirst();
+        List<String> alerts = Flux.from(client.retrieve(HttpRequest.GET("/alerts"), Argument.LIST_OF_STRING)).blockFirst();
 
         then:
         alerts.get(0) == "First alert"
@@ -57,10 +58,10 @@ class AlertsEndpointSpec extends Specification {
         Map<String, Object> map = new HashMap<>()
         map.put("spec.name", AlertsEndpointSpec.class.getSimpleName())
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map)
-        ReactorHttpClient client = server.getApplicationContext().createBean(ReactorHttpClient.class, server.getURL())
+        HttpClient client = server.getApplicationContext().createBean(HttpClient.class, server.getURL())
 
         when:
-        client.exchange(HttpRequest.DELETE("/alerts"), String.class).blockFirst()
+        Flux.from(client.exchange(HttpRequest.DELETE("/alerts"), String.class)).blockFirst()
 
         then:
         def ex = thrown(HttpClientResponseException)

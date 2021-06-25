@@ -40,7 +40,7 @@ class ExceptionOnErrorStatusSpec extends Specification {
 
     @Inject
     @Client("/")
-    ReactorHttpClient client
+    HttpClient client
 
     void "test not found"() {
         when:

@@ -48,7 +48,7 @@ import java.time.Duration
 class StreamRequestSpec extends Specification {
     @Inject
     @Client("/")
-    ReactorStreamingHttpClient client
+    StreamingHttpClient client
 
     @Inject
     ApplicationContext applicationContext
@@ -60,14 +60,13 @@ class StreamRequestSpec extends Specification {
 
         when:
         int i = 0
-        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/numbers', Flux.create(emitter -> {
+        HttpResponse<List> result = Flux.from(client.exchange(HttpRequest.POST('/stream/request/numbers', Flux.create(emitter -> {
                 while(i < 5) {
                     emitter.next(i++)
                 }
                 emitter.complete()
         }, FluxSink.OverflowStrategy.BUFFER
-
-        )).contentType(MediaType.APPLICATION_JSON_TYPE), List).blockFirst()
+        )).contentType(MediaType.APPLICATION_JSON_TYPE), List)).blockFirst()
 
         then:
         result.body().size() == 5
@@ -77,14 +76,13 @@ class StreamRequestSpec extends Specification {
     void "test stream post request with strings"() {
         when:
         int i = 0
-        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/strings', Flux.create(emitter -> {
+        HttpResponse<List> result = Flux.from(client.exchange(HttpRequest.POST('/stream/request/strings', Flux.create(emitter -> {
                 while(i < 5) {
                     emitter.next("Number ${i++}")
                 }
                 emitter.complete()
         }, FluxSink.OverflowStrategy.BUFFER
-
-        )).contentType(MediaType.TEXT_PLAIN_TYPE), List).blockFirst()
+        )).contentType(MediaType.TEXT_PLAIN_TYPE), List)).blockFirst()
 
         then:
         result.body().size() == 5
@@ -94,10 +92,10 @@ class StreamRequestSpec extends Specification {
 
     void "test stream get request with JSON strings"() {
         given:
-        ReactorStreamingHttpClient client = ReactorStreamingHttpClient.create(embeddedServer.getURL())
+        StreamingHttpClient client = StreamingHttpClient.create(embeddedServer.getURL())
 
         when:
-        HttpResponse<?> result = client.exchangeStream(HttpRequest.GET('/stream/request/jsonstrings')).blockFirst()
+        HttpResponse<?> result = Flux.from(client.exchangeStream(HttpRequest.GET('/stream/request/jsonstrings'))).blockFirst()
 
         then:
         result.headers.getAll(HttpHeaders.TRANSFER_ENCODING).size() == 1
@@ -110,14 +108,14 @@ class StreamRequestSpec extends Specification {
     void "test stream post request with byte chunks"() {
         when:
         int i = 0
-        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/bytes', Flux.create(emitter -> {
+        HttpResponse<List> result = Flux.from(client.exchange(HttpRequest.POST('/stream/request/bytes', Flux.create(emitter -> {
                 while(i < 5) {
                     emitter.next("Number ${i++}".getBytes(StandardCharsets.UTF_8))
                 }
                 emitter.complete()
         }, FluxSink.OverflowStrategy.BUFFER
 
-        )).contentType(MediaType.TEXT_PLAIN_TYPE), List).blockFirst()
+        )).contentType(MediaType.TEXT_PLAIN_TYPE), List)).blockFirst()
 
         then:
         result.body().size() == 5
@@ -127,13 +125,13 @@ class StreamRequestSpec extends Specification {
     void "test stream post request with POJOs"() {
         when:
         int i = 0
-        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/pojos', Flux.create(emitter -> {
+        HttpResponse<List> result = Flux.from(client.exchange(HttpRequest.POST('/stream/request/pojos', Flux.create(emitter -> {
                 while(i < 5) {
                     emitter.next(new Book(title:"Number ${i++}"))
                 }
                 emitter.complete()
         }, FluxSink.OverflowStrategy.BUFFER
-        )), Argument.of(List, Book)).blockFirst()
+        )), Argument.of(List, Book))).blockFirst()
 
         then:
         result.body().size() == 5
@@ -145,18 +143,18 @@ class StreamRequestSpec extends Specification {
         given:
         def configuration = new DefaultHttpClientConfiguration()
         configuration.setReadTimeout(Duration.ofMinutes(1))
-        ReactorHttpClient client = applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL(), configuration)
+        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL(), configuration)
 
         when:
         int i = 0
-        HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/pojo-flowable', Flux.create(emitter -> {
+        HttpResponse<List> result = Flux.from(client.exchange(HttpRequest.POST('/stream/request/pojo-flowable', Flux.create(emitter -> {
                 while(i < 5) {
                     emitter.next(new Book(title:"Number ${i++}"))
                 }
                 emitter.complete()
         }, FluxSink.OverflowStrategy.BUFFER
 
-        )), Argument.of(List, Book)).blockFirst()
+        )), Argument.of(List, Book))).blockFirst()
 
         then:
         result.body().size() == 5
@@ -205,14 +203,14 @@ class StreamRequestSpec extends Specification {
     void "test manually setting the content length does not chunked encoding"() {
         when:
         int i = 0
-        HttpResponse<String> result = client.exchange(HttpRequest.POST('/stream/request/strings/contentLength', Flux.create(emitter -> {
+        HttpResponse<String> result = Flux.from(client.exchange(HttpRequest.POST('/stream/request/strings/contentLength', Flux.create(emitter -> {
                 while(i < 5) {
                     emitter.next("aa")
                     i++
                 }
                 emitter.complete()
         }, FluxSink.OverflowStrategy.BUFFER
-        )).contentType(MediaType.TEXT_PLAIN_TYPE).contentLength(10), String).blockFirst()
+        )).contentType(MediaType.TEXT_PLAIN_TYPE).contentLength(10), String)).blockFirst()
 
         then:
         noExceptionThrown()

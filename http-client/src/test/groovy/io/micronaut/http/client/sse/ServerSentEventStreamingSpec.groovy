@@ -39,7 +39,7 @@ import java.util.concurrent.TimeUnit
 class ServerSentEventStreamingSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ServerSentEventStreamingSpec'])
-    @Shared @AutoCleanup ReactorSseClient sseClient = embeddedServer.applicationContext.createBean(ReactorSseClient, embeddedServer.getURL())
+    @Shared @AutoCleanup SseClient sseClient = embeddedServer.applicationContext.createBean(SseClient, embeddedServer.getURL())
     @Shared ProductClient productClient = embeddedServer.applicationContext.getBean(ProductClient)
 
     void "test consume SSE stream with ReactorSseClient"() {

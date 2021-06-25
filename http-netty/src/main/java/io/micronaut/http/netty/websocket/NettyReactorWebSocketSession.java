@@ -25,7 +25,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.websocket.CloseReason;
-import io.micronaut.websocket.ReactorWebSocketSession;
+import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
@@ -44,13 +44,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 /**
- * Implementation of the {@link ReactorWebSocketSession} interface for Netty and RxJava.
+ * Implementation of the {@link WebSocketSession} interface for Netty and RxJava.
  *
  * @author graemerocher
  * @since 1.0
  */
 @Internal
-public class NettyReactorWebSocketSession implements ReactorWebSocketSession {
+public class NettyReactorWebSocketSession implements WebSocketSession {
     /**
      * The WebSocket session is stored within a Channel attribute using the given key.
      */
@@ -118,7 +118,7 @@ public class NettyReactorWebSocketSession implements ReactorWebSocketSession {
     }
 
     @Override
-    public Set<? extends ReactorWebSocketSession> getOpenSessions() {
+    public Set<? extends WebSocketSession> getOpenSessions() {
         return Collections.emptySet();
     }
 

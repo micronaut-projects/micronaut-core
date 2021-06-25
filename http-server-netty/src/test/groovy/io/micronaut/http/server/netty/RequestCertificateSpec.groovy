@@ -5,6 +5,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import reactor.core.publisher.Flux
 
 import java.security.cert.X509Certificate
 
@@ -12,8 +13,8 @@ class RequestCertificateSpec extends AbstractMicronautSpec {
 
     void "test certificate extraction"() {
         when:
-        def response = rxClient
-                .exchange('/ssl', String)
+        def response = Flux.from(rxClient
+                .exchange('/ssl', String))
                 .blockFirst()
         then:
         response.code() == HttpStatus.OK.code

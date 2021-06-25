@@ -87,10 +87,10 @@ class ServerRedirectSpec extends Specification {
     @Unroll
     void "test http client follows #type redirects for regular stream requests"() {
         given:
-        ReactorStreamingHttpClient client = ReactorStreamingHttpClient.create(embeddedServer.getURL())
+        StreamingHttpClient client = StreamingHttpClient.create(embeddedServer.getURL())
 
         expect:
-        client.jsonStream(HttpRequest.GET("/redirect/stream/$type"), Book).blockFirst().title == "The Stand"
+        Flux.from(client.jsonStream(HttpRequest.GET("/redirect/stream/$type"), Book)).blockFirst().title == "The Stand"
 
         cleanup:
         client.stop()
@@ -107,11 +107,11 @@ class ServerRedirectSpec extends Specification {
 
     void "test stream redirect headers"() {
         given:
-        ReactorStreamingHttpClient client = ReactorStreamingHttpClient.create(embeddedServer.getURL())
+        StreamingHttpClient client = StreamingHttpClient.create(embeddedServer.getURL())
 
         when:
-        String response = ((ReactorStreamingHttpClient) client).exchangeStream(
-                HttpRequest.GET("/redirect/stream/title").accept(MediaType.TEXT_EVENT_STREAM_TYPE))
+        String response = Flux.from(client.exchangeStream(
+                HttpRequest.GET("/redirect/stream/title").accept(MediaType.TEXT_EVENT_STREAM_TYPE)))
                 .map({res ->
                     new String(res.body().toByteArray())
                 })

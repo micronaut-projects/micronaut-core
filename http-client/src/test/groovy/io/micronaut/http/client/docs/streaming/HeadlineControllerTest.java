@@ -16,17 +16,14 @@
 package io.micronaut.http.client.docs.streaming;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.http.client.ReactorStreamingHttpClient;
+import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.Test;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-
 import static io.micronaut.http.HttpRequest.GET;
 import static org.junit.Assert.*;
 
@@ -57,11 +54,10 @@ public class HeadlineControllerTest {
     @Test
     public void testStreamingClient() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
-        ReactorStreamingHttpClient client = embeddedServer.getApplicationContext().createBean(ReactorStreamingHttpClient.class, embeddedServer.getURL());
-
+        StreamingHttpClient client = embeddedServer.getApplicationContext().createBean(StreamingHttpClient.class, embeddedServer.getURL());
 
         // tag::streaming[]
-        Flux<Headline> headlineStream = client.jsonStream(GET("/streaming/headlines"), Headline.class); // <1>
+        Flux<Headline> headlineStream = Flux.from(client.jsonStream(GET("/streaming/headlines"), Headline.class)); // <1>
         CompletableFuture<Headline> future = new CompletableFuture<>(); // <2>
         headlineStream.subscribe(new Subscriber<Headline>() {
             @Override

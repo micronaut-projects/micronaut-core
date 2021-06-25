@@ -21,6 +21,8 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.reactivex.Flowable;
+import org.reactivestreams.Publisher;
+
 import java.util.Map;
 
 /**
@@ -38,7 +40,7 @@ public interface RxStreamingHttpClient extends StreamingHttpClient, RxHttpClient
     <I> Flowable<HttpResponse<ByteBuffer<?>>> exchangeStream(HttpRequest<I> request);
 
     @Override
-    <I> Flowable<Map<String, Object>> jsonStream(HttpRequest<I> request);
+    <I> Publisher<Map<String, Object>> jsonStream(HttpRequest<I> request);
 
     @Override
     <I, O> Flowable<O> jsonStream(HttpRequest<I> request, Argument<O> type);

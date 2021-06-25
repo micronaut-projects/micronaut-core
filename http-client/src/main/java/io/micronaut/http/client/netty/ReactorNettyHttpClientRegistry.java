@@ -41,13 +41,12 @@ import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.http.client.ReactiveHttpClientRegistry;
-import io.micronaut.http.client.ReactorHttpClient;
-import io.micronaut.http.client.ReactorStreamingHttpClient;
+import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
-import io.micronaut.http.client.sse.ReactorSseClient;
+import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
@@ -66,6 +65,7 @@ import io.micronaut.jackson.codec.JacksonMediaTypeCodec;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
+import io.micronaut.websocket.WebSocketClient;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.channel.ChannelFactory;
 import io.netty.channel.EventLoopGroup;
@@ -90,7 +90,8 @@ import java.util.concurrent.ThreadFactory;
 @Factory
 @BootstrapContextCompatible
 @Internal
-public class ReactorNettyHttpClientRegistry implements AutoCloseable, ReactiveHttpClientRegistry<ReactorHttpClient, ReactorSseClient, ReactorStreamingHttpClient> {
+public
+class ReactorNettyHttpClientRegistry implements AutoCloseable, ReactiveHttpClientRegistry<HttpClient, SseClient, StreamingHttpClient, WebSocketClient> {
     private static final Logger LOG = LoggerFactory.getLogger(ReactorNettyHttpClientRegistry.class);
     private final Map<ClientKey, DefaultHttpClient> clients = new ConcurrentHashMap<>(10);
     private final LoadBalancerResolver loadBalancerResolver;
@@ -144,7 +145,7 @@ public class ReactorNettyHttpClientRegistry implements AutoCloseable, ReactiveHt
 
     @NonNull
     @Override
-    public ReactorHttpClient getClient(HttpVersion httpVersion, @NonNull String clientId, @Nullable String path) {
+    public HttpClient getClient(HttpVersion httpVersion, @NonNull String clientId, @Nullable String path) {
         final ClientKey key = new ClientKey(
                 httpVersion,
                 clientId,
@@ -176,6 +177,12 @@ public class ReactorNettyHttpClientRegistry implements AutoCloseable, ReactiveHt
     }
 
     @Override
+    @NonNull
+    public DefaultHttpClient getWebSocketClient(@NonNull AnnotationMetadata metadata) {
+        return getClient(metadata);
+    }
+
+    @Override
     @PreDestroy
     public void close() {
         for (HttpClient httpClient : clients.values()) {
@@ -193,9 +200,9 @@ public class ReactorNettyHttpClientRegistry implements AutoCloseable, ReactiveHt
     @Override
     public void disposeClient(AnnotationMetadata annotationMetadata) {
         final ClientKey key = getClientKey(annotationMetadata);
-        final ReactorStreamingHttpClient rxStreamingHttpClient = clients.get(key);
-        if (rxStreamingHttpClient != null && rxStreamingHttpClient.isRunning()) {
-            rxStreamingHttpClient.close();
+        final StreamingHttpClient streamingHttpClient = clients.get(key);
+        if (streamingHttpClient != null && streamingHttpClient.isRunning()) {
+            streamingHttpClient.close();
             clients.remove(key);
         }
     }
@@ -228,7 +235,7 @@ public class ReactorNettyHttpClientRegistry implements AutoCloseable, ReactiveHt
 
             if (clientId != null) {
                 clientBean = (DefaultHttpClient) this.beanContext
-                        .findBean(ReactorHttpClient.class, Qualifiers.byName(clientId)).orElse(null);
+                        .findBean(HttpClient.class, Qualifiers.byName(clientId)).orElse(null);
             }
 
             if (configurationClass != null && !HttpClientConfiguration.class.isAssignableFrom(configurationClass)) {

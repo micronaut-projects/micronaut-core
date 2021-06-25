@@ -10,7 +10,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
@@ -72,11 +72,11 @@ class ThirdPartyClientFilterSpec extends Specification {
 //tag::bintrayService[]
 @Singleton
 class BintrayService {
-    final ReactorHttpClient client
+    final HttpClient client
     final String org
 
     BintrayService(
-            @Client(BintrayApi.URL) ReactorHttpClient client, // <1>
+            @Client(BintrayApi.URL) HttpClient client, // <1>
             @Value('${bintray.organization}') String org ) {
         this.client = client
         this.org = org

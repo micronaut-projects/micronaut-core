@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.errors
 import groovy.json.JsonSlurper
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
@@ -35,8 +36,8 @@ class HttpStatusExceptionSpec extends AbstractMicronautSpec {
 
     void 'test HttpStatusException'() {
         when:
-        def response = rxClient
-            .exchange(HttpRequest.GET('/errors'))
+        HttpResponse response = Flux.from(rxClient
+            .exchange(HttpRequest.GET('/errors')))
                 .onErrorResume( t -> {
                     if (t instanceof HttpClientResponseException) {
                         return Flux.just(((HttpClientResponseException) t).response)
@@ -58,8 +59,8 @@ class HttpStatusExceptionSpec extends AbstractMicronautSpec {
 
     void 'test returning an arbitrary POGO'() {
         when:
-        def response = rxClient
-            .exchange((HttpRequest.GET('/errors/book')), String).blockFirst()
+        HttpResponse<String> response = Flux.from(rxClient
+            .exchange((HttpRequest.GET('/errors/book')), String)).blockFirst()
 
         then:
         response.code() == HttpStatus.ACCEPTED.code

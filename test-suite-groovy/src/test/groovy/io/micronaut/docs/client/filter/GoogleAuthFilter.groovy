@@ -7,7 +7,7 @@ import io.micronaut.context.BeanProvider
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.annotation.Filter
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
 import org.reactivestreams.Publisher
@@ -20,9 +20,9 @@ import static io.micronaut.http.HttpRequest.GET
 @Filter(patterns = "/google-auth/api/**")
 class GoogleAuthFilter implements HttpClientFilter {
 
-    private final BeanProvider<ReactorHttpClient> authClientProvider
+    private final BeanProvider<HttpClient> authClientProvider
 
-    GoogleAuthFilter(BeanProvider<ReactorHttpClient> httpClientProvider) { // <1>
+    GoogleAuthFilter(BeanProvider<HttpClient> httpClientProvider) { // <1>
         this.authClientProvider = httpClientProvider
     }
 

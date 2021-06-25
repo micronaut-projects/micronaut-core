@@ -45,7 +45,7 @@ class HttpHeadSpec extends Specification {
 
     @Inject
     @Client("/")
-    ReactorHttpClient client
+    HttpClient client
 
     @Inject
     MyGetClient myGetClient
@@ -553,11 +553,11 @@ class HttpHeadSpec extends Specification {
     @Requires(property = 'spec.name', value = 'HttpHeadSpec')
     @jakarta.inject.Singleton
     static class MyGetHelper {
-        private final ReactorStreamingHttpClient rxClientSlash
-        private final ReactorStreamingHttpClient rxClient
+        private final StreamingHttpClient rxClientSlash
+        private final StreamingHttpClient rxClient
 
-        MyGetHelper(@Client("/head/") ReactorStreamingHttpClient rxClientSlash,
-                    @Client("/head") ReactorStreamingHttpClient rxClient) {
+        MyGetHelper(@Client("/head/") StreamingHttpClient rxClientSlash,
+                    @Client("/head") StreamingHttpClient rxClient) {
             this.rxClient = rxClient
             this.rxClientSlash = rxClientSlash
         }

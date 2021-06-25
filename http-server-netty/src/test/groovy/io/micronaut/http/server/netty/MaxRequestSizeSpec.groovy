@@ -6,7 +6,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.multipart.CompletedFileUpload
@@ -20,18 +20,18 @@ class MaxRequestSizeSpec extends Specification {
 
     void "test max request size default processor"() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.maxRequestSize': '10KB'])
-        ReactorHttpClient client = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         byte[] kb10 = new byte[10240]
-        String result = client.retrieve(HttpRequest.POST("/test-max-size/text", new String(kb10)).contentType(MediaType.TEXT_PLAIN_TYPE)).blockFirst()
+        String result = Flux.from(client.retrieve(HttpRequest.POST("/test-max-size/text", new String(kb10)).contentType(MediaType.TEXT_PLAIN_TYPE))).blockFirst()
 
         then:
         result == "OK"
 
         when:
         byte[] kb101 = new byte[10241]
-        client.retrieve(HttpRequest.POST("/test-max-size/text", new String(kb101)).contentType(MediaType.TEXT_PLAIN_TYPE)).blockFirst()
+        Flux.from(client.retrieve(HttpRequest.POST("/test-max-size/text", new String(kb101)).contentType(MediaType.TEXT_PLAIN_TYPE))).blockFirst()
 
         then:
         def ex = thrown(HttpClientResponseException)
@@ -44,18 +44,18 @@ class MaxRequestSizeSpec extends Specification {
 
     void "test max request size json processor"() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.maxRequestSize': '10KB'])
-        ReactorHttpClient client = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         String json = '{"x":"' + ('y' * (10240 - 8)) + '"}'
-        String result = client.retrieve(HttpRequest.POST("/test-max-size/json", json).contentType(MediaType.APPLICATION_JSON_TYPE)).blockFirst()
+        String result = Flux.from(client.retrieve(HttpRequest.POST("/test-max-size/json", json).contentType(MediaType.APPLICATION_JSON_TYPE))).blockFirst()
 
         then:
         result == "OK"
 
         when:
         json = '{"x":"' + ('y' * (10240 - 7)) + '"}'
-        client.retrieve(HttpRequest.POST("/test-max-size/json", new String(json)).contentType(MediaType.APPLICATION_JSON_TYPE)).blockFirst()
+        Flux.from(client.retrieve(HttpRequest.POST("/test-max-size/json", new String(json)).contentType(MediaType.APPLICATION_JSON_TYPE))).blockFirst()
 
         then:
         def ex = thrown(HttpClientResponseException)
@@ -69,7 +69,7 @@ class MaxRequestSizeSpec extends Specification {
     @Ignore("Whether or not the exception is thrown is inconsistent. I don't think there is anything we can do to ensure its consistency")
     void "test max request size multipart processor"() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.maxRequestSize': '10KB'])
-        ReactorHttpClient client = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         MultipartBody body = MultipartBody.builder()
@@ -80,7 +80,7 @@ class MaxRequestSizeSpec extends Specification {
                 .addPart("e", "e.pdf", new byte[1871])
                 .build()
 
-        String result = client.retrieve(HttpRequest.POST("/test-max-size/multipart", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE)).blockFirst()
+        String result = Flux.from(client.retrieve(HttpRequest.POST("/test-max-size/multipart", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE))).blockFirst()
 
         then:
         result == "OK"
@@ -93,7 +93,7 @@ class MaxRequestSizeSpec extends Specification {
                 .addPart("d", "d.pdf", new byte[1871])
                 .addPart("e", "e.pdf", new byte[1872]) //One extra byte
                 .build()
-        client.retrieve(HttpRequest.POST("/test-max-size/multipart", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE)).blockFirst()
+        Flux.from(client.retrieve(HttpRequest.POST("/test-max-size/multipart", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE))).blockFirst()
 
         then:
         def ex = thrown(HttpClientResponseException)
@@ -108,7 +108,7 @@ class MaxRequestSizeSpec extends Specification {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'micronaut.server.multipart.maxFileSize': '1KB'
         ])
-        ReactorHttpClient client = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         MultipartBody body = MultipartBody.builder()
@@ -119,7 +119,7 @@ class MaxRequestSizeSpec extends Specification {
                 .addPart("e", "e.pdf", new byte[1024])
                 .build()
 
-        String result = client.retrieve(HttpRequest.POST("/test-max-size/multipart", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE)).blockFirst()
+        String result = Flux.from(client.retrieve(HttpRequest.POST("/test-max-size/multipart", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE))).blockFirst()
 
         then:
         result == "OK"
@@ -132,7 +132,7 @@ class MaxRequestSizeSpec extends Specification {
                 .addPart("d", "d.pdf", new byte[1024])
                 .addPart("e", "e.pdf", new byte[1025]) //One extra byte
                 .build()
-        client.retrieve(HttpRequest.POST("/test-max-size/multipart", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE)).blockFirst()
+        Flux.from(client.retrieve(HttpRequest.POST("/test-max-size/multipart", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE))).blockFirst()
 
         then:
         def ex = thrown(HttpClientResponseException)
@@ -147,7 +147,7 @@ class MaxRequestSizeSpec extends Specification {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'micronaut.server.multipart.maxFileSize': '1KB'
         ])
-        ReactorHttpClient client = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         MultipartBody body = MultipartBody.builder()
@@ -158,7 +158,7 @@ class MaxRequestSizeSpec extends Specification {
                 .addPart("e", "e.pdf", new byte[1024])
                 .build()
 
-        String result = client.retrieve(HttpRequest.POST("/test-max-size/multipart-body", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE)).blockFirst()
+        String result = Flux.from(client.retrieve(HttpRequest.POST("/test-max-size/multipart-body", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE))).blockFirst()
 
         then:
         result == "OK"
@@ -171,7 +171,7 @@ class MaxRequestSizeSpec extends Specification {
                 .addPart("d", "d.pdf", new byte[1024])
                 .addPart("e", "e.pdf", new byte[1025]) //One extra byte
                 .build()
-        client.retrieve(HttpRequest.POST("/test-max-size/multipart-body", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE)).blockFirst()
+        Flux.from(client.retrieve(HttpRequest.POST("/test-max-size/multipart-body", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE))).blockFirst()
 
         then:
         def ex = thrown(HttpClientResponseException)
@@ -187,15 +187,15 @@ class MaxRequestSizeSpec extends Specification {
                 'micronaut.server.maxRequestSize': '10KB',
                 'micronaut.server.multipart.disk': true
         ])
-        ReactorHttpClient client = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         MultipartBody body = MultipartBody.builder()
                 .addPart("a", "a.pdf", new byte[20240])
                 .build()
 
-        String result = client.retrieve(HttpRequest.POST("/test-max-size/multipart-body", body)
-                .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)).blockFirst()
+        String result = Flux.from(client.retrieve(HttpRequest.POST("/test-max-size/multipart-body", body)
+                .contentType(MediaType.MULTIPART_FORM_DATA_TYPE))).blockFirst()
 
         then:
         def ex = thrown(HttpClientResponseException)

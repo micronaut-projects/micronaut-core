@@ -17,7 +17,7 @@ package io.micronaut.docs.http.server.netty.websocket
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.websocket.ReactorWebSocketClient
+import io.micronaut.websocket.WebSocketClient
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -30,7 +30,7 @@ class PojoWebSocketSpec extends Specification {
         PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
 
         when: "a websocket connection is established"
-        ReactorWebSocketClient wsClient = embeddedServer.applicationContext.createBean(ReactorWebSocketClient, embeddedServer.getURI())
+        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
         PojoChatClientWebSocket fred = wsClient.connect(PojoChatClientWebSocket, "/pojo/chat/stuff/fred").blockFirst()
         PojoChatClientWebSocket bob = wsClient.connect(PojoChatClientWebSocket, [topic:"stuff", username:"bob"]).blockFirst()
 

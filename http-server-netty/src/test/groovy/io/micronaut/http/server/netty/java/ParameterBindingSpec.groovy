@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.java
 
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -55,15 +56,15 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
     @Unroll
     void "test bind HTTP parameters for URI #uri"() {
         given:
-        def response = rxClient.exchange(uri, String)
+        HttpResponse<String> response = Flux.from(rxClient.exchange(uri, String))
                 .onErrorResume(t -> {
                     if (t instanceof HttpClientResponseException) {
                         return Flux.just(((HttpClientResponseException) t).response)
                     }
                     throw t
                 }).blockFirst()
-        def status = response.status
-        def body = null
+        HttpStatus status = response.status
+        String body = null
         if (status == HttpStatus.OK) {
             body = response.body()
         }

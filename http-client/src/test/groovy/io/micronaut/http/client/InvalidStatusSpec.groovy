@@ -5,6 +5,7 @@ import com.github.tomakehurst.wiremock.client.WireMock
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
+import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -21,17 +22,17 @@ class InvalidStatusSpec extends Specification {
         wireMockServer.start()
         wireMockServer.stubFor(WireMock.get("/status-only")
                 .willReturn(WireMock.status(519)))
-        ReactorStreamingHttpClient client = context.createBean(ReactorStreamingHttpClient, new URL("http://localhost:${wireMockServer.port()}"))
+        StreamingHttpClient client = context.createBean(StreamingHttpClient, new URL("http://localhost:${wireMockServer.port()}"))
 
         when:
-        client.exchange("/status-only", String).blockFirst()
+        Flux.from(client.exchange("/status-only", String)).blockFirst()
 
         then:
         def ex = thrown(IllegalArgumentException)
         ex.message == "Invalid HTTP status code: 519"
 
         when:
-        client.dataStream(HttpRequest.GET("/status-only")).blockFirst()
+        Flux.from(client.dataStream(HttpRequest.GET("/status-only"))).blockFirst()
 
         then:
         ex = thrown(IllegalArgumentException)

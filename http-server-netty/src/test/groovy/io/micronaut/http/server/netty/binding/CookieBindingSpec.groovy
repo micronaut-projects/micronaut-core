@@ -22,6 +22,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.cookie.Cookies
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import reactor.core.publisher.Flux
 import spock.lang.Unroll
 
 /**
@@ -32,11 +33,11 @@ class CookieBindingSpec extends AbstractMicronautSpec {
     @Unroll
     void "test bind HTTP cookies for URI #uri"() {
         expect:
-        def request = HttpRequest.GET(uri)
+        HttpRequest<?> request = HttpRequest.GET(uri)
         for (header in headers) {
             request = request.header(header.key, header.value)
         }
-        rxClient.retrieve(request).blockFirst() == result
+        Flux.from(rxClient.retrieve(request)).blockFirst() == result
 
         where:
         uri                | result              | headers

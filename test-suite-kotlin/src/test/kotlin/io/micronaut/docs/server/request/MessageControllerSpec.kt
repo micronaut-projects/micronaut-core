@@ -4,7 +4,7 @@ import io.kotlintest.shouldNotBe
 import io.kotlintest.shouldBe
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 
 class MessageControllerSpec: StringSpec() {
@@ -14,7 +14,7 @@ class MessageControllerSpec: StringSpec() {
     )
 
     val client = autoClose( // <2>
-            embeddedServer.applicationContext.createBean(ReactorHttpClient::class.java, embeddedServer.getURL()) // <1>
+            embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.getURL()) // <1>
     )
 
     init {

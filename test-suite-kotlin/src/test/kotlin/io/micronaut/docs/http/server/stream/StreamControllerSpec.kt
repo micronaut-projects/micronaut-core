@@ -3,7 +3,7 @@ package io.micronaut.docs.http.server.stream
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions
@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test
 class StreamControllerSpec {
 
     lateinit var ctx: ApplicationContext
-    lateinit var client: ReactorHttpClient
+    lateinit var client: HttpClient
 
     @BeforeEach
     fun setup() {
@@ -28,7 +28,7 @@ class StreamControllerSpec {
             )
         )
         ctx = server.applicationContext
-        client = ctx.createBean(ReactorHttpClient::class.java, server.url)
+        client = ctx.createBean(HttpClient::class.java, server.url)
     }
 
     @AfterEach

@@ -26,7 +26,7 @@ import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest.GET
 import io.micronaut.http.HttpRequest.OPTIONS
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import kotlinx.coroutines.reactive.awaitSingle
@@ -45,7 +45,7 @@ class SuspendControllerSpec : StringSpec() {
     )
 
     val client = autoClose(
-        embeddedServer.applicationContext.createBean(ReactorHttpClient::class.java, embeddedServer.url)
+        embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
     )
 
     private var suspendClient = embeddedServer.applicationContext.createBean(SuspendClient::class.java, embeddedServer.url)

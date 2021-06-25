@@ -52,7 +52,7 @@ class HttpGetSpec extends Specification {
 
     @Inject
     @Client("/")
-    ReactorHttpClient client
+    HttpClient client
 
     @Inject
     MyGetClient myGetClient
@@ -97,14 +97,12 @@ class HttpGetSpec extends Specification {
 
     void "test 500 request with body"() {
         when:
-        def flowable = Flux.from(client.exchange(
+        Flux.from(client.exchange(
                 HttpRequest.GET("/get/error"), Argument.of(String), Argument.of(String)
-        ))
-
-        flowable.blockFirst()
+        )).blockFirst()
 
         then:
-        def e = thrown(HttpClientResponseException)
+        HttpClientResponseException e = thrown()
         e.message == "Server error"
         e.status == HttpStatus.INTERNAL_SERVER_ERROR
         e.response.getBody(String).get() == "Server error"
@@ -113,14 +111,12 @@ class HttpGetSpec extends Specification {
 
     void "test 500 request with json body"() {
         when:
-        def flowable = Flux.from(client.exchange(
+        Flux.from(client.exchange(
                 HttpRequest.GET("/get/jsonError"), Argument.of(String), Argument.of(Map)
-        ))
-
-        flowable.blockFirst()
+        )).blockFirst()
 
         then:
-        def e = thrown(HttpClientResponseException)
+        HttpClientResponseException e = thrown()
         e.message == "{foo=bar}"
         e.status == HttpStatus.INTERNAL_SERVER_ERROR
 
@@ -396,7 +392,7 @@ class HttpGetSpec extends Specification {
 
     void "test empty list returns ok"() {
         when:
-        HttpResponse response = client.exchange(HttpRequest.GET("/get/emptyList"), Argument.listOf(Book)).blockFirst()
+        HttpResponse response = Flux.from(client.exchange(HttpRequest.GET("/get/emptyList"), Argument.listOf(Book))).blockFirst()
 
         then:
         noExceptionThrown()
@@ -409,7 +405,7 @@ class HttpGetSpec extends Specification {
 
     void "test single empty list returns ok"() {
         when:
-        HttpResponse response = client.exchange(HttpRequest.GET("/get/emptyList/single"), Argument.listOf(Book)).blockFirst()
+        HttpResponse response = Flux.from(client.exchange(HttpRequest.GET("/get/emptyList/single"), Argument.listOf(Book))).blockFirst()
 
         then:
         noExceptionThrown()
@@ -532,7 +528,7 @@ class HttpGetSpec extends Specification {
 
     void "test creating an rx client with a null URL"() {
         given:
-        BlockingHttpClient client = ReactorHttpClient.create(null).toBlocking()
+        BlockingHttpClient client = HttpClient.create(null).toBlocking()
 
         when:
         String uri = UriBuilder.of(embeddedServer.getURI()).path("/get/simple").toString()
@@ -559,7 +555,7 @@ class HttpGetSpec extends Specification {
         books[0][0].title == "The Stand"
 
         when:
-        BlockingHttpClient client = ReactorHttpClient.create(embeddedServer.getURL()).toBlocking()
+        BlockingHttpClient client = HttpClient.create(embeddedServer.getURL()).toBlocking()
         books = client.retrieve(HttpRequest.GET("/get/nestedPojoList"), Argument.listOf(Argument.listOf(Book.class)))
 
         then:
@@ -890,11 +886,11 @@ class HttpGetSpec extends Specification {
     @jakarta.inject.Singleton
     static class MyGetHelper {
 
-        private final ReactorStreamingHttpClient rxClientSlash
-        private final ReactorStreamingHttpClient rxClient
+        private final StreamingHttpClient rxClientSlash
+        private final StreamingHttpClient rxClient
 
-        MyGetHelper(@Client("/get/") ReactorStreamingHttpClient rxClientSlash,
-                    @Client("/get") ReactorStreamingHttpClient rxClient) {
+        MyGetHelper(@Client("/get/") StreamingHttpClient rxClientSlash,
+                    @Client("/get") StreamingHttpClient rxClient) {
             this.rxClient = rxClient
             this.rxClientSlash = rxClientSlash
         }

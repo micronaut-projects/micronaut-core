@@ -22,6 +22,8 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 class BasicAuthSpec extends Specification {
@@ -44,10 +46,10 @@ class BasicAuthSpec extends Specification {
         ])
         ApplicationContext ctx = server.applicationContext
 
-        def httpClient = ctx.createBean(ReactorHttpClient, new URL("http://sherlock:password@localhost:${server.port}"))
-        def client = httpClient.retrieve("/basicauth")
+        HttpClient httpClient = ctx.createBean(HttpClient, new URL("http://sherlock:password@localhost:${server.port}"))
+        Publisher<String> client = httpClient.retrieve("/basicauth")
         when:
-        String resp = client.blockFirst()
+        String resp = Flux.from(client).blockFirst()
 
         then:
         resp == "sherlock:password"

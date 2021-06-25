@@ -19,7 +19,7 @@ import io.micronaut.http.client.multipart.MultipartBody
 
 // tag::controllerImports[]
 import io.micronaut.http.annotation.Controller
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import reactor.core.publisher.Flux
 
 // end::controllerImports[]
@@ -32,7 +32,7 @@ class MultipartFileUploadSpec: StringSpec() {
     )
 
     val client = autoClose(
-        embeddedServer.applicationContext.createBean(ReactorHttpClient::class.java, embeddedServer.url)
+        embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
     )
 
     init {

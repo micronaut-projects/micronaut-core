@@ -29,7 +29,6 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
-import io.micronaut.http.client.sse.ReactorSseClient;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
 import io.micronaut.scheduling.TaskScheduler;
 import reactor.core.publisher.Flux;
@@ -52,7 +51,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class ServiceHttpClientFactory {
 
     private final TaskScheduler taskScheduler;
-    private final BeanProvider<ReactiveHttpClientRegistry<ReactorHttpClient, ReactorSseClient, ReactorStreamingHttpClient>> clientFactory;
+    private final BeanProvider<ReactiveHttpClientRegistry<?, ?, ?, ?>> clientFactory;
 
     /**
      * Default constructor.
@@ -62,7 +61,7 @@ public class ServiceHttpClientFactory {
      */
     public ServiceHttpClientFactory(
             TaskScheduler taskScheduler,
-            BeanProvider<ReactiveHttpClientRegistry<ReactorHttpClient, ReactorSseClient, ReactorStreamingHttpClient>> clientFactory) {
+            BeanProvider<ReactiveHttpClientRegistry<?, ?, ?, ?>> clientFactory) {
         this.taskScheduler = taskScheduler;
         this.clientFactory = clientFactory;
     }
@@ -97,7 +96,7 @@ public class ServiceHttpClientFactory {
             return event -> {
                     final List<URI> originalURLs = configuration.getUrls();
                     Collection<URI> loadBalancedURIs = instanceList.getLoadBalancedURIs();
-                    final ReactorHttpClient httpClient = clientFactory.get()
+                    final HttpClient httpClient = clientFactory.get()
                             .getClient(
                                     configuration.getHttpVersion(),
                                     configuration.getServiceId(),
@@ -107,7 +106,7 @@ public class ServiceHttpClientFactory {
                     taskScheduler.scheduleWithFixedDelay(initialDelay, delay, () -> Flux.fromIterable(originalURLs)
                             .flatMap(originalURI -> {
                                 URI healthCheckURI = originalURI.resolve(configuration.getHealthCheckUri());
-                                return httpClient.exchange(HttpRequest.GET(healthCheckURI))
+                                return Flux.from(httpClient.exchange(HttpRequest.GET(healthCheckURI)))
                                         .onErrorResume(throwable -> {
                                             if (throwable instanceof HttpClientResponseException) {
                                                 HttpClientResponseException responseException = (HttpClientResponseException) throwable;

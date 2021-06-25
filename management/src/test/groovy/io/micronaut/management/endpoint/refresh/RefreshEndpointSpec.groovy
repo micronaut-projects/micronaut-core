@@ -23,9 +23,10 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.server.EmbeddedServer
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 import spock.util.environment.RestoreSystemProperties
@@ -41,10 +42,10 @@ class RefreshEndpointSpec extends Specification {
         given:
         System.setProperty("foo.bar", "test")
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.refresh.sensitive': false], Environment.TEST)
-        ReactorHttpClient rxClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        def response = rxClient.exchange("/refreshTest", String).blockFirst()
+        def response = Flux.from(rxClient.exchange("/refreshTest", String)).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -52,7 +53,7 @@ class RefreshEndpointSpec extends Specification {
 
         when:
         System.setProperty("foo.bar", "changed")
-        response = rxClient.exchange(HttpRequest.POST("/refresh", new byte[0]), String).blockFirst()
+        response = Flux.from(rxClient.exchange(HttpRequest.POST("/refresh", new byte[0]), String)).blockFirst()
 
 
         then:
@@ -80,10 +81,10 @@ class RefreshEndpointSpec extends Specification {
         given:
         System.setProperty("foo.bar", "test")
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.refresh.sensitive': false], Environment.TEST)
-        ReactorHttpClient rxClient = embeddedServer.applicationContext.createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        def response = rxClient.exchange("/refreshTest/external", String).blockFirst()
+        def response = Flux.from(rxClient.exchange("/refreshTest/external", String)).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -96,14 +97,14 @@ class RefreshEndpointSpec extends Specification {
         response.code() == HttpStatus.OK.code
 
         when:
-        response = rxClient.exchange("/refreshTest/external", String).blockFirst()
+        response = Flux.from(rxClient.exchange("/refreshTest/external", String)).blockFirst()
 
         then: "subsequent response does not change"
         response.code() == HttpStatus.OK.code
         response.body() == firstResponse
 
         when: "/refresh is called with `all` body parameter"
-        response = rxClient.exchange(HttpRequest.POST("/refresh", '{"force": true}'), String).blockFirst()
+        response = Flux.from(rxClient.exchange(HttpRequest.POST("/refresh", '{"force": true}'), String)).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code

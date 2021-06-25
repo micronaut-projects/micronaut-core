@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.websocket;
+package io.micronaut.reactor.http.client.websocket;
 
 import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.websocket.WebSocketClient;
 import reactor.core.publisher.Flux;
 
 import java.net.URI;

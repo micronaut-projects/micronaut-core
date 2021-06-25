@@ -2,7 +2,7 @@ package io.micronaut.http2
 
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.micronaut.test.support.TestPropertyProvider
@@ -26,7 +26,7 @@ class Http2StaticResourceResolutionSpec extends Specification implements TestPro
     private static File tempFile
     @Inject
     @Client("/")
-    ReactorHttpClient rxClient
+    HttpClient rxClient
 
     static {
         tempFile = File.createTempFile("staticResourceResolutionSpec", ".html")

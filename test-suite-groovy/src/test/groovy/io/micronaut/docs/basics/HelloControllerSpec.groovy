@@ -5,7 +5,7 @@ import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.uri.UriBuilder
 import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Flux
@@ -21,8 +21,8 @@ class HelloControllerSpec extends Specification {
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(
             EmbeddedServer,
             ["spec.name": HelloControllerSpec.simpleName])
-    @Shared @AutoCleanup ReactorHttpClient client = embeddedServer.applicationContext
-                                                             .createBean(ReactorHttpClient, embeddedServer.URL)
+    @Shared @AutoCleanup HttpClient client = embeddedServer.applicationContext
+                                                             .createBean(HttpClient, embeddedServer.URL)
 
     void "test simple retrieve"() {
         // tag::simple[]
@@ -43,10 +43,10 @@ class HelloControllerSpec extends Specification {
     void "test retrieve with headers"() {
         when:
         // tag::headers[]
-        Flux<String> response = client.retrieve(
+        Flux<String> response = Flux.from(client.retrieve(
                 GET("/hello/John")
                 .header("X-My-Header", "SomeValue")
-        )
+        ))
         // end::headers[]
 
         then:
@@ -56,9 +56,9 @@ class HelloControllerSpec extends Specification {
     void "test retrieve with JSON"() {
         when:
         // tag::jsonmap[]
-        Flux<Map> response = client.retrieve(
+        Flux<Map> response = Flux.from(client.retrieve(
                 GET("/greet/John"), Map
-        )
+        ))
         // end::jsonmap[]
 
         then:
@@ -66,10 +66,10 @@ class HelloControllerSpec extends Specification {
 
         when:
         // tag::jsonmaptypes[]
-        response = client.retrieve(
+        response = Flux.from(client.retrieve(
                 GET("/greet/John"),
                 Argument.of(Map, String, String) // <1>
-        )
+        ))
         // end::jsonmaptypes[]
 
         then:
@@ -79,9 +79,9 @@ class HelloControllerSpec extends Specification {
     void "test retrieve with POJO"() {
         // tag::jsonpojo[]
         when:
-        Flux<Message> response = client.retrieve(
+        Flux<Message> response = Flux.from(client.retrieve(
                 GET("/greet/John"), Message
-        )
+        ))
 
         then:
         "Hello John" == response.blockFirst().getText()
@@ -91,9 +91,9 @@ class HelloControllerSpec extends Specification {
     void "test retrieve with POJO response"() {
         // tag::pojoresponse[]
         when:
-        Flux<HttpResponse<Message>> call = client.exchange(
+        Flux<HttpResponse<Message>> call = Flux.from(client.exchange(
                 GET("/greet/John"), Message // <1>
-        )
+        ))
 
         HttpResponse<Message> response = call.blockFirst();
         Optional<Message> message = response.getBody(Message) // <2>
@@ -109,12 +109,12 @@ class HelloControllerSpec extends Specification {
     void "test post request with string"() {
         when:
         // tag::poststring[]
-        Flux<HttpResponse<String>> call = client.exchange(
+        Flux<HttpResponse<String>> call = Flux.from(client.exchange(
                 POST("/hello", "Hello John") // <1>
                     .contentType(MediaType.TEXT_PLAIN_TYPE)
                     .accept(MediaType.TEXT_PLAIN_TYPE), // <2>
                 String // <3>
-        )
+        ))
         // end::poststring[]
 
         HttpResponse<String> response = call.blockFirst()
@@ -130,10 +130,10 @@ class HelloControllerSpec extends Specification {
     void "test post request with POJO"() {
         when:
         // tag::postpojo[]
-        Flux<HttpResponse<Message>> call = client.exchange(
+        Flux<HttpResponse<Message>> call = Flux.from(client.exchange(
                 POST("/greet", new Message("Hello John")), // <1>
                 Message // <2>
-        )
+        ))
         // end::postpojo[]
 
         HttpResponse<Message> response = call.blockFirst()

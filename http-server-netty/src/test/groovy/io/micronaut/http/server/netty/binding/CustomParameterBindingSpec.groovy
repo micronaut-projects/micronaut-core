@@ -8,6 +8,7 @@ import io.micronaut.http.annotation.CustomHttpMethod
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import spock.lang.Unroll
 
@@ -18,9 +19,9 @@ class CustomParameterBindingSpec extends AbstractMicronautSpec {
     @Unroll
     void "test bind HTTP parameters for URI #httpMethod #uri"() {
         given:
-        def req = HttpRequest.create(HttpMethod.CUSTOM, uri, httpMethod)
-        def exchange = rxClient.exchange(req, String)
-        def response = exchange.onErrorResume(t -> {
+        HttpRequest<?> req = HttpRequest.create(HttpMethod.CUSTOM, uri, httpMethod)
+        Publisher<HttpResponse<?>> exchange = rxClient.exchange(req, String)
+        HttpResponse<?> response = Flux.from(exchange).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)
             }
@@ -74,7 +75,7 @@ class CustomParameterBindingSpec extends AbstractMicronautSpec {
     void "test exploded with no default constructor"() {
         when:
         Flux<HttpResponse<String>> exchange = rxClient.exchange(HttpRequest.create(HttpMethod.CUSTOM, "/parameter/exploded?title=The%20Stand", "REPORT"), String)
-        HttpResponse<String> response = exchange.onErrorReturn({ t -> t.response }).blockFirst()
+        HttpResponse<String> response = exchange.blockFirst()
 
         then:
         response.status() == HttpStatus.OK

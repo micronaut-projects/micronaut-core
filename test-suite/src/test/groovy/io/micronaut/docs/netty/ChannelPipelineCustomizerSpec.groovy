@@ -4,11 +4,12 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Produces
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.test.annotation.MockBean
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import org.zalando.logbook.Logbook
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 import jakarta.inject.Inject
@@ -21,7 +22,7 @@ class ChannelPipelineCustomizerSpec extends Specification {
 
     @Inject
     @Client("/")
-    ReactorHttpClient client
+    HttpClient client
 
     void "test logbook is invoked"() {
         given:
@@ -29,7 +30,7 @@ class ChannelPipelineCustomizerSpec extends Specification {
         writeRequest.process(_) >> Stub(Logbook.ResponseWritingStage)
 
         when:
-        def result = client.retrieve("/logbook/logged").blockFirst()
+        def result = Flux.from(client.retrieve("/logbook/logged")).blockFirst()
 
         then:"2 logs, one for the client and one for the server"
         2 * logbook.process(_) >> writeRequest

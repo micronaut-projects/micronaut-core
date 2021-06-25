@@ -20,7 +20,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.client.ReactorHttpClient;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.runtime.server.EmbeddedServer;
@@ -38,14 +38,14 @@ import static org.junit.Assert.assertEquals;
 public class UploadControllerSpec {
 
     private static EmbeddedServer server;
-    private static ReactorHttpClient client;
+    private static HttpClient client;
 
     @BeforeClass
     public static void setupServer() {
         server = ApplicationContext.run(EmbeddedServer.class);
         client = server
                 .getApplicationContext()
-                .createBean(ReactorHttpClient.class, server.getURL());
+                .createBean(HttpClient.class, server.getURL());
     }
 
     @AfterClass

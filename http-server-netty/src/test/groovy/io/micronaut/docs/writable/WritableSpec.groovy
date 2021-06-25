@@ -18,7 +18,7 @@ package io.micronaut.docs.writable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -27,7 +27,7 @@ import spock.lang.Specification
 class WritableSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-    @Shared @AutoCleanup ReactorHttpClient client = embeddedServer.getApplicationContext().createBean(ReactorHttpClient, embeddedServer.getURL())
+    @Shared @AutoCleanup HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient, embeddedServer.getURL())
 
 
     void "test render template"() {

@@ -23,11 +23,10 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.Filter;
-import io.micronaut.http.client.ReactorHttpClient;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.io.UnsupportedEncodingException;
@@ -38,9 +37,9 @@ import java.net.URLEncoder;
 @Filter(patterns = "/google-auth/api/**")
 public class GoogleAuthFilter implements HttpClientFilter {
 
-    private final BeanProvider<ReactorHttpClient> authClientProvider;
+    private final BeanProvider<HttpClient> authClientProvider;
 
-    public GoogleAuthFilter(BeanProvider<ReactorHttpClient> httpClientProvider) { // <1>
+    public GoogleAuthFilter(BeanProvider<HttpClient> httpClientProvider) { // <1>
         this.authClientProvider = httpClientProvider;
     }
 

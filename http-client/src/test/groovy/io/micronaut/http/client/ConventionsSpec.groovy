@@ -28,7 +28,9 @@ import spock.lang.Specification
 
 class ConventionsSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name': 'ConventionsSpec'
     ])
 
@@ -42,19 +44,18 @@ class ConventionsSpec extends Specification {
 
     void 'test convention mappings'() {
         given:
-        ReactorHttpClient client = embeddedServer.getApplicationContext().createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient, embeddedServer.getURL())
 
         expect:
         client.toBlocking().retrieve('/hello-convention') == 'good'
 
         cleanup:
         client.close()
-
     }
 
     void 'test convention mappings with validation'() {
         given:
-        ReactorHttpClient client = embeddedServer.getApplicationContext().createBean(ReactorHttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient, embeddedServer.getURL())
 
         expect:
         client.toBlocking().retrieve('/hello-validated') == 'good'

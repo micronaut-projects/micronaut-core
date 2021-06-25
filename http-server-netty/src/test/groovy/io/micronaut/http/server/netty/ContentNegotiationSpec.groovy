@@ -7,13 +7,14 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.*
-import io.micronaut.http.client.ReactorHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.server.netty.binding.FormDataBindingSpec.FormController.Person
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -24,12 +25,12 @@ class ContentNegotiationSpec extends Specification {
 
     @Inject
     @Client("/")
-    ReactorHttpClient client
+    HttpClient client
 
     @Unroll
     void "test ACCEPT header content negotiation #header"() {
         expect:
-        client.retrieve(HttpRequest.GET("/negotiate").accept(header as MediaType[]), String)
+        Flux.from(client.retrieve(HttpRequest.GET("/negotiate").accept(header as MediaType[]), String))
                 .blockFirst() == response
 
         where:
@@ -54,7 +55,7 @@ class ContentNegotiationSpec extends Specification {
             request = request.contentType(contentType)
                     .accept(contentType)
         }
-        def response = client.exchange(request, String)
+        def response = Flux.from(client.exchange(request, String))
                 .blockFirst()
 
         expect: "the correct content type was used"
@@ -70,8 +71,8 @@ class ContentNegotiationSpec extends Specification {
 
     void "test send unacceptable type"() {
         when: "An unacceptable type is sent"
-        client.retrieve(HttpRequest.GET("/negotiate/other")
-                .accept(MediaType.APPLICATION_GRAPHQL), Argument.STRING, JsonError.TYPE)
+        Flux.from(client.retrieve(HttpRequest.GET("/negotiate/other")
+                .accept(MediaType.APPLICATION_GRAPHQL), Argument.STRING, JsonError.TYPE))
                 .blockFirst()
 
         then: "An exception is thrown that states the acceptable types"
@@ -90,7 +91,7 @@ class ContentNegotiationSpec extends Specification {
         }
         HttpResponse<String> response = null
         try {
-            client.exchange(request, String)
+            Flux.from(client.exchange(request, String))
                     .blockFirst()
         } catch (HttpClientResponseException e) {
             response = e.response
@@ -117,7 +118,7 @@ class ContentNegotiationSpec extends Specification {
         }
         HttpResponse<String> response = null
         try {
-            response = client.exchange(request, String)
+            response = Flux.from(client.exchange(request, String))
                     .blockFirst()
         } catch (HttpClientResponseException e) {
             response = e.response
