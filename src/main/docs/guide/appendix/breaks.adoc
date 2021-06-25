@@ -2,33 +2,195 @@ This section will document breaking changes between Micronaut 2.x and Micronaut 
 
 === Core Changes
 
+==== Annotation Inheritance
+
+Possibly the most important change in Micronaut 3.0 is a difference in how annotations are inherited from parent classes, methods and interfaces.
+
+Micronaut 2.x did not respect the rules defined in the jdk:java.lang.reflect.AnnotatedElement[] and inherited all annotations from parent interfaces and types regardless of the presence of the jdk:java.lang.annotation.Inherited[] annotation.
+
+With Micronaut 3.x and above only annotations that are explicitly meta-annotated with jdk:java.lang.annotation.Inherited[] are now in fact inherited from parent classes and interfaces.
+This applies to types in the case where one type extends another and methods in the case where one method overrides another.
+
+Many of Micronaut's core annotations have been annotated with `@Inherited` so no change will be required, but some annotations that are either outside Micronaut or defined by user code will need changes to code or the annotation.
+
+In general behaviour which you may wish to override is not inherited by default in Micronaut 3.x and above including <<scopes, Bean Scopes>>, <<qualifiers, Bean Qualifiers>>, <<conditionalBeans, Bean Conditions>>, <<validation, Validation Rules>> and so on.
+
+The following table summarizes the core Micronaut annotations and which ones are inherited and which annotations are not:
+
+.Annotation Inheritance in Micronaut 3.x and above
+[width="80%",frame="topbot",options="header"]
+|======================
+|Annotation |Inherited
+|ann:aop.Adapter[]                                                    | ❌
+|ann:aop.Around[]                                                     | ❌
+|ann:aop.AroundConstruct[]                                            | ❌
+|ann:aop.InterceptorBean[]                                            | ❌
+|ann:aop.InterceptorBinding[]                                         | ❌
+|ann:aop.Introduction[]                                               | ❌
+|ann:core.annotation.Blocking[]                                       | ✅
+|ann:core.annotation.Creator[]                                        | ❌
+|ann:core.annotation.EntryPoint[]                                     | ✅
+|ann:core.annotation.Experimental[] (source level)                    | ❌
+|ann:core.annotation.Indexes[] & ann:core.annotation.Indexed[]        | ✅
+|ann:core.annotation.Internal[]                                       | ✅
+|ann:core.annotation.Introspected[]                                   | ✅
+|ann:core.annotation.NonBlocking[]                                    | ✅
+|ann:core.annotation.Nullable[]                                       | ❌
+|ann:core.annotation.NonNull[]                                        | ❌
+|ann:core.annotation.Order[]                                          | ❌
+|ann:core.annotation.ReflectiveAccess[]                               | ❌
+|ann:core.annotation.TypeHint[]                                       | ❌
+|ann:core.async.annotation.SingleResult[]                             | ✅
+|ann:core.bind.annotation.Bindable[]                                  | ✅
+|ann:core.convert.format.Format[]                                     | ✅
+|ann:core.convert.format.MapFormat[]                                  | ✅
+|ann:core.convert.format.ReadableBytes[]                              | ✅
+|ann:core.version.annotation.Version[]                                | ❌
+|ann:context.annotation.AliasFor[]                                    | ❌
+|ann:context.annotation.Any[]                                         | ❌
+|ann:context.annotation.Bean[]                                        | ❌
+|ann:context.annotation.BootstrapContextCompatible[]                  | ✅
+|ann:context.annotation.ConfigurationBuilder[]                        | ❌
+|ann:context.annotation.ConfigurationInject[]                         | ❌
+|ann:context.annotation.ConfigurationProperties[]                     | ❌
+|ann:context.annotation.ConfigurationReader[]                         | ❌
+|ann:context.annotation.Context[]                                     | ❌
+|ann:context.annotation.DefaultImplementation[]                       | ✅
+|ann:context.annotation.DefaultScope[]                                | ❌
+|ann:context.annotation.EachBean[]                                    | ❌
+|ann:context.annotation.Executable[]                                  | ✅
+|ann:context.annotation.Factory[]                                     | ❌
+|ann:context.annotation.NonBinding[]                                  | ❌
+|ann:context.annotation.Parallel[]                                    | ❌
+|ann:context.annotation.Parameter[]                                   | ❌
+|ann:context.annotation.Primary[]                                     | ❌
+|ann:context.annotation.Property[]                                    | ❌
+|ann:context.annotation.PropertySource[]                              | ❌
+|ann:context.annotation.Prototype[]                                   | ❌
+|ann:context.annotation.Replaces[]                                    | ❌
+|ann:context.annotation.Requirements[]                                | ❌
+|ann:context.annotation.Requires[]                                    | ❌
+|ann:context.annotation.Secondary[]                                   | ❌
+|ann:context.annotation.Type[]                                        | ❌
+|ann:context.annotation.Value[]                                       | ❌
+|ann:http.annotation.Controller[]                                     | ❌
+|ann:http.annotation.Body[]                                           | ✅
+|ann:http.annotation.Consumes[]                                       | ✅
+|ann:http.annotation.CookieValue[]                                    | ✅
+|ann:http.annotation.CustomHttpMethod[]                               | ✅
+|ann:http.annotation.Delete[]                                         | ✅
+|ann:http.annotation.Error[]                                          | ✅
+|ann:http.annotation.Filter[]                                         | ❌
+|ann:http.annotation.FilterMatcher[]                                  | ❌
+|ann:http.annotation.Get[]                                            | ✅
+|ann:http.annotation.Head[]                                           | ✅
+|ann:http.annotation.Header[]                                         | ✅
+|ann:http.annotation.Headers[]                                        | ✅
+|ann:http.annotation.HttpMethodMapping[]                              | ✅
+|ann:http.annotation.Options[]                                        | ✅
+|ann:http.annotation.Part[]                                           | ✅
+|ann:http.annotation.Patch[]                                          | ✅
+|ann:http.annotation.PathVariable[]                                   | ✅
+|ann:http.annotation.Post[]                                           | ✅
+|ann:http.annotation.Produces[]                                       | ✅
+|ann:http.annotation.Put[]                                            | ✅
+|ann:http.annotation.QueryValue[]                                     | ✅
+|ann:http.annotation.RequestAttribute[]                               | ✅
+|ann:http.annotation.RequestAttributes[]                              | ✅
+|ann:http.annotation.RequestBean[]                                    | ✅
+|ann:http.annotation.Status[]                                         | ✅
+|ann:http.annotation.Trace[]                                          | ✅
+|ann:http.annotation.UriMapping[]                                     | ✅
+|ann:http.client.annotation.Client[]                                  | ❌
+|ann:jackson.annotation.JacksonFeatures[]                             | ❌
+|ann:management.endpoint.annotation.Delete[]                          | ✅
+|ann:management.endpoint.annotation.Endpoint[]                        | ❌
+|ann:management.endpoint.annotation.Read[]                            | ✅
+|ann:management.endpoint.annotation.Sensitive[]                       | ✅
+|ann:management.endpoint.annotation.Selector[]                        | ✅
+|ann:management.endpoint.annotation.Write[]                           | ✅
+|ann:management.health.indicator.annotation.Liveness[]                | ❌
+|ann:management.health.indicator.annotation.Readiness[]               | ❌
+|ann:messaging.annotation.MessageBody[]                               | ✅
+|ann:messaging.annotation.MessageHeader[]                             | ✅
+|ann:messaging.annotation.MessageHeaders[]                            | ✅
+|ann:messaging.annotation.MessageListener[]                           | ❌
+|ann:messaging.annotation.MessageMapping[]                            | ✅
+|ann:messaging.annotation.MessageProducer[]                           | ❌
+|ann:messaging.annotation.SendTo[]                                    | ✅
+|ann:retry.annotation.CircuitBreaker[]                                | ❌
+|ann:retry.annotation.Fallback[]                                      | ❌
+|ann:retry.annotation.Recoverable[]                                   | ❌
+|ann:retry.annotation.Retryable[]                                     | ❌
+|ann:runtime.context.scope.Refreshable[]                              | ❌
+|ann:runtime.context.scope.ScopedProxy[]                              | ❌
+|ann:runtime.context.scope.ThreadLocal[]                              | ❌
+|ann:runtime.event.annotation.EventListener[]                         | ❌
+|ann:runtime.http.scope.RequestScope[]                                | ❌
+|ann:scheduling.annotation.Async[]                                    | ❌
+|ann:scheduling.annotation.ExecuteOn[]                                | ❌
+|ann:scheduling.annotation.Scheduled[]                                | ❌
+|ann:session.annotation.SessionValue[]                                | ✅
+|ann:tracing.annotation.ContinueSpain[]                               | ✅
+|ann:tracing.annotation.NewSpan[]                                     | ✅
+|ann:tracing.annotation.SpanTag[]                                     | ✅
+|ann:validation.Validated[]                                           | ✅
+|ann:websocket.annotation.ClientWebSocket[]                           | ❌
+|ann:websocket.annotation.OnClose[]                                   | ✅
+|ann:websocket.annotation.OnError[]                                   | ✅
+|ann:websocket.annotation.OnMessage[]                                 | ✅
+|ann:websocket.annotation.OnOpen[]                                    | ✅
+|ann:websocket.annotation.ServerWebSocket[]                           | ❌
+|ann:websocket.annotation.WebSocketComponent[]                        | ❌
+|ann:websocket.annotation.WebSocketMapping[]                          | ✅
+|======================
+
+When upgrading an application you may need to take action if you implement an interface or subclass a super class and override a method.
+
+For example the annotations defined in `javax.validation` are not inherited by default so need to be defined again in any overridden or implemented methods.
+
+This behaviour grants more flexibility if you need to redefine the validation rules. Note that it is still possible to inherit validation rules through meta-annotations. See the section on <<annotationMetadata, Annotation Inheritance>> for more information.
+
 ==== Inject Annotations
 
-Micronaut now provides the `jakarta.inject` annotations as a transitive dependency instead of the `javax.inject` annotations. To continue using the old annotations, add the following dependency.
+Micronaut now provides the `jakarta.inject` annotations as a transitive dependency instead of the `javax.inject` annotations.
+To continue using the old annotations, add the following dependency.
 
 dependency:javax.inject:javax.inject:1[]
 
 ==== Nullable Annotations
 
-Micronaut no longer includes any third party dependency for nullability annotations. Micronaut now provides its own annotations for this purpose (api:core.annotation.Nullable[] and api:core.annotation.NonNull[]) that are used for our APIs. To continue using other nullability annotations, simply add the relevant dependency.
+Micronaut no longer includes any third party dependency for nullability annotations.
+Micronaut now provides its own annotations for this purpose (api:core.annotation.Nullable[] and api:core.annotation.NonNull[]) that are used for our APIs.
+To continue using other nullability annotations, simply add the relevant dependency.
 
 ==== Server Filter Behavior
 
-In Micronaut 2 server filters could have been called multiple times in the case of an exception being thrown, or sometimes not at all if the error resulted before route execution. This also allowed for filters to handle exceptions thrown from routes. Filters have changed in Micronaut 3 to always be called exactly once for each request, under all conditions. Exceptions are no longer propagated to filters and instead the resulting error response is passed through the reactive stream.
+In Micronaut 2 server filters could have been called multiple times in the case of an exception being thrown, or sometimes not at all if the error resulted before route execution.
+This also allowed for filters to handle exceptions thrown from routes.
+Filters have changed in Micronaut 3 to always be called exactly once for each request, under all conditions.
+Exceptions are no longer propagated to filters and instead the resulting error response is passed through the reactive stream.
 
-In the case of a response being created as a result of an exception, the original cause is now stored as a response attribute (api:http.HttpAttributes#EXCEPTION[]). That attribute can be read by filters to have context for the error HTTP response.
+In the case of a response being created as a result of an exception, the original cause is now stored as a response attribute (api:http.HttpAttributes#EXCEPTION[]).
+That attribute can be read by filters to have context for the error HTTP response.
 
-The api:http.filter.OncePerRequestHttpServerFilter[] class is now deprecated and will be removed in the next major release. The api:http.filter.OncePerRequestHttpServerFilter[] stores a request attribute when the filter is executed and some functionality may rely on that attribute existing. The class will still create the attribute but it is recommended to instead create a custom attribute in your filter class and use that instead of the one created by api:http.filter.OncePerRequestHttpServerFilter[].
+The api:http.filter.OncePerRequestHttpServerFilter[] class is now deprecated and will be removed in the next major release.
+The api:http.filter.OncePerRequestHttpServerFilter[] stores a request attribute when the filter is executed and some functionality may rely on that attribute existing.
+The class will still create the attribute but it is recommended to instead create a custom attribute in your filter class and use that instead of the one created by api:http.filter.OncePerRequestHttpServerFilter[].
 
-There is also a minor behavior change in when the response gets written. Any modifications to the response after the underlying `onNext` call is made will not have any effect as the response has already been written.
+There is also a minor behavior change in when the response gets written.
+Any modifications to the response after the underlying `onNext` call is made will not have any effect as the response has already been written.
 
 ==== Decapitalization Strategy
 
-For many cases, one common one being introspections, getter names like `getXForwarded()` would result in the bean property being `XForwarded`. The name will now be `xForwarded`. This can affect many areas of the framework where names like `XForwarded` are used.
+For many cases, one common one being introspections, getter names like `getXForwarded()` would result in the bean property being `XForwarded`.
+The name will now be `xForwarded`.
+This can affect many areas of the framework where names like `XForwarded` are used.
 
 ==== @Order default
 
-Previously the default order value for the `@Order` annotation was the lowest precedence. It is now 0.
+Previously the default order value for the `@Order` annotation was the lowest precedence.
+It is now 0.
 
 ==== Deprecation Removal
 
@@ -36,19 +198,29 @@ Classes, constructors, etc that have been deprecated in previous versions of Mic
 
 ==== Reflective Bean Map
 
-In several places in Micronaut, it is required to get a map representation of your object. In previous versions, a reflection based strategy was used to retrieve that information if the class was not annotated with `@Introspected`. That functionality has been removed and it is now required to annotate classes with `@Introspected` that are being used in this way. Any class may be affected if it is passed as an argument or returned from any controller or client, among other use cases.
+In several places in Micronaut, it is required to get a map representation of your object.
+In previous versions, a reflection based strategy was used to retrieve that information if the class was not annotated with `@Introspected`.
+That functionality has been removed and it is now required to annotate classes with `@Introspected` that are being used in this way.
+Any class may be affected if it is passed as an argument or returned from any controller or client, among other use cases.
 
 ==== Cookie Secure Configuration
 
-Previously the `secure` configuration for cookies was only respected if the request was determined to be sent over https. Due to a number of factors including proxies, HTTPS requests can be presented to the server as if they are HTTP. In those cases the setting was not having any effect. The setting is now respected regardless of the status of the request. If the setting is not set, cookies will be secure if the request is determined to be HTTPS.
+Previously the `secure` configuration for cookies was only respected if the request was determined to be sent over https.
+Due to a number of factors including proxies, HTTPS requests can be presented to the server as if they are HTTP.
+In those cases the setting was not having any effect.
+The setting is now respected regardless of the status of the request.
+If the setting is not set, cookies will be secure if the request is determined to be HTTPS.
 
 ==== Server Error Route Priority
 
-Previously if a route could not be satisfied, or an `HttpStatusException` was thrown, routes for the relevant HTTP status was searched before routes that handled the specific exception. In Micronaut 3 routes that handle the exception will be searched first, then routes that handle the HTTP status.
+Previously if a route could not be satisfied, or an `HttpStatusException` was thrown, routes for the relevant HTTP status was searched before routes that handled the specific exception.
+In Micronaut 3 routes that handle the exception will be searched first, then routes that handle the HTTP status.
 
 ==== Status Route Default Response Status
 
-Status error routes will now default to produce responses with the same HTTP status as specified in the `@Error` annotation. In previous versions a 200 OK response was created. For example:
+Status error routes will now default to produce responses with the same HTTP status as specified in the `@Error` annotation.
+In previous versions a 200 OK response was created.
+For example:
 
 ```
 @Error(status = HttpStatus.UNSUPPORTED_MEDIA_TYPE)
@@ -57,19 +229,25 @@ String unsupportedMediaTypeHandler() {
 }
 ```
 
-The above method will result in a response of HTTP status 415 with a body of "not supported". Previously it would have been a response of HTTP status 200 with a body of "not supported". To specify the desired response status, either annotate the method with `@Status` or return an `HttpResponse`.
+The above method will result in a response of HTTP status 415 with a body of "not supported".
+Previously it would have been a response of HTTP status 200 with a body of "not supported".
+To specify the desired response status, either annotate the method with `@Status` or return an `HttpResponse`.
 
 ==== No Longer Possible to Inject a `List` of `Provider`
 
-In Micronaut 2.x it was possible to inject a `List<javax.inject.Provider>`, although this was undocumented behaviour. In Micronaut 3.x injecting a list of `Provider` instances is no longer possible and you should instead use the api:context.BeanProvider[] API which provides `stream()` and `iterator()` methods to provide the same functionality.
+In Micronaut 2.x it was possible to inject a `List<javax.inject.Provider>`, although this was undocumented behaviour.
+In Micronaut 3.x injecting a list of `Provider` instances is no longer possible and you should instead use the api:context.BeanProvider[] API which provides `stream()` and `iterator()` methods to provide the same functionality.
 
 ==== Injecting ExecutorService
 
-In previous versions of Micronaut it was possible to inject an link:{jdkapi}/java/util/concurrent/ExecutorService.html[ExecutorService] without any qualifiers and the default Netty event loop group would be injected. Because the event loop should not be used for general purpose use cases, the injection will now fail by default with a non unique bean exception. The injection point should be qualified for which executor service is desired.
+In previous versions of Micronaut it was possible to inject an link:{jdkapi}/java/util/concurrent/ExecutorService.html[ExecutorService] without any qualifiers and the default Netty event loop group would be injected.
+Because the event loop should not be used for general purpose use cases, the injection will now fail by default with a non unique bean exception.
+The injection point should be qualified for which executor service is desired.
 
 ==== Only the Exported Type from Factories is Injectable
 
-It is no longer possible to inject the internal implementation type from beans produced via factories. For example in the following example:
+It is no longer possible to inject the internal implementation type from beans produced via factories.
+For example in the following example:
 
 [source,java]
 ----
@@ -85,7 +263,9 @@ public class ExecutorFactory {
 }
 ----
 
-In the above case, if the `ExecutorService` had been created previously a call to `context.getBean(ForkJoinPool.class)` would locate the already created bean. This behaviour was inconsistent because if the bean had not yet been created then this lookup would not work. In Micronaut 3 for consistency this is no longer possible.
+In the above case, if the `ExecutorService` had been created previously a call to `context.getBean(ForkJoinPool.class)` would locate the already created bean.
+This behaviour was inconsistent because if the bean had not yet been created then this lookup would not work.
+In Micronaut 3 for consistency this is no longer possible.
 
 You can however restore the behaviour by using the new `typed` member of the ann:context.annotation.Bean[] annotation:
 
@@ -106,7 +286,8 @@ public class ExecutorFactory {
 
 ==== No Longer Possible to Define AOP Advice on a Bean Produced from a Factory with Constructor arguments
 
-In previous versions of Micronaut it was possible to define AOP advice to a factory method that returned a class that featured constructor arguments. This could lead to undefined behaviour since the argument of the generated proxy which would be dependency injected by the framework may be different from manually constructed proxy target.
+In previous versions of Micronaut it was possible to define AOP advice to a factory method that returned a class that featured constructor arguments.
+This could lead to undefined behaviour since the argument of the generated proxy which would be dependency injected by the framework may be different from manually constructed proxy target.
 
 The following definition is now invalid in Micronaut 3 and above and will lead to a compilation error:
 
@@ -150,7 +331,9 @@ public class AProvider implements Provider<A> {
 }
 ----
 
-In the above example a bean of type `A` would automatically be exposed by Micronaut. This behaviour is no longer supported and instead the ann:context.annotation.Factory[] annotation should be used to express the same behaviour. For example:
+In the above example a bean of type `A` would automatically be exposed by Micronaut.
+This behaviour is no longer supported and instead the ann:context.annotation.Factory[] annotation should be used to express the same behaviour.
+For example:
 
 [source,java]
 ----
@@ -170,18 +353,20 @@ public class AProvider implements Provider<A> {
 
 ==== Fewer Executable Methods Generated for Controllers and Message Listeners
 
-Previous versions of Micronaut specified the ann:context.annotation.Executable[] annotation as a meta-annotation on the ann:http.annotation.Controller[], ann:http.annotation.Filter[] and ann:messaging.annotation.MessageListener[] annotations. This resulted in generating executable method all non-private methods of classes annotated with these annotations.
+Previous versions of Micronaut specified the ann:context.annotation.Executable[] annotation as a meta-annotation on the ann:http.annotation.Controller[], ann:http.annotation.Filter[] and ann:messaging.annotation.MessageListener[] annotations.
+This resulted in generating executable method all non-private methods of classes annotated with these annotations.
 
 In Micronaut 3.x and above the ann:context.annotation.Executable[] has been moved to a meta-annotation of ann:http.annotation.HttpMethodMapping[] and ann:messaging.annotation.MessageMapping[] instead to reduce memory consumption and improve efficiency.
 
 If you were relying on the present of these executable methods you will need to annotate explicitly methods in your classes with ann:context.annotation.Executable[] to restore this behaviour.
 
-
 ==== GraalVM changes
 
-In previous versions of Micronaut annotating a class with `@Introspected` automatically added it to the GraalVM `reflect-config.json` file. The original intended usage of the annotation is to generate <<introspection, Bean Introspection Metadata>> so Micronaut can instantiate the class and call getters and setters without using reflection.
+In previous versions of Micronaut annotating a class with `@Introspected` automatically added it to the GraalVM `reflect-config.json` file.
+The original intended usage of the annotation is to generate <<introspection, Bean Introspection Metadata>> so Micronaut can instantiate the class and call getters and setters without using reflection.
 
-Starting in Micronaut 3.x the `@Introspected` annotation doesn't add the class to the GraalVM `reflect-config.json` file anymore, because in most of the cases is not really necessary. If you need to declare a class to be accessed by reflection, use the `@ReflectiveAccess` annotation instead.
+Starting in Micronaut 3.x the `@Introspected` annotation doesn't add the class to the GraalVM `reflect-config.json` file anymore, because in most of the cases is not really necessary.
+If you need to declare a class to be accessed by reflection, use the `@ReflectiveAccess` annotation instead.
 
 === Module Changes
 

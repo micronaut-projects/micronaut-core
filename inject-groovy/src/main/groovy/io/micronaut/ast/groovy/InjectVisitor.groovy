@@ -676,13 +676,17 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         ClassNode returnType
         Map<String, Map<String, ClassElement>> allTypeArguments
         BeanDefinitionWriter beanMethodWriter
+        AnnotationMetadata beanFactoryMetadata = new AnnotationMetadataHierarchy(
+                concreteClassAnnotationMetadata,
+                methodAnnotationMetadata
+        );
         if (annotatedNode instanceof MethodNode) {
 
             def methodNode = (MethodNode) annotatedNode
             MethodElement factoryMethodElement = elementFactory.newMethodElement(
                     concreteClassElement,
                     methodNode,
-                    methodAnnotationMetadata
+                    beanFactoryMetadata
             )
             producedClassElement = factoryMethodElement.genericReturnType
             beanMethodWriter = new BeanDefinitionWriter(
@@ -710,7 +714,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             FieldElement factoryField = elementFactory.newFieldElement(
                     concreteClassElement,
                     fieldNode,
-                    methodAnnotationMetadata
+                    beanFactoryMetadata
             )
             producedClassElement = factoryField.genericField
             beanMethodWriter = new BeanDefinitionWriter(

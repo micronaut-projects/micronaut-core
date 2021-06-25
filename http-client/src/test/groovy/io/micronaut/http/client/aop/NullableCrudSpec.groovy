@@ -159,7 +159,7 @@ class NullableCrudSpec extends Specification {
         }
 
         @Override
-        NullableBook update(Long id, String title) {
+        NullableBook update(Long id, @Nullable String title) {
             NullableBook book = books[id]
             if (book != null) {
                 book.title = title
