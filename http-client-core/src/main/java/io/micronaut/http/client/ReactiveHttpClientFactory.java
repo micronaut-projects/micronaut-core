@@ -26,8 +26,9 @@ import java.net.URL;
  *
  * @author graemerocher
  * @since 2.0
- * @param <T> Reactive HTTP Client.
- * @param <S> Reactive Streaming HTTP Client.
+ * @param <T> Reactive HTTP Client
+ * @param <E> Server Sent Event Client
+ * @param <S> Reactive Streaming HTTP Client
  * @param <W> Web Socket Client
  */
 public interface ReactiveHttpClientFactory<T extends HttpClient, E extends SseClient, S extends StreamingHttpClient, W extends WebSocketClient>  {

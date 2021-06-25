@@ -15,24 +15,21 @@
  */
 package io.micronaut.http.client.netty;
 
-
 import io.micronaut.core.annotation.Internal;
-import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxOperator;
-import reactor.core.publisher.Operators;
 import reactor.util.context.Context;
 
 import java.util.function.Consumer;
 
-
 /**
- * Extensions to project reactor.
- * @author James
+ * Custom extensions to project reactor.
+ *
+ * @author James Kleeh
  * @since 3.0.0
- * @param <T> Item in the stream
+ * @param <T> The stream type
  */
 @Internal
 class MicronautFlux<T> extends Flux<T> {
@@ -67,9 +64,9 @@ class MicronautFlux<T> extends Flux<T> {
         private final Consumer<? super T> afterNext;
 
         /**
-         * Build a {@link FluxOperator} wrapper around the passed parent {@link Publisher}.
+         * Build a {@link FluxOperator} wrapper around the passed parent {@link org.reactivestreams.Publisher}.
          *
-         * @param source the {@link Publisher} to decorate
+         * @param source the {@link org.reactivestreams.Publisher} to decorate
          * @param afterNext Consumer with the current item after this item has been emitted to the downstream.
          */
         protected AfterNextOperator(Flux<? extends T> source, Consumer<? super T> afterNext) {
