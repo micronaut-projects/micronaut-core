@@ -26,8 +26,8 @@ class AbstractBeanSpec extends AbstractBeanDefinitionSpec {
 
     void "test that abstract bean definitions are built for abstract classes"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.AbstractBean', '''
-package test;
+        BeanDefinition beanDefinition = buildBeanDefinition('abbean1.AbstractBean', '''
+package abbean1;
 
 import io.micronaut.context.annotation.*;
 

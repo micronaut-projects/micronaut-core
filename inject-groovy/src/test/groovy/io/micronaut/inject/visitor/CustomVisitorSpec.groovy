@@ -71,8 +71,8 @@ class TestController {
     }
 
     void "test non controller class is not visited by custom visitor"() {
-        buildBeanDefinition('test.TestController', '''
-package test;
+        buildBeanDefinition('customvis1.TestController', '''
+package customvis1;
 
 import io.micronaut.http.annotation.*
 import jakarta.inject.Inject
@@ -105,13 +105,13 @@ public class TestController {
         expect:
         ControllerGetVisitor.getVisited().empty
         AllElementsVisitor.getVisited().empty
-        AllClassesVisitor.getVisited() == ["test.TestController", "getMethod"]
-        InjectVisitor.getVisited() == ["test.TestController", "privateField"]
+        AllClassesVisitor.getVisited() == ["customvis1.TestController", "getMethod"]
+        InjectVisitor.getVisited() == ["customvis1.TestController", "privateField"]
     }
 
     void "test @Generated class is not visited by any visitor"() {
-        buildBeanDefinition('test.TestGenerated', '''
-package test;
+        buildBeanDefinition('customvis2.TestGenerated', '''
+package customvis2;
 
 import io.micronaut.core.annotation.Generated
 import jakarta.inject.Inject
