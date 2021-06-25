@@ -162,7 +162,7 @@ class ClientRedirectSpec extends Specification {
         HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        String result = Flux.from(client.retrieve(HttpRequest.GET("/test/redirect-host").header("redirect", "http://localhost:${otherServer.getPort()}/test/host-header"))).blockFirst()
+        String result = client.toBlocking().retrieve(HttpRequest.GET("/test/redirect-host").header("redirect", "http://localhost:${otherServer.getPort()}/test/host-header"))
 
         then:
         result == "localhost:${otherServer.getPort()}"

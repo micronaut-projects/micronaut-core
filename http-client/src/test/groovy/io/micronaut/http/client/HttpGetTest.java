@@ -42,10 +42,9 @@ public class HttpGetTest {
         EmbeddedServer server = applicationContext.getBean(EmbeddedServer.class).start();
 
         HttpClient client = new DefaultHttpClient(server.getURL());
-        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
+        HttpResponse<String> response = client.toBlocking().exchange(
                 HttpRequest.GET("/get/simple"), String.class
-        ));
-        HttpResponse<String> response = flowable.blockFirst();
+        );
 
         Assert.assertEquals(HttpStatus.OK, response.getStatus());
         Optional<String> body = response.getBody(String.class);
@@ -63,10 +62,9 @@ public class HttpGetTest {
 
         HttpClient client = applicationContext.createBean(HttpClient.class, server.getURL());
 
-        Flux<HttpResponse<List>> flowable = Flux.from(client.exchange(
+        HttpResponse<List> response = client.toBlocking().exchange(
                 HttpRequest.GET("/get/pojoList"), Argument.of(List.class, HttpGetSpec.Book.class)
-        ));
-        HttpResponse<List> response = flowable.blockFirst();
+        );
 
         assertEquals(HttpStatus.OK, response.getStatus());
         Optional<List> body = response.getBody();

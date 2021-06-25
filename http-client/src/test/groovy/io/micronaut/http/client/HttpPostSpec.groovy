@@ -371,7 +371,7 @@ class HttpPostSpec extends Specification {
 
     void "test http post with empty body"() {
         when:
-        def res = Flux.from(client.exchange(HttpRequest.POST('/post/emptyBody', null))).blockFirst();
+        def res = client.toBlocking().exchange(HttpRequest.POST('/post/emptyBody', null));
 
         then:
         res.status == HttpStatus.NO_CONTENT

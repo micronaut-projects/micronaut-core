@@ -25,6 +25,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
 import io.micronaut.runtime.server.EmbeddedServer
+import io.netty.handler.codec.http.HttpHeaderValues
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
@@ -47,7 +48,10 @@ class CompressedRequest extends Specification {
 
         when:
         int i = 0
-        HttpResponse<List> result = Flux.from(client.exchange(HttpRequest.POST('/gzip/request/numbers', body).contentEncoding(io.netty.handler.codec.http.HttpHeaderValues.GZIP).contentType(MediaType.APPLICATION_JSON_TYPE), List)).blockFirst()
+        HttpResponse<List> result = client.toBlocking().exchange(
+                HttpRequest.POST('/gzip/request/numbers', body)
+                        .contentEncoding(HttpHeaderValues.GZIP)
+                        .contentType(MediaType.APPLICATION_JSON_TYPE), List)
 
         then:
         result.body().size() == 5

@@ -97,7 +97,7 @@ class ManualHttpServiceDefinitionSpec extends Specification {
 
         when:
         HttpClient client = clientApp.getBean(TestBean).fooClient
-        String result = Flux.from(client.retrieve('/')).blockFirst()
+        String result = client.toBlocking().retrieve('/')
 
         then:
         client.configuration == config
@@ -117,7 +117,7 @@ class ManualHttpServiceDefinitionSpec extends Specification {
 
         when:
         client = clientApp.getBean(TestBean).barClient
-        result = Flux.from(client.retrieve(HttpRequest.POST('/', ''))).blockFirst()
+        result = client.toBlocking().retrieve(HttpRequest.POST('/', ''))
 
         then:
         client.configuration == config

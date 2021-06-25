@@ -25,13 +25,13 @@ class CurrentDateEndpointSpec: StringSpec() {
 
     init {
         "test read custom date endpoint" {
-            val response = Flux.from(client.exchange("/date", String::class.java)).blockFirst()
+            val response = client.toBlocking().exchange("/date", String::class.java)
 
             response.code() shouldBe HttpStatus.OK.code
         }
 
         "test read custom date endpoint with argument" {
-            val response = Flux.from(client.exchange("/date/current_date_is", String::class.java)).blockFirst()
+            val response = client.toBlocking().exchange("/date/current_date_is", String::class.java)
 
             response.code() shouldBe HttpStatus.OK.code
             response.body()!!.startsWith("current_date_is: ") shouldBe true
@@ -39,7 +39,7 @@ class CurrentDateEndpointSpec: StringSpec() {
 
         // issue https://github.com/micronaut-projects/micronaut-core/issues/883
         "test read with produces" {
-            val response = Flux.from(client.exchange("/date/current_date_is", String::class.java)).blockFirst()
+            val response = client.toBlocking().exchange("/date/current_date_is", String::class.java)
 
             response.contentType.get() shouldBe MediaType.TEXT_PLAIN_TYPE
         }
@@ -48,15 +48,15 @@ class CurrentDateEndpointSpec: StringSpec() {
             val originalDate: Date
             val resetDate: Date
 
-            var response = Flux.from(client.exchange("/date", String::class.java)).blockFirst()
+            var response = client.toBlocking().exchange("/date", String::class.java)
             originalDate = Date(java.lang.Long.parseLong(response.body()!!))
 
-            response =  Flux.from(client.exchange(HttpRequest.POST<Map<String, Any>>("/date", mapOf()), String::class.java)).blockFirst()
+            response =  client.toBlocking().exchange(HttpRequest.POST<Map<String, Any>>("/date", mapOf()), String::class.java)
 
             response.code() shouldBe HttpStatus.OK.code
             response.body() shouldBe "Current date reset"
 
-            response =  Flux.from(client.exchange("/date", String::class.java)).blockFirst()
+            response =  client.toBlocking().exchange("/date", String::class.java)
             resetDate = Date(java.lang.Long.parseLong(response.body()!!))
 
             assert(resetDate.time > originalDate.time)
@@ -69,7 +69,7 @@ class CurrentDateEndpointSpec: StringSpec() {
             val rxClient = server.applicationContext.createBean(HttpClient::class.java, server.url)
 
             try {
-                Flux.from(rxClient.exchange("/date", String::class.java)).blockFirst()
+                rxClient.toBlocking().exchange("/date", String::class.java)
             } catch (ex: HttpClientResponseException) {
                 ex.response.code() shouldBe HttpStatus.NOT_FOUND.code
             }

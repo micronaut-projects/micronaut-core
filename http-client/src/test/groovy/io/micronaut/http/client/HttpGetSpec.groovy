@@ -392,7 +392,7 @@ class HttpGetSpec extends Specification {
 
     void "test empty list returns ok"() {
         when:
-        HttpResponse response = Flux.from(client.exchange(HttpRequest.GET("/get/emptyList"), Argument.listOf(Book))).blockFirst()
+        HttpResponse response = client.toBlocking().exchange(HttpRequest.GET("/get/emptyList"), Argument.listOf(Book))
 
         then:
         noExceptionThrown()
@@ -405,7 +405,7 @@ class HttpGetSpec extends Specification {
 
     void "test single empty list returns ok"() {
         when:
-        HttpResponse response = Flux.from(client.exchange(HttpRequest.GET("/get/emptyList/single"), Argument.listOf(Book))).blockFirst()
+        HttpResponse response = client.toBlocking().exchange(HttpRequest.GET("/get/emptyList/single"), Argument.listOf(Book))
 
         then:
         noExceptionThrown()

@@ -30,7 +30,7 @@ class ChannelPipelineCustomizerSpec extends Specification {
         writeRequest.process(_) >> Stub(Logbook.ResponseWritingStage)
 
         when:
-        def result = Flux.from(client.retrieve("/logbook/logged")).blockFirst()
+        def result = client.toBlocking().retrieve("/logbook/logged")
 
         then:"2 logs, one for the client and one for the server"
         2 * logbook.process(_) >> writeRequest

@@ -55,7 +55,7 @@ class ByteBufferSpec extends Specification {
 
     void "test read bytes"() {
         when:
-        byte[] bytes = Flux.from(rxClient.retrieve(HttpRequest.GET('/bytes'), byte[].class)).blockFirst()
+        byte[] bytes = rxClient.toBlocking().retrieve(HttpRequest.GET('/bytes'), byte[].class)
 
         then:
         new String(bytes) == 'blah'
@@ -64,7 +64,7 @@ class ByteBufferSpec extends Specification {
 
     void "test read byteBuffer"() {
         when:
-        def bytes = Flux.from(rxClient.retrieve(HttpRequest.GET('/byteBuffer'), byte[].class)).blockFirst()
+        def bytes = rxClient.toBlocking().retrieve(HttpRequest.GET('/byteBuffer'), byte[].class)
 
         then:
         new String(bytes) == 'blah'
@@ -72,7 +72,7 @@ class ByteBufferSpec extends Specification {
 
     void "test read byteBuf"() {
         when:
-        byte[] bytes = Flux.from(rxClient.retrieve(HttpRequest.GET('/byteBuf'), byte[].class)).blockFirst()
+        byte[] bytes = rxClient.toBlocking().retrieve(HttpRequest.GET('/byteBuf'), byte[].class)
 
         then:
         new String(bytes) == 'blah'
@@ -80,7 +80,7 @@ class ByteBufferSpec extends Specification {
 
     void "test read single bytes flowable"() {
         when:
-        byte[] bytes = Flux.from(rxClient.retrieve(HttpRequest.GET('/singleBytesFlowable'), byte[].class)).blockFirst()
+        byte[] bytes = rxClient.toBlocking().retrieve(HttpRequest.GET('/singleBytesFlowable'), byte[].class)
 
         then:
         new String(bytes) == 'blah'

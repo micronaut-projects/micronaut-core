@@ -55,7 +55,7 @@ class NettyHttpServerSpec extends Specification {
         EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
         HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
-        HttpResponse response = Flux.from(client.exchange('/person/Fred', String)).blockFirst()
+        HttpResponse response = client.toBlocking().exchange('/person/Fred', String)
         then:
         response.body() == "Person Named Fred"
 
@@ -70,7 +70,7 @@ class NettyHttpServerSpec extends Specification {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, propertySource, Environment.TEST)
 
         HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
-        HttpResponse response = Flux.from(client.exchange('/person/Fred', String)).blockFirst()
+        HttpResponse response = client.toBlocking().exchange('/person/Fred', String)
 
         then:
         response.body() == "Person Named Fred"
@@ -94,7 +94,7 @@ class NettyHttpServerSpec extends Specification {
         EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
         HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
-        HttpResponse response = Flux.from(client.exchange('/person/Fred', String)).blockFirst()
+        HttpResponse response = client.toBlocking().exchange('/person/Fred', String)
         then:
         response.body() == "Person Named Fred"
 
@@ -110,7 +110,7 @@ class NettyHttpServerSpec extends Specification {
         EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
         HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
-        HttpResponse response = Flux.from(client.exchange('/person/Fred', String)).blockFirst()
+        HttpResponse response = client.toBlocking().exchange('/person/Fred', String)
 
         then:
         response.body() == "Person Named Fred"
@@ -127,7 +127,7 @@ class NettyHttpServerSpec extends Specification {
         EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
         HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
-        HttpResponse response = Flux.from(client.exchange('/person/another/job?id=10', String)).blockFirst()
+        HttpResponse response = client.toBlocking().exchange('/person/another/job?id=10', String)
 
         then:
         response.body() == "JOB ID 10"
@@ -144,7 +144,7 @@ class NettyHttpServerSpec extends Specification {
         EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
         HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
-        Flux.from(client.exchange('/person/another/job', String)).blockFirst()
+        client.toBlocking().exchange('/person/another/job', String)
 
         then:"A 400 is returned"
         def e = thrown(HttpClientResponseException)
@@ -162,7 +162,7 @@ class NettyHttpServerSpec extends Specification {
         EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
         HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
-        Flux.from(client.exchange(HttpRequest.POST('/person/job/test', '{}'), String)).blockFirst()
+        client.toBlocking().exchange(HttpRequest.POST('/person/job/test', '{}'), String)
 
         then:
         HttpClientResponseException e = thrown()
@@ -187,7 +187,7 @@ class NettyHttpServerSpec extends Specification {
         HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL(), config)
 
         HttpRequest request = HttpRequest.create(HttpMethod.GET, '/person/Fred')
-        HttpResponse response = Flux.from(client.exchange(request, String)).blockFirst()
+        HttpResponse response = client.toBlocking().exchange(request, String)
         then:
         response.body() == "Person Named Fred"
         response.header(HttpHeaders.CONNECTION) == 'keep-alive'
@@ -211,8 +211,8 @@ class NettyHttpServerSpec extends Specification {
         URL secureUrl = embeddedServer.getURL()
         HttpClient httpsClient = embeddedServer.applicationContext.createBean(HttpClient, secureUrl)
         HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, new URL("http://localhost:$httpPort"))
-        HttpResponse httpsResponse = Flux.from(httpsClient.exchange('/person/Fred', String)).blockFirst()
-        HttpResponse httpResponse = Flux.from(httpClient.exchange('/person/Fred', String)).blockFirst()
+        HttpResponse httpsResponse = httpsClient.toBlocking().exchange('/person/Fred', String)
+        HttpResponse httpResponse = httpClient.toBlocking().exchange('/person/Fred', String)
 
         then:
         httpsResponse.body() == "Person Named Fred"

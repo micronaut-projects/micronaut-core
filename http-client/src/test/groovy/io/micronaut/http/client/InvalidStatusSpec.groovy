@@ -25,7 +25,7 @@ class InvalidStatusSpec extends Specification {
         StreamingHttpClient client = context.createBean(StreamingHttpClient, new URL("http://localhost:${wireMockServer.port()}"))
 
         when:
-        Flux.from(client.exchange("/status-only", String)).blockFirst()
+        client.toBlocking().exchange("/status-only", String)
 
         then:
         def ex = thrown(IllegalArgumentException)

@@ -25,7 +25,6 @@ import spock.lang.Specification
 
 import java.time.Duration
 import java.time.temporal.ChronoUnit
-import java.util.concurrent.Flow
 import java.util.function.Consumer
 
 // Netty + HTTP/2 on JDKs less than 9 require tcnative setup
@@ -52,15 +51,14 @@ class Http2RequestSpec extends Specification {
         people == Http2Controller.people
 
         when:"posting a data"
-        def response = Flux.from(client.exchange(HttpRequest.POST("${server.URL}/http2/personStream", Http2Controller.people), Argument.listOf(Person)))
-                .blockFirst()
+        def response = client.toBlocking().exchange(HttpRequest.POST("${server.URL}/http2/personStream", Http2Controller.people), Argument.listOf(Person))
+
 
         then:"The response is correct"
         response.body() == Http2Controller.people
 
         when:"posting a data again"
-        response = Flux.from(client.exchange(HttpRequest.POST("${server.URL}/http2/personStream", Http2Controller.people), Argument.listOf(Person)))
-                .blockFirst()
+        response = client.toBlocking().exchange(HttpRequest.POST("${server.URL}/http2/personStream", Http2Controller.people), Argument.listOf(Person))
 
         then:"The response is correct"
         response.body() == Http2Controller.people
@@ -81,20 +79,19 @@ class Http2RequestSpec extends Specification {
 
     void "test make HTTP/2 request - HTTPS"() {
         when:
-        def result = Flux.from(client.retrieve("${server.URL}/http2")).blockFirst()
+        def result = client.toBlocking().retrieve("${server.URL}/http2")
 
         then:
         result == 'Version: HTTP_2_0'
 
         when:"operation repeated to use same connection"
-        result = Flux.from(client.retrieve("${server.URL}/http2")).blockFirst()
+        result = client.toBlocking().retrieve("${server.URL}/http2")
 
         then:
         result == 'Version: HTTP_2_0'
 
         when:"A non stream request is executed"
-        List<Person> people = Flux.from(client.retrieve(HttpRequest.GET("${server.URL}/http2/personStream"), Argument.listOf(Person)))
-                .blockFirst()
+        List<Person> people = client.toBlocking().retrieve(HttpRequest.GET("${server.URL}/http2/personStream"), Argument.listOf(Person))
 
         then:
         people == Http2Controller.people
@@ -112,28 +109,26 @@ class Http2RequestSpec extends Specification {
         HttpClient client = server.getApplicationContext().getBean(HttpClient)
 
         when:
-        def result = Flux.from(client.retrieve("${server.URL}/http2")).blockFirst()
+        def result = client.toBlocking().retrieve("${server.URL}/http2")
 
         then:
         result == 'Version: HTTP_2_0'
 
         when:"operation repeated to use same connection"
-        result = Flux.from(client.retrieve("${server.URL}/http2")).blockFirst()
+        result = client.toBlocking().retrieve("${server.URL}/http2")
 
         then:
         result == 'Version: HTTP_2_0'
 
         when:"A post request is performed"
-        def response = Flux.from(client.exchange(HttpRequest.POST("${server.URL}/http2", "test").contentType(MediaType.TEXT_PLAIN), String.class))
-                .blockFirst()
+        def response = client.toBlocking().exchange(HttpRequest.POST("${server.URL}/http2", "test").contentType(MediaType.TEXT_PLAIN), String.class)
 
         then:
         response.status() == HttpStatus.OK
         response.body() == 'Version: HTTP_2_0 test'
 
         when:"A post request is performed again"
-        response = Flux.from(client.exchange(HttpRequest.POST("${server.URL}/http2", "test").contentType(MediaType.TEXT_PLAIN), String.class))
-                .blockFirst()
+        response = client.toBlocking().exchange(HttpRequest.POST("${server.URL}/http2", "test").contentType(MediaType.TEXT_PLAIN), String.class)
 
         then:
         response.status() == HttpStatus.OK
@@ -155,7 +150,7 @@ class Http2RequestSpec extends Specification {
                 "micronaut.server.netty.log-level" : "TRACE"
         ])
         HttpClient client = server.getApplicationContext().getBean(HttpClient)
-        def result = Flux.from(client.retrieve("${server.URL}/http2")).blockFirst()
+        def result = client.toBlocking().retrieve("${server.URL}/http2")
 
         expect:
         result == 'Version: HTTP_1_1'
@@ -167,7 +162,6 @@ class Http2RequestSpec extends Specification {
 
     @Controller("/http2")
     static class Http2Controller {
-
 
         public static final List<Person> people = [new Person("Fred", "Flinstone"), new Person("Barney", "Rubble")]
 

@@ -83,8 +83,8 @@ class ReadTimeoutSpec extends Specification {
         HttpClient client = clientContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:"Another request is made"
-        def result = Flux.from(client.retrieve(HttpRequest.GET('/timeout/success'), String)).blockFirst()
-        def result2 = Flux.from(client.retrieve(HttpRequest.GET('/timeout/success'), String)).blockFirst()
+        def result = client.toBlocking().retrieve(HttpRequest.GET('/timeout/success'), String)
+        def result2 = client.toBlocking().retrieve(HttpRequest.GET('/timeout/success'), String)
 
         then:"Ensure the read timeout was reset in the connection in the pool"
         result == result2
@@ -93,7 +93,7 @@ class ReadTimeoutSpec extends Specification {
         AtomicInteger integer = new AtomicInteger(0)
         def results = (1..50).collect() { // larger than available connections
             CompletableFuture.supplyAsync({->
-                Flux.from(client.retrieve(HttpRequest.GET('/timeout/success/' + integer.incrementAndGet()), String)).blockFirst()
+                client.toBlocking().retrieve(HttpRequest.GET('/timeout/success/' + integer.incrementAndGet()), String)
             })
 
         }.collect({ it.get()})
@@ -119,8 +119,8 @@ class ReadTimeoutSpec extends Specification {
         HttpClient client = clientContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:"Another request is made"
-        def result = Flux.from(client.retrieve(HttpRequest.GET('/timeout/success'), String)).blockFirst()
-        def result2 = Flux.from(client.retrieve(HttpRequest.GET('/timeout/success'), String)).blockFirst()
+        def result = client.toBlocking().retrieve(HttpRequest.GET('/timeout/success'), String)
+        def result2 = client.toBlocking().retrieve(HttpRequest.GET('/timeout/success'), String)
 
         then:"Ensure the read timeout was reset in the connection in the pool"
         result == result2
@@ -153,8 +153,8 @@ class ReadTimeoutSpec extends Specification {
         HttpClient client = clientContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:"Another request is made"
-        def result = Flux.from(client.retrieve(HttpRequest.GET('/timeout/success'), String)).blockFirst()
-        def result2 = Flux.from(client.retrieve(HttpRequest.GET('/timeout/success'), String)).blockFirst()
+        def result = client.toBlocking().retrieve(HttpRequest.GET('/timeout/success'), String)
+        def result2 = client.toBlocking().retrieve(HttpRequest.GET('/timeout/success'), String)
 
         then:"Ensure the read timeout was reset in the connection in the pool"
         result == result2
@@ -186,8 +186,8 @@ class ReadTimeoutSpec extends Specification {
 
         when:"Another request is made"
         def integer = new AtomicInteger()
-        def result = Flux.from(client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String)).blockFirst()
-        def result2 = Flux.from(client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String)).blockFirst()
+        def result = client.toBlocking().retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String)
+        def result2 = client.toBlocking().retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String)
 
         then:"Ensure the read timeout was reset in the connection in the pool"
         result == result2
@@ -219,8 +219,8 @@ class ReadTimeoutSpec extends Specification {
 
         when:"Another request is made"
         def integer = new AtomicInteger()
-        def result = Flux.from(client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String)).blockFirst()
-        def result2 = Flux.from(client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String)).blockFirst()
+        def result = client.toBlocking().retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String)
+        def result2 = client.toBlocking().retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String)
 
         then:"Ensure the read timeout was reset in the connection in the pool"
         result == result2
@@ -228,7 +228,7 @@ class ReadTimeoutSpec extends Specification {
         when:"issue a whole bunch of requests"
         def results = (1..25).collect() { // larger than available connections
             CompletableFuture.supplyAsync({->
-                Flux.from(client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String)).blockFirst()
+                client.toBlocking().retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String)
             })
 
         }.collect({ it.get()})
@@ -253,15 +253,15 @@ class ReadTimeoutSpec extends Specification {
         )
         HttpClient client = clientContext.createBean(HttpClient, embeddedServer.getURL())
         when:
-        Flux.from(client.retrieve(HttpRequest.GET('/timeout/client'), String)).blockFirst()
+        client.toBlocking().retrieve(HttpRequest.GET('/timeout/client'), String)
 
         then:
         def e = thrown(ReadTimeoutException)
         e.message == 'Read Timeout'
 
         when:"Another request is made"
-        def result = Flux.from(client.retrieve(HttpRequest.GET('/timeout/success'), String)).blockFirst()
-        def result2 = Flux.from(client.retrieve(HttpRequest.GET('/timeout/success'), String)).blockFirst()
+        def result = client.toBlocking().retrieve(HttpRequest.GET('/timeout/success'), String)
+        def result2 = client.toBlocking().retrieve(HttpRequest.GET('/timeout/success'), String)
 
         then:"Ensure the read timeout was reset in the connection in the pool"
         result == result2
@@ -326,7 +326,7 @@ class ReadTimeoutSpec extends Specification {
         def server = clientContext.getBean(EmbeddedServer).start()
         HttpClient client = clientContext.createBean(HttpClient, server.getURL())
         when:
-        def result = Flux.from(client.retrieve(HttpRequest.GET('/timeout/client'), String)).blockFirst()
+        def result = client.toBlocking().retrieve(HttpRequest.GET('/timeout/client'), String)
 
         then:
         result == 'success'

@@ -41,7 +41,7 @@ public class MessageEndpointSpec {
         map.put("spec.name", MessageEndpointSpec.class.getSimpleName());
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map);
         HttpClient rxClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
-        HttpResponse<String> response = Flux.from(rxClient.exchange("/message", String.class)).blockFirst();
+        HttpResponse<String> response = rxClient.toBlocking().exchange("/message", String.class);
 
         assertEquals(HttpStatus.OK.getCode(), response.code());
         assertEquals("default message", response.body());
@@ -65,7 +65,7 @@ public class MessageEndpointSpec {
         assertEquals("Message updated", response.body());
         assertEquals(MediaType.TEXT_PLAIN_TYPE, response.getContentType().get());
 
-        response = Flux.from(rxClient.exchange("/message", String.class)).blockFirst();
+        response = rxClient.toBlocking().exchange("/message", String.class);
 
         assertEquals("A new message", response.body());
 
@@ -79,13 +79,13 @@ public class MessageEndpointSpec {
         map.put("spec.name", MessageEndpointSpec.class.getSimpleName());
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map);
         HttpClient rxClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
-        HttpResponse<String> response = Flux.from(rxClient.exchange(HttpRequest.DELETE("/message"), String.class)).blockFirst();
+        HttpResponse<String> response = rxClient.toBlocking().exchange(HttpRequest.DELETE("/message"), String.class);
 
         assertEquals(HttpStatus.OK.getCode(), response.code());
         assertEquals("Message deleted", response.body());
 
         try {
-            Flux.from(rxClient.exchange("/message", String.class)).blockFirst();
+            rxClient.toBlocking().exchange("/message", String.class);
         } catch (HttpClientResponseException e) {
             assertEquals(404, e.getStatus().getCode());
         } catch (Exception e) {

@@ -1306,8 +1306,14 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                                           RouteMatch<?> routeMatch,
                                                                           Executor executor) {
 
-        Flux<MutableHttpResponse<?>> reactiveSequence = Flux.create(emitter ->
-                emitRouteResponse(emitter, request, requestReference, routeMatch));
+        Flux<MutableHttpResponse<?>> reactiveSequence = Flux.create(emitter -> {
+            try {
+                ServerRequestContext.set(requestReference.get());
+                emitRouteResponse(emitter, request, requestReference, routeMatch);
+            } finally {
+                ServerRequestContext.set(null);
+            }
+        });
         if (executor != null) {
             reactiveSequence = reactiveSequence.subscribeOn(Schedulers.fromExecutor(executor));
         }

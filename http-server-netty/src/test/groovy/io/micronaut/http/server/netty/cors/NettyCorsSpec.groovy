@@ -32,7 +32,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
     void "test non cors request"() {
         when:
-        HttpResponse response = Flux.from(rxClient.exchange('/test')).blockFirst()
+        HttpResponse response = rxClient.toBlocking().exchange('/test')
         Set<String> headerNames = response.getHeaders().names()
 
         then:

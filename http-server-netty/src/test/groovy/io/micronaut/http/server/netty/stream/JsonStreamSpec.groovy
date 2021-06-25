@@ -88,7 +88,7 @@ class JsonStreamSpec extends Specification {
         StreamingHttpClient client = embeddedServer.applicationContext.createBean(StreamingHttpClient, embeddedServer.getURL())
 
         when:
-        List<Book> books = client.jsonStream(HttpRequest.GET("/json/stream/empty"), Book).collectList().block()
+        List<Book> books = Flux.from(client.jsonStream(HttpRequest.GET("/json/stream/empty"), Book)).collectList().block()
 
         then:
         books == []

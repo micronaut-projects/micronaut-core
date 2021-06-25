@@ -23,6 +23,7 @@ import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Operators;
+import reactor.util.context.Context;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -34,6 +35,11 @@ public final class JsonSubscriber implements CoreSubscriber<HttpContent> {
 
     public JsonSubscriber(CoreSubscriber<? super HttpContent> upstream) {
         this.upstream = upstream;
+    }
+
+    @Override
+    public Context currentContext() {
+        return upstream.currentContext();
     }
 
     @Override

@@ -38,7 +38,7 @@ public class GoogleAuthFilterSpec {
     @Test
     void testApplyGoogleAuthFilter() {
         HttpClientException e = Assertions.assertThrows(HttpClientException.class, () ->
-                Flux.from(client.exchange("/google-auth/api/test")).blockFirst()
+                client.toBlocking().exchange("/google-auth/api/test")
         );
         String message = e.getMessage();
         assertTrue(

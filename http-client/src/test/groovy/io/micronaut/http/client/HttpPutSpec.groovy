@@ -199,7 +199,7 @@ class HttpPutSpec extends Specification {
 
     void "test http put with empty body"() {
         when:
-        def res = Flux.from(client.exchange(HttpRequest.PUT('/put/emptyBody', null))).blockFirst();
+        def res = client.toBlocking().exchange(HttpRequest.PUT('/put/emptyBody', null));
 
         then:
         res.status == HttpStatus.NO_CONTENT

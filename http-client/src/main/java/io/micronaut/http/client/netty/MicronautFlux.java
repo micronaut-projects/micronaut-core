@@ -23,6 +23,8 @@ import reactor.core.CoreSubscriber;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxOperator;
 import reactor.core.publisher.Operators;
+import reactor.util.context.Context;
+
 import java.util.function.Consumer;
 
 
@@ -41,9 +43,9 @@ class MicronautFlux<T> extends Flux<T> {
      *
      * @param publisher Reactive Sequence
      */
-    MicronautFlux(Publisher<T> publisher) {
+    MicronautFlux(Flux<T> publisher) {
         super();
-        this.flux = Flux.from(publisher);
+        this.flux = publisher;
     }
 
     @Override
@@ -78,47 +80,29 @@ class MicronautFlux<T> extends Flux<T> {
         @Override
         public void subscribe(CoreSubscriber<? super T> actual) {
             source.subscribe(new CoreSubscriber<T>() {
-                private Subscription s;
-                private boolean done;
+                @Override
+                public Context currentContext() {
+                    return actual.currentContext();
+                }
 
                 @Override
                 public void onSubscribe(Subscription s) {
-                    this.s = s;
                     actual.onSubscribe(s);
                 }
 
                 @Override
                 public void onNext(T t) {
-                    if (done) {
-                        Operators.onNextDropped(t, actual.currentContext());
-                        return;
-                    }
-
                     actual.onNext(t);
-
-                    try {
-                        afterNext.accept(t);
-                    } catch (Throwable e) {
-                        Throwable throwable = Operators.onNextError(t, e, actual.currentContext(), s);
-                        if (throwable == null) {
-                            s.request(1);
-                            return;
-                        } else {
-                            onError(throwable);
-                            return;
-                        }
-                    }
+                    afterNext.accept(t);
                 }
 
                 @Override
                 public void onError(Throwable t) {
-                    done = true;
                     actual.onError(t);
                 }
 
                 @Override
                 public void onComplete() {
-                    done = true;
                     actual.onComplete();
                 }
             });

@@ -159,9 +159,11 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.CoreSubscriber;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
+import reactor.core.publisher.Operators;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
@@ -735,8 +737,7 @@ public class DefaultHttpClient implements
 
     @Override
     public <I> Publisher<ByteBuffer<?>> dataStream(io.micronaut.http.HttpRequest<I> request) {
-        return new MicronautFlux<>(Flux.from(resolveRequestURI(request))
-                .flatMap(buildDataStreamPublisher(request)))
+        return new MicronautFlux<>(Flux.from(resolveRequestURI(request)).flatMap(buildDataStreamPublisher(request)))
                 .doAfterNext(buffer -> {
                     Object o = buffer.asNativeBuffer();
                     if (o instanceof ByteBuf) {
@@ -750,14 +751,13 @@ public class DefaultHttpClient implements
 
     @Override
     public <I> Publisher<io.micronaut.http.HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.HttpRequest<I> request) {
-        return new MicronautFlux<>(Flux.from(resolveRequestURI(request))
-                .flatMap(buildExchangeStreamPublisher(request)))
+        return new MicronautFlux<>(Flux.from(resolveRequestURI(request)).flatMap(buildExchangeStreamPublisher(request)))
                 .doAfterNext(byteBufferHttpResponse -> {
-            ByteBuffer<?> buffer = byteBufferHttpResponse.body();
-            if (buffer instanceof ReferenceCounted) {
-                ((ReferenceCounted) buffer).release();
-            }
-        });
+                    ByteBuffer<?> buffer = byteBufferHttpResponse.body();
+                    if (buffer instanceof ReferenceCounted) {
+                        ((ReferenceCounted) buffer).release();
+                    }
+                });
     }
 
     @Override

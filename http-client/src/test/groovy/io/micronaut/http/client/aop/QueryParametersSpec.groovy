@@ -135,24 +135,24 @@ class QueryParametersSpec extends Specification {
         expect:
         client.searchDefault("Riverside").albums.size() == 2
         client.searchDefault(null).albums.size() == 1
-        Flux.from(lowLevelClient.retrieve(HttpRequest.GET('/itunes/search-default'), SearchResult)).blockFirst().albums.size() == 1
+        lowLevelClient.toBlocking().retrieve(HttpRequest.GET('/itunes/search-default'), SearchResult).albums.size() == 1
 
         when:
-        Flux.from(lowLevelClient.retrieve(HttpRequest.GET('/itunes/search-exploded/list'), SearchResult)).blockFirst()
+        lowLevelClient.toBlocking().retrieve(HttpRequest.GET('/itunes/search-exploded/list'), SearchResult)
 
         then:
         def ex = thrown(HttpClientResponseException)
         ex.status == HttpStatus.NOT_FOUND // because null is returned
 
         when:
-        Flux.from(lowLevelClient.retrieve(HttpRequest.GET('/itunes/search-exploded/map'), SearchResult)).blockFirst()
+        lowLevelClient.toBlocking().retrieve(HttpRequest.GET('/itunes/search-exploded/map'), SearchResult)
 
         then:
         ex = thrown(HttpClientResponseException)
         ex.status == HttpStatus.NOT_FOUND // because null is returned
 
         when:
-        Flux.from(lowLevelClient.retrieve(HttpRequest.GET('/itunes/search-exploded/pojo'), SearchResult)).blockFirst()
+        lowLevelClient.toBlocking().retrieve(HttpRequest.GET('/itunes/search-exploded/pojo'), SearchResult)
 
         then:
         ex = thrown(HttpClientResponseException)

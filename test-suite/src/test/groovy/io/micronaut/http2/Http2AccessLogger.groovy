@@ -82,14 +82,14 @@ class Http2AccessLoggerSpec extends Specification {
     void "test make HTTP/2 request with access logger enabled - HTTPS"() {
         when:
         appender.events.clear()
-        def result = Flux.from(client.retrieve("${server.URL}/http2")).blockFirst()
+        def result = client.toBlocking().retrieve("${server.URL}/http2")
 
         then:
         result == 'Version: HTTP_2_0'
         appender.headLog(10)
 
         when:"operation repeated to use same connection"
-        result = Flux.from(client.retrieve("${server.URL}/http2")).blockFirst()
+        result = client.toBlocking().retrieve("${server.URL}/http2")
 
         then:
         result == 'Version: HTTP_2_0'
@@ -117,14 +117,14 @@ class Http2AccessLoggerSpec extends Specification {
         appender.events.clear()
 
         when:
-        String result = Flux.from(client.retrieve("${server.URL}/http2")).blockFirst()
+        String result = client.toBlocking().retrieve("${server.URL}/http2")
 
         then:
         result == 'Version: HTTP_2_0'
         appender.headLog(10)
 
         when:"operation repeated to use same connection"
-        result = Flux.from(client.retrieve("${server.URL}/http2")).blockFirst()
+        result = client.toBlocking().retrieve("${server.URL}/http2")
 
         then:
         result == 'Version: HTTP_2_0'
@@ -147,7 +147,7 @@ class Http2AccessLoggerSpec extends Specification {
         ])
         HttpClient client = server.getApplicationContext().getBean(HttpClient)
         appender.events.clear()
-        String result = Flux.from(client.retrieve("${server.URL}/http2")).blockFirst()
+        String result = client.toBlocking().retrieve("${server.URL}/http2")
 
         expect:
         result == 'Version: HTTP_1_1'

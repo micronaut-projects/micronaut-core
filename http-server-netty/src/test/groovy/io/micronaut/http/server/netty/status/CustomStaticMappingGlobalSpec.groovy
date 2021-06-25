@@ -32,7 +32,7 @@ class CustomStaticMappingGlobalSpec extends AbstractMicronautSpec {
 
     void "test that a bad request is handled is handled by a globally marked controller method"() {
         when:
-        Flux.from(rxClient.exchange('/test1/bad')).blockFirst()
+        rxClient.toBlocking().exchange('/test1/bad')
 
         then:
         HttpClientResponseException e = thrown()
@@ -40,7 +40,7 @@ class CustomStaticMappingGlobalSpec extends AbstractMicronautSpec {
         e.response.reason() == "You sent me bad stuff - from Test2Controller.badHandler()"
 
         when:
-        Flux.from(rxClient.exchange('/test2/bad')).blockFirst()
+        rxClient.toBlocking().exchange('/test2/bad')
 
         then:
         e = thrown(HttpClientResponseException)

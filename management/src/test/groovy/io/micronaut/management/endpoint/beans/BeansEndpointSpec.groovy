@@ -36,7 +36,7 @@ class BeansEndpointSpec extends Specification {
         HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        HttpResponse<Map> response = Flux.from(rxClient.exchange("/beans", Map)).blockFirst()
+        HttpResponse<Map> response = rxClient.toBlocking().exchange("/beans", Map)
         Map result = response.body()
         Map<String, Map<String, Object>> beans = result.beans
 
