@@ -1,5 +1,9 @@
 dependencies {
     annotationProcessor project(":inject-java")
-    api dependencyVersion("rxjava2")
+    api project(":rxjava2")
     implementation project(":http-server-netty")
+
+    testAnnotationProcessor project(":inject-java")
+    testImplementation project(":http-client")
+    testImplementation dependencyModuleVersion("groovy", "groovy-json")
 }

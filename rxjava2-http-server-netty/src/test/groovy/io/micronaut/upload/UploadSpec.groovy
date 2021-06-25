@@ -24,8 +24,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
-import reactor.core.publisher.Flux
-import spock.lang.Ignore
+import io.reactivex.Flowable
 import spock.lang.IgnoreIf
 import spock.lang.Retry
 
@@ -49,13 +48,13 @@ class UploadSpec extends AbstractMicronautSpec {
                 .build()
 
         when:
-        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/receive-json", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        HttpResponse<String> response = flowable.blockFirst()
+        HttpResponse<String> response = flowable.blockingFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -71,13 +70,13 @@ class UploadSpec extends AbstractMicronautSpec {
                 .build()
 
         when:
-        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/receive-json", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        HttpResponse<String> response = flowable.blockFirst()
+        HttpResponse<String> response = flowable.blockingFirst()
 
         then: "the second file is ignored"
         response.code() == HttpStatus.OK.code
@@ -92,14 +91,14 @@ class UploadSpec extends AbstractMicronautSpec {
                 .build()
 
         when:
-        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/receive-json", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN),
                 String
         ))
 
-        flowable.blockFirst()
+        flowable.blockingFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -123,13 +122,13 @@ class UploadSpec extends AbstractMicronautSpec {
                 .build()
 
         when:
-        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/receive-plain", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        HttpResponse<String> response = flowable.blockFirst()
+        HttpResponse<String> response = flowable.blockingFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -144,13 +143,13 @@ class UploadSpec extends AbstractMicronautSpec {
                 .build()
 
         when:
-        Flux<HttpResponse> flowable = Flux.from(client.exchange(
+        Flowable<HttpResponse> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/receive-plain", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        def resp = flowable.blockFirst()
+        def resp = flowable.blockingFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -171,13 +170,13 @@ class UploadSpec extends AbstractMicronautSpec {
                 .build()
 
         when:
-        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/receive-plain", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        flowable.blockFirst()
+        flowable.blockingFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -197,13 +196,13 @@ class UploadSpec extends AbstractMicronautSpec {
                 .build()
 
         when:
-        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/receive-plain", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        flowable.blockFirst()
+        flowable.blockingFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -223,13 +222,13 @@ class UploadSpec extends AbstractMicronautSpec {
                 .build()
 
         when:
-        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/receive-plain", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        flowable.blockFirst()
+        flowable.blockingFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -250,13 +249,13 @@ class UploadSpec extends AbstractMicronautSpec {
                 .build()
 
         when:
-        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/receive-bytes", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        HttpResponse<String> response = flowable.blockFirst()
+        HttpResponse<String> response = flowable.blockingFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -272,13 +271,13 @@ class UploadSpec extends AbstractMicronautSpec {
                 .build()
 
         when:
-        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/receive-plain", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        flowable.blockFirst()
+        flowable.blockingFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -301,13 +300,13 @@ class UploadSpec extends AbstractMicronautSpec {
 
 
         when:
-        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/receive-completed-file-upload", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        HttpResponse<String> response = flowable.blockFirst()
+        HttpResponse<String> response = flowable.blockingFirst()
         def result = response.getBody().get()
 
         then:
@@ -323,21 +322,17 @@ class UploadSpec extends AbstractMicronautSpec {
                 .build()
 
         when:
-        HttpResponse<?> response = Flux.from(client.exchange(
+        Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/receive-multipart-body-as-single", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 Argument.STRING,
                 Argument.mapOf(String, Object)
-        )).onErrorResume(t -> {
-            if (t instanceof HttpClientResponseException) {
-                return Flux.just(((HttpClientResponseException) t).response)
-            }
-            throw t
-        }).blockFirst()
+        )).blockingFirst()
 
         then:
-        response.status() == HttpStatus.OK
-        response.getBody(Map).get().message == "Internal Server Error: The bytes have already been released"
+        def ex = thrown(HttpClientResponseException)
+        ex.response.status() == HttpStatus.INTERNAL_SERVER_ERROR
+        ex.response.getBody(Map).get().message == "Internal Server Error: The bytes have already been released"
     }
 }
