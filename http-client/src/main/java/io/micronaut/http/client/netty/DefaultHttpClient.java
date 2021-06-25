@@ -84,10 +84,10 @@ import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
-import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.netty.stream.DefaultHttp2Content;
 import io.micronaut.http.netty.stream.Http2Content;
 import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
+import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
@@ -162,7 +162,6 @@ import org.slf4j.LoggerFactory;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
-import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
@@ -736,18 +735,29 @@ public class DefaultHttpClient implements
 
     @Override
     public <I> Publisher<ByteBuffer<?>> dataStream(io.micronaut.http.HttpRequest<I> request) {
-        DoAfterNextConsumer<ByteBuffer<?>> doOnEachConsumer = new DoAfterNextConsumer<>(ByteBufferUtils::safeRelease);
-        return Flux.from(resolveRequestURI(request))
-                .flatMap(buildDataStreamPublisher(request))
-                .doOnEach(doOnEachConsumer);
+        return new MicronautFlux<>(Flux.from(resolveRequestURI(request))
+                .flatMap(buildDataStreamPublisher(request)))
+                .doAfterNext(buffer -> {
+                    Object o = buffer.asNativeBuffer();
+                    if (o instanceof ByteBuf) {
+                        ByteBuf byteBuf = (ByteBuf) o;
+                        if (byteBuf.refCnt() > 0) {
+                            ReferenceCountUtil.safeRelease(byteBuf);
+                        }
+                    }
+                });
     }
 
     @Override
     public <I> Publisher<io.micronaut.http.HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.HttpRequest<I> request) {
-        DoAfterNextConsumer<HttpResponse<ByteBuffer<?>>> doOnEachConsumer = new DoAfterNextConsumer<>(ByteBufferUtils::release);
-        return Flux.from(resolveRequestURI(request))
-                .flatMap(buildExchangeStreamPublisher(request))
-                .doOnEach(doOnEachConsumer);
+        return new MicronautFlux<>(Flux.from(resolveRequestURI(request))
+                .flatMap(buildExchangeStreamPublisher(request)))
+                .doAfterNext(byteBufferHttpResponse -> {
+            ByteBuffer<?> buffer = byteBufferHttpResponse.body();
+            if (buffer instanceof ReferenceCounted) {
+                ((ReferenceCounted) buffer).release();
+            }
+        });
     }
 
     @Override
@@ -1609,24 +1619,7 @@ public class DefaultHttpClient implements
                         });
 
                         if (!isSingle && MediaType.APPLICATION_JSON_TYPE.equals(requestContentType)) {
-                            requestBodyPublisher = requestBodyPublisher.map(new Function<HttpContent, HttpContent>() {
-                                boolean first = true;
-
-                                @Override
-                                public HttpContent apply(HttpContent httpContent) {
-                                    if (!first) {
-                                        return HttpContentUtil.prefixComma(httpContent);
-                                    } else {
-                                        first = false;
-                                        return httpContent;
-                                    }
-                                }
-                            });
-                            requestBodyPublisher = Flux.concat(
-                                    Mono.fromCallable(HttpContentUtil::openBracket),
-                                    requestBodyPublisher,
-                                    Mono.fromCallable(HttpContentUtil::closeBracket)
-                            );
+                           requestBodyPublisher = JsonSubscriber.lift(requestBodyPublisher);
                         }
 
                         requestBodyPublisher = requestBodyPublisher.doOnError(onError);

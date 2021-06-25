@@ -98,7 +98,7 @@ class StreamSpec extends Specification {
         Flux<ByteBuffer> reactiveSequence = myClient.echoAsByteBuffers(n, "Hello, World!")
         int sum = 0
         CountDownLatch latch = new CountDownLatch(1)
-        reactiveSequence.doOnTerminate { latch.countDown() }.toStream().forEach(bytes -> {
+        reactiveSequence.doOnTerminate { latch.countDown() }.subscribe(bytes -> {
             sum += bytes.toByteArray().count('!')
         })
         latch.await()

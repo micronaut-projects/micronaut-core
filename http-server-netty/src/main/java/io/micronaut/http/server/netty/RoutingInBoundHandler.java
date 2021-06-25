@@ -53,7 +53,7 @@ import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.netty.content.HttpContentUtil;
+import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
@@ -1211,7 +1211,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     NettyByteBufferFactory byteBufferFactory = new NettyByteBufferFactory(context.alloc());
 
                                     Publisher<HttpContent> httpContentPublisher = Publishers.map(bodyPublisher, new Function<Object, HttpContent>() {
-                                        boolean first = true;
 
                                         @Override
                                         public HttpContent apply(Object message) {
@@ -1241,23 +1240,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                 ByteBuffer<ByteBuf> encoded = codec.encode(message, byteBufferFactory);
                                                 httpContent = new DefaultHttpContent(encoded.asNativeBuffer());
                                             }
-                                            if (!isJson || first) {
-                                                first = false;
-                                                if (isJson) {
-                                                    return HttpContentUtil.prefixOpenBracket(httpContent);
-                                                } else {
-                                                    return httpContent;
-                                                }
-                                            } else {
-                                                return HttpContentUtil.prefixComma(httpContent);
-                                            }
+                                            return httpContent;
                                         }
                                     });
 
                                     if (isJson) {
                                         // if the Publisher is returning JSON then in order for it to be valid JSON for each emitted element
                                         // we must wrap the JSON in array and delimit the emitted items
-                                        httpContentPublisher = addTrailingBracket(httpContentPublisher);
+
+                                        httpContentPublisher = JsonSubscriber.lift(httpContentPublisher);
                                     }
 
                                     httpContentPublisher = Publishers.then(httpContentPublisher, httpContent ->
@@ -1276,13 +1267,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     }
                     return Publishers.just(message);
                 });
-    }
-
-    private static Publisher<HttpContent> addTrailingBracket(Publisher<HttpContent> reactiveSequence) {
-        return Flux.concat(
-                Flux.from(reactiveSequence)
-                        .switchIfEmpty(Mono.just(HttpContentUtil.openBracket())),
-                Flux.just(HttpContentUtil.closeBracket()));
     }
 
     private Flux<MutableHttpResponse<?>> buildResultEmitter(
@@ -1322,14 +1306,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                                           RouteMatch<?> routeMatch,
                                                                           Executor executor) {
 
-        Flux<MutableHttpResponse<?>> reactiveSequence = Flux.create(emitter -> {
-            try {
-                ServerRequestContext.set(requestReference.get());
-                emitRouteResponse(emitter, request, requestReference, routeMatch);
-            } finally {
-                ServerRequestContext.set(null);
-            }
-        });
+        Flux<MutableHttpResponse<?>> reactiveSequence = Flux.create(emitter ->
+                emitRouteResponse(emitter, request, requestReference, routeMatch));
         if (executor != null) {
             reactiveSequence = reactiveSequence.subscribeOn(Schedulers.fromExecutor(executor));
         }
