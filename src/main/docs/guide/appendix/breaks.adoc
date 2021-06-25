@@ -21,7 +21,7 @@ The following table summarizes the core Micronaut annotations and which ones are
 [width="80%",frame="topbot",options="header"]
 |======================
 |Annotation |Inherited
-|ann:aop.Adapter[]                                                    | ❌
+|ann:aop.Adapter[]                                                    | ✅
 |ann:aop.Around[]                                                     | ❌
 |ann:aop.AroundConstruct[]                                            | ❌
 |ann:aop.InterceptorBean[]                                            | ❌
@@ -131,7 +131,7 @@ The following table summarizes the core Micronaut annotations and which ones are
 |ann:scheduling.annotation.ExecuteOn[]                                | ❌
 |ann:scheduling.annotation.Scheduled[]                                | ❌
 |ann:session.annotation.SessionValue[]                                | ✅
-|ann:tracing.annotation.ContinueSpain[]                               | ✅
+|ann:tracing.annotation.ContinueSpan[]                                | ✅
 |ann:tracing.annotation.NewSpan[]                                     | ✅
 |ann:tracing.annotation.SpanTag[]                                     | ✅
 |ann:validation.Validated[]                                           | ✅
