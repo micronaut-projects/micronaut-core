@@ -293,6 +293,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         return targetElement.annotate(Property.class, (builder) -> builder.member("name", propertyMetadata.getPath())).getAnnotationMetadata();
     }
 
+    private boolean isDeclaredBeanInMetadata(AnnotationMetadata concreteClassMetadata) {
+        return concreteClassMetadata.hasDeclaredStereotype(Bean.class) ||
+                concreteClassMetadata.hasStereotype(AnnotationUtil.SCOPE) ||
+                concreteClassMetadata.hasStereotype(DefaultScope.class);
+    }
+
     /**
      * Annotation Bean element visitor.
      */
@@ -2048,12 +2054,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             return shouldExclude(configurationMetadata.getIncludes(), configurationMetadata.getExcludes(), propertyName);
         }
 
-    }
-
-    private boolean isDeclaredBeanInMetadata(AnnotationMetadata concreteClassMetadata) {
-        return concreteClassMetadata.hasDeclaredStereotype(Bean.class) ||
-                concreteClassMetadata.hasStereotype(AnnotationUtil.SCOPE) ||
-                concreteClassMetadata.hasStereotype(DefaultScope.class);
     }
 
     /**

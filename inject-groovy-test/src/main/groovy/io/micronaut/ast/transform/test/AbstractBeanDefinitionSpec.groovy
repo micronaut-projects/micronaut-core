@@ -19,7 +19,6 @@ import groovy.transform.CompileStatic
 import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
-import io.micronaut.ast.groovy.visitor.GroovyClassElement
 import io.micronaut.ast.groovy.visitor.GroovyElementFactory
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.context.ApplicationContext
@@ -34,7 +33,6 @@ import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.Parameter
-import org.codehaus.groovy.ast.builder.AstBuilder
 import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
 import io.micronaut.core.annotation.AnnotationMetadata
@@ -62,8 +60,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
      * @return The class element
      */
     ClassElement buildClassElement(String source) {
-        def builder = new AstBuilder()
-        ASTNode[] nodes = builder.buildFromString(source)
+        def nodes = new MicronautAstBuilder().compile(source)
         def lastNode = nodes ? nodes[-1] : null
         ClassNode cn = lastNode instanceof ClassNode ? lastNode : null
         if (cn != null) {
@@ -79,8 +76,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
     }
 
     ClassElement buildClassElement(String className, String source) {
-        def builder = new AstBuilder()
-        ASTNode[] nodes = builder.buildFromString(source)
+        ASTNode[] nodes = new MicronautAstBuilder().compile(source)
         for (ASTNode node: nodes) {
             if (node instanceof ClassNode) {
                 if (node.getName() == className) {
@@ -162,7 +158,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
     }
 
     AnnotationMetadata buildTypeAnnotationMetadata(String cls, String source) {
-        ASTNode[] nodes = new AstBuilder().buildFromString(source)
+        ASTNode[] nodes = new MicronautAstBuilder().compile(source)
 
         ClassNode element = nodes ? nodes.find { it instanceof ClassNode && it.name == cls } : null
         def sourceUnit = Mock(SourceUnit)
@@ -192,7 +188,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
     }
 
     ClassNode buildClassNode(String source, String cls) {
-        ASTNode[] nodes = new AstBuilder().buildFromString(source)
+        ASTNode[] nodes = new MicronautAstBuilder().compile(source)
 
         ClassNode element = nodes ? nodes.find { it instanceof ClassNode && it.name == cls } : null
         return element
