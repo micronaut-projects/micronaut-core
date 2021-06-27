@@ -35,6 +35,7 @@ public class HttpContentUtil {
     public static final byte[] OPEN_BRACKET = "[".getBytes(StandardCharsets.UTF_8);
     public static final byte[] CLOSE_BRACKET = "]".getBytes(StandardCharsets.UTF_8);
     public static final byte[] COMMA = ",".getBytes(StandardCharsets.UTF_8);
+
     /**
      * @return Produces HTTP content for {@code ]}
      */

@@ -17,7 +17,6 @@ package io.micronaut.context.scope;
 
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.core.annotation.Indexed;
-import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 
 import java.lang.annotation.Annotation;
@@ -58,7 +57,7 @@ public interface CustomScope<A extends Annotation> {
     <T> Optional<T> remove(BeanIdentifier identifier);
 
     /**
-     * Get the {@link BeanDefinition} for the given bean.
+     * Get the {@link io.micronaut.inject.BeanDefinition} for the given bean.
      *
      * @param bean The bean
      * @param <T> The bean generic type
