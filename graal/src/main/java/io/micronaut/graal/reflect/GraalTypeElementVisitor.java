@@ -69,13 +69,6 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
     private static final TypeHint.AccessType[] DEFAULT_ACCESS_TYPE = {TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS};
     private static final String REFLECTION_CONFIG_JSON = "reflect-config.json";
-    private static final String BASE_RESOURCE_CONFIG_JSON = "src/main/graal/resource-config.json";
-    private static final String RESOURCE_CONFIG_JSON = "resource-config.json";
-    private static final String RESOURCES_DIR = "src/main/resources";
-    private static final String RESOURCES = "resources";
-    private static final String PATTERN = "pattern";
-    private static final String META_INF = "META-INF";
-    private static final List<String> EXCLUDED_META_INF_DIRECTORIES = Arrays.asList("native-image", "services");
 
     private static final String BASE_REFLECT_JSON = "src/main/graal/reflect.json";
 
@@ -217,11 +210,8 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
         // Execute only once and never for subclasses
         if (!executed && !isSubclass) {
-
             executed = true;
-
             generateNativeImageProperties(visitorContext);
-            generateResourceConfig(visitorContext);
         }
     }
 
@@ -253,7 +243,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         try {
             String path = buildNativeImagePath(visitorContext);
             String reflectFile = path + REFLECTION_CONFIG_JSON;
-            final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(reflectFile);
+            final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(reflectFile, Element.EMPTY_ELEMENT_ARRAY);
             generatedFile.ifPresent(gf -> {
                 for (Map<String, Object> value : classes.values()) {
                     json.add(value);
@@ -279,104 +269,6 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
             classes.clear();
             arrays.clear();
         }
-    }
-
-    private void generateResourceConfig(VisitorContext visitorContext) {
-        ObjectWriter writer = MAPPER.writer(new DefaultPrettyPrinter());
-        Map json;
-
-        Optional<Path> projectDir = visitorContext.getProjectDir();
-
-        if (projectDir.isPresent()) {
-            File f = Paths.get(projectDir.get().toString(), BASE_RESOURCE_CONFIG_JSON).toFile();
-            if (f.exists()) {
-                try {
-                    json = MAPPER.readValue(f, new TypeReference<Map>() {
-                    });
-                } catch (Throwable e) {
-                    visitorContext.fail("Error parsing base resource-config.json: " + BASE_RESOURCE_CONFIG_JSON, null);
-                    return;
-                }
-            } else {
-                json = new HashMap();
-            }
-
-            try {
-                Set<String> resourceFiles = findResourceFiles(Paths.get(projectDir.get().toString(), RESOURCES_DIR).toFile(), new ArrayList<>());
-
-                if (!resourceFiles.isEmpty()) {
-                    String path = buildNativeImagePath(visitorContext);
-                    String resourcesFile = path + RESOURCE_CONFIG_JSON;
-
-                    final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(resourcesFile);
-                    generatedFile.ifPresent(gf -> {
-                        resourceFiles.addAll(visitorContext.getGeneratedResources());
-
-                        List<Map> resourceList = resourceFiles.stream()
-                                .map(this::mapToGraalResource)
-                                .collect(Collectors.toList());
-
-                        // add any existing resource defined by the user in it's own file in src/main/graal
-                        resourceList.addAll((List) json.getOrDefault(RESOURCES, Collections.EMPTY_LIST));
-
-                        json.put(RESOURCES, resourceList);
-
-                        try (Writer w = gf.openWriter()) {
-                            visitorContext.info("Writing " + RESOURCE_CONFIG_JSON + " file to destination: " + gf.getName());
-                            writer.writeValue(w, json);
-                        } catch (IOException e) {
-                            visitorContext.fail("Error writing " + RESOURCE_CONFIG_JSON + ": " + e.getMessage(), null);
-                        }
-                    });
-                }
-            } catch (Exception e) {
-                // skip processing resources
-                visitorContext.fail("There was an error generating " + RESOURCE_CONFIG_JSON + ": " + e.getMessage(), null);
-            }
-        }
-    }
-
-    private Map mapToGraalResource(String resourceName) {
-        return resourceName.contains("*") ?
-                CollectionUtils.mapOf(PATTERN, resourceName) :
-                CollectionUtils.mapOf(PATTERN, "\\Q" + resourceName + "\\E");
-    }
-
-    private Set<String> findResourceFiles(File folder, List<String> filePath) {
-        Set<String> resourceFiles = new HashSet<>();
-
-        if (filePath == null) {
-            filePath = new ArrayList<>();
-        }
-
-        if (folder.exists()) {
-            File[] files = folder.listFiles();
-
-            if (files != null) {
-                boolean isMetaInfDirectory = folder.getName().equals(META_INF);
-
-                for (File element : files) {
-                    boolean isExcludedDirectory = EXCLUDED_META_INF_DIRECTORIES.contains(element.getName());
-                    // Exclude some directories in 'META-INF' like 'native-image' and 'services' but process other
-                    // 'META-INF' files and directories, for example, to include swagger-ui.
-                    if (!isMetaInfDirectory || !isExcludedDirectory) {
-                        if (element.isDirectory()) {
-                            List<String> paths = new ArrayList<>(filePath);
-                            paths.add(element.getName());
-
-                            resourceFiles.addAll(findResourceFiles(element, paths));
-                        } else {
-                            String joinedDirectories = String.join("/", filePath);
-                            String elementName = joinedDirectories.isEmpty() ? element.getName() : joinedDirectories + "/" + element.getName();
-
-                            resourceFiles.add(elementName);
-                        }
-                    }
-                }
-            }
-        }
-
-        return resourceFiles;
     }
 
     private String buildNativeImagePath(VisitorContext visitorContext) {

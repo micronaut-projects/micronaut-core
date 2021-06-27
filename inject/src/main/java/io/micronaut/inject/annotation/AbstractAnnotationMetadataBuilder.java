@@ -1797,7 +1797,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         return annotationName != null &&
                 (ANNOTATION_MAPPERS.containsKey(annotationName) ||
                         ANNOTATION_TRANSFORMERS.containsKey(annotationName) ||
-                        ANNOTATION_TRANSFORMERS.keySet().stream().anyMatch(pkg -> annotationName.startsWith(pkg)));
+                        ANNOTATION_TRANSFORMERS.keySet().stream().anyMatch(annotationName::startsWith));
     }
 
     /**

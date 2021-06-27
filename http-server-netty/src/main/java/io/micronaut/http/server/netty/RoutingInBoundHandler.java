@@ -53,8 +53,7 @@ import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.netty.content.HttpContentUtil;
-import io.micronaut.http.netty.stream.ArrayBracketSubscriber;
+import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
@@ -1205,52 +1204,45 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     Publisher<Object> bodyPublisher = applyExecutorToPublisher(Publishers.convertPublisher(body, Publisher.class), executor);
                                     NettyByteBufferFactory byteBufferFactory = new NettyByteBufferFactory(context.alloc());
 
-                                    Publisher<HttpContent> httpContentPublisher = Publishers.map(bodyPublisher, new Function<Object, HttpContent>() {
-                                        boolean first = true;
-
-                                        @Override
-                                        public HttpContent apply(Object message) {
-                                            HttpContent httpContent;
-                                            if (message instanceof ByteBuf) {
-                                                httpContent = new DefaultHttpContent((ByteBuf) message);
-                                            } else if (message instanceof ByteBuffer) {
-                                                ByteBuffer<?> byteBuffer = (ByteBuffer<?>) message;
-                                                Object nativeBuffer = byteBuffer.asNativeBuffer();
-                                                if (nativeBuffer instanceof ByteBuf) {
-                                                    httpContent = new DefaultHttpContent((ByteBuf) nativeBuffer);
-                                                } else {
-                                                    httpContent = new DefaultHttpContent(Unpooled.copiedBuffer(byteBuffer.asNioBuffer()));
-                                                }
-                                            } else if (message instanceof byte[]) {
-                                                httpContent = new DefaultHttpContent(Unpooled.copiedBuffer((byte[]) message));
-                                            } else if (message instanceof HttpContent) {
-                                                httpContent = (HttpContent) message;
+                                Publisher<HttpContent> httpContentPublisher = Publishers.map(bodyPublisher, new Function<Object, HttpContent>() {
+                                    @Override
+                                    public HttpContent apply(Object message) {
+                                        HttpContent httpContent;
+                                        if (message instanceof ByteBuf) {
+                                            httpContent = new DefaultHttpContent((ByteBuf) message);
+                                        } else if (message instanceof ByteBuffer) {
+                                            ByteBuffer<?> byteBuffer = (ByteBuffer<?>) message;
+                                            Object nativeBuffer = byteBuffer.asNativeBuffer();
+                                            if (nativeBuffer instanceof ByteBuf) {
+                                                httpContent = new DefaultHttpContent((ByteBuf) nativeBuffer);
                                             } else {
+                                                httpContent = new DefaultHttpContent(Unpooled.copiedBuffer(byteBuffer.asNioBuffer()));
+                                            }
+                                        } else if (message instanceof byte[]) {
+                                            httpContent = new DefaultHttpContent(Unpooled.copiedBuffer((byte[]) message));
+                                        } else if (message instanceof HttpContent) {
+                                            httpContent = (HttpContent) message;
+                                        } else {
 
                                                 MediaTypeCodec codec = mediaTypeCodecRegistry.findCodec(mediaType, message.getClass()).orElse(
                                                         new TextPlainCodec(serverConfiguration.getDefaultCharset()));
 
-                                                if (LOG.isTraceEnabled()) {
-                                                    LOG.trace("Encoding emitted response object [{}] using codec: {}", message, codec);
-                                                }
-                                                ByteBuffer<ByteBuf> encoded = codec.encode(message, byteBufferFactory);
-                                                httpContent = new DefaultHttpContent(encoded.asNativeBuffer());
+                                            if (LOG.isTraceEnabled()) {
+                                                LOG.trace("Encoding emitted response object [{}] using codec: {}", message, codec);
                                             }
-                                            if (!isJson || first) {
-                                                first = false;
-                                                return httpContent;
-                                            } else {
-                                                return HttpContentUtil.prefixComma(httpContent);
-                                            }
+                                            ByteBuffer<ByteBuf> encoded = codec.encode(message, byteBufferFactory);
+                                            httpContent = new DefaultHttpContent(encoded.asNativeBuffer());
                                         }
-                                    });
-
-                                    if (isJson) {
-                                        // if the Publisher is returning JSON then in order for it to be valid JSON for each emitted element
-                                        // we must wrap the JSON in array and delimit the emitted items
-                                        httpContentPublisher = Flowable.fromPublisher(httpContentPublisher)
-                                                .lift((FlowableOperator<HttpContent, HttpContent>) ArrayBracketSubscriber::new);
+                                        return httpContent;
                                     }
+                                });
+
+                                if (isJson) {
+                                    // if the Publisher is returning JSON then in order for it to be valid JSON for each emitted element
+                                    // we must wrap the JSON in array and delimit the emitted items
+                                    httpContentPublisher = Flowable.fromPublisher(httpContentPublisher)
+                                            .lift((FlowableOperator<HttpContent, HttpContent>) JsonSubscriber::new);
+                                }
 
                                     httpContentPublisher = Publishers.then(httpContentPublisher, httpContent ->
                                             // once an http content is written, read the next item if it is available

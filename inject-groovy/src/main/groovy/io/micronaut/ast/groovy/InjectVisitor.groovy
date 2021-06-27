@@ -1426,7 +1426,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         true,
                         false,
                         originatingElement,
-                        methodAnnotationMetadata,
+                        new AnnotationMetadataHierarchy(concreteClassAnnotationMetadata, methodAnnotationMetadata),
                         [elementFactory.newClassElement(typeToImplement, AnnotationMetadata.EMPTY_METADATA)] as ClassElement[],
                         groovyVisitorContext,
                         configurationMetadataBuilder,

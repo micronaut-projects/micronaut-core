@@ -1,3 +1,4 @@
+io.micronaut.visitors.CustomAnnMapper
 io.micronaut.aop.factory.mapped.TestConfigurationMapper
 io.micronaut.inject.annotation.CustomHeaderMapper
 io.micronaut.aop.introduction.ListenerAdviceMarkerMapper

@@ -174,7 +174,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             return;
                         }
                         if (element.getKind() == ENUM) {
-                            error(element, "Enum types cannot be defined as beans");
+                            final AnnotationMetadata am = annotationUtils.getAnnotationMetadata(element);
+                            if (isDeclaredBeanInMetadata(am)) {
+                                error(element, "Enum types cannot be defined as beans");
+                            }
                             return;
                         }
                         // skip Groovy code, handled by InjectTransform. Required for GroovyEclipse compiler
@@ -290,6 +293,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         return targetElement.annotate(Property.class, (builder) -> builder.member("name", propertyMetadata.getPath())).getAnnotationMetadata();
     }
 
+    private boolean isDeclaredBeanInMetadata(AnnotationMetadata concreteClassMetadata) {
+        return concreteClassMetadata.hasDeclaredStereotype(Bean.class) ||
+                concreteClassMetadata.hasStereotype(AnnotationUtil.SCOPE) ||
+                concreteClassMetadata.hasStereotype(DefaultScope.class);
+    }
+
     /**
      * Annotation Bean element visitor.
      */
@@ -351,10 +360,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         private boolean isDeclaredBean(@Nullable MethodElement constructor, boolean hasQualifier) {
+            final AnnotationMetadata concreteClassMetadata = this.concreteClassMetadata;
             return isExecutableType ||
-                    concreteClassElement.hasDeclaredStereotype(Bean.class) ||
-                    concreteClassMetadata.hasStereotype(AnnotationUtil.SCOPE) ||
-                    concreteClassMetadata.hasStereotype(DefaultScope.class) ||
+                    isDeclaredBeanInMetadata(concreteClassMetadata) ||
                     (constructor != null && constructor.hasStereotype(AnnotationUtil.INJECT)) || hasQualifier;
         }
 
@@ -1110,14 +1118,15 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             if (StringUtils.isNotEmpty(destroyMethodName)) {
                                 TypeElement destroyMethodDeclaringClass = (TypeElement) typeUtils.asElement(producedType);
                                 ClassElement destroyMethodDeclaringElement = elementFactory.newClassElement(destroyMethodDeclaringClass, AnnotationMetadata.EMPTY_METADATA);
-                                final Optional<ExecutableElement> destroyMethodRef = modelUtils.findAccessibleNoArgumentInstanceMethod(destroyMethodDeclaringClass, destroyMethodName);
-                                if (destroyMethodRef.isPresent()) {
-                                    ExecutableElement executableElement = destroyMethodRef.get();
-                                    MethodElement destroyMethodElement = elementFactory.newMethodElement(
-                                            declaringClassElement,
-                                            executableElement,
-                                            AnnotationMetadata.EMPTY_METADATA
-                                    );
+                                final Optional<MethodElement> destroyMethod = destroyMethodDeclaringElement.getEnclosedElement(
+                                        ElementQuery.ALL_METHODS
+                                                .onlyAccessible(concreteClassElement)
+                                                .onlyInstance()
+                                                .named((name) -> name.equals(destroyMethodName))
+                                                .filter((e) -> !e.hasParameters())
+                                );
+                                if (destroyMethod.isPresent()) {
+                                    MethodElement destroyMethodElement = destroyMethod.get();
                                     beanMethodWriter.visitPreDestroyMethod(
                                             destroyMethodDeclaringElement,
                                             destroyMethodElement,

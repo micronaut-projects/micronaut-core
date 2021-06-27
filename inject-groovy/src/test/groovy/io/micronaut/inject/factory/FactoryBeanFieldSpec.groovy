@@ -8,8 +8,8 @@ import spock.lang.Unroll
 class FactoryBeanFieldSpec extends AbstractBeanDefinitionSpec {
     void "test a factory bean can be supplied from a field"() {
         given:
-        ApplicationContext context = buildContext('test.TestFactory$TestField', '''\
-package test;
+        ApplicationContext context = buildContext('io.micronaut.inject.factory.TestFactory$TestField', '''\
+package io.micronaut.inject.factory;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import java.lang.annotation.Documented;
@@ -74,17 +74,17 @@ class TestConstructInterceptor implements ConstructorInterceptor<Object> {
 
         expect:
 
-        getBean(context, "test.Foo").name == 'one'
-        getBean(context, "test.Foo", Qualifiers.byName("two")).name == 'two'
-        getBean(context, "test.Foo", Qualifiers.byName("two")).is(
-                getBean(context, "test.Foo", Qualifiers.byName("two"))
+        getBean(context, "io.micronaut.inject.factory.Foo").name == 'one'
+        getBean(context, "io.micronaut.inject.factory.Foo", Qualifiers.byName("two")).name == 'two'
+        getBean(context, "io.micronaut.inject.factory.Foo", Qualifiers.byName("two")).is(
+                getBean(context, "io.micronaut.inject.factory.Foo", Qualifiers.byName("two"))
         )
-        getBean(context, "test.Foo", Qualifiers.byName("three")).is(
-                getBean(context, "test.Foo", Qualifiers.byName("three"))
+        getBean(context, "io.micronaut.inject.factory.Foo", Qualifiers.byName("three")).is(
+                getBean(context, "io.micronaut.inject.factory.Foo", Qualifiers.byName("three"))
         )
-        getBean(context, 'test.TestConstructInterceptor').invoked == false
-        getBean(context, "test.Foo", Qualifiers.byName("four")) // around construct
-        getBean(context, 'test.TestConstructInterceptor').invoked == true
+        getBean(context, 'io.micronaut.inject.factory.TestConstructInterceptor').invoked == false
+        getBean(context, "io.micronaut.inject.factory.Foo", Qualifiers.byName("four")) // around construct
+        getBean(context, 'io.micronaut.inject.factory.TestConstructInterceptor').invoked == true
 
         cleanup:
         context.close()

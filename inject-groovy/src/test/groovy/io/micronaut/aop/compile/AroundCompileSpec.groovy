@@ -312,7 +312,7 @@ import io.micronaut.http.annotation.*;
     void 'test byte[] return compile'() {
         given:
         ApplicationContext context = buildContext('''
-package test;
+package aroundctest1;
 
 import io.micronaut.aop.proxytarget.*;
 
@@ -324,7 +324,7 @@ class MyBean {
     };
 }
 ''')
-        def instance = getBean(context, 'test.MyBean')
+        def instance = getBean(context, 'aroundctest1.MyBean')
         expect:
         instance != null
 
@@ -334,8 +334,8 @@ class MyBean {
 
     void 'compile simple AOP advice'() {
         given:
-        BeanDefinition beanDefinition = buildInterceptedBeanDefinition('test.MyBean', '''
-package test;
+        BeanDefinition beanDefinition = buildInterceptedBeanDefinition('aroundctest2.MyBean', '''
+package aroundctest2;
 
 import io.micronaut.aop.interceptors.*;
 import io.micronaut.aop.simple.*;
@@ -348,8 +348,8 @@ class MyBean {
 }
 ''')
 
-        BeanDefinitionReference ref = buildInterceptedBeanDefinitionReference('test.MyBean', '''
-package test;
+        BeanDefinitionReference ref = buildInterceptedBeanDefinitionReference('aroundctest3.MyBean', '''
+package aroundctest3;
 
 import io.micronaut.aop.interceptors.*;
 import io.micronaut.aop.simple.*;
@@ -375,9 +375,9 @@ class MyBean {
         values[1].enumValue("kind", InterceptorKind).get() == InterceptorKind.AROUND
         beanDefinition != null
         beanDefinition instanceof AdvisedBeanType
-        beanDefinition.interceptedType.name == 'test.MyBean'
+        beanDefinition.interceptedType.name == 'aroundctest2.MyBean'
         ref in AdvisedBeanType
-        ref.interceptedType.name == 'test.MyBean'
+        ref.interceptedType.name == 'aroundctest3.MyBean'
     }
 
     void 'test multiple annotations on a single method'() {
@@ -577,8 +577,8 @@ class TestInterceptor implements Interceptor {
 
     void "test validated on class with generics"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.$BaseEntityServiceDefinition$Intercepted', """
-package test;
+        BeanDefinition beanDefinition = buildBeanDefinition('aroundctest4.$BaseEntityServiceDefinition$Intercepted', """
+package aroundctest4;
 
 @io.micronaut.validation.Validated
 class BaseEntityService<T extends BaseEntity> extends BaseService<T> {
@@ -598,7 +598,7 @@ interface IBeanValidator<T> {
         then:
         noExceptionThrown()
         beanDefinition != null
-        beanDefinition.getTypeArguments('test.BaseService')[0].type.name == 'test.BaseEntity'
+        beanDefinition.getTypeArguments('aroundctest4.BaseService')[0].type.name == 'aroundctest4.BaseEntity'
     }
 
     static class NamedTestAnnMapper implements NamedAnnotationMapper {

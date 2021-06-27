@@ -229,6 +229,16 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
     }
 
     @Override
+    public int code() {
+        return httpResponseStatus.code();
+    }
+
+    @Override
+    public String reason() {
+        return httpResponseStatus.reasonPhrase();
+    }
+
+    @Override
     public MutableHttpResponse<B> cookie(Cookie cookie) {
         if (cookie instanceof NettyCookie) {
             NettyCookie nettyCookie = (NettyCookie) cookie;
