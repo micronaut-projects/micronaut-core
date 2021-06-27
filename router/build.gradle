@@ -1,11 +1,12 @@
 dependencies {
     annotationProcessor project(":inject-java")
-    
+
     api project(":inject")
     api project(":http")
     compileOnly dependencyModuleVersion("groovy", "groovy")
-    
+
     testImplementation project(":inject-groovy")
     testImplementation project(":inject-java")
     testAnnotationProcessor project(":inject-java")
+    testImplementation project(":inject-groovy-test")
 }
