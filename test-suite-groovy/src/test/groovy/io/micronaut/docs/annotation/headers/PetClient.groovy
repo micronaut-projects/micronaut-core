@@ -22,13 +22,16 @@ import io.micronaut.http.annotation.Header
 import io.micronaut.http.client.annotation.Client
 import io.reactivex.Single
 
+import javax.validation.constraints.Min
+import javax.validation.constraints.NotBlank
+
 // tag::class[]
 @Client("/pets")
 @Header(name="X-Pet-Client", value='${pet.client.id}')
 interface PetClient extends PetOperations {
 
     @Override
-    Single<Pet> save(String name, int age)
+    Single<Pet> save(@NotBlank String name, @Min(1L) int age)
 
     @Get("/{name}")
     Single<Pet> get(String name)

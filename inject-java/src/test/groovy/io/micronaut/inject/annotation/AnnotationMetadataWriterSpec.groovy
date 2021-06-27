@@ -29,6 +29,7 @@ import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.TypeHint
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.retry.annotation.Recoverable
 
 import jakarta.inject.Qualifier
@@ -495,7 +496,7 @@ interface ITest {
     }
 
     void "test repeatable annotations are combined"() {
-        AnnotationMetadata toWrite = buildMethodAnnotationMetadata('''\
+        BeanDefinition definition = buildBeanDefinition('test.Test','''\
 package test;
 
 import io.micronaut.inject.annotation.repeatable.*;
@@ -510,13 +511,13 @@ class Test {
     @Property(name="prop2", value="value2")    
     @Property(name="prop3", value="value33")    
     @Property(name="prop4", value="value4")    
+    @io.micronaut.context.annotation.Executable
     void someMethod() {}
 }
-''', 'someMethod')
+''')
 
         when:
-        def className = "test"
-        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+        AnnotationMetadata metadata = definition.getRequiredMethod("someMethod").getAnnotationMetadata()
 
         then:
         List<AnnotationValue<Property>> properties = metadata.getAnnotationValuesByType(Property)

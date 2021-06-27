@@ -103,6 +103,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
      * @return The metadata that is actually declared in the element
      */
     @NonNull
+    @Override
     public AnnotationMetadata getDeclaredMetadata() {
         return hierarchy[0];
     }

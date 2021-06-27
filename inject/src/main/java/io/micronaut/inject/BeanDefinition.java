@@ -18,7 +18,6 @@ package io.micronaut.inject;
 import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.Provided;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -75,18 +74,13 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @return Whether the scope is singleton
      */
     default boolean isSingleton() {
-        AnnotationMetadata am = getAnnotationMetadata();
-        if (am.hasDeclaredStereotype(AnnotationUtil.SINGLETON)) {
+        final String scopeName = getScopeName().orElse(null);
+        if (scopeName != null && scopeName.equals(AnnotationUtil.SINGLETON)) {
             return true;
         } else {
-            if (!am.hasDeclaredStereotype(AnnotationUtil.SCOPE) &&
-                    am.hasDeclaredStereotype(DefaultScope.class)) {
-                return am.stringValue(DefaultScope.class)
-                        .map(t -> t.equals(Singleton.class.getName()) || t.equals(AnnotationUtil.SINGLETON))
-                        .orElse(false);
-            } else {
-                return false;
-            }
+            return getAnnotationMetadata().stringValue(DefaultScope.class)
+                    .map(t -> t.equals(Singleton.class.getName()) || t.equals(AnnotationUtil.SINGLETON))
+                    .orElse(false);
         }
     }
 
@@ -448,7 +442,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
         } else {
             Qualifier<T> qualifier = resolveDynamicQualifier();
             if (qualifier == null) {
-                String name = stringValue(AnnotationUtil.NAMED).orElse(null);
+                String name = getAnnotationMetadata().stringValue(AnnotationUtil.NAMED).orElse(null);
                 qualifier = name != null ? Qualifiers.byAnnotation(this, name) : null;
             }
             return qualifier;

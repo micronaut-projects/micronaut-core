@@ -625,6 +625,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                         if (annotationUtils.isAnnotated(introductionType.getName(), method) || JavaAnnotationMetadataBuilder.hasAnnotation(method, Override.class)) {
                             annotationMetadata = annotationUtils.newAnnotationBuilder().buildForParent(introductionType.getName(), classElement, method);
+                            annotationMetadata = new AnnotationMetadataHierarchy(typeAnnotationMetadata, annotationMetadata);
                         } else {
                             annotationMetadata = new AnnotationMetadataReference(
                                     aopProxyWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
@@ -753,7 +754,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             // handle @Bean annotation for @Factory class
             JavaMethodElement javaMethodElement = elementFactory.newMethodElement(concreteClassElement, method, methodAnnotationMetadata);
             if (isFactoryType && javaMethodElement.hasDeclaredStereotype(Bean.class.getName(), AnnotationUtil.SCOPE) && !javaMethodElement.getReturnType().isPrimitive()) {
-                visitBeanFactoryElement(method);
+                if (!modelUtils.overridingOrHidingMethod(method, concreteClass, true).isPresent()) {
+                    visitBeanFactoryElement(method);
+                }
                 return null;
             }
 
@@ -2018,7 +2021,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         private BeanDefinitionWriter createFactoryBeanMethodWriterFor(Element method, TypeElement producedElement) {
-            AnnotationMetadata annotationMetadata = annotationUtils.newAnnotationBuilder().buildForParent(producedElement, method, true);
+            AnnotationMetadata annotationMetadata = annotationUtils.newAnnotationBuilder().buildForParent(producedElement, method, false);
+
+            annotationMetadata = new AnnotationMetadataHierarchy(
+                    concreteClassMetadata,
+                    annotationMetadata
+            );
             io.micronaut.inject.ast.Element factoryElement;
             if (method instanceof ExecutableElement) {
                 factoryElement = elementFactory.newMethodElement(

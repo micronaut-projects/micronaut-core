@@ -282,7 +282,7 @@ interface Foo {
         BeanDefinition definition = classLoader.loadClass('test.$Test$Foo0Definition').newInstance()
         expect:
         definition != null
-        definition.hasStereotype(AnnotationUtil.SINGLETON)
+        definition.hasAnnotation(AnnotationUtil.SINGLETON)
         definition.hasDeclaredAnnotation(Bean)
     }
 
@@ -305,7 +305,7 @@ class Test {
     }
 }
 
-
+@Singleton
 interface Foo extends Bar {
 
 }

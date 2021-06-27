@@ -168,12 +168,13 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
         if (isAopProxyType && Modifier.isFinal(targetClassNode.modifiers)) {
             addError("Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + targetClassNode.name, targetClassNode)
-        } else if (isFactoryClass || isConfigurationProperties || annotationMetadata.hasStereotype(Bean.getName(), AnnotationUtil.SCOPE)) {
-            defineBeanDefinition(concreteClass)
         }
-        this.isDeclaredBean = isExecutableType || isConfigurationProperties || isFactoryClass || annotationMetadata.hasStereotype(AnnotationUtil.SCOPE) || annotationMetadata.hasStereotype(DefaultScope) || annotationMetadata.hasDeclaredStereotype(Bean) ||concreteClass.declaredConstructors.any {
+        this.isDeclaredBean = isExecutableType || isConfigurationProperties || isFactoryClass || annotationMetadata.hasStereotype(AnnotationUtil.SCOPE) || annotationMetadata.hasStereotype(DefaultScope) || annotationMetadata.hasDeclaredStereotype(Bean) || concreteClass.declaredConstructors.any {
             AnnotationMetadata constructorMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, it)
             constructorMetadata.hasStereotype(AnnotationUtil.INJECT)
+        }
+        if (isDeclaredBean) {
+            defineBeanDefinition(concreteClass)
         }
     }
 
@@ -331,6 +332,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 AnnotationMetadata annotationMetadata
                 if (AstAnnotationUtils.isAnnotated(node.name, methodNode) || AstAnnotationUtils.hasAnnotation(methodNode, Override)) {
                     annotationMetadata = AstAnnotationUtils.newBuilder(source, unit).buildForParent(node.name, node, methodNode)
+                    annotationMetadata = new AnnotationMetadataHierarchy(concreteClassAnnotationMetadata, annotationMetadata)
                 } else {
                     annotationMetadata = new AnnotationMetadataReference(
                             aopProxyWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
@@ -348,6 +350,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         owningType,
                         concreteClassAnnotationMetadata
                 )
+
 
                 if (!annotationMetadata.hasStereotype("io.micronaut.validation.Validated") &&
                         isDeclaredBean) {
@@ -474,8 +477,14 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         final boolean isPublic = methodNode.isPublic()
 
         if (isFactoryClass && !isConstructor && methodAnnotationMetadata.hasDeclaredStereotype(Bean.getName(), AnnotationUtil.SCOPE)) {
-            methodAnnotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).buildForParent(methodNode.returnType, methodNode, true)
-            visitBeanFactoryElement(declaringClass, methodNode, methodAnnotationMetadata, methodName)
+            boolean isParent = declaringClass != concreteClass
+            MethodNode overriddenMethod = isParent ? concreteClass.getMethod(methodName, methodNode.parameters) : methodNode
+            boolean overridden = isParent && overriddenMethod.declaringClass != declaringClass
+            if (!overridden) {
+                methodAnnotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).buildForParent(methodNode.returnType, methodNode, true)
+
+                visitBeanFactoryElement(declaringClass, methodNode, methodAnnotationMetadata, methodName)
+            }
         } else if (methodAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT, ProcessedTypes.POST_CONSTRUCT, ProcessedTypes.PRE_DESTROY)) {
             if (isConstructor && methodAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT)) {
                 // constructor with explicit @Inject
@@ -667,13 +676,17 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         ClassNode returnType
         Map<String, Map<String, ClassElement>> allTypeArguments
         BeanDefinitionWriter beanMethodWriter
+        AnnotationMetadata beanFactoryMetadata = new AnnotationMetadataHierarchy(
+                concreteClassAnnotationMetadata,
+                methodAnnotationMetadata
+        );
         if (annotatedNode instanceof MethodNode) {
 
             def methodNode = (MethodNode) annotatedNode
             MethodElement factoryMethodElement = elementFactory.newMethodElement(
                     concreteClassElement,
                     methodNode,
-                    methodAnnotationMetadata
+                    beanFactoryMetadata
             )
             producedClassElement = factoryMethodElement.genericReturnType
             beanMethodWriter = new BeanDefinitionWriter(
@@ -701,7 +714,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             FieldElement factoryField = elementFactory.newFieldElement(
                     concreteClassElement,
                     fieldNode,
-                    methodAnnotationMetadata
+                    beanFactoryMetadata
             )
             producedClassElement = factoryField.genericField
             beanMethodWriter = new BeanDefinitionWriter(

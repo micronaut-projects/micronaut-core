@@ -32,6 +32,7 @@ import java.lang.annotation.*;
 @Target({ElementType.PARAMETER, ElementType.TYPE, ElementType.METHOD}) // this can be either type or param
 @Repeatable(value = MessageHeaders.class)
 @Bindable
+@Inherited
 public @interface MessageHeader {
 
     /**

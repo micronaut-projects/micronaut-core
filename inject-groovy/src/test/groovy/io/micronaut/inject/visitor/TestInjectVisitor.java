@@ -25,7 +25,7 @@ import jakarta.inject.Inject;
 
 import java.util.*;
 
-public class InjectVisitor implements TypeElementVisitor<Object, Object> {
+public class TestInjectVisitor implements TypeElementVisitor<Object, Object> {
 
     private static List<String> VISITED_ELEMENTS = new ArrayList<>();
     private static Map<VisitorContext, Boolean> started = new LinkedHashMap<>();

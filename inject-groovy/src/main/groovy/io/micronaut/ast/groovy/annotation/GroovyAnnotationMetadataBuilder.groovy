@@ -54,6 +54,7 @@ import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.SourceUnit
 
 import java.lang.annotation.Annotation
+import java.lang.annotation.Inherited
 import java.lang.annotation.Repeatable
 import java.lang.annotation.Retention
 import java.lang.annotation.RetentionPolicy
@@ -405,6 +406,16 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
         }
 
         return defaults.get(annotationName) ?: Collections.emptyMap()
+    }
+
+    @Override
+    protected boolean isInheritedAnnotation(@NonNull AnnotationNode annotationMirror) {
+        return annotationMirror?.classNode?.annotations?.any { it?.classNode?.name == Inherited.name }
+    }
+
+    @Override
+    protected boolean isInheritedAnnotationType(@NonNull AnnotatedNode annotationType) {
+        return annotationType?.annotations?.any { it?.classNode?.name == Inherited.name }
     }
 
     @Override
