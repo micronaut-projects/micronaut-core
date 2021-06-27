@@ -22,10 +22,10 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.validation.InternalUriMatchTemplate;
 import io.micronaut.validation.routes.rules.MissingParameterRule;
 import io.micronaut.validation.routes.rules.NullableParameterRule;
 import io.micronaut.validation.routes.rules.RequestBeanParameterRule;
@@ -80,7 +80,7 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, Object
             Set<String> uris = CollectionUtils.setOf(mappingAnnotation.stringValues("uris"));
             mappingAnnotation.stringValue().ifPresent(uris::add);
 
-            List<InternalUriMatchTemplate> templates = uris.stream().map(uri -> {
+            List<UriMatchTemplate> templates = uris.stream().map(uri -> {
                 List<Segment> segments = resolver.buildSegments(uri);
                 StringBuilder uriValue = new StringBuilder();
                 for (Segment segment : segments) {
@@ -91,7 +91,7 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, Object
                     }
                 }
 
-                return InternalUriMatchTemplate.of(uriValue.toString());
+                return UriMatchTemplate.of(uriValue.toString());
             }).collect(Collectors.toList());
 
             RouteParameterElement[] parameters = Arrays.stream(element.getParameters())
