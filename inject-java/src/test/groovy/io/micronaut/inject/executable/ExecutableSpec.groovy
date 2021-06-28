@@ -15,10 +15,9 @@
  */
 package io.micronaut.inject.executable
 
-import io.micronaut.context.AbstractExecutableMethod
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
@@ -75,7 +74,6 @@ class MyBean {
         then:
         executionHandle.returnType.type == String
         executionHandle.invoke(1L) == "1 - The Stand"
-        executableMethod.getClass().getSuperclass() == AbstractExecutableMethod
 
         when:
         executionHandle.invoke("bad")

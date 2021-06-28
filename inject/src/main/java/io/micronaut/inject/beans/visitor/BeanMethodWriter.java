@@ -39,10 +39,7 @@ import org.objectweb.asm.commons.GeneratorAdapter;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 
 /**
  * Writes {@link io.micronaut.core.beans.BeanMethod} instances for introspections.
@@ -60,6 +57,7 @@ final class BeanMethodWriter extends AbstractClassFileWriter implements Named {
     private final ClassWriter classWriter;
     private final BeanIntrospectionWriter introspectionWriter;
     private final HashMap<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
+    private final Map<String, Integer> defaults = new HashMap<>();
 
     /**
      * Default constructor.
@@ -167,6 +165,7 @@ final class BeanMethodWriter extends AbstractClassFileWriter implements Named {
                     genericReturnType,
                     genericReturnType.getAnnotationMetadata(),
                     genericReturnType.getTypeArguments(),
+                    new HashMap<>(),
                     loadTypeMethods
             );
         }
@@ -188,7 +187,7 @@ final class BeanMethodWriter extends AbstractClassFileWriter implements Named {
             if (defaultMetadata.isEmpty()) {
                 constructor.visitInsn(ACONST_NULL);
             } else {
-                AnnotationMetadataWriter.instantiateNewMetadata(type, classWriter, constructor, defaultMetadata, loadTypeMethods);
+                AnnotationMetadataWriter.instantiateNewMetadata(type, classWriter, constructor, defaultMetadata, defaults, loadTypeMethods);
             }
         } else {
             constructor.visitInsn(ACONST_NULL);
@@ -201,6 +200,7 @@ final class BeanMethodWriter extends AbstractClassFileWriter implements Named {
                 classWriter,
                 constructor,
                 Arrays.asList(methodElement.getParameters()),
+                new HashMap<>(),
                 loadTypeMethods
         );
 

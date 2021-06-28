@@ -4,11 +4,12 @@ import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.writer.BeanDefinitionWriter
 
 class LifeCycleWithProxySpec extends AbstractBeanDefinitionSpec {
     void "test that a simple AOP definition lifecycle hooks are invoked - annotation at class level"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('lifecycleproxy1.$MyBeanDefinition$Intercepted', '''
+        BeanDefinition beanDefinition = buildBeanDefinition('lifecycleproxy1.$MyBean' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
 package lifecycleproxy1;
 
 import io.micronaut.aop.interceptors.*;
@@ -60,7 +61,7 @@ class MyBean {
 
     void "test that a simple AOP definition lifecycle hooks are invoked - annotation at method level with hooks last"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('lifecycleproxy2.$MyBeanDefinition$Intercepted', '''
+        BeanDefinition beanDefinition = buildBeanDefinition('lifecycleproxy2.$MyBean' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
 package lifecycleproxy2;
 
 import io.micronaut.aop.interceptors.*;
@@ -111,7 +112,7 @@ class MyBean {
 
     void "test that a simple AOP definition lifecycle hooks are invoked - annotation at method level"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('lifecycleproxy3.$MyBeanDefinition$Intercepted', '''
+        BeanDefinition beanDefinition = buildBeanDefinition('lifecycleproxy3.$MyBean' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
 package lifecycleproxy3;
 
 import io.micronaut.aop.interceptors.*;

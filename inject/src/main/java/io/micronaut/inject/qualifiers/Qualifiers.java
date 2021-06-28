@@ -77,12 +77,12 @@ public class Qualifiers {
                         qualifierTypes.iterator().next()
                 );
             } else {
-                final Qualifier[] qualifiers = qualifierTypes
-                        .stream().map((type) -> Qualifiers.byAnnotation(annotationMetadata, type))
-                        .toArray(Qualifier[]::new);
-                return Qualifiers.byQualifiers(
-                        qualifiers
-                );
+                Qualifier[] qualifiers = new Qualifier[qualifierTypes.size()];
+                int i = 0;
+                for (String type : qualifierTypes) {
+                    qualifiers[i++] = Qualifiers.byAnnotation(annotationMetadata, type);
+                }
+                return Qualifiers.byQualifiers(qualifiers);
             }
         }
 

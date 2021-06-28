@@ -19,6 +19,7 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.FieldInjectionPoint;
 import io.micronaut.inject.MethodInjectionPoint;
 
@@ -34,11 +35,36 @@ public class DependencyInjectionException extends BeanCreationException {
 
     /**
      * @param resolutionContext The resolution context
+     * @param cause             The throwable
+     */
+    public DependencyInjectionException(BeanResolutionContext resolutionContext, Throwable cause) {
+        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, !(cause instanceof BeanInstantiationException) ? cause.getMessage() : null, false), cause);
+    }
+
+    /**
+     * @param resolutionContext The resolution context
      * @param argument          The argument
      * @param cause             The throwable
      */
     public DependencyInjectionException(BeanResolutionContext resolutionContext, Argument argument, Throwable cause) {
         super(resolutionContext, MessageUtils.buildMessage(resolutionContext, argument, !(cause instanceof BeanInstantiationException) ? cause.getMessage() : null, false), cause);
+    }
+
+    /**
+     * @param resolutionContext The resolution context
+     * @param message           The message
+     * @param cause             The throwable
+     */
+    public DependencyInjectionException(BeanResolutionContext resolutionContext, String message, Throwable cause) {
+        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, message), cause);
+    }
+
+    /**
+     * @param resolutionContext The resolution context
+     * @param message           The message
+     */
+    public DependencyInjectionException(BeanResolutionContext resolutionContext, String message) {
+        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, message, false));
     }
 
     /**
@@ -56,7 +82,17 @@ public class DependencyInjectionException extends BeanCreationException {
      * @param cause               The throwable
      */
     public DependencyInjectionException(BeanResolutionContext resolutionContext, FieldInjectionPoint fieldInjectionPoint, Throwable cause) {
-        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, fieldInjectionPoint, null, false), cause);
+        this(resolutionContext, fieldInjectionPoint.getDeclaringBean(), fieldInjectionPoint.getName(), cause);
+    }
+
+    /**
+     * @param resolutionContext   The resolution context
+     * @param declaringBean       The declaring type
+     * @param fieldName           The field name
+     * @param cause               The throwable
+     */
+    public DependencyInjectionException(BeanResolutionContext resolutionContext, BeanDefinition declaringBean, String fieldName, Throwable cause) {
+        super(resolutionContext, MessageUtils.buildMessageForField(resolutionContext, declaringBean, fieldName, null, false), cause);
     }
 
     /**
@@ -65,7 +101,17 @@ public class DependencyInjectionException extends BeanCreationException {
      * @param message             The message
      */
     public DependencyInjectionException(BeanResolutionContext resolutionContext, FieldInjectionPoint fieldInjectionPoint, String message) {
-        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, fieldInjectionPoint, message, false));
+        this(resolutionContext, fieldInjectionPoint.getDeclaringBean(), fieldInjectionPoint.getName(), message);
+    }
+
+    /**
+     * @param resolutionContext   The resolution context
+     * @param declaringBean       The declaring bean
+     * @param fieldName           The field name
+     * @param message             The message
+     */
+    public DependencyInjectionException(BeanResolutionContext resolutionContext, BeanDefinition declaringBean, String fieldName, String message) {
+        super(resolutionContext, MessageUtils.buildMessageForField(resolutionContext, declaringBean, fieldName, message, false));
     }
 
     /**
@@ -75,7 +121,18 @@ public class DependencyInjectionException extends BeanCreationException {
      * @param cause               The throwable
      */
     public DependencyInjectionException(BeanResolutionContext resolutionContext, FieldInjectionPoint fieldInjectionPoint, String message, Throwable cause) {
-        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, fieldInjectionPoint, message, false), cause);
+        this(resolutionContext, fieldInjectionPoint.getDeclaringBean(), fieldInjectionPoint.getName(), message, cause);
+    }
+
+    /**
+     * @param resolutionContext   The resolution context
+     * @param declaringBean       The declaring bean
+     * @param fieldName           The field name
+     * @param message             The message
+     * @param cause               The throwable
+     */
+    public DependencyInjectionException(BeanResolutionContext resolutionContext, BeanDefinition declaringBean, String fieldName, String message, Throwable cause) {
+        super(resolutionContext, MessageUtils.buildMessageForField(resolutionContext, declaringBean, fieldName, message, false), cause);
     }
 
     /**
@@ -85,7 +142,18 @@ public class DependencyInjectionException extends BeanCreationException {
      * @param cause                The throwable
      */
     public DependencyInjectionException(BeanResolutionContext resolutionContext, MethodInjectionPoint methodInjectionPoint, Argument argument, Throwable cause) {
-        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, methodInjectionPoint, argument, null, false), cause);
+        super(resolutionContext, MessageUtils.buildMessageForMethod(resolutionContext, methodInjectionPoint.getDeclaringBean(), methodInjectionPoint.getName(), argument, null, false), cause);
+    }
+
+    /**
+     * @param resolutionContext    The resolution context
+     * @param declaringType        The declaring type
+     * @param methodName           The method name
+     * @param argument             The argument
+     * @param cause                The throwable
+     */
+    public DependencyInjectionException(BeanResolutionContext resolutionContext, BeanDefinition declaringType, String methodName, Argument argument, Throwable cause) {
+        super(resolutionContext, MessageUtils.buildMessageForMethod(resolutionContext, declaringType, methodName, argument, null, false), cause);
     }
 
     /**
@@ -95,7 +163,18 @@ public class DependencyInjectionException extends BeanCreationException {
      * @param message              The message
      */
     public DependencyInjectionException(BeanResolutionContext resolutionContext, MethodInjectionPoint methodInjectionPoint, Argument argument, String message) {
-        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, methodInjectionPoint, argument, message, false));
+        this(resolutionContext, methodInjectionPoint.getDeclaringBean(), methodInjectionPoint.getName(), argument, message);
+    }
+
+    /**
+     * @param resolutionContext    The resolution context
+     * @param declaringType        The declaring type
+     * @param methodName           The method name
+     * @param argument             The argument
+     * @param message              The message
+     */
+    public DependencyInjectionException(BeanResolutionContext resolutionContext, BeanDefinition declaringType, String methodName, Argument argument, String message) {
+        super(resolutionContext, MessageUtils.buildMessageForMethod(resolutionContext, declaringType, methodName, argument, message, false));
     }
 
     /**
@@ -123,7 +202,25 @@ public class DependencyInjectionException extends BeanCreationException {
         MethodInjectionPoint methodInjectionPoint,
         ArgumentConversionContext conversionContext,
         String property) {
-        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, methodInjectionPoint, conversionContext.getArgument(), buildConversionMessage(property, conversionContext), false));
+        this(resolutionContext, methodInjectionPoint.getDeclaringBean(), methodInjectionPoint.getName(), conversionContext, property);
+    }
+
+    /**
+     * Builds an error message for attempted argument conversion on a method.
+     *
+     * @param resolutionContext    The resolution context
+     * @param declaringBean        The declaring bean
+     * @param methodName           The method name
+     * @param conversionContext    The conversion context
+     * @param property             The property being resolved
+     */
+    public DependencyInjectionException(
+        BeanResolutionContext resolutionContext,
+        BeanDefinition declaringBean,
+        String methodName,
+        ArgumentConversionContext conversionContext,
+        String property) {
+        super(resolutionContext, MessageUtils.buildMessageForMethod(resolutionContext, declaringBean, methodName, conversionContext.getArgument(), buildConversionMessage(property, conversionContext), false));
     }
 
     /**
@@ -134,7 +231,19 @@ public class DependencyInjectionException extends BeanCreationException {
      * @param circular             Is the path circular
      */
     protected DependencyInjectionException(BeanResolutionContext resolutionContext, MethodInjectionPoint methodInjectionPoint, Argument argument, String message, boolean circular) {
-        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, methodInjectionPoint, argument, message, circular));
+        this(resolutionContext, methodInjectionPoint.getDeclaringBean(), methodInjectionPoint.getName(), argument, message, circular);
+    }
+
+    /**
+     * @param resolutionContext    The resolution context
+     * @param declaringType        The method declaring type
+     * @param methodName           The method name
+     * @param argument             The argument
+     * @param message              The message
+     * @param circular             Is the path circular
+     */
+    protected DependencyInjectionException(BeanResolutionContext resolutionContext, BeanDefinition declaringType, String methodName, Argument argument, String message, boolean circular) {
+        super(resolutionContext, MessageUtils.buildMessageForMethod(resolutionContext, declaringType, methodName, argument, message, circular));
     }
 
     /**
@@ -144,7 +253,18 @@ public class DependencyInjectionException extends BeanCreationException {
      * @param circular            Is the path circular
      */
     protected DependencyInjectionException(BeanResolutionContext resolutionContext, FieldInjectionPoint fieldInjectionPoint, String message, boolean circular) {
-        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, fieldInjectionPoint, message, circular));
+        this(resolutionContext, fieldInjectionPoint.getDeclaringBean(), fieldInjectionPoint.getName(), message, circular);
+    }
+
+    /**
+     * @param resolutionContext   The resolution context
+     * @param declaringType       The field declaringType
+     * @param fieldName       The field name
+     * @param message             The message
+     * @param circular            Is the path circular
+     */
+    protected DependencyInjectionException(BeanResolutionContext resolutionContext, BeanDefinition declaringType, String fieldName, String message, boolean circular) {
+        super(resolutionContext, MessageUtils.buildMessageForField(resolutionContext, declaringType, fieldName, message, circular));
     }
 
     /**
@@ -155,6 +275,18 @@ public class DependencyInjectionException extends BeanCreationException {
      */
     protected DependencyInjectionException(BeanResolutionContext resolutionContext, Argument argument, String message, boolean circular) {
         super(resolutionContext, MessageUtils.buildMessage(resolutionContext, argument, message, circular));
+    }
+
+    /**
+     * Builds an error message for attempted argument conversion on a method.
+     *
+     * @param resolutionContext    The resolution context
+     * @param conversionContext    The conversion context
+     * @param property             The property being resolved
+     * @return new instance of {@link DependencyInjectionException}
+     */
+    public static DependencyInjectionException missingProperty(BeanResolutionContext resolutionContext, ArgumentConversionContext conversionContext, String property) {
+        return new DependencyInjectionException(resolutionContext, MessageUtils.buildMessage(resolutionContext, buildConversionMessage(property, conversionContext), false));
     }
 
     private static String buildConversionMessage(String property, ArgumentConversionContext conversionContext) {

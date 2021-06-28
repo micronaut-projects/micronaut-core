@@ -5,13 +5,14 @@ import io.micronaut.aop.Around
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.inject.ProxyBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
+import io.micronaut.inject.writer.BeanDefinitionWriter
 
 import java.time.LocalDate
 
 class ValidatedParseSpec extends AbstractBeanDefinitionSpec {
     void "test constraints on beans make them @Validated"() {
         given:
-        def definition = buildBeanDefinition('validateparse1.$TestDefinition' + BeanDefinitionVisitor.PROXY_SUFFIX,'''
+        def definition = buildBeanDefinition('validateparse1.$Test' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX,'''
 package validateparse1;
 
 @jakarta.inject.Singleton

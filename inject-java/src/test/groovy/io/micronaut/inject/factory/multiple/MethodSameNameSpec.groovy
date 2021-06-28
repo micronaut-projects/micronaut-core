@@ -2,6 +2,7 @@ package io.micronaut.inject.factory.multiple
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.inject.writer.BeanDefinitionWriter
 
 class MethodSameNameSpec extends AbstractTypeElementSpec {
 
@@ -52,8 +53,8 @@ class Y { }
 ''')
 
         when:
-        context.classLoader.loadClass('test.$AFactory$A0Definition')
-        context.classLoader.loadClass('test.$AFactory$A1Definition')
+        context.classLoader.loadClass('test.$AFactory$A0' + BeanDefinitionWriter.CLASS_SUFFIX)
+        context.classLoader.loadClass('test.$AFactory$A1' + BeanDefinitionWriter.CLASS_SUFFIX)
 
         then:
         noExceptionThrown()
