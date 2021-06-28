@@ -2,7 +2,7 @@ By default Micronaut is a stateless HTTP server, however depending on your appli
 
 Micronaut includes a `session` module inspired by https://projects.spring.io/spring-session/[Spring Session] that enables this which currently has two implementations:
 
-* In-Memory sessions - which you should combine with an a sticky session proxy if you plan to run multiple instances.
+* In-Memory sessions - which you should combine with a sticky session proxy if you plan to run multiple instances.
 * Redis sessions - In this case https://redis.io[Redis] stores sessions, and non-blocking I/O is used to read/write sessions to Redis.
 
 == Enabling Sessions
