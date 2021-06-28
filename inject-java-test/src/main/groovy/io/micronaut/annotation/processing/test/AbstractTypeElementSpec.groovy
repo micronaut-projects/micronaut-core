@@ -49,7 +49,9 @@ import io.micronaut.inject.provider.BeanProviderDefinition
 import io.micronaut.inject.provider.JakartaProviderBeanDefinition
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.writer.BeanConfigurationWriter
+import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
+import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Specification
 
 import javax.annotation.processing.ProcessingEnvironment
@@ -231,7 +233,7 @@ class Test {
             protected List<BeanDefinitionReference> resolveBeanDefinitionReferences(Predicate<BeanDefinitionReference> predicate) {
                 def references = StreamSupport.stream(files.spliterator(), false)
                         .filter({ JavaFileObject jfo ->
-                            jfo.kind == JavaFileObject.Kind.CLASS && jfo.name.endsWith("DefinitionClass.class")
+                            jfo.kind == JavaFileObject.Kind.CLASS && jfo.name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX + ".class")
                         })
                         .map({ JavaFileObject jfo ->
                             def name = jfo.toUri().toString().substring("mem:///CLASS_OUTPUT/".length())
@@ -342,7 +344,7 @@ class Test {
     }
 
     protected BeanDefinition buildBeanDefinition(String className, String cls) {
-        def beanDefName= '$' + NameUtils.getSimpleName(className) + 'Definition'
+        def beanDefName= '$' + NameUtils.getSimpleName(className) + BeanDefinitionWriter.CLASS_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
@@ -355,7 +357,7 @@ class Test {
     }
 
     protected BeanDefinition buildBeanDefinition(String packageName, String className, String cls) {
-        def beanDefName= '$' + className + 'Definition'
+        def beanDefName= '$' + className + BeanDefinitionWriter.CLASS_SUFFIX
         String beanFullName = "${packageName}.${beanDefName}"
 
         ClassLoader classLoader = buildClassLoader(className, cls)
@@ -373,7 +375,7 @@ class Test {
      * @return The bean definition
      */
     protected BeanDefinition buildInterceptedBeanDefinition(String className, String cls) {
-        def beanDefName= '$$' + NameUtils.getSimpleName(className) + 'Definition' + BeanDefinitionVisitor.PROXY_SUFFIX + 'Definition'
+        def beanDefName= '$$' + NameUtils.getSimpleName(className) + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
@@ -414,7 +416,7 @@ class Test {
      * @return The bean definition
      */
     protected BeanDefinitionReference buildInterceptedBeanDefinitionReference(String className, String cls) {
-        def beanDefName= '$$' + NameUtils.getSimpleName(className) + 'Definition' + BeanDefinitionVisitor.PROXY_SUFFIX + 'DefinitionClass'
+        def beanDefName= '$$' + NameUtils.getSimpleName(className) + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
@@ -423,7 +425,7 @@ class Test {
     }
 
     protected BeanDefinitionReference buildBeanDefinitionReference(String className, String cls) {
-        def beanDefName= '$' + NameUtils.getSimpleName(className) + 'DefinitionClass'
+        def beanDefName= '$' + NameUtils.getSimpleName(className) + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 

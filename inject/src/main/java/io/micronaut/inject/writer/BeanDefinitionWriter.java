@@ -80,6 +80,7 @@ import java.util.stream.Collectors;
  */
 @Internal
 public class BeanDefinitionWriter extends AbstractClassFileWriter implements BeanDefinitionVisitor {
+    public static final String CLASS_SUFFIX = "Definition";
     private static final String ANN_CONSTRAINT = "javax.validation.Constraint";
 
     private static final Constructor<AbstractConstructorInjectionPoint> CONSTRUCTOR_ABSTRACT_CONSTRUCTOR_IP = ReflectionUtils.findConstructor(
@@ -454,7 +455,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @NonNull
     private static String getBeanDefinitionName(String packageName, String className) {
-        return packageName + ".$" + className + "Definition";
+        return packageName + ".$" + className + CLASS_SUFFIX;
     }
 
     @NonNull
