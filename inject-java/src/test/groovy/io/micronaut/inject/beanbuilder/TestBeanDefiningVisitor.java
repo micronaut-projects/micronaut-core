@@ -21,6 +21,7 @@ import io.micronaut.inject.visitor.VisitorContext;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.Supplier;
 
 public class TestBeanDefiningVisitor implements TypeElementVisitor<SomeInterceptor, AroundInvoke> {
 
@@ -71,6 +72,7 @@ public class TestBeanDefiningVisitor implements TypeElementVisitor<SomeIntercept
                                     builder.values(annotationValues);
                                 })
                                 .typeArguments(classElement)
+                                .typeArgumentsForType(context.getClassElement(Supplier.class).orElse(null), classElement)
                                 .qualifier("test")
                                 .withParameters((parameters) -> {
                                     parameters[0].typeArguments(classElement);

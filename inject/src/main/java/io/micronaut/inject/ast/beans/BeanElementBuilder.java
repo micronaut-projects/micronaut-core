@@ -77,6 +77,15 @@ public interface BeanElementBuilder extends ConfigurableElement {
     @Override
     @NonNull BeanElementBuilder typeArguments(@NonNull ClassElement...types);
 
+
+    /**
+     * Fills the type arguments for the given interface or super class with the given types.
+     * @param type The type or interface. If null, results in a no-op
+     * @param types The types
+     * @return This bean builder
+     */
+    @NonNull BeanElementBuilder typeArgumentsForType(@Nullable ClassElement type, @NonNull ClassElement...types);
+
     /**
      * Adds a scope for the given annotation value to the bean.
      *
