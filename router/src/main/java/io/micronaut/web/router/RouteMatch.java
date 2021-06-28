@@ -19,9 +19,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
+import io.micronaut.http.*;
 import io.micronaut.http.annotation.Status;
 
 import java.util.*;
@@ -219,7 +217,8 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Rout
      */
     @NonNull
     default HttpStatus findStatus(HttpStatus defaultStatus) {
-        return getAnnotationMetadata().enumValue(Status.class, HttpStatus.class).orElse(defaultStatus);
+        return getAnnotationMetadata().enumValue(Status.class, HttpStatusStandard.class)
+                .orElse(HttpStatusCustom.toStandard(defaultStatus));
     }
 
     /**

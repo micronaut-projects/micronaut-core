@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,123 +15,80 @@
  */
 package io.micronaut.http;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
 
-/**
- * Represents HTTP status codes. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html.
- *
- * @author Graeme Rocher
- * @since 1.0
- */
-public enum HttpStatus implements CharSequence {
-    CONTINUE(100, "Continue"),
-    SWITCHING_PROTOCOLS(101, "Switching Protocols"),
-    PROCESSING(102, "Processing"),
-    OK(200, "Ok"),
-    CREATED(201, "Created"),
-    ACCEPTED(202, "Accepted"),
-    NON_AUTHORITATIVE_INFORMATION(203, "Non-Authoritative Information"),
-    NO_CONTENT(204, "No Content"),
-    RESET_CONTENT(205, "Reset Content"),
-    PARTIAL_CONTENT(206, "Partial Content"),
-    MULTI_STATUS(207, "Multi Status"),
-    ALREADY_IMPORTED(208, "Already imported"),
-    IM_USED(226, "IM Used"),
-    MULTIPLE_CHOICES(300, "Multiple Choices"),
-    MOVED_PERMANENTLY(301, "Moved Permanently"),
-    FOUND(302, "Found"),
-    SEE_OTHER(303, "See Other"),
-    NOT_MODIFIED(304, "Not Modified"),
-    USE_PROXY(305, "Use Proxy"),
-    SWITCH_PROXY(306, "Switch Proxy"),
-    TEMPORARY_REDIRECT(307, "Temporary Redirect"),
-    PERMANENT_REDIRECT(308, "Permanent Redirect"),
-    BAD_REQUEST(400, "Bad Request"),
-    UNAUTHORIZED(401, "Unauthorized"),
-    PAYMENT_REQUIRED(402, "Payment Required"),
-    FORBIDDEN(403, "Forbidden"),
-    NOT_FOUND(404, "Not Found"),
-    METHOD_NOT_ALLOWED(405, "Method Not Allowed"),
-    NOT_ACCEPTABLE(406, "Not Acceptable"),
-    PROXY_AUTHENTICATION_REQUIRED(407, "Proxy Authentication Required"),
-    REQUEST_TIMEOUT(408, "Request Timeout"),
-    CONFLICT(409, "Conflict"),
-    GONE(410, "Gone"),
-    LENGTH_REQUIRED(411, "Length Required"),
-    PRECONDITION_FAILED(412, "Precondition Failed"),
-    REQUEST_ENTITY_TOO_LARGE(413, "Request Entity Too Large"),
-    REQUEST_URI_TOO_LONG(414, "Request-URI Too Long"),
-    UNSUPPORTED_MEDIA_TYPE(415, "Unsupported Media Type"),
-    REQUESTED_RANGE_NOT_SATISFIABLE(416, "Requested Range Not Satisfiable"),
-    EXPECTATION_FAILED(417, "Expectation Failed"),
-    I_AM_A_TEAPOT(418, "I am a teapot"),
-    ENHANCE_YOUR_CALM(420, "Enhance your calm"),
-    UNPROCESSABLE_ENTITY(422, "Unprocessable Entity"),
-    LOCKED(423, "Locked"),
-    FAILED_DEPENDENCY(424, "Failed Dependency"),
-    UNORDERED_COLLECTION(425, "Unordered Collection"),
-    UPGRADE_REQUIRED(426, "Upgrade Required"),
-    PRECONDITION_REQUIRED(428, "Precondition Required"),
-    TOO_MANY_REQUESTS(429, "Too Many Requests"),
-    REQUEST_HEADER_FIELDS_TOO_LARGE(431, "Request Header Fields Too Large"),
-    NO_RESPONSE(444, "No Response"),
-    BLOCKED_BY_WINDOWS_PARENTAL_CONTROLS(450, "Blocked by Windows Parental Controls"),
-    UNAVAILABLE_FOR_LEGAL_REASONS(451, "Unavailable For Legal Reasons"),
-    REQUEST_HEADER_TOO_LARGE(494, "Request Header Too Large"),
-    INTERNAL_SERVER_ERROR(500, "Internal Server Error"),
-    NOT_IMPLEMENTED(501, "Not Implemented"),
-    BAD_GATEWAY(502, "Bad Gateway"),
-    SERVICE_UNAVAILABLE(503, "Service Unavailable"),
-    GATEWAY_TIMEOUT(504, "Gateway Timeout"),
-    HTTP_VERSION_NOT_SUPPORTED(505, "HTTP Version Not Supported"),
-    VARIANT_ALSO_NEGOTIATES(506, "Variant Also Negotiates"),
-    INSUFFICIENT_STORAGE(507, "Insufficient Storage"),
-    LOOP_DETECTED(508, "Loop Detected"),
-    BANDWIDTH_LIMIT_EXCEEDED(509, "Bandwidth Limit Exceeded"),
-    NOT_EXTENDED(510, "Not Extended"),
-    NETWORK_AUTHENTICATION_REQUIRED(511, "Network Authentication Required"),
-    CONNECTION_TIMED_OUT(522, "Connection Timed Out"),
-    CUSTOM_STATUS(0, "Custom Reason");
+public interface HttpStatus extends CharSequence {
+    HttpStatus CONTINUE = HttpStatusStandard.valueOf(100);
+    HttpStatus SWITCHING_PROTOCOLS = HttpStatusStandard.valueOf(101);
+    HttpStatus PROCESSING = HttpStatusStandard.valueOf(102);
+    HttpStatus OK = HttpStatusStandard.valueOf(200);
+    HttpStatus CREATED = HttpStatusStandard.valueOf(201);
+    HttpStatus ACCEPTED = HttpStatusStandard.valueOf(202);
+    HttpStatus NON_AUTHORITATIVE_INFORMATION = HttpStatusStandard.valueOf(203);
+    HttpStatus NO_CONTENT = HttpStatusStandard.valueOf(204);
+    HttpStatus RESET_CONTENT = HttpStatusStandard.valueOf(205);
+    HttpStatus PARTIAL_CONTENT = HttpStatusStandard.valueOf(206);
+    HttpStatus MULTI_STATUS = HttpStatusStandard.valueOf(207);
+    HttpStatus ALREADY_IMPORTED = HttpStatusStandard.valueOf(208);
+    HttpStatus IM_USED = HttpStatusStandard.valueOf(226);
+    HttpStatus MULTIPLE_CHOICES = HttpStatusStandard.valueOf(300);
+    HttpStatus MOVED_PERMANENTLY = HttpStatusStandard.valueOf(301);
+    HttpStatus FOUND = HttpStatusStandard.valueOf(302);
+    HttpStatus SEE_OTHER = HttpStatusStandard.valueOf(303);
+    HttpStatus NOT_MODIFIED = HttpStatusStandard.valueOf(304);
+    HttpStatus USE_PROXY = HttpStatusStandard.valueOf(305);
+    HttpStatus SWITCH_PROXY = HttpStatusStandard.valueOf(306);
+    HttpStatus TEMPORARY_REDIRECT = HttpStatusStandard.valueOf(307);
+    HttpStatus PERMANENT_REDIRECT = HttpStatusStandard.valueOf(308);
+    HttpStatus BAD_REQUEST = HttpStatusStandard.valueOf(400);
+    HttpStatus UNAUTHORIZED = HttpStatusStandard.valueOf(401);
+    HttpStatus PAYMENT_REQUIRED = HttpStatusStandard.valueOf(402);
+    HttpStatus FORBIDDEN = HttpStatusStandard.valueOf(403);
+    HttpStatus NOT_FOUND = HttpStatusStandard.valueOf(404);
+    HttpStatus METHOD_NOT_ALLOWED = HttpStatusStandard.valueOf(405);
+    HttpStatus NOT_ACCEPTABLE = HttpStatusStandard.valueOf(406);
+    HttpStatus PROXY_AUTHENTICATION_REQUIRED = HttpStatusStandard.valueOf(407);
+    HttpStatus REQUEST_TIMEOUT = HttpStatusStandard.valueOf(408);
+    HttpStatus CONFLICT = HttpStatusStandard.valueOf(409);
+    HttpStatus GONE = HttpStatusStandard.valueOf(410);
+    HttpStatus LENGTH_REQUIRED = HttpStatusStandard.valueOf(411);
+    HttpStatus PRECONDITION_FAILED = HttpStatusStandard.valueOf(412);
+    HttpStatus REQUEST_ENTITY_TOO_LARGE = HttpStatusStandard.valueOf(413);
+    HttpStatus REQUEST_URI_TOO_LONG = HttpStatusStandard.valueOf(414);
+    HttpStatus UNSUPPORTED_MEDIA_TYPE = HttpStatusStandard.valueOf(415);
+    HttpStatus REQUESTED_RANGE_NOT_SATISFIABLE = HttpStatusStandard.valueOf(416);
+    HttpStatus EXPECTATION_FAILED = HttpStatusStandard.valueOf(417);
+    HttpStatus I_AM_A_TEAPOT = HttpStatusStandard.valueOf(418);
+    HttpStatus ENHANCE_YOUR_CALM = HttpStatusStandard.valueOf(420);
+    HttpStatus UNPROCESSABLE_ENTITY = HttpStatusStandard.valueOf(422);
+    HttpStatus LOCKED = HttpStatusStandard.valueOf(423);
+    HttpStatus FAILED_DEPENDENCY = HttpStatusStandard.valueOf(424);
+    HttpStatus UNORDERED_COLLECTION = HttpStatusStandard.valueOf(425);
+    HttpStatus UPGRADE_REQUIRED = HttpStatusStandard.valueOf(426);
+    HttpStatus PRECONDITION_REQUIRED = HttpStatusStandard.valueOf(428);
+    HttpStatus TOO_MANY_REQUESTS = HttpStatusStandard.valueOf(429);
+    HttpStatus REQUEST_HEADER_FIELDS_TOO_LARGE = HttpStatusStandard.valueOf(431);
+    HttpStatus NO_RESPONSE = HttpStatusStandard.valueOf(444);
+    HttpStatus BLOCKED_BY_WINDOWS_PARENTAL_CONTROLS = HttpStatusStandard.valueOf(450);
+    HttpStatus UNAVAILABLE_FOR_LEGAL_REASONS = HttpStatusStandard.valueOf(451);
+    HttpStatus REQUEST_HEADER_TOO_LARGE = HttpStatusStandard.valueOf(494);
+    HttpStatus INTERNAL_SERVER_ERROR = HttpStatusStandard.valueOf(500);
+    HttpStatus NOT_IMPLEMENTED = HttpStatusStandard.valueOf(501);
+    HttpStatus BAD_GATEWAY = HttpStatusStandard.valueOf(502);
+    HttpStatus SERVICE_UNAVAILABLE = HttpStatusStandard.valueOf(503);
+    HttpStatus GATEWAY_TIMEOUT = HttpStatusStandard.valueOf(504);
+    HttpStatus HTTP_VERSION_NOT_SUPPORTED = HttpStatusStandard.valueOf(505);
+    HttpStatus VARIANT_ALSO_NEGOTIATES = HttpStatusStandard.valueOf(506);
+    HttpStatus INSUFFICIENT_STORAGE = HttpStatusStandard.valueOf(507);
+    HttpStatus LOOP_DETECTED = HttpStatusStandard.valueOf(508);
+    HttpStatus BANDWIDTH_LIMIT_EXCEEDED = HttpStatusStandard.valueOf(509);
+    HttpStatus NOT_EXTENDED = HttpStatusStandard.valueOf(510);
+    HttpStatus NETWORK_AUTHENTICATION_REQUIRED = HttpStatusStandard.valueOf(511);
+    HttpStatus CONNECTION_TIMED_OUT = HttpStatusStandard.valueOf(522);
 
-    private static final Map<Integer, String> GENERIC_REASONS;
+    int getCode();
 
-    static {
-        GENERIC_REASONS = new HashMap<>();
-        GENERIC_REASONS.put(1, "Informational");
-        GENERIC_REASONS.put(2, "Success");
-        GENERIC_REASONS.put(3, "Redirection");
-        GENERIC_REASONS.put(4, "Client Error");
-        GENERIC_REASONS.put(5, "Server Error");
-    }
-
-    private int code;
-    private String reason;
-
-    /**
-     * @param code   The code
-     * @param reason The reason
-     */
-    HttpStatus(int code, String reason) {
-        Objects.requireNonNull(reason, "Argument 'reason' cannot be null");
-        this.code = code;
-        this.reason = reason;
-    }
-
-    /**
-     * @return The reason text
-     */
-    public String getReason() {
-        return reason;
-    }
-
-    /**
-     * @return The code
-     */
-    public int getCode() {
-        return code;
-    }
+    String getReason();
 
     /**
      * The status for the given code. If the code is non-standard a
@@ -143,186 +100,38 @@ public enum HttpStatus implements CharSequence {
      * @param code The code
      * @return The value
      */
-    public static HttpStatus valueOf(int code) {
-        switch (code) {
-            case 100:
-                return CONTINUE;
-            case 101:
-                return SWITCHING_PROTOCOLS;
-            case 102:
-                return PROCESSING;
-            case 200:
-                return OK;
-            case 201:
-                return CREATED;
-            case 202:
-                return ACCEPTED;
-            case 203:
-                return NON_AUTHORITATIVE_INFORMATION;
-            case 204:
-                return NO_CONTENT;
-            case 205:
-                return RESET_CONTENT;
-            case 206:
-                return PARTIAL_CONTENT;
-            case 207:
-                return MULTI_STATUS;
-            case 208:
-                return ALREADY_IMPORTED;
-            case 226:
-                return IM_USED;
-            case 300:
-                return MULTIPLE_CHOICES;
-            case 301:
-                return MOVED_PERMANENTLY;
-            case 302:
-                return FOUND;
-            case 303:
-                return SEE_OTHER;
-            case 304:
-                return NOT_MODIFIED;
-            case 305:
-                return USE_PROXY;
-            case 306:
-                return SWITCH_PROXY;
-            case 307:
-                return TEMPORARY_REDIRECT;
-            case 308:
-                return PERMANENT_REDIRECT;
-            case 400:
-                return BAD_REQUEST;
-            case 401:
-                return UNAUTHORIZED;
-            case 402:
-                return PAYMENT_REQUIRED;
-            case 403:
-                return FORBIDDEN;
-            case 404:
-                return NOT_FOUND;
-            case 405:
-                return METHOD_NOT_ALLOWED;
-            case 406:
-                return NOT_ACCEPTABLE;
-            case 407:
-                return PROXY_AUTHENTICATION_REQUIRED;
-            case 408:
-                return REQUEST_TIMEOUT;
-            case 409:
-                return CONFLICT;
-            case 410:
-                return GONE;
-            case 411:
-                return LENGTH_REQUIRED;
-            case 412:
-                return PRECONDITION_FAILED;
-            case 413:
-                return REQUEST_ENTITY_TOO_LARGE;
-            case 414:
-                return REQUEST_URI_TOO_LONG;
-            case 415:
-                return UNSUPPORTED_MEDIA_TYPE;
-            case 416:
-                return REQUESTED_RANGE_NOT_SATISFIABLE;
-            case 417:
-                return EXPECTATION_FAILED;
-            case 418:
-                return I_AM_A_TEAPOT;
-            case 420:
-                return ENHANCE_YOUR_CALM;
-            case 422:
-                return UNPROCESSABLE_ENTITY;
-            case 423:
-                return LOCKED;
-            case 424:
-                return FAILED_DEPENDENCY;
-            case 425:
-                return UNORDERED_COLLECTION;
-            case 426:
-                return UPGRADE_REQUIRED;
-            case 428:
-                return PRECONDITION_REQUIRED;
-            case 429:
-                return TOO_MANY_REQUESTS;
-            case 431:
-                return REQUEST_HEADER_FIELDS_TOO_LARGE;
-            case 444:
-                return NO_RESPONSE;
-            case 450:
-                return BLOCKED_BY_WINDOWS_PARENTAL_CONTROLS;
-            case 451:
-                return UNAVAILABLE_FOR_LEGAL_REASONS;
-            case 494:
-                return REQUEST_HEADER_TOO_LARGE;
-            case 500:
-                return INTERNAL_SERVER_ERROR;
-            case 501:
-                return NOT_IMPLEMENTED;
-            case 502:
-                return BAD_GATEWAY;
-            case 503:
-                return SERVICE_UNAVAILABLE;
-            case 504:
-                return GATEWAY_TIMEOUT;
-            case 505:
-                return HTTP_VERSION_NOT_SUPPORTED;
-            case 506:
-                return VARIANT_ALSO_NEGOTIATES;
-            case 507:
-                return INSUFFICIENT_STORAGE;
-            case 508:
-                return LOOP_DETECTED;
-            case 509:
-                return BANDWIDTH_LIMIT_EXCEEDED;
-            case 510:
-                return NOT_EXTENDED;
-            case 511:
-                return NETWORK_AUTHENTICATION_REQUIRED;
-            case 522:
-                return CONNECTION_TIMED_OUT;
-            default:
-                return custom(code, genericReason(code));
+    static HttpStatus valueOf(int code) {
+        try {
+            return HttpStatusStandard.valueOf(code);
+        } catch (IllegalArgumentException e) {
+            return new HttpStatusCustom(code, null);
         }
     }
 
     /**
      * The status for the given code and reason.
      *
-     * @param statusCode The status code
-     * @param reason The reason. If null, a generic reason, same as {@link HttpStatus#valueOf(int)}, is provided
+     * @param code The status code
+     * @param reason The reason. If null, a generic reason is provided
      * @return The {@link HttpStatus}
      */
-    public static HttpStatus custom(int statusCode, String reason) {
-        if (Objects.isNull(reason)) {
-            return valueOf(statusCode);
+    static HttpStatus custom(int code, String reason) {
+        try {
+            if (Objects.isNull(reason)) {
+                return HttpStatusStandard.valueOf(code);
+            }
+        } catch (IllegalArgumentException e) {
+            return new HttpStatusCustom(code, null);
         }
-        CUSTOM_STATUS.code = statusCode;
-        CUSTOM_STATUS.reason = reason;
-        return CUSTOM_STATUS;
-    }
-
-    private static String genericReason(int statusCode) {
-        int firstDigit = statusCode / 100;
-        String reason = "Unknown Status";
-
-        if (GENERIC_REASONS.containsKey(firstDigit)) {
-            reason = GENERIC_REASONS.get(firstDigit);
-        }
-
-        return String.format("%s (%d)", reason, statusCode);
+        return new HttpStatusCustom(code, reason);
     }
 
     @Override
-    public int length() {
-        return name().length();
-    }
+    int length();
 
     @Override
-    public char charAt(int index) {
-        return name().charAt(index);
-    }
+    char charAt(int index);
 
     @Override
-    public CharSequence subSequence(int start, int end) {
-        return name().subSequence(start, end);
-    }
+    CharSequence subSequence(int start, int end);
 }

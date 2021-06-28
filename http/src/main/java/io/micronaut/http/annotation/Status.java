@@ -16,7 +16,7 @@
 package io.micronaut.http.annotation;
 
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.http.HttpStatus;
+import io.micronaut.http.HttpStatusStandard;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -40,5 +40,5 @@ public @interface Status {
     /**
      * @return The HttpStatus specified when declared on the method
      */
-    HttpStatus value();
+    HttpStatusStandard value();
 }

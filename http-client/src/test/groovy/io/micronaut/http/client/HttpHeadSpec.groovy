@@ -20,6 +20,7 @@ import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.HttpStatusStandard
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
@@ -480,7 +481,7 @@ class HttpHeadSpec extends Specification {
         }
 
         @Head("/no-content")
-        @Status(HttpStatus.NO_CONTENT)
+        @Status(HttpStatusStandard.NO_CONTENT)
         void noContent() {}
     }
 

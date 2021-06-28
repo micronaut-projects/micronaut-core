@@ -18,6 +18,7 @@ package io.micronaut.http.client.docs.basics;
 // tag::imports[]
 
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.HttpStatusStandard;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
@@ -61,13 +62,13 @@ public class HelloController {
     // end::json[]
 
     @Post("/greet")
-    @Status(HttpStatus.CREATED)
+    @Status(HttpStatusStandard.CREATED)
     Message echo(@Body Message message) {
         return message;
     }
 
     @Post(value = "/hello", consumes = MediaType.TEXT_PLAIN, produces = MediaType.TEXT_PLAIN)
-    @Status(HttpStatus.CREATED)
+    @Status(HttpStatusStandard.CREATED)
     String echoHello(@Body String message) {
         return message;
     }

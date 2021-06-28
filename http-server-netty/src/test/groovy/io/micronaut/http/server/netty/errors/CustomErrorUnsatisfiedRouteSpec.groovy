@@ -5,6 +5,7 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.HttpStatusStandard
 import io.micronaut.http.annotation.*
 import io.micronaut.http.client.BlockingHttpClient
 import io.micronaut.http.client.HttpClient
@@ -89,47 +90,47 @@ class CustomErrorUnsatisfiedRouteSpec extends Specification {
     @Controller
     static class MissingArgumentController {
         @Get("/header")
-        @Status(HttpStatus.OK)
+        @Status(HttpStatusStandard.OK)
         void header(@Header("X-API-Version") String apiVersion) {
         }
 
         @Get("/headerNoValue")
-        @Status(HttpStatus.OK)
+        @Status(HttpStatusStandard.OK)
         void headerNoValue(@Header String apiVersion) {
         }
 
         @Get("/cookie")
-        @Status(HttpStatus.OK)
+        @Status(HttpStatusStandard.OK)
         void cookie(@CookieValue("myCookie") String myCookie) {
         }
 
         @Get("/cookieNoValue")
-        @Status(HttpStatus.OK)
+        @Status(HttpStatusStandard.OK)
         void cookieNoValue(@CookieValue String myCookie) {
         }
 
         @Get("/queryvalue")
-        @Status(HttpStatus.OK)
+        @Status(HttpStatusStandard.OK)
         void queryvalue(@QueryValue("number-of-items") Integer numberOfItems) {
         }
 
         @Get("/queryvalueNoValue")
-        @Status(HttpStatus.OK)
+        @Status(HttpStatusStandard.OK)
         void queryvalueNoValue(@QueryValue Integer numberOfItems) {
         }
 
         @Get("/queryvalueWithoutAnnotation")
-        @Status(HttpStatus.OK)
+        @Status(HttpStatusStandard.OK)
         void queryvalueWithoutAnnotation(Integer numberOfItems) {
         }
 
         @Get("/body")
-        @Status(HttpStatus.OK)
+        @Status(HttpStatusStandard.OK)
         void body(@Body Integer numberOfItems) {
         }
 
         @Get("/somethingbad1")
-        @Status(HttpStatus.BAD_REQUEST)
+        @Status(HttpStatusStandard.BAD_REQUEST)
         void somethingbad1() {
         }
 
@@ -149,7 +150,7 @@ class CustomErrorUnsatisfiedRouteSpec extends Specification {
         }
 
         @Get("/notfound1")
-        @Status(HttpStatus.NOT_FOUND)
+        @Status(HttpStatusStandard.NOT_FOUND)
         void notfound1() {
         }
 
@@ -178,18 +179,18 @@ class CustomErrorUnsatisfiedRouteSpec extends Specification {
             HttpResponse.badRequest().body(['myMessage': "Oh no: " + e.getMessage()])
         }
 
-        @Error(status = HttpStatus.BAD_REQUEST)
+        @Error(status = HttpStatusStandard.BAD_REQUEST)
         Map<String, String> badRequest() {
             ['myMessage': "Something bad"]
         }
 
-        @Error(status = HttpStatus.NOT_FOUND)
+        @Error(status = HttpStatusStandard.NOT_FOUND)
         HttpResponse notFound() {
             HttpResponse.badRequest().body(['myMessage': "Cannot find"])
         }
 
-        @Error(status = HttpStatus.GONE)
-        @Status(HttpStatus.I_AM_A_TEAPOT)
+        @Error(status = HttpStatusStandard.GONE)
+        @Status(HttpStatusStandard.I_AM_A_TEAPOT)
         Map<String, String> gone() {
             ['myMessage': "teapot"]
         }

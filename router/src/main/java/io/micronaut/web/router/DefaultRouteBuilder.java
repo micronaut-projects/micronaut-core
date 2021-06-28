@@ -29,10 +29,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
+import io.micronaut.http.*;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
@@ -490,7 +487,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             }
             setConsumesMediaTypesContainsAll();
             setProducesMediaTypesContainsAll();
-            this.definedStatus = targetMethod.enumValue(Status.class, HttpStatus.class).orElse(null);
+            this.definedStatus = targetMethod.enumValue(Status.class, HttpStatusStandard.class).orElse(null);
             this.isWebSocketRoute = targetMethod.hasAnnotation("io.micronaut.websocket.annotation.OnMessage");
         }
 

@@ -18,7 +18,7 @@ package io.micronaut.http.annotation;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.http.HttpStatus;
+import io.micronaut.http.HttpStatusStandard;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -52,7 +52,7 @@ public @interface Error {
     /**
      * @return The {@link io.micronaut.http.HttpStatus} code to map
      */
-    HttpStatus status() default HttpStatus.INTERNAL_SERVER_ERROR;
+    HttpStatusStandard status() default HttpStatusStandard.INTERNAL_SERVER_ERROR;
 
     /**
      * Whether the error handler should be registered as a global error handler or just locally to the declaring

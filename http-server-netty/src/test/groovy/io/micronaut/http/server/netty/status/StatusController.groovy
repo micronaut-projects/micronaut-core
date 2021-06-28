@@ -35,7 +35,7 @@ class StatusController {
         "success"
     }
 
-    @Status(HttpStatus.CREATED)
+    @Status(HttpStatusStandard.CREATED)
     @Get(produces = MediaType.TEXT_PLAIN)
     String index() {
         return "success"
@@ -51,24 +51,24 @@ class StatusController {
         HttpResponse.status(HttpStatus.CREATED).body("success")
     }
 
-    @Status(HttpStatus.CREATED)
+    @Status(HttpStatusStandard.CREATED)
     @Get(value = "/voidreturn")
     void voidReturn() {
     }
 
-    @Status(HttpStatus.CREATED)
+    @Status(HttpStatusStandard.CREATED)
     @Get(value = "/completableVoid")
     CompletableFuture<Void> voidCompletableFuture() {
         CompletableFuture.completedFuture(null)
     }
 
-    @Status(HttpStatus.CREATED)
+    @Status(HttpStatusStandard.CREATED)
     @Get(value = "/maybeVoid")
     Maybe<Void> maybeVoid() {
         Maybe.empty()
     }
 
-    @Status(HttpStatus.NOT_FOUND)
+    @Status(HttpStatusStandard.NOT_FOUND)
     @Get(value = "/simple404", produces = MediaType.TEXT_PLAIN)
     String simple404() {
         "success"

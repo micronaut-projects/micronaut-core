@@ -28,7 +28,7 @@ import io.micronaut.http.annotation.Status
 class StatusController {
 
     //tag::atstatus[]
-    @Status(HttpStatus.CREATED)
+    @Status(HttpStatusStandard.CREATED)
     @Get(produces = [MediaType.TEXT_PLAIN])
     fun index(): String {
         return "success"

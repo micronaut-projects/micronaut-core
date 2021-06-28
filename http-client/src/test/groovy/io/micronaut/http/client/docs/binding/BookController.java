@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.client.docs.binding;
 
-import io.micronaut.http.HttpStatus;
+import io.micronaut.http.HttpStatusStandard;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
@@ -30,7 +30,7 @@ import io.micronaut.http.annotation.Status;
 public class BookController {
 
     @Post(value = "/book", consumes = {MediaType.APPLICATION_JSON, MediaType.APPLICATION_FORM_URLENCODED})
-    @Status(HttpStatus.CREATED)
+    @Status(HttpStatusStandard.CREATED)
     Book save(@Body Book book) {
         return book;
     }
