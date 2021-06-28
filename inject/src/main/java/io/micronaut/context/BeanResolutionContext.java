@@ -163,6 +163,18 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
         Path pushMethodArgumentResolve(BeanDefinition declaringType, MethodInjectionPoint methodInjectionPoint, Argument argument);
 
         /**
+         * Push an unresolved method call onto the queue.
+         *
+         * @param declaringType        The type
+         * @param methodName           The method name
+         * @param argument             The unresolved argument
+         * @param arguments            The arguments
+         * @param requiresReflection  is requires reflection
+         * @return This path
+         */
+        Path pushMethodArgumentResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments, boolean requiresReflection);
+
+        /**
          * Push an unresolved field onto the queue.
          *
          * @param declaringType       declaring type
@@ -170,6 +182,16 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
          * @return This path
          */
         Path pushFieldResolve(BeanDefinition declaringType, FieldInjectionPoint fieldInjectionPoint);
+
+        /**
+         * Push an unresolved field onto the queue.
+         *
+         * @param declaringType       declaring type
+         * @param fieldAsArgument     The field as argument
+         * @param requiresReflection  is requires reflection
+         * @return This path
+         */
+        Path pushFieldResolve(BeanDefinition declaringType, Argument fieldAsArgument, boolean requiresReflection);
 
         /**
          * Converts the path to a circular string.

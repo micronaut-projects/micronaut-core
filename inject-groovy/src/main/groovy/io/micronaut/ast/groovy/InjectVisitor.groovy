@@ -537,28 +537,35 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
                     if (isDeclaredBean && methodAnnotationMetadata.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT)) {
                         defineBeanDefinition(concreteClass)
-                        def beanWriter = getBeanWriter()
-                        if (aopProxyWriter instanceof AopProxyWriter && !((AopProxyWriter)aopProxyWriter).isProxyTarget()) {
-                            beanWriter = aopProxyWriter
-                        }
-                        beanWriter.visitPostConstructMethod(
+                        getBeanWriter().visitPostConstructMethod(
                                 declaringElement,
                                 groovyMethodElement,
                                 requiresReflection,
                                 groovyVisitorContext
+                        )
+                        if (aopProxyWriter instanceof AopProxyWriter && !((AopProxyWriter)aopProxyWriter).isProxyTarget()) {
+                            aopProxyWriter.visitPostConstructMethod(
+                                    declaringElement,
+                                    groovyMethodElement,
+                                    requiresReflection,
+                                    groovyVisitorContext
                         )
                     } else if (isDeclaredBean && methodAnnotationMetadata.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)) {
                         defineBeanDefinition(concreteClass)
-                        def beanWriter = getBeanWriter()
-                        if (aopProxyWriter instanceof AopProxyWriter && !((AopProxyWriter)aopProxyWriter).isProxyTarget()) {
-                            beanWriter = aopProxyWriter
-                        }
-                        beanWriter.visitPreDestroyMethod(
+                        getBeanWriter().visitPreDestroyMethod(
                                 declaringElement,
                                 groovyMethodElement,
                                 requiresReflection,
                                 groovyVisitorContext
                         )
+                        if (aopProxyWriter instanceof AopProxyWriter && !((AopProxyWriter)aopProxyWriter).isProxyTarget()) {
+                            aopProxyWriter.visitPreDestroyMethod(
+                                    declaringElement,
+                                    groovyMethodElement,
+                                    requiresReflection,
+                                    groovyVisitorContext
+                            )
+                        }
                     } else if (methodAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT)) {
                         defineBeanDefinition(concreteClass)
                         getBeanWriter().visitMethodInjectionPoint(

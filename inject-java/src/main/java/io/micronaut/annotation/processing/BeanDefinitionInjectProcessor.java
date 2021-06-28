@@ -39,10 +39,8 @@ import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.VisitorConfiguration;
-import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
-import io.micronaut.inject.writer.BeanDefinitionVisitor;
-import io.micronaut.inject.writer.BeanDefinitionWriter;
-import io.micronaut.inject.writer.OriginatingElements;
+import io.micronaut.inject.writer.*;
+
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
@@ -1534,10 +1532,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             if (javaMethodElement.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT)) {
                 BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
-                final AopProxyWriter aopWriter = resolveAopWriter(writer);
-                if (aopWriter != null && !aopWriter.isProxyTarget()) {
-                    writer = aopWriter;
-                }
                 addOriginatingElementIfNecessary(writer, declaringClass);
                 writer.visitPostConstructMethod(
                         declaringClass,
@@ -1547,10 +1541,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 );
             } else if (javaMethodElement.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)) {
                 BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
-                final AopProxyWriter aopWriter = resolveAopWriter(writer);
-                if (aopWriter != null && !aopWriter.isProxyTarget()) {
-                    writer = aopWriter;
-                }
                 addOriginatingElementIfNecessary(writer, declaringClass);
                 writer.visitPreDestroyMethod(
                         declaringClass,

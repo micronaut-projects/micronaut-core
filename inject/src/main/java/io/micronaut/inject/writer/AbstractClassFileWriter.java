@@ -15,11 +15,7 @@
  */
 package io.micronaut.inject.writer;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.Generated;
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.*;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -94,6 +90,47 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             )
     );
 
+    private static final org.objectweb.asm.commons.Method[] MAP_OF;
+    private static final org.objectweb.asm.commons.Method[] LIST_OF;
+    private static final org.objectweb.asm.commons.Method MAP_OF_ENTRIES;
+    private static final org.objectweb.asm.commons.Method MAP_ENTRY;
+    private static final org.objectweb.asm.commons.Method LIST_OF_ARRAY;
+
+    static {
+        boolean mapListSupported;
+        try {
+            mapListSupported = ReflectionUtils.findMethod(Map.class, "of").isPresent();
+        } catch (Exception e) {
+            mapListSupported = false;
+        }
+        if (mapListSupported) {
+            MAP_OF = new Method[11];
+            LIST_OF = new Method[11];
+            for (int i = 0; i < MAP_OF.length; i++) {
+                Class[] mapArgs = new Class[i * 2];
+                Arrays.fill(mapArgs, Object.class);
+                MAP_OF[i] = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredMethod(Map.class, "of", mapArgs));
+                Class[] listArgs = new Class[i];
+                Arrays.fill(listArgs, Object.class);
+                LIST_OF[i] = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredMethod(List.class, "of", listArgs));
+            }
+            MAP_OF_ENTRIES = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredMethod(Map.class, "ofEntries", Map.Entry[].class));
+            MAP_ENTRY = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredMethod(Map.class, "entry", Object.class, Object.class));
+            LIST_OF_ARRAY = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredMethod(List.class, "of", Object[].class));
+        } else {
+            MAP_OF = null;
+            LIST_OF = null;
+            MAP_OF_ENTRIES = null;
+            MAP_ENTRY = null;
+            LIST_OF_ARRAY = null;
+        }
+    }
+
+    private static final Type MAP_TYPE = Type.getType(Map.class);
+    private static final Type LIST_TYPE = Type.getType(List.class);
+    private static final String EMPTY_MAP = "EMPTY_MAP";
+    private static final String EMPTY_LIST = "EMPTY_LIST";
+
     private final OriginatingElements originatingElements;
 
     /**
@@ -138,6 +175,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param generatorAdapter     The generator adapter
      * @param declaringElementName The declaring class element of the generics
      * @param types                The type references
+     * @param defaults             The annotation defaults
      * @param loadTypeMethods      The load type methods
      */
     protected static void pushTypeArgumentElements(
@@ -146,13 +184,14 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             GeneratorAdapter generatorAdapter,
             String declaringElementName,
             Map<String, ClassElement> types,
+            Map<String, Integer> defaults,
             Map<String, GeneratorAdapter> loadTypeMethods) {
         if (types == null || types.isEmpty()) {
             generatorAdapter.visitInsn(ACONST_NULL);
             return;
         }
         Set<String> visitedTypes = new HashSet<>(5);
-        pushTypeArgumentElements(owningType, owningTypeWriter, generatorAdapter, declaringElementName, types, visitedTypes, loadTypeMethods);
+        pushTypeArgumentElements(owningType, owningTypeWriter, generatorAdapter, declaringElementName, types, visitedTypes, defaults, loadTypeMethods);
     }
 
     private static void pushTypeArgumentElements(
@@ -162,6 +201,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             String declaringElementName,
             Map<String, ClassElement> types,
             Set<String> visitedTypes,
+            Map<String, Integer> defaults,
             Map<String, GeneratorAdapter> loadTypeMethods) {
         if (visitedTypes.contains(declaringElementName)) {
             generatorAdapter.getStatic(
@@ -193,6 +233,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                             classElement,
                             typeArguments,
                             visitedTypes,
+                            defaults,
                             loadTypeMethods
                     );
                 } else {
@@ -242,6 +283,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param classElement      The class element that declares the generics
      * @param typeArguments     The nested type arguments
      * @param visitedTypes      The visited types
+     * @param defaults          The annotation defaults
      * @param loadTypeMethods   The load type methods
      */
     protected static void buildArgumentWithGenerics(
@@ -253,14 +295,27 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             ClassElement classElement,
             Map<String, ClassElement> typeArguments,
             Set<String> visitedTypes,
+            Map<String, Integer> defaults,
             Map<String, GeneratorAdapter> loadTypeMethods) {
         // 1st argument: the type
         generatorAdapter.push(typeReference);
         // 2nd argument: the name
         generatorAdapter.push(argumentName);
-        // 3rd argument: annotation metadata
+
         AnnotationMetadata annotationMetadata = classElement.getAnnotationMetadata();
-        if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
+        boolean hasAnnotationMetadata = annotationMetadata != AnnotationMetadata.EMPTY_METADATA;
+
+        if (!hasAnnotationMetadata && typeArguments.isEmpty()) {
+            invokeInterfaceStaticMethod(
+                    generatorAdapter,
+                    Argument.class,
+                    METHOD_CREATE_ARGUMENT_SIMPLE
+            );
+            return;
+        }
+
+        // 3rd argument: annotation metadata
+        if (!hasAnnotationMetadata) {
             generatorAdapter.visitInsn(ACONST_NULL);
         } else {
             AnnotationMetadataWriter.instantiateNewMetadata(
@@ -268,6 +323,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                     owningClassWriter,
                     generatorAdapter,
                     (DefaultAnnotationMetadata) annotationMetadata,
+                    defaults,
                     loadTypeMethods
             );
         }
@@ -280,6 +336,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                 classElement.getName(),
                 typeArguments,
                 visitedTypes,
+                defaults,
                 loadTypeMethods
         );
 
@@ -337,6 +394,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param declaringClassWriter The declaring class writer
      * @param generatorAdapter     The {@link GeneratorAdapter}
      * @param argumentTypes        The argument types
+     * @param defaults             The annotation defaults
      * @param loadTypeMethods      The load type methods
      */
     protected static void pushBuildArgumentsForMethod(
@@ -345,6 +403,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             ClassWriter declaringClassWriter,
             GeneratorAdapter generatorAdapter,
             Collection<ParameterElement> argumentTypes,
+            Map<String, Integer> defaults,
             Map<String, GeneratorAdapter> loadTypeMethods) {
         int len = argumentTypes.size();
         pushNewArray(generatorAdapter, Argument.class, len);
@@ -365,7 +424,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                     argumentName,
                     classElement,
                     annotationMetadata,
-                    typeArguments, loadTypeMethods
+                    typeArguments, defaults, loadTypeMethods
             );
             // store the type reference
             generatorAdapter.visitInsn(AASTORE);
@@ -388,6 +447,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param classElement         The class name
      * @param annotationMetadata   The annotation metadata
      * @param typeArguments        The type arguments
+     * @param defaults             The annotation defaults
      * @param loadTypeMethods      The load type methods
      */
     protected static void pushCreateArgument(
@@ -399,6 +459,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             ClassElement classElement,
             AnnotationMetadata annotationMetadata,
             Map<String, ClassElement> typeArguments,
+            Map<String, Integer> defaults,
             Map<String, GeneratorAdapter> loadTypeMethods) {
         Type argumentType = JavaModelUtils.getTypeReference(classElement);
 
@@ -408,13 +469,26 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         // 2nd argument: The argument name
         generatorAdapter.push(argumentName);
 
+        boolean hasAnnotations = annotationMetadata instanceof DefaultAnnotationMetadata;
+        boolean hasTypeArguments = typeArguments != null && !typeArguments.isEmpty();
+
+        if (!hasAnnotations && !hasTypeArguments) {
+            invokeInterfaceStaticMethod(
+                    generatorAdapter,
+                    Argument.class,
+                    METHOD_CREATE_ARGUMENT_SIMPLE
+            );
+            return;
+        }
+
         // 3rd argument: The annotation metadata
-        if (annotationMetadata instanceof DefaultAnnotationMetadata && !annotationMetadata.isEmpty()) {
+        if (hasAnnotations) {
             AnnotationMetadataWriter.instantiateNewMetadata(
                     owningType,
                     declaringClassWriter,
                     generatorAdapter,
                     (DefaultAnnotationMetadata) annotationMetadata,
+                    defaults,
                     loadTypeMethods
             );
         } else {
@@ -422,13 +496,14 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         }
 
         // 4th argument: The generic types
-        if (typeArguments != null) {
+        if (hasTypeArguments) {
             pushTypeArgumentElements(
                     owningType,
                     declaringClassWriter,
                     generatorAdapter,
                     declaringTypeName,
                     typeArguments,
+                    defaults,
                     loadTypeMethods
             );
         } else {

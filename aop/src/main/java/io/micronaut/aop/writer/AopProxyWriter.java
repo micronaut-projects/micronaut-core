@@ -200,7 +200,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 metadataBuilder, visitorContext
         );
         startClass(classWriter, getInternalName(proxyFullName), getTypeReferenceForName(targetClassFullName));
-        processAlreadyVisitedMethods(parent);
         proxyBeanDefinitionWriter.setInterceptedType(targetClassFullName);
     }
 
@@ -429,15 +428,25 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         ));
         this.interceptorParameter = ParameterElement.of(interceptorList, "$interceptors");
         this.qualifierParameter = ParameterElement.of(Qualifier.class, "$qualifier");
-        this.newConstructor = constructor.withNewParameters(
-                ParameterElement.of(BeanContext.class, "$beanContext"),
-                qualifierParameter,
-                interceptorParameter
+        ClassElement proxyClass = ClassElement.of(proxyType.getClassName());
+
+        ParameterElement[] constructorParameters = constructor.getParameters();
+        List<ParameterElement> newConstructorParameters = new ArrayList<>(constructorParameters.length + 3);
+        newConstructorParameters.addAll(Arrays.asList(constructorParameters));
+        newConstructorParameters.add(ParameterElement.of(BeanContext.class, "$beanContext"));
+        newConstructorParameters.add(qualifierParameter);
+        newConstructorParameters.add(interceptorParameter);
+        this.newConstructor = MethodElement.of(
+                proxyClass,
+                constructor.getAnnotationMetadata(),
+                proxyClass,
+                proxyClass,
+                "<init>",
+                newConstructorParameters.toArray(new ParameterElement[0])
         );
-        ParameterElement[] parameters = constructor.getParameters();
-        this.beanContextArgumentIndex = parameters.length;
-        this.qualifierIndex = parameters.length + 1;
-        this.interceptorArgumentIndex = parameters.length + 2;
+        this.beanContextArgumentIndex = constructorParameters.length;
+        this.qualifierIndex = constructorParameters.length + 1;
+        this.interceptorArgumentIndex = constructorParameters.length + 2;
     }
 
     @NonNull
@@ -626,6 +635,10 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             throw new IllegalStateException("The method visitBeanDefinitionConstructor(..) should be called at least once");
         } else {
             initConstructor(declaredConstructor);
+        }
+
+        if (parentWriter != null && !isProxyTarget) {
+            processAlreadyVisitedMethods(parentWriter);
         }
 
         interceptorParameter.annotate(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER, builder -> {
@@ -1364,15 +1377,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         final List<BeanDefinitionWriter.MethodVisitData> postConstructMethodVisits = parent.getPostConstructMethodVisits();
         for (BeanDefinitionWriter.MethodVisitData methodVisit : postConstructMethodVisits) {
             visitPostConstructMethod(
-                    methodVisit.getBeanType(),
-                    methodVisit.getMethodElement(),
-                    methodVisit.isRequiresReflection(),
-                    visitorContext
-            );
-        }
-        final List<BeanDefinitionWriter.MethodVisitData> preDestroyMethodVisits = parent.getPreDestroyMethodVisits();
-        for (BeanDefinitionWriter.MethodVisitData methodVisit : preDestroyMethodVisits) {
-            visitPreDestroyMethod(
                     methodVisit.getBeanType(),
                     methodVisit.getMethodElement(),
                     methodVisit.isRequiresReflection(),

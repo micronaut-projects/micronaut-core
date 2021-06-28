@@ -298,6 +298,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                         introspectionWriter,
                         constructorWriter,
                         Arrays.asList(constructor.getParameters()),
+                        new HashMap<>(),
                         localLoadTypeMethods
                 );
 
@@ -363,6 +364,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                             introspectionWriter,
                             constructorMetadata,
                             (DefaultAnnotationMetadata) annotationMetadata,
+                            new HashMap<>(),
                             localLoadTypeMethods
                     );
                     constructorMetadata.returnValue();

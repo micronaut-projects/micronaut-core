@@ -483,7 +483,7 @@ class Test {
 ''')
         expect:
         definition != null
-        definition.getTypeArgumentsMap().size() == 2
+//        definition.getTypeArgumentsMap().size() == 2
         definition.getTypeParameters(Reporter) == [Span] as Class[]
         definition.getTypeParameters(AsyncReporter) == [Span] as Class[]
     }
