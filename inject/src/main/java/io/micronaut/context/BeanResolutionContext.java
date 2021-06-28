@@ -133,7 +133,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     /**
      * Represents a path taken to resolve a bean definitions dependencies.
      */
-    interface Path extends Deque<Segment<?>> {
+    interface Path extends Deque<Segment<?>>, AutoCloseable {
         /**
          * Push an unresolved constructor call onto the queue.
          *
@@ -204,6 +204,11 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
          * @return The current path segment
          */
         Optional<Segment<?>> currentSegment();
+
+        @Override
+        default void close() {
+            pop();
+        }
     }
 
     /**

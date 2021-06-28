@@ -69,9 +69,7 @@ public abstract class AbstractParametrizedBeanDefinition2<T> extends AbstractBea
                 requiredArgumentValues.put(requiredArgument.getName(), resolutionContext);
             }
 
-            BeanResolutionContext.Path path = resolutionContext.getPath();
-            try {
-                path.pushConstructorResolve(this, requiredArgument);
+            try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(this, requiredArgument)) {
                 String argumentName = requiredArgument.getName();
                 if (!requiredArgumentValues.containsKey(argumentName) && !requiredArgument.isNullable()) {
                     if (eachBeanType.filter(type -> type == requiredArgument.getType()).isPresent()) {
@@ -87,8 +85,6 @@ public abstract class AbstractParametrizedBeanDefinition2<T> extends AbstractBea
                     value = converted.orElseThrow(() -> new BeanInstantiationException(resolutionContext, "Invalid value [" + finalValue + "] for argument: " + argumentName));
                     requiredArgumentValues.put(argumentName, value);
                 }
-            } finally {
-                path.pop();
             }
         }
         return doBuild(resolutionContext, context, definition, requiredArgumentValues);
