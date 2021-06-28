@@ -19,7 +19,7 @@ import io.micronaut.context.annotation.Prototype
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanDefinition
-
+import io.micronaut.inject.writer.BeanDefinitionWriter
 import jakarta.inject.Singleton
 
 /**
@@ -117,7 +117,7 @@ class MyBean {
 }
 ''')
         BeanDefinition beanDefinition = classLoader
-                .loadClass('test.$MyBeanFactory$MyBean0Definition')
+                .loadClass('test.$MyBeanFactory$MyBean0' + BeanDefinitionWriter.CLASS_SUFFIX)
                 .newInstance()
 
         then:"the default scope is singleton"
@@ -145,7 +145,7 @@ class MyBean {
 }
 ''')
         BeanDefinition beanDefinition = classLoader
-                .loadClass('test.$MyBeanFactory$MyBean0Definition')
+                .loadClass('test.$MyBeanFactory$MyBean0' + BeanDefinitionWriter.CLASS_SUFFIX)
                 .newInstance()
 
         then:"the default scope is singleton"

@@ -16,6 +16,8 @@
 package io.micronaut.core.util;
 
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
+
 import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.IntFunction;
@@ -31,6 +33,7 @@ public class ArrayUtils {
     /**
      * An empty object array.
      */
+    @UsedByGeneratedCode
     public static final Object[] EMPTY_OBJECT_ARRAY = new Object[0];
 
     /**
@@ -170,6 +173,18 @@ public class ArrayUtils {
     public static <T> T[] toArray(Collection<T> collection, IntFunction<T[]> createArrayFn) {
         T[] array = createArrayFn.apply(collection.size());
         return collection.toArray(array);
+    }
+
+    /**
+     * Returns an array containing all of the elements in this collection, using the item class.
+     *
+     * @param collection The collection
+     * @param arrayItemClass The array item class
+     * @param <T> The type of the array
+     * @return The array
+     */
+    public static <T> T[] toArray(Collection<T> collection, Class<T> arrayItemClass) {
+        return (T[]) collection.toArray((Object[]) Array.newInstance(arrayItemClass, collection.size()));
     }
 
     /**

@@ -15,11 +15,10 @@
  */
 package io.micronaut.inject.field.simpleinjection
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
-import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-import io.micronaut.inject.qualifiers.Qualifiers
-import spock.lang.Specification
 
 class FieldInjectionSpec extends AbstractTypeElementSpec {
 
@@ -54,6 +53,34 @@ class Bar {
 
         then:"The implementation is injected"
         b.a != null
+    }
+
+    void "test values injection with private fields"() {
+        BeanContext context = ApplicationContext.run()
+
+        when:
+            E e = context.getBean(E)
+
+        then:
+            e.value == null
+            e.property == null
+
+        cleanup:
+            context.close()
+    }
+
+    void "test values injection with protected fields"() {
+        BeanContext context = ApplicationContext.run()
+
+        when:
+            D e = context.getBean(D)
+
+        then:
+            e.value == null
+            e.property == null
+
+        cleanup:
+            context.close()
     }
 }
 
