@@ -822,6 +822,7 @@ subprojects { Project subproject ->
             }
         }
         compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
+        testAnnotationProcessor project(":http-validation")
         testImplementation "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
         testImplementation dependencyModuleVersion("groovy", "groovy")
         testImplementation(dependencyVersion("spock")) {
