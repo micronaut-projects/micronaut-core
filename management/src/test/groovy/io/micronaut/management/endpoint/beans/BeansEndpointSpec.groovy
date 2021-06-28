@@ -18,10 +18,10 @@ package io.micronaut.management.endpoint.beans
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpResponse
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 class BeansEndpointSpec extends Specification {
@@ -44,7 +44,7 @@ class BeansEndpointSpec extends Specification {
         response.code() == HttpStatus.OK.code
         beans["io.micronaut.management.endpoint.beans.\$BeansEndpointDefinition"].dependencies.contains("io.micronaut.context.BeanContext")
         beans["io.micronaut.management.endpoint.beans.\$BeansEndpointDefinition"].dependencies.contains("io.micronaut.management.endpoint.beans.BeanDefinitionDataCollector")
-        beans["io.micronaut.management.endpoint.beans.\$BeansEndpointDefinition"].scope == "io.micronaut.management.endpoint.annotation.Endpoint"
+        beans["io.micronaut.management.endpoint.beans.\$BeansEndpointDefinition"].scope == AnnotationUtil.SINGLETON
         beans["io.micronaut.management.endpoint.beans.\$BeansEndpointDefinition"].type == "io.micronaut.management.endpoint.beans.BeansEndpoint"
 
         cleanup:

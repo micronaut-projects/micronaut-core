@@ -293,6 +293,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         return targetElement.annotate(Property.class, (builder) -> builder.member("name", propertyMetadata.getPath())).getAnnotationMetadata();
     }
 
+    private boolean isDeclaredBeanInMetadata(AnnotationMetadata concreteClassMetadata) {
+        return concreteClassMetadata.hasDeclaredStereotype(Bean.class) ||
+                concreteClassMetadata.hasStereotype(AnnotationUtil.SCOPE) ||
+                concreteClassMetadata.hasStereotype(DefaultScope.class);
+    }
+
     /**
      * Annotation Bean element visitor.
      */
@@ -619,6 +625,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                         if (annotationUtils.isAnnotated(introductionType.getName(), method) || JavaAnnotationMetadataBuilder.hasAnnotation(method, Override.class)) {
                             annotationMetadata = annotationUtils.newAnnotationBuilder().buildForParent(introductionType.getName(), classElement, method);
+                            annotationMetadata = new AnnotationMetadataHierarchy(typeAnnotationMetadata, annotationMetadata);
                         } else {
                             annotationMetadata = new AnnotationMetadataReference(
                                     aopProxyWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
@@ -747,7 +754,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             // handle @Bean annotation for @Factory class
             JavaMethodElement javaMethodElement = elementFactory.newMethodElement(concreteClassElement, method, methodAnnotationMetadata);
             if (isFactoryType && javaMethodElement.hasDeclaredStereotype(Bean.class.getName(), AnnotationUtil.SCOPE) && !javaMethodElement.getReturnType().isPrimitive()) {
-                visitBeanFactoryElement(method);
+                if (!modelUtils.overridingOrHidingMethod(method, concreteClass, true).isPresent()) {
+                    visitBeanFactoryElement(method);
+                }
                 return null;
             }
 
@@ -1109,14 +1118,15 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             if (StringUtils.isNotEmpty(destroyMethodName)) {
                                 TypeElement destroyMethodDeclaringClass = (TypeElement) typeUtils.asElement(producedType);
                                 ClassElement destroyMethodDeclaringElement = elementFactory.newClassElement(destroyMethodDeclaringClass, AnnotationMetadata.EMPTY_METADATA);
-                                final Optional<ExecutableElement> destroyMethodRef = modelUtils.findAccessibleNoArgumentInstanceMethod(destroyMethodDeclaringClass, destroyMethodName);
-                                if (destroyMethodRef.isPresent()) {
-                                    ExecutableElement executableElement = destroyMethodRef.get();
-                                    MethodElement destroyMethodElement = elementFactory.newMethodElement(
-                                            declaringClassElement,
-                                            executableElement,
-                                            AnnotationMetadata.EMPTY_METADATA
-                                    );
+                                final Optional<MethodElement> destroyMethod = destroyMethodDeclaringElement.getEnclosedElement(
+                                        ElementQuery.ALL_METHODS
+                                                .onlyAccessible(concreteClassElement)
+                                                .onlyInstance()
+                                                .named((name) -> name.equals(destroyMethodName))
+                                                .filter((e) -> !e.hasParameters())
+                                );
+                                if (destroyMethod.isPresent()) {
+                                    MethodElement destroyMethodElement = destroyMethod.get();
                                     beanMethodWriter.visitPreDestroyMethod(
                                             destroyMethodDeclaringElement,
                                             destroyMethodElement,
@@ -2011,7 +2021,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         private BeanDefinitionWriter createFactoryBeanMethodWriterFor(Element method, TypeElement producedElement) {
-            AnnotationMetadata annotationMetadata = annotationUtils.newAnnotationBuilder().buildForParent(producedElement, method, true);
+            AnnotationMetadata annotationMetadata = annotationUtils.newAnnotationBuilder().buildForParent(producedElement, method, false);
+
+            annotationMetadata = new AnnotationMetadataHierarchy(
+                    concreteClassMetadata,
+                    annotationMetadata
+            );
             io.micronaut.inject.ast.Element factoryElement;
             if (method instanceof ExecutableElement) {
                 factoryElement = elementFactory.newMethodElement(
@@ -2047,12 +2062,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             return shouldExclude(configurationMetadata.getIncludes(), configurationMetadata.getExcludes(), propertyName);
         }
 
-    }
-
-    private boolean isDeclaredBeanInMetadata(AnnotationMetadata concreteClassMetadata) {
-        return concreteClassMetadata.hasDeclaredStereotype(Bean.class) ||
-                concreteClassMetadata.hasStereotype(AnnotationUtil.SCOPE) ||
-                concreteClassMetadata.hasStereotype(DefaultScope.class);
     }
 
     /**

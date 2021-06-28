@@ -37,13 +37,6 @@ public class HttpContentUtil {
     public static final byte[] COMMA = ",".getBytes(StandardCharsets.UTF_8);
 
     /**
-     * @return Produces HTTP content for {@code [}
-     */
-    public static HttpContent openBracket() {
-        return new DefaultHttpContent(Unpooled.wrappedBuffer(OPEN_BRACKET));
-    }
-
-    /**
      * @return Produces HTTP content for {@code ]}
      */
     public static HttpContent closeBracket() {

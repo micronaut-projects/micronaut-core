@@ -22,13 +22,16 @@ import io.micronaut.http.annotation.Header
 import io.micronaut.http.client.annotation.Client
 import reactor.core.publisher.Mono
 
+import javax.validation.constraints.Min
+import javax.validation.constraints.NotBlank
+
 // tag::class[]
 @Client("/pets")
 @Header(name="X-Pet-Client", value='${pet.client.id}')
 interface PetClient extends PetOperations {
 
     @Override
-    Mono<Pet> save(String name, int age)
+    Mono<Pet> save(@NotBlank String name, @Min(1L) int age)
 
     @Get("/{name}")
     Mono<Pet> get(String name)

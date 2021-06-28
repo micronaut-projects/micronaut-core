@@ -35,6 +35,8 @@ import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Provided;
+import io.micronaut.context.annotation.Requirements;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
@@ -348,6 +350,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             this.providedBeanClassName = beanFullClassName;
             this.beanDefinitionName = getBeanDefinitionName(packageName, beanSimpleClassName);
         } else if (beanProducingElement instanceof MethodElement) {
+            // copy the requirements from the factory class to the method
+            inheritTypeLevelRequirements(beanProducingElement);
             autoApplyNamedToBeanProducingElement(beanProducingElement);
             MethodElement factoryMethodElement = (MethodElement) beanProducingElement;
             final ClassElement producedElement = factoryMethodElement.getGenericReturnType();
@@ -364,6 +368,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             final ClassElement declaringType = factoryMethodElement.getDeclaringType();
             this.beanDefinitionName = declaringType.getPackageName() + ".$" + declaringType.getSimpleName() + "$" + upperCaseMethodName + uniqueIdentifier + "Definition";
         } else if (beanProducingElement instanceof FieldElement) {
+            inheritTypeLevelRequirements(beanProducingElement);
             autoApplyNamedToBeanProducingElement(beanProducingElement);
             FieldElement factoryMethodElement = (FieldElement) beanProducingElement;
             final ClassElement producedElement = factoryMethodElement.getGenericField();
@@ -413,6 +418,16 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.isConfigurationProperties = annotationMetadata.hasDeclaredStereotype(ConfigurationProperties.class);
         validateExposedTypes(annotationMetadata, visitorContext);
 
+    }
+
+    private void inheritTypeLevelRequirements(Element beanProducingElement) {
+        final List<AnnotationValue<Requires>> requirements = ((MemberElement) beanProducingElement).getDeclaringType()
+                                                                        .getDeclaredAnnotationValuesByType(Requires.class);
+        if (!requirements.isEmpty()) {
+            beanProducingElement.annotate(Requirements.class, (builder) ->
+                    builder.member(AnnotationMetadata.VALUE_MEMBER, requirements.toArray(new AnnotationValue[0]))
+            );
+        }
     }
 
     @NonNull
@@ -493,7 +508,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public boolean isSingleton() {
-        return annotationMetadata.hasDeclaredStereotype(AnnotationUtil.SINGLETON);
+        String scope = annotationMetadata.getAnnotationNameByStereotype(AnnotationUtil.SCOPE).orElse(null);
+        return isSingleton(scope);
     }
 
     @Override
@@ -858,15 +874,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
 
         // method: boolean isSingleton()
-
         AnnotationMetadata annotationMetadata = this.annotationMetadata != null ? this.annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
+        String scope = annotationMetadata.getAnnotationNameByStereotype(AnnotationUtil.SCOPE).orElse(null);
         writeBooleanMethod(classWriter, "isSingleton", () ->
-                annotationMetadata.hasDeclaredStereotype(AnnotationUtil.SINGLETON) ||
-                        (!annotationMetadata.hasDeclaredStereotype(AnnotationUtil.SCOPE) &&
-                                annotationMetadata.hasDeclaredStereotype(DefaultScope.class) &&
-                                annotationMetadata.stringValue(DefaultScope.class)
-                                        .map(t -> t.equals(Singleton.class.getName()) || t.equals(AnnotationUtil.SINGLETON))
-                                        .orElse(false)));
+                isSingleton(scope)
+        );
 
         // method: boolean isIterable()
         writeBooleanMethod(classWriter, "isIterable", () ->
@@ -881,28 +893,71 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         writeBooleanMethod(classWriter, "isProvided", () ->
                 annotationMetadata.hasDeclaredStereotype(Provided.class));
 
+
+
+        // method: Optional<String> getScopeName()
         // method: Optional<Class> getScope()
         GeneratorAdapter getScopeMethod = startPublicMethodZeroArgs(
                 classWriter,
                 Optional.class,
                 "getScope"
         );
+        GeneratorAdapter getScopeNameMethod = startPublicMethodZeroArgs(
+                classWriter,
+                Optional.class,
+                "getScopeName"
+        );
         getScopeMethod.loadThis();
-        Optional<String> scope = annotationMetadata.getDeclaredAnnotationNameByStereotype(AnnotationUtil.SCOPE);
-        if (scope.isPresent()) {
-            getScopeMethod.push(getTypeReferenceForName(scope.get()));
+        getScopeNameMethod.loadThis();
+
+        if (scope != null) {
+            getScopeMethod.push(getTypeReferenceForName(scope));
             getScopeMethod.invokeStatic(
+                    TYPE_OPTIONAL,
+                    METHOD_OPTIONAL_OF
+            );
+            getScopeNameMethod.push(scope);
+            getScopeNameMethod.invokeStatic(
                     TYPE_OPTIONAL,
                     METHOD_OPTIONAL_OF
             );
         } else {
             getScopeMethod.invokeStatic(TYPE_OPTIONAL, METHOD_OPTIONAL_EMPTY);
+            getScopeNameMethod.invokeStatic(TYPE_OPTIONAL, METHOD_OPTIONAL_EMPTY);
         }
+
+
 
         getScopeMethod.returnValue();
         getScopeMethod.visitMaxs(1, 1);
         getScopeMethod.visitEnd();
+        getScopeNameMethod.returnValue();
+        getScopeNameMethod.visitMaxs(1, 1);
+        getScopeNameMethod.visitEnd();
 
+
+    }
+
+    private boolean isSingleton(String scope) {
+        if (beanProducingElement instanceof FieldElement && beanProducingElement.isFinal()) {
+            // final fields can't change so effectively singleton
+            return true;
+        }
+
+        if (scope != null) {
+            return scope.equals(Singleton.class.getName()) || scope.equals(AnnotationUtil.SINGLETON);
+        } else {
+            final AnnotationMetadata annotationMetadata;
+            if (beanProducingElement instanceof ClassElement) {
+                annotationMetadata = getAnnotationMetadata();
+            } else {
+                annotationMetadata = beanProducingElement.getDeclaredMetadata();
+            }
+
+            return annotationMetadata.stringValue(DefaultScope.class)
+                    .map(t -> t.equals(Singleton.class.getName()) || t.equals(AnnotationUtil.SINGLETON))
+                    .orElse(false);
+        }
     }
 
     private void lookupReferenceAnnotationMetadata(GeneratorAdapter annotationMetadataMethod) {
@@ -1129,7 +1184,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
             annotationMetadata = new AnnotationMetadataHierarchy(
                     new AnnotationMetadataReference(getBeanDefinitionReferenceClassName(), this.annotationMetadata),
-                    ((AnnotationMetadataHierarchy) annotationMetadata).getDeclaredMetadata()
+                    annotationMetadata.getDeclaredMetadata()
             );
         }
 

@@ -17,7 +17,12 @@ package io.micronaut.core.annotation;
 
 import javax.annotation.Nonnull;
 import javax.annotation.meta.TypeQualifierNickname;
-import java.lang.annotation.*;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
 
 
 /**
@@ -30,9 +35,9 @@ import java.lang.annotation.*;
  * <p>Use {@code @NonNullApi} (scope = parameters + return values) to set the default behavior to non-nullable in order to avoid annotating
  * your whole codebase with {@code @NonNull}.</p>
  *
- * @since 2.4
  * @author graemerocher
  * @see Nullable
+ * @since 2.4
  */
 @Target({ElementType.METHOD, ElementType.PARAMETER, ElementType.FIELD, ElementType.ANNOTATION_TYPE})
 @Retention(RetentionPolicy.RUNTIME)

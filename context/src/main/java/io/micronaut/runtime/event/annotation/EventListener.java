@@ -45,6 +45,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target({ElementType.ANNOTATION_TYPE, ElementType.METHOD})
 @Adapter(ApplicationEventListener.class) // <1>
 @Indexed(ApplicationEventListener.class)
+@Inherited
 public @interface EventListener {
 }
 // end::clazz[]

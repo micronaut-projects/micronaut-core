@@ -30,6 +30,12 @@ import java.util.*;
  */
 public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, AnnotationMetadata {
 
+    @NonNull
+    @Override
+    default AnnotationMetadata getDeclaredMetadata() {
+        return getAnnotationMetadata().getDeclaredMetadata();
+    }
+
     @Override
     default boolean hasSimpleAnnotation(@Nullable String annotation) {
         return getAnnotationMetadata().hasSimpleAnnotation(annotation);

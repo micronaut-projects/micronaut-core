@@ -200,6 +200,7 @@ class FiltersSpec extends Specification {
 
     @Order(100) //to show that @Order is not supported
     @Filter(Filter.MATCH_ALL_PATTERN)
+    @Requires(property = 'spec.name', value = 'FiltersSpec')
     static class Filter1 extends AbstractFilter {
 
         @Override
@@ -209,6 +210,7 @@ class FiltersSpec extends Specification {
     }
 
     @Filter("/filters**")
+    @Requires(property = 'spec.name', value = 'FiltersSpec')
     static class Filter2 extends AbstractFilter {
 
         @Override
@@ -219,6 +221,7 @@ class FiltersSpec extends Specification {
 
     @Requires(property = 'enableFilter3', value = 'true')
     @Filter("/filters**")
+    @Requires(property = 'spec.name', value = 'FiltersSpec')
     static class Filter3 extends AbstractFilter {
 
         @Inject
@@ -238,6 +241,7 @@ class FiltersSpec extends Specification {
 
     @Requires(property = 'badFilter', value = 'true')
     @Filter("/filters**")
+    @Requires(property = 'spec.name', value = 'FiltersSpec')
     static class FilterBadFilter3 extends AbstractFilter {
 
         @Override
@@ -252,6 +256,7 @@ class FiltersSpec extends Specification {
     }
 
     @Filter(Filter.MATCH_ALL_PATTERN)
+    @Requires(property = 'spec.name', value = 'FiltersSpec')
     static class Filter4 extends AbstractFilter {
 
         @Override
@@ -261,6 +266,7 @@ class FiltersSpec extends Specification {
     }
 
     @Filter("/filters**")
+    @Requires(property = 'spec.name', value = 'FiltersSpec')
     static class Filter5 extends AbstractFilter {
 
         @Override
@@ -270,6 +276,7 @@ class FiltersSpec extends Specification {
     }
 
     @Filter(Filter.MATCH_ALL_PATTERN)
+    @Requires(property = 'spec.name', value = 'FiltersSpec')
     static class Filter6 extends AbstractFilter {
 
         @Override
@@ -279,6 +286,7 @@ class FiltersSpec extends Specification {
     }
 
     @Filter("/filters**")
+    @Requires(property = 'spec.name', value = 'FiltersSpec')
     static class Filter7 extends AbstractFilter {
 
         @Override
@@ -287,7 +295,6 @@ class FiltersSpec extends Specification {
         }
     }
 
-    @Requires(property = 'spec.name', value = 'FiltersSpec')
     static abstract class AbstractFilter implements HttpServerFilter {
 
         String doFilterExecutedOn

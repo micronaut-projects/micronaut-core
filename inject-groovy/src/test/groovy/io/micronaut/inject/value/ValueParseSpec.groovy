@@ -7,8 +7,8 @@ class ValueParseSpec extends AbstractBeanDefinitionSpec{
 
     void 'test value annotation present'() {
         given:
-        def definition = buildBeanDefinition('test.A', '''
-package test;
+        def definition = buildBeanDefinition('io.micronaut.inject.value.A', '''
+package io.micronaut.inject.value;
 import io.micronaut.context.annotation.Value;
 
 @jakarta.inject.Singleton

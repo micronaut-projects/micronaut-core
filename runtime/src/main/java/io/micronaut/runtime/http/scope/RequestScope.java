@@ -16,6 +16,7 @@
 package io.micronaut.runtime.http.scope;
 
 import io.micronaut.runtime.context.scope.ScopedProxy;
+import jakarta.inject.Scope;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -34,5 +35,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.TYPE, ElementType.METHOD})
+@Scope
 public @interface RequestScope {
 }

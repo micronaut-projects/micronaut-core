@@ -28,8 +28,8 @@ import io.micronaut.inject.writer.BeanDefinitionVisitor
 class InheritedAnnotationMetadataSpec extends AbstractBeanDefinitionSpec {
     void "test that annotation metadata is inherited from overridden methods for introduction advice"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
-package test;
+        BeanDefinition beanDefinition = buildBeanDefinition('inheritmetadatatest1.MyBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package inheritmetadatatest1;
 
 import io.micronaut.aop.introduction.*;
 import io.micronaut.context.annotation.*;
@@ -59,8 +59,8 @@ interface MyInterface {
 
     void "test that annotation metadata is inherited from overridden methods for around advice"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.$MyBean2Definition$Intercepted', '''
-package test;
+        BeanDefinition beanDefinition = buildBeanDefinition('inheritmetadatatest2.$MyBean2Definition$Intercepted', '''
+package inheritmetadatatest2;
 
 import io.micronaut.aop.interceptors.*;
 import io.micronaut.context.annotation.*;
@@ -99,8 +99,8 @@ interface MyInterface2 {
 
     void "test that a bean definition is not created for an abstract class"() {
         when:
-        ApplicationContext ctx = buildContext('test.$BaseServiceDefinition$Intercepted', '''
-package test;
+        ApplicationContext ctx = buildContext('inheritmetadatatest3.$BaseServiceDefinition$Intercepted', '''
+package inheritmetadatatest3;
 
 import io.micronaut.aop.*;
 import io.micronaut.context.annotation.*;
@@ -153,23 +153,23 @@ class SomeInterceptor implements MethodInterceptor<Object, Object>, Ordered {
 
 ''')
         then:
-        Class clazz = ctx.classLoader.loadClass("test.ContractService")
+        Class clazz = ctx.classLoader.loadClass("inheritmetadatatest3.ContractService")
         ctx.getBean(clazz)
 
         when:
-        ctx.classLoader.loadClass("test.\$BaseServiceDefinition\$Intercepted")
+        ctx.classLoader.loadClass("inheritmetadatatest3.\$BaseServiceDefinition\$Intercepted")
 
         then:
         thrown(ClassNotFoundException)
 
         when:
-        ctx.classLoader.loadClass("test.\$BaseServiceDefinition")
+        ctx.classLoader.loadClass("inheritmetadatatest3.\$BaseServiceDefinition")
 
         then:
         thrown(ClassNotFoundException)
 
         when:
-        ctx.classLoader.loadClass("test.\$BaseAnnotatedServiceDefinition")
+        ctx.classLoader.loadClass("inheritmetadatatest3.\$BaseAnnotatedServiceDefinition")
 
         then:
         thrown(ClassNotFoundException)

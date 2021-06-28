@@ -283,7 +283,7 @@ public interface BeanDefinitionRegistry {
      * @return The beans
      * @since 2.4.0
      */
-    @NonNull <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Class<T> beanType, @NonNull Qualifier<T> qualifier);
+    @NonNull <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
      * Find and if necessary initialize {@link javax.inject.Singleton} beans for the given bean type, returning all the active registrations. Note that
@@ -295,7 +295,7 @@ public interface BeanDefinitionRegistry {
      * @return The beans
      * @since 3.0.0
      */
-    default @NonNull <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Argument<T> beanType, @NonNull Qualifier<T> qualifier) {
+    default @NonNull <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return getBeanRegistrations(
                 Objects.requireNonNull(beanType, "Bean type cannot be null").getType(),
                 qualifier
@@ -312,7 +312,7 @@ public interface BeanDefinitionRegistry {
      * @throws NoSuchBeanException if the bean doesn't exist
      * @since 2.4.0
      */
-    @NonNull <T> BeanRegistration<T> getBeanRegistration(@NonNull Class<T> beanType, @NonNull Qualifier<T> qualifier);
+    @NonNull <T> BeanRegistration<T> getBeanRegistration(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
      * Find a bean registration for the given bean type and optional qualifier.
@@ -324,7 +324,7 @@ public interface BeanDefinitionRegistry {
      * @throws NoSuchBeanException if the bean doesn't exist
      * @since 3.0.0
      */
-    default @NonNull <T> BeanRegistration<T> getBeanRegistration(@NonNull Argument<T> beanType, @NonNull Qualifier<T> qualifier) {
+    default @NonNull <T> BeanRegistration<T> getBeanRegistration(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return getBeanRegistration(
                 Objects.requireNonNull(beanType, "Bean type cannot be null").getType(),
                 qualifier
