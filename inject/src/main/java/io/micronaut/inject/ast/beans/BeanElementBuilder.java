@@ -205,4 +205,10 @@ public interface BeanElementBuilder extends ConfigurableElement {
     default <T extends Annotation> BeanElementBuilder annotate(@NonNull Class<T> annotationType) {
         return (BeanElementBuilder) ConfigurableElement.super.annotate(annotationType);
     }
+
+    /**
+     * Dependency inject this bean.
+     * @return this bean builder
+     */
+    BeanElementBuilder inject();
 }
