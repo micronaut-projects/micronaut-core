@@ -3,12 +3,15 @@ package io.micronaut.inject.beanbuilder
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.Intercepted
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.core.annotation.NonNull
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.annotation.AnnotationTransformer
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.inject.visitor.TypeElementVisitor
 
 import java.lang.annotation.Annotation
+import java.util.function.Supplier
 
 class BeanElementBuilderSpec extends AbstractTypeElementSpec {
 
@@ -60,10 +63,23 @@ class SomeBean {
         interceptorForBean.registration.bean.invoked
 
         when:"A bean is retrieved that uses a custom createWith from a static method"
-        def bean = context.getBean(TestBeanWithStaticCreator)
+        def bean = context.getBean(BeanWithStaticCreator)
 
         then:"The bean was created"
         bean
+
+        when:"A non exposed type is used"
+        context.getBean(TestBeanWithStaticCreator)
+
+        then:
+        thrown(NoSuchBeanException)
+
+        when:
+        def definition = context.getBeanDefinition(TestInterceptorAdapter)
+
+        then:
+        definition
+        !definition.getTypeArguments(Supplier).isEmpty()
     }
 
     @Override

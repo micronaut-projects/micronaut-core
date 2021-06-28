@@ -17,6 +17,7 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
@@ -75,8 +76,9 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     private final List<BeanMethodElement> postConstructMethods = new ArrayList<>(5);
     private final List<BeanFieldElement> injectedFields = new ArrayList<>(5);
     private MethodElement constructorElement;
-    private Map<String, ClassElement> typeArguments;
+    private Map<String, Map<String, ClassElement>> typeArguments;
     private BeanParameterElement[] beanElementParameters;
+    private ClassElement[] exposedTypes;
 
     /**
      * Default constructor.
@@ -151,11 +153,39 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
 
     @NonNull
     @Override
+    public BeanElementBuilder typed(ClassElement... types) {
+        if (ArrayUtils.isNotEmpty(types)) {
+            this.exposedTypes = types;
+        }
+        return this;
+    }
+
+    @NonNull
+    @Override
     public BeanElementBuilder typeArguments(@NonNull ClassElement... types) {
         final Map<String, ClassElement> typeArguments = this.beanType.getTypeArguments();
         Map<String, ClassElement> resolvedTypes = resolveTypeArguments(typeArguments, types);
         if (resolvedTypes != null) {
-            this.typeArguments = resolvedTypes;
+            if (this.typeArguments == null) {
+                this.typeArguments = new LinkedHashMap<>();
+            }
+            this.typeArguments.put(beanType.getName(), typeArguments);
+        }
+        return this;
+    }
+
+    @NonNull
+    @Override
+    public BeanElementBuilder typeArgumentsForType(ClassElement type, @NonNull ClassElement... types) {
+        if (type != null) {
+            final Map<String, ClassElement> typeArguments = type.getTypeArguments();
+            Map<String, ClassElement> resolvedTypes = resolveTypeArguments(typeArguments, types);
+            if (resolvedTypes != null) {
+                if (this.typeArguments == null) {
+                    this.typeArguments = new LinkedHashMap<>();
+                }
+                this.typeArguments.put(type.getName(), typeArguments);
+            }
         }
         return this;
     }
@@ -264,6 +294,11 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
      */
     @Nullable
     public BeanDefinitionWriter build() {
+        if (exposedTypes != null) {
+            final AnnotationClassValue[] annotationClassValues =
+                    Arrays.stream(exposedTypes).map(ce -> new AnnotationClassValue<>(ce.getName())).toArray(AnnotationClassValue[]::new);
+            annotate(Bean.class, (builder) -> builder.member("typed", annotationClassValues));
+        }
         final BeanDefinitionWriter beanDefinitionWriter = new BeanDefinitionWriter(
                 this,
                 OriginatingElements.of(originatingElement),
@@ -272,10 +307,9 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                 identifier
         );
         if (typeArguments != null) {
-            beanDefinitionWriter.visitTypeArguments(Collections.singletonMap(
-                    beanType.getName(), this.typeArguments
-            ));
+            beanDefinitionWriter.visitTypeArguments(this.typeArguments);
         }
+
         if (constructorElement == null) {
             constructorElement = beanType.getPrimaryConstructor().orElse(null);
         }
