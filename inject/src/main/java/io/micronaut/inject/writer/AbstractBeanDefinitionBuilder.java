@@ -17,6 +17,7 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
@@ -77,6 +78,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     private MethodElement constructorElement;
     private Map<String, Map<String, ClassElement>> typeArguments;
     private BeanParameterElement[] beanElementParameters;
+    private ClassElement[] exposedTypes;
 
     /**
      * Default constructor.
@@ -145,6 +147,15 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         if (element != null) {
             constructorElement = element;
             this.beanElementParameters = initBeanParameters(element.getParameters());
+        }
+        return this;
+    }
+
+    @NonNull
+    @Override
+    public BeanElementBuilder typed(ClassElement... types) {
+        if (ArrayUtils.isNotEmpty(types)) {
+            this.exposedTypes = types;
         }
         return this;
     }
@@ -283,6 +294,11 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
      */
     @Nullable
     public BeanDefinitionWriter build() {
+        if (exposedTypes != null) {
+            final AnnotationClassValue[] annotationClassValues =
+                    Arrays.stream(exposedTypes).map(ce -> new AnnotationClassValue<>(ce.getName())).toArray(AnnotationClassValue[]::new);
+            annotate(Bean.class, (builder) -> builder.member("typed", annotationClassValues));
+        }
         final BeanDefinitionWriter beanDefinitionWriter = new BeanDefinitionWriter(
                 this,
                 OriginatingElements.of(originatingElement),
@@ -293,6 +309,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         if (typeArguments != null) {
             beanDefinitionWriter.visitTypeArguments(this.typeArguments);
         }
+
         if (constructorElement == null) {
             constructorElement = beanType.getPrimaryConstructor().orElse(null);
         }

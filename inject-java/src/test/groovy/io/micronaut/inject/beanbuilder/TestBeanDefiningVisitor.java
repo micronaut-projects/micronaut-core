@@ -4,6 +4,7 @@ import io.micronaut.aop.InterceptorBean;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.InterceptorBindingDefinitions;
 import io.micronaut.aop.InterceptorKind;
+import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.env.Environment;
@@ -38,6 +39,7 @@ public class TestBeanDefiningVisitor implements TypeElementVisitor<SomeIntercept
         context.getClassElement(TestBeanWithStaticCreator.class)
                 .ifPresent(e ->
                         element.addAssociatedBean(e)
+                                .typed(ClassElement.of(BeanWithStaticCreator.class))
                                .createWith(e.getEnclosedElement(
                                        ElementQuery.ALL_METHODS
                                                .onlyDeclared()

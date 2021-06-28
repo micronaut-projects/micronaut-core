@@ -52,6 +52,7 @@ public interface BeanElementBuilder extends ConfigurableElement {
     @NonNull
     ClassElement getBeanType();
 
+
     /**
      * Specifies the bean will created with the given method element. If
      * not specified the bean will be created with {@link ClassElement#getPrimaryConstructor()}.
@@ -68,6 +69,13 @@ public interface BeanElementBuilder extends ConfigurableElement {
      * @return This bean builder
      */
     @NonNull BeanElementBuilder createWith(@NonNull MethodElement element);
+
+    /**
+     * Alters the exposed types for the bean limiting the exposed type to the given types.
+     * @param types 1 or more types to expose
+     * @return This builder
+     */
+    @NonNull BeanElementBuilder typed(ClassElement...types);
 
     /**
      * Fills the type arguments for the bean with the given types.
