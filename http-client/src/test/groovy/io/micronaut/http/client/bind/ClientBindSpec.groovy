@@ -1,6 +1,6 @@
 package io.micronaut.http.client.bind
 
-
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -59,14 +59,13 @@ class ClientBindSpec extends Specification {
 
     void "test deep object format query values"() {
         given:
-        var house = new House("white", 2, 120, new Door("red"))
+        var house = new House("white", 2, 120)
 
         expect:
         var result = bindClient.deepObjectQueryValue(house)
         result.contains("house[nFloors]=2")
         result.contains("house[color]=white")
         result.contains("house[area]=120.0")
-        result.contains("house[door][color]=red")
     }
 
     void "test bind to method"() {
@@ -133,26 +132,29 @@ class ClientBindSpec extends Specification {
             return request.getUri().getQuery()
         }
     }
+}
 
-    class House {
-        String color
-        Integer nFloors
-        Float area
-        Door door
+@Introspected
+class House {
+    String color
+    Integer nFloors
+    Float area
 
-        House(String color, Integer nFloors, Float area, Door door) {
-            this.color = color
-            this.nFloors = nFloors
-            this.area = area
-            this.door = door
-        }
+    House(String color, Integer nFloors, Float area) {
+        this.color = color
+        this.nFloors = nFloors
+        this.area = area
     }
 
-    class Door {
-        String color
+    String getColor() {
+        return color
+    }
 
-        Door(String color) {
-            this.color = color
-        }
+    Integer getNFloors() {
+        return nFloors
+    }
+
+    Float getArea() {
+        return area
     }
 }
