@@ -198,25 +198,32 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         @Override
         public Path pushConstructorResolve(BeanDefinition declaringType, Argument argument) {
             ConstructorInjectionPoint constructor = declaringType.getConstructor();
-            if (constructor instanceof ReflectionMethodConstructorInjectionPoint) {
-                ReflectionMethodConstructorInjectionPoint reflectionConstructor = (ReflectionMethodConstructorInjectionPoint) constructor;
-                MethodSegment methodSegment = new MethodSegment(declaringType, reflectionConstructor.getName(), argument, reflectionConstructor.getArguments(), true);
+            if (constructor instanceof MethodInjectionPoint) {
+                MethodInjectionPoint<?, ?> methodInjectionPoint = (MethodInjectionPoint<?, ?>) constructor;
+                return pushConstructorResolve(declaringType, methodInjectionPoint.getName(), argument, constructor.getArguments(), constructor.requiresReflection());
+            }
+            return pushConstructorResolve(declaringType, "<init>", argument, constructor.getArguments(), constructor.requiresReflection());
+        }
+
+        @Override
+        public Path pushConstructorResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments, boolean requiresReflection) {
+            if ("<init>".equals(methodName)) {
+                ConstructorSegment constructorSegment = new ConstructorSegment(declaringType, methodName, argument, arguments);
+                detectCircularDependency(declaringType, argument, constructorSegment);
+            } else {
+                MethodSegment methodSegment = new MethodSegment(declaringType, methodName, argument, arguments, requiresReflection);
                 if (contains(methodSegment)) {
                     throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, "Circular dependency detected");
                 } else {
                     path.push(methodSegment);
                 }
-            } else {
-                ConstructorSegment constructorSegment = new ConstructorSegment(declaringType, argument);
-                detectCircularDependency(declaringType, argument, constructorSegment);
             }
             return this;
         }
 
         @Override
         public Path pushBeanCreate(BeanDefinition<?> declaringType, Argument<?> beanType) {
-            path.push(new ConstructorSegment(declaringType, beanType));
-            return this;
+            return pushConstructorResolve(declaringType, beanType);
         }
 
         @Override
@@ -309,31 +316,33 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      */
     static class ConstructorSegment extends AbstractSegment {
 
+        private final String methodName;
+        private final Argument[] arguments;
+
         /**
          * @param declaringClass The declaring class
+         * @param methodName     The methodName
          * @param argument       The argument
+         * @param arguments      The arguments
          */
-        ConstructorSegment(BeanDefinition declaringClass, Argument argument) {
+        ConstructorSegment(BeanDefinition declaringClass, String methodName, Argument argument, Argument[] arguments) {
             super(declaringClass, declaringClass.getBeanType().getName(), argument);
+            this.methodName = methodName;
+            this.arguments = arguments;
         }
 
         @Override
         public String toString() {
-            // TODO: reduce getConstructor usage
-            ConstructorInjectionPoint constructorInjectionPoint = getDeclaringType().getConstructor();
-            if (constructorInjectionPoint instanceof MethodInjectionPoint) {
-                MethodInjectionPoint methodInjectionPoint = (MethodInjectionPoint) constructorInjectionPoint;
-                StringBuilder baseString = new StringBuilder(methodInjectionPoint.getDeclaringBean().getBeanType().getSimpleName()).append('.');
-                baseString.append(methodInjectionPoint.getName());
-                outputArguments(baseString, methodInjectionPoint.getArguments());
-                return baseString.toString();
+            StringBuilder baseString;
+            if ("<init>".equals(methodName)) {
+                baseString = new StringBuilder("new ");
+                baseString.append(getDeclaringType().getBeanType().getSimpleName());
             } else {
-                StringBuilder baseString = new StringBuilder("new ");
-                BeanDefinition declaringType = getDeclaringType();
-                baseString.append(declaringType.getBeanType().getSimpleName());
-                outputArguments(declaringType, baseString);
-                return baseString.toString();
+                baseString = new StringBuilder(getDeclaringType().getBeanType().getSimpleName()).append('.');
+                baseString.append(methodName);
             }
+            outputArguments(baseString, arguments);
+            return baseString.toString();
         }
 
         @Override
@@ -533,15 +542,6 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             result = 31 * result + name.hashCode();
             result = 31 * result + argument.hashCode();
             return result;
-        }
-
-        /**
-         * @param declaringType The declaring type
-         * @param baseString    The base string
-         */
-        void outputArguments(BeanDefinition declaringType, StringBuilder baseString) {
-            Argument[] arguments = declaringType.getConstructor().getArguments();
-            outputArguments(baseString, arguments);
         }
 
         /**

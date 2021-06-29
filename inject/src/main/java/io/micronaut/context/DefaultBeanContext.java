@@ -2333,7 +2333,7 @@ public class DefaultBeanContext implements BeanContext {
 
         if (bean != null) {
             Qualifier<T> finalQualifier = qualifier != null ? qualifier : declaredQualifier;
-            if (!BeanCreatedEventListener.class.isInstance(bean) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
+            if (!(bean instanceof BeanCreatedEventListener) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
                 for (Map.Entry<Class, List<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
                     if (entry.getKey().isAssignableFrom(beanType)) {
                         BeanKey<T> beanKey = new BeanKey<>(beanDefinition, finalQualifier);

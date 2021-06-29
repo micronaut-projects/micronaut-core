@@ -324,19 +324,39 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
         } else {
             if (constructor instanceof MethodReference) {
                 MethodReference methodConstructor = (MethodReference) constructor;
-                if (methodConstructor.requiresReflection) {
-                    this.constructorInjectionPoint = new ReflectionConstructorInjectionPoint<>(
-                            this,
-                            methodConstructor.declaringType,
-                            methodConstructor.annotationMetadata,
-                            methodConstructor.arguments);
+                if ("<init>".equals(methodConstructor.methodName)) {
+                    if (methodConstructor.requiresReflection) {
+                        this.constructorInjectionPoint = new ReflectionConstructorInjectionPoint<>(
+                                this,
+                                methodConstructor.declaringType,
+                                methodConstructor.annotationMetadata,
+                                methodConstructor.arguments);
+                    } else {
+                        this.constructorInjectionPoint = new DefaultConstructorInjectionPoint<>(
+                                this,
+                                methodConstructor.declaringType,
+                                methodConstructor.annotationMetadata,
+                                methodConstructor.arguments
+                        );
+                    }
                 } else {
-                    this.constructorInjectionPoint = new DefaultConstructorInjectionPoint<>(
-                            this,
-                            methodConstructor.declaringType,
-                            methodConstructor.annotationMetadata,
-                            methodConstructor.arguments
-                    );
+                    if (methodConstructor.requiresReflection) {
+                        this.constructorInjectionPoint = new ReflectionMethodConstructorInjectionPoint(
+                                this,
+                                methodConstructor.declaringType,
+                                methodConstructor.methodName,
+                                methodConstructor.arguments,
+                                methodConstructor.annotationMetadata
+                        );
+                    } else {
+                        this.constructorInjectionPoint = new DefaultMethodConstructorInjectionPoint(
+                                this,
+                                methodConstructor.declaringType,
+                                methodConstructor.methodName,
+                                methodConstructor.arguments,
+                                methodConstructor.annotationMetadata
+                        );
+                    }
                 }
             } else if (constructor instanceof FieldReference) {
                 FieldReference fieldConstructor = (FieldReference) constructor;
