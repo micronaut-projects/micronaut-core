@@ -35,6 +35,40 @@ Controller controllerAnn = definition.synthesize(Controller.class);
 
 This approach is not recommended however, as it requires reflection and increases memory consumption due to the use of runtime generated proxies, and should be used as a last resort, for example if you need an instance of the annotation to integrate with a third-party library.
 
+=== Annotation Inheritance
+
+Micronaut will respect the rules defined in Java's jdk:java.lang.reflect.AnnotatedElement[] API with regards to annotation inheritance:
+
+* Annotations meta-annotated with jdk:java.lang.annotation.Inherited[] will be available via the `getAnnotation*` methods of the api:core.annotation.AnnotationMetadata[] API whilst those directly declared are available via the `getDeclaredAnnotation*` methods.
+* Annotations not meta-annotated with jdk:java.lang.annotation.Inherited[] will not be included in the metadata
+
+Micronaut differs from the jdk:java.lang.reflect.AnnotatedElement[] API in that it extends these rules to methods and method parameters such that:
+
+* Any annotations annotated with jdk:java.lang.annotation.Inherited[] and present on a method of interface or super class `A` that is overridden by child interface or class `B` will be inherited into the api:core.annotation.AnnotationMetadata[] retrievable via the api:inject.ExecutableMethod[] API from a api:inject.BeanDefinition[] or an <<aop, AOP interceptor>>.
+* Any annotations annotated with jdk:java.lang.annotation.Inherited[] and present on a method parameter of interface or super class `A` that is overridden by child interface or class `B` will be inherited into the api:core.annotation.AnnotationMetadata[] retrievable via the api:core.type.Argument[] interface from the `getArguments` method of the api:inject.ExecutableMethod[] API.
+
+In general behaviour which you may wish to override is not inherited by default including <<scopes, Bean Scopes>>, <<qualifiers, Bean Qualifiers>>, <<conditionalBeans, Bean Conditions>>, <<validation, Validation Rules>> and so on.
+
+If you wish a particular scope, qualifier, or set of requirements to be inherited when subclassing then you can define a meta-annotation that is annotated with `@Inherited`. For example:
+
+snippet::io.micronaut.docs.inject.anninheritance.SqlRepository[tags="imports, class", indent=0, title="Defining Inherited Meta Annotations"]
+
+<1> The annotation is declared as `@Inherited`
+<2> <<conditionalBeans, Bean Conditions>> will be inherited by child classes
+<3> <<qualifiers, Bean Qualifiers>> will be inherited by child classes
+<4> <<scopes, Bean Scopes>> will be inherited by child classes
+<5> You can also alias annotations and they will be inherited
+
+With this meta-annotation in place you can add the annotation to a super class:
+
+snippet::io.micronaut.docs.inject.anninheritance.BaseSqlRepository[tags="imports, class", indent=0, title="Using Inherited Meta Annotations on a Super Class"]
+
+And then a subclass will inherit all the annotations:
+
+snippet::io.micronaut.docs.inject.anninheritance.BookRepository[tags="imports, class", indent=0, title="Inherting Annotations in a Child Class"]
+
+NOTE: A child class must at least have one bean definition annotation such as a scope or qualifier.
+
 === Aliasing / Mapping Annotations
 
 There are times when you may want to alias the value of an annotation member to the value of another annotation member. To do this, use the ann:io.micronaut.context.annotation.AliasFor[] annotation.

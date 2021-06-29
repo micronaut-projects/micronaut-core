@@ -78,7 +78,7 @@ public class GroovyVisitorContext implements VisitorContext {
      */
     public GroovyVisitorContext(SourceUnit sourceUnit, @Nullable CompilationUnit compilationUnit) {
         this.sourceUnit = sourceUnit;
-        this.errorCollector = sourceUnit.getErrorCollector();
+        this.errorCollector = sourceUnit != null ? sourceUnit.getErrorCollector() : null;
         this.compilationUnit = compilationUnit;
         this.attributes = VISITOR_ATTRIBUTES;
         this.groovyElementFactory = new GroovyElementFactory(this);
@@ -178,7 +178,9 @@ public class GroovyVisitorContext implements VisitorContext {
         } else {
             msg = new SimpleMessage(message, sourceUnit);
         }
-        errorCollector.addError(msg);
+        if (errorCollector != null) {
+            errorCollector.addError(msg);
+        }
     }
 
     @Override

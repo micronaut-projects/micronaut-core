@@ -86,8 +86,8 @@ interface Foo {}
     @Unroll
     void "test generic return type resolution for return type: #returnType"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.Test', """\
-package test;
+        BeanDefinition definition = buildBeanDefinition('generreturntest1.Test', """\
+package generreturntest1;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
@@ -116,8 +116,8 @@ class Test {
 
     void "test type arguments for interface"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.GenericsTest1', '''\
-package test;
+        BeanDefinition definition = buildBeanDefinition('generictest1.GenericsTest1', '''\
+package generictest1;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
@@ -143,8 +143,8 @@ class Foo {}
 
     void "test type arguments for inherited interface"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.GenericsTest2', '''\
-package test;
+        BeanDefinition definition = buildBeanDefinition('generictest2.GenericsTest2', '''\
+package generictest2;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
@@ -171,8 +171,8 @@ interface Foo extends java.util.function.Function<String, Integer> {}
 
     void "test type arguments for superclass with interface"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.GenericsTest3', '''\
-package test;
+        BeanDefinition definition = buildBeanDefinition('generictest3.GenericsTest3', '''\
+package generictest3;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
@@ -198,8 +198,8 @@ abstract class Foo implements java.util.function.Function<String, Integer> {}
 
     void "test type arguments for superclass"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.GenericsTest4', '''\
-package test;
+        BeanDefinition definition = buildBeanDefinition('generictest4.GenericsTest4', '''\
+package generictest4;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
@@ -219,17 +219,17 @@ abstract class Foo<T, R> {
 ''')
         expect:
         definition != null
-        definition.getTypeArguments('test.Foo').size() == 2
-        definition.getTypeArguments('test.Foo')[0].name == 'T'
-        definition.getTypeArguments('test.Foo')[1].name == 'R'
-        definition.getTypeArguments('test.Foo')[0].type == String
-        definition.getTypeArguments('test.Foo')[1].type == Integer
+        definition.getTypeArguments('generictest4.Foo').size() == 2
+        definition.getTypeArguments('generictest4.Foo')[0].name == 'T'
+        definition.getTypeArguments('generictest4.Foo')[1].name == 'R'
+        definition.getTypeArguments('generictest4.Foo')[0].type == String
+        definition.getTypeArguments('generictest4.Foo')[1].type == Integer
     }
 
     void "test type arguments for factory"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.TestFactory$MyFunc0', '''\
-package test;
+        BeanDefinition definition = buildBeanDefinition('generictest5.TestFactory$MyFunc0', '''\
+package generictest5;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
@@ -255,8 +255,8 @@ class TestFactory {
 
     void "test type arguments for factory with AOP advice applied"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.$TestFactory$MyFunc0Definition$Intercepted', '''\
-package test;
+        BeanDefinition definition = buildBeanDefinition('generictest6.$TestFactory$MyFunc0Definition$Intercepted', '''\
+package generictest6;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
@@ -282,8 +282,8 @@ class TestFactory {
     }
 
     void "test type arguments for methods"() {
-        BeanDefinition definition = buildBeanDefinition('test.StatusController', '''
-package test;
+        BeanDefinition definition = buildBeanDefinition('generictest7.StatusController', '''
+package generictest7;
 
 import io.micronaut.http.annotation.*;
 
@@ -310,8 +310,8 @@ class StatusController extends GenericController<String> {
     }
 
     void "test replacing an impl with an interface"() {
-        BeanDefinition definition = buildBeanDefinition('test.FactoryReplace$TestService0', '''
-package test
+        BeanDefinition definition = buildBeanDefinition('generictest8.FactoryReplace$TestService0', '''
+package generictest8
 
 import io.micronaut.context.annotation.*
 import io.micronaut.inject.generics.missing.*

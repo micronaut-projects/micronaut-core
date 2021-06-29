@@ -500,6 +500,7 @@ public record Foo(List<@Min(10) Long> value){
 
         then:
         property != null
+        genericTypeArg.annotationMetadata.hasStereotype(Constraint)
         genericTypeArg.annotationMetadata.hasAnnotation(Min)
         genericTypeArg.annotationMetadata.intValue(Min).getAsInt() == 10
     }
@@ -566,6 +567,7 @@ public record Foo(@javax.validation.constraints.NotBlank String name, int age){
 
         then:
         argument.name == 'name'
+        argument.getAnnotationMetadata().hasStereotype(Constraint)
         argument.getAnnotationMetadata().hasAnnotation(NotBlank)
         test.name == 'test'
         test.name() == 'test'
@@ -1094,6 +1096,8 @@ public class ValidatedConfig {
 ''')
         expect:
         introspection != null
+        !introspection.getIndexedProperties(Constraint.class).isEmpty()
+        introspection.getIndexedProperties(Constraint.class).size() == 2
     }
 
     void "test generate bean introspection for @ConfigurationProperties with validation rules"() {

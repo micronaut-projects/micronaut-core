@@ -62,6 +62,15 @@ public interface AnnotationMetadata extends AnnotationSource {
     String CLASS_NAME_SUFFIX = "$$AnnotationMetadata";
 
     /**
+     * Gets the declared metadata without inherited metdata.
+     * @return The declared metadata
+     * @since 3.0.0
+     */
+    default @NonNull AnnotationMetadata getDeclaredMetadata() {
+        return this;
+    }
+
+    /**
      * Does the metadata contain any property expressions like {@code ${foo.bar}}. Note
      * this by default returns {@code true} as previous versions of Micronaut must assume metadata
      * is present. The compilation time this is computed in order to decide whether to instrument

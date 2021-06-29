@@ -15,6 +15,7 @@ class RemoveAnnotationSpec extends AbstractBeanDefinitionSpec {
     }
 
     def cleanup() {
+        System.setProperty(TypeElementVisitorStart.ELEMENT_VISITORS_PROPERTY, "")
         AllElementsVisitor.clearVisited()
     }
 
@@ -45,8 +46,10 @@ class Test {
     static class ReplacingTypeElementVisitor implements TypeElementVisitor<Object, Object> {
         @Override
         void visitClass(ClassElement element, VisitorContext context) {
-            element.removeAnnotation(ScopeOne)
-            element.annotate(Prototype)
+            if (System.getProperty(TypeElementVisitorStart.ELEMENT_VISITORS_PROPERTY) ==  ReplacingTypeElementVisitor.name) {
+                element.removeAnnotation(ScopeOne)
+                element.annotate(Prototype)
+            }
         }
     }
 

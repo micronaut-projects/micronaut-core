@@ -6,7 +6,9 @@ import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.env.Environment;
 import io.micronaut.inject.ExecutableMethod;
 
-public class TestInterceptorAdapter<T> implements MethodInterceptor<Object, Object> {
+import java.util.function.Supplier;
+
+public class TestInterceptorAdapter<T> implements MethodInterceptor<Object, Object>, Supplier<T> {
     public final BeanRegistration<T> registration;
     private final ExecutableMethod<T, Object> proceedMethod;
 
@@ -41,5 +43,10 @@ public class TestInterceptorAdapter<T> implements MethodInterceptor<Object, Obje
                 registration.getBean(),
                 (CustomInvocationContext) context::proceed
         );
+    }
+
+    @Override
+    public T get() {
+        return registration.bean();
     }
 }

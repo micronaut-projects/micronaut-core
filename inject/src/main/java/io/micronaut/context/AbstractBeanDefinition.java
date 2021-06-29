@@ -82,7 +82,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     private final Class<T> type;
     private final boolean isAbstract;
     private final boolean isConfigurationProperties;
-    private final boolean singleton;
     private final Class<?> declaringType;
     private final ConstructorInjectionPoint<T> constructor;
     private final Collection<Class<?>> requiredComponents = new HashSet<>(3);
@@ -121,7 +120,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 fieldMetadata
         );
         this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
-        this.singleton = isFinal;
         initContainerElement();
     }
 
@@ -167,7 +165,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         }
         this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
         this.addRequiredComponents(arguments);
-        this.singleton = getAnnotationMetadata().hasDeclaredStereotype(AnnotationUtil.SINGLETON);
         initContainerElement();
     }
 
@@ -205,7 +202,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         }
         this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
         this.addRequiredComponents(arguments);
-        this.singleton = getAnnotationMetadata().hasDeclaredStereotype(AnnotationUtil.SINGLETON);
         initContainerElement();
     }
 
@@ -316,18 +312,13 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     }
 
     @Override
-    public boolean isSingleton() {
-        return singleton;
-    }
-
-    @Override
     public Optional<Class<? extends Annotation>> getScope() {
-        return getAnnotationMetadata().getDeclaredAnnotationTypeByStereotype(AnnotationUtil.SCOPE);
+        return getAnnotationMetadata().getAnnotationTypeByStereotype(AnnotationUtil.SCOPE);
     }
 
     @Override
     public Optional<String> getScopeName() {
-        return getAnnotationMetadata().getDeclaredAnnotationNameByStereotype(AnnotationUtil.SCOPE);
+        return getAnnotationMetadata().getAnnotationNameByStereotype(AnnotationUtil.SCOPE);
     }
 
     @Override

@@ -85,10 +85,10 @@ import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
-import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.netty.stream.DefaultHttp2Content;
 import io.micronaut.http.netty.stream.Http2Content;
 import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
+import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
@@ -158,6 +158,7 @@ import io.netty.util.concurrent.GenericFutureListener;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.FlowableEmitter;
+import io.reactivex.FlowableOperator;
 import io.reactivex.Scheduler;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Cancellable;
@@ -1620,24 +1621,8 @@ public class DefaultHttpClient implements
                         });
 
                         if (!isSingle && MediaType.APPLICATION_JSON_TYPE.equals(requestContentType)) {
-                            requestBodyPublisher = requestBodyPublisher.map(new Function<HttpContent, HttpContent>() {
-                                boolean first = true;
-
-                                @Override
-                                public HttpContent apply(HttpContent httpContent) {
-                                    if (!first) {
-                                        return HttpContentUtil.prefixComma(httpContent);
-                                    } else {
-                                        first = false;
-                                        return httpContent;
-                                    }
-                                }
-                            });
-                            requestBodyPublisher = Flowable.concat(
-                                    Flowable.fromCallable(HttpContentUtil::openBracket),
-                                    requestBodyPublisher,
-                                    Flowable.fromCallable(HttpContentUtil::closeBracket)
-                            );
+                            requestBodyPublisher = requestBodyPublisher
+                                    .lift((FlowableOperator<HttpContent, HttpContent>) JsonSubscriber::new);
                         }
 
                         requestBodyPublisher = requestBodyPublisher.doOnError(onError);

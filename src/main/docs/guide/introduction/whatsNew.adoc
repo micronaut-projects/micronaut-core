@@ -6,6 +6,12 @@ Micronaut {version} includes the following changes:
 
 The `jakarta.inject` annotations are now the default injection annotations for Micronaut 3
 
+==== Support for Controlling Annotation Inheritance
+
+api:core.annotation.AnnotationMetadata[] inheritance can now be controlled via Java's `@Inherited` annotation. If an annotation is not explicitly annotated with `@Inherited` it will not be included in the metadata. See the <<annotationMetadata, Annotation Inheritance>> section of the documentation for more information.
+
+NOTE: This is an important behavioural change from Micronaut 2.x, see the <<breaks, Breaking Changes>> section for information on how to upgrade.
+
 ==== Support Narrowing Injection by Generic Type Arguments
 
 Micronaut can now resolve the correct bean to inject based on the generic type arguments specified on the injection point:

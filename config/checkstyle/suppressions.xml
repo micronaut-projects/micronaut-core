@@ -10,7 +10,7 @@
     <suppress checks="DeclarationOrder"
               files="UriTemplate.java"/>
     <suppress checks="Header"
-              files="AnnotationClassReader.java|Attribute.java|Context.java|io[\\/]micronaut[\\/]core[\\/]util[\\/]clhm|AmazonInfo.java|DataCenterInfo.java|LeaseInfo.java|QueryStringDecoder.java|CronExpression.java|AntPathMatcher.java|io[\\/]micronaut[\\/]http[\\/]netty[\\/]stream[\\/]package-info.java" />
+              files="AnnotationClassReader.java|Attribute.java|Context.java|io[\\/]micronaut[\\/]core[\\/]util[\\/]clhm|AmazonInfo.java|DataCenterInfo.java|LeaseInfo.java|QueryStringDecoder.java|CronExpression.java|AntPathMatcher.java|MicronautAstBuilder.java|io[\\/]micronaut[\\/]http[\\/]netty[\\/]stream[\\/]package-info.java" />
     <suppress checks="[a-zA-Z0-9]*"
               files="FlowControlHandler.java" />
     <suppress checks="ParameterNumber"

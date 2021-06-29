@@ -16,6 +16,7 @@
 package io.micronaut.aop.introduction
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.inject.BeanDefinition
@@ -143,8 +144,7 @@ interface MyBean  {
         beanDefinition.findMethod("onApplicationEvent", Object).isPresent()
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        def context = BeanContext.run()
         def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
         ListenerAdviceInterceptor listenerAdviceInterceptor= context.getBean(ListenerAdviceInterceptor)
         listenerAdviceInterceptor.recievedMessages.clear()
@@ -157,6 +157,8 @@ interface MyBean  {
         !listenerAdviceInterceptor.recievedMessages.isEmpty()
         listenerAdviceInterceptor.recievedMessages.size() == 1
 
+        cleanup:
+        context.close()
     }
 
     void "test an interface with non overriding but subclass return type method"() {

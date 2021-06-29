@@ -4,6 +4,7 @@ import io.micronaut.aop.InterceptorBean;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.InterceptorBindingDefinitions;
 import io.micronaut.aop.InterceptorKind;
+import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.env.Environment;
@@ -21,6 +22,7 @@ import io.micronaut.inject.visitor.VisitorContext;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.Supplier;
 
 public class TestBeanDefiningVisitor implements TypeElementVisitor<SomeInterceptor, AroundInvoke> {
 
@@ -37,6 +39,7 @@ public class TestBeanDefiningVisitor implements TypeElementVisitor<SomeIntercept
         context.getClassElement(TestBeanWithStaticCreator.class)
                 .ifPresent(e ->
                         element.addAssociatedBean(e)
+                                .typed(ClassElement.of(BeanWithStaticCreator.class))
                                .createWith(e.getEnclosedElement(
                                        ElementQuery.ALL_METHODS
                                                .onlyDeclared()
@@ -71,6 +74,7 @@ public class TestBeanDefiningVisitor implements TypeElementVisitor<SomeIntercept
                                     builder.values(annotationValues);
                                 })
                                 .typeArguments(classElement)
+                                .typeArgumentsForType(context.getClassElement(Supplier.class).orElse(null), classElement)
                                 .qualifier("test")
                                 .withParameters((parameters) -> {
                                     parameters[0].typeArguments(classElement);
