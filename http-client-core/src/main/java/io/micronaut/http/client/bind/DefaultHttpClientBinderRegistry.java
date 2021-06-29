@@ -29,23 +29,15 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.BasicAuth;
 import io.micronaut.http.HttpHeaders;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.CookieValue;
-import io.micronaut.http.annotation.Header;
-import io.micronaut.http.annotation.PathVariable;
-import io.micronaut.http.annotation.RequestAttribute;
-import io.micronaut.http.annotation.RequestBean;
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.client.bind.binders.QueryValueClientArgumentBinder;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import jakarta.inject.Singleton;
 import kotlin.coroutines.Continuation;
 
 import java.lang.annotation.Annotation;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 import static io.micronaut.core.util.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
 
@@ -87,6 +79,7 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
         byType.put(Argument.of(Locale.class).typeHashCode(), (ClientArgumentRequestBinder<Locale>) (context, uriContext, value, request) -> {
             request.header(HttpHeaders.ACCEPT_LANGUAGE, value.toLanguageTag());
         });
+        byAnnotation.put(QueryValue.class, new QueryValueClientArgumentBinder(conversionService));
         byAnnotation.put(PathVariable.class, (context, uriContext, value, request) -> {
             String parameterName = context.getAnnotationMetadata().stringValue(PathVariable.class)
                     .filter (StringUtils::isNotEmpty)

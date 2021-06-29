@@ -13,8 +13,6 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.client.bind.AnnotatedClientArgumentRequestBinder;
 import io.micronaut.http.client.bind.ClientRequestUriContext;
-import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 
 import javax.validation.constraints.NotNull;
 import java.io.UnsupportedEncodingException;
@@ -29,14 +27,16 @@ import java.util.Optional;
  * @author Andriy Dmytruk
  */
 
-@Singleton
 public class QueryValueClientArgumentBinder implements AnnotatedClientArgumentRequestBinder<QueryValue> {
     private static final String COMMA_DELIMITER = ",";
     private static final String PIPE_DELIMITER = encodeURIComponent("|");
     private static final String SPACE_DELIMITER = encodeURIComponent(" ");
 
-    @Inject
-    private ConversionService<?> conversionService;
+    private final ConversionService<?> conversionService;
+
+    public QueryValueClientArgumentBinder(ConversionService<?> conversionService) {
+        this.conversionService = conversionService;
+    }
 
     @NonNull
     @Override
