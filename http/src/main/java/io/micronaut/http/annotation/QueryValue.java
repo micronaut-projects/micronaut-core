@@ -15,16 +15,12 @@
  */
 package io.micronaut.http.annotation;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.core.bind.annotation.Bindable;
 
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Inherited;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
+import java.lang.annotation.*;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Indicates that the parameter to a method should be bound from a value in the query string or path of the URI.
@@ -68,7 +64,6 @@ public @interface QueryValue {
     public static enum Format {
         /**
          * The values of iterator are comma-delimited.
-         * The value for object will contain separated attribute names and values, e.g.: 'color=R,100,G,200,B,150'.
          */
         COMMA_DELIMITED,
         /**
@@ -76,6 +71,7 @@ public @interface QueryValue {
          * If possible, it is recommended to use a different format, as space is not a reserved symbol by
          * <a href="https://datatracker.ietf.org/doc/html/rfc3986#section-2.3">rfc3986</a> and thus ambiguity arises
          * if string values contain spaces themselves.
+         * Null values are not supported and will be removed during the conversion process.
          */
         SPACE_DELIMITED,
         /**
@@ -85,11 +81,10 @@ public @interface QueryValue {
         PIPE_DELIMITED,
         /**
          * The values are repeated as separate parameters, e.g.: color=blue&color=black&color=brown.
-         * The value for object will contain its keys as separate parameters, e.g.: 'R=100&G=200&B=150'.
          */
         MULTI,
         /**
-         * The format supports recursion into objects with setting each attribute as a separate parameter, e.g.:
+         * The format supports 1-depth recursion into objects with setting each attribute as a separate parameter, e.g.:
          * 'color[R]=100&color[G]=200&color[B]=150'.
          */
         DEEP_OBJECT
