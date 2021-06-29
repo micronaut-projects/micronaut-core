@@ -76,6 +76,10 @@ The following table summarizes the parameter annotations and their purpose, and 
 
 IMPORTANT: Always use ann:http.annotation.Produces[] or ann:http.annotation.Consumes[] instead of supplying a header for `Content-Type` or `Accept`.
 
+.Query Parameter formats
+The `@QueryValue` annotation's format parameter allows specifying the formatting of the parameter in the request, e.g.: `@QueryValue(format=QueryValue.Formats.DEEP_OBJECT)`.
+
+
 ==== Type-Based Binding Parameters
 
 Some parameters are recognized by their type instead of their annotation. The following table summarizes these parameter types and their purpose, and provides an example:
@@ -126,3 +130,26 @@ Without any additional code, the client attempts to convert the metadata to a st
 The following binder handles arguments passed to clients of type `Metadata` and mutate the request to contain the desired headers.
 
 snippet::io.micronaut.docs.http.client.bind.type.MetadataClientArgumentBinder[tags="clazz", indent=0, title="Typed Argument Binder"]
+
+=== Binding On Method
+
+It is also possible to create a binder, that would change the request with an annotation on the method. For example:
+
+snippet::io.micronaut.docs.http.client.bind.method.NameAuthorizedClient[tags="clazz", indent=0, title="Client With Annotated Method"]
+
+<1> The `@NameAuthorization` is annotating a method
+
+The annotation is defined as:
+
+snippet::io.micronaut.docs.http.client.bind.method.NameAuthorization[tags="clazz", indent=0, title="Annotation Definition"]
+
+<1> It is defined to be used on methods
+
+The following binder specifies the behavior:
+
+snippet::io.micronaut.docs.http.client.bind.method.NameAuthorizationBinder[tags="clazz", indent=0, title="Annotation Definition"]
+
+<1> The `@Singleton` annotation registers it in Micronaut context
+<2> It implements the `AnnotatedClientRequestBinder<NameAuthorization>`
+<3> The custom `bind` method is used to implement the behavior of the binder
+
