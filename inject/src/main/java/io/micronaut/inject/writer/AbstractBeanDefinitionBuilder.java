@@ -31,6 +31,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementFactory;
+import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -69,6 +70,10 @@ import javax.annotation.PreDestroy;
 @Internal
 public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilder {
     private static final Map<String, AtomicInteger> BEAN_COUNTER = new HashMap<>(15);
+    private static final Predicate<Set<ElementModifier>> PUBLIC_FILTER = (
+            elementModifiers -> elementModifiers.contains(ElementModifier.PUBLIC));
+    private static final Predicate<Set<ElementModifier>> NON_PUBLIC_FILTER = (
+            elementModifiers -> !elementModifiers.contains(ElementModifier.PUBLIC));
     private final Element originatingElement;
     private final ClassElement originatingType;
     private final ClassElement beanType;
@@ -111,7 +116,12 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         this.visitorContext = visitorContext;
         this.identifier = BEAN_COUNTER.computeIfAbsent(beanType.getName(), (s) -> new AtomicInteger(0))
                                       .getAndIncrement();
-        this.annotationMetadata = new MutableAnnotationMetadata();
+        final AnnotationMetadata annotationMetadata = beanType.getAnnotationMetadata();
+        if (annotationMetadata instanceof MutableAnnotationMetadata) {
+            this.annotationMetadata = ((MutableAnnotationMetadata) annotationMetadata).clone();
+        } else {
+            this.annotationMetadata = new MutableAnnotationMetadata();
+        }
         this.annotationMetadata.addDeclaredAnnotation(Bean.class.getName(), Collections.emptyMap());
         final ParameterElement[] constructorParameters = beanType.getPrimaryConstructor().map(MethodElement::getParameters).orElse(null);
         this.beanElementParameters = initBeanParameters(constructorParameters);
@@ -129,12 +139,12 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                 .onlyInstance()
                 .annotated((metadata) -> metadata.hasDeclaredAnnotation(AnnotationUtil.INJECT));
         Set<FieldElement> accessibleFields = new HashSet<>();
-        this.beanType.getEnclosedElements(baseQuery.onlyAccessible(originatingType))
+        this.beanType.getEnclosedElements(baseQuery.modifiers(PUBLIC_FILTER))
                 .forEach((fieldElement) -> {
                     accessibleFields.add(fieldElement);
                     new InternalBeanElementField(fieldElement, false).inject();
                 });
-        this.beanType.getEnclosedElements(baseQuery)
+        this.beanType.getEnclosedElements(baseQuery.modifiers(NON_PUBLIC_FILTER))
                 .forEach((fieldElement) -> {
                     if (!accessibleFields.contains(fieldElement)) {
                         new InternalBeanElementField(fieldElement, true).inject();
@@ -152,12 +162,12 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                            metadata.hasDeclaredAnnotation(PostConstruct.class)
                 );
         Set<MethodElement> accessibleMethods = new HashSet<>();
-        this.beanType.getEnclosedElements(baseQuery.onlyAccessible(originatingType))
+        this.beanType.getEnclosedElements(baseQuery.modifiers(PUBLIC_FILTER))
                 .forEach((methodElement) -> {
                      accessibleMethods.add(methodElement);
                     handleMethod(methodElement, false);
                 });
-        this.beanType.getEnclosedElements(baseQuery)
+        this.beanType.getEnclosedElements(baseQuery.modifiers(NON_PUBLIC_FILTER))
                 .forEach((methodElement) -> {
                     if (!accessibleMethods.contains(methodElement)) {
                         handleMethod(methodElement, true);
@@ -394,7 +404,52 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             }
             beanDefinitionWriter.visitBeanDefinitionConstructor(
                     finalConstructor,
-                    finalConstructor.isPrivate(),
+                    !finalConstructor.isPublic(),
+                    visitorContext
+            );
+        }
+
+        Collections.reverse(injectedFields); // visit super types first
+        Collections.reverse(executableMethods); // visit super types first
+        Collections.reverse(injectedMethods); // visit super types first
+        Collections.reverse(postConstructMethods); // visit super types first
+        Collections.reverse(preDestroyMethods); // visit super types first
+        final Iterator<BeanFieldElement> i = injectedFields.iterator();
+        while (i.hasNext()) {
+            final BeanFieldElement injectedField = i.next();
+            if (!injectedField.getDeclaringType().equals(beanType)) {
+                InternalBeanElementField ibf = (InternalBeanElementField) injectedField;
+                visitField(beanDefinitionWriter, injectedField, ibf);
+                i.remove();
+            }
+        }
+
+        final Iterator<BeanMethodElement> im = injectedMethods.iterator();
+        while (im.hasNext()) {
+            final BeanMethodElement injectedMethod = im.next();
+            if (!injectedMethod.getDeclaringType().equals(beanType)) {
+                InternalBeanElementMethod ibf = (InternalBeanElementMethod) injectedMethod;
+                beanDefinitionWriter.visitMethodInjectionPoint(
+                        beanType,
+                        injectedMethod,
+                        ibf.isRequiresReflection(),
+                        visitorContext
+                );
+                im.remove();
+            }
+        }
+
+        for (BeanFieldElement injectedField : injectedFields) {
+            InternalBeanElementField ibf = (InternalBeanElementField) injectedField;
+            visitField(beanDefinitionWriter, injectedField, ibf);
+        }
+
+
+        for (BeanMethodElement injectedMethod : injectedMethods) {
+            beanDefinitionWriter.visitMethodInjectionPoint(
+                    beanType,
+                    injectedMethod,
+                    ((InternalBeanElementMethod) injectedMethod).isRequiresReflection(),
                     visitorContext
             );
         }
@@ -407,47 +462,24 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             );
         }
 
-        for (BeanMethodElement injectedMethod : injectedMethods) {
-            beanDefinitionWriter.visitMethodInjectionPoint(
-                    beanType,
-                    injectedMethod,
-                    ((InternalBeanElementMethod) injectedMethod).isRequiresReflection(),
-                    visitorContext
-            );
-        }
-
         for (BeanMethodElement postConstructMethod : postConstructMethods) {
-            beanDefinitionWriter.visitPostConstructMethod(
-                    beanType,
-                    postConstructMethod,
-                    ((InternalBeanElementMethod) postConstructMethod).isRequiresReflection(),
-                    visitorContext
-            );
+            if (postConstructMethod.getDeclaringType().equals(beanType)) {
+                beanDefinitionWriter.visitPostConstructMethod(
+                        beanType,
+                        postConstructMethod,
+                        ((InternalBeanElementMethod) postConstructMethod).isRequiresReflection(),
+                        visitorContext
+                );
+            }
         }
 
         for (BeanMethodElement preDestroyMethod : preDestroyMethods) {
-            beanDefinitionWriter.visitPreDestroyMethod(
-                    beanType,
-                    preDestroyMethod,
-                    ((InternalBeanElementMethod) preDestroyMethod).isRequiresReflection(),
-                    visitorContext
-            );
-        }
-
-        for (BeanFieldElement injectedField : injectedFields) {
-            InternalBeanElementField ibf = (InternalBeanElementField) injectedField;
-            if (injectedField.hasAnnotation(Value.class)) {
-                beanDefinitionWriter.visitFieldValue(
-                        this.beanType,
-                        injectedField,
-                        ibf.isRequiresReflection(),
-                        injectedField.isNullable()
-                );
-            } else {
-                beanDefinitionWriter.visitFieldInjectionPoint(
-                        this.beanType,
-                        injectedField,
-                        ibf.isRequiresReflection()
+            if (preDestroyMethod.getDeclaringType().equals(beanType)) {
+                beanDefinitionWriter.visitPreDestroyMethod(
+                        beanType,
+                        preDestroyMethod,
+                        ((InternalBeanElementMethod) preDestroyMethod).isRequiresReflection(),
+                        visitorContext
                 );
             }
         }
@@ -455,6 +487,25 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         beanDefinitionWriter.visitBeanDefinitionEnd();
 
         return beanDefinitionWriter;
+    }
+
+    private void visitField(BeanDefinitionWriter beanDefinitionWriter,
+                           BeanFieldElement injectedField,
+                           InternalBeanElementField ibf) {
+        if (injectedField.hasAnnotation(Value.class)) {
+            beanDefinitionWriter.visitFieldValue(
+                    this.beanType,
+                    injectedField,
+                    ibf.isRequiresReflection(),
+                    injectedField.isNullable()
+            );
+        } else {
+            beanDefinitionWriter.visitFieldInjectionPoint(
+                    this.beanType,
+                    injectedField,
+                    ibf.isRequiresReflection()
+            );
+        }
     }
 
     /**

@@ -15,7 +15,9 @@
  */
 package io.micronaut.context.visitor;
 
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 
 import io.micronaut.context.annotation.Bean;
@@ -24,6 +26,7 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -38,6 +41,14 @@ public class BeanImportVisitor implements TypeElementVisitor<Import, Object> {
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         final String[] classNames = element.getAnnotationMetadata().stringValues(Import.class, "classes");
+        String[] annotations = element.getAnnotationMetadata().stringValues(Import.class, "annotated");
+        Set<String> annotationSet;
+        if (ArrayUtils.isEmpty(annotations)) {
+            annotationSet = CollectionUtils.setOf(AnnotationUtil.SCOPE, Bean.class.getName(), AnnotationUtil.QUALIFIER);
+        } else {
+            annotationSet = new HashSet<>(Arrays.asList(annotations));
+        }
+
         if (ArrayUtils.isNotEmpty(classNames)) {
             for (String className : classNames) {
                 context.getClassElement(className).ifPresent((beanElement) ->
@@ -51,10 +62,12 @@ public class BeanImportVisitor implements TypeElementVisitor<Import, Object> {
         if (ArrayUtils.isNotEmpty(packages)) {
             for (String aPackage : packages) {
                 final ClassElement[] classElements = context
-                        .getClassElements(aPackage, AnnotationUtil.SCOPE, Bean.class.getName());
+                            .getClassElements(aPackage, annotationSet.toArray(new String[0]));
                 for (ClassElement classElement : classElements) {
-                    element.addAssociatedBean(classElement)
-                            .inject();
+                    if (!classElement.isAbstract()) {
+                        element.addAssociatedBean(classElement)
+                                .inject();
+                    }
                 }
             }
         }

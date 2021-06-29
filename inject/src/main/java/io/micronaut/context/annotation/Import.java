@@ -20,6 +20,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Experimental;
 
 /**
@@ -48,4 +49,10 @@ public @interface Import {
      * @return The packages to import.
      */
     String[] packages() default {};
+
+    /**
+     * The annotations types to include in a search. If set to "*" will include all. Defaults to only included types annotated with scopes or qualifiers.
+     * @return The annotation types
+     */
+    String[] annotated() default { AnnotationUtil.SCOPE, AnnotationUtil.QUALIFIER };
 }

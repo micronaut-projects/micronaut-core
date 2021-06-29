@@ -426,7 +426,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         boolean onlyDeclared = result.isOnlyDeclared();
         boolean onlyAbstract = result.isOnlyAbstract();
         boolean onlyConcrete = result.isOnlyConcrete();
-
+        boolean onlyInstance = result.isOnlyInstance();
 
         if (!onlyDeclared) {
             Elements elements = visitorContext.getElements();
@@ -458,6 +458,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         if (onlyAbstract && !superElement.getModifiers().contains(Modifier.ABSTRACT)) {
                             continue;
                         } else if (onlyConcrete && superElement.getModifiers().contains(Modifier.ABSTRACT)) {
+                            continue;
+                        } else if (onlyInstance && superElement.getModifiers().contains(Modifier.STATIC)) {
                             continue;
                         }
                         elementsToAdd.add(superElement);
@@ -513,6 +515,9 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                     enclosedElements.removeIf((e) -> e.getModifiers().contains(Modifier.ABSTRACT));
                 }
             }
+        }
+        if (onlyInstance) {
+            enclosedElements.removeIf((e) -> e.getModifiers().contains(Modifier.STATIC));
         }
         List<Predicate<Set<ElementModifier>>> modifierPredicates = result.getModifierPredicates();
         List<Predicate<String>> namePredicates = result.getNamePredicates();
