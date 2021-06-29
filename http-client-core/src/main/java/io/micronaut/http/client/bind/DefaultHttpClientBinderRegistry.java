@@ -33,7 +33,6 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.CookieValue;
 import io.micronaut.http.annotation.Header;
 import io.micronaut.http.annotation.PathVariable;
-import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.annotation.RequestAttribute;
 import io.micronaut.http.annotation.RequestBean;
 import io.micronaut.http.cookie.Cookie;
@@ -63,13 +62,16 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
 
     private final Map<Class<? extends Annotation>, ClientArgumentRequestBinder<?>> byAnnotation = new LinkedHashMap<>();
     private final Map<Integer, ClientArgumentRequestBinder<?>> byType = new LinkedHashMap<>();
+    private final Map<Class<? extends Annotation>, AnnotatedClientRequestBinder<?>> methodByAnnotation = new LinkedHashMap<>();
 
     /**
      * @param conversionService The conversion service
-     * @param binders           The request argument binders
+     * @param argumentBinders   The request argument binders
+     * @param binders           The method binders
      */
     protected DefaultHttpClientBinderRegistry(ConversionService<?> conversionService,
-                                              List<ClientArgumentRequestBinder<?>> binders) {
+                                              List<ClientArgumentRequestBinder<?>> argumentBinders,
+                                              List<AnnotatedClientRequestBinder<?>> binders) {
         byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (ClientArgumentRequestBinder<HttpHeaders>) (context, uriContext, value, request) -> {
             value.forEachValue(request::header);
         });
@@ -84,17 +86,6 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
         });
         byType.put(Argument.of(Locale.class).typeHashCode(), (ClientArgumentRequestBinder<Locale>) (context, uriContext, value, request) -> {
             request.header(HttpHeaders.ACCEPT_LANGUAGE, value.toLanguageTag());
-        });
-        byAnnotation.put(QueryValue.class, (context, uriContext, value, request) -> {
-            String parameterName = context.getAnnotationMetadata().stringValue(QueryValue.class)
-                    .filter (StringUtils::isNotEmpty)
-                    .orElse(context.getArgument().getName());
-
-            conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
-                    .filter(StringUtils::isNotEmpty)
-                    .ifPresent(o -> {
-                        uriContext.getQueryParameters().put(parameterName, o);
-                    });
         });
         byAnnotation.put(PathVariable.class, (context, uriContext, value, request) -> {
             String parameterName = context.getAnnotationMetadata().stringValue(PathVariable.class)
@@ -151,8 +142,14 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
             byType.put(Argument.of(Continuation.class).typeHashCode(),  (context, uriContext, value, request) -> { });
         }
 
+        if (CollectionUtils.isNotEmpty(argumentBinders)) {
+            for (ClientArgumentRequestBinder<?> binder : argumentBinders) {
+                addBinder(binder);
+            }
+        }
+
         if (CollectionUtils.isNotEmpty(binders)) {
-            for (ClientArgumentRequestBinder<?> binder : binders) {
+            for (AnnotatedClientRequestBinder<?> binder: binders) {
                 addBinder(binder);
             }
         }
@@ -178,6 +175,11 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
         }
     }
 
+    @Override
+    public Optional<AnnotatedClientRequestBinder<?>> findBinder(Class<?> annotationType) {
+        return Optional.ofNullable(methodByAnnotation.get(annotationType));
+    }
+
     /**
      * Adds a binder to the registry.
      *
@@ -199,6 +201,10 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
                 }
             }
         }
+    }
+
+    public void addBinder(AnnotatedClientRequestBinder<?> binder) {
+        methodByAnnotation.put(binder.getAnnotationType(), binder);
     }
 
     private <T> Optional<ClientArgumentRequestBinder<?>> findTypeBinder(Argument<T> argument) {

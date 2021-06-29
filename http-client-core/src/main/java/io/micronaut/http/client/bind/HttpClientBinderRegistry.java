@@ -41,4 +41,12 @@ public interface HttpClientBinderRegistry {
      */
     <T> Optional<ClientArgumentRequestBinder<?>> findArgumentBinder(@NonNull Argument<T> argument);
 
+    /**
+     * Locate an {@link AnnotatedClientRequestBinder} for a given annotation type
+     * (that is supposed to be applied to the method)
+     *
+     * @param annotationType - the type of annotation
+     * @return An {@link Optional} of {@link AnnotatedClientRequestBinder}
+     */
+    Optional<AnnotatedClientRequestBinder<?>> findBinder(@NonNull Class<?> annotationType);
 }

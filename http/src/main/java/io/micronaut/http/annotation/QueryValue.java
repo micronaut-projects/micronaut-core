@@ -51,4 +51,45 @@ public @interface QueryValue {
      */
     @AliasFor(annotation = Bindable.class, member = "defaultValue")
     String defaultValue() default "";
+
+    /**
+     * @return The format of the given values in the URL
+     */
+    Format format() default Format.COMMA_DELIMITED;
+
+    /**
+     * The possible formats of the query parameter in the URL.
+     * The conversion of various types is according to openapi v3 specification:
+     * @see <a href="https://swagger.io/specification/">openapi v3 specification</a>
+     * Values are serialized using Jackson object mapper
+     */
+    public static enum Format {
+        /**
+         * The values of iterator are comma-delimited.
+         * The value for object will contain separated attribute names and values, e.g.: 'color=R,100,G,200,B,150'.
+         */
+        COMMA_DELIMITED,
+        /**
+         * The values are space-delimited, similarly to comma-delimited format.
+         * If possible, it is recommended to use a different format, as space is not a reserved symbol by
+         * <a href="https://datatracker.ietf.org/doc/html/rfc3986#section-2.3">rfc3986</a> and thus ambiguity arises
+         * if string values contain spaces themselves.
+         */
+        SPACE_DELIMITED,
+        /**
+         * The values a delimited by pipes "|", similarly to comma-delimited format.
+         * This is also not a recommended format for the same reasons as SPACE_DELIMITED
+         */
+        PIPE_DELIMITED,
+        /**
+         * The values are repeated as separate parameters, e.g.: color=blue&color=black&color=brown.
+         * The value for object will contain its keys as separate parameters, e.g.: 'R=100&G=200&B=150'.
+         */
+        MULTI,
+        /**
+         * The format supports recursion into objects with setting each attribute as a separate parameter, e.g.:
+         * 'color[R]=100&color[G]=200&color[B]=150'.
+         */
+        DEEP_OBJECT
+    }
 }

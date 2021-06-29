@@ -38,14 +38,7 @@ import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.annotation.Version;
-import io.micronaut.http.HttpAttributes;
-import io.micronaut.http.HttpHeaders;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.*;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.CustomHttpMethod;
 import io.micronaut.http.annotation.Header;
@@ -227,8 +220,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             }
 
-            ConversionService<?> conversionService = ConversionService.SHARED;
-
             ClientRequestUriContext uriContext = new ClientRequestUriContext(uriTemplate, paramMap, queryParams);
 
             if (!headers.isEmpty()) {
@@ -250,6 +241,14 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             };
 
+            // Apply all the method binders
+            List<Class<? extends Annotation>> methodBinderTypes = context.getAnnotationTypesByStereotype(Bindable.class);
+            for (Class<? extends Annotation> binderType: methodBinderTypes) {
+                binderRegistry.findBinder(binderType).ifPresent(b -> b.bind(context, uriContext, request));
+            }
+
+            // Apply all the argument binders
+            Argument.of(Void.class, context.getAnnotationMetadata());
             for (Argument argument : arguments) {
                 Object definedValue = getValue(argument, context, parameters, paramMap);
 
@@ -314,7 +313,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             uri = uriTemplate.expand(paramMap);
             uriVariables.forEach(queryParams::remove);
 
-            request.uri(URI.create(appendQuery(uri, queryParams)));
+            String query = request.getUri().getQuery();
+            request.uri(URI.create(appendQuery(uri, query, queryParams)));
 
             if (body != null && !request.getContentType().isPresent()) {
                 MediaType[] contentTypes = MediaType.of(context.stringValues(Produces.class));
@@ -604,13 +604,19 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         return clientAnn.stringValue(Client.class).orElse(null);
     }
 
-    private String appendQuery(String uri, Map<String, String> queryParams) {
+    private String appendQuery(String uri, String query, Map<String, String> queryParams) {
         if (!queryParams.isEmpty()) {
             final UriBuilder builder = UriBuilder.of(uri);
             for (Map.Entry<String, String> entry : queryParams.entrySet()) {
                 builder.queryParam(entry.getKey(), entry.getValue());
             }
+            if (StringUtils.isNotEmpty(query)) {
+                return builder.toString() + '&' + query;
+            }
             return builder.toString();
+        }
+        if (StringUtils.isNotEmpty(query)) {
+            return uri + '?' + query;
         }
         return uri;
     }
