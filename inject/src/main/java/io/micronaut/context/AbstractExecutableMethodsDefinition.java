@@ -147,7 +147,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     protected abstract Method getTargetMethodByIndex(int index);
 
     /**
-     * Creates a new exception when the method at index is not found,
+     * Creates a new exception when the method at index is not found.
      *
      * @param index The method index
      * @return The exception
@@ -362,7 +362,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         }
     }
 
-    private final static class MethodAnnotationMetadata extends AbstractEnvironmentAnnotationMetadata {
+    private static final class MethodAnnotationMetadata extends AbstractEnvironmentAnnotationMetadata {
 
         private final Environment environment;
 
