@@ -15,9 +15,11 @@
  */
 package io.micronaut.context.visitor;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import io.micronaut.context.annotation.Bean;
@@ -40,7 +42,24 @@ import io.micronaut.inject.visitor.VisitorContext;
 public class BeanImportVisitor implements TypeElementVisitor<Import, Object> {
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
+        List<ClassElement> beanElements = collectInjectableElements(element, context);
+
+        for (ClassElement beanElement : beanElements) {
+            element.addAssociatedBean(beanElement)
+                    .inject();
+        }
+    }
+
+    @NonNull
+    public static List<ClassElement> collectInjectableElements(ClassElement element, VisitorContext context) {
+        List<ClassElement> beanElements = new ArrayList<>();
         final String[] classNames = element.getAnnotationMetadata().stringValues(Import.class, "classes");
+        if (ArrayUtils.isNotEmpty(classNames)) {
+            for (String className : classNames) {
+                context.getClassElement(className).ifPresent(beanElements::add);
+            }
+        }
+
         String[] annotations = element.getAnnotationMetadata().stringValues(Import.class, "annotated");
         Set<String> annotationSet;
         if (ArrayUtils.isEmpty(annotations)) {
@@ -48,29 +67,20 @@ public class BeanImportVisitor implements TypeElementVisitor<Import, Object> {
         } else {
             annotationSet = new HashSet<>(Arrays.asList(annotations));
         }
-
-        if (ArrayUtils.isNotEmpty(classNames)) {
-            for (String className : classNames) {
-                context.getClassElement(className).ifPresent((beanElement) ->
-                    element.addAssociatedBean(beanElement)
-                            .inject()
-                );
-            }
-        }
-
         final String[] packages = element.getAnnotationMetadata().stringValues(Import.class, "packages");
+
         if (ArrayUtils.isNotEmpty(packages)) {
             for (String aPackage : packages) {
                 final ClassElement[] classElements = context
                             .getClassElements(aPackage, annotationSet.toArray(new String[0]));
                 for (ClassElement classElement : classElements) {
                     if (!classElement.isAbstract()) {
-                        element.addAssociatedBean(classElement)
-                                .inject();
+                        beanElements.add(classElement);
                     }
                 }
             }
         }
+        return beanElements;
     }
 
     @Override
