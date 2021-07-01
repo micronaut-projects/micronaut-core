@@ -1,10 +1,10 @@
 package io.micronaut.docs.http.client.bind
 
-import javax.annotation.Nullable;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
+import javax.annotation.Nullable
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
-import io.micronaut.http.annotation.QueryValue;
+import io.micronaut.http.annotation.QueryValue
 
 @Controller
 class ClientBindController {

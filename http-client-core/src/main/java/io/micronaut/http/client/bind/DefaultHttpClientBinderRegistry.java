@@ -112,6 +112,9 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
                     .filter(StringUtils::isNotEmpty)
                     .orElse(NameUtils.hyphenate(context.getArgument().getName()));
             request.getAttributes().put(attributeName, value);
+
+            conversionService.convert(value, String.class)
+                    .ifPresent(v -> uriContext.getPathParameters().put(context.getArgument().getName(), v));
         });
         byAnnotation.put(Body.class, (context, uriContext, value, request) -> {
             request.body(value);

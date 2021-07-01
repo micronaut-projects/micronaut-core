@@ -145,11 +145,11 @@ snippet::io.micronaut.docs.http.client.bind.method.NameAuthorization[tags="clazz
 
 <1> It is defined to be used on methods
 
-The following binder specifies the behavior:
+The following binder specifies the behaviour:
 
 snippet::io.micronaut.docs.http.client.bind.method.NameAuthorizationBinder[tags="clazz", indent=0, title="Annotation Definition"]
 
 <1> The `@Singleton` annotation registers it in Micronaut context
 <2> It implements the `AnnotatedClientRequestBinder<NameAuthorization>`
-<3> The custom `bind` method is used to implement the behavior of the binder
+<3> The custom `bind` method is used to implement the behaviour of the binder
 

@@ -506,7 +506,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         if (definedValue == null && !argument.isNullable()) {
             throw new IllegalArgumentException(
-                    String.format("Argument [%s] is null. Null values are not allowed to be passed to client methods (%s). Add a supported Nullable annotation type if that is the desired behavior", argument.getName(), context.getExecutableMethod().toString())
+                    String.format("Argument [%s] is null. Null values are not allowed to be passed to client methods (%s). Add a supported Nullable annotation type if that is the desired behaviour", argument.getName(), context.getExecutableMethod().toString())
             );
         }
 

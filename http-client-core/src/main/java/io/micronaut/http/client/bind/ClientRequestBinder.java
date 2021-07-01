@@ -8,7 +8,7 @@ import io.micronaut.http.MutableHttpRequest;
 /**
  * A binder that binds to a {@link MutableHttpRequest}.
  * This class is extended by {@link ClientArgumentRequestBinder} and {@link AnnotatedClientRequestBinder}
- * to account for different binding behaviors
+ * to account for different binding behaviours
  *
  * @author Andriy Dmytruk
  * @since 2.1.0
