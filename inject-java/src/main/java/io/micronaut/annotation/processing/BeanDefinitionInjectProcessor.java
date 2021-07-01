@@ -1023,8 +1023,29 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 MethodElement constructor = producedClassElement.getPrimaryConstructor().orElse(null);
                 if (!producedClassElement.isInterface() && constructor != null && constructor.getParameters().length > 0) {
                     final Element nativeElement = (Element) constructor.getNativeType();
-                    error(nativeElement, "The produced type from a factory which has AOP proxy advice specified must define an accessible no arguments constructor: " + nativeElement);
-                    return;
+                    final String proxyTargetMode = methodAnnotationMetadata.stringValue(AROUND_TYPE, "proxyTargetMode")
+                            .orElseGet(() -> {
+                                // temporary workaround until micronaut-test can be upgraded to 3.0
+                                if (methodAnnotationMetadata.hasAnnotation("io.micronaut.test.annotation.MockBean")) {
+                                    return "WARN";
+                                } else {
+                                    return "ERROR";
+                                }
+                            });
+                    switch (proxyTargetMode) {
+                        case "ALLOW":
+                            allowProxyConstruction(constructor);
+                            break;
+                        case "WARN":
+                            allowProxyConstruction(constructor);
+                            warning(element, "The produced type of a @Factory method has constructor arguments and is proxied. This can lead to unexpected behaviour. See the javadoc for Around.ProxyTargetConstructorMode for more information: " + element);
+                            break;
+                        case "ERROR":
+                        default:
+                            error(element, "The produced type from a factory which has AOP proxy advice specified must define an accessible no arguments constructor. Proxying types with constructor arguments can lead to unexpected behaviour. See the javadoc for for Around.ProxyTargetConstructorMode for more information and possible solutions: " + element);
+                        return;
+                    }
+
                 }
                 OptionalValues<Boolean> aopSettings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean.class);
                 Map<CharSequence, Boolean> finalSettings = new LinkedHashMap<>();
@@ -1139,6 +1160,24 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                             }
                         });
+            }
+        }
+
+        private void allowProxyConstruction(MethodElement constructor) {
+            final ParameterElement[] parameters = constructor.getParameters();
+            for (ParameterElement parameter : parameters) {
+                if (parameter.isPrimitive() && !parameter.isArray()) {
+                    final String name = parameter.getType().getName();
+                    if ("boolean".equals(name)) {
+                        parameter.annotate(Value.class, (builder) -> builder.value(false));
+                    } else {
+                        parameter.annotate(Value.class, (builder) -> builder.value(0));
+                    }
+                } else {
+                    // allow null
+                    parameter.annotate(AnnotationUtil.NULLABLE);
+                    parameter.removeAnnotation(AnnotationUtil.NON_NULL);
+                }
             }
         }
 
