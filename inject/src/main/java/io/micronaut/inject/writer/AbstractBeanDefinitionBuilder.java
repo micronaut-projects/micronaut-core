@@ -19,7 +19,6 @@ import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
@@ -34,6 +33,7 @@ import io.micronaut.inject.ast.ElementFactory;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
@@ -47,6 +47,7 @@ import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -74,6 +75,21 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             elementModifiers -> elementModifiers.contains(ElementModifier.PUBLIC));
     private static final Predicate<Set<ElementModifier>> NON_PUBLIC_FILTER = (
             elementModifiers -> !elementModifiers.contains(ElementModifier.PUBLIC));
+    private static final Comparator<MemberElement> SORTER = (o1, o2) -> {
+        final ClassElement d1 = o1.getDeclaringType();
+        final ClassElement d2 = o2.getDeclaringType();
+        final String o1Type = d1.getName();
+        final String o2Type = d2.getName();
+        if (o1Type.equals(o2Type)) {
+            return 0;
+        } else {
+            if (d1.isAssignable(d2)) {
+                return 1;
+            } else {
+                return -1;
+            }
+        }
+    };
     private final Element originatingElement;
     private final ClassElement originatingType;
     private final ClassElement beanType;
@@ -137,7 +153,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     private void processInjectedFields() {
         final ElementQuery<FieldElement> baseQuery = ElementQuery.ALL_FIELDS
                 .onlyInstance()
-                .annotated((metadata) -> metadata.hasDeclaredAnnotation(AnnotationUtil.INJECT));
+                .onlyInjected();
         Set<FieldElement> accessibleFields = new HashSet<>();
         this.beanType.getEnclosedElements(baseQuery.modifiers(PUBLIC_FILTER))
                 .forEach((fieldElement) -> {
@@ -156,11 +172,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         final ElementQuery<MethodElement> baseQuery = ElementQuery.ALL_METHODS
                 .onlyInstance()
                 .onlyConcrete()
-                .annotated((metadata) ->
-                   metadata.hasDeclaredAnnotation(AnnotationUtil.INJECT) ||
-                           metadata.hasDeclaredAnnotation(PreDestroy.class) ||
-                           metadata.hasDeclaredAnnotation(PostConstruct.class)
-                );
+                .onlyInjected();
         Set<MethodElement> accessibleMethods = new HashSet<>();
         this.beanType.getEnclosedElements(baseQuery.modifiers(PUBLIC_FILTER))
                 .forEach((methodElement) -> {
@@ -409,50 +421,52 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             );
         }
 
-        Collections.reverse(injectedFields); // visit super types first
-        Collections.reverse(executableMethods); // visit super types first
-        Collections.reverse(injectedMethods); // visit super types first
-        Collections.reverse(postConstructMethods); // visit super types first
-        Collections.reverse(preDestroyMethods); // visit super types first
-        final Iterator<BeanFieldElement> i = injectedFields.iterator();
-        while (i.hasNext()) {
-            final BeanFieldElement injectedField = i.next();
-            if (!injectedField.getDeclaringType().equals(beanType)) {
-                InternalBeanElementField ibf = (InternalBeanElementField) injectedField;
-                visitField(beanDefinitionWriter, injectedField, ibf);
-                i.remove();
+        Map<ClassElement, List<MemberElement>> sortedInjections = new LinkedHashMap<>();
+        List<MemberElement> allInjected = new ArrayList<>();
+        allInjected.addAll(injectedFields);
+        allInjected.addAll(injectedMethods);
+        allInjected.sort(SORTER);
+        for (MemberElement memberElement : allInjected) {
+            final List<MemberElement> list = sortedInjections
+                    .computeIfAbsent(memberElement.getDeclaringType(),
+                                     classElement -> new ArrayList<>()
+                    );
+            list.add(memberElement);
+        }
+        for (List<MemberElement> members : sortedInjections.values()) {
+            members.sort((o1, o2) -> {
+                if (o1 instanceof FieldElement && o2 instanceof MethodElement) {
+                    return 1;
+                } else if (o1 instanceof MethodElement && o1 instanceof FieldElement) {
+                    return -1;
+                }
+                return 0;
+            });
+        }
+
+        for (List<MemberElement> list : sortedInjections.values()) {
+            for (MemberElement memberElement : list) {
+                if (memberElement instanceof FieldElement) {
+                    InternalBeanElementField ibf = (InternalBeanElementField) memberElement;
+                    ibf.<InternalBeanElementField>with((element) ->
+                         visitField(beanDefinitionWriter, element, element)
+                    );
+
+                } else {
+                    InternalBeanElementMethod ibm = (InternalBeanElementMethod) memberElement;
+                    ibm.<InternalBeanElementMethod>with((element) ->
+                         beanDefinitionWriter.visitMethodInjectionPoint(
+                                 ibm.getDeclaringType(),
+                                 ibm,
+                                 ibm.isRequiresReflection(),
+                                 visitorContext
+                         )
+                    );
+
+                }
             }
         }
 
-        final Iterator<BeanMethodElement> im = injectedMethods.iterator();
-        while (im.hasNext()) {
-            final BeanMethodElement injectedMethod = im.next();
-            if (!injectedMethod.getDeclaringType().equals(beanType)) {
-                InternalBeanElementMethod ibf = (InternalBeanElementMethod) injectedMethod;
-                beanDefinitionWriter.visitMethodInjectionPoint(
-                        beanType,
-                        injectedMethod,
-                        ibf.isRequiresReflection(),
-                        visitorContext
-                );
-                im.remove();
-            }
-        }
-
-        for (BeanFieldElement injectedField : injectedFields) {
-            InternalBeanElementField ibf = (InternalBeanElementField) injectedField;
-            visitField(beanDefinitionWriter, injectedField, ibf);
-        }
-
-
-        for (BeanMethodElement injectedMethod : injectedMethods) {
-            beanDefinitionWriter.visitMethodInjectionPoint(
-                    beanType,
-                    injectedMethod,
-                    ((InternalBeanElementMethod) injectedMethod).isRequiresReflection(),
-                    visitorContext
-            );
-        }
 
         for (BeanMethodElement executableMethod : executableMethods) {
             beanDefinitionWriter.visitExecutableMethod(
@@ -494,14 +508,14 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                            InternalBeanElementField ibf) {
         if (injectedField.hasAnnotation(Value.class)) {
             beanDefinitionWriter.visitFieldValue(
-                    this.beanType,
+                    injectedField.getDeclaringType(),
                     injectedField,
                     ibf.isRequiresReflection(),
                     injectedField.isNullable()
             );
         } else {
             beanDefinitionWriter.visitFieldInjectionPoint(
-                    this.beanType,
+                    injectedField.getDeclaringType(),
                     injectedField,
                     ibf.isRequiresReflection()
             );
@@ -546,6 +560,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     private abstract class InternalBeanElement<E extends Element> implements Element {
         private final E element;
         private final MutableAnnotationMetadata elementMetadata;
+        private AnnotationMetadata currentMetadata;
 
         private InternalBeanElement(E element) {
             this.element = element;
@@ -560,6 +575,9 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         @NonNull
         @Override
         public AnnotationMetadata getAnnotationMetadata() {
+            if (currentMetadata != null) {
+                return currentMetadata;
+            }
             return elementMetadata;
         }
 
@@ -608,6 +626,16 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         public Element removeStereotype(@NonNull String annotationType) {
             AbstractBeanDefinitionBuilder.this.removeStereotype(elementMetadata, annotationType);
             return this;
+        }
+
+        public <T extends InternalBeanElement<E>> void with(Consumer<T> consumer) {
+            try {
+                this.currentMetadata = elementMetadata.isEmpty() ? AnnotationMetadata.EMPTY_METADATA : elementMetadata;
+                //noinspection unchecked
+                consumer.accept((T) this);
+            } finally {
+                currentMetadata = null;
+            }
         }
     }
 
@@ -745,6 +773,11 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
 
         @Override
         public ClassElement getDeclaringType() {
+            return methodElement.getDeclaringType();
+        }
+
+        @Override
+        public ClassElement getOwningType() {
             return AbstractBeanDefinitionBuilder.this.beanType;
         }
     }
@@ -785,6 +818,11 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
 
         @Override
         public ClassElement getDeclaringType() {
+            return fieldElement.getDeclaringType();
+        }
+
+        @Override
+        public ClassElement getOwningType() {
             return AbstractBeanDefinitionBuilder.this.beanType;
         }
 

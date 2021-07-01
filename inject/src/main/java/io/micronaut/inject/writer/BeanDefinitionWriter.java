@@ -1929,7 +1929,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
 
         // 4th argument: the annotation metadata
-        pushAnnotationMetadata(this.annotationMetadata, constructorVisitor);
+        AnnotationMetadata am = annotationMetadata.isEmpty()
+                ? AnnotationMetadata.EMPTY_METADATA
+                : annotationMetadata;
+        pushAnnotationMetadata(am, constructorVisitor);
 
         // 5th  argument to addInjectionPoint: do we need reflection?
         constructorVisitor.visitInsn(requiresReflection ? ICONST_1 : ICONST_0);

@@ -40,6 +40,7 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
     private JavaClassElement declaringElement;
     private ClassElement typeElement;
     private ClassElement genericType;
+    private ClassElement resolvedDeclaringClass;
 
     /**
      * @param variableElement    The {@link VariableElement}
@@ -110,19 +111,20 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
 
     @Override
     public ClassElement getDeclaringType() {
-        if (declaringElement == null) {
+        if (resolvedDeclaringClass == null) {
 
-            final Element enclosingElement = variableElement.getEnclosingElement();
-            if (!(enclosingElement instanceof TypeElement)) {
-                throw new IllegalStateException("Enclosing element should be a type element");
+            Element enclosingElement = variableElement.getEnclosingElement();
+            if (enclosingElement instanceof TypeElement) {
+                TypeElement te = (TypeElement) enclosingElement;
+                if (declaringElement.getName().equals(te.getQualifiedName().toString())) {
+                    resolvedDeclaringClass = declaringElement;
+                } else {
+                    resolvedDeclaringClass = mirrorToClassElement(te.asType(), visitorContext, declaringElement.getGenericTypeInfo());
+                }
+            } else {
+                return declaringElement;
             }
-            declaringElement = new JavaClassElement(
-                    (TypeElement) enclosingElement,
-                    visitorContext.getAnnotationUtils().getAnnotationMetadata(enclosingElement),
-                    visitorContext
-            );
         }
-
-        return declaringElement;
+        return resolvedDeclaringClass;
     }
 }

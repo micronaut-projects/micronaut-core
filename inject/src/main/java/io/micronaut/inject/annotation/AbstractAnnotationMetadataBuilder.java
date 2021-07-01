@@ -699,7 +699,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     final List<? extends A> annotationsForMember = getAnnotationsForType(member)
                             .stream().filter((a) -> !getAnnotationTypeName(a).equals(annotationName))
                             .collect(Collectors.toList());
-                    includeAnnotations(memberMetadata, member, null,true, annotationsForMember, false);
+                    includeAnnotations(memberMetadata, member, null, true, annotationsForMember, false);
 
                     boolean isInstantiatedMember = memberMetadata.hasAnnotation(InstantiatedMember.class);
 
