@@ -81,6 +81,8 @@ public class QueryValueClientArgumentBinder implements AnnotatedClientArgumentRe
             createSeparatedQueryValue(context, value, delimiter)
                     .ifPresent(v -> parameters.add(key, v));
         }
+
+        uriContext.getPathParameters().remove(key);
     }
 
     private void addMultiParameters(

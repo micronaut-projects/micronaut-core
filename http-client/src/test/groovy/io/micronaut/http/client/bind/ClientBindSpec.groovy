@@ -46,7 +46,9 @@ class ClientBindSpec extends Specification {
         bindClient.pipeSeparatedQueryValue(values) == "x=xx|yy"
         var result = bindClient.differentSeparatedQueryValues(values, values)
         result.contains("pipeParams=xx|yy")
+        result.count("pipeParams") == 1
         result.contains("commaParams=xx,yy")
+        result.count("commaParams=xx,yy") == 1
     }
 
     void "test multi format query values"() {
