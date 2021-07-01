@@ -26,7 +26,7 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.ExecutableMethodsDefinition;
 import io.micronaut.inject.ParametrizedBeanFactory;
 
 import java.lang.annotation.Annotation;
@@ -45,8 +45,8 @@ public abstract class AbstractParametrizedBeanDefinition2<T> extends AbstractBea
     private final Argument[] requiredArguments;
 
     @SuppressWarnings("ParameterNumber")
-    protected AbstractParametrizedBeanDefinition2(Class<T> beanType, MethodOrFieldReference constructor, AnnotationMetadata annotationMetadata, MethodReference[] methodInjection, FieldReference[] fieldInjection, ExecutableMethod<T, ?>[] executableMethods, Map<String, Argument<?>[]> typeArgumentsMap, Optional<String> scope, boolean isAbstract, boolean isProvided, boolean isIterable, boolean isSingleton, boolean isPrimary) {
-        super(beanType, constructor, annotationMetadata, methodInjection, fieldInjection, executableMethods, typeArgumentsMap, scope, isAbstract, isProvided, isIterable, isSingleton, isPrimary);
+    protected AbstractParametrizedBeanDefinition2(Class<T> beanType, MethodOrFieldReference constructor, AnnotationMetadata annotationMetadata, MethodReference[] methodInjection, FieldReference[] fieldInjection, ExecutableMethodsDefinition<T> executableMethodsDefinition, Map<String, Argument<?>[]> typeArgumentsMap, Optional<String> scope, boolean isAbstract, boolean isProvided, boolean isIterable, boolean isSingleton, boolean isPrimary) {
+        super(beanType, constructor, annotationMetadata, methodInjection, fieldInjection, executableMethodsDefinition, typeArgumentsMap, scope, isAbstract, isProvided, isIterable, isSingleton, isPrimary);
         this.requiredArguments = resolveRequiredArguments();
     }
 

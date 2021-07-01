@@ -131,7 +131,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     private static final String EMPTY_MAP = "EMPTY_MAP";
     private static final String EMPTY_LIST = "EMPTY_LIST";
 
-    private final OriginatingElements originatingElements;
+    protected final OriginatingElements originatingElements;
 
     /**
      * @param originatingElement The originating element
@@ -433,6 +433,52 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                 generatorAdapter.visitInsn(DUP);
             }
             i++;
+        }
+    }
+
+    /**
+     * Pushes an argument.
+     *
+     * @param owningType           The owning type
+     * @param classWriter          The declaring class writer
+     * @param generatorAdapter     The generator adapter
+     * @param declaringTypeName     The declaring type name
+     * @param argument             The argument
+     * @param defaults             The annotation defaults
+     * @param loadTypeMethods      The load type methods
+     */
+    protected void pushArgument(Type owningType,
+                              ClassWriter classWriter,
+                              GeneratorAdapter generatorAdapter,
+                              String declaringTypeName,
+                              ClassElement argument,
+                              Map<String, Integer> defaults,
+                              Map<String, GeneratorAdapter> loadTypeMethods) {
+        Type type = Type.getType(Argument.class);
+        if (argument.isPrimitive() && !argument.isArray()) {
+            String constantName = argument.getName().toUpperCase(Locale.ENGLISH);
+            // refer to constant for primitives
+            generatorAdapter.getStatic(type, constantName, type);
+        } else {
+            if (!argument.isArray() && String.class.getName().equals(argument.getType().getName())
+                    && argument.getName().equals(argument.getType().getName())
+                    && argument.getAnnotationMetadata().isEmpty()) {
+                    generatorAdapter.getStatic(type, "STRING", type);
+                    return;
+            }
+
+            pushCreateArgument(
+                    declaringTypeName,
+                    owningType,
+                    classWriter,
+                    generatorAdapter,
+                    argument.getName(),
+                    argument,
+                    argument.getAnnotationMetadata(),
+                    argument.getTypeArguments(),
+                    defaults,
+                    loadTypeMethods
+            );
         }
     }
 

@@ -143,7 +143,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private boolean isProxyTarget;
 
     private MethodVisitor constructorWriter;
-    private final List<ExecutableMethodWriter> proxiedMethods = new ArrayList<>();
     private final Set<MethodRef> proxiedMethodsRefSet = new HashSet<>();
     private final List<MethodRef> proxyTargetMethods = new ArrayList<>();
     private int proxyMethodCount = 0;
@@ -523,14 +522,14 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             }
 
             BeanDefinitionWriter beanDefinitionWriter = parentWriter == null ? proxyBeanDefinitionWriter : parentWriter;
-            ExecutableMethodWriter executableMethodWriter = beanDefinitionWriter.visitExecutableMethod(
+            int methodIndex = beanDefinitionWriter.visitExecutableMethod(
                     beanType,
                     methodElement,
                     interceptedProxyClassName,
                     interceptedProxyBridgeMethodName
             );
+            methodKey.methodIndex = methodIndex;
 
-            proxiedMethods.add(executableMethodWriter);
             proxiedMethodsRefSet.add(methodKey);
             proxyTargetMethods.add(methodKey);
 
@@ -858,7 +857,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
         // now initialize the held values
         if (isProxyTarget) {
-            if (proxiedMethods.size() == proxyMethodCount) {
+            if (proxiedMethodsRefSet.size() == proxyMethodCount) {
 
                 Iterator<MethodRef> iterator = proxyTargetMethods.iterator();
                 for (int i = 0; i < proxyMethodCount; i++) {
@@ -893,30 +892,45 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                     pushResolveInterceptorsCall(proxyConstructorGenerator, i, isIntroduction);
                 }
             }
-        } else {
+        } else if (!proxiedMethodsRefSet.isEmpty()) {
+            BeanDefinitionWriter beanDefinitionWriter = parentWriter == null ? proxyBeanDefinitionWriter : parentWriter;
+            ExecutableMethodsDefinitionWriter executableMethodsDefinitionWriter = beanDefinitionWriter.getExecutableMethodsWriter();
+            Type executableMethodsDefinitionType = executableMethodsDefinitionWriter.getClassType();
+            proxyConstructorGenerator.newInstance(executableMethodsDefinitionType);
+            proxyConstructorGenerator.dup();
+            if (executableMethodsDefinitionWriter.isSupportsInterceptedProxy()) {
+                proxyConstructorGenerator.push(true);
+                proxyConstructorGenerator.invokeConstructor(executableMethodsDefinitionType, new Method(CONSTRUCTOR_NAME, getConstructorDescriptor(boolean.class)));
+            } else {
+                proxyConstructorGenerator.invokeConstructor(executableMethodsDefinitionType, new Method(CONSTRUCTOR_NAME, DESCRIPTOR_DEFAULT_CONSTRUCTOR));
+            }
+            int executableMethodsDefinitionIndex = proxyConstructorGenerator.newLocal(executableMethodsDefinitionType);
+            proxyConstructorGenerator.storeLocal(executableMethodsDefinitionIndex, executableMethodsDefinitionType);
 
-            for (int i = 0; i < proxyMethodCount; i++) {
-                ExecutableMethodWriter executableMethodWriter = proxiedMethods.get(i);
+            List<MethodRef> methods = new ArrayList<>(proxiedMethodsRefSet);
+            methods.sort(Comparator.comparing(methodRef -> methodRef.methodIndex));
+            int i = 0;
+            for (MethodRef methodRef : methods) {
+                int methodIndex = methodRef.methodIndex;
+
                 boolean introduction = isIntroduction && (
-                        executableMethodWriter.isAbstract() || (
-                                executableMethodWriter.isInterface() && !executableMethodWriter.isDefault()));
+                        executableMethodsDefinitionWriter.isAbstract(methodIndex) || (
+                                executableMethodsDefinitionWriter.isInterface(methodIndex) && !executableMethodsDefinitionWriter.isDefault(methodIndex)));
 
                 // The following will initialize the array of $proxyMethod instances
                 // Eg. this.proxyMethods[0] = new $blah0();
                 proxyConstructorGenerator.loadThis();
                 proxyConstructorGenerator.getField(proxyType, FIELD_PROXY_METHODS, FIELD_TYPE_PROXY_METHODS);
                 proxyConstructorGenerator.push(i);
-                Type methodType = Type.getObjectType(executableMethodWriter.getInternalName());
-                proxyConstructorGenerator.newInstance(methodType);
-                proxyConstructorGenerator.dup();
-                if (executableMethodWriter.isSupportsInterceptedProxy()) {
-                    proxyConstructorGenerator.push(true);
-                    proxyConstructorGenerator.invokeConstructor(methodType, new Method(CONSTRUCTOR_NAME, getConstructorDescriptor(boolean.class)));
-                } else {
-                    proxyConstructorGenerator.invokeConstructor(methodType, new Method(CONSTRUCTOR_NAME, DESCRIPTOR_DEFAULT_CONSTRUCTOR));
-                }
+                // getExecutableMethodByIndex
+                proxyConstructorGenerator.loadLocal(executableMethodsDefinitionIndex);
+                proxyConstructorGenerator.push(methodIndex);
+                proxyConstructorGenerator.invokeVirtual(executableMethodsDefinitionType, ExecutableMethodsDefinitionWriter.GET_EXECUTABLE_AT_INDEX_METHOD);
                 proxyConstructorGenerator.visitInsn(AASTORE);
+                
                 pushResolveInterceptorsCall(proxyConstructorGenerator, i, introduction);
+                
+                i++;
             }
         }
 
@@ -1056,7 +1070,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
-    public ExecutableMethodWriter visitExecutableMethod(
+    public int visitExecutableMethod(
             TypedElement declaringBean,
             MethodElement methodElement,
             VisitorContext visitorContext) {
@@ -1067,7 +1081,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                         visitorContext
                 )
         );
-        return null;
+        return -1;
     }
 
     @Override
@@ -1393,6 +1407,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         protected final List<ClassElement> argumentTypes;
         protected final Type returnType;
         private final List<String> rawTypes;
+        int methodIndex;
 
         public MethodRef(String name, List<ParameterElement> argumentTypes, Type returnType) {
             this.name = name;

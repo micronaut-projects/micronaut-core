@@ -235,9 +235,9 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      * @param declaringBean  The declaring bean of the method. Note this may differ from {@link MethodElement#getDeclaringType()} in the case of the method coming from a super class or interface.
      * @param methodElement  The method element
      * @param visitorContext The visitor context
-     * @return The {@link ExecutableMethodWriter}.
+     * @return The index of a new method
      */
-    ExecutableMethodWriter visitExecutableMethod(TypedElement declaringBean,
+    int visitExecutableMethod(TypedElement declaringBean,
                                                  MethodElement methodElement,
                                                  VisitorContext visitorContext);
 

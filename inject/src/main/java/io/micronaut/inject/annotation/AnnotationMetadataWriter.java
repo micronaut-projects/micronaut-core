@@ -305,6 +305,18 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             AnnotationMetadataHierarchy hierarchy,
             Map<String, Integer> defaultsStorage,
             Map<String, GeneratorAdapter> loadTypeMethods) {
+
+        if (hierarchy.isEmpty()) {
+            generatorAdapter.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
+            return;
+        }
+        List<AnnotationMetadata> notEmpty = CollectionUtils.iterableToList(hierarchy)
+                .stream().filter(h -> !h.isEmpty()).collect(Collectors.toList());
+        if (notEmpty.size() == 1) {
+            pushNewAnnotationMetadataOrReference(owningType, classWriter, generatorAdapter, defaultsStorage, loadTypeMethods, notEmpty.get(0));
+            return;
+        }
+
         generatorAdapter.visitTypeInsn(NEW, TYPE_DEFAULT_ANNOTATION_METADATA_HIERARCHY.getInternalName());
         generatorAdapter.visitInsn(DUP);
 
