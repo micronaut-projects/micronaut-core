@@ -38,6 +38,7 @@ ioc:
   introspection: Bean Introspection
   beanValidation: Bean Validation
   annotationMetadata: Bean Annotation Metadata
+  beanImport: Importing Beans from Libraries
   springBeans: Micronaut Beans And Spring
   android: Android Support
 config:
