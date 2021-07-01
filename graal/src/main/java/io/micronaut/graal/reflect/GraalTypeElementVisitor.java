@@ -122,11 +122,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 packages.add(element.getPackageName());
                 final String beanName = element.getName();
                 addBean(beanName);
-                if (element.isArray()) {
-                    resolveClassData(beanName + "[]");
-                } else {
-                    resolveClassData(beanName);
-                }
+                resolveClassData(beanName + "[]");
             } else if (element.hasAnnotation(TypeHint.class)) {
                 originatingElements.add(element);
                 packages.add(element.getPackageName());
