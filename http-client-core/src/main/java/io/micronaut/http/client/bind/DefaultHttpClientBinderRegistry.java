@@ -58,12 +58,10 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
 
     /**
      * @param conversionService The conversion service
-     * @param argumentBinders   The request argument binders
-     * @param binders           The method binders
+     * @param binders           The request binders
      */
     protected DefaultHttpClientBinderRegistry(ConversionService<?> conversionService,
-                                              List<ClientArgumentRequestBinder<?>> argumentBinders,
-                                              List<AnnotatedClientRequestBinder<?>> binders) {
+                                              List<ClientRequestBinder> binders) {
         byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (ClientArgumentRequestBinder<HttpHeaders>) (context, uriContext, value, request) -> {
             value.forEachValue(request::header);
         });
@@ -135,14 +133,8 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
             byType.put(Argument.of(Continuation.class).typeHashCode(),  (context, uriContext, value, request) -> { });
         }
 
-        if (CollectionUtils.isNotEmpty(argumentBinders)) {
-            for (ClientArgumentRequestBinder<?> binder : argumentBinders) {
-                addBinder(binder);
-            }
-        }
-
         if (CollectionUtils.isNotEmpty(binders)) {
-            for (AnnotatedClientRequestBinder<?> binder: binders) {
+            for (ClientRequestBinder binder : binders) {
                 addBinder(binder);
             }
         }
@@ -169,7 +161,7 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
     }
 
     @Override
-    public Optional<AnnotatedClientRequestBinder<?>> findBinder(Class<?> annotationType) {
+    public Optional<AnnotatedClientRequestBinder<?>> findAnnotatedBinder(@NonNull Class<?> annotationType) {
         return Optional.ofNullable(methodByAnnotation.get(annotationType));
     }
 
@@ -179,13 +171,16 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
      * @param binder The binder
      * @param <T> The type
      */
-    public <T> void addBinder(ClientArgumentRequestBinder<T> binder) {
-        if (binder instanceof AnnotatedClientArgumentRequestBinder) {
-            AnnotatedClientArgumentRequestBinder<?> annotatedRequestArgumentBinder = (AnnotatedClientArgumentRequestBinder) binder;
+    public <T> void addBinder(ClientRequestBinder binder) {
+        if (binder instanceof AnnotatedClientRequestBinder) {
+            AnnotatedClientRequestBinder<?> annotatedBinder = (AnnotatedClientRequestBinder<?>) binder;
+            methodByAnnotation.put(annotatedBinder.getAnnotationType(), annotatedBinder);
+        } else if (binder instanceof AnnotatedClientArgumentRequestBinder) {
+            AnnotatedClientArgumentRequestBinder<?> annotatedRequestArgumentBinder = (AnnotatedClientArgumentRequestBinder<?>) binder;
             Class<? extends Annotation> annotationType = annotatedRequestArgumentBinder.getAnnotationType();
             byAnnotation.put(annotationType, annotatedRequestArgumentBinder);
         } else if (binder instanceof TypedClientArgumentRequestBinder) {
-            TypedClientArgumentRequestBinder<?> typedRequestArgumentBinder = (TypedClientArgumentRequestBinder) binder;
+            TypedClientArgumentRequestBinder<?> typedRequestArgumentBinder = (TypedClientArgumentRequestBinder<?>) binder;
             byType.put(typedRequestArgumentBinder.argumentType().typeHashCode(), typedRequestArgumentBinder);
             List<Class<?>> superTypes = typedRequestArgumentBinder.superTypes();
             if (CollectionUtils.isNotEmpty(superTypes)) {
@@ -194,10 +189,6 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
                 }
             }
         }
-    }
-
-    public void addBinder(AnnotatedClientRequestBinder<?> binder) {
-        methodByAnnotation.put(binder.getAnnotationType(), binder);
     }
 
     private <T> Optional<ClientArgumentRequestBinder<?>> findTypeBinder(Argument<T> argument) {

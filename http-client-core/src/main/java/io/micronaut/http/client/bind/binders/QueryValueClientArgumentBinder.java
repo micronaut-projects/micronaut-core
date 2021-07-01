@@ -1,6 +1,5 @@
 package io.micronaut.http.client.bind.binders;
 
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.beans.BeanWrapper;
@@ -50,14 +49,13 @@ public class QueryValueClientArgumentBinder implements AnnotatedClientArgumentRe
                      @NonNull Object value,
                      @NonNull MutableHttpRequest<?> request
     ) {
-        AnnotationValue<QueryValue> annotation = context.getAnnotationMetadata()
-                .getAnnotationValuesByType(QueryValue.class).get(0);
         String unencodedKey = context.getAnnotationMetadata().stringValue(QueryValue.class)
                     .filter(StringUtils::isNotEmpty)
                     .orElse(context.getArgument().getName());
         String key = encodeURIComponent(unencodedKey);
 
-        QueryValue.Format format = annotation.get("format", QueryValue.Format.class)
+        QueryValue.Format format = context.getAnnotationMetadata()
+                .enumValue(QueryValue.class, "format", QueryValue.Format.class)
                 .orElse(QueryValue.Format.COMMA_DELIMITED);
         MutableHttpParameters parameters = request.getParameters();
 
@@ -81,8 +79,6 @@ public class QueryValueClientArgumentBinder implements AnnotatedClientArgumentRe
             createSeparatedQueryValue(context, value, delimiter)
                     .ifPresent(v -> parameters.add(key, v));
         }
-
-        uriContext.getPathParameters().remove(key);
     }
 
     private void addMultiParameters(

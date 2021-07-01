@@ -238,19 +238,21 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             // Apply all the method binders
             List<Class<? extends Annotation>> methodBinderTypes = context.getAnnotationTypesByStereotype(Bindable.class);
             for (Class<? extends Annotation> binderType: methodBinderTypes) {
-                binderRegistry.findBinder(binderType).ifPresent(b -> b.bind(context, uriContext, request));
+                binderRegistry.findAnnotatedBinder(binderType).ifPresent(b -> b.bind(context, uriContext, request));
             }
 
             // Apply all the argument binders
             Argument.of(Void.class, context.getAnnotationMetadata());
-            for (Argument argument : arguments) {
-                Object definedValue = getValue(argument, context, parameters, paramMap);
+            if (arguments.length > 0) {
+                for (Argument argument : arguments) {
+                    Object definedValue = getValue(argument, context, parameters, paramMap);
 
-                if (definedValue != null) {
-                    final ClientArgumentRequestBinder<Object> binder = (ClientArgumentRequestBinder<Object>) binderRegistry
-                            .findArgumentBinder((Argument<Object>) argument)
-                            .orElse(defaultBinder);
-                    binder.bind(ConversionContext.of(argument), uriContext, definedValue, request);
+                    if (definedValue != null) {
+                        final ClientArgumentRequestBinder<Object> binder = (ClientArgumentRequestBinder<Object>) binderRegistry
+                                .findArgumentBinder((Argument<Object>) argument)
+                                .orElse(defaultBinder);
+                        binder.bind(ConversionContext.of(argument), uriContext, definedValue, request);
+                    }
                 }
             }
 

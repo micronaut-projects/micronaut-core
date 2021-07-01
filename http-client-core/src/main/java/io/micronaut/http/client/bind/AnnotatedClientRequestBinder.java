@@ -37,7 +37,7 @@ import java.lang.annotation.Annotation;
 @Experimental
 @BootstrapContextCompatible
 @Indexed(AnnotatedClientRequestBinder.class)
-public interface AnnotatedClientRequestBinder<A extends Annotation> {
+public interface AnnotatedClientRequestBinder<A extends Annotation> extends ClientRequestBinder {
 
     /**
      * Modify the request with the annotation that this binder is applied to.
