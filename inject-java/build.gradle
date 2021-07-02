@@ -29,6 +29,7 @@ dependencies {
     testImplementation dependencyVersion("zipkin.reporter")
     testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-core"), {
         exclude module:'micronaut-runtime'
+        exclude module:'micronaut-bom'
         exclude module:'micronaut-inject'
     }
     testRuntimeOnly 'org.glassfish.web:el-impl:2.2.1-b05'

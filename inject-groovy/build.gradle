@@ -21,6 +21,7 @@ dependencies {
     testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-core"), {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
+        exclude module:'micronaut-bom'
     }
 }
 
