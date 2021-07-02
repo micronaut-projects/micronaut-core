@@ -96,7 +96,8 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
 
     @CompileStatic
     BeanDefinition buildBeanDefinition(String className, String classStr) {
-        def beanDefName= '$' + NameUtils.getSimpleName(className) + BeanDefinitionWriter.CLASS_SUFFIX
+        def classSimpleName = NameUtils.getSimpleName(className)
+        def beanDefName= (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
@@ -111,7 +112,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
 
     @CompileStatic
     BeanDefinition buildBeanDefinition(String packageName, String className, String classStr) {
-        def beanDefName= '$' + className + BeanDefinitionWriter.CLASS_SUFFIX
+        def beanDefName= (className.startsWith('$') ? '' : '$') + className + BeanDefinitionWriter.CLASS_SUFFIX
         String beanFullName = "${packageName}.${beanDefName}"
 
         def classLoader = new InMemoryByteCodeGroovyClassLoader()
@@ -130,7 +131,8 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
      * @return The bean definition
      */
     protected BeanDefinition buildInterceptedBeanDefinition(String className, String cls) {
-        def beanDefName= '$$' + NameUtils.getSimpleName(className) + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX
+        def classSimpleName = NameUtils.getSimpleName(className)
+        def beanDefName= (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
@@ -145,7 +147,8 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
      * @return The bean definition
      */
     protected BeanDefinitionReference buildInterceptedBeanDefinitionReference(String className, String cls) {
-        def beanDefName= '$$' + NameUtils.getSimpleName(className) + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX
+        def classSimpleName = NameUtils.getSimpleName(className)
+        def beanDefName= (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 

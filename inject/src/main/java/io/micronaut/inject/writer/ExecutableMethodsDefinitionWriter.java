@@ -51,6 +51,7 @@ import java.util.stream.IntStream;
  */
 @Internal
 public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter implements Opcodes {
+    public static final String CLASS_SUFFIX = "$Exec";
 
     public static final Method GET_EXECUTABLE_AT_INDEX_METHOD = Method.getMethod(
             ReflectionUtils.findMethod(AbstractExecutableMethodsDefinition.class, "getExecutableMethodByIndex", int.class).get()
@@ -109,7 +110,7 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
                                              String beanDefinitionReferenceClassName,
                                              OriginatingElements originatingElements) {
         super(originatingElements);
-        this.className = beanDefinitionClassName + "$Exec";
+        this.className = beanDefinitionClassName + CLASS_SUFFIX;
         this.internalName = getInternalName(className);
         this.thisType = Type.getObjectType(internalName);
         this.beanDefinitionReferenceClassName = beanDefinitionReferenceClassName;

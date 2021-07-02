@@ -17,14 +17,7 @@ package io.micronaut.annotation.processing.test
 
 import com.sun.source.util.JavacTask
 import groovy.transform.CompileStatic
-import io.micronaut.annotation.processing.AggregatingTypeElementVisitorProcessor
-import io.micronaut.annotation.processing.AnnotationUtils
-import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor
-import io.micronaut.annotation.processing.GenericUtils
-import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
-import io.micronaut.annotation.processing.ModelUtils
-import io.micronaut.annotation.processing.TypeElementVisitorProcessor
-import io.micronaut.annotation.processing.visitor.JavaClassElement
+import io.micronaut.annotation.processing.*
 import io.micronaut.annotation.processing.visitor.JavaElementFactory
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext
 import io.micronaut.aop.internal.InterceptorRegistryBean
@@ -54,7 +47,6 @@ import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Specification
 
-import javax.annotation.processing.ProcessingEnvironment
 import javax.lang.model.element.Element
 import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
@@ -64,7 +56,6 @@ import java.lang.annotation.Annotation
 import java.util.function.Predicate
 import java.util.stream.Collectors
 import java.util.stream.StreamSupport
-
 /**
  * Base class to extend from to allow compilation of Java sources
  * at runtime to allow testing of compile time behavior.
@@ -144,7 +135,7 @@ abstract class AbstractTypeElementSpec extends Specification {
     * @return the introspection if it is correct
     **/
     protected BeanIntrospection buildBeanIntrospection(String className, String cls) {
-        def beanDefName= '$' + NameUtils.getSimpleName(className) + '$Introspection'
+        def beanDefName= (className.startsWith('$') ? '' : '$') + NameUtils.getSimpleName(className) + '$Introspection'
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
@@ -344,7 +335,8 @@ class Test {
     }
 
     protected BeanDefinition buildBeanDefinition(String className, String cls) {
-        def beanDefName= '$' + NameUtils.getSimpleName(className) + BeanDefinitionWriter.CLASS_SUFFIX
+        def classSimpleName = NameUtils.getSimpleName(className)
+        def beanDefName = (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
@@ -357,7 +349,7 @@ class Test {
     }
 
     protected BeanDefinition buildBeanDefinition(String packageName, String className, String cls) {
-        def beanDefName= '$' + className + BeanDefinitionWriter.CLASS_SUFFIX
+        def beanDefName= (className.startsWith('$') ? '' : '$') + className + BeanDefinitionWriter.CLASS_SUFFIX
         String beanFullName = "${packageName}.${beanDefName}"
 
         ClassLoader classLoader = buildClassLoader(className, cls)
@@ -375,7 +367,8 @@ class Test {
      * @return The bean definition
      */
     protected BeanDefinition buildInterceptedBeanDefinition(String className, String cls) {
-        def beanDefName= '$$' + NameUtils.getSimpleName(className) + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX
+        def classSimpleName = NameUtils.getSimpleName(className)
+        def beanDefName = (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
@@ -416,7 +409,8 @@ class Test {
      * @return The bean definition
      */
     protected BeanDefinitionReference buildInterceptedBeanDefinitionReference(String className, String cls) {
-        def beanDefName= '$$' + NameUtils.getSimpleName(className) + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX
+        def classSimpleName = NameUtils.getSimpleName(className)
+        def beanDefName = (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
@@ -425,7 +419,8 @@ class Test {
     }
 
     protected BeanDefinitionReference buildBeanDefinitionReference(String className, String cls) {
-        def beanDefName= '$' + NameUtils.getSimpleName(className) + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX
+        def classSimpleName = NameUtils.getSimpleName(className)
+        def beanDefName= (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 

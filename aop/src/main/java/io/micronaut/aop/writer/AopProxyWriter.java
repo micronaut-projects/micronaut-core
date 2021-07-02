@@ -15,17 +15,15 @@
  */
 package io.micronaut.aop.writer;
 
-import io.micronaut.context.*;
-import io.micronaut.context.annotation.ConfigurationReader;
-import io.micronaut.core.annotation.*;
-import io.micronaut.aop.HotSwappableInterceptedProxy;
-import io.micronaut.aop.Intercepted;
-import io.micronaut.aop.InterceptedProxy;
-import io.micronaut.aop.Interceptor;
-import io.micronaut.aop.Introduced;
+import io.micronaut.aop.*;
 import io.micronaut.aop.chain.InterceptorChain;
 import io.micronaut.aop.chain.MethodInterceptorChain;
-import io.micronaut.core.naming.NameUtils;
+import io.micronaut.context.*;
+import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
@@ -42,12 +40,7 @@ import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.*;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
+import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
@@ -187,7 +180,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
 
         this.proxyFullName = parent.getBeanDefinitionName() + PROXY_SUFFIX;
-        String proxyShortName = NameUtils.getSimpleName(proxyFullName);
         this.proxyInternalName = getInternalName(this.proxyFullName);
         this.proxyType = getTypeReferenceForName(proxyFullName);
         this.interceptorBinding = toInterceptorBindingMap(interceptorBinding);

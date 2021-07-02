@@ -78,7 +78,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Internal
 public class BeanDefinitionWriter extends AbstractClassFileWriter implements BeanDefinitionVisitor {
-    public static final String CLASS_SUFFIX = "Definition";
+    public static final String CLASS_SUFFIX = "$Definition";
     private static final String ANN_CONSTRAINT = "javax.validation.Constraint";
 
     private static final Constructor<AbstractConstructorInjectionPoint> CONSTRUCTOR_ABSTRACT_CONSTRUCTOR_IP = ReflectionUtils.findConstructor(
@@ -370,7 +370,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 throw new IllegalArgumentException("Factory methods require passing a unique identifier");
             }
             final ClassElement declaringType = factoryMethodElement.getDeclaringType();
-            this.beanDefinitionName = declaringType.getPackageName() + ".$" + declaringType.getSimpleName() + "$" + upperCaseMethodName + uniqueIdentifier + "Definition";
+            this.beanDefinitionName = declaringType.getPackageName() + "." + prefixClassName(declaringType.getSimpleName()) + "$" + upperCaseMethodName + uniqueIdentifier + CLASS_SUFFIX;
         } else if (beanProducingElement instanceof FieldElement) {
             autoApplyNamedToBeanProducingElement(beanProducingElement);
             FieldElement factoryMethodElement = (FieldElement) beanProducingElement;
@@ -387,7 +387,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 throw new IllegalArgumentException("Factory fields require passing a unique identifier");
             }
             final ClassElement declaringType = factoryMethodElement.getDeclaringType();
-            this.beanDefinitionName = declaringType.getPackageName() + ".$" + declaringType.getSimpleName() + "$" + fieldName + uniqueIdentifier + "Definition";
+            this.beanDefinitionName = declaringType.getPackageName() + "." + prefixClassName(declaringType.getSimpleName()) + "$" + fieldName + uniqueIdentifier + CLASS_SUFFIX;
         } else if (beanProducingElement instanceof BeanElementBuilder) {
             BeanElementBuilder beanElementBuilder = (BeanElementBuilder) beanProducingElement;
             this.beanTypeElement = beanElementBuilder.getBeanType();
@@ -437,7 +437,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @NonNull
     private String getAssociatedBeanName(@NonNull Integer uniqueIdentifier, ClassElement originatingClass) {
-        return originatingClass.getPackageName() + ".$" + originatingClass.getSimpleName() + "$" + beanSimpleClassName + uniqueIdentifier + "Definition";
+        return originatingClass.getPackageName() + "." + prefixClassName(originatingClass.getSimpleName()) + prefixClassName(beanSimpleClassName) + uniqueIdentifier + CLASS_SUFFIX;
     }
 
     private void autoApplyNamedToBeanProducingElement(Element beanProducingElement) {
@@ -463,7 +463,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @NonNull
     private static String getBeanDefinitionName(String packageName, String className) {
-        return packageName + ".$" + className + CLASS_SUFFIX;
+        return packageName + "." + prefixClassName(className) + CLASS_SUFFIX;
+    }
+
+    private static String prefixClassName(String className) {
+        if (className.startsWith("$")) {
+            return className;
+        }
+        return "$" + className;
     }
 
     @NonNull

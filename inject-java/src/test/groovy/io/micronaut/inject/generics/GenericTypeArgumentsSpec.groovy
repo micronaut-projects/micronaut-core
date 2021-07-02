@@ -17,11 +17,9 @@ package io.micronaut.inject.generics
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.event.BeanCreatedEventListener
-import io.micronaut.core.annotation.AnnotationMetadataProvider
-import io.micronaut.http.filter.HttpClientFilterResolver
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
-import io.micronaut.inject.qualifiers.Qualifiers
+import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Unroll
 import zipkin2.Span
 import zipkin2.reporter.AsyncReporter
@@ -30,7 +28,6 @@ import zipkin2.reporter.Reporter
 import javax.validation.ConstraintViolationException
 import java.util.function.Function
 import java.util.function.Supplier
-import java.util.stream.Stream
 
 class GenericTypeArgumentsSpec extends AbstractTypeElementSpec {
 
@@ -483,14 +480,13 @@ class Test {
 ''')
         expect:
         definition != null
-//        definition.getTypeArgumentsMap().size() == 2
         definition.getTypeParameters(Reporter) == [Span] as Class[]
         definition.getTypeParameters(AsyncReporter) == [Span] as Class[]
     }
 
     void "test type arguments for factory with AOP advice applied"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.$TestFactory$MyFunc0Definition$Intercepted', '''\
+        BeanDefinition definition = buildBeanDefinition('test.$TestFactory$MyFunc0' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''\
 package test;
 
 import io.micronaut.inject.annotation.*;
