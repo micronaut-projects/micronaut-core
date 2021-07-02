@@ -90,47 +90,6 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             )
     );
 
-    private static final org.objectweb.asm.commons.Method[] MAP_OF;
-    private static final org.objectweb.asm.commons.Method[] LIST_OF;
-    private static final org.objectweb.asm.commons.Method MAP_OF_ENTRIES;
-    private static final org.objectweb.asm.commons.Method MAP_ENTRY;
-    private static final org.objectweb.asm.commons.Method LIST_OF_ARRAY;
-
-    static {
-        boolean mapListSupported;
-        try {
-            mapListSupported = ReflectionUtils.findMethod(Map.class, "of").isPresent();
-        } catch (Exception e) {
-            mapListSupported = false;
-        }
-        if (mapListSupported) {
-            MAP_OF = new Method[11];
-            LIST_OF = new Method[11];
-            for (int i = 0; i < MAP_OF.length; i++) {
-                Class[] mapArgs = new Class[i * 2];
-                Arrays.fill(mapArgs, Object.class);
-                MAP_OF[i] = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredMethod(Map.class, "of", mapArgs));
-                Class[] listArgs = new Class[i];
-                Arrays.fill(listArgs, Object.class);
-                LIST_OF[i] = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredMethod(List.class, "of", listArgs));
-            }
-            MAP_OF_ENTRIES = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredMethod(Map.class, "ofEntries", Map.Entry[].class));
-            MAP_ENTRY = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredMethod(Map.class, "entry", Object.class, Object.class));
-            LIST_OF_ARRAY = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredMethod(List.class, "of", Object[].class));
-        } else {
-            MAP_OF = null;
-            LIST_OF = null;
-            MAP_OF_ENTRIES = null;
-            MAP_ENTRY = null;
-            LIST_OF_ARRAY = null;
-        }
-    }
-
-    private static final Type MAP_TYPE = Type.getType(Map.class);
-    private static final Type LIST_TYPE = Type.getType(List.class);
-    private static final String EMPTY_MAP = "EMPTY_MAP";
-    private static final String EMPTY_LIST = "EMPTY_LIST";
-
     protected final OriginatingElements originatingElements;
 
     /**

@@ -38,19 +38,19 @@ public class AnnotationUtil {
     public static final String KOTLIN_METADATA = "kotlin.Metadata";
 
     public static final List<String> INTERNAL_ANNOTATION_NAMES = Arrays.asList(
-        Retention.class.getName(),
-        "javax.annotation.meta.TypeQualifier",
-        "javax.annotation.meta.TypeQualifierNickname",
-        "kotlin.annotation.Retention",
-        Inherited.class.getName(),
-        SuppressWarnings.class.getName(),
-        Override.class.getName(),
-        Repeatable.class.getName(),
-        Documented.class.getName(),
-        "kotlin.annotation.MustBeDocumented",
-        Target.class.getName(),
-        "kotlin.annotation.Target",
-        KOTLIN_METADATA
+            Retention.class.getName(),
+            "javax.annotation.meta.TypeQualifier",
+            "javax.annotation.meta.TypeQualifierNickname",
+            "kotlin.annotation.Retention",
+            Inherited.class.getName(),
+            SuppressWarnings.class.getName(),
+            Override.class.getName(),
+            Repeatable.class.getName(),
+            Documented.class.getName(),
+            "kotlin.annotation.MustBeDocumented",
+            Target.class.getName(),
+            "kotlin.annotation.Target",
+            KOTLIN_METADATA
     );
 
     /**
@@ -227,22 +227,31 @@ public class AnnotationUtil {
 
         // if the length is 2 then only a single annotation is defined, so tried use internal pool
         if (len == 2) {
-            Object value = values[1];
-            if (value == Collections.EMPTY_MAP) {
-                String key = values[0].toString();
-                return INTERN_MAP_POOL.computeIfAbsent(key, s ->
-                        Collections.singletonMap(s, Collections.emptyMap())
-                );
-            } else {
-                return Collections.singletonMap(
-                        values[0].toString(),
-                        value
-                );
-            }
-
+            return internMapOf((String) values[0], values[1]);
         } else {
             return StringUtils.internMapOf(values);
         }
+    }
+
+    /**
+     * Converts the given objects into a map of potentially cached and interned strings where the keys and values are alternating entries in the passed array. See {@link String#intern()}.
+     *
+     * <p>The values stored at even number positions will be converted to strings and interned.</p>
+     *
+     * @param key   The key
+     * @param value The value
+     * @return An unmodifiable set of strings
+     * @since 3.0
+     */
+    @SuppressWarnings("unused")
+    @UsedByGeneratedCode
+    public static Map<String, Object> internMapOf(String key, Object value) {
+        Objects.requireNonNull(key);
+        Objects.requireNonNull(value);
+        if (value == Collections.EMPTY_MAP) {
+            return INTERN_MAP_POOL.computeIfAbsent(key, s -> Collections.singletonMap(s, Collections.emptyMap()));
+        }
+        return Collections.singletonMap(key, value);
     }
 
     /**
@@ -261,19 +270,19 @@ public class AnnotationUtil {
             int nameHashCode = member.getKey().hashCode();
 
             int valueHashCode =
-                !value.getClass().isArray() ? value.hashCode() :
-                    value.getClass() == boolean[].class ? Arrays.hashCode((boolean[]) value) :
-                        value.getClass() == byte[].class ? Arrays.hashCode((byte[]) value) :
-                            value.getClass() == char[].class ? Arrays.hashCode((char[]) value) :
-                                value.getClass() == double[].class ? Arrays.hashCode((double[]) value) :
-                                    value.getClass() == float[].class ? Arrays.hashCode((float[]) value) :
-                                        value.getClass() == int[].class ? Arrays.hashCode((int[]) value) :
-                                            value.getClass() == long[].class ? Arrays.hashCode(
-                                                (long[]) value
-                                            ) :
-                                                value.getClass() == short[].class ? Arrays
-                                                    .hashCode((short[]) value) :
-                                                    Arrays.hashCode((Object[]) value);
+                    !value.getClass().isArray() ? value.hashCode() :
+                            value.getClass() == boolean[].class ? Arrays.hashCode((boolean[]) value) :
+                                    value.getClass() == byte[].class ? Arrays.hashCode((byte[]) value) :
+                                            value.getClass() == char[].class ? Arrays.hashCode((char[]) value) :
+                                                    value.getClass() == double[].class ? Arrays.hashCode((double[]) value) :
+                                                            value.getClass() == float[].class ? Arrays.hashCode((float[]) value) :
+                                                                    value.getClass() == int[].class ? Arrays.hashCode((int[]) value) :
+                                                                            value.getClass() == long[].class ? Arrays.hashCode(
+                                                                                    (long[]) value
+                                                                            ) :
+                                                                                    value.getClass() == short[].class ? Arrays
+                                                                                            .hashCode((short[]) value) :
+                                                                                            Arrays.hashCode((Object[]) value);
 
             hashCode += 127 * nameHashCode ^ valueHashCode;
         }
@@ -290,33 +299,33 @@ public class AnnotationUtil {
      */
     public static boolean areEqual(Object o1, Object o2) {
         return
-            !o1.getClass().isArray() ? o1.equals(o2) :
-                o1.getClass() == boolean[].class ? Arrays.equals((boolean[]) o1, (boolean[]) o2) :
-                    o1.getClass() == byte[].class ? Arrays.equals((byte[]) o1, (byte[]) o2) :
-                        o1.getClass() == char[].class ? Arrays.equals((char[]) o1, (char[]) o2) :
-                            o1.getClass() == double[].class ? Arrays.equals(
-                                (double[]) o1,
-                                (double[]) o2
-                            ) :
-                                o1.getClass() == float[].class ? Arrays.equals(
-                                    (float[]) o1,
-                                    (float[]) o2
-                                ) :
-                                    o1.getClass() == int[].class ? Arrays.equals(
-                                        (int[]) o1,
-                                        (int[]) o2
-                                    ) :
-                                        o1.getClass() == long[].class ? Arrays.equals(
-                                            (long[]) o1,
-                                            (long[]) o2
-                                        ) :
-                                            o1.getClass() == short[].class ? Arrays.equals(
-                                                (short[]) o1,
-                                                (short[]) o2
-                                            ) :
-                                                Arrays.equals(
-                                                    (Object[]) o1,
-                                                    (Object[]) o2
-                                                );
+                !o1.getClass().isArray() ? o1.equals(o2) :
+                        o1.getClass() == boolean[].class ? Arrays.equals((boolean[]) o1, (boolean[]) o2) :
+                                o1.getClass() == byte[].class ? Arrays.equals((byte[]) o1, (byte[]) o2) :
+                                        o1.getClass() == char[].class ? Arrays.equals((char[]) o1, (char[]) o2) :
+                                                o1.getClass() == double[].class ? Arrays.equals(
+                                                        (double[]) o1,
+                                                        (double[]) o2
+                                                ) :
+                                                        o1.getClass() == float[].class ? Arrays.equals(
+                                                                (float[]) o1,
+                                                                (float[]) o2
+                                                        ) :
+                                                                o1.getClass() == int[].class ? Arrays.equals(
+                                                                        (int[]) o1,
+                                                                        (int[]) o2
+                                                                ) :
+                                                                        o1.getClass() == long[].class ? Arrays.equals(
+                                                                                (long[]) o1,
+                                                                                (long[]) o2
+                                                                        ) :
+                                                                                o1.getClass() == short[].class ? Arrays.equals(
+                                                                                        (short[]) o1,
+                                                                                        (short[]) o2
+                                                                                ) :
+                                                                                        Arrays.equals(
+                                                                                                (Object[]) o1,
+                                                                                                (Object[]) o2
+                                                                                        );
     }
 }
