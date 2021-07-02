@@ -160,9 +160,25 @@ dependency:javax.inject:javax.inject:1[]
 
 ==== Nullable Annotations
 
-Micronaut no longer includes any third party dependency for nullability annotations.
+Micronaut no longer exports any third party dependency for nullability annotations.
 Micronaut now provides its own annotations for this purpose (api:core.annotation.Nullable[] and api:core.annotation.NonNull[]) that are used for our APIs.
 To continue using other nullability annotations, simply add the relevant dependency.
+
+Internally, Micronaut makes use of a third party annotation that may manifest as a warning in your project:
+```
+warning: unknown enum constant When.MAYBE
+  reason: class file for javax.annotation.meta.When not found
+```
+
+This warning is harmless and can be ignored. If you want to eliminate this warning, add the following dependency to your project:
+
+[source,groovy]
+----
+dependencies {
+    ...
+    compileOnly "com.google.code.findbugs:jsr305"
+}
+----
 
 ==== Server Filter Behavior
 
