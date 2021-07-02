@@ -97,12 +97,14 @@ public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<Inpu
                             }
                             ByteBuf content = message.content();
                             if (!(content instanceof EmptyByteBuf)) {
-                                byte[] bytes = ByteBufUtil.getBytes(content);
                                 try {
+                                    byte[] bytes = ByteBufUtil.getBytes(content);
                                     outputStream.write(bytes, 0, bytes.length);
                                 } catch (IOException e) {
                                     subscription.cancel();
                                     return;
+                                } finally {
+                                    content.release();
                                 }
                             }
                             subscription.request(1);
