@@ -146,7 +146,6 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                     final MethodElement constructor = beanElement.getPrimaryConstructor().orElse(null);
                     if (constructor != null && !constructor.isPublic()) {
                         processMethodElement(constructor);
-                        continue;
                     }
 
                     final ElementQuery<MethodElement> reflectiveMethodQuery = ElementQuery.ALL_METHODS
