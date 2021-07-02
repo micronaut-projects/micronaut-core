@@ -81,6 +81,8 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
     private final boolean isPrimary;
     private final boolean isAbstract;
     private final boolean isConfigurationProperties;
+    private final boolean hasExposedTypes;
+    private final boolean requiresMethodProcessing;
     @Nullable
     private final MethodOrFieldReference constructor;
     @Nullable
@@ -125,7 +127,10 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
             boolean isProvided,
             boolean isIterable,
             boolean isSingleton,
-            boolean isPrimary) {
+            boolean isPrimary,
+            boolean isConfigurationProperties,
+            boolean hasExposedTypes,
+            boolean requiresMethodProcessing) {
         this.scope = scope;
         this.type = beanType;
         if (annotationMetadata == null || annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
@@ -139,7 +144,6 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
                 this.annotationMetadata = annotationMetadata;
             }
         }
-        // TODO: process method and fields annotation
         this.isProvided = isProvided;
         this.isIterable = isIterable;
         this.isSingleton = isSingleton;
@@ -150,7 +154,9 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
         this.fieldInjection = fieldInjection;
         this.executableMethodsDefinition = executableMethodsDefinition;
         this.typeArgumentsMap = typeArgumentsMap;
-        this.isConfigurationProperties = isIterable || hasStereotype(ConfigurationReader.class);
+        this.isConfigurationProperties = isConfigurationProperties;
+        this.hasExposedTypes = hasExposedTypes;
+        this.requiresMethodProcessing = requiresMethodProcessing;
         Optional<Argument<?>> containerElement = Optional.empty();
         if (isContainerType()) {
             final List<Argument<?>> iterableArguments = getTypeArguments(Iterable.class);
@@ -208,6 +214,11 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
     @Override
     public boolean isProvided() {
         return isProvided;
+    }
+
+    @Override
+    public boolean requiresMethodProcessing() {
+        return requiresMethodProcessing;
     }
 
     @SuppressWarnings("unchecked")
@@ -268,10 +279,12 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
         return type;
     }
 
-    // TODO: provide at runtime
     @Override
     @NonNull
     public final Set<Class<?>> getExposedTypes() {
+        if (!hasExposedTypes) {
+            return Collections.EMPTY_SET;
+        }
         if (this.exposedTypes == null) {
             this.exposedTypes = BeanDefinition.super.getExposedTypes();
         }
@@ -1671,25 +1684,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
     @Internal
     @UsedByGeneratedCode
     protected final boolean containsProperties(@SuppressWarnings("unused") BeanResolutionContext resolutionContext, BeanContext context, String subProperty) {
-//        // todo
-//        boolean isSubProperty = StringUtils.isNotEmpty(subProperty);
-//        if (!isSubProperty && false && !requiredComponents.isEmpty()) { // TODO
-//            // if the bean requires dependency injection we disable this optimization
-//            return true;
-//        }
-        if (isConfigurationProperties) {
-            AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-            Optional<Object> cliPrefix = annotationMetadata.getValue(ConfigurationProperties.class, "cliPrefix");
-            if (cliPrefix.isPresent()) {
-                return true;
-            } else if (context instanceof ApplicationContext) {
-                ApplicationContext appCtx = (ApplicationContext) context;
-                String path = getConfigurationPropertiesPath(resolutionContext);
-                return appCtx.containsProperties(path);
-            }
-
-        }
-        return false;
+        return isConfigurationProperties;
     }
 
     /**

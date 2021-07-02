@@ -45,8 +45,11 @@ public abstract class AbstractParametrizedBeanDefinition2<T> extends AbstractBea
     private final Argument[] requiredArguments;
 
     @SuppressWarnings("ParameterNumber")
-    protected AbstractParametrizedBeanDefinition2(Class<T> beanType, MethodOrFieldReference constructor, AnnotationMetadata annotationMetadata, MethodReference[] methodInjection, FieldReference[] fieldInjection, ExecutableMethodsDefinition<T> executableMethodsDefinition, Map<String, Argument<?>[]> typeArgumentsMap, Optional<String> scope, boolean isAbstract, boolean isProvided, boolean isIterable, boolean isSingleton, boolean isPrimary) {
-        super(beanType, constructor, annotationMetadata, methodInjection, fieldInjection, executableMethodsDefinition, typeArgumentsMap, scope, isAbstract, isProvided, isIterable, isSingleton, isPrimary);
+    protected AbstractParametrizedBeanDefinition2(Class<T> beanType, MethodOrFieldReference constructor, AnnotationMetadata annotationMetadata, MethodReference[] methodInjection, FieldReference[] fieldInjection, ExecutableMethodsDefinition<T> executableMethodsDefinition, Map<String, Argument<?>[]> typeArgumentsMap, Optional<String> scope,
+                                                  boolean isAbstract, boolean isProvided, boolean isIterable, boolean isSingleton,
+                                                  boolean isPrimary, boolean isConfigurationProperties, boolean hasExposedTypes, boolean requiresMethodProcessing) {
+        super(beanType, constructor, annotationMetadata, methodInjection, fieldInjection, executableMethodsDefinition, typeArgumentsMap, scope,
+                isAbstract, isProvided, isIterable, isSingleton, isPrimary, isConfigurationProperties, hasExposedTypes, requiresMethodProcessing);
         this.requiredArguments = resolveRequiredArguments();
     }
 
