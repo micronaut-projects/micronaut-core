@@ -1993,7 +1993,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void applyDefaultNamedToParameters(List<ParameterElement> argumentTypes) {
         for (ParameterElement parameterElement : argumentTypes) {
-            autoApplyNamedIfPresent(parameterElement, parameterElement.getAnnotationMetadata());
+            final AnnotationMetadata annotationMetadata = parameterElement.getAnnotationMetadata();
+            DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, annotationMetadata);
+            autoApplyNamedIfPresent(parameterElement, annotationMetadata);
         }
     }
 

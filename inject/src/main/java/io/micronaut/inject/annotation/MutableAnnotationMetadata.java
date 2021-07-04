@@ -25,6 +25,7 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -43,6 +44,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
      * Default constructor.
      */
     public MutableAnnotationMetadata() {
+        this(null, null, null, null, null, false);
     }
 
     private MutableAnnotationMetadata(@Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
@@ -67,7 +69,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
 
     @Override
     public MutableAnnotationMetadata clone() {
-        return new MutableAnnotationMetadata(
+        final MutableAnnotationMetadata cloned = new MutableAnnotationMetadata(
                 declaredAnnotations != null ? new HashMap<>(declaredAnnotations) : null,
                 declaredStereotypes != null ? new HashMap<>(declaredStereotypes) : null,
                 allStereotypes != null ? new HashMap<>(allStereotypes) : null,
@@ -75,6 +77,10 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                 annotationsByStereotype != null ? new HashMap<>(annotationsByStereotype) : null,
                 hasPropertyExpressions
         );
+        if (annotationDefaultValues != null) {
+            cloned.annotationDefaultValues = new LinkedHashMap<>(annotationDefaultValues);
+        }
+        return cloned;
     }
 
     @Override
