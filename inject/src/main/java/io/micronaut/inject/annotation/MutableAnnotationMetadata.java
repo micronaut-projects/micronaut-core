@@ -44,7 +44,6 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
      * Default constructor.
      */
     public MutableAnnotationMetadata() {
-        this(null, null, null, null, null, false);
     }
 
     private MutableAnnotationMetadata(@Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
