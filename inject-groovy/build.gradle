@@ -18,7 +18,11 @@ dependencies {
     testImplementation 'org.neo4j.driver:neo4j-java-driver:1.4.5'
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
     testImplementation "com.blazebit:blaze-persistence-core-impl:1.6.0-Alpha1"
-
+    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-core"), {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+        exclude module:'micronaut-bom'
+    }
 }
 
 test {

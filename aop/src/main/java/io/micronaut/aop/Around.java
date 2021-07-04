@@ -45,7 +45,7 @@ import java.lang.annotation.Target;
  */
 @Documented
 @Retention(RUNTIME)
-@Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE})
+@Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE, ElementType.METHOD})
 @InterceptorBinding(kind = InterceptorKind.AROUND)
 public @interface Around {
 
@@ -81,4 +81,42 @@ public @interface Around {
      * @return True if the proxy target should be resolved lazily
      */
     boolean lazy() default false;
+
+    /**
+     * Sets the {@link io.micronaut.aop.Around.ProxyTargetConstructorMode}. See the
+     * javadoc for {@link io.micronaut.aop.Around.ProxyTargetConstructorMode} for more information.
+     *
+     * @return The {@link io.micronaut.aop.Around.ProxyTargetConstructorMode}.
+     * @see io.micronaut.aop.Around.ProxyTargetConstructorMode
+     * @since 3.0.0
+     */
+    ProxyTargetConstructorMode proxyTargetMode() default ProxyTargetConstructorMode.ERROR;
+
+    /**
+     * When using {@link #proxyTarget()} on a {@link io.micronaut.context.annotation.Factory} method if the
+     * returned bean features constructor arguments this can lead to undefined behaviour since it is expected
+     * with factory methods that the developer is responsible for constructing the object.
+     *
+     * <p>For example if the type accepts an argument of type <code>String</code> then there is no way
+     * for Micronaut to know what to inject as a value for the argument and injecting <code>null</code> is inherently unsafe.</p>
+     *
+     * <p>The {@link io.micronaut.aop.Around.ProxyTargetConstructorMode} allows the developer decide if they wish to allow
+     * proxies to be constructed and if a proxy is allowed then Micronaut will either inject a bean if it is found or <code>null</code> if is not. For primitive types Micronaut will inject <code>true</code> for booleans and <code>0</code> for number types</p>
+     */
+    enum ProxyTargetConstructorMode {
+        /**
+         * Do not allow types with constructor arguments to be proxied. This is the default behaviour and compilation will fail.
+         */
+        ERROR,
+        /**
+         * Allow types to be proxied but print a warning when this feature is used.
+         *
+         * <p>In this case if a constructor parameter cannot be injected Micronaut will inject <code>null</code> for objects or <code>false</code> for boolean or <code>0</code> for any other primitive.</p>
+         */
+        WARN,
+        /**
+         * Allow types to be proxied and don't print any warnings.
+         */
+        ALLOW
+    }
 }

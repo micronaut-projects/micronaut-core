@@ -253,7 +253,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     node,
                     annotationMetadata
             )
-            populateProxyWriterConstructor(groovyClassElement, aopProxyWriter)
+            populateProxyWriterConstructor(groovyClassElement, aopProxyWriter, groovyClassElement.getPrimaryConstructor().orElse(null))
             beanDefinitionWriters.put(node, aopProxyWriter)
             visitIntroductionTypePublicMethods(aopProxyWriter, node)
             if (ArrayUtils.isNotEmpty(interfaceTypes)) {
@@ -745,9 +745,27 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             }
             MethodElement constructor = producedClassElement.getPrimaryConstructor().orElse(null)
             if (!producedClassElement.isInterface() && constructor != null && constructor.getParameters().length > 0) {
-                final ASTNode nativeElement = (ASTNode) constructor.getNativeType()
-                addError("The produced type from a factory which has AOP proxy advice specified must define an accessible no arguments constructor", nativeElement);
-                return;
+                final String proxyTargetMode = methodAnnotationMetadata.stringValue(AROUND_TYPE, "proxyTargetMode")
+                        .orElseGet(() -> {
+                            // temporary workaround until micronaut-test can be upgraded to 3.0
+                            if (methodAnnotationMetadata.hasAnnotation("io.micronaut.test.annotation.MockBean")) {
+                                return "WARN";
+                            } else {
+                                return "ERROR";
+                            }
+                        });
+                switch (proxyTargetMode) {
+                    case "ALLOW":
+                        allowProxyConstruction(constructor)
+                        break
+                    case "WARN":
+                        allowProxyConstruction(constructor)
+                        AstMessageUtils.warning(sourceUnit, annotatedNode, "The produced type of a @Factory method has constructor arguments and is proxied. This can lead to unexpected behaviour. See the javadoc for Around.ProxyTargetConstructorMode for more information.")
+                        break
+                    default:
+                        addError("The produced type from a factory which has AOP proxy advice specified must define an accessible no arguments constructor. Proxying types with constructor arguments can lead to unexpected behaviour. See the javadoc for for Around.ProxyTargetConstructorMode for more information and possible solutions.", annotatedNode)
+                        return
+                }
             }
 
             AnnotationValue<?>[] interceptorTypeReferences = InterceptedMethodUtil
@@ -770,7 +788,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             if (producedClassElement.isInterface()) {
                 proxyWriter.visitDefaultConstructor(AnnotationMetadata.EMPTY_METADATA, groovyVisitorContext)
             } else {
-                populateProxyWriterConstructor(producedClassElement, proxyWriter)
+                populateProxyWriterConstructor(producedClassElement, proxyWriter, constructor)
             }
             SourceUnit source = this.sourceUnit
             CompilationUnit unit = this.compilationUnit
@@ -824,6 +842,24 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             }
         }
         beanDefinitionWriters.put(annotatedNode, beanMethodWriter)
+    }
+
+    private static void allowProxyConstruction(MethodElement constructor) {
+        final ParameterElement[] parameters = constructor.getParameters()
+        for (ParameterElement parameter : parameters) {
+            if (parameter.primitive && !parameter.array) {
+                final String name = parameter.getType().getName()
+                if ("boolean" == name) {
+                    parameter.annotate(Value.class, (builder) -> builder.value(false))
+                } else {
+                    parameter.annotate(Value.class, (builder) -> builder.value(0))
+                }
+            } else {
+                // allow null
+                parameter.annotate(AnnotationUtil.NULLABLE)
+                parameter.removeAnnotation(AnnotationUtil.NON_NULL)
+            }
+        }
     }
 
     private static AnnotationMetadata addPropertyMetadata(Element element, PropertyMetadata propertyMetadata) {
@@ -966,7 +1002,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     interceptorTypeReferences
             )
 
-            populateProxyWriterConstructor(concreteClassElement, proxyWriter)
+            populateProxyWriterConstructor(concreteClassElement, proxyWriter, concreteClassElement.primaryConstructor.orElse(null))
             String beanDefinitionName = getBeanWriter().getBeanDefinitionName()
             if (isFactoryType) {
                 proxyWriter.visitSuperBeanDefinitionFactory(beanDefinitionName)
@@ -982,8 +1018,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         proxyWriter
     }
 
-    protected void populateProxyWriterConstructor(ClassElement targetClass, AopProxyWriter proxyWriter) {
-        MethodElement constructor = targetClass.getPrimaryConstructor().orElse(null)
+    protected void populateProxyWriterConstructor(ClassElement targetClass, AopProxyWriter proxyWriter, MethodElement constructor) {
         if (constructor != null) {
             if (constructor.parameters.length == 0) {
                 proxyWriter.visitDefaultConstructor(

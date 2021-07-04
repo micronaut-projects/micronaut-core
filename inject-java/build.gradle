@@ -27,6 +27,11 @@ dependencies {
     testImplementation project(":validation")
     testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
     testImplementation dependencyVersion("zipkin.reporter")
+    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-core"), {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-bom'
+        exclude module:'micronaut-inject'
+    }
     testRuntimeOnly 'org.glassfish.web:el-impl:2.2.1-b05'
     testRuntimeOnly 'org.glassfish:javax.el:3.0.1-b12'
 }
