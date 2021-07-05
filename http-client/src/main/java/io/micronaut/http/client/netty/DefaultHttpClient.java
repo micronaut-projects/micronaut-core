@@ -1568,11 +1568,11 @@ public class DefaultHttpClient implements
                     if (Publishers.isConvertibleToPublisher(bodyValue)) {
                         boolean isSingle = Publishers.isSingle(bodyValue.getClass());
 
-                        Flux<?> publisher = ConversionService.SHARED.convert(bodyValue, Flux.class).orElseThrow(() ->
+                        Publisher<?> publisher = ConversionService.SHARED.convert(bodyValue, Publisher.class).orElseThrow(() ->
                                 new IllegalArgumentException("Unconvertible reactive type: " + bodyValue)
                         );
 
-                        Flux<HttpContent> requestBodyPublisher = publisher.map(o -> {
+                        Flux<HttpContent> requestBodyPublisher = Flux.from(publisher).map(o -> {
                             if (o instanceof CharSequence) {
                                 ByteBuf textChunk = Unpooled.copiedBuffer(((CharSequence) o), requestContentType.getCharset().orElse(StandardCharsets.UTF_8));
                                 if (log.isTraceEnabled()) {
