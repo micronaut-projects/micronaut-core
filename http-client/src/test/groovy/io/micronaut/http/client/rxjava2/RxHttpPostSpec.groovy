@@ -118,34 +118,6 @@ class RxHttpPostSpec extends Specification {
         book.title == "The Stand"
     }
 
-    void "test reactive Mono post retrieve request with JSON"() {
-        when:
-        Flux<HttpPostSpec.Book> flowable = Flux.from(client.retrieve(
-                HttpRequest.POST("/reactive/post/single", Mono.just(new HttpPostSpec.Book(title: "The Stand", pages: 1000)))
-                        .accept(MediaType.APPLICATION_JSON_TYPE),
-
-                HttpPostSpec.Book
-        ))
-        HttpPostSpec.Book book = flowable.blockFirst()
-
-        then:
-        book.title == "The Stand"
-    }
-
-    void "test reactive maybe post retrieve request with JSON"() {
-        when:
-        Flux<HttpPostSpec.Book> flowable = Flux.from(client.retrieve(
-                HttpRequest.POST("/reactive/post/maybe", Mono.just(new HttpPostSpec.Book(title: "The Stand", pages: 1000)))
-                        .accept(MediaType.APPLICATION_JSON_TYPE),
-
-                HttpPostSpec.Book
-        ))
-        HttpPostSpec.Book book = flowable.blockFirst()
-
-        then:
-        book.title == "The Stand"
-    }
-
     void "test reactive post with unserializable data"() {
         when:
         Flux<User> flowable = Flux.from(client.retrieve(
@@ -280,16 +252,6 @@ class RxHttpPostSpec extends Specification {
     @Requires(property = 'spec.name', value = 'RxHttpPostSpec')
     @Controller('/reactive/post')
     static class ReactivePostController {
-
-        @Post('/single')
-        Mono<HttpPostSpec.Book> simple(@Body Mono<HttpPostSpec.Book> book) {
-            return book
-        }
-
-        @Post('/maybe')
-        Mono<HttpPostSpec.Book> maybe(@Body Mono<HttpPostSpec.Book> book) {
-            return book
-        }
 
         @Post("/user")
         Mono<HttpResponse<User>> postUser(@Body Mono<User> user) {
