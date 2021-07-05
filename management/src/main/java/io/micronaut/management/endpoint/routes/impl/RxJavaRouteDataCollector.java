@@ -25,6 +25,8 @@ import io.reactivex.Flowable;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 
+import javax.inject.Named;
+import javax.inject.Singleton;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,12 +43,12 @@ import java.util.stream.Stream;
 @Requires(beans = RoutesEndpoint.class)
 public class RxJavaRouteDataCollector implements RouteDataCollector<Map<String, Object>> {
 
-    private final RouteData routeData;
+    protected final RouteData routeData;
 
     /**
      * @param routeData       The RouteData
      */
-    public RxJavaRouteDataCollector(RouteData routeData) {
+    public RxJavaRouteDataCollector(@Named("default") RouteData routeData) {
         this.routeData = routeData;
     }
 

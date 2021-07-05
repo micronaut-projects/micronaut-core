@@ -21,6 +21,7 @@ import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRoute;
 import io.reactivex.Single;
 
+import javax.inject.Named;
 import java.util.Comparator;
 import java.util.stream.Stream;
 
@@ -41,7 +42,7 @@ public class RoutesEndpoint {
      * @param router The {@link Router}
      * @param routeDataCollector The {@link RouteDataCollector}
      */
-    public RoutesEndpoint(Router router, RouteDataCollector routeDataCollector) {
+    public RoutesEndpoint(Router router, @Named("RxJava") RouteDataCollector routeDataCollector) {
         this.router = router;
         this.routeDataCollector = routeDataCollector;
     }
