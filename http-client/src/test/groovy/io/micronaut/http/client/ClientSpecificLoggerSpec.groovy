@@ -51,7 +51,7 @@ class ClientSpecificLoggerSpec extends Specification {
 
         then:
         ((DefaultHttpClient) myService.client).log.name == "${ClientSpecificLoggerSpec.class}.client.one".toString()
-        ((DefaultHttpClient) myService.rxHttpClient).log.name == "${ClientSpecificLoggerSpec.class}.client.two".toString()
+        ((DefaultHttpClient) myService.reactiveHttpClient).log.name == "${ClientSpecificLoggerSpec.class}.client.two".toString()
 
         cleanup:
         context.close()
@@ -67,7 +67,7 @@ class ClientSpecificLoggerSpec extends Specification {
 
         @Inject
         @Client(value = "client-two", configuration = ClientTwoHttpConfiguration.class)
-        HttpClient rxHttpClient
+        HttpClient reactiveHttpClient
     }
 
     @Requires(property = 'spec.name', value = 'ClientSpecificLoggerSpec')
