@@ -3715,7 +3715,8 @@ public class DefaultBeanContext implements BeanContext {
         if (!candidates.isEmpty()) {
             filterReplacedBeans(null, candidates);
             Stream<BeanDefinition<T>> stream = candidates.stream();
-            if (qualifier != null) {
+            if (qualifier != null && !(qualifier instanceof AnyQualifier)) {
+                stream = stream.filter(bd -> !bd.hasDeclaredAnnotation(Any.class));
                 stream = qualifier.reduce(beanType.getType(), stream);
             }
             return stream.count() > 0;
