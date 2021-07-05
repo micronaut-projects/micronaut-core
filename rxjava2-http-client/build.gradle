@@ -2,4 +2,9 @@ dependencies {
     annotationProcessor project(":inject-java")
     api dependencyVersion("rxjava2")
     api project(":http-client-core")
+
+    testCompileOnly project(":inject-groovy")
+    testImplementation project(":rxjava2-http-server-netty")
+    testImplementation project(":http-client")
+
 }
