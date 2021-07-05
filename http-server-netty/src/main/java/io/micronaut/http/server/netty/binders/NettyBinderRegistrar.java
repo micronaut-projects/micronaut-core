@@ -28,7 +28,6 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.multipart.MultipartBodyArgumentBinder;
 import jakarta.inject.Singleton;
-import reactor.core.publisher.Flux;
 
 /**
  * A binder registrar that requests Netty related binders.
@@ -38,7 +37,6 @@ import reactor.core.publisher.Flux;
  */
 @Singleton
 @Internal
-@Requires(classes = Flux.class)
 class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegistry> {
     private final ConversionService<?> conversionService;
     private final HttpContentProcessorResolver httpContentProcessorResolver;
