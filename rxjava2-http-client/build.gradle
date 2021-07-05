@@ -5,6 +5,7 @@ dependencies {
 
     testCompileOnly project(":inject-groovy")
     testImplementation project(":rxjava2-http-server-netty")
+    testImplementation project(":rxjava2")
     testImplementation project(":http-client")
 
 }
