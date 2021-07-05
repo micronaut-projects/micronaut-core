@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.websocket.WebSocketClient;
@@ -39,6 +40,7 @@ public interface ReactiveHttpClientFactory<T extends HttpClient, E extends SseCl
      * @param url The base URL
      * @return The client
      */
+    @NonNull
     T createClient(@Nullable URL url);
 
     /**
@@ -50,6 +52,7 @@ public interface ReactiveHttpClientFactory<T extends HttpClient, E extends SseCl
      * @return The client
      * @since 2.2.0
      */
+    @NonNull
     T createClient(@Nullable URL url, HttpClientConfiguration configuration);
 
     /**
@@ -59,6 +62,7 @@ public interface ReactiveHttpClientFactory<T extends HttpClient, E extends SseCl
      * @param url The base URL
      * @return The client
      */
+    @NonNull
     S createStreamingClient(@Nullable URL url);
 
     /**
@@ -70,6 +74,7 @@ public interface ReactiveHttpClientFactory<T extends HttpClient, E extends SseCl
      * @return The client
      * @since 2.2.0
      */
+    @NonNull
     S createStreamingClient(@Nullable URL url, HttpClientConfiguration configuration);
 
     /**
@@ -79,6 +84,7 @@ public interface ReactiveHttpClientFactory<T extends HttpClient, E extends SseCl
      * @param url The base URL
      * @return The client
      */
+    @NonNull
     E createSseClient(@Nullable URL url);
 
     /**
@@ -89,6 +95,7 @@ public interface ReactiveHttpClientFactory<T extends HttpClient, E extends SseCl
      * @param configuration The client configuration
      * @return The client
      */
+    @NonNull
     E createSseClient(@Nullable URL url,  HttpClientConfiguration configuration);
 
     /**
@@ -98,6 +105,7 @@ public interface ReactiveHttpClientFactory<T extends HttpClient, E extends SseCl
      * @param url The base URL
      * @return The client
      */
+    @NonNull
     W createWebSocketClient(@Nullable URL url);
 
     /**
@@ -108,6 +116,7 @@ public interface ReactiveHttpClientFactory<T extends HttpClient, E extends SseCl
      * @param configuration The client configuration
      * @return The client
      */
+    @NonNull
     W createWebSocketClient(@Nullable URL url,  HttpClientConfiguration configuration);
 }
 

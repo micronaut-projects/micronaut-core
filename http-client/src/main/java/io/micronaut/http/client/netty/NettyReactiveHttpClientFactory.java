@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
@@ -34,41 +35,49 @@ import java.net.URL;
 @Internal
 public class NettyReactiveHttpClientFactory implements ReactiveHttpClientFactory<HttpClient, SseClient, StreamingHttpClient, WebSocketClient> {
     @Override
+    @NonNull
     public HttpClient createClient(URL url) {
         return new DefaultHttpClient(url);
     }
 
     @Override
+    @NonNull
     public HttpClient createClient(URL url, HttpClientConfiguration configuration) {
         return new DefaultHttpClient(url, configuration);
     }
 
     @Override
+    @NonNull
     public StreamingHttpClient createStreamingClient(URL url) {
         return new DefaultHttpClient(url);
     }
 
     @Override
+    @NonNull
     public StreamingHttpClient createStreamingClient(URL url, HttpClientConfiguration configuration) {
         return new DefaultHttpClient(url, configuration);
     }
 
     @Override
+    @NonNull
     public SseClient createSseClient(URL url) {
         return new DefaultHttpClient(url);
     }
 
     @Override
+    @NonNull
     public SseClient createSseClient(URL url, HttpClientConfiguration configuration) {
         return new DefaultHttpClient(url, configuration);
     }
 
     @Override
+    @NonNull
     public WebSocketClient createWebSocketClient(URL url) {
         return new DefaultHttpClient(url);
     }
 
     @Override
+    @NonNull
     public WebSocketClient createWebSocketClient(URL url, HttpClientConfiguration configuration) {
         return new DefaultHttpClient(url, configuration);
     }
