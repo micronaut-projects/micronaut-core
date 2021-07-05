@@ -157,7 +157,7 @@ class Parent {
 
     void "test inherited AOP advice on types is not inherited when not annotated with @Inherited"() {
         given:
-        def context = buildContext('anntest.Test', '''
+        def context = buildContext('''
 package anntest;
 
 import jakarta.inject.*;
@@ -193,7 +193,7 @@ class Parent {
 
     void "test inherited AOP advice on methods are not inherited when not annotated with @Inherited"() {
         given:
-        def context = buildContext('anntest.Test', '''
+        def context = buildContext('''
 package anntest;
 
 import jakarta.inject.*;
@@ -236,7 +236,7 @@ class Parent {
 
     void "test inherited AOP advice on methods are inherited when annotated with @Inherited"() {
         given:
-        def context = buildContext('anntest.Test', '''
+        def context = buildContext('''
 package anntest;
 
 import jakarta.inject.*;
@@ -279,7 +279,7 @@ class Parent {
 
     void "test inherited AOP advice on types on bean - inherited"() {
         given:
-        def context = buildContext('anntest.Test', '''
+        def context = buildContext('''
 package anntest;
 
 import jakarta.inject.*;

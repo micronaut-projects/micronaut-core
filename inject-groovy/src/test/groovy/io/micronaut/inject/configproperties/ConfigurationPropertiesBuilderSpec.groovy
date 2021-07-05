@@ -473,7 +473,7 @@ class Neo4jProperties {
 
     void "test configuration builder that are interfaces"() {
         given:
-        ApplicationContext ctx = buildContext("cpbtest11.PoolConfig", '''
+        ApplicationContext ctx = buildContext('''
 package cpbtest11
 
 import io.micronaut.context.annotation.*

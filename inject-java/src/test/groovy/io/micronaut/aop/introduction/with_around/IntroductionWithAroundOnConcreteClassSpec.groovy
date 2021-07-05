@@ -85,12 +85,19 @@ class Test{}
 
     void "test executable methods count for around with executable"() {
         when:
-            def clazz = MyBean8.class
-            def proxyTargetBeanDefinition = applicationContext.getProxyTargetBeanDefinition(clazz, null)
-            def beanDefinition = applicationContext.getBeanDefinition(clazz, null)
+        def clazz = MyBean8.class
+        def proxyTargetBeanDefinition = applicationContext.getProxyTargetBeanDefinition(clazz, null)
+        def beanDefinition = applicationContext.getBeanDefinition(clazz, null)
+
         then:
-            proxyTargetBeanDefinition.getExecutableMethods().size() == 4
-            beanDefinition.getExecutableMethods().size() == 4
+        proxyTargetBeanDefinition.getExecutableMethods().size() == 4
+        beanDefinition.getExecutableMethods().size() == 4
+
+        when:
+        MyBean8 myBean8 = applicationContext.getBean(clazz)
+
+        then:
+        myBean8.getId() == 1L
     }
 
     void "test a multidimensional array property"() {

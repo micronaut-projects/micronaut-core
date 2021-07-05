@@ -19,7 +19,6 @@ import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.scope.AbstractConcurrentCustomScope;
 import io.micronaut.context.scope.BeanCreationContext;
 import io.micronaut.context.scope.CreatedBean;
-import io.micronaut.context.scope.CustomScope;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.util.ArgumentUtils;
@@ -34,7 +33,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * A {@link CustomScope} that creates a new bean for every HTTP request.
+ * A {@link io.micronaut.context.scope.CustomScope} that creates a new bean for every HTTP request.
  *
  * @author James Kleeh
  * @author Marcel Overdijk

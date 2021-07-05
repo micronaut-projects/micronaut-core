@@ -116,7 +116,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
     final boolean isExecutableType
     final boolean isAopProxyType
     final boolean isDeclaredBean
-    final OptionalValues<Boolean> aopSettings
     final ConfigurationMetadataBuilder<ClassNode> configurationMetadataBuilder
     ConfigurationMetadata configurationMetadata
 
@@ -156,7 +155,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         this.concreteClassElement = originatingElement
         this.isFactoryClass = annotationMetadata.hasStereotype(Factory)
         this.isAopProxyType = hasAroundStereotype(annotationMetadata) && !targetClassNode.isAbstract() && !concreteClassElement.isAssignable(Interceptor.class)
-        this.aopSettings = isAopProxyType ? annotationMetadata.getValues(AROUND_TYPE, Boolean.class) : OptionalValues.<Boolean> empty()
         this.isExecutableType = isAopProxyType || annotationMetadata.hasStereotype(Executable)
         this.isConfigurationProperties = configurationProperties != null ? configurationProperties : annotationMetadata.hasDeclaredStereotype(ConfigurationReader)
         if (isConfigurationProperties) {
@@ -235,7 +233,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
             AnnotationValue<?>[] interceptorTypes = (AnnotationValue<?>[]) ArrayUtils.concat(aroundInterceptors, introductionInterceptors)
             ClassElement[] interfaceTypes = annotationMetadata.getValue(Introduction.class, "interfaces", String[].class).orElse(new String[0])
-                                                    .collect {ClassElement.of(it) }
+                    .collect { ClassElement.of(it) }
 
             AopProxyWriter aopProxyWriter = new AopProxyWriter(
                     packageName,
@@ -278,6 +276,13 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             if (isOwningClass && concreteClass.abstract && !isDeclaredBean) {
                 return
             }
+
+            if (annotationMetadata.hasStereotype(AROUND_TYPE)) {
+                AnnotationValue<?>[] interceptorTypeReferences = InterceptedMethodUtil
+                        .resolveInterceptorBinding(annotationMetadata, InterceptorKind.AROUND)
+                resolveProxyWriter(annotationMetadata.getValues(AROUND_TYPE, Boolean.class), false, interceptorTypeReferences)
+            }
+
             ClassNode superClass = node.getSuperClass()
             List<ClassNode> superClasses = []
             while (superClass != null) {
@@ -1017,8 +1022,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
             this.aopProxyWriter = proxyWriter
 
-            def node = new AnnotatedNode()
-            beanDefinitionWriters.put(node, proxyWriter)
+            beanDefinitionWriters.put(new AnnotatedNode(), proxyWriter)
         }
         proxyWriter
     }
@@ -1422,13 +1426,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     addError("Class must have at least one non private constructor in order to be a candidate for dependency injection", classNode)
                 }
             }
-
-            if (isAopProxyType) {
-                AnnotationValue<?>[] interceptorTypeReferences = InterceptedMethodUtil
-                        .resolveInterceptorBinding(annotationMetadata, InterceptorKind.AROUND)
-                resolveProxyWriter(aopSettings, false, interceptorTypeReferences)
-            }
-
         } else {
             beanWriter = beanDefinitionWriters.get(classNode)
         }
