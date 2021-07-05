@@ -40,7 +40,6 @@ import io.netty.channel.unix.UnixChannelOption
 import io.netty.util.internal.logging.InternalLogger
 import io.netty.util.internal.logging.InternalLoggerFactory
 import org.slf4j.LoggerFactory
-import spock.lang.Ignore
 import spock.lang.IgnoreIf
 import spock.lang.Specification
 import spock.lang.Unroll
