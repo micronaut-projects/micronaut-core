@@ -28,8 +28,8 @@ import java.net.URL;
 /**
  * Implementation of {@link ReactiveHttpClientFactory} for Netty.
  *
- * @author graemerocher
- * @since 2.0
+ * @author Sergio del Amo
+ * @since 3.0
  */
 @Internal
 public class NettyReactiveHttpClientFactory implements ReactiveHttpClientFactory<HttpClient, SseClient, StreamingHttpClient, WebSocketClient> {
