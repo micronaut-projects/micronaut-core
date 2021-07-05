@@ -59,7 +59,11 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
                 Collections.emptyMap()
         );
         metadata.addDeclaredAnnotation(BootstrapContextCompatible.class.getName(), Collections.emptyMap());
-        metadata.addDeclaredAnnotation(Indexes.class.getName(), Collections.singletonMap(AnnotationMetadata.VALUE_MEMBER, getBeanType()));
+        try {
+            metadata.addDeclaredAnnotation(Indexes.class.getName(), Collections.singletonMap(AnnotationMetadata.VALUE_MEMBER, getBeanType()));
+        } catch (NoClassDefFoundError e) {
+            // ignore, might happen if javax.inject is not the classpath
+        }
         annotationMetadata = metadata;
     }
 
