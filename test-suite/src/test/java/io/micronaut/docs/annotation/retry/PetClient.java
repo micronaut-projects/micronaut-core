@@ -19,7 +19,8 @@ import io.micronaut.docs.annotation.Pet;
 import io.micronaut.docs.annotation.PetOperations;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.retry.annotation.Retryable;
-import reactor.core.publisher.Mono;
+import org.reactivestreams.Publisher;
+import io.micronaut.core.async.annotation.SingleResult;
 
 // tag::class[]
 @Client("/pets")
@@ -27,6 +28,7 @@ import reactor.core.publisher.Mono;
 public interface PetClient extends PetOperations {
 
     @Override
-    Mono<Pet> save(String name, int age);
+    @SingleResult
+    Publisher<Pet> save(String name, int age);
 }
 // end::class[]

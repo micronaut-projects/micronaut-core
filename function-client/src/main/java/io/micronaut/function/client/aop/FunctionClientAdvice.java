@@ -27,6 +27,7 @@ import io.micronaut.function.client.FunctionInvoker;
 import io.micronaut.function.client.FunctionInvokerChooser;
 import io.micronaut.function.client.exceptions.FunctionNotFoundException;
 import jakarta.inject.Singleton;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -99,11 +100,11 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
     private Flux<Object> invokeFn(Object body, String functionName, Flux<FunctionDefinition> functionDefinition, Argument<?> valueType) {
         return functionDefinition.next().flatMap(def -> {
             FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
-            return (Mono<Object>) functionInvoker.invoke(
+            return Mono.from((Publisher<Object>) functionInvoker.invoke(
                     def,
                     body,
-                    Argument.of(Mono.class, valueType)
-            );
+                    Argument.of(Publisher.class, valueType)
+            ));
         }).switchIfEmpty(Mono.error(() -> new FunctionNotFoundException(functionName))).flux();
     }
 

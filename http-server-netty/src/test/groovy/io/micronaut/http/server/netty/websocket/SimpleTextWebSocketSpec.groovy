@@ -22,6 +22,7 @@ import io.micronaut.websocket.WebSocketClient
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -79,7 +80,7 @@ class SimpleTextWebSocketSpec extends Specification {
             bob.replies.size() == 1
         }
         fred.sendAsync("foo").get() == 'foo'
-        fred.sendRx("bar").block() == 'bar'
+        Mono.from(fred.sendRx("bar")).block() == 'bar'
 
         when:
         bob.close()
@@ -157,7 +158,7 @@ class SimpleTextWebSocketSpec extends Specification {
             bob.replies.size() == 1
         }
         fred.sendAsync("foo").get() == 'foo'
-        fred.sendRx("bar").block() == 'bar'
+        Mono.from(fred.sendRx("bar")).block() == 'bar'
 
         when:
         bob.close()

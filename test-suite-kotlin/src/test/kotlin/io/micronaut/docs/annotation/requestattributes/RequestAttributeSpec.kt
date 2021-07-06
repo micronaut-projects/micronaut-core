@@ -5,6 +5,7 @@ import io.kotlintest.shouldNotBe
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.runtime.server.EmbeddedServer
+import reactor.core.publisher.Mono
 
 class RequestAttributeSpec: StringSpec() {
 
@@ -17,7 +18,7 @@ class RequestAttributeSpec: StringSpec() {
             val client = embeddedServer.applicationContext.getBean(StoryClient::class.java)
             val filter = embeddedServer.applicationContext.getBean(StoryClientFilter::class.java)
 
-            val story = client.getById("jan2019").block()
+            val story = Mono.from(client.getById("jan2019")).block()
             val attributes = filter.latestRequestAttributes
 
             story shouldNotBe null

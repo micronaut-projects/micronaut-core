@@ -12,6 +12,7 @@ import io.micronaut.http.sse.Event
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Issue
@@ -55,8 +56,7 @@ class ServerSentEventMultilineSpec extends Specification {
     static interface ProductClient {
 
         @Get(value = '/pojo/objects', processes = MediaType.TEXT_EVENT_STREAM)
-        Flux<Product> pojoStream()
-
+        Publisher<Product> pojoStream()
     }
 
     @Requires(property = 'spec.name', value = 'ServerSentEventMultilineSpec')
@@ -65,12 +65,12 @@ class ServerSentEventMultilineSpec extends Specification {
     static class SseController {
 
         @Get(value = '/pojo/objects', produces = MediaType.TEXT_EVENT_STREAM)
-        Flux<Product> pojoStream() {
+        Publisher<Product> pojoStream() {
             return Flux.fromIterable(dataSet().collect { it.data })
         }
 
         @Get(value = '/pojo/events', produces = MediaType.TEXT_EVENT_STREAM)
-        Flux<Event<Product>> pojoEventStream() {
+        Publisher<Event<Product>> pojoEventStream() {
             return Flux.fromIterable(dataSet())
         }
     }

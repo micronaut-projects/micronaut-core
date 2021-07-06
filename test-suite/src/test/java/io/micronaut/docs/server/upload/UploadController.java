@@ -22,7 +22,7 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
-
+import io.micronaut.core.async.annotation.SingleResult;
 import java.io.File;
 import java.io.IOException;
 
@@ -34,7 +34,8 @@ import static io.micronaut.http.MediaType.TEXT_PLAIN;
 public class UploadController {
 
     @Post(value = "/", consumes = MULTIPART_FORM_DATA, produces = TEXT_PLAIN) // <1>
-    public Mono<HttpResponse<String>> upload(StreamingFileUpload file) { // <2>
+    @SingleResult
+    public Publisher<HttpResponse<String>> upload(StreamingFileUpload file) { // <2>
 
         File tempFile;
         try {

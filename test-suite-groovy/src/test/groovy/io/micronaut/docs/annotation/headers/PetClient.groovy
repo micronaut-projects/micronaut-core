@@ -20,8 +20,9 @@ import io.micronaut.docs.annotation.PetOperations
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.client.annotation.Client
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
-
+import io.micronaut.core.async.annotation.SingleResult
 import javax.validation.constraints.Min
 import javax.validation.constraints.NotBlank
 
@@ -34,6 +35,7 @@ interface PetClient extends PetOperations {
     Mono<Pet> save(@NotBlank String name, @Min(1L) int age)
 
     @Get("/{name}")
-    Mono<Pet> get(String name)
+    @SingleResult
+    Publisher<Pet> get(String name)
 }
 // end::class[]

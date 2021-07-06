@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client
 
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
@@ -26,6 +27,7 @@ import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.handler.codec.http.HttpHeaderValues
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
@@ -67,7 +69,8 @@ class CompressedRequest extends Specification {
     static class StreamController {
 
         @Post("/numbers")
-        Mono<List<Long>> numbers(@Header MediaType contentType, @Body Mono<List<Long>> numbers) {
+        @SingleResult
+        Publisher<List<Long>> numbers(@Header MediaType contentType, @Body Publisher<List<Long>> numbers) {
             assert contentType == MediaType.APPLICATION_JSON_TYPE
             numbers
         }

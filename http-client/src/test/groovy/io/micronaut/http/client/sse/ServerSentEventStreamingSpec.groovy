@@ -27,6 +27,7 @@ import io.micronaut.http.sse.Event
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -113,13 +114,13 @@ class ServerSentEventStreamingSpec extends Specification {
     static interface ProductClient {
 
         @Get(value = '/pojo/events', processes = MediaType.TEXT_EVENT_STREAM)
-        Flux<Event<Product>> pojoEventStream()
+        Publisher<Event<Product>> pojoEventStream()
 
         @Get(value = '/pojo/objects', processes = MediaType.TEXT_EVENT_STREAM)
-        Flux<Product> pojoStream()
+        Publisher<Product> pojoStream()
 
         @Get(value = '/pojo/delayed', processes = MediaType.TEXT_EVENT_STREAM)
-        Flux<Product> delayedStream()
+        Publisher<Product> delayedStream()
     }
 
     @Requires(property = 'spec.name', value = 'ServerSentEventStreamingSpec')
@@ -129,17 +130,17 @@ class ServerSentEventStreamingSpec extends Specification {
 
 
         @Get(value = '/pojo/events', produces = MediaType.TEXT_EVENT_STREAM)
-        Flux<Event<Product>> pojoEventStream() {
+        Publisher<Event<Product>> pojoEventStream() {
             return Flux.fromIterable(dataSet())
         }
 
         @Get(value = '/pojo/objects', produces = MediaType.TEXT_EVENT_STREAM)
-        Flux<Product> pojoStream() {
+        Publisher<Product> pojoStream() {
             return Flux.fromIterable(dataSet().collect { it.data })
         }
 
         @Get(value = '/pojo/delayed', produces = MediaType.TEXT_EVENT_STREAM)
-        Flux<Product> delayedStream() {
+        Publisher<Product> delayedStream() {
             return Flux.fromIterable(dataSet().collect { it.data })
                     .delayElements(Duration.of(5, ChronoUnit.SECONDS))
         }

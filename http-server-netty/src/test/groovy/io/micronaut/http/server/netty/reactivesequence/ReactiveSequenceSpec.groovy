@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty.reactivesequence
 
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.type.Argument
@@ -15,6 +16,7 @@ import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.Specification
@@ -102,8 +104,8 @@ class ReactiveSequenceSpec extends Specification {
         }
 
         @Get("/gateway")
-        Flux<Book> findAll() {
-            return booksClient.fetchBooks()
+        Publisher<Book> findAll() {
+            return Flux.from(booksClient.fetchBooks())
                     .flatMap({ b ->
                         inventoryClient.inventory(b.getIsbn())
                                 .filter({ stock -> stock > 0 })
@@ -119,7 +121,7 @@ class ReactiveSequenceSpec extends Specification {
     @Client("books")
     static interface BooksClient {
         @Get("/api/books")
-        Flux<Book> fetchBooks();
+        Publisher<Book> fetchBooks();
     }
 
     @Requires(property = "spec.name", value = "ReactiveSequenceSpec.gateway")
@@ -128,7 +130,9 @@ class ReactiveSequenceSpec extends Specification {
 
         @Consumes(MediaType.TEXT_PLAIN)
         @Get("/api/inventory/{isbn}")
-        Mono<Integer> inventory(String isbn);
+        @SingleResult
+        Publisher<Integer> inventory(String isbn);
+
     }
 
     static class Book {

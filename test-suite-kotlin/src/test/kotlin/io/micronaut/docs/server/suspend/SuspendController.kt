@@ -55,6 +55,7 @@ class SuspendController(
     @Status(HttpStatus.CREATED) // <1>
     @Get("/status")
     suspend fun status() {
+        val foo = "bar"
     }
     // end::suspendStatus[]
 

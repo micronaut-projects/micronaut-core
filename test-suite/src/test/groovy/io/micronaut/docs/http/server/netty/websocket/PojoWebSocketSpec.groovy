@@ -18,11 +18,11 @@ package io.micronaut.docs.http.server.netty.websocket
 import io.micronaut.context.ApplicationContext
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.websocket.WebSocketClient
+import reactor.core.publisher.Mono
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
 class PojoWebSocketSpec extends Specification {
-
 
     void "test POJO websocket exchange"() {
         given:
@@ -65,7 +65,7 @@ class PojoWebSocketSpec extends Specification {
             bob.replies.contains(new Message(text:"[fred] Hello bob!"))
         }
         fred.sendAsync(new Message(text:  "foo")).get().text == 'foo'
-        fred.sendRx(new Message(text:  "bar")).block().text == 'bar'
+        Mono.from(fred.sendRx(new Message(text:  "bar"))).block().text == 'bar'
 
         cleanup:
         bob?.close()

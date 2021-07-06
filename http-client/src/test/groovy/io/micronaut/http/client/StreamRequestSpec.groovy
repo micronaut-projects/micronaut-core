@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client
 
+import io.micronaut.core.async.annotation.SingleResult
 import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
 import io.micronaut.context.ApplicationContext
@@ -31,6 +32,7 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.FluxSink
 import reactor.core.publisher.Mono
@@ -224,23 +226,25 @@ class StreamRequestSpec extends Specification {
     static class StreamController {
 
         @Post("/numbers")
-        Mono<List<Long>> numbers(@Header MediaType contentType, @Body Mono<List<Long>> numbers) {
+        @SingleResult
+        Publisher<List<Long>> numbers(@Header MediaType contentType, @Body Publisher<List<Long>> numbers) {
             assert contentType == MediaType.APPLICATION_JSON_TYPE
             numbers
         }
 
         @Get("/jsonstrings")
-        Flux<String> jsonStrings() {
+        Publisher<String> jsonStrings() {
             return Flux.just("Hello World")
         }
 
         @Post(uri = "/strings", consumes = MediaType.TEXT_PLAIN)
-        Mono<List<String>> strings(@Body Flux<String> strings) {
-            strings.collectList()
+        @SingleResult
+        Publisher<List<String>> strings(@Body Publisher<String> strings) {
+            Flux.from(strings).collectList()
         }
 
         @Post(uri = "/strings/contentLength", processes = MediaType.TEXT_PLAIN)
-        Flux<String> strings(@Body Flux<String> strings, HttpHeaders headers) {
+        Publisher<String> strings(@Body Publisher<String> strings, HttpHeaders headers) {
             assert headers.contentLength().isPresent()
             assert headers.contentLength().getAsLong() == 10
             assert !headers.getFirst(HttpHeaders.TRANSFER_ENCODING).isPresent()
@@ -248,25 +252,27 @@ class StreamRequestSpec extends Specification {
         }
 
         @Post(uri = "/bytes", consumes = MediaType.TEXT_PLAIN)
-        Mono<List<String>> bytes(@Body Flux<byte[]> strings) {
-            strings.map({ byte[] bytes -> new String(bytes, StandardCharsets.UTF_8)}).collectList()
+        @SingleResult
+        Publisher<List<String>> bytes(@Body Publisher<byte[]> strings) {
+            Flux.from(strings).map({ byte[] bytes -> new String(bytes, StandardCharsets.UTF_8)}).collectList()
         }
 
         @Post("/pojos")
-        Mono<List<Book>> pojos(@Header MediaType contentType, @Body Mono<List<Book>> books) {
+        @SingleResult
+        Publisher<List<Book>> pojos(@Header MediaType contentType, @Body Publisher<List<Book>> books) {
             assert contentType == MediaType.APPLICATION_JSON_TYPE
             books
         }
 
         @Post("/pojo-flowable")
-        Flux<Book> pojoReactiveSequence(@Header MediaType contentType, @Body Flux<Book> books) {
+        Publisher<Book> pojoReactiveSequence(@Header MediaType contentType, @Body Publisher<Book> books) {
             assert contentType == MediaType.APPLICATION_JSON_TYPE
             books
         }
 
         @Post("/pojo-flowable-error")
-        Flux<Book> pojoReactiveSequenceError(@Header MediaType contentType, @Body Flux<Book> books) {
-            return books.flatMap({ Book book ->
+        Publisher<Book> pojoReactiveSequenceError(@Header MediaType contentType, @Body Publisher<Book> books) {
+            return Flux.from(books).flatMap({ Book book ->
                 if(book.title.endsWith("3")) {
                     return Flux.error(new RuntimeException("Can't have books with 3"))
                 }

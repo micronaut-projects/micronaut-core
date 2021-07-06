@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client
 
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.convert.format.Format
@@ -30,6 +31,7 @@ import io.micronaut.http.uri.UriBuilder
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.Issue
@@ -577,10 +579,10 @@ class HttpGetSpec extends Specification {
 
     void "test an invalid content type reactive response"() {
         when:
-        myGetClient.invalidContentTypeReactive().block()
+        Mono.from(myGetClient.invalidContentTypeReactive()).block()
 
         then:
-        def ex = thrown(HttpClientResponseException)
+        HttpClientResponseException ex = thrown()
         ex.message == "Failed to decode the body for the given content type [does/notexist]"
     }
 
@@ -869,8 +871,8 @@ class HttpGetSpec extends Specification {
         Book invalidContentType()
 
         @Get(value = "/invalidContentType", consumes = "does/notexist")
-        Mono<Book> invalidContentTypeReactive()
-
+        @SingleResult
+        Publisher<Book> invalidContentTypeReactive()
     }
 
     @Requires(property = 'spec.name', value = 'HttpGetSpec')
@@ -879,7 +881,6 @@ class HttpGetSpec extends Specification {
 
         @Get(value = "{+url}/get/simple", consumes = MediaType.TEXT_PLAIN)
         String overrideUrl(String url);
-
     }
 
     @Requires(property = 'spec.name', value = 'HttpGetSpec')

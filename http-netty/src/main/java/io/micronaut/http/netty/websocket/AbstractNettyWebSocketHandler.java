@@ -50,6 +50,7 @@ import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -282,8 +283,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @return The flowable
      */
     protected Flux<?> instrumentPublisher(ChannelHandlerContext ctx, Object result) {
-        Flux<?> actual = Publishers.convertPublisher(result, Flux.class);
-        return actual.subscribeOn(Schedulers.fromExecutorService(ctx.channel().eventLoop()));
+        Publisher<?> actual = Publishers.convertPublisher(result, Publisher.class);
+        return Flux.from(actual).subscribeOn(Schedulers.fromExecutorService(ctx.channel().eventLoop()));
     }
 
     /**

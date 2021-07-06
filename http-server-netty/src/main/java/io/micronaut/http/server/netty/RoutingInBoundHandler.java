@@ -1169,7 +1169,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             boolean isCompletable = !isSingle && routeMatch.isVoid() && Publishers.isCompletable(bodyClass);
                             if (isSingle || isCompletable) {
                                 // full response case
-                                return ((Flux<Object>) Publishers.convertPublisher(body, Flux.class))
+                                return (Flux.from((Publisher<Object>) Publishers.convertPublisher(body, Publisher.class))
                                         .onErrorResume((Throwable t) -> exceptionCaughtInternal(context, t, request))
                                         .switchIfEmpty(Flux.defer(() -> {
                                             if (isCompletable || routeMatch.isVoid() || routeMatch.isSuspended()) {
@@ -1197,14 +1197,14 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                             } else {
                                                 return message.body(result);
                                             }
-                                        });
+                                        }));
                             } else {
                                 // streaming case
                                 Argument<?> typeArgument = routeMatch.getReturnType().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
                                 if (HttpResponse.class.isAssignableFrom(typeArgument.getType()) && !typeArgument.getFirstTypeVariable().map(Argument::isAsyncOrReactive).orElse(false)) {
                                     // a response stream
-                                    Flux<HttpResponse<?>> bodyPublisher = Publishers.convertPublisher(body, Flux.class);
-                                    return bodyPublisher.map(this::toMutableResponse);
+                                    Publisher<HttpResponse<?>> bodyPublisher = Publishers.convertPublisher(body, Publisher.class);
+                                    return Flux.from(bodyPublisher).map(this::toMutableResponse);
                                 } else {
                                     boolean isJson = mediaType.getExtension().equals(MediaType.EXTENSION_JSON) && isJsonFormattable(typeArgument);
                                     Publisher<Object> bodyPublisher = applyExecutorToPublisher(Publishers.convertPublisher(body, Publisher.class), executor);

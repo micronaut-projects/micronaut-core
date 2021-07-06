@@ -21,10 +21,11 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Named;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
-
+import io.micronaut.core.async.annotation.SingleResult;
 import java.util.concurrent.ExecutorService;
 // end::imports[]
 
@@ -43,7 +44,8 @@ public class PersonController {
     }
 
     @Get("/{name}")
-    Mono<Person> byName(String name) {
+    @SingleResult
+    Publisher<Person> byName(String name) {
         return Mono
                 .fromCallable(() -> personService.findByName(name)) // <2>
                 .subscribeOn(scheduler); // <3>

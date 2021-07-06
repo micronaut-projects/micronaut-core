@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty.binding
 
+import io.micronaut.core.async.annotation.SingleResult
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.core.JsonParseException
 import groovy.json.JsonSlurper
@@ -18,7 +19,6 @@ import io.micronaut.http.hateoas.Link
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
-import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 import spock.lang.Issue
 
@@ -357,7 +357,8 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         }
 
         @Post("/single")
-        Mono<String> single(@Body Mono<String> message) {
+        @SingleResult
+        Publisher<String> single(@Body Publisher<String> message) {
             message
         }
 
@@ -384,8 +385,8 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         }
 
         @Post("/publisher-object")
-        Publisher<String> publisherObject(@Body Flux<Foo> publisher) {
-            return publisher
+        Publisher<String> publisherObject(@Body Publisher<Foo> publisher) {
+            return Flux.from(publisher)
                     .subscribeOn(Schedulers.boundedElastic())
                     .map({ Foo foo ->
                         foo.toString()

@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.rxjava2
 
+import io.micronaut.core.async.annotation.SingleResult
 import groovy.transform.EqualsAndHashCode
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
@@ -35,6 +36,7 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
@@ -219,7 +221,6 @@ class RxHttpPostSpec extends Specification {
         ex.response.getBody(String).get() == "illegal.argument"
     }
 
-
     @EqualsAndHashCode
     @Introspected
     static class Book {
@@ -254,36 +255,41 @@ class RxHttpPostSpec extends Specification {
     static class ReactivePostController {
 
         @Post("/user")
-        Mono<HttpResponse<User>> postUser(@Body Mono<User> user) {
-            return user.map({ User u->
+        @SingleResult
+        Publisher<HttpResponse<User>> postUser(@Body Publisher<User> user) {
+            return Mono.from(user).map({ User u->
                 return HttpResponse.ok(u)
             })
         }
 
         @Post("/user-error")
-        Mono<HttpResponse<User>> postUserError(@Body Mono<User> user) {
-            return user.map({ User u->
+        @SingleResult
+        Publisher<HttpResponse<User>> postUserError(@Body Publisher<User> user) {
+            return Mono.from(user).map({ User u->
                 return HttpResponse.badRequest(u)
             })
         }
 
         @Post(uri = "/booleans")
-        Flux<Boolean> booleans(@Body Flux<Boolean> booleans) {
+        Publisher<Boolean> booleans(@Body Publisher<Boolean> booleans) {
             return booleans
         }
 
         @Post(uri = "/person", consumes = MediaType.APPLICATION_FORM_URLENCODED)
-        Mono<HttpResponse<Person>> createPerson(@Valid @Body Person person)  {
+        @SingleResult
+        Publisher<HttpResponse<Person>> createPerson(@Valid @Body Person person)  {
             return Mono.just(HttpResponse.created(person))
         }
 
         @Post(uri = "/error")
-        Mono<HttpResponse<Person>> emitError(@Body Person person)  {
+        @SingleResult
+        Publisher<HttpResponse<Person>> emitError(@Body Person person)  {
             return Mono.error(new IllegalArgumentException())
         }
 
         @Error(exception = IllegalArgumentException.class)
-        Mono<HttpResponse<String>> illegalArgument(HttpRequest request, IllegalArgumentException e) {
+        @SingleResult
+        Publisher<HttpResponse<String>> illegalArgument(HttpRequest request, IllegalArgumentException e) {
             Mono.just(HttpResponse.notFound("illegal.argument"))
         }
     }

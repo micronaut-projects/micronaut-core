@@ -5,6 +5,7 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.websocket.WebSocketClient
 import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -22,7 +23,7 @@ class SimpleTextWebSocketSpec extends Specification {
 
         when: "a websocket connection is established"
         WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
-        ChatClientWebSocket fred = wsClient.connect(ChatClientWebSocket, "/chat/stuff/fred").blockFirst()
+        ChatClientWebSocket fred = Flux.from(wsClient.connect(ChatClientWebSocket, "/chat/stuff/fred")).blockFirst()
         Thread.sleep(50)
         ChatClientWebSocket bob = Flux.from(wsClient.connect(ChatClientWebSocket, [topic:"stuff", username:"bob"])).blockFirst()
 
@@ -66,7 +67,7 @@ class SimpleTextWebSocketSpec extends Specification {
             bob.replies.size() == 1
         }
         fred.sendAsync("foo").get() == 'foo'
-        fred.sendRx("bar").block() == 'bar'
+        Mono.from(fred.sendRx("bar")).block() == 'bar'
 
         when:
         bob.close()

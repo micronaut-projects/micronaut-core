@@ -51,6 +51,7 @@ class SuspendControllerSpec : StringSpec() {
     private var suspendClient = embeddedServer.applicationContext.createBean(SuspendClient::class.java, embeddedServer.url)
 
     init {
+        /*
         "test suspend applies CORS options" {
             val origin = "foo.com"
             val headers = "$CONTENT_TYPE,$ACCEPT"
@@ -142,13 +143,13 @@ class SuspendControllerSpec : StringSpec() {
             body shouldBe "Delayed"
             response.status shouldBe HttpStatus.OK
         }
-
+*/
         "test suspend status" {
             val response = client.exchange(GET<Any>("/suspend/status"), String::class.java).awaitSingle()
 
             response.status shouldBe HttpStatus.CREATED
         }
-
+/*
         "test suspend status delayed" {
             val response = client.exchange(GET<Any>("/suspend/statusDelayed"), String::class.java).awaitSingle()
 
@@ -234,5 +235,7 @@ class SuspendControllerSpec : StringSpec() {
             beforeThreadId shouldNotBe afterThreadId // it will be the default co-routine dispatcher
             response.status shouldBe HttpStatus.OK
         }
+
+        */
     }
 }

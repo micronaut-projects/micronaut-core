@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client
 
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
@@ -37,12 +38,9 @@ import spock.lang.Issue
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
-
 import java.time.Duration
 import java.time.temporal.ChronoUnit
-import java.time.temporal.TemporalUnit
 import java.util.concurrent.Semaphore
-import java.util.concurrent.TimeUnit
 
 /**
  * Created by graemerocher on 19/01/2018.
@@ -194,12 +192,12 @@ class JsonStreamSpec  extends Specification {
         given:
         signal = new Semaphore(1)
         when:
-        Mono<LibraryStats> result = bookClient.count(
+        Mono<LibraryStats> result = Mono.from(bookClient.count(
                 Mono.fromCallable {
                     JsonStreamSpec.signal.acquire()
                     new Book(title: "Micronaut for dummies, volume 2")
                 }
-                .repeat(6))
+                .repeat(6)))
         then:
         result.timeout(Duration.of(10, ChronoUnit.SECONDS)).block().bookCount == 7
     }
@@ -211,7 +209,8 @@ class JsonStreamSpec  extends Specification {
         Publisher<Book> list();
 
         @Post(uri = "/count", processes = MediaType.APPLICATION_JSON_STREAM)
-        Mono<LibraryStats> count(@Body Flux<Book> theBooks)
+        @SingleResult
+        Publisher<LibraryStats> count(@Body Flux<Book> theBooks)
     }
 
     @Requires(property = "spec.name", value = 'JsonStreamSpec' )
@@ -220,14 +219,14 @@ class JsonStreamSpec  extends Specification {
     static class BookController {
 
         @Get(produces = MediaType.APPLICATION_JSON_STREAM)
-        Flux<Book> list() {
+        Publisher<Book> list() {
             return Flux.just(new Book(title: "The Stand"), new Book(title: "The Shining"))
         }
 
         // Funny controller which signals the semaphone, causing the the client to send more
         @Post(uri = "/count", processes = MediaType.APPLICATION_JSON_STREAM)
-        Mono<LibraryStats> count(@Body Flux<Book> theBooks) {
-            theBooks.map {
+        Publisher<LibraryStats> count(@Body Publisher<Book> theBooks) {
+            Flux.from(theBooks).map {
                 Book b ->
                     JsonStreamSpec.signal.release()
                     b.title
@@ -237,8 +236,8 @@ class JsonStreamSpec  extends Specification {
         }
 
         @Post(uri = "/raw", processes = MediaType.APPLICATION_JSON_STREAM)
-        String rawData(@Body Flux<Chunk> chunks) {
-            return chunks
+        String rawData(@Body Publisher<Chunk> chunks) {
+            return Flux.from(chunks)
                     .map({ chunk -> "{\"type\":\"${chunk.type}\"}"})
                     .collectList()
                     .map({ chunkList -> "\n" + chunkList.join("\n")})

@@ -17,9 +17,11 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import jakarta.inject.Inject
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.Specification
+import io.micronaut.core.async.annotation.SingleResult
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CompletableFuture
@@ -93,8 +95,8 @@ class ByteBufferSpec extends Specification {
         @Inject ByteBufferFactory<?, ?> byteBufferFactory
 
         @Post(uri = "/buffer-test", processes = MediaType.TEXT_PLAIN)
-        Flux<String> buffer(@Body Flux<ByteBuffer> body) {
-            return body.map({ buffer -> buffer.toString(StandardCharsets.UTF_8) })
+        Publisher<String> buffer(@Body Publisher<ByteBuffer> body) {
+            return Flux.from(body).map({ buffer -> buffer.toString(StandardCharsets.UTF_8) })
         }
 
         @Post(uri = "/buffer-completable", processes = MediaType.TEXT_PLAIN)
@@ -125,7 +127,8 @@ class ByteBufferSpec extends Specification {
         }
 
         @Get(uri = "/singleBytesFlowable", produces = MediaType.IMAGE_JPEG)
-        Mono<HttpResponse<Flux<byte[]>>> singleBytesFlowable() throws IOException {
+        @SingleResult
+        Publisher<HttpResponse<Flux<byte[]>>> singleBytesFlowable() throws IOException {
             return Mono.just(
                     HttpResponse
                             .ok(Flux.just("blah".getBytes()))

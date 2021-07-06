@@ -16,6 +16,7 @@
 package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.retry.annotation.Fallback
@@ -26,6 +27,7 @@ import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+import io.micronaut.core.async.annotation.SingleResult
 
 /**
  * @author graemerocher
@@ -34,18 +36,19 @@ import spock.lang.Specification
 class ReactorJavaFallbackSpec extends Specification{
     @Shared
     @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ReactorJavaFallbackSpec'])
 
     @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @AutoCleanup
+    ApplicationContext context = embeddedServer.applicationContext
 
     void "test that fallbacks are called for RxJava responses"() {
         given:
         BookClient client = context.getBean(BookClient)
 
         when:
-        Book book = client.get(99).block()
-        List<Book> books = client.list().block()
+        Book book = Mono.from(client.get(99)).block()
+        List<Book> books = Mono.from(client.list()).block()
 
         List<Book> stream = Flux.from(client.stream()).collectList().block()
 
@@ -56,7 +59,7 @@ class ReactorJavaFallbackSpec extends Specification{
         stream.first().title == "Fallback Book"
 
         when:
-        book = client.save("The Stand").block()
+        book = Mono.from(client.save("The Stand")).block()
 
         then:
         book != null
@@ -64,7 +67,7 @@ class ReactorJavaFallbackSpec extends Specification{
         book.id == null
 
         when:
-        book = client.get(1).block()
+        book = Mono.from(client.get(1)).block()
 
         then:
         book != null
@@ -72,7 +75,7 @@ class ReactorJavaFallbackSpec extends Specification{
         book.id == null
 
         when:
-        book = client.update(1, "The Shining").block()
+        book = Mono.from(client.update(1, "The Shining")).block()
 
         then:
         book != null
@@ -80,33 +83,36 @@ class ReactorJavaFallbackSpec extends Specification{
         book.id == null
 
         when:
-        book = client.delete(1).block()
+        book = Mono.from(client.delete(1)).block()
 
         then:
         book == null
 
         when:
-        book = client.get(1).block()
+        book = Mono.from(client.get(1)).block()
 
         then:
         book.title == "Fallback Book"
     }
 
-
+    @Requires(property = 'spec.name', value = 'ReactorJavaFallbackSpec')
     @Client('/rxjava/fallback/books')
     static interface BookClient extends BookApi {
     }
 
+    @Requires(property = 'spec.name', value = 'ReactorJavaFallbackSpec')
     @Fallback
     static class BookFallback implements BookApi {
 
         @Override
-        Mono<Book> get(Long id) {
+        @SingleResult
+        Publisher<Book> get(Long id) {
             return Mono.just(new Book(title: "Fallback Book"))
         }
 
         @Override
-        Mono<List<Book>> list() {
+        @SingleResult
+        Publisher<List<Book>> list() {
             return Mono.just([])
         }
 
@@ -116,33 +122,39 @@ class ReactorJavaFallbackSpec extends Specification{
         }
 
         @Override
-        Mono<Book> delete(Long id) {
+        @SingleResult
+        Publisher<Book> delete(Long id) {
             return Mono.empty()
         }
 
         @Override
-        Mono<Book> save(String title) {
+        @SingleResult
+        Publisher<Book> save(String title) {
             return Mono.just(new Book(title: "Fallback Book"))
         }
 
         @Override
-        Mono<Book> update(Long id, String title) {
+        @SingleResult
+        Publisher<Book> update(Long id, String title) {
             return Mono.just(new Book(title: "Fallback Book"))
         }
     }
 
+    @Requires(property = 'spec.name', value = 'ReactorJavaFallbackSpec')
     @Controller("/rxjava/fallback/books")
     static class BookController implements BookApi {
 
         Map<Long, Book> books = new LinkedHashMap<>()
 
         @Override
-        Mono<Book> get(Long id) {
+        @SingleResult
+        Publisher<Book> get(Long id) {
             Mono.error(new RuntimeException("bad"))
         }
 
         @Override
-        Mono<List<Book>> list() {
+        @SingleResult
+        Publisher<List<Book>> list() {
             Mono.error(new RuntimeException("bad"))
         }
 
@@ -152,17 +164,20 @@ class ReactorJavaFallbackSpec extends Specification{
         }
 
         @Override
-        Mono<Book> delete(Long id) {
+        @SingleResult
+        Publisher<Book> delete(Long id) {
             Mono.error(new RuntimeException("bad"))
         }
 
         @Override
-        Mono<Book> save(String title) {
+        @SingleResult
+        Publisher<Book> save(String title) {
             Mono.error(new RuntimeException("bad"))
         }
 
         @Override
-        Mono<Book> update(Long id, String title) {
+        @SingleResult
+        Publisher<Book> update(Long id, String title) {
             Mono.error(new RuntimeException("bad"))
         }
     }
@@ -170,22 +185,27 @@ class ReactorJavaFallbackSpec extends Specification{
     static interface BookApi {
 
         @Get("/{id}")
-        Mono<Book> get(Long id)
+        @SingleResult
+        Publisher<Book> get(Long id)
 
         @Get
-        Mono<List<Book>> list()
+        @SingleResult
+        Publisher<List<Book>> list()
 
         @Get('/stream')
         Publisher<Book> stream()
 
         @Delete("/{id}")
-        Mono<Book> delete(Long id)
+        @SingleResult
+        Publisher<Book> delete(Long id)
 
         @Post
-        Mono<Book> save(String title)
+        @SingleResult
+        Publisher<Book> save(String title)
 
         @Patch("/{id}")
-        Mono<Book> update(Long id, String title)
+        @SingleResult
+        Publisher<Book> update(Long id, String title)
     }
 
     static class Book {

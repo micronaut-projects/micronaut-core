@@ -20,6 +20,7 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.websocket.WebSocketClient
 import io.netty.buffer.Unpooled
 import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -44,8 +45,6 @@ class BinaryWebSocketSpec extends Specification {
         then:"The connection is valid"
         fred.session != null
         fred.session.id != null
-
-
 
         then:"A session is established"
         fred.session != null
@@ -85,7 +84,7 @@ class BinaryWebSocketSpec extends Specification {
         def buffer = Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)
         buffer.retain()
         fred.sendAsync(buffer).get().toString(StandardCharsets.UTF_8) == 'foo'
-        new String(fred.sendRx(ByteBuffer.wrap("bar".bytes)).block().array()) == 'bar'
+        new String(Mono.from(fred.sendRx(ByteBuffer.wrap("bar".bytes))).block().array()) == 'bar'
 
         when:
         bob.close()

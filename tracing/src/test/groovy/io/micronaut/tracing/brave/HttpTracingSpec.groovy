@@ -28,11 +28,13 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Inject
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 import spock.lang.Specification
 import zipkin2.Span
 import zipkin2.Span.Kind
+import io.micronaut.core.async.annotation.SingleResult
 
 /**
  * @author graemerocher
@@ -270,7 +272,8 @@ class HttpTracingSpec extends Specification {
         }
 
         @Get(value = "/rxjava/observe", produces = MediaType.TEXT_PLAIN)
-        Mono<String> index() {
+        @SingleResult
+        Publisher<String> index() {
             return Mono.just("hello").publishOn(Schedulers.boundedElastic()).map( { r ->
                 if (ServerRequestContext.currentRequest().isPresent()) {
                     return r;
@@ -281,7 +284,8 @@ class HttpTracingSpec extends Specification {
         }
 
         @Get("/rxjava/{name}")
-        Mono<String> rxjava(String name) {
+        @SingleResult
+        Publisher<String> rxjava(String name) {
             Mono.fromCallable({->
                 spanCustomizer.tag("foo", "bar")
                 return name

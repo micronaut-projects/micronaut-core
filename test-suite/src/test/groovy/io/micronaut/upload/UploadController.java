@@ -31,7 +31,7 @@ import io.micronaut.http.server.multipart.MultipartBody;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
-
+import io.micronaut.core.async.annotation.SingleResult;
 import jakarta.inject.Singleton;
 import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
@@ -92,8 +92,9 @@ public class UploadController {
     }
 
     @Post(value = "/receive-publisher", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
-    public Mono<HttpResponse> receivePublisher(Flux<byte[]> data) {
-        return data.reduce(new StringBuilder(), (stringBuilder, bytes) ->
+    @SingleResult
+    public Publisher<HttpResponse> receivePublisher(Publisher<byte[]> data) {
+        return Flux.from(data).reduce(new StringBuilder(), (stringBuilder, bytes) ->
 
                 {
                     StringBuilder append = stringBuilder.append(new String(bytes));
@@ -112,8 +113,9 @@ public class UploadController {
     }
 
     @Post(value = "/receive-flow-parts", consumes = MediaType.MULTIPART_FORM_DATA)
-    public Mono<HttpResponse> receiveFlowParts(Flux<PartData> data) {
-        return data.collectList().doOnSuccess(parts -> {
+    @SingleResult
+    public Publisher<HttpResponse> receiveFlowParts(Publisher<PartData> data) {
+        return Flux.from(data).collectList().doOnSuccess(parts -> {
             for (PartData part : parts) {
                 try {
                     part.getBytes(); //intentionally releasing the parts after all data has been received
@@ -130,7 +132,8 @@ public class UploadController {
     }
 
     @Post(value = "/receive-multiple-flow-data", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
-    public Mono<HttpResponse> receiveMultipleFlowData(Publisher<Data> data) {
+    @SingleResult
+    public Publisher<HttpResponse> receiveMultipleFlowData(Publisher<Data> data) {
         return Mono.create(emitter -> {
            data.subscribe(new Subscriber<Data>() {
                private Subscription s;
@@ -162,19 +165,19 @@ public class UploadController {
 
     @Post(value = "/receive-two-flow-parts", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
     public Publisher<HttpResponse> receiveTwoFlowParts(
-            @Part("data") Flux<String> dataPublisher,
-            @Part("title") Flux<String> titlePublisher) {
-        return titlePublisher.zipWith(dataPublisher, (title, data) -> HttpResponse.ok( title + ": " + data ));
+            @Part("data") Publisher<String> dataPublisher,
+            @Part("title") Publisher<String> titlePublisher) {
+        return Flux.from(titlePublisher).zipWith(dataPublisher, (title, data) -> HttpResponse.ok( title + ": " + data ));
     }
 
     @Post(value = "/receive-multiple-completed", consumes = MediaType.MULTIPART_FORM_DATA)
     public Publisher<HttpResponse> receiveMultipleCompleted(
-            Flux<CompletedFileUpload> data,
+            Publisher<CompletedFileUpload> data,
             String title) {
         List<Map> results = new ArrayList<>();
 
         ReplayProcessor<HttpResponse> subject = ReplayProcessor.create();
-        data.subscribeOn(Schedulers.boundedElastic())
+        Flux.from(data).subscribeOn(Schedulers.boundedElastic())
                 .subscribe(new Subscriber<CompletedFileUpload>() {
                     Subscription subscription;
                     @Override
@@ -210,9 +213,10 @@ public class UploadController {
     }
 
     @Post(value = "/receive-multiple-streaming", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
-    public Mono<HttpResponse> receiveMultipleStreaming(
-            Flux<StreamingFileUpload> data) {
-        return data.subscribeOn(Schedulers.boundedElastic()).flatMap((StreamingFileUpload upload) -> {
+    @SingleResult
+    public Publisher<HttpResponse> receiveMultipleStreaming(
+            Publisher<StreamingFileUpload> data) {
+        return Flux.from(data).subscribeOn(Schedulers.boundedElastic()).flatMap((StreamingFileUpload upload) -> {
             return Flux.from(upload)
                     .map((pd) -> {
                         try {
@@ -228,9 +232,10 @@ public class UploadController {
     }
 
     @Post(value = "/receive-partdata", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
-    public Mono<HttpResponse> receivePartdata(
-            Flux<PartData> data) {
-        return data.subscribeOn(Schedulers.boundedElastic())
+    @SingleResult
+    public Publisher<HttpResponse> receivePartdata(
+            Publisher<PartData> data) {
+        return Flux.from(data).subscribeOn(Schedulers.boundedElastic())
                 .map((pd) -> {
                     try {
                         final byte[] bytes = pd.getBytes();
@@ -249,17 +254,21 @@ public class UploadController {
     }
 
     @Post(value = "/receive-multiple-publishers", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
-    public Mono<HttpResponse> receiveMultiplePublishers(Flux<Flux<byte[]>> data) {
-        return data.subscribeOn(Schedulers.boundedElastic()).flatMap((Flux<byte[]> upload) -> {
-            return upload.map((bytes) -> bytes);
-        }).collect(LongAdder::new, (adder, bytes) -> adder.add((long)bytes.length))
+    @SingleResult
+    public Publisher<HttpResponse> receiveMultiplePublishers(Publisher<Publisher<byte[]>> data) {
+        return Flux.from(data)
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap((Publisher<byte[]> upload) -> {
+                    return Flux.from(upload).map((bytes) -> bytes);
+                }).collect(LongAdder::new, (adder, bytes) -> adder.add((long)bytes.length))
                 .map((adder) -> {
                     return HttpResponse.ok(adder.longValue());
                 });
     }
 
     @Post(value =  "/receive-flow-control", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
-    Mono<String> go(Map json, Flux<byte[]> file) {
+    @SingleResult
+    public Publisher<String> go(Map json, Publisher<byte[]> file) {
         return Mono.create(singleEmitter -> {
             file.subscribe(new Subscriber<byte[]>() {
                 private Subscription subscription;
@@ -290,7 +299,8 @@ public class UploadController {
     }
 
     @Post(value = "/receive-big-attribute", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
-    public Mono<HttpResponse> receiveBigAttribute(Publisher<PartData> data) {
+    @SingleResult
+    public Publisher<HttpResponse> receiveBigAttribute(Publisher<PartData> data) {
         return Mono.create(emitter -> {
             data.subscribe(new Subscriber<PartData>() {
                 private Subscription s;
@@ -326,7 +336,8 @@ public class UploadController {
     }
 
     @Post(value =  "/receive-multipart-body", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
-    Mono<String> go(@Body MultipartBody multipartBody) {
+    @SingleResult
+    public Publisher<String> go(@Body MultipartBody multipartBody) {
         return Mono.create(emitter -> {
             multipartBody.subscribe(new Subscriber<CompletedPart>() {
                 private Subscription s;
@@ -362,7 +373,8 @@ public class UploadController {
     }
 
     @Post(value =  "/receive-multipart-body-principal", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
-    Mono<String> multipartBodyWithPrincipal(Principal principal, @Body MultipartBody multipartBody) {
+    @SingleResult
+    public Publisher<String> multipartBodyWithPrincipal(Principal principal, @Body MultipartBody multipartBody) {
         return Mono.create(emitter -> {
             multipartBody.subscribe(new Subscriber<CompletedPart>() {
                 private Subscription s;
@@ -398,7 +410,8 @@ public class UploadController {
     }
 
     @Post(value = "/publisher-completedpart", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
-    Mono<String> publisherCompletedPart(Publisher<CompletedPart> recipients) {
+    @SingleResult
+    public Publisher<String> publisherCompletedPart(Publisher<CompletedPart> recipients) {
         return Mono.create(emitter -> {
             recipients.subscribe(new Subscriber<CompletedPart>() {
                 private Subscription s;
@@ -434,7 +447,8 @@ public class UploadController {
     }
 
     @Post(uri = "/receive-multipart-body-as-mono", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
-    Mono<String> multipartAsSingle(@Body io.micronaut.http.server.multipart.MultipartBody body) {
+    @SingleResult
+    public Publisher<String> multipartAsSingle(@Body io.micronaut.http.server.multipart.MultipartBody body) {
         //This will throw an exception because it caches the first result and does not emit it until
         //the publisher completes. By this time the data has been freed. The data is freed immediately
         //after the onNext call to prevent memory leaks

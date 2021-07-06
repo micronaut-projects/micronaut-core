@@ -1,5 +1,6 @@
 package io.micronaut.http.client
 
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpResponse
@@ -9,7 +10,6 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Inject
 import org.reactivestreams.Publisher
-import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -40,7 +40,8 @@ class NonMutableResponseSpec extends Specification {
         CompletableFuture<HttpResponse<String>> goCompletable()
 
         @Get('/test/non-mutable/proxy')
-        Mono<HttpResponse<String>> goMono()
+        @SingleResult
+        Publisher<HttpResponse<String>> goMono()
 
         @Get('/test/non-mutable/proxy')
         Publisher<HttpResponse<String>> goPublisher()
@@ -63,7 +64,8 @@ class NonMutableResponseSpec extends Specification {
         }
 
         @Get('/test/non-mutable/single')
-        Mono<HttpResponse<String>> goMono() {
+        @SingleResult
+        Publisher<HttpResponse<String>> goMono() {
             responseClient.goMono()
         }
 

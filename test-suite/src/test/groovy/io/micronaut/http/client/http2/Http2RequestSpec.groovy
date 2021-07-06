@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
 import io.micronaut.docs.server.json.Person
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
@@ -44,14 +45,14 @@ class Http2RequestSpec extends Specification {
 
     void "test make HTTP/2 stream request"() {
         when:"A non stream request is executed"
-        def people = Flux.from(((StreamingHttpClient)client).jsonStream(HttpRequest.GET("${server.URL}/http2/personStream"), Person))
+        List<Person> people = Flux.from(((StreamingHttpClient)client).jsonStream(HttpRequest.GET("${server.URL}/http2/personStream"), Person))
                 .collectList().block()
 
         then:
         people == Http2Controller.people
 
         when:"posting a data"
-        def response = client.toBlocking().exchange(HttpRequest.POST("${server.URL}/http2/personStream", Http2Controller.people), Argument.listOf(Person))
+        HttpResponse<List<Person>> response = client.toBlocking().exchange(HttpRequest.POST("${server.URL}/http2/personStream", Http2Controller.people), Argument.listOf(Person))
 
 
         then:"The response is correct"
@@ -66,9 +67,9 @@ class Http2RequestSpec extends Specification {
 
     void "test make HTTP/2 sse stream request"() {
         when:"An sse stream is obtain"
-        def client = server.applicationContext.getBean(TestHttp2Client)
+        TestHttp2Client client = server.applicationContext.getBean(TestHttp2Client)
 
-        def results = client.rich().collectList().block()
+        List<Event<Person>> results = Flux.from(client.rich()).collectList().block()
 
         then:
         results.size() == 4
@@ -79,7 +80,7 @@ class Http2RequestSpec extends Specification {
 
     void "test make HTTP/2 request - HTTPS"() {
         when:
-        def result = client.toBlocking().retrieve("${server.URL}/http2")
+        String result = client.toBlocking().retrieve("${server.URL}/http2")
 
         then:
         result == 'Version: HTTP_2_0'
@@ -109,7 +110,7 @@ class Http2RequestSpec extends Specification {
         HttpClient client = server.getApplicationContext().getBean(HttpClient)
 
         when:
-        def result = client.toBlocking().retrieve("${server.URL}/http2")
+        String result = client.toBlocking().retrieve("${server.URL}/http2")
 
         then:
         result == 'Version: HTTP_2_0'
@@ -121,7 +122,7 @@ class Http2RequestSpec extends Specification {
         result == 'Version: HTTP_2_0'
 
         when:"A post request is performed"
-        def response = client.toBlocking().exchange(HttpRequest.POST("${server.URL}/http2", "test").contentType(MediaType.TEXT_PLAIN), String.class)
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.POST("${server.URL}/http2", "test").contentType(MediaType.TEXT_PLAIN), String.class)
 
         then:
         response.status() == HttpStatus.OK
@@ -150,7 +151,7 @@ class Http2RequestSpec extends Specification {
                 "micronaut.server.netty.log-level" : "TRACE"
         ])
         HttpClient client = server.getApplicationContext().getBean(HttpClient)
-        def result = client.toBlocking().retrieve("${server.URL}/http2")
+        String result = client.toBlocking().retrieve("${server.URL}/http2")
 
         expect:
         result == 'Version: HTTP_1_1'
@@ -158,7 +159,6 @@ class Http2RequestSpec extends Specification {
         cleanup:
         server.close()
     }
-
 
     @Controller("/http2")
     static class Http2Controller {
@@ -176,7 +176,7 @@ class Http2RequestSpec extends Specification {
         }
 
         @Get(value = '/stream', produces = MediaType.TEXT_PLAIN)
-        Flux<String> flowable(HttpRequest<?> request) {
+        Publisher<String> flowable(HttpRequest<?> request) {
             return Flux.fromIterable(
                     ["Version: ",
                     request.httpVersion.toString()]
@@ -184,14 +184,14 @@ class Http2RequestSpec extends Specification {
         }
 
         @Get(value = '/personStream', produces = MediaType.APPLICATION_JSON)
-        Flux<Person> personStream(HttpRequest<?> request) {
+        Publisher<Person> personStream(HttpRequest<?> request) {
             return Flux.fromIterable(
                     people
             )
         }
 
         @Post(value = '/personStream', processes = MediaType.APPLICATION_JSON)
-        Flux<Person> postStream(@Body Flux<Person> body) {
+        Publisher<Person> postStream(@Body Publisher<Person> body) {
             return Flux.fromIterable(
                     people
             )
@@ -225,6 +225,6 @@ class Http2RequestSpec extends Specification {
     static interface TestHttp2Client {
 
         @Get(value = '/rich', processes = MediaType.TEXT_EVENT_STREAM)
-        Flux<Event<Person>> rich()
+        Publisher<Event<Person>> rich()
     }
 }

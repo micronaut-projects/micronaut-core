@@ -27,8 +27,9 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.hateoas.Link
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
-
+import io.micronaut.core.async.annotation.SingleResult
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 
@@ -46,7 +47,8 @@ class PersonController {
     }
 
     @Get("/{name}")
-    Mono<Person> get(String name) {
+    @SingleResult
+    Publisher<Person> get(String name) {
         Person person = inMemoryDatastore.get(name)
         if (person != null) {
             Mono.just(person)
@@ -57,8 +59,9 @@ class PersonController {
 
     // tag::single[]
     @Post("/saveReactive")
-    Mono<HttpResponse<Person>> save(@Body Mono<Person> person) { // <1>
-        person.map({ p ->
+    @SingleResult
+    Publisher<HttpResponse<Person>> save(@Body Publisher<Person> person) { // <1>
+        Mono.from(person).map({ p ->
             inMemoryDatastore.put(p.getFirstName(), p) // <2>
             HttpResponse.created(p) // <3>
         })

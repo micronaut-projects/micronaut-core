@@ -20,7 +20,8 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.function.client.FunctionClient;
 import io.micronaut.http.annotation.Body;
 import jakarta.inject.Named;
-import reactor.core.publisher.Mono;
+import io.micronaut.core.async.annotation.SingleResult;
+import org.reactivestreams.Publisher;
 //end::imports[]
 
 @Requires(property = "spec.name", value = "IsbnValidationSpec")
@@ -29,6 +30,7 @@ import reactor.core.publisher.Mono;
 public interface IsbnValidatorClient {
 
     @Named("isbn-validator")
-    Mono<IsbnValidationResponse> validate(@Body IsbnValidationRequest request); // <1>
+    @SingleResult
+    Publisher<IsbnValidationResponse> validate(@Body IsbnValidationRequest request); // <1>
 }
 //end::clazz[]

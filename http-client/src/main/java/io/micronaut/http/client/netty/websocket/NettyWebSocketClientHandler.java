@@ -50,6 +50,7 @@ import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 
@@ -199,8 +200,8 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                     Object result = openMethodBound.invoke(target);
 
                     if (Publishers.isConvertibleToPublisher(result)) {
-                        Flux<?> flowable = Publishers.convertPublisher(result, Flux.class);
-                        flowable.subscribe(
+                        Publisher<?> reactiveSequence = Publishers.convertPublisher(result, Publisher.class);
+                        Flux.from(reactiveSequence).subscribe(
                                 o -> { },
                                 error -> emitter.error(new WebSocketSessionException("Error opening WebSocket client session: " + error.getMessage(), error)),
                                 () -> {

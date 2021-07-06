@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.retry
 
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -22,6 +23,7 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.retry.annotation.CircuitBreaker
 import io.micronaut.runtime.server.EmbeddedServer
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -32,12 +34,14 @@ import spock.lang.Specification
  * @since 1.0
  */
 class HttpClientWithCircuitBreakerSpec extends Specification {
-    @Shared
-    @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
 
     @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @AutoCleanup
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = embeddedServer.applicationContext
 
     void "test simple blocking retry"() {
         given:
@@ -56,19 +60,17 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
         countClient.getCount()
 
         then:"The original exception is thrown"
-        def e = thrown(HttpClientResponseException)
+        HttpClientResponseException e = thrown()
         e.message == "Internal Server Error: Bad count"
         controller.countValue == 6
 
         when:"the method is called again"
-
         countClient.getCount()
 
         then:"The value is not incremented because the circuit is open"
         e = thrown(HttpClientResponseException)
         e.message == "Internal Server Error: Bad count"
         controller.countValue == 6
-
     }
 
     void "test simply retry with rxjava"() {
@@ -79,7 +81,7 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
         controller.countValue = 0
 
         when:"A method is annotated retry"
-        int result = countClient.getCountSingle().block()
+        int result = Mono.from(countClient.getCountSingle()).block()
 
         then:"It executes until successful"
         result == 3
@@ -87,20 +89,20 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
         when:"The threshold can never be met"
         controller.countThreshold = Integer.MAX_VALUE
         controller.countRx = 0
-        def single = countClient.getCountSingle()
-        single.block()
+        Publisher<Integer> single = countClient.getCountSingle()
+        Mono.from(single).block()
 
         then:"The original exception is thrown"
-        def e = thrown(HttpClientResponseException)
+        HttpClientResponseException e = thrown()
         e.message == "Internal Server Error: Bad count"
         controller.countRx == 6
 
         when:"The method is called again"
         single = countClient.getCountSingle()
-        single.block()
+        Mono.from(single).block()
 
         then:"The value is not incremented because the circuit is open"
-         e = thrown(HttpClientResponseException)
+        e = thrown()
         e.message == "Internal Server Error: Bad count"
         controller.countRx == 6
     }
@@ -127,7 +129,8 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
         }
 
         @Override
-        Mono<Integer> getCountSingle() {
+        @SingleResult
+        Publisher<Integer> getCountSingle() {
             Mono.fromCallable({->
                 countRx++
                 if(countRx < countThreshold) {
@@ -145,6 +148,7 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
         int getCount()
 
         @Get('/rx-count')
-        Mono<Integer> getCountSingle()
+        @SingleResult
+        Publisher<Integer> getCountSingle()
     }
 }

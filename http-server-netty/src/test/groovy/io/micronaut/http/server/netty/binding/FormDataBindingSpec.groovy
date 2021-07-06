@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.binding
 
+import io.micronaut.core.async.annotation.SingleResult
 import groovy.transform.EqualsAndHashCode
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -27,8 +28,8 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
-import reactor.core.publisher.Mono
 import spock.lang.Issue
 
 /**
@@ -163,8 +164,9 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         }
 
         @Post('/maybe-string')
-        Mono<String> string(@Body Flux<String> string) {
-            string.reduce({ a, b -> a + b })
+        @SingleResult
+        Publisher<String> string(@Body Publisher<String> string) {
+            Flux.from(string).reduce({ a, b -> a + b })
         }
 
         @Post('/simple')
@@ -184,12 +186,11 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         }
     }
 
-
     @Controller('/form/saml/test')
     static class MainController {
 
         @Post(consumes = MediaType.APPLICATION_FORM_URLENCODED)
-        public String process(String SAMLResponse) {
+        String process(String SAMLResponse) {
             System.out.println("Response: " + SAMLResponse)
             System.out.println("Response length: " + SAMLResponse.length())
             assert SAMLResponse == FormDataBindingSpec.SAML_DATA
@@ -198,7 +199,7 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         }
 
         @Post(uri = "/form-data", consumes = MediaType.MULTIPART_FORM_DATA)
-        public String processFormData(String SAMLResponse) {
+        String processFormData(String SAMLResponse) {
             System.out.println("Response: " + SAMLResponse)
             System.out.println("Response length: " + SAMLResponse.length())
             assert SAMLResponse == FormDataBindingSpec.SAML_DATA
@@ -207,12 +208,12 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         }
 
         @Post(uri = "/small-form", consumes = MediaType.APPLICATION_FORM_URLENCODED)
-        public String processTempFormData(String aaa0123456789, String bbb0123456789) {
+        String processTempFormData(String aaa0123456789, String bbb0123456789) {
             return aaa0123456789 + bbb0123456789
         }
 
         @Post(uri = "/small-form/pogo", consumes = MediaType.APPLICATION_FORM_URLENCODED)
-        public String processTempFormData(UrlEncodedPogo pogo) {
+        String processTempFormData(UrlEncodedPogo pogo) {
             return pogo.aaa0123456789 + pogo.bbb0123456789
         }
     }

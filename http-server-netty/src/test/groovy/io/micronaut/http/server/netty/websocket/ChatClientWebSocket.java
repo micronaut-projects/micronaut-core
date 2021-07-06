@@ -17,11 +17,13 @@ package io.micronaut.http.server.netty.websocket;
 
 // tag::imports[]
 
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
 import java.util.Collection;
@@ -77,6 +79,7 @@ public abstract class ChatClientWebSocket implements AutoCloseable { // <2>
 
     public abstract Future<String> sendAsync(String message);
 
-    public abstract Mono<String> sendRx(String message);
+    @SingleResult
+    public abstract Publisher<String> sendRx(String message);
 
 }

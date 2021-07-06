@@ -20,6 +20,8 @@ import io.micronaut.docs.annotation.PetOperations
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.client.annotation.Client
+import org.reactivestreams.Publisher
+import io.micronaut.core.async.annotation.SingleResult
 import reactor.core.publisher.Mono
 
 // tag::class[]
@@ -27,9 +29,11 @@ import reactor.core.publisher.Mono
 @Header(name = "X-Pet-Client", value = "\${pet.client.id}")
 interface PetClient : PetOperations {
 
-    override fun save(name: String, age: Int): Mono<Pet>
+    @SingleResult
+    override fun save(name: String, age: Int): Publisher<Pet>
 
     @Get("/{name}")
-    operator fun get(name: String): Mono<Pet>
+    @SingleResult
+    operator fun get(name: String): Publisher<Pet>
 }
 // end::class[]

@@ -18,7 +18,9 @@ package io.micronaut.runtime.event.annotation;
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.scheduling.annotation.Async;
 import jakarta.inject.Singleton;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
+import io.micronaut.core.async.annotation.SingleResult;
 
 @Singleton
 public class AsyncListener {
@@ -27,7 +29,8 @@ public class AsyncListener {
 
     @EventListener
     @Async
-    Mono<Void> onCompletableStartup(StartupEvent event) {
+    @SingleResult
+    Publisher<Void> onCompletableStartup(StartupEvent event) {
         try {
             Thread.currentThread().sleep(500);
         } catch (InterruptedException e) {

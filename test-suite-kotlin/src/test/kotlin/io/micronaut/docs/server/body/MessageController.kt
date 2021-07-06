@@ -22,8 +22,9 @@ import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
-import reactor.core.publisher.Mono
+import io.micronaut.core.async.annotation.SingleResult
 import javax.validation.constraints.Size
 // end::imports[]
 
@@ -39,8 +40,9 @@ open class MessageController {
 
     // tag::echoReactive[]
     @Post(value = "/echo-flow", consumes = [MediaType.TEXT_PLAIN]) // <1>
-    open fun echoFlow(@Body text: Flux<String>): Mono<MutableHttpResponse<String>> { //<2>
-        return text
+    @SingleResult
+    open fun echoFlow(@Body text: Publisher<String>): Publisher<MutableHttpResponse<String>> { //<2>
+        return Flux.from(text)
             .collect({ StringBuffer() }, { obj, str -> obj.append(str) }) // <3>
             .map { buffer -> HttpResponse.ok(buffer.toString()) }
     }

@@ -1,4 +1,4 @@
-package io.micronaut.http.client.rxjava2
+package io.micronaut.reactor.http.client
 
 import groovy.transform.EqualsAndHashCode
 import io.micronaut.context.ApplicationContext
@@ -9,7 +9,6 @@ import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.HttpClient
-import io.micronaut.http.client.HttpPostSpec
 import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
@@ -59,4 +58,5 @@ class MonoPostSpec extends Specification {
         Integer pages
     }
 }
+
 

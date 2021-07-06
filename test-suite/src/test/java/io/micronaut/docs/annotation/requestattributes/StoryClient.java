@@ -19,7 +19,8 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.RequestAttribute;
 import io.micronaut.http.annotation.RequestAttributes;
 import io.micronaut.http.client.annotation.Client;
-import reactor.core.publisher.Mono;
+import io.micronaut.core.async.annotation.SingleResult;
+import org.reactivestreams.Publisher;
 
 // tag::class[]
 @Client("/story")
@@ -30,6 +31,7 @@ import reactor.core.publisher.Mono;
 public interface StoryClient {
 
     @Get("/{storyId}")
-    Mono<Story> getById(@RequestAttribute String storyId);
+    @SingleResult
+    Publisher<Story> getById(@RequestAttribute String storyId);
 }
 // end::class[]

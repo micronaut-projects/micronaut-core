@@ -5,6 +5,7 @@ import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
+import reactor.core.publisher.Mono
 
 import javax.validation.ConstraintViolationException
 
@@ -25,7 +26,7 @@ class PetControllerSpec: StringSpec() {
             val client = embeddedServer.applicationContext.getBean(PetClient::class.java)
 
             // tag::post[]
-            val pet = client.save("Dino", 10).block()
+            val pet = Mono.from(client.save("Dino", 10)).block()
 
             pet.name shouldBe "Dino"
             pet.age.toLong() shouldBe 10
@@ -37,7 +38,7 @@ class PetControllerSpec: StringSpec() {
 
             // tag::error[]
             try {
-                client.save("Fred", -1).block()
+                Mono.from(client.save("Fred", -1)).block()
             } catch (e: Exception) {
                 e.javaClass shouldBe ConstraintViolationException::class.java
                 e.message shouldBe "save.age: must be greater than or equal to 1"

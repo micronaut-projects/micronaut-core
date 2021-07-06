@@ -42,7 +42,7 @@ public class HeadlineControllerSpec {
                                                 .getApplicationContext()
                                                 .getBean(HeadlineClient.class); // <1>
 
-            Mono<Headline> firstHeadline = headlineClient.streamHeadlines().next(); // <2>
+            Mono<Headline> firstHeadline = Mono.from(headlineClient.streamHeadlines()); // <2>
 
             Headline headline = firstHeadline.block(); // <3>
 

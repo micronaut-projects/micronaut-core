@@ -15,6 +15,7 @@
  */
 package io.micronaut.tracing.jaeger
 
+import io.jaegertracing.internal.JaegerSpan
 import io.jaegertracing.internal.JaegerTracer
 import io.jaegertracing.internal.metrics.InMemoryMetricsFactory
 import io.jaegertracing.internal.reporters.InMemoryReporter
@@ -34,13 +35,13 @@ import io.micronaut.scheduling.annotation.ExecuteOn
 import io.micronaut.tracing.annotation.ContinueSpan
 import io.opentracing.Tracer
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 import spock.lang.AutoCleanup
-import spock.lang.Ignore
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
-
+import io.micronaut.core.async.annotation.SingleResult
 import jakarta.inject.Inject
 import java.time.Duration
 import java.time.temporal.ChronoUnit
@@ -73,7 +74,7 @@ class HttpTracingSpec extends Specification {
         response
         conditions.eventually {
             reporter.spans.size() == 2
-            def span = reporter.spans.find { it.operationName == 'GET /traced/hello/{name}' }
+            JaegerSpan span = reporter.spans.find { it.operationName == 'GET /traced/hello/{name}' }
             span != null
             span.tags.get("foo") == 'bar'
             span.tags.get('http.path') == '/traced/hello/John'
@@ -100,7 +101,7 @@ class HttpTracingSpec extends Specification {
         response
         conditions.eventually {
             reporter.spans.size() == 2
-            def span = reporter.spans.find { it.operationName == 'GET /traced/blocking/hello/{name}' }
+            JaegerSpan span = reporter.spans.find { it.operationName == 'GET /traced/blocking/hello/{name}' }
             span != null
             span.tags.get("foo") == 'bar'
             span.tags.get('http.path') == '/traced/blocking/hello/John'
@@ -150,7 +151,7 @@ class HttpTracingSpec extends Specification {
         response
         conditions.eventually {
             reporter.spans.size() == 2
-            def span = reporter.spans.find { it.operationName == 'GET /traced/rxjava/{name}' }
+            JaegerSpan span = reporter.spans.find { it.operationName == 'GET /traced/rxjava/{name}' }
             span != null
             span.tags.get("foo") == 'bar'
             span.tags.get('http.path') == '/traced/rxjava/John'
@@ -208,13 +209,13 @@ class HttpTracingSpec extends Specification {
         response
         conditions.eventually {
             reporter.spans.size() == 2
-            def span = reporter.spans.find { it.tags.containsKey('http.client') }
+            JaegerSpan span = reporter.spans.find { it.tags.containsKey('http.client') }
             span.tags.get('http.path') == '/traced/blocking/error/John'
             span.tags.get('http.status_code') == 500
             span.tags.get('http.method') == 'GET'
             span.tags.get('error') == 'Internal Server Error: bad'
             span.operationName == 'GET /traced/blocking/error/John'
-            def serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
+            JaegerSpan serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
             serverSpan.tags.get('http.path') == '/traced/blocking/error/John'
             serverSpan.tags.get('http.status_code') == 500
             serverSpan.tags.get('http.method') == 'GET'
@@ -236,18 +237,18 @@ class HttpTracingSpec extends Specification {
         client.toBlocking().exchange('/traced/rxError/John', String)
 
         then:
-        def e = thrown(HttpClientResponseException)
-        def response = e.response
+        HttpClientResponseException e = thrown()
+        HttpResponse<?> response = e.response
         response
         conditions.eventually {
             reporter.spans.size() == 2
-            def span = reporter.spans.find { it.tags.containsKey('http.client') }
+            JaegerSpan span = reporter.spans.find { it.tags.containsKey('http.client') }
             span.tags.get('http.path') == '/traced/rxError/John'
             span.tags.get('http.status_code') == 500
             span.tags.get('http.method') == 'GET'
             span.tags.get('error') == 'Internal Server Error: bad'
             span.operationName == 'GET /traced/rxError/John'
-            def serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
+            JaegerSpan serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
             serverSpan.tags.get('http.path') == '/traced/rxError/John'
             serverSpan.tags.get('http.status_code') == 500
             serverSpan.tags.get('http.method') == 'GET'
@@ -269,18 +270,18 @@ class HttpTracingSpec extends Specification {
         client.toBlocking().exchange('/traced/quota-error', String)
 
         then:
-        def e = thrown(HttpClientResponseException)
-        def response = e.response
+        HttpClientResponseException e = thrown()
+        HttpResponse<?> response = e.response
         response
         conditions.eventually {
             reporter.spans.size() == 2
-            def span = reporter.spans.find { it.tags.containsKey('http.client') }
+            JaegerSpan span = reporter.spans.find { it.tags.containsKey('http.client') }
             span.tags.get('http.path') == '/traced/quota-error'
             span.tags.get('http.status_code') == 429
             span.tags.get('http.method') == 'GET'
             span.tags.get('error') == 'retry later'
             span.operationName == 'GET /traced/quota-error'
-            def serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
+            JaegerSpan serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
             serverSpan.tags.get('http.path') == '/traced/quota-error'
             serverSpan.tags.get('http.status_code') == 429
             serverSpan.tags.get('http.method') == 'GET'
@@ -302,18 +303,18 @@ class HttpTracingSpec extends Specification {
         client.toBlocking().exchange('/traced/delayed-error/2s', String)
 
         then:
-        def e = thrown(HttpClientResponseException)
-        def response = e.response
+        HttpClientResponseException e = thrown()
+        HttpResponse<?> response = e.response
         response
         conditions.eventually {
             reporter.spans.size() == 2
-            def span = reporter.spans.find { it.tags.containsKey('http.client') }
+            JaegerSpan span = reporter.spans.find { it.tags.containsKey('http.client') }
             span.tags.get('http.path') == '/traced/delayed-error/2s'
             span.tags.get('http.status_code') == 500
             span.tags.get('http.method') == 'GET'
             span.tags.get('error') == 'Internal Server Error: delayed error'
             span.operationName == 'GET /traced/delayed-error/2s'
-            def serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
+            JaegerSpan serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
             serverSpan.tags.get('http.path') == '/traced/delayed-error/2s'
             serverSpan.tags.get('http.status_code') == 500
             serverSpan.tags.get('http.method') == 'GET'
@@ -615,7 +616,7 @@ class HttpTracingSpec extends Specification {
         client.toBlocking().exchange('/traced/blocking/nestedError/John', String)
 
         then:
-        def ex = thrown(HttpClientResponseException)
+        HttpClientResponseException ex = thrown()
         ex != null
         conditions.eventually {
             reporter.spans.size() == 4
@@ -768,7 +769,7 @@ class HttpTracingSpec extends Specification {
         }
 
         @Get("/rxjava/{name}")
-        Mono<String> rxjava(String name) {
+        Publisher<String> rxjava(String name) {
             Mono.fromCallable({ ->
                 spanCustomizer.activeSpan().setTag("foo", "bar")
                 return name
@@ -787,7 +788,8 @@ class HttpTracingSpec extends Specification {
         }
 
         @Get("/rxError/{name}")
-        Mono<String> rxError(String name) {
+        @SingleResult
+        Publisher<String> rxError(String name) {
             Mono.defer { Mono.just(error(name)) }
         }
 
@@ -817,7 +819,7 @@ class HttpTracingSpec extends Specification {
 
         @ContinueSpan
         @Get("/continueRx/{name}")
-        Mono<String> continuedRx(String name) {
+        Publisher<String> continuedRx(String name) {
             tracedClient.continuedRx(name)
         }
 
@@ -846,28 +848,32 @@ class HttpTracingSpec extends Specification {
         }
 
         @Get("/nestedRx/{name}")
-        Mono<String> nestedRx(String name) {
+        @SingleResult
+        Publisher<String> nestedRx(String name) {
             spanCustomizer.activeSpan().setBaggageItem("foo", "bar")
-            tracedClient.continuedRx(name)
-                    .map({ String res ->
+            Flux.from(tracedClient.continuedRx(name))
+                    .flatMap({ String res ->
                         assert spanCustomizer.activeSpan().getBaggageItem("foo") == "bar"
                         return tracedClient.nestedRx2(res)
                     })
         }
 
         @Get("/nestedRx2/{name}")
-        Mono<Integer> nestedRx2(String name) {
+        @SingleResult
+        Publisher<Integer> nestedRx2(String name) {
             assert spanCustomizer.activeSpan().getBaggageItem("foo") == "bar"
             return Mono.just(10)
         }
 
         @Get("/quota-error")
-        Mono<String> quotaError() {
+        @SingleResult
+        Publisher<String> quotaError() {
             Mono.error(new QuotaException("retry later"))
         }
 
         @Get("/delayed-error/{duration}")
-        Mono<Object> delayedError(Duration duration) {
+        @SingleResult
+        Publisher<Object> delayedError(Duration duration) {
             Mono.error(new RuntimeException("delayed error"))
                     .delaySubscription(Duration.of(duration.toMillis(), ChronoUnit.MILLIS))
         }
@@ -906,9 +912,11 @@ class HttpTracingSpec extends Specification {
         String blockingContinued(String name)
 
         @Get("/hello/{name}")
-        Mono<String> continuedRx(String name)
+        @SingleResult
+        Publisher<String> continuedRx(String name)
 
         @Get("/nestedRx2/{name}")
-        Mono<String> nestedRx2(String name)
+        @SingleResult
+        Publisher<String> nestedRx2(String name)
     }
 }

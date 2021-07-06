@@ -19,6 +19,7 @@ package io.micronaut.docs.streaming;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import java.time.Duration;
@@ -35,7 +36,7 @@ public class HeadlineController {
 
     // tag::streaming[]
     @Get(value = "/headlines", processes = MediaType.APPLICATION_JSON_STREAM) // <1>
-    Flux<Headline> streamHeadlines() {
+    Publisher<Headline> streamHeadlines() {
         return Mono.fromCallable(() -> {  // <2>
             Headline headline = new Headline();
             headline.setText("Latest Headline at " + ZonedDateTime.now());

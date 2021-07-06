@@ -5,6 +5,7 @@ import ch.qos.logback.core.AppenderBase
 import ch.qos.logback.classic.Logger
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.StreamingHttpClient
+import org.reactivestreams.Publisher
 import org.slf4j.LoggerFactory
 
 import io.micronaut.context.ApplicationContext
@@ -72,7 +73,7 @@ class Http2AccessLoggerSpec extends Specification {
         when:"An sse stream is obtain"
         def client = server.applicationContext.getBean(TestHttp2Client)
         appender.events.clear()
-        def results = client.rich().collectList().block()
+        def results = Flux.from(client.rich()).collectList().block()
 
         then:
         results.size() == 4
@@ -165,11 +166,11 @@ class Http2AccessLoggerSpec extends Specification {
             events.add(e.formattedMessage)
         }
 
-        public Queue<String> getEvents() {
+        Queue<String> getEvents() {
             return events
         }
 
-        public String headLog(long timeout) {
+        String headLog(long timeout) {
             return events.poll(timeout, TimeUnit.SECONDS)
         }
     }
@@ -179,6 +180,6 @@ class Http2AccessLoggerSpec extends Specification {
     static interface TestHttp2Client {
 
         @Get(value = '/rich', processes = MediaType.TEXT_EVENT_STREAM)
-        Flux<Event<Person>> rich()
+        Publisher<Event<Person>> rich()
     }
 }

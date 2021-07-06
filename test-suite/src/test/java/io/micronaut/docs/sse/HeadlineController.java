@@ -20,6 +20,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.sse.Event;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 
@@ -32,7 +33,7 @@ public class HeadlineController {
 
     // tag::streaming[]
     @Get(value = "/headlines", processes = MediaType.TEXT_EVENT_STREAM) // <1>
-    Flux<Event<Headline>> streamHeadlines() {
+    Publisher<Event<Headline>> streamHeadlines() {
         return Flux.<Event<Headline>>create((emitter) -> {  // <2>
             Headline headline = new Headline();
             headline.setText("Latest Headline at " + ZonedDateTime.now());

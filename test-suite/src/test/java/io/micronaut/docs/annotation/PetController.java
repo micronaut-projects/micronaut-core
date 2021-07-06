@@ -17,7 +17,9 @@ package io.micronaut.docs.annotation;
 
 // tag::imports[]
 import io.micronaut.http.annotation.Controller;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
+import io.micronaut.core.async.annotation.SingleResult;
 // end::imports[]
 
 // tag::class[]
@@ -25,7 +27,8 @@ import reactor.core.publisher.Mono;
 public class PetController implements PetOperations {
 
     @Override
-    public Mono<Pet> save(String name, int age) {
+    @SingleResult
+    public Publisher<Pet> save(String name, int age) {
         Pet pet = new Pet();
         pet.setName(name);
         pet.setAge(age);

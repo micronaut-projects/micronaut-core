@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client
 
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.*
@@ -24,6 +25,7 @@ import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.uri.UriBuilder
 import io.micronaut.runtime.server.EmbeddedServer
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.Specification
@@ -50,9 +52,9 @@ class ServerRedirectSpec extends Specification {
 
         given:"An HTTPS URL issues an HTTPS"
         YoutubeClient youtubeClient=  embeddedServer.getApplicationContext().getBean(YoutubeClient)
-        def client = HttpClient.create(new URL("https://www.youtube.com"))
-        def declarativeResult = youtubeClient.test().block()
-        def response= client
+        HttpClient client = HttpClient.create(new URL("https://www.youtube.com"))
+        String declarativeResult = Mono.from(youtubeClient.test()).block()
+        String response= client
                 .toBlocking().retrieve("/")
 //
         expect:"The response was returned and doesn't loop"
@@ -81,7 +83,6 @@ class ServerRedirectSpec extends Specification {
         'temporary' | 'good'
         'moved'     | 'good'
         'seeOther'  | 'good'
-
     }
 
     @Unroll
@@ -102,7 +103,6 @@ class ServerRedirectSpec extends Specification {
         'temporary' | 'good'
         'moved'     | 'good'
         'seeOther'  | 'good'
-
     }
 
     void "test stream redirect headers"() {
@@ -224,7 +224,7 @@ class ServerRedirectSpec extends Specification {
 
         @Get
         @Produces(MediaType.APPLICATION_JSON_STREAM)
-        Flux<Book> home() {
+        Publisher<Book> home() {
             Flux.just(new Book(title: "The Stand"))
         }
 
@@ -242,7 +242,8 @@ class ServerRedirectSpec extends Specification {
     @Client("https://www.youtube.com")
     static interface YoutubeClient {
         @Get
-        Mono<String> test()
+        @SingleResult
+        Publisher<String> test()
     }
 
     static class Book {

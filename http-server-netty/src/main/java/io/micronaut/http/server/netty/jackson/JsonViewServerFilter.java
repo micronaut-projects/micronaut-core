@@ -80,7 +80,8 @@ public class JsonViewServerFilter implements HttpServerFilter {
                     Object body = optionalBody.get();
                     MediaTypeCodec codec = codecFactory.resolveJsonViewCodec(viewClass.get());
                     if (Publishers.isConvertibleToPublisher(body)) {
-                        response.body(Publishers.convertPublisher(body, Flux.class)
+                        Publisher<?> pub = Publishers.convertPublisher(body, Publisher.class);
+                        response.body(Flux.from(pub)
                                 .map(codec::encode)
                                 .subscribeOn(Schedulers.fromExecutorService(executorService)));
                     } else {

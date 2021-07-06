@@ -17,6 +17,7 @@ package io.micronaut.docs.server.filters;
 
 // tag::imports[]
 import io.micronaut.http.HttpRequest;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,7 +33,7 @@ public class TraceService {
 
     private static final Logger LOG = LoggerFactory.getLogger(TraceService.class);
 
-    Flux<Boolean> trace(HttpRequest<?> request) {
+    Publisher<Boolean> trace(HttpRequest<?> request) {
         return Mono.fromCallable(() -> { // <1>
             LOG.debug("Tracing request: {}", request.getUri());
             // trace logic here, potentially performing I/O <2>

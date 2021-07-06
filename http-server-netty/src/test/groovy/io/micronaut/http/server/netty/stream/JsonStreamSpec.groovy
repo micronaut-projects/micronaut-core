@@ -23,11 +23,13 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+import io.micronaut.core.async.annotation.SingleResult
 
 /**
  * @author graemerocher
@@ -108,12 +110,13 @@ class JsonStreamSpec extends Specification {
         }
 
         @Get(uri = "/single", produces = MediaType.APPLICATION_JSON_STREAM)
-        HttpResponse<Mono<Book>> streamSingleResponse() {
-            return HttpResponse.ok(Mono.just(new Book(title: "The Stand"))).header("X-MyHeader", "42")
+        @SingleResult
+        Publisher<HttpResponse<Book>> streamSingleResponse() {
+            return Mono.just(HttpResponse.ok(new Book(title: "The Stand")).header("X-MyHeader", "42"))
         }
 
         @Get(uri = "/empty", produces = MediaType.APPLICATION_JSON_STREAM)
-        Flux<Book> emptyStream() {
+        Publisher<Book> emptyStream() {
             return Flux.empty()
         }
 

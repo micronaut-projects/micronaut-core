@@ -890,9 +890,9 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             AnnotationMetadata annotationMetadata,
             Object parameterValue,
             boolean isValid) {
-        final Flux<Object> publisher = Publishers.convertPublisher(parameterValue, Flux.class);
+        final Publisher<Object> publisher = Publishers.convertPublisher(parameterValue, Publisher.class);
         PathImpl copied = new PathImpl(context.currentPath);
-        final Flux<Object> finalFlowable = publisher.flatMap(o -> {
+        final Flux<Object> finalFlowable = Flux.from(publisher).flatMap(o -> {
             DefaultConstraintValidatorContext newContext =
                     new DefaultConstraintValidatorContext(
                             object,
@@ -1590,8 +1590,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
     @Override
     public <T> Publisher<T> validatePublisher(@NonNull Publisher<T> publisher, Class<?>... groups) {
         ArgumentUtils.requireNonNull("publisher", publisher);
-        final Flux<T> flowable = Publishers.convertPublisher(publisher, Flux.class);
-        return flowable.flatMap(object -> {
+        final Publisher<T> reactiveSequence = Publishers.convertPublisher(publisher, Publisher.class);
+        return Flux.from(reactiveSequence).flatMap(object -> {
             final Set<ConstraintViolation<Object>> constraintViolations = validate(object, groups);
             if (!constraintViolations.isEmpty()) {
                 return Flux.error(new ConstraintViolationException(constraintViolations));

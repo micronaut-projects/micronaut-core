@@ -17,6 +17,8 @@ package io.micronaut.docs.annotation
 
 // tag::imports[]
 import io.micronaut.http.annotation.Controller
+import org.reactivestreams.Publisher
+import io.micronaut.core.async.annotation.SingleResult
 import reactor.core.publisher.Mono
 // end::imports[]
 
@@ -25,7 +27,8 @@ import reactor.core.publisher.Mono
 class PetController implements PetOperations {
 
     @Override
-    Mono<Pet> save(String name, int age) {
+    @SingleResult
+    Publisher<Pet> save(String name, int age) {
         Pet pet = new Pet(name: name, age: age)
         // save to database or something
         return Mono.just(pet)
