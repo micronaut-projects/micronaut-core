@@ -37,14 +37,14 @@ import java.util.Map;
  */
 @Singleton
 @Requires(beans = BeansEndpoint.class)
-public class ReactiveJavaBeanDefinitionDataCollector implements BeanDefinitionDataCollector<Map<String, Object>> {
+public class DefaultBeanDefinitionDataCollector implements BeanDefinitionDataCollector<Map<String, Object>> {
 
     private BeanDefinitionData beanDefinitionData;
 
     /**
      * @param beanDefinitionData The {@link BeanDefinitionData}
      */
-    ReactiveJavaBeanDefinitionDataCollector(BeanDefinitionData beanDefinitionData) {
+    DefaultBeanDefinitionDataCollector(BeanDefinitionData beanDefinitionData) {
         this.beanDefinitionData = beanDefinitionData;
     }
 
