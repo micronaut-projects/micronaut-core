@@ -621,7 +621,8 @@ class HttpGetSpec extends Specification {
         }
 
         @Get("/emptyList/single")
-        Mono<List<Book>> emptyListSingle() {
+        @SingleResult
+        Publisher<List<Book>> emptyListSingle() {
             return Mono.just([])
         }
 
