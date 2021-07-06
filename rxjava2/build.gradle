@@ -1,5 +1,0 @@
-dependencies {
-    annotationProcessor project(":inject-java")
-    api project(":runtime")
-    api dependencyVersion("rxjava2")
-}

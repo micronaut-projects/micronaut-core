@@ -1,8 +1,0 @@
-group "io.micronaut.reactor"
-
-dependencies {
-    annotationProcessor project(":inject-java")
-    api platform("io.projectreactor:reactor-bom:$reactorVersion")
-    api 'io.projectreactor:reactor-core'
-    implementation project(":http-server-netty")
-}

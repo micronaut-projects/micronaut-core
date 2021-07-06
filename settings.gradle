@@ -34,13 +34,6 @@ include "tracing"
 include "validation"
 include "websocket"
 
-include 'reactor'
-include 'reactor-http-server-netty'
-include 'reactor-http-client'
-include 'rxjava2'
-include 'rxjava2-http-client'
-include 'rxjava2-http-server-netty'
-
 // test suites
 include "test-suite"
 include "test-suite-helper"
