@@ -44,7 +44,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 /**
- * Implementation of the {@link WebSocketSession} interface for Netty and RxJava.
+ * Implementation of the {@link WebSocketSession} interface for Netty.
  *
  * @author graemerocher
  * @since 1.0
