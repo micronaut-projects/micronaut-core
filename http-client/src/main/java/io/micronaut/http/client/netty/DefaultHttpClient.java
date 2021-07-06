@@ -903,10 +903,10 @@ public class DefaultHttpClient implements
      * @param <I>     The input type
      * @return A {@link Function}
      */
-    protected <I> Function<URI, Flux<HttpResponse<ByteBuffer<?>>>> buildExchangeStreamPublisher(io.micronaut.http.HttpRequest<I> request) {
+    protected <I> Function<URI, Publisher<HttpResponse<ByteBuffer<?>>>> buildExchangeStreamPublisher(io.micronaut.http.HttpRequest<I> request) {
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         return requestURI -> {
-            Flux<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = buildStreamExchange(parentRequest, request, requestURI);
+            Flux<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = Flux.from(buildStreamExchange(parentRequest, request, requestURI));
             return streamResponsePublisher.switchMap(response -> {
                 StreamedHttpResponse streamedHttpResponse = NettyHttpResponseBuilder.toStreamResponse(response);
                 Flux<HttpContent> httpContentReactiveSequence = Flux.from(streamedHttpResponse);
@@ -947,13 +947,13 @@ public class DefaultHttpClient implements
      * @param <O>           The output type
      * @return A {@link Function}
      */
-    protected <I, O> Function<URI, Flux<O>> buildJsonStreamPublisher(
+    protected <I, O> Function<URI, Publisher<O>> buildJsonStreamPublisher(
             io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<I> request,
             io.micronaut.core.type.Argument<O> type) {
         return requestURI -> {
             Flux<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher =
-                    buildStreamExchange(parentRequest, request, requestURI);
+                    Flux.from(buildStreamExchange(parentRequest, request, requestURI));
             return streamResponsePublisher.switchMap(response -> {
                 if (!(response instanceof NettyStreamedHttpResponse)) {
                     throw new IllegalStateException("Response has been wrapped in non streaming type. Do not wrap the response in client filters for stream requests");
@@ -1006,10 +1006,10 @@ public class DefaultHttpClient implements
      * @param <I>     The input type
      * @return A {@link Function}
      */
-    protected <I> Function<URI, Flux<ByteBuffer<?>>> buildDataStreamPublisher(io.micronaut.http.HttpRequest<I> request) {
+    protected <I> Function<URI, Publisher<ByteBuffer<?>>> buildDataStreamPublisher(io.micronaut.http.HttpRequest<I> request) {
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         return requestURI -> {
-            Flux<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = buildStreamExchange(parentRequest, request, requestURI);
+            Flux<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = Flux.from(buildStreamExchange(parentRequest, request, requestURI));
             Function<HttpContent, ByteBuffer<?>> contentMapper = message -> {
                 ByteBuf byteBuf = message.content();
                 return byteBufferFactory.wrap(byteBuf);
@@ -1044,7 +1044,7 @@ public class DefaultHttpClient implements
      * @return A {@link Flux}
      */
     @SuppressWarnings("MagicNumber")
-    protected <I> Flux<io.micronaut.http.HttpResponse<Object>> buildStreamExchange(
+    protected <I> Publisher<io.micronaut.http.HttpResponse<Object>> buildStreamExchange(
             @Nullable io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<I> request,
             URI requestURI) {
