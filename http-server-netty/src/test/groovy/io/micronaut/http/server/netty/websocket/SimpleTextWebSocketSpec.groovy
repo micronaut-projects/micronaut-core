@@ -58,7 +58,6 @@ class SimpleTextWebSocketSpec extends Specification {
             fred.replies.size() == 1
         }
 
-
         when:"A message is sent"
         fred.send("Hello bob!")
 
@@ -138,7 +137,6 @@ class SimpleTextWebSocketSpec extends Specification {
             fred.replies.contains("[bob] Joined!")
             fred.replies.size() == 1
         }
-
 
         when:"A message is sent"
         fred.send("Hello bob!")
