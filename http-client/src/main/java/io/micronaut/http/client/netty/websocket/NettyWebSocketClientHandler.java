@@ -75,7 +75,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     private final MediaTypeCodecRegistry codecRegistry;
     private ChannelPromise handshakeFuture;
     private NettyWebSocketSession clientSession;
-    private WebSocketStateBinderRegistry webSocketStateBinderRegistry;
+    private final WebSocketStateBinderRegistry webSocketStateBinderRegistry;
     private FullHttpResponse handshakeResponse;
     private Argument<?> clientBodyArgument;
 
