@@ -43,9 +43,9 @@ class ServerSentEventStreamingSpec extends Specification {
     @Shared @AutoCleanup SseClient sseClient = embeddedServer.applicationContext.createBean(SseClient, embeddedServer.getURL())
     @Shared ProductClient productClient = embeddedServer.applicationContext.getBean(ProductClient)
 
-    void "test consume SSE stream with ReactorSseClient"() {
+    void "test consume SSE stream with SseClient"() {
         when:
-        List<Event<Product>> results = sseClient.eventStream("/stream/sse/pojo/events", Product).collectList().block()
+        List<Event<Product>> results = Flux.from(sseClient.eventStream("/stream/sse/pojo/events", Product)).collectList().block()
 
         then:
         results[0].data.name == "Apple"
@@ -59,7 +59,7 @@ class ServerSentEventStreamingSpec extends Specification {
 
     void "test consume SSE stream with @Client"() {
         when:
-        List<Event<Product>> results = productClient.pojoEventStream().collectList().block()
+        List<Event<Product>> results = Flux.from(productClient.pojoEventStream()).collectList().block()
 
         then:
         results[0].data.name == "Apple"
@@ -72,7 +72,7 @@ class ServerSentEventStreamingSpec extends Specification {
 
     void "test consume pojo SSE stream with @Client"() {
         when:
-        List<Product> results = productClient.pojoStream().collectList().block()
+        List<Product> results = Flux.from(productClient.pojoStream()).collectList().block()
 
         then:
         results[0].name == "Apple"
@@ -85,7 +85,7 @@ class ServerSentEventStreamingSpec extends Specification {
     // this tests that read timeout is not applied, but instead idle timeout is applied
     void "test consume pojo delayed SSE stream with @Client"() {
         when:
-        List<Product> results = productClient.delayedStream().collectList().block()
+        List<Product> results = Flux.from(productClient.delayedStream()).collectList().block()
 
         then:
         results[0].name == "Apple"

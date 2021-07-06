@@ -26,9 +26,9 @@ class ServerSentEventMultilineSpec extends Specification {
     @Shared @AutoCleanup SseClient sseClient = embeddedServer.applicationContext.createBean(SseClient, embeddedServer.getURL())
     @Shared ProductClient productClient = embeddedServer.applicationContext.getBean(ProductClient)
 
-    void "test consume multiline SSE stream with ReactorSseClient"() {
+    void "test consume multiline SSE stream with SseClient"() {
         when:
-        List<Event<Product>> results = sseClient.eventStream("/stream/sse/pojo/events", Product).collectList().block()
+        List<Event<Product>> results = Flux.from(sseClient.eventStream("/stream/sse/pojo/events", Product)).collectList().block()
 
         then:
         results[0].data.name == "Apple"
@@ -41,7 +41,7 @@ class ServerSentEventMultilineSpec extends Specification {
 
     void "test consume multiline pojo SSE stream with @Client"() {
         when:
-        List<Product> results = productClient.pojoStream().collectList().block()
+        List<Product> results = Flux.from(productClient.pojoStream()).collectList().block()
 
         then:
         results[0].name == "Apple"

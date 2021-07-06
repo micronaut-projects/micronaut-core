@@ -21,6 +21,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -33,7 +34,7 @@ class ClientStreamSpec extends Specification {
 
     void "test stream array of json objects"() {
         when:
-        List<Book> books = bookClient.arrayStream().collectList().block()
+        List<Book> books = Flux.from(bookClient.arrayStream()).collectList().block()
 
         then:
         books.size() == 2
@@ -43,7 +44,7 @@ class ClientStreamSpec extends Specification {
 
     void "test stream json stream of objects"() {
         when:
-        List<Book> books = bookClient.jsonStream().collectList().block()
+        List<Book> books = Flux.from(bookClient.jsonStream()).collectList().block()
 
         then:
         books.size() == 2
@@ -62,7 +63,7 @@ class ClientStreamSpec extends Specification {
     static class StreamController implements BookApi {
 
         @Override
-        Flux<Book> arrayStream() {
+        Publisher<Book> arrayStream() {
             return Flux.just(
                     new Book(title: "The Stand"),
                     new Book(title: "The Shining"),
@@ -70,7 +71,7 @@ class ClientStreamSpec extends Specification {
         }
 
         @Override
-        Flux<Book> jsonStream() {
+        Publisher<Book> jsonStream() {
             return Flux.just(
                     new Book(title: "The Stand"),
                     new Book(title: "The Shining"),
@@ -80,10 +81,10 @@ class ClientStreamSpec extends Specification {
 
     static interface BookApi {
         @Get("/array")
-        Flux<Book> arrayStream()
+        Publisher<Book> arrayStream()
 
         @Get(value = "/json", processes = MediaType.APPLICATION_JSON_STREAM)
-        Flux<Book> jsonStream()
+        Publisher<Book> jsonStream()
     }
 
     static class Book {
