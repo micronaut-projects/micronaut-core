@@ -25,8 +25,8 @@ import java.net.URL;
 /**
  * Factory interface for creating clients.
  *
- * @author graemerocher
- * @since 2.0
+ * @author Sergio del Amo
+ * @since 3.0
  * @param <T> Reactive HTTP Client
  * @param <E> Server Sent Event Client
  * @param <S> Reactive Streaming HTTP Client
