@@ -27,9 +27,9 @@ import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Status
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
-import reactor.core.publisher.Mono
-
+import io.micronaut.core.async.annotation.SingleResult
 // end::imports[]
 
 @Requires(property = "spec.name", value = "HelloControllerSpec")
@@ -38,7 +38,8 @@ class HelloController(@param:Client("/endpoint") private val httpClient: HttpCli
 
     // tag::nonblocking[]
     @Get("/hello/{name}")
-    internal fun hello(name: String): Mono<String> { // <1>
+    @SingleResult
+    internal fun hello(name: String): Publisher<String> { // <1>
         return Flux.from(httpClient.retrieve(GET<Any>("/hello/$name")))
                          .next() // <2>
     }
