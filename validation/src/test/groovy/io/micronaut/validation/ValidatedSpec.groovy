@@ -23,6 +23,7 @@ import io.micronaut.aop.MethodInvocationContext
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.exceptions.BeanInstantiationException
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
@@ -58,12 +59,14 @@ class ValidatedSpec extends Specification {
                 return InterceptPhase.CACHE.getPosition()
             }
 
+            @Nullable
             @Override
             Object intercept(MethodInvocationContext context) {
                 return null
             }
 
             @Override
+            @Nullable
             Object intercept(InvocationContext context) {
                 return null
             }
