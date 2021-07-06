@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.interceptor
 
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.annotation.AliasFor
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
@@ -173,7 +174,8 @@ class HttpFilterSpec extends Specification {
         }
 
         @Get("/reactive")
-        Mono<HttpResponse> reactive() {
+        @SingleResult
+        Publisher<HttpResponse> reactive() {
             Mono.just(HttpResponse.ok())
         }
 

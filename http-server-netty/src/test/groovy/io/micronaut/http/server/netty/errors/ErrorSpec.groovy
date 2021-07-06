@@ -27,8 +27,10 @@ import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.server.exceptions.ExceptionHandler
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import jakarta.inject.Singleton
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import io.micronaut.core.async.annotation.SingleResult
 
 /**
  * Tests for different kinds of errors and the expected responses
@@ -161,7 +163,8 @@ class ErrorSpec extends AbstractMicronautSpec {
         }
 
         @Get("/io-error")
-        Mono<String> ioError() {
+        @SingleResult
+        Publisher<String> ioError() {
             return Mono.create({ emitter ->
                 emitter.error(new IOException())
             })
