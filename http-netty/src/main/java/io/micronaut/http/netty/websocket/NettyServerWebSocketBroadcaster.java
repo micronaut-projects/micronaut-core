@@ -23,9 +23,9 @@ import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.util.Attribute;
 import jakarta.inject.Singleton;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
-
 import java.util.function.Predicate;
 
 /**
@@ -67,7 +67,7 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
     }
 
     @Override
-    public <T> Flux<T> broadcast(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
+    public <T> Publisher<T> broadcast(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
         return Flux.create(emitter -> {
             try {
                 WebSocketFrame frame = webSocketMessageEncoder.encodeMessage(message, mediaType);
