@@ -29,7 +29,7 @@ Another way to create an `HttpClient` is with the static `create` method of api:
 
 ==== Performing an HTTP GET
 
-Generally there are two methods of interest when working with the `HttpClient`. The first is `retrieve`, which executes an HTTP request and returns the body in whichever type you request (by default a `String`) as an Reactor reactor:Flux[].
+Generally there are two methods of interest when working with the `HttpClient`. The first is `retrieve`, which executes an HTTP request and returns the body in whichever type you request (by default a `String`) as `Publisher`.
 
 The `retrieve` method accepts an api:http.HttpRequest[] or a `String` URI to the endpoint you wish to request.
 
