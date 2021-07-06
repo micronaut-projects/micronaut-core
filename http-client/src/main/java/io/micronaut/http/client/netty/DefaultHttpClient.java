@@ -1298,7 +1298,7 @@ public class DefaultHttpClient implements
             try {
                 return new URI(StringUtils.prependUri(contextPath, requestURI.toString()));
             } catch (URISyntaxException e) {
-                //should never happen
+                throw new HttpClientException("Failed to construct the request URI", e);
             }
         }
         return requestURI;

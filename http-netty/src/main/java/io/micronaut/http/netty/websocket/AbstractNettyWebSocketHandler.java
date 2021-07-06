@@ -90,6 +90,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     protected final NettyWebSocketSession session;
     protected final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected final WebSocketVersion webSocketVersion;
+    protected final String subProtocol;
     protected final WebSocketSessionRepository webSocketSessionRepository;
     private final Argument<?> bodyArgument;
     private final AtomicBoolean closed = new AtomicBoolean(false);
@@ -105,6 +106,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param request                    The originating request
      * @param uriVariables               The URI variables
      * @param version                    The websocket version being used
+     * @param subProtocol                The handler sub-protocol
      * @param webSocketSessionRepository The web socket repository if they are supported (like on the server), null otherwise
      */
     protected AbstractNettyWebSocketHandler(
@@ -115,7 +117,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             HttpRequest<?> request,
             Map<String, Object> uriVariables,
             WebSocketVersion version,
+            String subProtocol,
             WebSocketSessionRepository webSocketSessionRepository) {
+        this.subProtocol = subProtocol;
         this.webSocketSessionRepository = webSocketSessionRepository;
         this.webSocketBinder = new WebSocketStateBinderRegistry(binderRegistry);
         this.uriVariables = uriVariables;

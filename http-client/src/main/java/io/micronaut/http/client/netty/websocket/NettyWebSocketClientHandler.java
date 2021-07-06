@@ -95,7 +95,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
             RequestBinderRegistry requestBinderRegistry,
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
             FluxSink<T> emitter) {
-        super(null, requestBinderRegistry, mediaTypeCodecRegistry, webSocketBean, request, Collections.emptyMap(), handshaker.version(), null);
+        super(null, requestBinderRegistry, mediaTypeCodecRegistry, webSocketBean, request, Collections.emptyMap(), handshaker.version(), handshaker.actualSubprotocol(), null);
         this.codecRegistry = mediaTypeCodecRegistry;
         this.handshaker = handshaker;
         this.webSocketBean = webSocketBean;

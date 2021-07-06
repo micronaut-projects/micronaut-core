@@ -116,7 +116,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
     final boolean isExecutableType
     final boolean isAopProxyType
     final boolean isDeclaredBean
-    final OptionalValues<Boolean> aopSettings
     final ConfigurationMetadataBuilder<ClassNode> configurationMetadataBuilder
     ConfigurationMetadata configurationMetadata
 
@@ -156,7 +155,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         this.concreteClassElement = originatingElement
         this.isFactoryClass = annotationMetadata.hasStereotype(Factory)
         this.isAopProxyType = hasAroundStereotype(annotationMetadata) && !targetClassNode.isAbstract() && !concreteClassElement.isAssignable(Interceptor.class)
-        this.aopSettings = isAopProxyType ? annotationMetadata.getValues(AROUND_TYPE, Boolean.class) : OptionalValues.<Boolean> empty()
         this.isExecutableType = isAopProxyType || annotationMetadata.hasStereotype(Executable)
         this.isConfigurationProperties = configurationProperties != null ? configurationProperties : annotationMetadata.hasDeclaredStereotype(ConfigurationReader)
         if (isConfigurationProperties) {
@@ -235,7 +233,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
             AnnotationValue<?>[] interceptorTypes = (AnnotationValue<?>[]) ArrayUtils.concat(aroundInterceptors, introductionInterceptors)
             ClassElement[] interfaceTypes = annotationMetadata.getValue(Introduction.class, "interfaces", String[].class).orElse(new String[0])
-                                                    .collect {ClassElement.of(it) }
+                    .collect { ClassElement.of(it) }
 
             AopProxyWriter aopProxyWriter = new AopProxyWriter(
                     packageName,
@@ -253,8 +251,9 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     node,
                     annotationMetadata
             )
-            populateProxyWriterConstructor(groovyClassElement, aopProxyWriter)
+            populateProxyWriterConstructor(groovyClassElement, aopProxyWriter, groovyClassElement.getPrimaryConstructor().orElse(null))
             beanDefinitionWriters.put(node, aopProxyWriter)
+            this.aopProxyWriter = aopProxyWriter
             visitIntroductionTypePublicMethods(aopProxyWriter, node)
             if (ArrayUtils.isNotEmpty(interfaceTypes)) {
                 List<AnnotationNode> annotationNodes = node.annotations
@@ -277,6 +276,13 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             if (isOwningClass && concreteClass.abstract && !isDeclaredBean) {
                 return
             }
+
+            if (annotationMetadata.hasStereotype(AROUND_TYPE)) {
+                AnnotationValue<?>[] interceptorTypeReferences = InterceptedMethodUtil
+                        .resolveInterceptorBinding(annotationMetadata, InterceptorKind.AROUND)
+                resolveProxyWriter(annotationMetadata.getValues(AROUND_TYPE, Boolean.class), false, interceptorTypeReferences)
+            }
+
             ClassNode superClass = node.getSuperClass()
             List<ClassNode> superClasses = []
             while (superClass != null) {
@@ -745,9 +751,27 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             }
             MethodElement constructor = producedClassElement.getPrimaryConstructor().orElse(null)
             if (!producedClassElement.isInterface() && constructor != null && constructor.getParameters().length > 0) {
-                final ASTNode nativeElement = (ASTNode) constructor.getNativeType()
-                addError("The produced type from a factory which has AOP proxy advice specified must define an accessible no arguments constructor", nativeElement);
-                return;
+                final String proxyTargetMode = methodAnnotationMetadata.stringValue(AROUND_TYPE, "proxyTargetMode")
+                        .orElseGet(() -> {
+                            // temporary workaround until micronaut-test can be upgraded to 3.0
+                            if (methodAnnotationMetadata.hasAnnotation("io.micronaut.test.annotation.MockBean")) {
+                                return "WARN";
+                            } else {
+                                return "ERROR";
+                            }
+                        });
+                switch (proxyTargetMode) {
+                    case "ALLOW":
+                        allowProxyConstruction(constructor)
+                        break
+                    case "WARN":
+                        allowProxyConstruction(constructor)
+                        AstMessageUtils.warning(sourceUnit, annotatedNode, "The produced type of a @Factory method has constructor arguments and is proxied. This can lead to unexpected behaviour. See the javadoc for Around.ProxyTargetConstructorMode for more information.")
+                        break
+                    default:
+                        addError("The produced type from a factory which has AOP proxy advice specified must define an accessible no arguments constructor. Proxying types with constructor arguments can lead to unexpected behaviour. See the javadoc for for Around.ProxyTargetConstructorMode for more information and possible solutions.", annotatedNode)
+                        return
+                }
             }
 
             AnnotationValue<?>[] interceptorTypeReferences = InterceptedMethodUtil
@@ -770,7 +794,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             if (producedClassElement.isInterface()) {
                 proxyWriter.visitDefaultConstructor(AnnotationMetadata.EMPTY_METADATA, groovyVisitorContext)
             } else {
-                populateProxyWriterConstructor(producedClassElement, proxyWriter)
+                populateProxyWriterConstructor(producedClassElement, proxyWriter, constructor)
             }
             SourceUnit source = this.sourceUnit
             CompilationUnit unit = this.compilationUnit
@@ -824,6 +848,24 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             }
         }
         beanDefinitionWriters.put(annotatedNode, beanMethodWriter)
+    }
+
+    private static void allowProxyConstruction(MethodElement constructor) {
+        final ParameterElement[] parameters = constructor.getParameters()
+        for (ParameterElement parameter : parameters) {
+            if (parameter.primitive && !parameter.array) {
+                final String name = parameter.getType().getName()
+                if ("boolean" == name) {
+                    parameter.annotate(Value.class, (builder) -> builder.value(false))
+                } else {
+                    parameter.annotate(Value.class, (builder) -> builder.value(0))
+                }
+            } else {
+                // allow null
+                parameter.annotate(AnnotationUtil.NULLABLE)
+                parameter.removeAnnotation(AnnotationUtil.NON_NULL)
+            }
+        }
     }
 
     private static AnnotationMetadata addPropertyMetadata(Element element, PropertyMetadata propertyMetadata) {
@@ -957,16 +999,20 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             AnnotationValue<?>[] interceptorTypeReferences) {
         AopProxyWriter proxyWriter = (AopProxyWriter) aopProxyWriter
         if (proxyWriter == null) {
+            if (getBeanWriter() instanceof BeanDefinitionWriter) {
+                proxyWriter = new AopProxyWriter(
+                        (BeanDefinitionWriter) getBeanWriter(),
+                        aopSettings,
+                        configurationMetadataBuilder,
+                        groovyVisitorContext,
+                        interceptorTypeReferences
+                )
+            } else {
+                // Unexpected: should be unreachable
+                throw new IllegalStateException("Internal Error: bean writer not an instance of BeanDefinitionWriter")
+            }
 
-            proxyWriter = new AopProxyWriter(
-                    (BeanDefinitionWriter) getBeanWriter(),
-                    aopSettings,
-                    configurationMetadataBuilder,
-                    groovyVisitorContext,
-                    interceptorTypeReferences
-            )
-
-            populateProxyWriterConstructor(concreteClassElement, proxyWriter)
+            populateProxyWriterConstructor(concreteClassElement, proxyWriter, concreteClassElement.primaryConstructor.orElse(null))
             String beanDefinitionName = getBeanWriter().getBeanDefinitionName()
             if (isFactoryType) {
                 proxyWriter.visitSuperBeanDefinitionFactory(beanDefinitionName)
@@ -976,14 +1022,12 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
             this.aopProxyWriter = proxyWriter
 
-            def node = new AnnotatedNode()
-            beanDefinitionWriters.put(node, proxyWriter)
+            beanDefinitionWriters.put(new AnnotatedNode(), proxyWriter)
         }
         proxyWriter
     }
 
-    protected void populateProxyWriterConstructor(ClassElement targetClass, AopProxyWriter proxyWriter) {
-        MethodElement constructor = targetClass.getPrimaryConstructor().orElse(null)
+    protected void populateProxyWriterConstructor(ClassElement targetClass, AopProxyWriter proxyWriter, MethodElement constructor) {
         if (constructor != null) {
             if (constructor.parameters.length == 0) {
                 proxyWriter.visitDefaultConstructor(
@@ -1382,13 +1426,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     addError("Class must have at least one non private constructor in order to be a candidate for dependency injection", classNode)
                 }
             }
-
-            if (isAopProxyType) {
-                AnnotationValue<?>[] interceptorTypeReferences = InterceptedMethodUtil
-                        .resolveInterceptorBinding(annotationMetadata, InterceptorKind.AROUND)
-                resolveProxyWriter(aopSettings, false, interceptorTypeReferences)
-            }
-
         } else {
             beanWriter = beanDefinitionWriters.get(classNode)
         }

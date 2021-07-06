@@ -99,7 +99,7 @@ interface MyInterface2 {
 
     void "test that a bean definition is not created for an abstract class"() {
         when:
-        ApplicationContext ctx = buildContext('inheritmetadatatest3.$BaseServiceDefinition$Intercepted', '''
+        ApplicationContext ctx = buildContext('''
 package inheritmetadatatest3;
 
 import io.micronaut.aop.*;

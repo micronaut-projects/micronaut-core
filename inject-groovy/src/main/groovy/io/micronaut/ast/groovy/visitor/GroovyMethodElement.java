@@ -180,10 +180,11 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
 
     @Override
     public MethodElement withNewParameters(ParameterElement... newParameters) {
+        final ParameterElement[] existing = getParameters();
         return new GroovyMethodElement(declaringClass, visitorContext, methodNode, getAnnotationMetadata()) {
             @Override
             public ParameterElement[] getParameters() {
-                return ArrayUtils.concat(super.getParameters(), newParameters);
+                return ArrayUtils.concat(existing, newParameters);
             }
         };
     }

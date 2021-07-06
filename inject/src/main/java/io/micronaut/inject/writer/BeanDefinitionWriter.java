@@ -365,7 +365,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             if (uniqueIdentifier == null) {
                 throw new IllegalArgumentException("Factory methods require passing a unique identifier");
             }
-            final ClassElement declaringType = factoryMethodElement.getDeclaringType();
+            final ClassElement declaringType = factoryMethodElement.getOwningType();
             this.beanDefinitionName = declaringType.getPackageName() + ".$" + declaringType.getSimpleName() + "$" + upperCaseMethodName + uniqueIdentifier + "Definition";
         } else if (beanProducingElement instanceof FieldElement) {
             inheritTypeLevelRequirements(beanProducingElement);
@@ -382,7 +382,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             if (uniqueIdentifier == null) {
                 throw new IllegalArgumentException("Factory fields require passing a unique identifier");
             }
-            final ClassElement declaringType = factoryMethodElement.getDeclaringType();
+            final ClassElement declaringType = factoryMethodElement.getOwningType();
             this.beanDefinitionName = declaringType.getPackageName() + ".$" + declaringType.getSimpleName() + "$" + fieldName + uniqueIdentifier + "Definition";
         } else if (beanProducingElement instanceof BeanElementBuilder) {
             BeanElementBuilder beanElementBuilder = (BeanElementBuilder) beanProducingElement;

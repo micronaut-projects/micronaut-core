@@ -71,7 +71,6 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      */
     public static final String ID = "websocket-handler";
 
-    private final WebSocketServerHandshaker handshaker;
     private final ApplicationEventPublisher eventPublisher;
 
     /**
@@ -104,13 +103,13 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                 request,
                 routeMatch.getVariableValues(),
                 handshaker.version(),
+                handshaker.selectedSubprotocol(),
                 webSocketSessionRepository);
 
 
         request.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
         request.setAttribute(HttpAttributes.ROUTE, routeMatch.getRoute());
         this.eventPublisher = eventPublisher;
-        this.handshaker = handshaker;
 
         try {
             eventPublisher.publishEvent(new WebSocketSessionOpenEvent(session));
@@ -153,7 +152,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
             @Override
             public Optional<String> getSubprotocol() {
-                return Optional.ofNullable(handshaker.selectedSubprotocol());
+                return Optional.ofNullable(subProtocol);
             }
 
             @Override
@@ -175,7 +174,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
             @Override
             public Optional<Principal> getUserPrincipal() {
-                return originatingRequest.getAttribute("micronaut.AUTHENTICATION", Principal.class);
+                return originatingRequest.getAttribute(HttpAttributes.PRINCIPAL, Principal.class);
             }
 
             @Override

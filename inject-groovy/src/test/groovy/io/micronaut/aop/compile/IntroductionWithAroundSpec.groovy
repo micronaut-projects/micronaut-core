@@ -46,4 +46,5 @@ abstract class MyBean {
         cleanup:
         context.close()
     }
+
 }

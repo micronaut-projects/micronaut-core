@@ -117,11 +117,14 @@ class SimpleTextWebSocketSpec extends Specification {
         WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
         ChatClientWebSocket fred = Flux.from(wsClient.connect(ChatClientWebSocket, "/chat/stuff/fred")).blockFirst()
         ChatClientWebSocket bob = Flux.from(wsClient.connect(ChatClientWebSocket, [topic:"stuff",username:"bob"])).blockFirst()
+        ChatServerWebSocket server = embeddedServer.applicationContext.getBean(ChatServerWebSocket)
 
         then:"The connection is valid"
         fred.session != null
         fred.session.id != null
         fred.request != null
+        fred.subProtocol == null
+        server.subProtocol == null
 
         then:"A session is established"
         fred.session != null
