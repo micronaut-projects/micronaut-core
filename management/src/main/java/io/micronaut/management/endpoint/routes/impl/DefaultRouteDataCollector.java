@@ -37,14 +37,14 @@ import java.util.stream.Stream;
  */
 @Singleton
 @Requires(beans = RoutesEndpoint.class)
-public class ReactiveJavaRouteDataCollector implements RouteDataCollector<Map<String, Object>> {
+public class DefaultRouteDataCollector implements RouteDataCollector<Map<String, Object>> {
 
     private final RouteData routeData;
 
     /**
      * @param routeData       The RouteData
      */
-    public ReactiveJavaRouteDataCollector(RouteData routeData) {
+    public DefaultRouteDataCollector(RouteData routeData) {
         this.routeData = routeData;
     }
 
