@@ -42,9 +42,9 @@ class MessageController {
     // end::echo[]
 
     // tag::echoReactive[]
-    @Post(value = "/echo-flow", consumes = MediaType.TEXT_PLAIN) // <1>
+    @Post(value = "/echo-publisher", consumes = MediaType.TEXT_PLAIN) // <1>
     @SingleResult
-    Publisher<MutableHttpResponse<String>> echoFlow(@Body Publisher<String> text) { // <2>
+    Publisher<HttpResponse<String>> echoFlow(@Body Publisher<String> text) { // <2>
         return Flux.from(text)
                 .collect({ x -> new StringBuffer() }, { StringBuffer sb, String s -> sb.append(s) }) // <3>
                 .map({ buffer -> HttpResponse.ok(buffer.toString()) });

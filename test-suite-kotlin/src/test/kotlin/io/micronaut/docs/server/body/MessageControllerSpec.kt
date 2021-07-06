@@ -31,7 +31,7 @@ class MessageControllerSpec: StringSpec() {
         "test echo reactive response"() {
             val body = "My Text"
             val response = client.toBlocking().retrieve(
-                    HttpRequest.POST("/receive/echo-flow", body)
+                    HttpRequest.POST("/receive/echo-publisher", body)
                             .contentType(MediaType.TEXT_PLAIN_TYPE), String::class.java)
 
             response shouldBe body
