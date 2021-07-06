@@ -59,7 +59,7 @@ public class DefaultBeanDefinitionDataCollector implements BeanDefinitionDataCol
 
     /**
      * @param definitions The bean definitions
-     * @return A {@link Mono} that wraps a Map
+     * @return A {@link Publisher} that wraps a Map
      */
     protected Publisher<Map<String, Object>> getBeans(Collection<BeanDefinition<?>> definitions) {
         return Flux.fromIterable(definitions)
