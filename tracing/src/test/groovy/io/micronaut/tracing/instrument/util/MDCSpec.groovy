@@ -17,9 +17,12 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import reactor.core.publisher.Flux
+import reactor.core.publisher.SignalType
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+
+import java.util.function.Consumer
 
 class MDCSpec extends Specification {
 
@@ -82,10 +85,13 @@ class MDCSpec extends Specification {
 
             return Flux
                     .from(chain.proceed(request))
-                    .doFinally{->
-                        LOG.info('Removing traceId id from MDC')
-                        MDC.clear()
-                    }
+                    .doFinally(new Consumer<SignalType>() {
+                        @Override
+                        void accept(SignalType signalType) {
+                            LOG.info('Removing traceId id from MDC')
+                            MDC.clear()
+                        }
+                    })
         }
 
         @Override
