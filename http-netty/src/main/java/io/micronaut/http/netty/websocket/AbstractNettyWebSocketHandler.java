@@ -171,7 +171,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         BoundExecutable finalBoundExecutable = boundExecutable;
                         Object result = invokeExecutable(finalBoundExecutable, openMethod);
                         if (Publishers.isConvertibleToPublisher(result)) {
-                            Flux<?> flowable = instrumentPublisher(ctx, result);
+                            Flux<?> flowable = Flux.from(instrumentPublisher(ctx, result));
                             flowable.subscribe(
                                     o -> {
                                     },
@@ -244,7 +244,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     return;
                 }
                 if (Publishers.isConvertibleToPublisher(result)) {
-                    Flux<?> flowable = instrumentPublisher(ctx, result);
+                    Flux<?> flowable = Flux.from(instrumentPublisher(ctx, result));
                     flowable.collectList().subscribe(objects -> handleUnexpected(ctx, cause), throwable -> {
                         if (throwable != null && LOG.isErrorEnabled()) {
                             LOG.error("Error subscribing to @OnError handler " + target.getClass().getSimpleName() + "." + errorMethod.getExecutableMethod() + ": " + throwable.getMessage(), throwable);
@@ -282,7 +282,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param result The result
      * @return The flowable
      */
-    protected Flux<?> instrumentPublisher(ChannelHandlerContext ctx, Object result) {
+    protected Publisher<?> instrumentPublisher(ChannelHandlerContext ctx, Object result) {
         Publisher<?> actual = Publishers.convertPublisher(result, Publisher.class);
         return Flux.from(actual).subscribeOn(Schedulers.fromExecutorService(ctx.channel().eventLoop()));
     }
@@ -386,7 +386,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
                         Object result = invokeExecutable(boundExecutable, messageHandler);
                         if (Publishers.isConvertibleToPublisher(result)) {
-                            Flux<?> flowable = instrumentPublisher(ctx, result);
+                            Flux<?> flowable = Flux.from(instrumentPublisher(ctx, result));
                             flowable.subscribe(
                                     o -> {
                                     },
@@ -510,7 +510,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         }
 
         if (Publishers.isConvertibleToPublisher(result)) {
-            Flux<?> reactiveSequence = instrumentPublisher(ctx, result);
+            Flux<?> reactiveSequence = Flux.from(instrumentPublisher(ctx, result));
             reactiveSequence.collectList().subscribe((Consumer<List<?>>) objects -> {
 
             }, throwable -> {
