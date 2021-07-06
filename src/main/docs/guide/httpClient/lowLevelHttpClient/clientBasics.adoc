@@ -5,14 +5,14 @@ There are a few ways to obtain a reference to an api:http.client.HttpClient[]. T
 .Injecting an HTTP client
 [source,java]
 ----
-@Client("https://api.twitter.com/1.1") @Inject ReactorHttpClient httpClient;
+@Client("https://api.twitter.com/1.1") @Inject HttpClient httpClient;
 ----
 
 The above example injects a client that targets the Twitter API.
 
 [source,kotlin]
 ----
-@field:Client("\${myapp.api.twitter.url}") @Inject lateinit var httpClient: ReactorHttpClient
+@field:Client("\${myapp.api.twitter.url}") @Inject lateinit var httpClient: HttpClient
 ----
 
 The above Kotlin example injects a client that targets the Twitter API using a configuration path. Note the required escaping (backslash) on `"\${path.to.config}"` which is necessary due to Kotlin string interpolation.
@@ -25,7 +25,7 @@ The value you pass to the api:http.client.annotation.Client[] annotation can be 
 * A relative URI, in which case the targeted server will be the current server (useful for testing)
 * A service identifier. See the section on <<serviceDiscovery, Service Discovery>> for more information on this topic.
 
-Another way to create an `HttpClient` is with the static `create` method of api:http.client.ReactorHttpClient[], however this approach is not recommended as you must ensure you manually shutdown the client, and of course no dependency injection will occur for the created client.
+Another way to create an `HttpClient` is with the static `create` method of api:http.client.HttpClient[], however this approach is not recommended as you must ensure you manually shutdown the client, and of course no dependency injection will occur for the created client.
 
 ==== Performing an HTTP GET
 
