@@ -87,7 +87,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     protected final WebSocketBean<?> webSocketBean;
     protected final HttpRequest<?> originatingRequest;
     protected final MethodExecutionHandle<?, ?> messageHandler;
-    protected final NettyReactorWebSocketSession session;
+    protected final NettyWebSocketSession session;
     protected final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected final WebSocketVersion webSocketVersion;
     protected final WebSocketSessionRepository webSocketSessionRepository;
@@ -212,7 +212,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     /**
      * @return The session
      */
-    public NettyReactorWebSocketSession getSession() {
+    public NettyWebSocketSession getSession() {
         return session;
     }
 
@@ -268,12 +268,12 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     }
 
     /**
-     * Subclasses should implement to create the actual {@link NettyReactorWebSocketSession}.
+     * Subclasses should implement to create the actual {@link NettyWebSocketSession}.
      *
      * @param ctx The context
      * @return The session
      */
-    protected abstract NettyReactorWebSocketSession createWebSocketSession(ChannelHandlerContext ctx);
+    protected abstract NettyWebSocketSession createWebSocketSession(ChannelHandlerContext ctx);
 
     /**
      * Subclasses can override to customize publishers returned from message handlers.
@@ -372,7 +372,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 if (converted.isPresent()) {
                     Object v = converted.get();
 
-                    NettyReactorWebSocketSession currentSession = getSession();
+                    NettyWebSocketSession currentSession = getSession();
                     ExecutableBinder<WebSocketState> executableBinder = new DefaultExecutableBinder<>(
                             Collections.singletonMap(bodyArgument, v)
                     );
@@ -441,7 +441,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param session The session
      * @param message The message that was handled
      */
-    protected void messageHandled(ChannelHandlerContext ctx, NettyReactorWebSocketSession session, Object message) {
+    protected void messageHandled(ChannelHandlerContext ctx, NettyWebSocketSession session, Object message) {
         // no-op
     }
 

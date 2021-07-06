@@ -28,7 +28,7 @@ import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.websocket.AbstractNettyWebSocketHandler;
-import io.micronaut.http.netty.websocket.NettyReactorWebSocketSession;
+import io.micronaut.http.netty.websocket.NettyWebSocketSession;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.MethodExecutionHandle;
@@ -74,7 +74,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     private final UriMatchInfo matchInfo;
     private final MediaTypeCodecRegistry codecRegistry;
     private ChannelPromise handshakeFuture;
-    private NettyReactorWebSocketSession clientSession;
+    private NettyWebSocketSession clientSession;
     private WebSocketStateBinderRegistry webSocketStateBinderRegistry;
     private FullHttpResponse handshakeResponse;
     private Argument<?> clientBodyArgument;
@@ -126,7 +126,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     }
 
     @Override
-    public NettyReactorWebSocketSession getSession() {
+    public NettyWebSocketSession getSession() {
         return clientSession;
     }
 
@@ -236,9 +236,9 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     }
 
     @Override
-    protected NettyReactorWebSocketSession createWebSocketSession(ChannelHandlerContext ctx) {
+    protected NettyWebSocketSession createWebSocketSession(ChannelHandlerContext ctx) {
         if (ctx != null) {
-            return new NettyReactorWebSocketSession(
+            return new NettyWebSocketSession(
                     handshakeResponse.headers().get(HttpHeaderNames.SEC_WEBSOCKET_ACCEPT),
                     ctx.channel(),
                     originatingRequest,

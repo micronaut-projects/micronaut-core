@@ -26,7 +26,7 @@ import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.netty.websocket.AbstractNettyWebSocketHandler;
-import io.micronaut.http.netty.websocket.NettyReactorWebSocketSession;
+import io.micronaut.http.netty.websocket.NettyWebSocketSession;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.UriRouteMatch;
@@ -136,11 +136,11 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     }
 
     @Override
-    protected NettyReactorWebSocketSession createWebSocketSession(ChannelHandlerContext ctx) {
+    protected NettyWebSocketSession createWebSocketSession(ChannelHandlerContext ctx) {
         String id = originatingRequest.getHeaders().get(HttpHeaderNames.SEC_WEBSOCKET_KEY);
         final Channel channel = ctx.channel();
 
-        NettyReactorWebSocketSession session = new NettyReactorWebSocketSession(
+        NettyWebSocketSession session = new NettyWebSocketSession(
                 id,
                 channel,
                 originatingRequest,
@@ -159,7 +159,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             @Override
             public Set<? extends WebSocketSession> getOpenSessions() {
                 return webSocketSessionRepository.getChannelGroup().stream().flatMap((Function<Channel, Stream<WebSocketSession>>) ch -> {
-                    NettyReactorWebSocketSession s = ch.attr(NettyReactorWebSocketSession.WEB_SOCKET_SESSION_KEY).get();
+                    NettyWebSocketSession s = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).get();
                     if (s != null && s.isOpen()) {
                         return Stream.of(s);
                     }
@@ -224,7 +224,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     }
 
     @Override
-    protected void messageHandled(ChannelHandlerContext ctx, NettyReactorWebSocketSession session, Object message) {
+    protected void messageHandled(ChannelHandlerContext ctx, NettyWebSocketSession session, Object message) {
         ctx.executor().execute(() -> {
             try {
                 eventPublisher.publishEvent(new WebSocketMessageProcessedEvent<>(session, message));
@@ -239,7 +239,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
         Channel channel = ctx.channel();
-        channel.attr(NettyReactorWebSocketSession.WEB_SOCKET_SESSION_KEY).set(null);
+        channel.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).set(null);
         if (LOG.isDebugEnabled()) {
             LOG.debug("Removing WebSocket Server session: " + session);
         }

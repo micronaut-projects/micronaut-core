@@ -57,8 +57,8 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
         WebSocketFrame frame = webSocketMessageEncoder.encodeMessage(message, mediaType);
         try {
             webSocketSessionRepository.getChannelGroup().writeAndFlush(frame, ch -> {
-                Attribute<NettyReactorWebSocketSession> attr = ch.attr(NettyReactorWebSocketSession.WEB_SOCKET_SESSION_KEY);
-                NettyReactorWebSocketSession s = attr.get();
+                Attribute<NettyWebSocketSession> attr = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY);
+                NettyWebSocketSession s = attr.get();
                 return s != null && s.isOpen() && filter.test(s);
             }).sync();
         } catch (InterruptedException e) {
@@ -72,8 +72,8 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
             try {
                 WebSocketFrame frame = webSocketMessageEncoder.encodeMessage(message, mediaType);
                 webSocketSessionRepository.getChannelGroup().writeAndFlush(frame, ch -> {
-                    Attribute<NettyReactorWebSocketSession> attr = ch.attr(NettyReactorWebSocketSession.WEB_SOCKET_SESSION_KEY);
-                    NettyReactorWebSocketSession s = attr.get();
+                    Attribute<NettyWebSocketSession> attr = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY);
+                    NettyWebSocketSession s = attr.get();
                     return s != null && s.isOpen() && filter.test(s);
                 }).addListener(future -> {
                     if (future.isSuccess()) {

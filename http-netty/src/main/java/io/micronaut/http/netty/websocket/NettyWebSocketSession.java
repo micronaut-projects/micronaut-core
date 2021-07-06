@@ -50,11 +50,11 @@ import java.util.concurrent.ExecutionException;
  * @since 1.0
  */
 @Internal
-public class NettyReactorWebSocketSession implements WebSocketSession {
+public class NettyWebSocketSession implements WebSocketSession {
     /**
      * The WebSocket session is stored within a Channel attribute using the given key.
      */
-    public static final AttributeKey<NettyReactorWebSocketSession> WEB_SOCKET_SESSION_KEY = AttributeKey.newInstance("micronaut.websocket.session");
+    public static final AttributeKey<NettyWebSocketSession> WEB_SOCKET_SESSION_KEY = AttributeKey.newInstance("micronaut.websocket.session");
 
     private final String id;
     private final Channel channel;
@@ -74,7 +74,7 @@ public class NettyReactorWebSocketSession implements WebSocketSession {
      * @param protocolVersion The protocol version
      * @param isSecure Whether the session is secure
      */
-    protected NettyReactorWebSocketSession(
+    protected NettyWebSocketSession(
             String id,
             Channel channel,
             HttpRequest<?> request,
