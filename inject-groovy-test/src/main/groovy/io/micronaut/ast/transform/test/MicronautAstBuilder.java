@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Forked from {@link org.codehaus.groovy.ast.builder.AstStringCompiler}
+ * Forked from {@link org.codehaus.groovy.ast.builder.AstStringCompiler}.
  */
 class MicronautAstBuilder {
 
