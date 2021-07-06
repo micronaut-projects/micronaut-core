@@ -193,8 +193,9 @@ configurations:
   title: Configurations
   reactiveConfigs:
     title: Configurations for Reactive Programming
-    rxjava3: RxJava 3 Support
     reactor: Reactor Support
+    rxjava3: RxJava 3 Support
+    rxjava2: RxJava 2 Support
     rxjava1: RxJava 1 Support
   dataAccess:
     title: Configurations for Data Access

@@ -20,9 +20,7 @@ import io.micronaut.http.HttpRequest;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import jakarta.inject.Singleton;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 // end::imports[]

@@ -2,12 +2,12 @@ The ann:http.client.Client[] annotation can also handle streaming HTTP responses
 
 === Streaming JSON with @Client
 
-For example, to write a client that streams data from the controller defined in the <<clientStreaming, JSON Streaming>> section of the documentation, you can define a client that returns an unbound rs:Publisher[] such as a RxJava reactor:Flux[] or Reactor `Flux`:
+For example, to write a client that streams data from the controller defined in the <<clientStreaming, JSON Streaming>> section of the documentation, you can define a client that returns an unbound rs:Publisher[] such as Reactor's reactor:Flux[] or a RxJava's rx:Flowable[]:
 
 snippet::io.micronaut.docs.streaming.HeadlineClient[tags="imports, class, endclass", indent=0, title="HeadlineClient.java"]
 
 <1> The `@Get` method processes responses of type `APPLICATION_JSON_STREAM`
-<2> The return type is reactor:Flux[]
+<2> The return type is `Publisher`
 
 The following example shows how the previously defined `HeadlineClient` can be invoked from a test:
 
@@ -41,7 +41,7 @@ The reason for this is simple; a sequence of JSON object is not, in fact, valid 
 
 Micronaut's client does however support streaming of both individual JSON objects via `application/x-json-stream` and also JSON arrays defined with `application/json`.
 
-If the server returns `application/json` and a non-single rs:Publisher[] is returned (such as a reactor:Flux[] or a Reactor `Flux`), the client streams the array elements as they become available.
+If the server returns `application/json` and a non-single rs:Publisher[] is returned (such as a Reactor's reactor:Flux[] or a RxJava's rx:Flowable[]), the client streams the array elements as they become available.
 
 === Streaming Clients and Read Timeout
 

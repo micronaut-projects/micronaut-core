@@ -8,7 +8,7 @@ Imagine for an example a event stream of news headlines; you may define a data c
 
 snippet::io.micronaut.docs.server.sse.Headline[tags="class", indent=0,title="Headline"]
 
-To emit news headline events, write a controller that returns a rs:Publisher[] of api:http.sse.Event[] instances using whichever Reactive library you prefer. The example below uses RxJava 2's reactor:Flux[] via the `generate` method:
+To emit news headline events, write a controller that returns a rs:Publisher[] of api:http.sse.Event[] instances using whichever Reactive library you prefer. The example below uses https://projectreactor.io[Project Reactor]'s reactor:Flux[] via the `generate` method:
 
 snippet::io.micronaut.docs.server.sse.HeadlineController[tags="imports,class", indent=0,title="Publishing Server Sent Events from a Controller"]
 

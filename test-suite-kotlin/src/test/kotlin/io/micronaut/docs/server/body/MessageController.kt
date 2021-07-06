@@ -18,18 +18,20 @@ package io.micronaut.docs.server.body
 // tag::imports[]
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
-import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
-import org.reactivestreams.Publisher
-import reactor.core.publisher.Flux
-import io.micronaut.core.async.annotation.SingleResult
 import javax.validation.constraints.Size
 // end::imports[]
-
+// end::importsreactive[]
+import org.reactivestreams.Publisher
+import io.micronaut.core.async.annotation.SingleResult
+import reactor.core.publisher.Flux
+// end::importsreactive[]
+// tag::class[]
 @Controller("/receive")
 open class MessageController {
+// end::class[]
 
     // tag::echo[]
     @Post(value = "/echo", consumes = [MediaType.TEXT_PLAIN]) // <1>
@@ -48,4 +50,6 @@ open class MessageController {
     }
     // end::echoReactive[]
 
+// tag::endclass[]
 }
+// end::endclass[]

@@ -46,7 +46,7 @@ snippet::io.micronaut.docs.basics.HelloController[tags="imports, nonblocking", i
 <1> The `hello` method returns a reactor:Mono[] which may or may not emit an item. If an item is not emitted, a 404 is returned.
 <2> The `retrieve` method is called which returns a reactor:Flux[]. This has a `firstElement` method that returns the first emitted item or nothing
 
-TIP: Using RxJava (or Reactor if you prefer) you can easily and efficiently compose multiple HTTP client calls without blocking (which limits the throughput and scalability of your application).
+TIP: Using Reactor (or RxJava if you prefer) you can easily and efficiently compose multiple HTTP client calls without blocking (which limits the throughput and scalability of your application).
 
 ==== Debugging / Tracing the HTTP Client
 

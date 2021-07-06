@@ -18,17 +18,16 @@ package io.micronaut.docs.server.body;
 // tag::imports[]
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
-import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-import io.micronaut.core.async.annotation.SingleResult;
-
 import javax.validation.constraints.Size;
 // end::imports[]
+// end::importsreactive[]
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
+import io.micronaut.core.async.annotation.SingleResult;
+// end::importsreactive[]
 
 // tag::class[]
 @Controller("/receive")
@@ -52,6 +51,6 @@ public class MessageController {
     }
     // end::echoReactive[]
 
-// tag::class[]
+// tag::endclass[]
 }
-// end::class[]
+// end::endclass[]
