@@ -24,9 +24,9 @@ import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Status
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
-import reactor.core.publisher.Flux
+import org.reactivestreams.Publisher
+import io.micronaut.core.async.annotation.SingleResult
 import reactor.core.publisher.Mono
-
 import static io.micronaut.http.HttpRequest.GET
 import static io.micronaut.http.HttpStatus.CREATED
 import static io.micronaut.http.MediaType.TEXT_PLAIN
@@ -44,7 +44,8 @@ class HelloController {
 
     // tag::nonblocking[]
     @Get("/hello/{name}")
-    Mono<String> hello(String name) { // <1>
+    @SingleResult
+    Publisher<String> hello(String name) { // <1>
         Mono.from(httpClient.retrieve( GET("/hello/" + name))) // <2>
     }
     // end::nonblocking[]

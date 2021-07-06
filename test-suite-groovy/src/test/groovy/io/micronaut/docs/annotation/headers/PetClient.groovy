@@ -32,7 +32,8 @@ import javax.validation.constraints.NotBlank
 interface PetClient extends PetOperations {
 
     @Override
-    Mono<Pet> save(@NotBlank String name, @Min(1L) int age)
+    @SingleResult
+    Publisher<Pet> save(@NotBlank String name, @Min(1L) int age)
 
     @Get("/{name}")
     @SingleResult
