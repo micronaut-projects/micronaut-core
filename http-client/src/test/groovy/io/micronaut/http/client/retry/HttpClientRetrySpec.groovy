@@ -94,7 +94,7 @@ class HttpClientRetrySpec extends Specification {
     void "test retry JSON post"() {
         given:
         RetryableClient client = context.getBean(RetryableClient)
-        def result = Mono.from(client.post(new FooDTO(foo: "Good"))).block()
+        String result = Mono.from(client.post(new FooDTO(foo: "Good"))).block()
 
         expect:
         result == 'Good'
