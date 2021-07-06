@@ -54,7 +54,7 @@ public class DefaultBeanDefinitionDataCollector implements BeanDefinitionDataCol
             Map<String, Object> beanData = new LinkedHashMap<>(1);
             beanData.put("beans", beans);
             return beanData;
-        }).flux();
+        });
     }
 
     /**
