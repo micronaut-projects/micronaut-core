@@ -31,6 +31,8 @@ class AnyProviderSpec extends Specification {
 
         then:
         beanContext.getBean(Object, Qualifiers.byName("poodle")) instanceof Poodle
+        beanContext.containsBean(Object, Qualifiers.byName("poodle"))
+        !beanContext.containsBean(Object, Qualifiers.byName("doesnt-exist"))
         owner.dog instanceof Dog
         dogBeanProvider.get(Qualifiers.byName("poodle")) instanceof Dog
         dogBeanProvider.stream().collect(Collectors.toList()).size() == 2
