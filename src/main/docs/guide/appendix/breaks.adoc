@@ -192,6 +192,11 @@ This can affect many areas of the framework where names like `XForwarded` are us
 Previously the default order value for the `@Order` annotation was the lowest precedence.
 It is now 0.
 
+==== Classes Renaming
+
+* `RxJavaRouteDataCollector` has been renamed to `DefaultRouteDataCollector`.
+* `RxJavaBeanDefinitionDataCollector.html` has been renamed to `DefaultBeanDefinitionDataCollector`.
+
 ==== Deprecation Removal
 
 Classes, constructors, etc that have been deprecated in previous versions of Micronaut have been removed.
