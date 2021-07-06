@@ -11,8 +11,9 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.multipart.CompletedFileUpload
 import io.micronaut.runtime.server.EmbeddedServer
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
-import reactor.core.publisher.Mono
+import io.micronaut.core.async.annotation.SingleResult
 import spock.lang.Ignore
 import spock.lang.Specification
 
@@ -229,7 +230,8 @@ class MaxRequestSizeSpec extends Specification {
         }
 
         @Post(uri = "/multipart-body", consumes = MediaType.MULTIPART_FORM_DATA)
-        Mono<String> multipart(@Body io.micronaut.http.server.multipart.MultipartBody body) {
+        @SingleResult
+        Publisher<String> multipart(@Body io.micronaut.http.server.multipart.MultipartBody body) {
             return Flux.from(body).collectList().map({ list -> "OK" })
         }
     }
