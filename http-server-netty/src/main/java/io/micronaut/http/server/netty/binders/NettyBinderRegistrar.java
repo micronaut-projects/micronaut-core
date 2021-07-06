@@ -17,7 +17,6 @@ package io.micronaut.http.server.netty.binders;
 
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanProvider;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.annotation.Internal;
