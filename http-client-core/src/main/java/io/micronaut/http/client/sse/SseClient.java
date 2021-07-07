@@ -15,11 +15,15 @@
  */
 package io.micronaut.http.client.sse;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.sse.Event;
 import org.reactivestreams.Publisher;
+
+import java.net.URL;
 
 /**
  * A client for streaming Server Sent Event streams.
@@ -94,5 +98,31 @@ public interface SseClient {
      */
     default <B> Publisher<Event<B>> eventStream(String uri, Argument<B> eventType) {
         return eventStream(HttpRequest.GET(uri), eventType);
+    }
+
+
+
+    /**
+     * Create a new {@link SseClient}. Note that this method should only be used outside of the context of a
+     * Micronaut application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead.
+     *
+     * @param url The base URL
+     * @return The client
+     */
+    static SseClient create(@Nullable URL url) {
+        return HttpClientConfiguration.createSseClient(url);
+    }
+
+    /**
+     * Create a new {@link SseClient} with the specified configuration. Note that this method should only be used
+     * outside of the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @param configuration the client configuration
+     * @return The client
+     * @since 2.2.0
+     */
+    static SseClient create(@Nullable URL url, HttpClientConfiguration configuration) {
+        return HttpClientConfiguration.createSseClient(url, configuration);
     }
 }

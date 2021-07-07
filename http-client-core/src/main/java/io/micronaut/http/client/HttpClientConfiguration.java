@@ -27,6 +27,7 @@ import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.runtime.ApplicationConfiguration;
+import io.micronaut.websocket.WebSocketClient;
 
 import java.net.Proxy;
 import java.net.ProxySelector;
@@ -667,7 +668,7 @@ public abstract class HttpClientConfiguration {
      * @return The client
      */
     @Internal
-    static SseClient createSseClient(@Nullable URL url) {
+    public static SseClient createSseClient(@Nullable URL url) {
         ReactiveHttpClientFactory clientFactory = getReactiveHttpClientFactory();
         return clientFactory.createSseClient(url);
     }
@@ -681,11 +682,37 @@ public abstract class HttpClientConfiguration {
      * @return The client
      */
     @Internal
-    static SseClient createSseClient(@Nullable URL url, HttpClientConfiguration configuration) {
+    public static SseClient createSseClient(@Nullable URL url, HttpClientConfiguration configuration) {
         ReactiveHttpClientFactory clientFactory = getReactiveHttpClientFactory();
-        return clientFactory.createSseClient(url);
+        return clientFactory.createSseClient(url, configuration);
     }
 
+    /**
+     * Create a new {@link WebSocketClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
+     * {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @return The client
+     */
+    @Internal
+    static WebSocketClient createWebSocketClient(@Nullable URL url) {
+        ReactiveHttpClientFactory clientFactory = getReactiveHttpClientFactory();
+        return clientFactory.createWebSocketClient(url);
+    }
+
+    /**
+     * Create a new {@link WebSocketClient} with the specified configuration. Note that this method should only be used outside of the context of an application. Within Micronaut use
+     * {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @param configuration the client configuration
+     * @return The client
+     */
+    @Internal
+    static WebSocketClient createWebSocketClient(@Nullable URL url, HttpClientConfiguration configuration) {
+        ReactiveHttpClientFactory clientFactory = getReactiveHttpClientFactory();
+        return clientFactory.createWebSocketClient(url, configuration);
+    }
 
     /**
      * Create a new {@link HttpClient} with the specified configuration. Note that this method should only be used
@@ -699,7 +726,6 @@ public abstract class HttpClientConfiguration {
     @Internal
     static HttpClient createClient(@Nullable URL url, HttpClientConfiguration configuration) {
         ReactiveHttpClientFactory clientFactory = getReactiveHttpClientFactory();
-
         return clientFactory.createClient(url, configuration);
     }
 

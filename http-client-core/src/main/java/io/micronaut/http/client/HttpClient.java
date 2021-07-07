@@ -26,6 +26,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.hateoas.JsonError;
+import io.micronaut.websocket.WebSocketClient;
 import org.reactivestreams.Publisher;
 
 import java.io.Closeable;
@@ -254,18 +255,18 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
     }
 
     /**
-     * Create a new {@link SseClient}. Note that this method should only be used outside of the context of a
+     * Create a new {@link WebSocketClient}. Note that this method should only be used outside of the context of a
      * Micronaut application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead.
      *
      * @param url The base URL
      * @return The client
      */
-    static SseClient createSseClient(@Nullable URL url) {
-        return HttpClientConfiguration.createSseClient(url);
+    static WebSocketClient createWebSocketClient(@Nullable URL url) {
+        return HttpClientConfiguration.createWebSocketClient(url);
     }
 
     /**
-     * Create a new {@link SseClient} with the specified configuration. Note that this method should only be used
+     * Create a new {@link WebSocketClient} with the specified configuration. Note that this method should only be used
      * outside of the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead
      *
      * @param url The base URL
@@ -273,31 +274,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @return The client
      * @since 2.2.0
      */
-    static SseClient createSseClient(@Nullable URL url, HttpClientConfiguration configuration) {
-        return HttpClientConfiguration.createSseClient(url, configuration);
-    }
-
-    /**
-     * Create a new {@link StreamingHttpClient}. Note that this method should only be used outside of the context of a
-     * Micronaut application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead.
-     *
-     * @param url The base URL
-     * @return The client
-     */
-    static StreamingHttpClient createStreamingClient(@Nullable URL url) {
-        return HttpClientConfiguration.createStreamingClient(url);
-    }
-
-    /**
-     * Create a new {@link StreamingHttpClient} with the specified configuration. Note that this method should only be used
-     * outside of the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead
-     *
-     * @param url The base URL
-     * @param configuration the client configuration
-     * @return The client
-     * @since 2.2.0
-     */
-    static StreamingHttpClient createStreamingClient(@Nullable URL url, HttpClientConfiguration configuration) {
-        return HttpClientConfiguration.createStreamingClient(url, configuration);
+    static WebSocketClient createWebSocketClient(@Nullable URL url, HttpClientConfiguration configuration) {
+        return HttpClientConfiguration.createWebSocketClient(url, configuration);
     }
 }
