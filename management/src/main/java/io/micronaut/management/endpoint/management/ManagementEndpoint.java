@@ -7,6 +7,12 @@ import io.micronaut.web.router.UriRoute;
 
 import java.util.stream.Stream;
 
+/**
+ * <p>Exposes an {@link Endpoint} to list the available management endpoints of the application</p>
+ *
+ * @author Herán Cervera
+ * @since 2.5
+ */
 @Endpoint(ManagementEndpoint.ENDPOINT_ID)
 public class ManagementEndpoint {
 
