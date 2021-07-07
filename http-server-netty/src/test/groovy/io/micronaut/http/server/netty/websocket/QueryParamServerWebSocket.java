@@ -1,5 +1,7 @@
 package io.micronaut.http.server.netty.websocket;
 
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.websocket.WebSocketBroadcaster;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.annotation.OnClose;
@@ -19,7 +21,7 @@ public class QueryParamServerWebSocket {
     }
 
     @OnOpen
-    public void onOpen(String dinner, WebSocketSession session) {
+    public void onOpen(@QueryValue String dinner, WebSocketSession session) {
         this.dinner = dinner;
         this.session = session;
     }
@@ -28,7 +30,6 @@ public class QueryParamServerWebSocket {
     public void onMessage(
             String dinner,
             WebSocketSession session) {
-
     }
 
     @OnClose

@@ -84,7 +84,7 @@ class Foo {
 
         then:
             def ex = thrown(RuntimeException)
-            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with a Nullable annotation.")
 
         when:
             buildTypeElement("""
@@ -129,7 +129,7 @@ class Foo {
 
         then:
             def ex = thrown(RuntimeException)
-            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with a Nullable annotation.")
     }
 
     void "test ampersand optional parameter"() {
@@ -153,7 +153,7 @@ class Foo {
 
         then:
             def ex = thrown(RuntimeException)
-            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with a Nullable annotation.")
     }
 
     void "test required argument doesn't fail compilation"() {
@@ -224,7 +224,7 @@ class Foo {
 
         then: "abc is optional because /{?def} may be matched and it does not have {abc}"
             def ex = thrown(RuntimeException)
-            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with a Nullable annotation.")
 
         when:
             buildTypeElement("""
@@ -245,7 +245,7 @@ class Foo {
 """)
         then: "abc is optional because it is optional in at least one template"
             ex = thrown(RuntimeException)
-            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with a Nullable annotation.")
 
         when:
             buildTypeElement("""
@@ -307,7 +307,7 @@ class Foo {
 """)
         then: "abc is optional because it is optional in at least one template"
             ex = thrown(RuntimeException)
-            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with a Nullable annotation.")
 
         when:
             buildTypeElement("""
@@ -329,7 +329,7 @@ class Foo {
 """)
         then:
             ex = thrown(RuntimeException)
-            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with a Nullable annotation.")
     }
 
     void "test nullable parameter with RequestBean"() {
@@ -340,7 +340,7 @@ package test;
 
 import io.micronaut.http.annotation.*;
 import io.micronaut.core.annotation.*;
-import javax.annotation.Nullable;
+import io.micronaut.core.annotation.Nullable;
 
 @Controller("/foo")
 class Foo {
@@ -375,7 +375,7 @@ package test;
 
 import io.micronaut.http.annotation.*;
 import io.micronaut.core.annotation.*;
-import javax.annotation.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.util.Optional;
 
 @Controller("/foo")
@@ -435,7 +435,7 @@ class Foo {
 """)
         then:
             def ex = thrown(RuntimeException)
-            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with a Nullable annotation.")
 
         when:
             buildTypeElement("""
@@ -541,7 +541,7 @@ class Foo {
 
         then:
             def ex = thrown(RuntimeException)
-            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with a Nullable annotation.")
     }
 
     void "test ampersand optional RequestBean parameter"() {
@@ -579,7 +579,7 @@ class Foo {
 
         then:
             def ex = thrown(RuntimeException)
-            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with a Nullable annotation.")
     }
 
     void "test nullable with multiple uris with RequestBean"() {
@@ -590,7 +590,7 @@ package test;
 
 import io.micronaut.http.annotation.*;
 import io.micronaut.core.annotation.*;
-import javax.annotation.Nullable;
+import io.micronaut.core.annotation.Nullable;
 
 @Controller("/foo")
 class Foo {
@@ -624,7 +624,7 @@ class Foo {
 
         then: "abc is optional because /{?def} may be matched and it does not have {abc}"
         def ex = thrown(RuntimeException)
-        ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+        ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with a Nullable annotation.")
 
         when:
             buildTypeElement("""
@@ -658,7 +658,7 @@ class Foo {
 """)
         then: "abc is optional because it is optional in at least one template"
             ex = thrown(RuntimeException)
-            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+            ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with a Nullable annotation.")
 
         when:
             buildTypeElement("""
@@ -667,7 +667,7 @@ package test;
 
 import io.micronaut.http.annotation.*;
 import io.micronaut.core.annotation.*;
-import javax.annotation.Nullable;
+import io.micronaut.core.annotation.Nullable;
 
 @Controller("/foo")
 class Foo {

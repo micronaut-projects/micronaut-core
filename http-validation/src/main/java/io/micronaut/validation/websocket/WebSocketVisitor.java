@@ -19,12 +19,12 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.validation.InternalUriMatchTemplate;
 import io.micronaut.websocket.annotation.WebSocketComponent;
 import io.micronaut.websocket.annotation.WebSocketMapping;
 
@@ -55,7 +55,7 @@ public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, 
     private static final String ON_MESSAGE = "io.micronaut.websocket.annotation.OnMessage";
     private static final String ON_ERROR = "io.micronaut.websocket.annotation.OnError";
 
-    private Map<String, InternalUriMatchTemplate> uriCache = new HashMap<>(3);
+    private Map<String, UriMatchTemplate> uriCache = new HashMap<>(3);
     private boolean skipValidation = false;
 
     @NonNull
@@ -77,7 +77,7 @@ public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, 
             return;
         }
         String uri = element.stringValue(WEB_SOCKET_COMPONENT).orElse("/ws");
-        InternalUriMatchTemplate template = uriCache.computeIfAbsent(uri, InternalUriMatchTemplate::of);
+        UriMatchTemplate template = uriCache.computeIfAbsent(uri, UriMatchTemplate::of);
         List<String> variables = template.getVariableNames();
         ParameterElement[] parameters = element.getParameters();
         if (ArrayUtils.isNotEmpty(parameters)) {
