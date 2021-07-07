@@ -224,7 +224,39 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable, ReactiveHttpClien
             @Parameter @Nullable LoadBalancer loadBalancer,
             @Parameter @Nullable HttpClientConfiguration configuration,
             BeanContext beanContext) {
-        return resolveClient(injectionPoint, loadBalancer, configuration, beanContext);
+        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
+    }
+
+    @Override
+    public HttpClient resolveClient(@Nullable InjectionPoint injectionPoint,
+                                    @Nullable LoadBalancer loadBalancer,
+                                    @Nullable HttpClientConfiguration configuration,
+                                    BeanContext beanContext) {
+        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
+    }
+
+    @Override
+    public SseClient resolveSseClient(@Nullable InjectionPoint injectionPoint,
+                       @Nullable LoadBalancer loadBalancer,
+                       @Nullable HttpClientConfiguration configuration,
+                       BeanContext beanContext) {
+        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
+    }
+
+    @Override
+    public StreamingHttpClient resolveStreamingClient(@Nullable InjectionPoint injectionPoint,
+                             @Nullable LoadBalancer loadBalancer,
+                             @Nullable HttpClientConfiguration configuration,
+                             BeanContext beanContext) {
+        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
+    }
+
+    @Override
+    public WebSocketClient resolveWebSocketClient(@Nullable InjectionPoint injectionPoint,
+                             @Nullable LoadBalancer loadBalancer,
+                             @Nullable HttpClientConfiguration configuration,
+                             BeanContext beanContext) {
+        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
 
     private DefaultHttpClient getClient(ClientKey key, BeanContext beanContext, AnnotationMetadata annotationMetadata) {
@@ -389,7 +421,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable, ReactiveHttpClien
         return eventLoopGroup;
     }
 
-    private DefaultHttpClient resolveClient(
+    private DefaultHttpClient resolveDefaultHttpClient(
             @Nullable InjectionPoint injectionPoint,
             @Nullable LoadBalancer loadBalancer,
             @Nullable HttpClientConfiguration configuration,
