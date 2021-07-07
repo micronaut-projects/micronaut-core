@@ -85,7 +85,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     private final Class<?> declaringType;
     private final ConstructorInjectionPoint<T> constructor;
     private final Collection<Class<?>> requiredComponents = new HashSet<>(3);
-    private final Collection<Argument<?>> requiredComponentArguments = new HashSet<>(3);
     private AnnotationMetadata beanAnnotationMetadata;
     private Environment environment;
     private Set<Class<?>> exposedTypes;
@@ -521,28 +520,30 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Argument[] typeArguments,
             boolean requiresReflection) {
-        if (annotationMetadata != null && annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.INJECT)) {
-            requiredComponents.add(fieldType);
-        }
+        FieldInjectionPoint injectionPoint;
         if (requiresReflection) {
-            fieldInjectionPoints.add(new ReflectionFieldInjectionPoint(
+            injectionPoint = new ReflectionFieldInjectionPoint(
                     this,
                     declaringType,
                     fieldType,
                     field,
                     annotationMetadata,
                     typeArguments
-            ));
+            );
         } else {
-            fieldInjectionPoints.add(new DefaultFieldInjectionPoint(
+            injectionPoint = new DefaultFieldInjectionPoint(
                     this,
                     declaringType,
                     fieldType,
                     field,
                     annotationMetadata,
                     typeArguments
-            ));
+            );
         }
+        if (annotationMetadata != null && annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.INJECT)) {
+            addRequiredComponents(injectionPoint.asArgument());
+        }
+        fieldInjectionPoints.add(injectionPoint);
         return this;
     }
 
@@ -2261,7 +2262,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 } else {
                     requiredComponents.add(argument.getType());
                 }
-                requiredComponentArguments.add(argument);
             }
         }
     }
