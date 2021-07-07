@@ -17,6 +17,13 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Stream;
 
+/**
+ * <p>Default {@link ManagementLinkCollector} implementation. The full paths
+ * to endpoints are provided to be clickable.</p>
+ *
+ * @author Hernán Cervera
+ * @since 2.5
+ */
 @Singleton
 @Requires(beans = ManagementEndpoint.class)
 public class DefaultManagementLinkCollector implements ManagementLinkCollector {
@@ -27,6 +34,15 @@ public class DefaultManagementLinkCollector implements ManagementLinkCollector {
         this.server = server;
     }
 
+    /**
+     * <p>Collect management endpoints in a {@link Resource}. Duplicate route paths are not registered because
+     * Http methods are not shown on a resource, which makes identical route paths seemingly the same. Each entry
+     * has the id of the Endpoint as key, except for the management route, which its key is <code>self</code>.</p>
+     *
+     * @param routes management routes to collect.
+     * @param selfEndpointId id of the {@link Endpoint} which returns the {@link Resource}.
+     * @return the {@link Resource} with the links to the management endpoints.
+     */
     @Override
     public Resource collectLinks(Stream<UriRoute> routes, String selfEndpointId) {
         String routeBase = String.format("%s://%s:%d",
@@ -61,7 +77,7 @@ public class DefaultManagementLinkCollector implements ManagementLinkCollector {
         return resource;
     }
 
-    public String getEndpointId(UriRoute route) {
+    private String getEndpointId(UriRoute route) {
         Class<?> declaringType = ((MethodBasedRoute) route).getTargetMethod().getDeclaringType();
         Endpoint endpoint = declaringType.getAnnotation(Endpoint.class);
         return StringUtils.isNotEmpty(endpoint.value()) ? endpoint.value() : endpoint.id();
