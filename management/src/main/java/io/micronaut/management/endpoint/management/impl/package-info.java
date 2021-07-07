@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,6 @@
  * Management endpoint definition implementation.
  *
  * @author Hernán Cervera
- * @since 2.5
+ * @since 3.0.0
  */
 package io.micronaut.management.endpoint.management.impl;
