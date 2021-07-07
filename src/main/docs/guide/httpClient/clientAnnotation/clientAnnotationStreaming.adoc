@@ -47,9 +47,9 @@ If the server returns `application/json` and a non-single rs:Publisher[] is retu
 
 When streaming responses from servers, the underlying HTTP client will not apply the default `readTimeout` setting (which defaults to 10 seconds) of the api:http.client.HttpClientConfiguration[] since the delay between reads for streaming responses may differ from normal reads.
 
-Instead, the `read-idle-timeout` setting (which defaults to 60 seconds) dictates when to close a connection after it becomes idle.
+Instead, the `read-idle-timeout` setting (which defaults to 5 minutes) dictates when to close a connection after it becomes idle.
 
-If you stream data from a server that defines a longer delay than 60 seconds between items, you should adjust `readIdleTimeout`. The following configuration in `application.yml` demonstrates how:
+If you stream data from a server that defines a longer delay than 5 minutes between items, you should adjust `readIdleTimeout`. The following configuration in `application.yml` demonstrates how:
 
 .Adjusting the readIdleTimeout
 [source,yaml]
@@ -57,10 +57,10 @@ If you stream data from a server that defines a longer delay than 60 seconds bet
 micronaut:
   http:
     client:
-      read-idle-timeout: 5m
+      read-idle-timeout: 10m
 ----
 
-The above example sets the `readIdleTimeout` to five minutes.
+The above example sets the `readIdleTimeout` to ten minutes.
 
 === Streaming Server Sent Events
 

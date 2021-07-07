@@ -37,6 +37,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -60,10 +61,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @param environmentNames The environment names
      */
     public DefaultApplicationContext(@NonNull String... environmentNames) {
-        this(() -> {
-            ArgumentUtils.requireNonNull("environmentNames", environmentNames);
-            return Arrays.asList(environmentNames);
-        });
+        this(ClassPathResourceLoader.defaultLoader(DefaultApplicationContext.class.getClassLoader()), environmentNames);
     }
 
     /**
@@ -123,11 +121,28 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    protected @NonNull List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-        if (resolvedBeanReferences != null) {
+    protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
+        if (resolvedBeanReferences == null) {
+            return super.resolveBeanDefinitionReferences();
+        }
+        return resolvedBeanReferences;
+    }
+
+    @Override
+    protected @NonNull List<BeanDefinitionReference> resolveBeanDefinitionReferences(Predicate<BeanDefinitionReference> predicate) {
+        if (resolvedBeanReferences == null) {
+            return super.resolveBeanDefinitionReferences(predicate);
+        }
+        if (predicate == null) {
             return resolvedBeanReferences;
         }
-        return super.resolveBeanDefinitionReferences();
+        List<BeanDefinitionReference> beanDefinitionReferences = new ArrayList<>(resolvedBeanReferences.size());
+        for (BeanDefinitionReference reference : resolvedBeanReferences) {
+            if (predicate.test(reference)) {
+                beanDefinitionReferences.add(reference);
+            }
+        }
+        return beanDefinitionReferences;
     }
 
     /**
@@ -226,6 +241,12 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
+    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(BeanResolutionContext resolutionContext, Class<T> beanType, boolean filterProxied, Predicate<BeanDefinition<T>> predicate) {
+        Collection<BeanDefinition<T>> candidates = super.findBeanCandidates(resolutionContext, beanType, filterProxied, predicate);
+        return transformIterables(resolutionContext, candidates, filterProxied);
+    }
+
+    @Override
     protected <T> Collection<BeanDefinition<T>> transformIterables(BeanResolutionContext resolutionContext, Collection<BeanDefinition<T>> candidates, boolean filterProxied) {
         if (!candidates.isEmpty()) {
 
@@ -286,7 +307,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                         continue;
                     }
 
-                    Collection<BeanDefinition> dependentCandidates = findBeanCandidates(resolutionContext, dependentType, null, filterProxied);
+                    Collection<BeanDefinition> dependentCandidates = findBeanCandidates(resolutionContext, dependentType, filterProxied, null);
                     if (!dependentCandidates.isEmpty()) {
                         for (BeanDefinition dependentCandidate : dependentCandidates) {
 
@@ -612,14 +633,18 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         }
 
         @Override
-        protected @NonNull List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-            List<BeanDefinitionReference> refs = super.resolveBeanDefinitionReferences();
+        protected @NonNull List<BeanDefinitionReference> resolveBeanDefinitionReferences(Predicate<BeanDefinitionReference> predicate) {
+            List<BeanDefinitionReference> refs = super.resolveBeanDefinitionReferences(null);
             // we cache the resolved beans in a local field to avoid the I/O cost of resolving them twice
             // once for the bootstrap context and again for the main context
             resolvedBeanReferences = refs;
-            return refs.stream()
-                        .filter(ref -> ref.isAnnotationPresent(BootstrapContextCompatible.class))
-                        .collect(Collectors.toList());
+            List<BeanDefinitionReference> beanDefinitionReferences = new ArrayList<>();
+            for (BeanDefinitionReference reference : refs) {
+                if ((predicate == null || predicate.test(reference)) && reference.isAnnotationPresent(BootstrapContextCompatible.class)) {
+                    beanDefinitionReferences.add(reference);
+                }
+            }
+            return beanDefinitionReferences;
         }
 
         @Override

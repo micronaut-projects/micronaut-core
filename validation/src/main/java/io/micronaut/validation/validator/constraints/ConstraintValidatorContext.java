@@ -48,5 +48,15 @@ public interface ConstraintValidatorContext {
      * @return The root bean under validation.
      */
     @Nullable Object getRootBean();
+
+    /**
+     * Sets a message template to be used for the validation error message.
+     *
+     * @param messageTemplate the message template
+     * @since 2.5.0
+     */
+    default void messageTemplate(@Nullable final String messageTemplate) {
+        throw new UnsupportedOperationException("not implemented");
+    }
     
 }

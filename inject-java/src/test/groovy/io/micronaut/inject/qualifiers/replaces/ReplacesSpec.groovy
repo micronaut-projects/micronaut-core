@@ -153,4 +153,18 @@ class ReplacesSpec extends Specification {
         cleanup:
         ctx.close()
     }
+
+    void "test replacing a chain of factory methods"() {
+        given:
+        def ctx = ApplicationContext.run("factory-replacement-chain")
+
+        when:
+        D d = ctx.getBean(D)
+
+        then:
+        d instanceof D3
+
+        cleanup:
+        ctx.close()
+    }
 }

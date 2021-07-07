@@ -73,7 +73,7 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
     @Override
     public Optional<MediaType> getContentType() {
         try {
-            return Optional.of(new MediaType(fileUpload.getContentType()));
+            return Optional.of(MediaType.of(fileUpload.getContentType()));
         } catch (IllegalArgumentException e) {
             return Optional.empty();
         }

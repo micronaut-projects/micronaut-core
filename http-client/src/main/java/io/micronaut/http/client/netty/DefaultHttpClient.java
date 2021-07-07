@@ -124,6 +124,7 @@ import io.netty.util.concurrent.GenericFutureListener;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.FlowableEmitter;
+import io.reactivex.FlowableOperator;
 import io.reactivex.Scheduler;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Cancellable;
@@ -230,7 +231,7 @@ public class DefaultHttpClient implements
             @Nullable AnnotationMetadataResolver annotationMetadataResolver,
             List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
             HttpClientFilter... filters) {
-        this(loadBalancer, io.micronaut.http.HttpVersion.HTTP_1_1, configuration, contextPath, new DefaultHttpClientFilterResolver(annotationMetadataResolver, Arrays.asList(filters)), null, threadFactory, nettyClientSslBuilder, codecRegistry, WebSocketBeanRegistry.EMPTY, new DefaultRequestBinderRegistry(ConversionService.SHARED), null, NioSocketChannel.class, invocationInstrumenterFactories);
+        this(loadBalancer, io.micronaut.http.HttpVersion.HTTP_1_1, configuration, contextPath, new DefaultHttpClientFilterResolver(annotationMetadataResolver, Arrays.asList(filters)), null, threadFactory, nettyClientSslBuilder, codecRegistry, WebSocketBeanRegistry.EMPTY, new DefaultRequestBinderRegistry(ConversionService.SHARED), null, NioSocketChannel::new, invocationInstrumenterFactories);
     }
 
     /**
@@ -248,7 +249,7 @@ public class DefaultHttpClient implements
      * @param webSocketBeanRegistry           The websocket bean registry
      * @param requestBinderRegistry           The request binder registry
      * @param eventLoopGroup                  The event loop group to use
-     * @param socketChannelClass              The socket channel class
+     * @param socketChannelFactory            The socket channel factory
      * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument netty handlers execution with
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
@@ -263,7 +264,7 @@ public class DefaultHttpClient implements
                              @NonNull WebSocketBeanRegistry webSocketBeanRegistry,
                              @NonNull RequestBinderRegistry requestBinderRegistry,
                              @Nullable EventLoopGroup eventLoopGroup,
-                             @NonNull Class<? extends SocketChannel> socketChannelClass,
+                             @NonNull ChannelFactory socketChannelFactory,
                              List<InvocationInstrumenterFactory> invocationInstrumenterFactories
             ) {
         ArgumentUtils.requireNonNull("nettyClientSslBuilder", nettyClientSslBuilder);
@@ -272,7 +273,7 @@ public class DefaultHttpClient implements
         ArgumentUtils.requireNonNull("requestBinderRegistry", requestBinderRegistry);
         ArgumentUtils.requireNonNull("configuration", configuration);
         ArgumentUtils.requireNonNull("filterResolver", filterResolver);
-        ArgumentUtils.requireNonNull("socketChannelClass", socketChannelClass);
+        ArgumentUtils.requireNonNull("socketChannelFactory", socketChannelFactory);
         this.loadBalancer = loadBalancer;
         this.httpVersion = httpVersion != null ? httpVersion : configuration.getHttpVersion();
         this.defaultCharset = configuration.getDefaultCharset();
@@ -297,7 +298,7 @@ public class DefaultHttpClient implements
         this.scheduler = Schedulers.from(group);
         this.threadFactory = threadFactory;
         this.bootstrap.group(group)
-                .channel(socketChannelClass)
+                .channelFactory(socketChannelFactory)
                 .option(ChannelOption.SO_KEEPALIVE, true);
 
         Optional<Duration> readTimeout = configuration.getReadTimeout();
@@ -1261,7 +1262,7 @@ public class DefaultHttpClient implements
             try {
                 return new URI(StringUtils.prependUri(contextPath, requestURI.toString()));
             } catch (URISyntaxException e) {
-                //should never happen
+                throw new HttpClientException("Failed to construct the request URI", e);
             }
         }
         return requestURI;
@@ -1580,24 +1581,8 @@ public class DefaultHttpClient implements
                         });
 
                         if (!isSingle && MediaType.APPLICATION_JSON_TYPE.equals(requestContentType)) {
-                            requestBodyPublisher = requestBodyPublisher.map(new Function<HttpContent, HttpContent>() {
-                                boolean first = true;
-
-                                @Override
-                                public HttpContent apply(HttpContent httpContent) {
-                                    if (!first) {
-                                        return HttpContentUtil.prefixComma(httpContent);
-                                    } else {
-                                        first = false;
-                                        return httpContent;
-                                    }
-                                }
-                            });
-                            requestBodyPublisher = Flowable.concat(
-                                    Flowable.fromCallable(HttpContentUtil::openBracket),
-                                    requestBodyPublisher,
-                                    Flowable.fromCallable(HttpContentUtil::closeBracket)
-                            );
+                            requestBodyPublisher = requestBodyPublisher
+                                    .lift((FlowableOperator<HttpContent, HttpContent>) JsonSubscriber::new);
                         }
 
                         requestBodyPublisher = requestBodyPublisher.doOnError(onError);

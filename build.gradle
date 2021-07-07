@@ -1,12 +1,12 @@
 buildscript {
     repositories {
+        gradlePluginPortal()
         mavenCentral()
-        maven { url "https://repo.grails.org/grails/core" }
     }
     dependencies {
-        classpath 'com.github.jengelman.gradle.plugins:shadow:6.1.0'
-        classpath "io.micronaut.build.internal:micronaut-gradle-plugins:3.0.4"
-        classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
+        classpath "gradle.plugin.com.github.jengelman.gradle.plugins:shadow:7.0.0"
+        classpath "io.micronaut.build.internal:micronaut-gradle-plugins:4.0.0.RC5"
+        classpath "org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
         classpath 'javax.xml.bind:jaxb-api:2.3.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
     }
@@ -15,8 +15,7 @@ buildscript {
 apply plugin: 'org.aim42.htmlSanityCheck'
 
 repositories {
-    maven { url "https://repo.grails.org/grails/core" }
-    //maven { url "https://oss.sonatype.org/content/repositories/snapshots/" }
+    mavenCentral()
 }
 
 ext {
@@ -61,6 +60,11 @@ ext {
                     group: 'io.micronaut.coherence',
                     name: 'micronaut-coherence-bom',
                     version: micronautCoherenceVersion
+            ],
+            'micronaut.aws': [
+                    group: 'io.micronaut.aws',
+                    name: 'micronaut-aws-bom',
+                    version: micronautAwsVersion
             ],
             //Third-party
             'netty': [
@@ -240,7 +244,7 @@ ext {
                     version:micronautGcpVersion,
                     group:'io.micronaut.gcp',
                     name:'micronaut-gcp-common',
-                    modules:['micronaut-gcp-tracing', 'micronaut-gcp-function-http', 'micronaut-gcp-function-http-test', 'micronaut-gcp-function', 'micronaut-gcp-http-client', 'micronaut-gcp-logging', 'micronaut-gcp-pubsub']
+                    modules:['micronaut-gcp-tracing', 'micronaut-gcp-function-http', 'micronaut-gcp-function-http-test', 'micronaut-gcp-function', 'micronaut-gcp-http-client', 'micronaut-gcp-logging', 'micronaut-gcp-pubsub', 'micronaut-gcp-secret-manager']
             ],
             'micronaut.azure': [
                     version:micronautAzureVersion,
@@ -249,7 +253,7 @@ ext {
                     modules:['micronaut-azure-function', 'micronaut-azure-function-http', 'micronaut-azure-function-http-test']
             ],
             'azure.function': [
-                    version:'1.3.1',
+                    version:azureFunctionsJavaLibraryVersion,
                     group:'com.microsoft.azure.functions',
                     name:'azure-functions-java-library'
             ],
@@ -262,12 +266,6 @@ ext {
                 version:micronautFlywayVersion,
                 group:'io.micronaut.flyway',
                 name:'micronaut-flyway'
-            ],
-            'micronaut.aws': [
-                    version:micronautAwsVersion,
-                    group:'io.micronaut.aws',
-                    name:'micronaut-function-aws-api-proxy',
-                    modules: ['micronaut-aws-common', 'micronaut-function-aws-api-proxy-test', 'micronaut-function-aws', 'micronaut-function-aws-custom-runtime', 'micronaut-function-aws-alexa', 'micronaut-aws-alexa-httpserver', 'micronaut-aws-parameter-store', 'micronaut-aws-sdk-v1', 'micronaut-aws-sdk-v2', 'micronaut-function-client-aws', 'micronaut-function-aws-test']
             ],
             'micronaut.kotlin': [
                     version:micronautKotlinVersion,
@@ -424,7 +422,7 @@ ext {
             picocli                    : [
                     version: picocliVersion,
                     group  : 'info.picocli',
-                    modules: ['picocli', 'picocli-codegen']                    
+                    modules: ['picocli', 'picocli-codegen']
             ],
             lettuce                    : [
                     version: lettuceVersion,
@@ -519,6 +517,11 @@ ext {
                     version: micronautReactorVersion,
                     group  : 'io.micronaut.reactor',
                     name   : 'micronaut-reactor'
+            ],
+            'micronaut.problem': [
+                    version: micronautProblemJsonVersion,
+                    group  : 'io.micronaut.problem',
+                    modules: ['micronaut-problem-json']
             ],
             reactor                    : [
                     version: reactorVersion,

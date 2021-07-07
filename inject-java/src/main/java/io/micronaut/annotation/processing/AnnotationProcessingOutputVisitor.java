@@ -47,23 +47,23 @@ import java.util.*;
  */
 public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutputVisitor {
 
+    private static final Field FILTER_OUTPUT_STREAM_OUT = ReflectionUtils.findField(FilterOutputStream.class, "out")
+        .map(field -> {
+            try {
+                addOpenJavaModules(FilterOutputStream.class, AnnotationProcessingOutputVisitor.class);
+                field.setAccessible(true);
+                return field;
+            } catch (Exception e) {
+                return null;
+            }
+        })
+        .orElse(null);
+
     private final Filer filer;
     private final Map<String, Optional<GeneratedFile>> metaInfFiles = new LinkedHashMap<>();
     private final Map<String, FileObject> openedFiles = new LinkedHashMap<>();
     private final Map<String, Optional<GeneratedFile>> generatedFiles = new LinkedHashMap<>();
     private final boolean isGradleFiler;
-
-    private static final Field FILTER_OUTPUT_STREAM_OUT = ReflectionUtils.findField(FilterOutputStream.class, "out")
-            .map(field -> {
-                try {
-                    addOpenJavaModules(FilterOutputStream.class, AnnotationProcessingOutputVisitor.class);
-                    field.setAccessible(true);
-                    return field;
-                } catch (Exception e) {
-                    return null;
-                }
-            })
-            .orElse(null);
 
     /**
      * @param filer The {@link Filer} for creating new files
@@ -93,7 +93,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     }
 
     private static boolean isEclipseFiler(Filer filer) {
-        return filer.getClass().getTypeName().startsWith("org.eclipse.jdt");
+        return filer != null && filer.getClass().getTypeName().startsWith("org.eclipse.jdt");
     }
 
     @Override

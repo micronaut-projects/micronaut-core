@@ -13,6 +13,7 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.NamedAnnotationMapper
 import io.micronaut.inject.visitor.VisitorContext
+import spock.lang.Issue
 
 import java.lang.annotation.Annotation
 
@@ -256,6 +257,36 @@ class AnotherInterceptor implements Interceptor {
 
         cleanup:
         context.close()
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/5522')
+    void 'test Around annotation on private method fails'() {
+        when:
+        buildContext('''
+package around.priv.method;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import javax.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Singleton
+class MyBean {
+    @TestAnn
+    private void test() {
+    }
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Around
+@interface TestAnn {
+}
+''')
+
+        then:
+        Throwable t = thrown()
+        t.message.contains 'Method annotated as executable but is declared private'
     }
 
     void 'test byte[] return compile'() {

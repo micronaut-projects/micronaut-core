@@ -16,6 +16,8 @@
 package io.micronaut.annotation.processing.test;
 
 
+import javax.annotation.processing.Filer;
+import javax.lang.model.element.Element;
 import javax.tools.*;
 import javax.tools.JavaFileObject.Kind;
 import java.io.*;
@@ -36,7 +38,7 @@ import java.util.function.Function;
  * @author Gregory Kick
  */
 @SuppressWarnings("all")
-final class InMemoryJavaFileManager extends ForwardingJavaFileManager<JavaFileManager> {
+final class InMemoryJavaFileManager extends ForwardingJavaFileManager<JavaFileManager> implements Filer {
     private final Map<URI, JavaFileObject> inMemoryFileObjects = new LinkedHashMap<>();
 
     InMemoryJavaFileManager(JavaFileManager fileManager) {
@@ -133,6 +135,26 @@ final class InMemoryJavaFileManager extends ForwardingJavaFileManager<JavaFileMa
 
     Iterable<JavaFileObject> getOutputFiles() {
         return Collections.unmodifiableCollection(inMemoryFileObjects.values());
+    }
+
+    @Override
+    public JavaFileObject createSourceFile(CharSequence name, Element... originatingElements) throws IOException {
+        return getJavaFileForOutput(StandardLocation.SOURCE_OUTPUT, name.toString(), Kind.SOURCE, null);
+    }
+
+    @Override
+    public JavaFileObject createClassFile(CharSequence name, Element... originatingElements) throws IOException {
+        return getJavaFileForOutput(StandardLocation.CLASS_OUTPUT, name.toString(), Kind.SOURCE, null);
+    }
+
+    @Override
+    public FileObject createResource(Location location, CharSequence pkg, CharSequence relativeName, Element... originatingElements) throws IOException {
+        return getFileForOutput(StandardLocation.CLASS_OUTPUT, pkg.toString(), relativeName.toString(), null);
+    }
+
+    @Override
+    public FileObject getResource(Location location, CharSequence pkg, CharSequence relativeName) throws IOException {
+        return getFileForInput(StandardLocation.SOURCE_PATH, pkg.toString(), relativeName.toString());
     }
 
     private static final class InMemoryJavaFileObject extends SimpleJavaFileObject

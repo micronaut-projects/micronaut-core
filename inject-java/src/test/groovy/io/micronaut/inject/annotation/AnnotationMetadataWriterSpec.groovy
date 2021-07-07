@@ -27,7 +27,7 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.TypeHint
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.retry.annotation.Recoverable
 
 import javax.inject.Qualifier

@@ -82,10 +82,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
-    public final void removeAttribute(CharSequence key) {
+    public final Object removeAttribute(CharSequence key) {
         if (key != null) {
-            attributes.remove(key);
+            return attributes.remove(key);
         }
+        return null;
     }
 
     @Nullable

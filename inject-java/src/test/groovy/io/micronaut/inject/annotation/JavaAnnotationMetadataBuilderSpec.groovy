@@ -23,7 +23,7 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.http.annotation.Header
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.context.scope.ScopedProxy

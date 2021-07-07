@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -177,7 +177,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         TypeElement typeElement = modelUtils.classElementFor(element);
 
                         if (element.getKind() == ENUM) {
-                            error(element, "Enum types cannot be defined as beans");
+                            final AnnotationMetadata am = annotationUtils.getAnnotationMetadata(element);
+                            if (isDeclaredBeanInMetadata(am)) {
+                                error(element, "Enum types cannot be defined as beans");
+                            }
                             return;
                         }
                         // skip Groovy code, handled by InjectTransform. Required for GroovyEclipse compiler
@@ -374,10 +377,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         private boolean isDeclaredBean(@Nullable MethodElement constructor, boolean hasQualifier) {
+            final AnnotationMetadata concreteClassMetadata = this.concreteClassMetadata;
             return isExecutableType ||
-                    concreteClassElement.hasDeclaredStereotype(Bean.class) ||
-                    concreteClassMetadata.hasStereotype(Scope.class) ||
-                    concreteClassMetadata.hasStereotype(DefaultScope.class) ||
+                    isDeclaredBeanInMetadata(concreteClassMetadata) ||
                     (constructor != null && constructor.hasStereotype(Inject.class)) || hasQualifier;
         }
 
@@ -792,17 +794,18 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
+            final boolean isAbstract = javaMethodElement.isAbstract();
+            final boolean isPrivate = javaMethodElement.isPrivate();
+            final boolean isStatic = javaMethodElement.isStatic();
+            final boolean isPublic = javaMethodElement.isPublic();
+            final boolean isInternal = methodAnnotationMetadata.hasAnnotation(Internal.class);
+
+            boolean hasInvalidModifiers = isAbstract || isStatic || isPrivate || isInternal;
 
             Set<Modifier> modifiers = method.getModifiers();
-            boolean hasInvalidModifiers = javaMethodElement.isAbstract() ||
-                    javaMethodElement.isStatic() ||
-                    methodAnnotationMetadata.hasAnnotation(Internal.class) ||
-                    javaMethodElement.isPrivate();
-            boolean isPublic = javaMethodElement.isPublic() && !hasInvalidModifiers;
             boolean isExecutable =
-                    !hasInvalidModifiers &&
-                            (isExecutableThroughType(method.getEnclosingElement(), methodAnnotationMetadata, annotationMetadata, modifiers, isPublic) ||
-                                    hasAroundStereotype(annotationMetadata));
+                            isExecutableThroughType(method.getEnclosingElement(), methodAnnotationMetadata, annotationMetadata, modifiers, isPublic) ||
+                            hasAroundStereotype(annotationMetadata);
 
             boolean hasConstraints = false;
             if (isDeclaredBean && !methodAnnotationMetadata.hasStereotype(ANN_VALIDATED) &&
@@ -813,7 +816,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
 
             if (isDeclaredBean && isExecutable) {
-                visitExecutableMethod(javaMethodElement, method, methodAnnotationMetadata);
+                if (hasInvalidModifiers) {
+                    if (isPrivate) {
+                        error(method, "Method annotated as executable but is declared private. Change the method to be non-private in order for AOP advice to be applied.");
+                    }
+                } else {
+                    visitExecutableMethod(javaMethodElement, method, methodAnnotationMetadata);
+                }
             } else if (isConfigurationPropertiesType && !modelUtils.isPrivate(method) && !modelUtils.isStatic(method)) {
                 String methodName = javaMethodElement.getSimpleName();
                 if (NameUtils.isSetterName(methodName) && javaMethodElement.getParameters().length == 1) {
@@ -824,8 +833,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         writer.setValidated(IS_CONSTRAINT.test(methodAnnotationMetadata));
                     }
                 }
-            } else if (isPublic && hasConstraints) {
-                visitExecutableMethod(javaMethodElement, method, methodAnnotationMetadata);
+            } else if (hasConstraints) {
+                if (hasInvalidModifiers) {
+                    if (isPrivate) {
+                        error(method, "Method annotated with constraints but is declared private. Change the method to be non-private in order for AOP advice to be applied.");
+                    }
+                } else if (isPublic) {
+                    visitExecutableMethod(javaMethodElement, method, methodAnnotationMetadata);
+                }
             }
 
             return null;
@@ -1257,6 +1272,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                             int paramLen = targetParameters.size();
                             if (paramLen == sourceParams.length) {
+
+                                if (sourceMethodElement.isSuspend()) {
+                                    error(sourceMethod, "Cannot adapt method [" + sourceMethod + "] to target method [" + targetMethod + "]. Kotlin suspend method not supported here.");
+                                    return;
+                                }
 
                                 Map<String, ClassElement> genericTypes = new LinkedHashMap<>(paramLen);
                                 for (int i = 0; i < paramLen; i++) {
@@ -1965,6 +1985,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             return shouldExclude(configurationMetadata.getIncludes(), configurationMetadata.getExcludes(), propertyName);
         }
 
+    }
+
+    private boolean isDeclaredBeanInMetadata(AnnotationMetadata concreteClassMetadata) {
+        return concreteClassMetadata.hasDeclaredStereotype(Bean.class) ||
+                concreteClassMetadata.hasStereotype(Scope.class) ||
+                concreteClassMetadata.hasStereotype(DefaultScope.class);
     }
 
     /**

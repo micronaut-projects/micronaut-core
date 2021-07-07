@@ -43,6 +43,7 @@ class SimpleTextWebSocketSpec extends Specification {
         fred.session != null
         fred.session.id != null
         fred.request != null
+        fred.subProtocol == null
 
         then:"A session is established"
         fred.session != null
@@ -116,11 +117,14 @@ class SimpleTextWebSocketSpec extends Specification {
         RxWebSocketClient wsClient = embeddedServer.applicationContext.createBean(RxWebSocketClient, embeddedServer.getURI())
         ChatClientWebSocket fred = wsClient.connect(ChatClientWebSocket, "/chat/stuff/fred").blockingFirst()
         ChatClientWebSocket bob = wsClient.connect(ChatClientWebSocket, [topic:"stuff",username:"bob"]).blockingFirst()
+        ChatServerWebSocket server = embeddedServer.applicationContext.getBean(ChatServerWebSocket)
 
         then:"The connection is valid"
         fred.session != null
         fred.session.id != null
         fred.request != null
+        fred.subProtocol == null
+        server.subProtocol == null
 
         then:"A session is established"
         fred.session != null

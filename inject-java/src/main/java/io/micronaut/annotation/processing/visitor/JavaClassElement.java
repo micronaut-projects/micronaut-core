@@ -55,6 +55,9 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     private List<PropertyElement> beanProperties;
     private Map<String, Map<String, TypeMirror>> genericTypeInfo;
     private List<? extends Element> enclosedElements;
+    private String simpleName;
+    private String name;
+    private String packageName;
 
     /**
      * @param classElement       The {@link TypeElement}
@@ -512,11 +515,11 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         boolean hasNamePredicates = !namePredicates.isEmpty();
         boolean hasModifierPredicates = !modifierPredicates.isEmpty();
         boolean hasAnnotationPredicates = !annotationPredicates.isEmpty();
-        
+
         elementLoop:
         for (Element enclosedElement : enclosedElements) {
             ElementKind enclosedElementKind = enclosedElement.getKind();
-            if (enclosedElementKind == kind) {
+            if (enclosedElementKind == kind || (enclosedElementKind == ElementKind.ENUM && kind == ElementKind.CLASS)) {
                 String elementName = enclosedElement.getSimpleName().toString();
                 if (onlyAccessible) {
                     // exclude private members
@@ -593,6 +596,13 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                                 (ExecutableElement) enclosedElement,
                                 metadata
                         );
+                    case CLASS:
+                    case ENUM:
+                        //noinspection unchecked
+                        element = (T) visitorContext.getElementFactory().newClassElement(
+                                (TypeElement) enclosedElement,
+                                metadata
+                        );
                     break;
                     default:
                         element = null;
@@ -628,6 +638,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             return ElementKind.FIELD;
         } else if (elementType == ConstructorElement.class) {
             return ElementKind.CONSTRUCTOR;
+        } else if (elementType == ClassElement.class) {
+            return ElementKind.CLASS;
         }
         throw new IllegalArgumentException("Unsupported element type for query: " + elementType);
     }
@@ -648,8 +660,27 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     }
 
     @Override
+    public String getSimpleName() {
+        if (simpleName == null) {
+            simpleName = JavaModelUtils.getClassNameWithoutPackage(classElement);
+        }
+        return simpleName;
+    }
+
+    @Override
     public String getName() {
-        return JavaModelUtils.getClassName(classElement);
+        if (name == null) {
+            name = JavaModelUtils.getClassName(classElement);
+        }
+        return name;
+    }
+
+    @Override
+    public String getPackageName() {
+        if (packageName == null) {
+            packageName = JavaModelUtils.getPackageName(classElement);
+        }
+        return packageName;
     }
 
     @Override

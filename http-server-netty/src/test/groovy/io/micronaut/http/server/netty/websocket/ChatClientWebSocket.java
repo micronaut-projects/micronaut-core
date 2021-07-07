@@ -34,6 +34,7 @@ public abstract class ChatClientWebSocket implements AutoCloseable { // <2>
     private String topic;
     private String username;
     private Collection<String> replies = new ConcurrentLinkedQueue<>();
+    private String subProtocol;
 
     @OnOpen
     public void onOpen(String topic, String username, WebSocketSession session, HttpRequest request) { // <3>
@@ -41,6 +42,7 @@ public abstract class ChatClientWebSocket implements AutoCloseable { // <2>
         this.username = username;
         this.session = session;
         this.request = request;
+        this.subProtocol = session.getSubprotocol().orElse(null);
     }
 
     public String getTopic() {
@@ -76,4 +78,7 @@ public abstract class ChatClientWebSocket implements AutoCloseable { // <2>
 
     public abstract Single<String> sendRx(String message);
 
+    public String getSubProtocol() {
+        return subProtocol;
+    }
 }

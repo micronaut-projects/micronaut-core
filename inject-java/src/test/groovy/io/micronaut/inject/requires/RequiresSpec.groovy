@@ -7,7 +7,7 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.context.condition.OperatingSystem
 import io.micronaut.context.env.PropertySource
 import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import spock.util.environment.RestoreSystemProperties

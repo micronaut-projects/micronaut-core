@@ -1,7 +1,7 @@
 package io.micronaut.inject.factory.multiple
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
 class MethodSameNameSpec extends AbstractTypeElementSpec {
 

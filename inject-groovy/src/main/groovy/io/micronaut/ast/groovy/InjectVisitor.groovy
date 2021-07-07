@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -254,6 +254,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             )
             populateProxyWriterConstructor(groovyClassElement, aopProxyWriter)
             beanDefinitionWriters.put(node, aopProxyWriter)
+            this.aopProxyWriter = aopProxyWriter
             visitIntroductionTypePublicMethods(aopProxyWriter, node)
             if (ArrayUtils.isNotEmpty(interfaceTypes)) {
                 List<AnnotationNode> annotationNodes = node.annotations
@@ -465,10 +466,16 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 declaringClass,
                 AnnotationMetadata.EMPTY_METADATA
         )
+
+        final boolean isStatic = methodNode.isStatic()
+        final boolean isAbstract = methodNode.isAbstract()
+        final boolean isPrivate = methodNode.isPrivate()
+        final boolean isPublic = methodNode.isPublic()
+
         if (isFactoryClass && !isConstructor && methodAnnotationMetadata.hasDeclaredStereotype(Bean, Scope)) {
             methodAnnotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).buildForParent(methodNode.returnType, methodNode, true)
             if (concreteClassAnnotationMetadata.hasDeclaredStereotype(Around)) {
-                visitExecutableMethod(declaringClass, methodNode, methodAnnotationMetadata, methodName, methodNode.isPublic())
+                visitExecutableMethod(declaringClass, methodNode, methodAnnotationMetadata, methodName, isPublic)
             }
 
             MethodElement factoryMethodElement = elementFactory.newMethodElement(
@@ -586,16 +593,14 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 // constructor with explicit @Inject
                 defineBeanDefinition(concreteClass)
             } else if (!isConstructor) {
-                if (!methodNode.isStatic() && !methodNode.isAbstract()) {
+                if (!isStatic && !isAbstract) {
                     boolean isParent = declaringClass != concreteClass
                     MethodNode overriddenMethod = isParent ? concreteClass.getMethod(methodName, methodNode.parameters) : methodNode
                     boolean overridden = isParent && overriddenMethod.declaringClass != declaringClass
 
                     boolean isPackagePrivate = isPackagePrivate(methodNode, methodNode.modifiers)
-                    boolean isPrivate = methodNode.isPrivate()
 
                     if (isParent && !isPrivate && !isPackagePrivate) {
-
                         if (overridden) {
                             // bail out if the method has been overridden, since it will have already been handled
                             return
@@ -658,11 +663,17 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 }
             }
         } else if (!isConstructor) {
-            boolean hasInvalidModifiers = methodNode.isStatic() || methodNode.isAbstract() || methodNode.isSynthetic() || methodAnnotationMetadata.hasAnnotation(Internal) || methodNode.isPrivate()
-            boolean isPublic = methodNode.isPublic() && !hasInvalidModifiers
-            boolean isExecutable = ((isExecutableType && isPublic) || methodAnnotationMetadata.hasStereotype(Executable) || hasAroundStereotype(methodAnnotationMetadata)) && !hasInvalidModifiers
+            boolean hasInvalidModifiers = isStatic || isAbstract || methodNode.isSynthetic() || methodAnnotationMetadata.hasAnnotation(Internal) || isPrivate
+            boolean isExecutable = ((isExecutableType && isPublic) || methodAnnotationMetadata.hasStereotype(Executable) || hasAroundStereotype(methodAnnotationMetadata))
+
             if (isDeclaredBean && isExecutable) {
-                visitExecutableMethod(declaringClass, methodNode, methodAnnotationMetadata, methodName, isPublic)
+                if (hasInvalidModifiers) {
+                    if (isPrivate && (methodAnnotationMetadata.hasDeclaredStereotype(Executable) || hasDeclaredAroundStereotype(methodAnnotationMetadata))) {
+                        addError("Method annotated as executable but is declared private. Change the method to be non-private in order for AOP advice to be applied.", methodNode)
+                    }
+                } else {
+                    visitExecutableMethod(declaringClass, methodNode, methodAnnotationMetadata, methodName, isPublic)
+                }
             } else if (isConfigurationProperties && isPublic) {
                 if (NameUtils.isSetterName(methodNode.name) && methodNode.parameters.length == 1) {
                     String propertyName = NameUtils.getPropertyNameForSetter(methodNode.name)
@@ -718,7 +729,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         getBeanWriter().setValidated(InjectTransform.IS_CONSTRAINT.test(methodAnnotationMetadata))
                     }
                 }
-            } else if (isPublic) {
+            } else {
                 def sourceUnit = sourceUnit
                 def compilationUnit = this.compilationUnit
                 final boolean isConstrained = isDeclaredBean &&
@@ -728,7 +739,13 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                                     InjectTransform.IS_CONSTRAINT.test(annotationMetadata)
                                 }
                 if (isConstrained) {
-                    visitExecutableMethod(declaringClass, methodNode, methodAnnotationMetadata, methodName, isPublic)
+                    if (hasInvalidModifiers) {
+                        if (isPrivate) {
+                            addError("Method annotated with constraints but is declared private. Change the method to be non-private in order for AOP advice to be applied.", methodNode)
+                        }
+                    } else if (isPublic) {
+                        visitExecutableMethod(declaringClass, methodNode, methodAnnotationMetadata, methodName, isPublic)
+                    }
                 }
             }
         }
@@ -865,12 +882,17 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         AopProxyWriter proxyWriter = (AopProxyWriter) aopProxyWriter
         if (proxyWriter == null) {
 
-            proxyWriter = new AopProxyWriter(
-                    (BeanDefinitionWriter) getBeanWriter(),
-                    aopSettings,
-                    configurationMetadataBuilder,
-                    interceptorTypeReferences
-            )
+            if (getBeanWriter() instanceof BeanDefinitionWriter) {
+                proxyWriter = new AopProxyWriter(
+                        (BeanDefinitionWriter) getBeanWriter(),
+                        aopSettings,
+                        configurationMetadataBuilder,
+                        interceptorTypeReferences
+                )
+            } else {
+                // Unexpected: should be unreachable
+                throw new IllegalStateException("Internal Error: bean writer not an instance of BeanDefinitionWriter")
+            }
 
             populateProxyWriterConstructor(concreteClassElement, proxyWriter)
             String beanDefinitionName = getBeanWriter().getBeanDefinitionName()

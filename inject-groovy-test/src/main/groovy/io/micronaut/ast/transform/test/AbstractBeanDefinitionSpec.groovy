@@ -19,6 +19,7 @@ import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
 import io.micronaut.ast.groovy.visitor.GroovyClassElement
+import io.micronaut.ast.groovy.visitor.GroovyElementFactory
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
@@ -45,6 +46,8 @@ import org.codehaus.groovy.control.ErrorCollector
 import org.codehaus.groovy.control.SourceUnit
 import spock.lang.Specification
 
+import java.util.function.Predicate
+
 /**
  * @author graemerocher
  * @since 1.0
@@ -66,18 +69,49 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
             def sourceUnit = new SourceUnit("test", source, cc, new GroovyClassLoader(), new ErrorCollector(cc))
             def compilationUnit = new CompilationUnit()
             def metadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn)
-            return new GroovyClassElement(
-                    new GroovyVisitorContext(sourceUnit, compilationUnit ), cn, metadata
-            )
+            def elementFactory = new GroovyElementFactory(new GroovyVisitorContext(sourceUnit, compilationUnit))
+            return elementFactory.newClassElement(cn, metadata)
         } else {
             throw new IllegalArgumentException("No class found in passed source code")
         }
+    }
+
+    ClassElement buildClassElement(String className, String source) {
+        def builder = new AstBuilder()
+        ASTNode[] nodes = builder.buildFromString(source)
+        for (ASTNode node: nodes) {
+            if (node instanceof ClassNode) {
+                if (node.getName() == className) {
+                    def cc = new CompilerConfiguration()
+                    def sourceUnit = new SourceUnit("test", source, cc, new GroovyClassLoader(), new ErrorCollector(cc))
+                    def compilationUnit = new CompilationUnit()
+                    def metadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, node)
+                    def elementFactory = new GroovyElementFactory(new GroovyVisitorContext(sourceUnit, compilationUnit))
+                    return elementFactory.newClassElement(node, metadata)
+                }
+            }
+        }
+        throw new IllegalArgumentException("No class found in passed source code")
     }
 
     @CompileStatic
     BeanDefinition buildBeanDefinition(String className, String classStr) {
         def beanDefName= '$' + NameUtils.getSimpleName(className) + 'Definition'
         def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        def classLoader = new InMemoryByteCodeGroovyClassLoader()
+        classLoader.parseClass(classStr)
+        try {
+            return (BeanDefinition) classLoader.loadClass(beanFullName).newInstance()
+        } catch (ClassNotFoundException e) {
+            return null
+        }
+    }
+
+    @CompileStatic
+    BeanDefinition buildBeanDefinition(String packageName, String className, String classStr) {
+        def beanDefName= '$' + className + 'Definition'
         String beanFullName = "${packageName}.${beanDefName}"
 
         def classLoader = new InMemoryByteCodeGroovyClassLoader()
@@ -211,12 +245,12 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         return new DefaultApplicationContext(
                 ClassPathResourceLoader.defaultLoader(classLoader),"test") {
             @Override
-            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
+            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences(Predicate<BeanDefinitionReference> predicate) {
                 return classLoader.generatedClasses.keySet().findAll {
                     it.endsWith("DefinitionClass")
                 }.collect {
                     classLoader.loadClass(it).newInstance()
-                }
+                }.findAll { predicate == null || predicate.test(it) }
             }
         }.start()
     }
