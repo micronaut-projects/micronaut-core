@@ -20,8 +20,6 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.MethodElement;
 
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -50,10 +48,10 @@ public interface BeanMethodElement extends MethodElement {
      */
     default @NonNull
     BeanMethodElement inject() {
-        if (hasAnnotation(PreDestroy.class)) {
+        if (hasAnnotation(AnnotationUtil.PRE_DESTROY)) {
             throw new IllegalStateException("Cannot inject a method annotated with @PreDestroy");
         }
-        if (hasAnnotation(PostConstruct.class)) {
+        if (hasAnnotation(AnnotationUtil.POST_CONSTRUCT)) {
             throw new IllegalStateException("Cannot inject a method annotated with @PostConstruct");
         }
         annotate(AnnotationUtil.INJECT);
@@ -61,7 +59,7 @@ public interface BeanMethodElement extends MethodElement {
     }
 
     /**
-     * Make the method a {@link PreDestroy} hook.
+     * Make the method a {@link jakarta.annotation.PreDestroy} hook.
      *
      * @return This bean method
      */
@@ -70,15 +68,15 @@ public interface BeanMethodElement extends MethodElement {
         if (hasAnnotation(AnnotationUtil.INJECT)) {
             throw new IllegalStateException("Cannot make a method annotated with @Inject a @PreDestroy handler");
         }
-        if (hasAnnotation(PostConstruct.class)) {
+        if (hasAnnotation(AnnotationUtil.POST_CONSTRUCT)) {
             throw new IllegalStateException("Cannot make a method annotated with @PostConstruct a @PreDestroy handler");
         }
-        annotate(PreDestroy.class);
+        annotate(AnnotationUtil.PRE_DESTROY);
         return this;
     }
 
     /**
-     * Make the method a {@link PostConstruct} hook.
+     * Make the method a {@link jakarta.annotation.PostConstruct} hook.
      *
      * @return This bean method
      */
@@ -87,10 +85,10 @@ public interface BeanMethodElement extends MethodElement {
         if (hasAnnotation(AnnotationUtil.INJECT)) {
             throw new IllegalStateException("Cannot make a method annotated with @Inject a @PostConstruct handler");
         }
-        if (hasAnnotation(PreDestroy.class)) {
+        if (hasAnnotation(AnnotationUtil.PRE_DESTROY)) {
             throw new IllegalStateException("Cannot make a method annotated with @PreDestroy a @PostConstruct handler");
         }
-        annotate(PostConstruct.class);
+        annotate(AnnotationUtil.POST_CONSTRUCT);
         return this;
     }
 

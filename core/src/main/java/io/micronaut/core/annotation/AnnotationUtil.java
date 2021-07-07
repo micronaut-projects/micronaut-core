@@ -147,11 +147,40 @@ public class AnnotationUtil {
      */
     public static final String ANN_INTERCEPTOR_BINDINGS = "io.micronaut.aop.InterceptorBindingDefinitions";
 
+    /**
+     * The meta anontation used for inject declarations.
+     */
     public static final String INJECT = "javax.inject.Inject";
+
+    /**
+     * The meta annotation used for scope declarations.
+     */
     public static final String SCOPE = "javax.inject.Scope";
+
+    /**
+     * The meta annotation used for singleton scope.
+     */
     public static final String SINGLETON = "javax.inject.Singleton";
+
+    /**
+     * The meta anntotion used for qualifier declarations.
+     */
     public static final String QUALIFIER = "javax.inject.Qualifier";
+
+    /**
+     * The meta annotation used for named qualifiers.
+     */
     public static final String NAMED = "javax.inject.Named";
+
+    /**
+     * The meta annotation used for for pre-destroy declarations.
+     */
+    public static final String PRE_DESTROY = "javax.annotation.PreDestroy";
+
+    /**
+     * The meta annotation used for for post-construct declarations.
+     */
+    public static final String POST_CONSTRUCT = "javax.annotation.PostConstruct";
 
     private static final Map<Integer, List<String>> INTERN_LIST_POOL = new ConcurrentHashMap<>();
     private static final Map<String, Map<String, Object>> INTERN_MAP_POOL = new ConcurrentHashMap<>();

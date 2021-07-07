@@ -17,7 +17,7 @@ package io.micronaut.inject.close;
 
 import io.micronaut.context.annotation.Requires;
 
-import javax.annotation.PreDestroy;
+import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 import java.io.IOException;
 

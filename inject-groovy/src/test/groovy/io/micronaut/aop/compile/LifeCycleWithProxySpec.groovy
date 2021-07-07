@@ -26,7 +26,7 @@ class MyBean {
         return "good";
     }
     
-    @javax.annotation.PostConstruct
+    @jakarta.annotation.PostConstruct
     void created() {
         count++;
     }
@@ -78,7 +78,7 @@ class MyBean {
         return "good";
     }
 
-    @javax.annotation.PostConstruct
+    @jakarta.annotation.PostConstruct
     void created() {
         count++;
     }
@@ -124,7 +124,7 @@ class MyBean {
     @jakarta.inject.Inject public ConversionService conversionService;
     public int count = 0;
     
-    @javax.annotation.PostConstruct
+    @jakarta.annotation.PostConstruct
     void created() {
         count++;
     }

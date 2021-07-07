@@ -267,7 +267,7 @@ public class DefaultBeanContext implements BeanContext {
 
 
     /**
-     * The close method will shut down the context calling {@link javax.annotation.PreDestroy} hooks on loaded
+     * The close method will shut down the context calling {@link jakarta.annotation.PreDestroy} hooks on loaded
      * singletons.
      */
     @Override

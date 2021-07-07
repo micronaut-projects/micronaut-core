@@ -80,8 +80,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     private static final String AROUND_TYPE = AnnotationUtil.ANN_AROUND;
     private static final String INTRODUCTION_TYPE = AnnotationUtil.ANN_INTRODUCTION;
     private static final String[] ANNOTATION_STEREOTYPES = new String[]{
-            ProcessedTypes.POST_CONSTRUCT,
-            ProcessedTypes.PRE_DESTROY,
+            AnnotationUtil.POST_CONSTRUCT,
+            AnnotationUtil.PRE_DESTROY,
+            "jakarta.annotation.PreDestroy",
+            "jakarta.annotation.PostConstruct",
             "javax.inject.Inject",
             "javax.inject.Qualifier",
             "javax.inject.Singleton",
@@ -762,8 +764,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
 
             boolean injected = methodAnnotationMetadata.hasDeclaredStereotype(AnnotationUtil.INJECT);
-            boolean postConstruct = methodAnnotationMetadata.hasDeclaredStereotype(ProcessedTypes.POST_CONSTRUCT);
-            boolean preDestroy = methodAnnotationMetadata.hasDeclaredStereotype(ProcessedTypes.PRE_DESTROY);
+            boolean postConstruct = methodAnnotationMetadata.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT);
+            boolean preDestroy = methodAnnotationMetadata.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY);
             if (injected || postConstruct || preDestroy || methodAnnotationMetadata.hasDeclaredStereotype(ConfigurationInject.class)) {
                 if (isDeclaredBean) {
                     visitAnnotatedMethod(javaMethodElement, method, o);
@@ -1531,7 +1533,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 requiresReflection = true;
             }
 
-            if (javaMethodElement.hasDeclaredStereotype(ProcessedTypes.POST_CONSTRUCT)) {
+            if (javaMethodElement.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT)) {
                 BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
                 final AopProxyWriter aopWriter = resolveAopWriter(writer);
                 if (aopWriter != null && !aopWriter.isProxyTarget()) {
@@ -1544,7 +1546,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         requiresReflection,
                         javaVisitorContext
                 );
-            } else if (javaMethodElement.hasDeclaredStereotype(ProcessedTypes.PRE_DESTROY)) {
+            } else if (javaMethodElement.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)) {
                 BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
                 final AopProxyWriter aopWriter = resolveAopWriter(writer);
                 if (aopWriter != null && !aopWriter.isProxyTarget()) {

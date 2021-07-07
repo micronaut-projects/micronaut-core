@@ -3,7 +3,7 @@ package io.micronaut.inject.dependent;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
-import javax.annotation.PreDestroy;
+import jakarta.annotation.PreDestroy;
 import java.util.ArrayList;
 import java.util.List;
 

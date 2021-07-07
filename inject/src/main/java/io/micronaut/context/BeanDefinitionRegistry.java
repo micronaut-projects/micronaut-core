@@ -82,7 +82,7 @@ public interface BeanDefinitionRegistry {
      * compiled ahead of time.</p>
      * <p>
      * <p>If bean definition data is found the method will perform dependency injection on the instance followed by
-     * invoking any {@link javax.annotation.PostConstruct} hooks.</p>
+     * invoking any {@link jakarta.annotation.PostConstruct} hooks.</p>
      * <p>
      * <p>If no bean definition data is found the bean is registered as is.</p>
      *
@@ -390,7 +390,7 @@ public interface BeanDefinitionRegistry {
      * compiled ahead of time.</p>
      * <p>
      * <p>If bean definition data is found the method will perform dependency injection on the instance followed by
-     * invoking any {@link javax.annotation.PostConstruct} hooks.</p>
+     * invoking any {@link jakarta.annotation.PostConstruct} hooks.</p>
      * <p>
      * <p>If no bean definition data is found the bean is registered as is.</p>
      *
@@ -413,7 +413,7 @@ public interface BeanDefinitionRegistry {
      * compiled ahead of time.</p>
      * <p>
      * <p>If bean definition data is found the method will perform dependency injection on the instance followed by
-     * invoking any {@link javax.annotation.PostConstruct} hooks.</p>
+     * invoking any {@link jakarta.annotation.PostConstruct} hooks.</p>
      * <p>
      * <p>If no bean definition data is found the bean is registered as is.</p>
      *
@@ -538,7 +538,7 @@ public interface BeanDefinitionRegistry {
      * compiled ahead of time.</p>
      * <p>
      * <p>If bean definition data is found the method will perform dependency injection on the instance followed by
-     * invoking any {@link javax.annotation.PostConstruct} hooks.</p>
+     * invoking any {@link jakarta.annotation.PostConstruct} hooks.</p>
      * <p>
      * <p>If no bean definition data is found the bean is registered as is.</p>
      *
@@ -556,7 +556,7 @@ public interface BeanDefinitionRegistry {
      * compiled ahead of time.</p>
      * <p>
      * <p>If bean definition data is found the method will perform dependency injection on the instance followed by
-     * invoking any {@link javax.annotation.PostConstruct} hooks.</p>
+     * invoking any {@link jakarta.annotation.PostConstruct} hooks.</p>
      * <p>
      * <p>If no bean definition data is found the bean is registered as is.</p>
      *

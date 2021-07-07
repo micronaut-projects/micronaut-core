@@ -28,10 +28,10 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.RxHttpClient;
+import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 
-import javax.annotation.PreDestroy;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.URI;
