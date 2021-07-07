@@ -38,9 +38,25 @@ import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.annotation.Version;
-import io.micronaut.http.*;
-import io.micronaut.http.annotation.*;
-import io.micronaut.http.client.*;
+import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.CustomHttpMethod;
+import io.micronaut.http.annotation.Header;
+import io.micronaut.http.annotation.HttpMethodMapping;
+import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.annotation.RequestAttribute;
+import io.micronaut.http.client.BlockingHttpClient;
+import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.client.ReactiveClientResultTransformer;
+import io.micronaut.http.client.RxHttpClientRegistry;
+import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.bind.ClientArgumentRequestBinder;
 import io.micronaut.http.client.bind.ClientRequestUriContext;
@@ -298,6 +314,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
 
             uri = uriTemplate.expand(pathParams);
+            // Remove all the queryParams that have already been used.
+            // Others need to be still added
+            uriVariables.forEach(queryParams::remove);
 
             String query = request.getUri().getQuery();
             request.uri(URI.create(appendQuery(uri, query, queryParams)));

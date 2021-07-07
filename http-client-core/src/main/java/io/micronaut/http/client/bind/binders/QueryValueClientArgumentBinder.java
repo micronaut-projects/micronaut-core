@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2021 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.http.client.bind.binders;
 
 import io.micronaut.core.annotation.NonNull;
@@ -23,6 +38,7 @@ import java.util.Optional;
 /**
  * Implementation of the binder for the {@link QueryValue} annotation
  *
+ * @since 3.0.0
  * @author Andriy Dmytruk
  */
 
@@ -56,23 +72,26 @@ public class QueryValueClientArgumentBinder implements AnnotatedClientArgumentRe
 
         QueryValue.Format format = context.getAnnotationMetadata()
                 .enumValue(QueryValue.class, "format", QueryValue.Format.class)
-                .orElse(QueryValue.Format.COMMA_DELIMITED);
+                .orElse(QueryValue.Format.URI_TEMPLATE_FORMAT);
         MutableHttpParameters parameters = request.getParameters();
 
-        if (format == QueryValue.Format.DEEP_OBJECT) {
+        if (format == QueryValue.Format.URI_TEMPLATE_FORMAT) {
+            uriContext.getPathParameters().put(key, value);
+            convertToString(context, value).ifPresent(v -> uriContext.getQueryParameters().put(key, v));
+        } else if (format == QueryValue.Format.DEEP_OBJECT) {
             addDeepObjectParameters(context, value, key, parameters);
         } else if (format == QueryValue.Format.MULTI) {
             addMultiParameters(context, value, key, parameters);
         } else {
             String delimiter = "";
             switch(format) {
-                case SPACE_DELIMITED:
+                case SSV:
                     delimiter = SPACE_DELIMITER;
                     break;
-                case PIPE_DELIMITED:
+                case PIPES:
                     delimiter = PIPE_DELIMITER;
                     break;
-                case COMMA_DELIMITED:
+                case CSV:
                     delimiter = COMMA_DELIMITER;
                     break;
             }
@@ -89,10 +108,10 @@ public class QueryValueClientArgumentBinder implements AnnotatedClientArgumentRe
             Iterable<Object> iterable = (Iterable<Object>) value;
 
             for (Object item : iterable) {
-                valueToString(context, item).ifPresent(v -> parameters.add(key, v));
+                convertToEncodedURIComponent(context, item).ifPresent(v -> parameters.add(key, v));
             }
         } else {
-            valueToString(context, value).ifPresent(v -> parameters.add(key, v));
+            convertToEncodedURIComponent(context, value).ifPresent(v -> parameters.add(key, v));
         }
     }
 
@@ -116,7 +135,7 @@ public class QueryValueClientArgumentBinder implements AnnotatedClientArgumentRe
                 builder.append(index);
                 builder.append(']');
 
-                valueToString(context, item).ifPresent(v -> parameters.add(builder.toString(), v));
+                convertToEncodedURIComponent(context, item).ifPresent(v -> parameters.add(builder.toString(), v));
                 builder.delete(builder.length() - index.length() - 2, builder.length());
                 i++;
             }
@@ -135,7 +154,7 @@ public class QueryValueClientArgumentBinder implements AnnotatedClientArgumentRe
                 builder.append(property.getName());
                 builder.append(']');
 
-                valueToString(context, item).ifPresent(v -> parameters.add(builder.toString(), v));
+                convertToEncodedURIComponent(context, item).ifPresent(v -> parameters.add(builder.toString(), v));
                 builder.delete(builder.length() - property.getName().length() - 2, builder.length());
             }
         }
@@ -151,7 +170,7 @@ public class QueryValueClientArgumentBinder implements AnnotatedClientArgumentRe
 
             boolean first = true;
             for (Object item : iterable) {
-                Optional<String> opt = valueToString(context, item);
+                Optional<String> opt = convertToEncodedURIComponent(context, item);
                 if (opt.isPresent()) {
                     if (!first) {
                         builder.append(delimiter);
@@ -163,13 +182,17 @@ public class QueryValueClientArgumentBinder implements AnnotatedClientArgumentRe
 
             return Optional.of(builder.toString());
         } else {
-            return valueToString(context, value);
+            return convertToEncodedURIComponent(context, value);
         }
     }
 
-    private Optional<String> valueToString(ArgumentConversionContext<Object> context, Object value) {
+    private Optional<String> convertToString(ArgumentConversionContext<Object> context, Object value) {
         return conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
-                .filter(StringUtils::isNotEmpty)
+                .filter(StringUtils::isNotEmpty);
+    }
+
+    private Optional<String> convertToEncodedURIComponent(ArgumentConversionContext<Object> context, Object value) {
+        return convertToString(context, value)
                 .map(QueryValueClientArgumentBinder::encodeURIComponent);
     }
 

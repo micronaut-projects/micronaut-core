@@ -86,18 +86,18 @@ class ClientBindSpec extends Specification {
         String pathValue(String x, Optional<String> y)
 
         @Get("/queryFormat")
-        String spaceSeparatedQueryValue(@QueryValue(format=QueryValue.Format.SPACE_DELIMITED) List<String> x)
+        String spaceSeparatedQueryValue(@QueryValue(format=QueryValue.Format.SSV) List<String> x)
 
         @Get("/queryIdentity")
-        String commaSeparatedQueryValue(@QueryValue(value="x") List<String> params);
+        String commaSeparatedQueryValue(@QueryValue(value="x", format=QueryValue.Format.CSV) List<String> params);
 
         @Get("/queryIdentity")
-        String pipeSeparatedQueryValue(@QueryValue(value="x", format=QueryValue.Format.PIPE_DELIMITED) List<String> params);
+        String pipeSeparatedQueryValue(@QueryValue(value="x", format=QueryValue.Format.PIPES) List<String> params);
 
         @Get("/queryIdentity")
         String differentSeparatedQueryValues(
-                @QueryValue(format=QueryValue.Format.PIPE_DELIMITED) List<String> pipeParams,
-                @QueryValue(format=QueryValue.Format.COMMA_DELIMITED) List<String> commaParams
+                @QueryValue(format=QueryValue.Format.PIPES) List<String> pipeParams,
+                @QueryValue(format=QueryValue.Format.CSV) List<String> commaParams
         )
 
         @Get("/queryIdentity")

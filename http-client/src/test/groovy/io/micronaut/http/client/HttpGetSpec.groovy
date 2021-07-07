@@ -860,19 +860,17 @@ class HttpGetSpec extends Specification {
         @Get("/queryParam")
         String queryParam(@QueryValue String foo)
 
-        @Get("/queryParamExploded{?bar}")
-        String queryParamExploded(@QueryValue(value="bar", format=QueryValue.Format.MULTI) List<String> foo)
+        @Get("/queryParamExploded{?bar*}")
+        String queryParamExploded(@QueryValue(value="bar") List<String> foo)
 
-        @Get("/queryParamExploded{?bar}")
-        String queryParamExploded2(@QueryValue(format=QueryValue.Format.MULTI) List<String> bar)
+        @Get("/queryParamExploded{?bar*}")
+        String queryParamExploded2(@QueryValue List<String> bar)
 
-        @Get("/multipleExplodedQueryParams{?bar,tag}")
-        String multipleExplodedQueryParams(@QueryValue(value="bar", format=QueryValue.Format.MULTI) List<String> foo,
-                                           @QueryValue(value="tag", format=QueryValue.Format.MULTI) String label)
+        @Get("/multipleExplodedQueryParams{?bar*,tag}")
+        String multipleExplodedQueryParams(@QueryValue("bar") List<String> foo, @QueryValue("tag") String label)
 
-        @Get("/multipleExplodedQueryParams{?bar,tag}")
-        String multipleExplodedQueryParams2(@QueryValue(format=QueryValue.Format.MULTI) List<String> bar,
-                                            @QueryValue(format=QueryValue.Format.MULTI) String tag)
+        @Get("/multipleExplodedQueryParams{?bar*,tag}")
+        String multipleExplodedQueryParams2(@QueryValue List<String> bar, @QueryValue String tag)
 
         @Get("/multipleQueryParam")
         String queryParam(@QueryValue String foo, @QueryValue String bar)

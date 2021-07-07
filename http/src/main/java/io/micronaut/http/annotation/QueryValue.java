@@ -53,7 +53,7 @@ public @interface QueryValue {
     /**
      * @return The format of the given values in the URL
      */
-    Format format() default Format.COMMA_DELIMITED;
+    Format format() default Format.URI_TEMPLATE_FORMAT;
 
     /**
      * The possible formats of the query parameter in the URL.
@@ -63,9 +63,16 @@ public @interface QueryValue {
      */
     public static enum Format {
         /**
+         * The format is taken from the URI template. This was the default behavior before 3.0.0.
+         * For example, @Get("path{?param}") will be comma-delimited for Iterables and convert other values to String,
+         * but @Get("path{?param*}") will be same as MULTI format for Iterables and expand the values of a Map as
+         * separate parameters.
+         */
+        URI_TEMPLATE_FORMAT,
+        /**
          * The values of iterator are comma-delimited.
          */
-        COMMA_DELIMITED,
+        CSV,
         /**
          * The values are space-delimited, similarly to comma-delimited format.
          * If possible, it is recommended to use a different format, as space is not a reserved symbol by
@@ -73,12 +80,12 @@ public @interface QueryValue {
          * if string values contain spaces themselves.
          * Null values are not supported and will be removed during the conversion process.
          */
-        SPACE_DELIMITED,
+        SSV,
         /**
          * The values a delimited by pipes "|", similarly to comma-delimited format.
          * This is also not a recommended format for the same reasons as SPACE_DELIMITED
          */
-        PIPE_DELIMITED,
+        PIPES,
         /**
          * The values are repeated as separate parameters, e.g.: color=blue&color=black&color=brown.
          */
