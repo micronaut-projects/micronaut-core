@@ -7,6 +7,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.PathVariable
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import spock.lang.Specification
@@ -35,7 +36,7 @@ class ClientBindSpec extends Specification {
         errorContextPath.get("test")
 
         then:
-        def ex = thrown(HttpClientException)
+        HttpClientException ex = thrown()
         ex.message == "Failed to construct the request URI"
     }
 
