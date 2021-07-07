@@ -85,6 +85,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     private final Class<?> declaringType;
     private final ConstructorInjectionPoint<T> constructor;
     private final Collection<Class<?>> requiredComponents = new HashSet<>(3);
+    private final Collection<Argument<?>> requiredComponentArguments = new HashSet<>(3);
     private AnnotationMetadata beanAnnotationMetadata;
     private Environment environment;
     private Set<Class<?>> exposedTypes;
@@ -2253,7 +2254,14 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     private void addRequiredComponents(Argument... arguments) {
         if (arguments != null) {
             for (Argument argument : arguments) {
-                requiredComponents.add(argument.getType());
+                if (argument.isContainerType() || argument.isProvider()) {
+                    argument.getFirstTypeVariable()
+                            .map(Argument::getType)
+                            .ifPresent(requiredComponents::add);
+                } else {
+                    requiredComponents.add(argument.getType());
+                }
+                requiredComponentArguments.add(argument);
             }
         }
     }

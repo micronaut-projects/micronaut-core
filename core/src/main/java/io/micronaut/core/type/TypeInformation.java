@@ -243,4 +243,13 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
     default @NonNull String getSimpleName() {
         return getType().getSimpleName();
     }
+
+    default boolean isProvider() {
+        for (String type: DefaultArgument.PROVIDER_TYPES) {
+            if (getType().getName().equals(type)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }
