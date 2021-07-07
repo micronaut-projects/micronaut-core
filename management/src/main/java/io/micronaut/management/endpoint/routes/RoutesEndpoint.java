@@ -23,7 +23,6 @@ import io.micronaut.web.router.UriRoute;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
-import javax.inject.Named;
 import java.util.Comparator;
 import java.util.stream.Stream;
 
@@ -44,7 +43,7 @@ public class RoutesEndpoint {
      * @param router The {@link Router}
      * @param routeDataCollector The {@link RouteDataCollector}
      */
-    public RoutesEndpoint(Router router, @Named("RxJava") RouteDataCollector routeDataCollector) {
+    public RoutesEndpoint(Router router, RouteDataCollector routeDataCollector) {
         this.router = router;
         this.routeDataCollector = routeDataCollector;
     }
