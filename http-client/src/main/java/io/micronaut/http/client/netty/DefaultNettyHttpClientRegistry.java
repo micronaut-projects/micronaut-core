@@ -40,6 +40,7 @@ import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.LoadBalancerResolver;
+import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ReactiveHttpClientRegistry;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
@@ -91,7 +92,7 @@ import java.util.concurrent.ThreadFactory;
 @BootstrapContextCompatible
 @Internal
 public
-class DefaultNettyHttpClientRegistry implements AutoCloseable, ReactiveHttpClientRegistry<HttpClient, SseClient, StreamingHttpClient, WebSocketClient> {
+class DefaultNettyHttpClientRegistry implements AutoCloseable, ReactiveHttpClientRegistry<HttpClient, SseClient, StreamingHttpClient, WebSocketClient, ProxyHttpClient> {
     private static final Logger LOG = LoggerFactory.getLogger(DefaultNettyHttpClientRegistry.class);
     private final Map<ClientKey, DefaultHttpClient> clients = new ConcurrentHashMap<>(10);
     private final LoadBalancerResolver loadBalancerResolver;
@@ -232,6 +233,14 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable, ReactiveHttpClien
                                     @Nullable LoadBalancer loadBalancer,
                                     @Nullable HttpClientConfiguration configuration,
                                     BeanContext beanContext) {
+        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
+    }
+
+    @Override
+    public ProxyHttpClient resolveProxyClient(@Nullable InjectionPoint injectionPoint,
+                                              @Nullable LoadBalancer loadBalancer,
+                                              @Nullable HttpClientConfiguration configuration,
+                                              BeanContext beanContext) {
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
 

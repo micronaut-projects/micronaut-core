@@ -38,7 +38,7 @@ import io.micronaut.websocket.WebSocketClient;
  * @param <W> Web Socket Client
  */
 @Internal
-public interface ReactiveHttpClientRegistry<T extends HttpClient, E extends SseClient, S extends StreamingHttpClient, W extends WebSocketClient> {
+public interface ReactiveHttpClientRegistry<T extends HttpClient, E extends SseClient, S extends StreamingHttpClient, W extends WebSocketClient, P extends ProxyHttpClient> {
 
     /**
      * Return the client for the client ID and path.
@@ -64,6 +64,20 @@ public interface ReactiveHttpClientRegistry<T extends HttpClient, E extends SseC
                     @Nullable LoadBalancer loadBalancer,
                     @Nullable HttpClientConfiguration configuration,
                     BeanContext beanContext);
+
+    /**
+     * Resolves a {@link ProxyHttpClient} for the given injection point.
+     *
+     * @param injectionPoint The injection point
+     * @param loadBalancer   The load balancer to use (Optional)
+     * @param configuration  The configuration (Optional)
+     * @param beanContext    The bean context to use
+     * @return The Proxy HTTP Client
+     */
+    P resolveProxyClient(@Nullable InjectionPoint injectionPoint,
+                         @Nullable LoadBalancer loadBalancer,
+                         @Nullable HttpClientConfiguration configuration,
+                         BeanContext beanContext);
 
     /**
      * Resolves a {@link SseClient} for the given injection point.
