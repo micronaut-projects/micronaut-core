@@ -13,8 +13,7 @@ dependencies {
     testImplementation project(":validation")
     testImplementation project(":inject")
 
-    implementation platform("io.projectreactor:reactor-bom:$reactorVersion")
-    implementation 'io.projectreactor:reactor-core'
+    implementation dependencyVersion("reactor")
 
     testImplementation project(":http-server-netty")
     testImplementation "com.github.tomakehurst:wiremock-jre8:2.27.2"

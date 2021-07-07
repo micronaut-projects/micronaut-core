@@ -1,7 +1,7 @@
 dependencies {
     annotationProcessor project(":inject-java")
-    implementation platform("io.projectreactor:reactor-bom:$reactorVersion")
-    implementation 'io.projectreactor:reactor-core'
+
+    implementation dependencyVersion("reactor")
 
     api project(":runtime")
     api project(":websocket")

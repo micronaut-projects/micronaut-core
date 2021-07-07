@@ -52,8 +52,7 @@ dependencies {
         testImplementation('org.bouncycastle:bcpkix-jdk15on:1.65')
     }
 
-    testImplementation platform("io.projectreactor:reactor-bom:$reactorVersion")
-    testImplementation 'io.projectreactor:reactor-core'
+    testImplementation dependencyVersion("reactor")
 }
 
 compileTestKotlin {

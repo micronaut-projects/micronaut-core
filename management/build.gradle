@@ -9,8 +9,7 @@ dependencies {
         exclude module:'micronaut-bom'
     }
 
-    implementation platform("io.projectreactor:reactor-bom:$reactorVersion")
-    implementation 'io.projectreactor:reactor-core'
+    implementation dependencyVersion("reactor")
 
     testImplementation project(":http-client")
     testImplementation project(":inject-groovy")

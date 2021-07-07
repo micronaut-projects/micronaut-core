@@ -5,8 +5,8 @@ dependencies {
     api project(":http")
     api project(":inject")
     api project(':aop')
-    implementation platform("io.projectreactor:reactor-bom:$reactorVersion")
-    implementation 'io.projectreactor:reactor-core'
+
+    implementation dependencyVersion("reactor")
 
     testImplementation project(":inject-groovy")
 }

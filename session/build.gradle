@@ -9,8 +9,7 @@ dependencies {
     compileOnly project(":http-server")
     compileOnly project(":http-server-netty")
 
-    implementation platform("io.projectreactor:reactor-bom:$reactorVersion")
-    implementation 'io.projectreactor:reactor-core'
+    implementation dependencyVersion("reactor")
 
     testAnnotationProcessor project(":inject-java")
     testCompileOnly project(":inject-groovy")

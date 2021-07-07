@@ -7,8 +7,7 @@ dependencies {
     api project(":http-netty")
     api dependencyModuleVersion("netty", "netty-codec-http")
 
-    implementation platform("io.projectreactor:reactor-bom:$reactorVersion")
-    implementation 'io.projectreactor:reactor-core'
+    implementation dependencyVersion("reactor")
 
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
 

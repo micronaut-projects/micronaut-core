@@ -8,8 +8,7 @@ dependencies {
     compileOnly dependencyVersion("gorm")
     compileOnly project(":http-server")
 
-    implementation platform("io.projectreactor:reactor-bom:$reactorVersion")
-    implementation 'io.projectreactor:reactor-core'
+    implementation dependencyVersion("reactor")
 
     testImplementation dependencyVersion("spotbugs")
     testAnnotationProcessor project(":inject-java")

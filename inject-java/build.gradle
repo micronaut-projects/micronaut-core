@@ -12,8 +12,8 @@ dependencies {
     testImplementation project(":inject-java-test")
     testImplementation project(":inject-test-utils")
     testImplementation project(":runtime")
-    testImplementation platform("io.projectreactor:reactor-bom:$reactorVersion")
-    testImplementation 'io.projectreactor:reactor-core'
+
+    testImplementation dependencyVersion("reactor")
 
     testImplementation dependencyVersion("spotbugs")
     testImplementation "org.hibernate:hibernate-core:5.4.29.Final"
