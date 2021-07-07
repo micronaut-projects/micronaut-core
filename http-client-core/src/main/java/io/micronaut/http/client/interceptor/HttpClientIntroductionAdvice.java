@@ -37,6 +37,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.HttpAttributes;
@@ -79,7 +80,16 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.lang.annotation.Annotation;
 import java.net.URI;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
@@ -255,8 +265,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             // Apply all the method binders
             List<Class<? extends Annotation>> methodBinderTypes = context.getAnnotationTypesByStereotype(Bindable.class);
-            for (Class<? extends Annotation> binderType: methodBinderTypes) {
-                binderRegistry.findAnnotatedBinder(binderType).ifPresent(b -> b.bind(context, uriContext, request));
+            if (!CollectionUtils.isEmpty(methodBinderTypes)) {
+                for (Class<? extends Annotation> binderType : methodBinderTypes) {
+                    binderRegistry.findAnnotatedBinder(binderType).ifPresent(b -> b.bind(context, uriContext, request));
+                }
             }
 
             // Apply all the argument binders
