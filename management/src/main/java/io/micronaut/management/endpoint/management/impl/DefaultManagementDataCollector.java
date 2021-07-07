@@ -1,0 +1,79 @@
+package io.micronaut.management.endpoint.management.impl;
+
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.http.hateoas.AbstractResource;
+import io.micronaut.http.hateoas.Link;
+import io.micronaut.http.hateoas.Resource;
+import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.management.endpoint.annotation.Endpoint;
+import io.micronaut.management.endpoint.management.ManagementDataCollector;
+import io.micronaut.management.endpoint.management.ManagementController;
+import io.micronaut.web.router.MethodBasedRoute;
+import io.micronaut.web.router.UriRoute;
+import io.reactivex.Flowable;
+import org.reactivestreams.Publisher;
+
+import jakarta.inject.Singleton;
+import java.util.*;
+import java.util.stream.Stream;
+
+/**
+ * <p>Default {@link ManagementDataCollector} implementation. The full paths
+ * to endpoints are provided to be clickable.</p>
+ *
+ * @author Hernán Cervera
+ * @since 3.0.0
+ */
+@Singleton
+@Requires(beans = ManagementController.class)
+public class DefaultManagementDataCollector implements ManagementDataCollector<Resource> {
+
+    /**
+     * <p>Collect management endpoints in a {@link Resource}. Duplicate route paths are not registered because
+     * Http methods are not shown on a resource, which makes identical route paths seemingly the same. Each entry
+     * has the id of the Endpoint as key, except for the management route, which its key is <code>self</code>.</p>
+     *
+     * @param routes management routes to collect.
+     * @param routeBase base route of the endpoints.
+     * @param managementDiscoveryPath path of management endpoint.
+     * @param isManagementDiscoveryPathTemplated whether the discovery path is templated.
+     * @return {@link Publisher} with the Resource.
+     */
+    @Override
+    public Publisher<Resource> collectData(Stream<UriRoute> routes, String routeBase,
+                                           String managementDiscoveryPath, boolean isManagementDiscoveryPathTemplated) {
+        AbstractResource<ManagementControllerResponse> resource = new ManagementControllerResponse();
+
+        resource.link(Link.SELF, Link.build(routeBase + managementDiscoveryPath)
+                .templated(isManagementDiscoveryPathTemplated).build());
+
+        Set<String> collectedPaths = new HashSet<>();
+        routes.forEach(route -> {
+            UriMatchTemplate uriMatchTemplate = route.getUriMatchTemplate();
+            String path = uriMatchTemplate.toString();
+
+            // Since Http methods are not shown on a Resource, avoid identical
+            // URLs, since they only differ on their Http method.
+            if (collectedPaths.contains(path)) {
+                return;
+            }
+
+            CharSequence endpointId = getEndpointId(route);
+            boolean isTemplated = !uriMatchTemplate.getVariables().isEmpty();
+            resource.link(endpointId, Link.build(routeBase + path).templated(isTemplated).build());
+
+            collectedPaths.add(path);
+        });
+
+        return Flowable.fromArray(new Resource[]{resource}).firstOrError().toFlowable();
+    }
+
+    private String getEndpointId(UriRoute route) {
+        AnnotationValue<Endpoint> endpoint = ((MethodBasedRoute) route).getTargetMethod()
+                .getAnnotationMetadata().getAnnotation(Endpoint.class);
+        Objects.requireNonNull(endpoint);
+        return endpoint.get("value", String.class)
+                .orElseGet(() -> endpoint.get("id", String.class).get());
+    }
+}
