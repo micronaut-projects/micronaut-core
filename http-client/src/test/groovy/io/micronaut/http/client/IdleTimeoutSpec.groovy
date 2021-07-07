@@ -1,6 +1,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
@@ -8,7 +9,9 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.channel.Channel
 import io.netty.channel.pool.AbstractChannelPoolMap
-import spock.lang.*
+import spock.lang.Specification
+import spock.lang.AutoCleanup
+import spock.lang.Shared
 import spock.util.concurrent.PollingConditions
 
 import java.lang.reflect.Field
@@ -18,7 +21,6 @@ class IdleTimeoutSpec extends Specification {
     @AutoCleanup
     @Shared
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'IdleTimeoutSpec'])
-
 
     def "should close connection according to connection-pool-idle-timeout"() {
         setup:
@@ -43,6 +45,13 @@ class IdleTimeoutSpec extends Specification {
 
         when: "make another request"
         httpClient.toBlocking().retrieve(HttpRequest.GET('/idleTimeout'), String)
+
+        then:
+        new PollingConditions().eventually {
+            assert deque.size() > 0
+        }
+
+        when:
         Channel ch2 = deque.first
 
         then: "ensure channel 2 is open and channel 2 != channel 1"
@@ -79,6 +88,13 @@ class IdleTimeoutSpec extends Specification {
 
         when: "make another request"
         httpClient.toBlocking().retrieve(HttpRequest.GET('/idleTimeout'), String)
+
+        then:
+        new PollingConditions().eventually {
+            assert deque.size() > 0
+        }
+
+        when:
         Channel ch2 = deque.first
 
         then: "ensure channel is still open"
@@ -101,6 +117,7 @@ class IdleTimeoutSpec extends Specification {
         return innerMap.values().first().deque
     }
 
+    @Requires(property = 'spec.name', value = 'IdleTimeoutSpec')
     @Controller('/idleTimeout')
     static class GetController {
 
