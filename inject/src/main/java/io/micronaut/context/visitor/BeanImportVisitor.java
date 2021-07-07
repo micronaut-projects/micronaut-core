@@ -20,16 +20,19 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.ServiceLoader;
 import java.util.Set;
 
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Import;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -40,13 +43,30 @@ import io.micronaut.inject.visitor.VisitorContext;
  * @since 3.0.0
  */
 public class BeanImportVisitor implements TypeElementVisitor<Import, Object> {
+
+    private static final List<BeanImportHandler> BEAN_IMPORT_HANDLERS;
+
+    static {
+        final ServiceLoader<BeanImportHandler> handlers = ServiceLoader.load(BeanImportHandler.class);
+        List<BeanImportHandler> beanImportHandlers = new ArrayList<>();
+        for (BeanImportHandler handler : handlers) {
+            beanImportHandlers.add(handler);
+        }
+        OrderUtil.sort(beanImportHandlers);
+        BEAN_IMPORT_HANDLERS = Collections.unmodifiableList(beanImportHandlers);
+    }
+
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         List<ClassElement> beanElements = collectInjectableElements(element, context);
 
         for (ClassElement beanElement : beanElements) {
-            element.addAssociatedBean(beanElement)
+            final BeanElementBuilder beanElementBuilder =
+                    element.addAssociatedBean(beanElement)
                     .inject();
+            for (BeanImportHandler beanImportHandler : BEAN_IMPORT_HANDLERS) {
+                beanImportHandler.beanAdded(beanElementBuilder, context);
+            }
         }
     }
 
@@ -66,6 +86,11 @@ public class BeanImportVisitor implements TypeElementVisitor<Import, Object> {
             annotationSet = CollectionUtils.setOf(AnnotationUtil.SCOPE, Bean.class.getName(), AnnotationUtil.QUALIFIER);
         } else {
             annotationSet = new HashSet<>(Arrays.asList(annotations));
+        }
+        if (!annotationSet.contains("*")) {
+            for (BeanImportHandler beanImportHandler : BEAN_IMPORT_HANDLERS) {
+                annotationSet.addAll(beanImportHandler.getSupportedAnnotationNames());
+            }
         }
         final String[] packages = element.getAnnotationMetadata().stringValues(Import.class, "packages");
 
