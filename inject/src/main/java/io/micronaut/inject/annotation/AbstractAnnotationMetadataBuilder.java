@@ -699,7 +699,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     final List<? extends A> annotationsForMember = getAnnotationsForType(member)
                             .stream().filter((a) -> !getAnnotationTypeName(a).equals(annotationName))
                             .collect(Collectors.toList());
-                    includeAnnotations(memberMetadata, member, null,true, annotationsForMember, false);
+                    includeAnnotations(memberMetadata, member, null, true, annotationsForMember, false);
 
                     boolean isInstantiatedMember = memberMetadata.hasAnnotation(InstantiatedMember.class);
 
@@ -1907,6 +1907,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
 
             if (annotationMirror != null) {
+                final Map<? extends T, ?> defaultValues = readAnnotationDefaultValues(annotationName, annotationMirror);
+                processAnnotationDefaults(
+                        annotationMirror,
+                        newMetadata,
+                        annotationName,
+                        defaultValues
+                );
                 processAnnotationStereotypes(
                         newMetadata,
                         true,
@@ -1938,7 +1945,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         final boolean isHierarchy = annotationMetadata instanceof AnnotationMetadataHierarchy;
         AnnotationMetadata declaredMetadata = annotationMetadata;
         if (isHierarchy) {
-            declaredMetadata = ((AnnotationMetadataHierarchy) annotationMetadata).getDeclaredMetadata();
+            declaredMetadata = annotationMetadata.getDeclaredMetadata();
         }
         // if it is anything else other than DefaultAnnotationMetadata here it is probably empty
         // in which case nothing needs to be done
@@ -1979,7 +1986,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         final boolean isHierarchy = annotationMetadata instanceof AnnotationMetadataHierarchy;
         AnnotationMetadata declaredMetadata = annotationMetadata;
         if (isHierarchy) {
-            declaredMetadata = ((AnnotationMetadataHierarchy) annotationMetadata).getDeclaredMetadata();
+            declaredMetadata = annotationMetadata.getDeclaredMetadata();
         }
         // if it is anything else other than DefaultAnnotationMetadata here it is probably empty
         // in which case nothing needs to be done

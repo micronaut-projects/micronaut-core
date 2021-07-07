@@ -62,7 +62,7 @@ interface Parser {
 
     void "test method adapter with overloading"() {
         given:
-        def context = buildContext('adapteroverloading.Test', '''
+        def context = buildContext('''
 package adapteroverloading;
 
 import io.micronaut.context.event.*;

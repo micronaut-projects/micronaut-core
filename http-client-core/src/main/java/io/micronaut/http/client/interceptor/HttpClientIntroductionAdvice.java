@@ -24,6 +24,7 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.beans.BeanMap;
@@ -141,6 +142,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      * @param context The context
      * @return httpClient or future
      */
+    @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         if (!context.hasStereotype(Client.class)) {

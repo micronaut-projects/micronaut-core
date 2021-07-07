@@ -1,1 +1,2 @@
 io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
+io.micronaut.context.visitor.BeanImportVisitor

@@ -8,7 +8,7 @@ import spock.lang.Unroll
 class FactoryBeanFieldSpec extends AbstractBeanDefinitionSpec {
     void "test a factory bean can be supplied from a field"() {
         given:
-        ApplicationContext context = buildContext('io.micronaut.inject.factory.TestFactory$TestField', '''\
+        ApplicationContext context = buildContext('''
 package io.micronaut.inject.factory;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;

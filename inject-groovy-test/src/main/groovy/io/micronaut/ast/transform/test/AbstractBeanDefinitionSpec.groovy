@@ -28,6 +28,7 @@ import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.provider.BeanProviderDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
@@ -239,7 +240,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         context.getBean(context.classLoader.loadClass(className), qualifier)
     }
 
-    protected ApplicationContext buildContext(String className, String cls) {
+    protected ApplicationContext buildContext(String cls, boolean includeAllBeans = true) {
         InMemoryByteCodeGroovyClassLoader classLoader = buildClassLoader(cls)
 
         return new DefaultApplicationContext(
@@ -252,12 +253,11 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
                     .map({ name -> (BeanDefinitionReference) classLoader.loadClass(name).newInstance() })
                     .filter({ bdr -> predicate == null || predicate.test(bdr) })
                     .collect(Collectors.toList())
-                return references + new InterceptorRegistryBean()
+                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences(predicate) : [
+                        new InterceptorRegistryBean(),
+                        new BeanProviderDefinition()
+                ])
             }
         }.start()
-    }
-
-    protected ApplicationContext buildContext(String cls) {
-        buildContext(null, cls)
     }
 }

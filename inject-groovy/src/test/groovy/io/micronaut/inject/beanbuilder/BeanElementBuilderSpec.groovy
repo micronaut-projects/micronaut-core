@@ -37,7 +37,7 @@ class SomeBean {
     @Monitored
     void test() {}
 }
-''')
+''', false)
         when:
         def someBean = getBean(context, 'addbean.SomeBean')
 

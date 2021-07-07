@@ -126,6 +126,16 @@ public class MediaType implements CharSequence {
     public static final MediaType TEXT_HTML_TYPE = new MediaType(TEXT_HTML);
 
     /**
+     * CSV: text/csv.
+     */
+    public static final String TEXT_CSV = "text/csv";
+
+    /**
+     * CSV: text/csv.
+     */
+    public static final MediaType TEXT_CSV_TYPE = new MediaType(TEXT_CSV);
+
+    /**
      * XHTML: application/xhtml+xml.
      */
     public static final String APPLICATION_XHTML = "application/xhtml+xml";
@@ -515,6 +525,8 @@ public class MediaType implements CharSequence {
                 return MULTIPART_FORM_DATA_TYPE;
             case TEXT_HTML:
                 return TEXT_HTML_TYPE;
+            case TEXT_CSV:
+                return TEXT_CSV_TYPE;
             case APPLICATION_XHTML:
                 return APPLICATION_XHTML_TYPE;
             case APPLICATION_XML:

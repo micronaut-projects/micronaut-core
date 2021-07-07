@@ -18,11 +18,14 @@ package io.micronaut.inject.annotation;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -37,9 +40,46 @@ import java.util.function.Predicate;
 public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     private boolean hasPropertyExpressions = false;
 
+    /**
+     * Default constructor.
+     */
+    public MutableAnnotationMetadata() {
+    }
+
+    private MutableAnnotationMetadata(@Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
+                                     @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
+                                     @Nullable Map<String, Map<CharSequence, Object>> allStereotypes,
+                                     @Nullable Map<String, Map<CharSequence, Object>> allAnnotations,
+                                     @Nullable Map<String, List<String>> annotationsByStereotype,
+                                     boolean hasPropertyExpressions) {
+        super(declaredAnnotations,
+              declaredStereotypes,
+              allStereotypes,
+              allAnnotations,
+              annotationsByStereotype,
+              hasPropertyExpressions);
+        this.hasPropertyExpressions = hasPropertyExpressions;
+    }
+
     @Override
     public boolean hasPropertyExpressions() {
         return hasPropertyExpressions;
+    }
+
+    @Override
+    public MutableAnnotationMetadata clone() {
+        final MutableAnnotationMetadata cloned = new MutableAnnotationMetadata(
+                declaredAnnotations != null ? new HashMap<>(declaredAnnotations) : null,
+                declaredStereotypes != null ? new HashMap<>(declaredStereotypes) : null,
+                allStereotypes != null ? new HashMap<>(allStereotypes) : null,
+                allAnnotations != null ? new HashMap<>(allAnnotations) : null,
+                annotationsByStereotype != null ? new HashMap<>(annotationsByStereotype) : null,
+                hasPropertyExpressions
+        );
+        if (annotationDefaultValues != null) {
+            cloned.annotationDefaultValues = new LinkedHashMap<>(annotationDefaultValues);
+        }
+        return cloned;
     }
 
     @Override

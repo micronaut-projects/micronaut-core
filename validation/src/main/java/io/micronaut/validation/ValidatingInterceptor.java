@@ -82,6 +82,7 @@ public class ValidatingInterceptor implements MethodInterceptor<Object, Object> 
         return POSITION;
     }
 
+    @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         if (executableValidator != null) {

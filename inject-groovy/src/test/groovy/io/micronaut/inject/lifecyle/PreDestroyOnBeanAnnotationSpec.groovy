@@ -2,13 +2,14 @@ package io.micronaut.inject.lifecyle
 
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.inject.qualifiers.Qualifiers
 
 import java.util.concurrent.ExecutorService
 
 class PreDestroyOnBeanAnnotationSpec extends AbstractBeanDefinitionSpec {
     void "test pre destroy with bean method on parent class"() {
         given:
-        ApplicationContext context = buildContext('predestroy.TestFactory$TestBean', '''\
+        ApplicationContext context = buildContext('''
 package predestroy;
 
 import io.micronaut.inject.annotation.*;
@@ -52,7 +53,7 @@ class AbstractTest implements AutoCloseable {
 
     void "test pre destroy with bean method on parent interface"() {
         given:
-        ApplicationContext context = buildContext('predestroy2.TestFactory$TestBean', '''\
+        ApplicationContext context = buildContext('''
 package predestroy2;
 
 import io.micronaut.inject.annotation.*;
@@ -95,7 +96,7 @@ class Test implements AutoCloseable {
 
     void "test pre destroy with bean method on interface"() {
         given:
-        ApplicationContext context = buildContext('predestroy3.TestFactory$TestBean', '''\
+        ApplicationContext context = buildContext('''
 package predestroy3;
 
 import io.micronaut.inject.annotation.*;
@@ -106,13 +107,14 @@ class TestFactory {
 
     @Bean(preDestroy="shutdown")
     @jakarta.inject.Singleton
+    @jakarta.inject.Named("my")
     java.util.concurrent.ExecutorService myService() {
         return java.util.concurrent.Executors.newFixedThreadPool(1);
     }
 }
 
 
-''')
+''', false)
 
         when:
         def bean = context.getBean(ExecutorService)
@@ -130,7 +132,7 @@ class TestFactory {
 
     void "test pre destroy with bean method that returns a value"() {
         given:
-        ApplicationContext context = buildContext('predestroy4.TestFactory$TestBean', '''\
+        ApplicationContext context = buildContext('''
 package predestroy4;
 
 import io.micronaut.inject.annotation.*;
@@ -170,7 +172,7 @@ class Test {
     }
     void "test pre destroy with bean method that returns void"() {
         given:
-        ApplicationContext context = buildContext('predestroy5.TestFactory2$TestBean', '''\
+        ApplicationContext context = buildContext('''
 package predestroy5;
 
 import io.micronaut.inject.annotation.*;
@@ -211,7 +213,7 @@ class Test2 {
 
     void "test pre destroy with bean method that doesn't exist"() {
         when:
-        buildContext('predestroy6.TestFactory2$TestBean', '''\
+        buildContext('''
 package predestroy6;
 
 import io.micronaut.inject.annotation.*;

@@ -6,6 +6,12 @@ Micronaut {version} includes the following changes:
 
 The `jakarta.inject` annotations are now the default injection annotations for Micronaut 3
 
+==== Support for JSR-330 Bean Import
+
+Using the ann:context.annotation.Import[] annotation it is now possible to import bean definitions into your application where JSR-330 (either `javax.inject` or `jakarta.inject` annotations) are used in an external library.
+
+See the documentation on <<beanImport, Bean Import>> for more information.
+
 ==== Support for Controlling Annotation Inheritance
 
 api:core.annotation.AnnotationMetadata[] inheritance can now be controlled via Java's `@Inherited` annotation. If an annotation is not explicitly annotated with `@Inherited` it will not be included in the metadata. See the <<annotationMetadata, Annotation Inheritance>> section of the documentation for more information.

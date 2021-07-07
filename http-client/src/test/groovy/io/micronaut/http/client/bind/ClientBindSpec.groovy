@@ -4,8 +4,10 @@ import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.PathVariable
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import spock.lang.Specification
@@ -16,6 +18,7 @@ import javax.annotation.Nullable
 class ClientBindSpec extends Specification {
 
     @Inject BindClient bindClient
+    @Inject ErrorContextPath errorContextPath
 
     void "test binding to a query value"() {
         expect:
@@ -27,6 +30,15 @@ class ClientBindSpec extends Specification {
         expect:
         bindClient.pathValue("xx", Optional.of("yy")) == '/xx/yy'
         bindClient.pathValue("xx", Optional.empty()) == '/xx'
+    }
+
+    void "test a uri variable in the context path"() {
+        when:
+        errorContextPath.get("test")
+
+        then:
+        def ex = thrown(HttpClientException)
+        ex.message == "Failed to construct the request URI"
     }
 
     void "test space separated query value"() {
@@ -109,6 +121,12 @@ class ClientBindSpec extends Specification {
         @Get("/queryIdentity")
         @SimpleTestAuthorization
         String authorizedRequest()
+    }
+
+    @Client(value = "/", path = "/{bar}")
+    static interface ErrorContextPath {
+        @Get
+        String get(@PathVariable String bar)
     }
 
     @Controller("/bind")
