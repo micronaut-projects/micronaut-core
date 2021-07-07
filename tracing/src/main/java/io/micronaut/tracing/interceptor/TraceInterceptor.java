@@ -23,6 +23,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
@@ -78,6 +79,7 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
         return InterceptPhase.TRACE.getPosition();
     }
 
+    @Nullable
     @SuppressWarnings("unchecked")
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {

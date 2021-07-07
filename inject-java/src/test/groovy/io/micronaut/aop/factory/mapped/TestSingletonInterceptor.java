@@ -18,6 +18,7 @@ package io.micronaut.aop.factory.mapped;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.exceptions.BeanContextException;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ExecutableMethod;
 
 import jakarta.inject.Singleton;
@@ -29,6 +30,7 @@ public class TestSingletonInterceptor implements MethodInterceptor<Object, Objec
 
     private final Map<ExecutableMethod, Object> computedSingletons = new ConcurrentHashMap<>(30);
 
+    @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
 

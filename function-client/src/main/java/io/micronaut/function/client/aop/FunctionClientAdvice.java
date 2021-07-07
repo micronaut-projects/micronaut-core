@@ -19,6 +19,7 @@ import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.function.client.FunctionDefinition;
@@ -57,6 +58,7 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
         this.functionInvokerChooser = functionInvokerChooser;
     }
 
+    @Nullable
     @SuppressWarnings("unchecked")
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {

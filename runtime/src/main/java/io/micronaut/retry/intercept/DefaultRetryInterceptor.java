@@ -21,6 +21,7 @@ import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.retry.RetryState;
@@ -82,6 +83,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
         return InterceptPhase.RETRY.getPosition();
     }
 
+    @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         Optional<AnnotationValue<Retryable>> opt = context.findAnnotation(Retryable.class);
