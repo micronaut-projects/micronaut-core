@@ -46,6 +46,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import io.micronaut.inject.annotation.AnnotationTransformer
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.provider.BeanProviderDefinition
+import io.micronaut.inject.provider.JakartaProviderBeanDefinition
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.writer.BeanConfigurationWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
@@ -242,7 +243,8 @@ class Test {
 
                 return references + (includeAllBeans ? super.resolveBeanDefinitionReferences(predicate) : [
                         new InterceptorRegistryBean(),
-                        new BeanProviderDefinition()
+                        new BeanProviderDefinition(),
+                        new JakartaProviderBeanDefinition()
                 ])
             }
         }.start()

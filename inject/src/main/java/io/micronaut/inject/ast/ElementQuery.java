@@ -50,6 +50,11 @@ public interface ElementQuery<T extends Element> {
      */
     @NonNull ElementQuery<T> onlyDeclared();
 
+    /**
+     * Search for methods that are injection points.
+     * @return This query
+     */
+    ElementQuery<T> onlyInjected();
 
     /**
      * Indicates that only concrete members should be returned.
@@ -163,6 +168,11 @@ public interface ElementQuery<T extends Element> {
          * @return Whether to return only abstract methods
          */
         boolean isOnlyAbstract();
+
+        /**
+         * @return Whether to return only injection points
+         */
+        boolean isOnlyInjected();
 
         /**
          * @return Whether to return only concrete methods

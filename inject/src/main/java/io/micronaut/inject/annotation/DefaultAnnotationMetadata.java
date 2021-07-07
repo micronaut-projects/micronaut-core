@@ -1931,7 +1931,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Internal
     public static void contributeDefaults(AnnotationMetadata target, AnnotationMetadata source) {
         if (source instanceof AnnotationMetadataHierarchy) {
-            source = ((AnnotationMetadataHierarchy) source).getDeclaredMetadata();
+            source = source.getDeclaredMetadata();
         }
         if (target instanceof DefaultAnnotationMetadata && source instanceof DefaultAnnotationMetadata) {
             final Map<String, Map<CharSequence, Object>> existingDefaults = ((DefaultAnnotationMetadata) target).annotationDefaultValues;

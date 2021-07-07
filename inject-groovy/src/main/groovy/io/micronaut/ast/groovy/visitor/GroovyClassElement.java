@@ -33,6 +33,7 @@ import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static groovyjarjarasm.asm.Opcodes.*;
 import static org.codehaus.groovy.ast.ClassHelper.makeCached;
@@ -111,6 +112,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         boolean onlyAccessible = result.isOnlyAccessible();
         boolean onlyAbstract = result.isOnlyAbstract();
         boolean onlyConcrete = result.isOnlyConcrete();
+        boolean onlyInstance = result.isOnlyInstance();
         List<Predicate<String>> namePredicates = result.getNamePredicates();
         List<Predicate<ClassElement>> typePredicates = result.getTypePredicates();
         List<Predicate<AnnotationMetadata>> annotationPredicates = result.getAnnotationPredicates();
@@ -141,6 +143,10 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                     continue;
                 }
                 if (onlyConcrete && methodNode.isAbstract()) {
+                    i.remove();
+                    continue;
+                }
+                if (onlyInstance && methodNode.isStatic()) {
                     i.remove();
                     continue;
                 }
@@ -198,7 +204,11 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                 fields = findRelevantFields(onlyAccessible, result.getOnlyAccessibleFromType().orElse(this), fields, namePredicates, modifierPredicates);
             }
             //noinspection unchecked
-            elements = fields.stream().map(fieldNode -> (T) new GroovyFieldElement(
+            Stream<FieldNode> fieldStream = fields.stream();
+            if (onlyInstance) {
+                fieldStream = fieldStream.filter((fn) -> !fn.isStatic());
+            }
+            elements = fieldStream.map(fieldNode -> (T) new GroovyFieldElement(
                     visitorContext,
                     fieldNode,
                     fieldNode,

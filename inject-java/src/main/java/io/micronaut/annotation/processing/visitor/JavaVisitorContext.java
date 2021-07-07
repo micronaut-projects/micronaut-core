@@ -361,11 +361,11 @@ public class JavaVisitorContext implements VisitorContext {
 
     private void populateClassElements(@NonNull String[] stereotypes, PackageElement packageElement, List<ClassElement> classElements) {
         final List<? extends Element> enclosedElements = packageElement.getEnclosedElements();
-
+        boolean includeAll = Arrays.equals(stereotypes, new String[] { "*" });
         for (Element enclosedElement : enclosedElements) {
             if (enclosedElement instanceof TypeElement) {
                 final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(enclosedElement);
-                if (Arrays.stream(stereotypes).anyMatch(annotationMetadata::hasStereotype)) {
+                if (includeAll || Arrays.stream(stereotypes).anyMatch(annotationMetadata::hasStereotype)) {
                     JavaClassElement classElement = new JavaClassElement(
                             (TypeElement) enclosedElement,
                             annotationMetadata,
