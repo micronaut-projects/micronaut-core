@@ -1,10 +1,9 @@
 package io.micronaut.inject.generics
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.inject.BeanDefinition
-import jakarta.inject.Provider
-import jakarta.inject.Singleton
 
 class TypeArgumentsSpec extends AbstractTypeElementSpec {
 
@@ -52,7 +51,7 @@ interface ChainE<A, B, C, D> {
     }
 
     void "test argument is provider"() {
-        def context = BeanContext.run()
+        def context = ApplicationContext.run(["spec.name": TypeArgumentsSpec.simpleName])
         def beanDefinition = context.getBeanDefinition(MyBean)
 
         expect:
@@ -61,11 +60,5 @@ interface ChainE<A, B, C, D> {
 
         cleanup:
         context.close()
-    }
-
-    @Singleton
-    static class MyBean {
-
-        MyBean(Provider<String> provider) {}
     }
 }
