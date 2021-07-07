@@ -5,6 +5,7 @@ import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.core.annotation.Nullable;
 
 import javax.annotation.PreDestroy;
 
@@ -14,6 +15,7 @@ import javax.annotation.PreDestroy;
         kind = InterceptorKind.AROUND
 )
 public class TestInterceptor implements MethodInterceptor<Object, Object> {
+    @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         return context.proceed();

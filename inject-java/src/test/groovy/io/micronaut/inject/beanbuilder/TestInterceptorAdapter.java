@@ -4,6 +4,7 @@ import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ExecutableMethod;
 
 import java.util.function.Supplier;
@@ -37,6 +38,7 @@ public class TestInterceptorAdapter<T> implements MethodInterceptor<Object, Obje
         return valFromMethod;
     }
 
+    @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         return proceedMethod.invoke(
