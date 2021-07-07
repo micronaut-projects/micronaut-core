@@ -15,12 +15,10 @@
  */
 package io.micronaut.websocket;
 
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpRequest;
 import org.reactivestreams.Publisher;
 import java.net.URI;
-import java.net.URL;
 import java.util.Map;
 
 /**

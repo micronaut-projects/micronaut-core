@@ -100,8 +100,6 @@ public interface SseClient {
         return eventStream(HttpRequest.GET(uri), eventType);
     }
 
-
-
     /**
      * Create a new {@link SseClient}. Note that this method should only be used outside of the context of a
      * Micronaut application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead.
