@@ -91,8 +91,8 @@ import java.util.concurrent.ThreadFactory;
 @BootstrapContextCompatible
 @Internal
 public
-class ReactorNettyHttpClientRegistry implements AutoCloseable, ReactiveHttpClientRegistry<HttpClient, SseClient, StreamingHttpClient, WebSocketClient> {
-    private static final Logger LOG = LoggerFactory.getLogger(ReactorNettyHttpClientRegistry.class);
+class DefaultNettyHttpClientRegistry implements AutoCloseable, ReactiveHttpClientRegistry<HttpClient, SseClient, StreamingHttpClient, WebSocketClient> {
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultNettyHttpClientRegistry.class);
     private final Map<ClientKey, DefaultHttpClient> clients = new ConcurrentHashMap<>(10);
     private final LoadBalancerResolver loadBalancerResolver;
     private final NettyClientSslBuilder nettyClientSslBuilder;
@@ -119,7 +119,7 @@ class ReactorNettyHttpClientRegistry implements AutoCloseable, ReactiveHttpClien
      * @param beanContext                     The bean context
      * @param invocationInstrumenterFactories The invocation instrumenter factories
      */
-    public ReactorNettyHttpClientRegistry(
+    public DefaultNettyHttpClientRegistry(
             HttpClientConfiguration defaultHttpClientConfiguration,
             HttpClientFilterResolver httpClientFilterResolver,
             LoadBalancerResolver loadBalancerResolver,
