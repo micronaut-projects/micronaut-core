@@ -15,8 +15,11 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.service.ServiceDefinition;
+import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -100,7 +103,7 @@ public interface StreamingHttpClient extends HttpClient {
      * @return The client
      */
     static StreamingHttpClient create(@Nullable URL url) {
-        return HttpClientConfiguration.createStreamingClient(url);
+        return StreamingHttpClientFactoryResolver.createClient(url);
     }
 
     /**
@@ -113,6 +116,6 @@ public interface StreamingHttpClient extends HttpClient {
      * @since 2.2.0
      */
     static StreamingHttpClient create(@Nullable URL url, HttpClientConfiguration configuration) {
-        return HttpClientConfiguration.createStreamingClient(url, configuration);
+        return StreamingHttpClientFactoryResolver.createClient(url, configuration);
     }
 }

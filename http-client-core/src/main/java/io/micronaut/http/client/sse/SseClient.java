@@ -15,11 +15,15 @@
  */
 package io.micronaut.http.client.sse;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.service.ServiceDefinition;
+import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.StreamingHttpClientFactory;
 import io.micronaut.http.sse.Event;
 import org.reactivestreams.Publisher;
 
@@ -108,7 +112,7 @@ public interface SseClient {
      * @return The client
      */
     static SseClient create(@Nullable URL url) {
-        return HttpClientConfiguration.createSseClient(url);
+        return SseClientFactoryResolver.createClient(url);
     }
 
     /**
@@ -121,6 +125,6 @@ public interface SseClient {
      * @since 2.2.0
      */
     static SseClient create(@Nullable URL url, HttpClientConfiguration configuration) {
-        return HttpClientConfiguration.createSseClient(url, configuration);
+        return SseClientFactoryResolver.createClient(url, configuration);
     }
 }

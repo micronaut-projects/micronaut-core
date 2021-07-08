@@ -15,19 +15,16 @@
  */
 package io.micronaut.http.client;
 
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.HttpVersion;
-import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.runtime.ApplicationConfiguration;
-import io.micronaut.websocket.WebSocketClient;
 
 import java.net.Proxy;
 import java.net.ProxySelector;
@@ -40,11 +37,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.ServiceLoader;
 import java.util.concurrent.ThreadFactory;
 
 /**
@@ -105,8 +100,6 @@ public abstract class HttpClientConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_EXCEPTION_ON_ERROR_STATUS = true;
-
-    private static ReactiveHttpClientFactory clientFactory = null;
 
     private Map<String, Object> channelOptions = Collections.emptyMap();
 
@@ -645,138 +638,6 @@ public abstract class HttpClientConfiguration {
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    /**
-     * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
-     * {@link jakarta.inject.Inject} to inject a client instead
-     *
-     * @param url The base URL
-     * @return The client
-     */
-    @Internal
-    static HttpClient createClient(@Nullable URL url) {
-        ReactiveHttpClientFactory clientFactory = getReactiveHttpClientFactory();
-        return clientFactory.createClient(url);
-    }
-
-    /**
-     * Create a new {@link SseClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
-     * {@link jakarta.inject.Inject} to inject a client instead
-     *
-     * @param url The base URL
-     * @return The client
-     */
-    @Internal
-    public static SseClient createSseClient(@Nullable URL url) {
-        ReactiveHttpClientFactory clientFactory = getReactiveHttpClientFactory();
-        return clientFactory.createSseClient(url);
-    }
-
-    /**
-     * Create a new {@link SseClient} with the specified configuration. Note that this method should only be used outside of the context of an application. Within Micronaut use
-     * {@link jakarta.inject.Inject} to inject a client instead
-     *
-     * @param url The base URL
-     * @param configuration the client configuration
-     * @return The client
-     */
-    @Internal
-    public static SseClient createSseClient(@Nullable URL url, HttpClientConfiguration configuration) {
-        ReactiveHttpClientFactory clientFactory = getReactiveHttpClientFactory();
-        return clientFactory.createSseClient(url, configuration);
-    }
-
-    /**
-     * Create a new {@link WebSocketClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
-     * {@link jakarta.inject.Inject} to inject a client instead
-     *
-     * @param url The base URL
-     * @return The client
-     */
-    @Internal
-    static WebSocketClient createWebSocketClient(@Nullable URL url) {
-        ReactiveHttpClientFactory clientFactory = getReactiveHttpClientFactory();
-        return clientFactory.createWebSocketClient(url);
-    }
-
-    /**
-     * Create a new {@link WebSocketClient} with the specified configuration. Note that this method should only be used outside of the context of an application. Within Micronaut use
-     * {@link jakarta.inject.Inject} to inject a client instead
-     *
-     * @param url The base URL
-     * @param configuration the client configuration
-     * @return The client
-     */
-    @Internal
-    static WebSocketClient createWebSocketClient(@Nullable URL url, HttpClientConfiguration configuration) {
-        ReactiveHttpClientFactory clientFactory = getReactiveHttpClientFactory();
-        return clientFactory.createWebSocketClient(url, configuration);
-    }
-
-    /**
-     * Create a new {@link HttpClient} with the specified configuration. Note that this method should only be used
-     * outside of the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead
-     *
-     * @param url The base URL
-     * @param configuration the client configuration
-     * @return The client
-     * @since 2.2.0
-     */
-    @Internal
-    static HttpClient createClient(@Nullable URL url, HttpClientConfiguration configuration) {
-        ReactiveHttpClientFactory clientFactory = getReactiveHttpClientFactory();
-        return clientFactory.createClient(url, configuration);
-    }
-
-    /**
-     * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
-     * {@link jakarta.inject.Inject} to inject a client instead
-     *
-     * @param url The base URL
-     * @return The client
-     */
-    @Internal
-    static StreamingHttpClient createStreamingClient(@Nullable URL url) {
-        ReactiveHttpClientFactory clientFactory = getReactiveHttpClientFactory();
-        return clientFactory.createStreamingClient(url);
-    }
-
-    /**
-     * Create a new {@link HttpClient} with the specified configuration. Note that this method should only be used
-     * outside of the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead
-     *
-     * @param url The base URL
-     * @param configuration The client configuration
-     * @return The client
-     * @since 2.2.0
-     */
-    @Internal
-    static StreamingHttpClient createStreamingClient(@Nullable URL url, HttpClientConfiguration configuration) {
-        ReactiveHttpClientFactory clientFactory = getReactiveHttpClientFactory();
-        return clientFactory.createStreamingClient(url, configuration);
-    }
-
-    private static ReactiveHttpClientFactory getReactiveHttpClientFactory() {
-        ReactiveHttpClientFactory clientFactory = HttpClientConfiguration.clientFactory;
-        if (clientFactory == null) {
-            synchronized (HttpClientConfiguration.class) { // double check
-                clientFactory = HttpClientConfiguration.clientFactory;
-                if (clientFactory == null) {
-                    clientFactory = resolveClientFactory();
-                    HttpClientConfiguration.clientFactory = clientFactory;
-                }
-            }
-        }
-        return clientFactory;
-    }
-
-    private static ReactiveHttpClientFactory resolveClientFactory() {
-        final Iterator<ReactiveHttpClientFactory> i = ServiceLoader.load(ReactiveHttpClientFactory.class).iterator();
-        if (i.hasNext()) {
-            return i.next();
-        }
-        throw new IllegalStateException("No ReactorHttpClientFactory present on classpath, cannot create HTTP client");
     }
 
     /**

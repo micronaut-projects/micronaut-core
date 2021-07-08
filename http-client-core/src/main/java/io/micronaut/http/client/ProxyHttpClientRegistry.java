@@ -41,9 +41,9 @@ public interface ProxyHttpClientRegistry<P extends ProxyHttpClient> {
      */
     @NonNull
     P resolveProxyHttpClient(@Nullable InjectionPoint<?> injectionPoint,
-                         @Nullable LoadBalancer loadBalancer,
-                         @Nullable HttpClientConfiguration configuration,
-                         BeanContext beanContext);
+                             @Nullable LoadBalancer loadBalancer,
+                             @Nullable HttpClientConfiguration configuration,
+                             BeanContext beanContext);
 
     /**
      * Dispose of the client defined by the given metadata.

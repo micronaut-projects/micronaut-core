@@ -13,14 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client;
+package io.micronaut.websocket;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.inject.InjectionPoint;
-import io.micronaut.websocket.WebSocketClient;
 
 /**
  * Interface for managing the construction and lifecycle of instances of reactive {@link WebSocketClient} clients.

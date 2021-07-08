@@ -16,6 +16,7 @@
 package io.micronaut.http.client;
 
 import io.micronaut.context.LifeCycle;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -25,7 +26,6 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.hateoas.JsonError;
-import io.micronaut.websocket.WebSocketClient;
 import org.reactivestreams.Publisher;
 
 import java.io.Closeable;
@@ -39,6 +39,10 @@ import java.util.Optional;
  * @since 1.0
  */
 public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
+
+    @Internal
+    HttpClientFactoryResolver factory = new HttpClientFactoryResolver();
+
     /**
      * The default error type.
      */
@@ -237,7 +241,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @return The client
      */
     static HttpClient create(@Nullable URL url) {
-        return HttpClientConfiguration.createClient(url);
+        return factory.createClient(url);
     }
 
     /**
@@ -250,30 +254,6 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @since 2.2.0
      */
     static HttpClient create(@Nullable URL url, HttpClientConfiguration configuration) {
-        return HttpClientConfiguration.createClient(url, configuration);
-    }
-
-    /**
-     * Create a new {@link WebSocketClient}. Note that this method should only be used outside of the context of a
-     * Micronaut application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead.
-     *
-     * @param url The base URL
-     * @return The client
-     */
-    static WebSocketClient createWebSocketClient(@Nullable URL url) {
-        return HttpClientConfiguration.createWebSocketClient(url);
-    }
-
-    /**
-     * Create a new {@link WebSocketClient} with the specified configuration. Note that this method should only be used
-     * outside of the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead
-     *
-     * @param url The base URL
-     * @param configuration the client configuration
-     * @return The client
-     * @since 2.2.0
-     */
-    static WebSocketClient createWebSocketClient(@Nullable URL url, HttpClientConfiguration configuration) {
-        return HttpClientConfiguration.createWebSocketClient(url, configuration);
+        return factory.createClient(url, configuration);
     }
 }

@@ -15,9 +15,15 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.io.service.ServiceDefinition;
+import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import org.reactivestreams.Publisher;
+
+import java.net.URL;
 
 /**
  * Interface that allows proxying of HTTP requests in controllers and filters.
@@ -35,4 +41,28 @@ public interface ProxyHttpClient {
      * @return A publisher that emits the response.
      */
     Publisher<MutableHttpResponse<?>> proxy(HttpRequest<?> request);
+
+    /**
+     * Create a new {@link ProxyHttpClient}. Note that this method should only be used outside of the context of a
+     * Micronaut application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead.
+     *
+     * @param url The base URL
+     * @return The client
+     */
+    static ProxyHttpClient create(@Nullable URL url) {
+        return ProxyHttpClientFactoryResolver.createClient(url);
+    }
+
+    /**
+     * Create a new {@link ProxyHttpClient} with the specified configuration. Note that this method should only be used
+     * outside of the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @param configuration the client configuration
+     * @return The client
+     * @since 2.2.0
+     */
+    static ProxyHttpClient create(@Nullable URL url, HttpClientConfiguration configuration) {
+        return ProxyHttpClientFactoryResolver.createClient(url, configuration);
+    }
 }

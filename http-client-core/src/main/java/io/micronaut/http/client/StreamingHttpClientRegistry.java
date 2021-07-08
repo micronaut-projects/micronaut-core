@@ -41,9 +41,9 @@ public interface StreamingHttpClientRegistry<S extends StreamingHttpClient> {
      */
     @NonNull
     S resolveStreamingHttpClient(@Nullable InjectionPoint<?> injectionPoint,
-                             @Nullable LoadBalancer loadBalancer,
-                             @Nullable HttpClientConfiguration configuration,
-                             BeanContext beanContext);
+                                 @Nullable LoadBalancer loadBalancer,
+                                 @Nullable HttpClientConfiguration configuration,
+                                 BeanContext beanContext);
 
     /**
      * Return the client for the given annotation metadata.
