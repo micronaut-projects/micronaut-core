@@ -450,7 +450,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         for (Element enclosedElement : enclosedElements) {
                             if (elements.hides(enclosedElement, superElement)) {
                                 continue superElements;
-                            } else if (enclosedElement.getKind() == ElementKind.METHOD && superElement.getKind() == ElementKind.METHOD &&
+                            } else if (enclosedElement.getKind() == ElementKind.METHOD &&
+                                    superElement.getKind() == ElementKind.METHOD &&
                                     elements.overrides((ExecutableElement) enclosedElement, (ExecutableElement) superElement, this.classElement)) {
                                 continue superElements;
                             }
