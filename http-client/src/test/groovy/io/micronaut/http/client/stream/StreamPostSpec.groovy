@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.rxjava2
+package io.micronaut.http.client.stream
 
 import io.micronaut.core.async.annotation.SingleResult
 import groovy.transform.EqualsAndHashCode
@@ -52,11 +52,11 @@ import java.util.function.Function
  * @author Graeme Rocher
  * @since 1.0
  */
-class RxHttpPostSpec extends Specification {
+class StreamPostSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'RxHttpPostSpec'])
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'StreamPostSpec'])
 
     @Shared
     ApplicationContext context = embeddedServer.applicationContext
@@ -228,7 +228,7 @@ class RxHttpPostSpec extends Specification {
         Integer pages
     }
 
-    @Requires(property = 'spec.name', value = 'RxHttpPostSpec')
+    @Requires(property = 'spec.name', value = 'StreamPostSpec')
     @Controller('/post')
     static class PostController {
 
@@ -250,7 +250,7 @@ class RxHttpPostSpec extends Specification {
         String lastName
     }
 
-    @Requires(property = 'spec.name', value = 'RxHttpPostSpec')
+    @Requires(property = 'spec.name', value = 'StreamPostSpec')
     @Controller('/reactive/post')
     static class ReactivePostController {
 
