@@ -132,7 +132,7 @@ class StreamPostSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message.contains('Cannot construct instance of `io.micronaut.http.client.rxjava2.Movie`')
+        e.message.contains('Cannot construct instance of `io.micronaut.http.client.steam.Movie`')
     }
 
     void "test reactive post error handling"() {
