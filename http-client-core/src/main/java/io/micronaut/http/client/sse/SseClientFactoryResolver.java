@@ -10,6 +10,12 @@ import java.net.URL;
 import java.util.Iterator;
 import java.util.ServiceLoader;
 
+/**
+ * Resolves an {@link SseClientFactory} from a service loader.
+ *
+ * @author James Kleeh
+ * @since 3.0.0
+ */
 @Internal
 class SseClientFactoryResolver {
 
