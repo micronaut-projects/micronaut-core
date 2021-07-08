@@ -36,7 +36,7 @@ import java.util.Collection;
 import java.util.Optional;
 
 /**
- * Implementation of the binder for the {@link QueryValue} annotation
+ * Implementation of the binder for the {@link QueryValue} annotation.
  *
  * @since 3.0.0
  * @author Andriy Dmytruk
@@ -84,7 +84,7 @@ public class QueryValueClientArgumentBinder implements AnnotatedClientArgumentRe
             addMultiParameters(context, value, key, parameters);
         } else {
             String delimiter = "";
-            switch(format) {
+            switch (format) {
                 case SSV:
                     delimiter = SPACE_DELIMITER;
                     break;
@@ -94,6 +94,7 @@ public class QueryValueClientArgumentBinder implements AnnotatedClientArgumentRe
                 case CSV:
                     delimiter = COMMA_DELIMITER;
                     break;
+                default:
             }
             createSeparatedQueryValue(context, value, delimiter)
                     .ifPresent(v -> parameters.add(key, v));
@@ -144,7 +145,7 @@ public class QueryValueClientArgumentBinder implements AnnotatedClientArgumentRe
             // noinspection unechecked
             BeanWrapper wrapper = BeanWrapper.getWrapper(value);
             // noinspection unchecked
-            Collection<BeanProperty<Object,Object>> properties = wrapper.getBeanProperties();
+            Collection<BeanProperty<Object, Object>> properties = wrapper.getBeanProperties();
             for (BeanProperty<Object, Object> property: properties) {
                 Object item = property.get(value);
                 if (item == null) {

@@ -272,7 +272,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
 
             // Apply all the argument binders
-            Argument.of(Void.class, context.getAnnotationMetadata());
             if (arguments.length > 0) {
                 for (Argument argument : arguments) {
                     Object definedValue = getValue(argument, context, parameters, paramMap);

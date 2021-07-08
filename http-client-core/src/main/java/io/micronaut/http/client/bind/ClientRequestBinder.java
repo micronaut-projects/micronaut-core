@@ -18,7 +18,6 @@ package io.micronaut.http.client.bind;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Indexed;
-import io.micronaut.http.MutableHttpRequest;
 
 /**
  * A binder that binds to a {@link MutableHttpRequest}.

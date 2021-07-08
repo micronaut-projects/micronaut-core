@@ -43,7 +43,7 @@ public interface HttpClientBinderRegistry {
 
     /**
      * Locate an {@link AnnotatedClientRequestBinder} for a given annotation type
-     * (that is supposed to be applied to the method)
+     * (that is supposed to be applied to the method).
      *
      * @param annotationType - the type of annotation
      * @return An {@link Optional} of {@link AnnotatedClientRequestBinder}
