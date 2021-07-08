@@ -409,7 +409,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         generatorAdapter.push(argumentName);
 
         // 3rd argument: The annotation metadata
-        if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+        if (annotationMetadata instanceof DefaultAnnotationMetadata && !annotationMetadata.isEmpty()) {
             AnnotationMetadataWriter.instantiateNewMetadata(
                     owningType,
                     declaringClassWriter,
