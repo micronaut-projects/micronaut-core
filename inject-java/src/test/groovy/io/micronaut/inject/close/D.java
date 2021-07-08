@@ -20,12 +20,13 @@ import io.micronaut.context.annotation.Requires;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 import java.io.IOException;
+import java.util.List;
 
 @Requires(property = "spec.name", value = "BeanCloseOrderSpec")
 @Singleton
 public class D implements AutoCloseable {
 
-    public D() {}
+    public D(List<E> eList) {}
 
     @PreDestroy
     @Override
