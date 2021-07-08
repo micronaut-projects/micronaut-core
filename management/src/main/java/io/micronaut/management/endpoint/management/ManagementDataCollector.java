@@ -1,5 +1,7 @@
 package io.micronaut.management.endpoint.management;
 
+import io.micronaut.context.annotation.DefaultImplementation;
+import io.micronaut.management.endpoint.management.impl.DefaultManagementDataCollector;
 import io.micronaut.web.router.UriRoute;
 import org.reactivestreams.Publisher;
 
@@ -11,6 +13,7 @@ import java.util.stream.Stream;
  * @author Hernán Cervera
  * @since 3.0.0
  * */
+@DefaultImplementation(DefaultManagementDataCollector.class)
 public interface ManagementDataCollector<T> {
 
     /**

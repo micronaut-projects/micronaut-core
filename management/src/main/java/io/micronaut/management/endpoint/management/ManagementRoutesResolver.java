@@ -1,5 +1,8 @@
 package io.micronaut.management.endpoint.management;
 
+import io.micronaut.context.annotation.DefaultImplementation;
+import io.micronaut.management.endpoint.management.impl.DefaultManagementDataCollector;
+import io.micronaut.management.endpoint.management.impl.DefaultManagementRoutesResolver;
 import io.micronaut.web.router.UriRoute;
 
 import java.util.stream.Stream;
@@ -10,6 +13,7 @@ import java.util.stream.Stream;
  * @author Hernán Cervera
  * @since 3.0.0
  */
+@DefaultImplementation(DefaultManagementRoutesResolver.class)
 public interface ManagementRoutesResolver {
 
     /**
