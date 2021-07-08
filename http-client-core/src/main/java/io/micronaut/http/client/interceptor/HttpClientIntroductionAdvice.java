@@ -56,7 +56,7 @@ import io.micronaut.http.annotation.RequestAttribute;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.ReactiveClientResultTransformer;
-import io.micronaut.http.client.ReactiveHttpClientRegistry;
+import io.micronaut.http.client.HttpClientRegistry;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.bind.ClientArgumentRequestBinder;
@@ -119,7 +119,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private final List<ReactiveClientResultTransformer> transformers;
     private final HttpClientBinderRegistry binderRegistry;
     private final JsonMediaTypeCodec jsonMediaTypeCodec;
-    private final ReactiveHttpClientRegistry<?, ?, ?, ?, ?> clientFactory;
+    private final HttpClientRegistry<?> clientFactory;
 
     /**
      * Constructor for advice class to setup things like Headers, Cookies, Parameters for Clients.
@@ -132,7 +132,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      */
     public HttpClientIntroductionAdvice(
             BeanContext beanContext,
-            ReactiveHttpClientRegistry<?, ?, ?, ?, ?> clientFactory,
+            HttpClientRegistry<?> clientFactory,
             JsonMediaTypeCodec jsonMediaTypeCodec,
             List<ReactiveClientResultTransformer> transformers,
             HttpClientBinderRegistry binderRegistry) {

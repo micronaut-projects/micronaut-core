@@ -51,7 +51,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class ServiceHttpClientFactory {
 
     private final TaskScheduler taskScheduler;
-    private final BeanProvider<ReactiveHttpClientRegistry<?, ?, ?, ?, ?>> clientFactory;
+    private final BeanProvider<HttpClientRegistry<?>> clientFactory;
 
     /**
      * Default constructor.
@@ -61,7 +61,7 @@ public class ServiceHttpClientFactory {
      */
     public ServiceHttpClientFactory(
             TaskScheduler taskScheduler,
-            BeanProvider<ReactiveHttpClientRegistry<?, ?, ?, ?, ?>> clientFactory) {
+            BeanProvider<HttpClientRegistry<?>> clientFactory) {
         this.taskScheduler = taskScheduler;
         this.clientFactory = clientFactory;
     }

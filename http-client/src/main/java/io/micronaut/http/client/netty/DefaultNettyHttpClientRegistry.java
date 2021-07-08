@@ -36,18 +36,13 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
-import io.micronaut.http.client.HttpClient;
-import io.micronaut.http.client.HttpClientConfiguration;
-import io.micronaut.http.client.LoadBalancer;
-import io.micronaut.http.client.LoadBalancerResolver;
-import io.micronaut.http.client.ProxyHttpClient;
-import io.micronaut.http.client.ReactiveHttpClientRegistry;
-import io.micronaut.http.client.StreamingHttpClient;
+import io.micronaut.http.client.*;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
 import io.micronaut.http.client.sse.SseClient;
+import io.micronaut.http.client.sse.SseClientRegistry;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
@@ -92,7 +87,12 @@ import java.util.concurrent.ThreadFactory;
 @BootstrapContextCompatible
 @Internal
 public
-class DefaultNettyHttpClientRegistry implements AutoCloseable, ReactiveHttpClientRegistry<HttpClient, SseClient, StreamingHttpClient, WebSocketClient, ProxyHttpClient> {
+class DefaultNettyHttpClientRegistry implements AutoCloseable,
+        HttpClientRegistry<HttpClient>,
+        SseClientRegistry<SseClient>,
+        StreamingHttpClientRegistry<StreamingHttpClient>,
+        WebSocketClientRegistry<WebSocketClient>,
+        ProxyHttpClientRegistry<ProxyHttpClient> {
     private static final Logger LOG = LoggerFactory.getLogger(DefaultNettyHttpClientRegistry.class);
     private final Map<ClientKey, DefaultHttpClient> clients = new ConcurrentHashMap<>(10);
     private final LoadBalancerResolver loadBalancerResolver;
@@ -173,7 +173,13 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable, ReactiveHttpClien
 
     @Override
     @NonNull
-    public DefaultHttpClient getStreamingClient(@NonNull AnnotationMetadata metadata) {
+    public DefaultHttpClient getStreamingHttpClient(@NonNull AnnotationMetadata metadata) {
+        return getClient(metadata);
+    }
+
+    @Override
+    @NonNull
+    public DefaultHttpClient getProxyHttpClient(@NonNull AnnotationMetadata metadata) {
         return getClient(metadata);
     }
 
@@ -229,7 +235,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable, ReactiveHttpClien
     }
 
     @Override
-    public HttpClient resolveClient(@Nullable InjectionPoint injectionPoint,
+    @NonNull
+    public HttpClient resolveClient(@Nullable InjectionPoint<?>  injectionPoint,
                                     @Nullable LoadBalancer loadBalancer,
                                     @Nullable HttpClientConfiguration configuration,
                                     BeanContext beanContext) {
@@ -237,7 +244,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable, ReactiveHttpClien
     }
 
     @Override
-    public ProxyHttpClient resolveProxyClient(@Nullable InjectionPoint injectionPoint,
+    @NonNull
+    public ProxyHttpClient resolveProxyHttpClient(@Nullable InjectionPoint<?>  injectionPoint,
                                               @Nullable LoadBalancer loadBalancer,
                                               @Nullable HttpClientConfiguration configuration,
                                               BeanContext beanContext) {
@@ -245,7 +253,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable, ReactiveHttpClien
     }
 
     @Override
-    public SseClient resolveSseClient(@Nullable InjectionPoint injectionPoint,
+    @NonNull
+    public SseClient resolveSseClient(@Nullable InjectionPoint<?>  injectionPoint,
                        @Nullable LoadBalancer loadBalancer,
                        @Nullable HttpClientConfiguration configuration,
                        BeanContext beanContext) {
@@ -253,7 +262,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable, ReactiveHttpClien
     }
 
     @Override
-    public StreamingHttpClient resolveStreamingClient(@Nullable InjectionPoint injectionPoint,
+    @NonNull
+    public StreamingHttpClient resolveStreamingHttpClient(@Nullable InjectionPoint<?>  injectionPoint,
                              @Nullable LoadBalancer loadBalancer,
                              @Nullable HttpClientConfiguration configuration,
                              BeanContext beanContext) {
@@ -261,7 +271,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable, ReactiveHttpClien
     }
 
     @Override
-    public WebSocketClient resolveWebSocketClient(@Nullable InjectionPoint injectionPoint,
+    @NonNull
+    public WebSocketClient resolveWebSocketClient(@Nullable InjectionPoint<?> injectionPoint,
                              @Nullable LoadBalancer loadBalancer,
                              @Nullable HttpClientConfiguration configuration,
                              BeanContext beanContext) {
