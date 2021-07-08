@@ -16,12 +16,7 @@
 package io.micronaut.websocket;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.http.client.HttpClientConfiguration;
-import io.micronaut.http.client.StreamingHttpClient;
-import io.micronaut.http.client.StreamingHttpClientFactory;
 
-import java.net.URL;
 import java.util.Iterator;
 import java.util.ServiceLoader;
 
@@ -36,17 +31,7 @@ class WebSocketClientFactoryResolver {
 
     private static WebSocketClientFactory factory;
 
-    @NonNull
-    static WebSocketClient createClient(URL url) {
-        return getFactory().createWebSocketClient(url);
-    }
-
-    @NonNull
-    static WebSocketClient createClient(URL url, HttpClientConfiguration configuration) {
-        return getFactory().createWebSocketClient(url, configuration);
-    }
-
-    private static WebSocketClientFactory getFactory() {
+    static WebSocketClientFactory getFactory() {
         if (factory == null) {
             synchronized (WebSocketClientFactoryResolver.class) { // double check
                 if (factory == null) {

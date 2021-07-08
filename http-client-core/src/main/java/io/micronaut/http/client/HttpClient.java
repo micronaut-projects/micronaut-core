@@ -16,7 +16,6 @@
 package io.micronaut.http.client;
 
 import io.micronaut.context.LifeCycle;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -39,9 +38,6 @@ import java.util.Optional;
  * @since 1.0
  */
 public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
-
-    @Internal
-    HttpClientFactoryResolver factory = new HttpClientFactoryResolver();
 
     /**
      * The default error type.
@@ -241,7 +237,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @return The client
      */
     static HttpClient create(@Nullable URL url) {
-        return factory.createClient(url);
+        return HttpClientFactoryResolver.getFactory().createClient(url);
     }
 
     /**
@@ -254,6 +250,6 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @since 2.2.0
      */
     static HttpClient create(@Nullable URL url, HttpClientConfiguration configuration) {
-        return factory.createClient(url, configuration);
+        return HttpClientFactoryResolver.getFactory().createClient(url, configuration);
     }
 }

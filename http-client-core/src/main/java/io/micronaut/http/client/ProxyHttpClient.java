@@ -47,7 +47,7 @@ public interface ProxyHttpClient {
      * @return The client
      */
     static ProxyHttpClient create(@Nullable URL url) {
-        return ProxyHttpClientFactoryResolver.createClient(url);
+        return ProxyHttpClientFactoryResolver.getFactory().createProxyClient(url);
     }
 
     /**
@@ -60,6 +60,6 @@ public interface ProxyHttpClient {
      * @since 2.2.0
      */
     static ProxyHttpClient create(@Nullable URL url, HttpClientConfiguration configuration) {
-        return ProxyHttpClientFactoryResolver.createClient(url, configuration);
+        return ProxyHttpClientFactoryResolver.getFactory().createProxyClient(url, configuration);
     }
 }

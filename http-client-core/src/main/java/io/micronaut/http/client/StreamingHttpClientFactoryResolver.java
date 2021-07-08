@@ -16,9 +16,7 @@
 package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 
-import java.net.URL;
 import java.util.Iterator;
 import java.util.ServiceLoader;
 
@@ -33,17 +31,7 @@ class StreamingHttpClientFactoryResolver {
 
     private static StreamingHttpClientFactory factory;
 
-    @NonNull
-    static StreamingHttpClient createClient(URL url) {
-        return getFactory().createStreamingClient(url);
-    }
-
-    @NonNull
-    static StreamingHttpClient createClient(URL url, HttpClientConfiguration configuration) {
-        return getFactory().createStreamingClient(url, configuration);
-    }
-
-    private static StreamingHttpClientFactory getFactory() {
+    static StreamingHttpClientFactory getFactory() {
         if (factory == null) {
             synchronized (StreamingHttpClientFactoryResolver.class) { // double check
                 if (factory == null) {

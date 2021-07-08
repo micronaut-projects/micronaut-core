@@ -31,7 +31,6 @@ import java.net.ProxySelector;
 import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -43,10 +42,7 @@ import java.util.OptionalInt;
 import java.util.concurrent.ThreadFactory;
 
 /**
- * Configuration for the {@link HttpClient}. This configuration only takes affect for {@link HttpClient}
- * instances created outside the application context using {@link HttpClient#create(URL, HttpClientConfiguration)}.
- * For clients created within the context using, e.g. {@link jakarta.inject.Inject} or
- * {@link io.micronaut.context.ApplicationContext#createBean(Class)}, use event loop group configuration.
+ * Configuration for the {@link HttpClient}
  *
  * @author Graeme Rocher
  * @since 1.0

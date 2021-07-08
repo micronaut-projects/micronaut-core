@@ -16,10 +16,7 @@
 package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.http.client.sse.SseClient;
 
-import java.net.URL;
 import java.util.Iterator;
 import java.util.ServiceLoader;
 
@@ -34,17 +31,7 @@ class ProxyHttpClientFactoryResolver {
 
     private static ProxyHttpClientFactory factory;
 
-    @NonNull
-    static ProxyHttpClient createClient(URL url) {
-        return getFactory().createProxyClient(url);
-    }
-
-    @NonNull
-    static ProxyHttpClient createClient(URL url, HttpClientConfiguration configuration) {
-        return getFactory().createProxyClient(url, configuration);
-    }
-
-    private static ProxyHttpClientFactory getFactory() {
+    static ProxyHttpClientFactory getFactory() {
         if (factory == null) {
             synchronized (ProxyHttpClientFactoryResolver.class) { // double check
                 if (factory == null) {

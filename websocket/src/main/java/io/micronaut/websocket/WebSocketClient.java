@@ -15,18 +15,15 @@
  */
 package io.micronaut.websocket;
 
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.io.service.ServiceDefinition;
-import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.HttpClientConfiguration;
 import org.reactivestreams.Publisher;
+
 import java.net.URI;
 import java.net.URL;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * Interface that provides a way to connect a client over WebSocket.
@@ -106,7 +103,6 @@ public interface WebSocketClient extends AutoCloseable {
         return connect(clientEndpointType, HttpRequest.GET(uri));
     }
 
-
     /**
      * Create a new {@link WebSocketClient}. Note that this method should only be used outside of the context of a
      * Micronaut application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead.
@@ -115,7 +111,7 @@ public interface WebSocketClient extends AutoCloseable {
      * @return The client
      */
     static WebSocketClient create(@Nullable URL url) {
-        return WebSocketClientFactoryResolver.createClient(url);
+        return WebSocketClientFactoryResolver.getFactory().createWebSocketClient(url);
     }
 
     /**
@@ -128,7 +124,7 @@ public interface WebSocketClient extends AutoCloseable {
      * @since 2.2.0
      */
     static WebSocketClient create(@Nullable URL url, HttpClientConfiguration configuration) {
-        return WebSocketClientFactoryResolver.createClient(url, configuration);
+        return WebSocketClientFactoryResolver.getFactory().createWebSocketClient(url, configuration);
     }
 
 }
