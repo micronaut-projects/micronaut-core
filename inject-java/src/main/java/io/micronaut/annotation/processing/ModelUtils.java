@@ -549,7 +549,7 @@ public class ModelUtils {
      * @param strict       Whether to use strict checks for overriding and not include logic to handle method overloading
      * @return the overriding method
      */
-    Optional<ExecutableElement> overridingOrHidingMethod(ExecutableElement overridden, TypeElement classElement, boolean strict) {
+    public Optional<ExecutableElement> overridingOrHidingMethod(ExecutableElement overridden, TypeElement classElement, boolean strict) {
         List<ExecutableElement> methods = ElementFilter.methodsIn(elementUtils.getAllMembers(classElement));
         for (ExecutableElement method : methods) {
             if (strict) {

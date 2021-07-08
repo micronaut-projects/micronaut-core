@@ -46,15 +46,6 @@ public class ValidationExceptionHandler implements ExceptionHandler<ValidationEx
 
     /**
      * Constructor.
-     * @deprecated Use {@link ValidationExceptionHandler(ErrorResponseProcessor)} instead.
-     */
-    @Deprecated
-    public ValidationExceptionHandler() {
-        this.responseProcessor = null;
-    }
-
-    /**
-     * Constructor.
      * @param responseProcessor Error Response Processor
      */
     public ValidationExceptionHandler(ErrorResponseProcessor<?> responseProcessor) {

@@ -3,7 +3,7 @@ package io.micronaut.docs.aop.lifecycle;
 // tag::imports[]
 import io.micronaut.context.annotation.Parameter;
 
-import javax.annotation.PreDestroy;
+import jakarta.annotation.PreDestroy;
 // end::imports[]
 
 // tag::class[]

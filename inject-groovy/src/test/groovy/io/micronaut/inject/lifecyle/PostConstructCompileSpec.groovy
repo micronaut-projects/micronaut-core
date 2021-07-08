@@ -10,7 +10,7 @@ class PostConstructCompileSpec extends AbstractBeanDefinitionSpec {
         BeanDefinition definition = buildBeanDefinition('io.micronaut.inject.lifecyle.Test', '''
 package io.micronaut.inject.lifecyle;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 
 class Test {
 
@@ -31,7 +31,7 @@ class Test {
         def definition = buildBeanDefinition('io.micronaut.inject.lifecyle.Test', '''
 package io.micronaut.inject.lifecyle;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import jakarta.inject.Inject;
 
 class Test {
@@ -55,7 +55,7 @@ class Test {
         def definition = buildBeanDefinition('io.micronaut.inject.lifecyle.Test', '''
 package io.micronaut.inject.lifecyle;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import jakarta.inject.Inject;
 
 class Test {

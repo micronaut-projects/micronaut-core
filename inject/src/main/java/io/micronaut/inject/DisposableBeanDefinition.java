@@ -21,19 +21,19 @@ import io.micronaut.context.DefaultBeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
 
 /**
- * A bean definition that provides disposing hooks normally in the form of {@link javax.annotation.PreDestroy}
+ * A bean definition that provides disposing hooks normally in the form of {@link jakarta.annotation.PreDestroy}
  * annotated methods.
  *
  * @param <T> The bean definition type
  * @author Graeme Rocher
- * @see javax.annotation.PreDestroy
+ * @see jakarta.annotation.PreDestroy
  * @since 1.0
  */
 @Internal
 public interface DisposableBeanDefinition<T> extends BeanDefinition<T> {
 
     /**
-     * Disposes of the bean definition by executing all {@link javax.annotation.PreDestroy} hooks.
+     * Disposes of the bean definition by executing all {@link jakarta.annotation.PreDestroy} hooks.
      *
      * @param context The bean context
      * @param bean    The bean
@@ -46,7 +46,7 @@ public interface DisposableBeanDefinition<T> extends BeanDefinition<T> {
     }
 
     /**
-     * Disposes of the bean definition by executing all {@link javax.annotation.PreDestroy} hooks.
+     * Disposes of the bean definition by executing all {@link jakarta.annotation.PreDestroy} hooks.
      *
      * @param resolutionContext The bean resolution context
      * @param context           The bean context

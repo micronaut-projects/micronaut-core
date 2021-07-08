@@ -191,6 +191,12 @@ The class will still create the attribute but it is recommended to instead creat
 There is also a minor behavior change in when the response gets written.
 Any modifications to the response after the underlying `onNext` call is made will not have any effect as the response has already been written.
 
+==== HTTP Compile Time Validation
+
+Compile time validation of HTTP related classes has been moved to its own module. To continue validating controllers, websocket server classes add `http-validation` to the annotation processor classpath.
+
+dependency:io.micronaut:micronaut-http-validation[gradleScope="annotationProcessor"]
+
 ==== Decapitalization Strategy
 
 For many cases, one common one being introspections, getter names like `getXForwarded()` would result in the bean property being `XForwarded`.

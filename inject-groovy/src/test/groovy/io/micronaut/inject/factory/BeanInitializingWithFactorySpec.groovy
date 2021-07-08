@@ -24,7 +24,7 @@ import io.micronaut.context.event.BeanInitializedEventListener
 import io.micronaut.context.event.BeanInitializingEvent
 import spock.lang.Specification
 
-import javax.annotation.PostConstruct
+import jakarta.annotation.PostConstruct
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 

@@ -22,6 +22,7 @@ import io.micronaut.inject.annotation.NamedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.lang.annotation.Annotation;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -45,10 +46,14 @@ public final class PersistenceContextAnnotationMapper implements NamedAnnotation
     public List<AnnotationValue<?>> map(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
         final String name = annotation.stringValue("name").orElse(null);
         if (name != null) {
+            return Arrays.asList(
+                AnnotationValue.builder(AnnotationUtil.INJECT).build(),
+                AnnotationValue.builder(AnnotationUtil.NAMED).value(name).build()
+            );
+        } else {
             return Collections.singletonList(
-                    AnnotationValue.builder(AnnotationUtil.NAMED).value(name).build()
+                AnnotationValue.builder(AnnotationUtil.INJECT).build()
             );
         }
-        return Collections.emptyList();
     }
 }
