@@ -29,11 +29,13 @@ class BeanCloseOrderSpec extends Specification {
         ctx.getBean(B)
         ctx.getBean(C)
         ctx.getBean(D)
+        ctx.getBean(E)
+        ctx.getBean(F)
 
         when:
         ctx.close()
 
         then:
-        closed == [A,B,C,D]
+        closed == [A,B,C,D,E,F]
     }
 }
