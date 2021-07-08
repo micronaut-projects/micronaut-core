@@ -176,6 +176,18 @@ public class ArrayUtils {
     }
 
     /**
+     * Returns an array containing all of the elements in this collection, using the item class.
+     *
+     * @param collection The collection
+     * @param arrayItemClass The array item class
+     * @param <T> The type of the array
+     * @return The array
+     */
+    public static <T> T[] toArray(Collection<T> collection, Class<T> arrayItemClass) {
+        return (T[]) collection.toArray((Object[]) Array.newInstance(arrayItemClass, collection.size()));
+    }
+
+    /**
      * Iterator implementation used to efficiently expose contents of an
      * Array as read-only iterator.
      *

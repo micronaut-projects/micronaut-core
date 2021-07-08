@@ -44,6 +44,15 @@ public class DependencyInjectionException extends BeanCreationException {
 
     /**
      * @param resolutionContext The resolution context
+     * @param message           The message
+     * @param cause             The throwable
+     */
+    public DependencyInjectionException(BeanResolutionContext resolutionContext, String message, Throwable cause) {
+        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, message), cause);
+    }
+
+    /**
+     * @param resolutionContext The resolution context
      * @param argument          The argument
      * @param message           The message
      */

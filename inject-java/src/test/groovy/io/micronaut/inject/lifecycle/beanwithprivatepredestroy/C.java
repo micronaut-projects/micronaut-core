@@ -13,17 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.field.setinjection;
+package io.micronaut.inject.lifecycle.beanwithprivatepredestroy;
 
-import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
-import java.util.Set;
+import javax.annotation.PreDestroy;
 
-public class B {
-    @Inject
-    private Set<A> all;
+@Singleton
+public class C implements AutoCloseable {
 
-    Set<A> getAll() {
-        return this.all;
+    private boolean closed;
+
+    @Override
+    @PreDestroy
+    public void close() throws Exception {
+        this.closed = true;
+    }
+
+    public boolean isClosed() {
+        return closed;
     }
 }

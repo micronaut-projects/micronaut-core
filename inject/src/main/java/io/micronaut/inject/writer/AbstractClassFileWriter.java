@@ -62,7 +62,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     protected static final Type TYPE_GENERATED = Type.getType(Generated.class);
     protected static final Pattern ARRAY_PATTERN = Pattern.compile("(\\[\\])+$");
 
-    private static final Method METHOD_CREATE_ARGUMENT_SIMPLE = Method.getMethod(
+    protected static final Method METHOD_CREATE_ARGUMENT_SIMPLE = Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(
                     Argument.class,
                     "of",

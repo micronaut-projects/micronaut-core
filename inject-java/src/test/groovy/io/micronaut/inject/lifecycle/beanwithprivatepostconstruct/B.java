@@ -13,17 +13,37 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.field.setinjection;
+package io.micronaut.inject.lifecycle.beanwithprivatepostconstruct;
 
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
-import java.util.Set;
+import javax.annotation.PostConstruct;
 
+@Singleton
 public class B {
-    @Inject
-    private Set<A> all;
 
-    Set<A> getAll() {
-        return this.all;
+    boolean setupComplete = false;
+    boolean injectedFirst = false;
+
+    @Inject
+    protected A another;
+    private A a;
+
+    @Inject
+    public void setA(A a ) {
+        this.a = a;
+    }
+
+    public A getA() {
+        return a;
+    }
+
+    @PostConstruct
+    private void setup() {
+        if(a != null && another != null) {
+            injectedFirst = true;
+        }
+        setupComplete = true;
     }
 }

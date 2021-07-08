@@ -13,39 +13,43 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.method.setinjection;
+package io.micronaut.inject.lifecycle.beanwithprivatepredestroy;
 
-import io.micronaut.context.BeanContext;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
-import java.util.Set;
+import javax.annotation.PreDestroy;
+import java.io.Closeable;
 
 @Singleton
-public class B {
-    private Set<A> all;
-    private Set<A> allPrivate;
-    private BeanContext beanContext;
+public class B implements Closeable {
+
+    boolean noArgsDestroyCalled = false;
+    boolean injectedDestroyCalled = false;
 
     @Inject
-    void setA(Set<A> a) {
-        this.all = a;
-    }
+    protected A another;
+    private A a;
 
     @Inject
-    private void setPrivate(Set<A> a, BeanContext beanContext) {
-        this.all = a;
+    void setA(A a ) {
+        this.a = a;
     }
 
-    Set<A> getAll() {
-        return this.all;
+    A getA() {
+        return a;
     }
 
-    public Set<A> getAllPrivate() {
-        return allPrivate;
+    @Override
+    @PreDestroy
+    public void close() {
+        noArgsDestroyCalled = true;
     }
 
-    public BeanContext getBeanContext() {
-        return beanContext;
+    @PreDestroy
+    private void another(C c) {
+        if(c != null) {
+            injectedDestroyCalled = true;
+        }
     }
 }
