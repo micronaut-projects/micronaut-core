@@ -17,7 +17,7 @@ package io.micronaut.docs.events.factory;
 
 import io.micronaut.context.annotation.Factory;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import jakarta.inject.Singleton;
 
 // tag::class[]

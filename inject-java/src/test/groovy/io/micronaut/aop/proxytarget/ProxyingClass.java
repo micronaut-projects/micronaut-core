@@ -17,7 +17,7 @@ package io.micronaut.aop.proxytarget;
 
 import io.micronaut.aop.simple.*;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import jakarta.inject.Singleton;
 import java.util.Collections;
 import java.util.List;

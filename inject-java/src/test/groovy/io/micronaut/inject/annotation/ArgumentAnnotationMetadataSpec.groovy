@@ -75,7 +75,7 @@ import java.lang.annotation.*;
 @jakarta.inject.Singleton
 class Test implements TestApi {
 
-    @javax.annotation.PostConstruct
+    @jakarta.annotation.PostConstruct
     @java.lang.Override
     public void test(String id) {
     

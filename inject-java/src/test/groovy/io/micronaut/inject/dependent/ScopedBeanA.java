@@ -3,7 +3,7 @@ package io.micronaut.inject.dependent;
 import io.micronaut.runtime.context.scope.Refreshable;
 import jakarta.inject.Inject;
 
-import javax.annotation.PreDestroy;
+import jakarta.annotation.PreDestroy;
 
 @Refreshable
 public class ScopedBeanA {

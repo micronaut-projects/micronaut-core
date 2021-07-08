@@ -31,7 +31,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import jakarta.inject.Inject;
 import java.text.SimpleDateFormat;
 import java.util.Date;

@@ -34,7 +34,7 @@ import java.util.EventListener;
 @FunctionalInterface
 public interface BeanDestroyedEventListener<T> extends EventListener {
     /**
-     * Fired when a bean has been destroyed and all {@link javax.annotation.PreDestroy} methods invoked.
+     * Fired when a bean has been destroyed and all {@link jakarta.annotation.PreDestroy} methods invoked.
      *
      * @param event The bean created event
      */

@@ -491,7 +491,9 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
                 visitBeanFactoryElement(declaringClass, methodNode, methodAnnotationMetadata, methodName)
             }
-        } else if (methodAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT, ProcessedTypes.POST_CONSTRUCT, ProcessedTypes.PRE_DESTROY)) {
+        } else if (methodAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT) ||
+                methodAnnotationMetadata.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT) ||
+                methodAnnotationMetadata.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)) {
             if (isConstructor && methodAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT)) {
                 // constructor with explicit @Inject
                 defineBeanDefinition(concreteClass)
@@ -533,7 +535,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                             methodAnnotationMetadata
                     )
 
-                    if (isDeclaredBean && methodAnnotationMetadata.hasStereotype(ProcessedTypes.POST_CONSTRUCT)) {
+                    if (isDeclaredBean && methodAnnotationMetadata.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT)) {
                         defineBeanDefinition(concreteClass)
                         def beanWriter = getBeanWriter()
                         if (aopProxyWriter instanceof AopProxyWriter && !((AopProxyWriter)aopProxyWriter).isProxyTarget()) {
@@ -545,7 +547,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                                 requiresReflection,
                                 groovyVisitorContext
                         )
-                    } else if (isDeclaredBean && methodAnnotationMetadata.hasStereotype(ProcessedTypes.PRE_DESTROY)) {
+                    } else if (isDeclaredBean && methodAnnotationMetadata.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)) {
                         defineBeanDefinition(concreteClass)
                         def beanWriter = getBeanWriter()
                         if (aopProxyWriter instanceof AopProxyWriter && !((AopProxyWriter)aopProxyWriter).isProxyTarget()) {

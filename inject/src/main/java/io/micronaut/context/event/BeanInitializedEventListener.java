@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.Indexed;
 import java.util.EventListener;
 
 /**
- * <p>Allows hooking into bean instantiation at the point prior to when {@link javax.annotation.PostConstruct}
+ * <p>Allows hooking into bean instantiation at the point prior to when {@link jakarta.annotation.PostConstruct}
  * initialization hooks have been called and in the case of bean {@link io.micronaut.context.BeanProvider} instances the
  * {@link io.micronaut.context.BeanProvider#get()} method has not yet been invoked.</p>
  * <p>
@@ -35,9 +35,9 @@ import java.util.EventListener;
 public interface BeanInitializedEventListener<T> extends EventListener {
 
     /**
-     * <p>Fired when a bean is instantiated but the {@link javax.annotation.PostConstruct} initialization hooks have not
-     * yet been called and in this case of bean {@link javax.inject.Provider} instances the
-     * {@link javax.inject.Provider#get()} method has not yet been invoked.</p>
+     * <p>Fired when a bean is instantiated but the {@link jakarta.annotation.PostConstruct} initialization hooks have not
+     * yet been called and in this case of bean {@link jakarta.inject.Provider} instances the
+     * {@link jakarta.inject.Provider#get()} method has not yet been invoked.</p>
      *
      * @param event The bean initializing event
      * @return The bean or a replacement bean of the same type
