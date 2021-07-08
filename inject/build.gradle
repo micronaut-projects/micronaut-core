@@ -5,7 +5,7 @@ dependencies {
     api dependencyVersion("javax.annotation-api")
     compileOnly group: 'javax.inject', name: 'javax.inject', version: '1'
     api "jakarta.inject:jakarta.inject-api:2.0.0"
-    api 'jakarta.annotation:jakarta.annotation-api:2.0.0'
+    api "jakarta.annotation:jakarta.annotation-api:$jakartaAnnotationApiVersion"
     api project(':core')
     api dependencyVersion("snakeyaml")
 
