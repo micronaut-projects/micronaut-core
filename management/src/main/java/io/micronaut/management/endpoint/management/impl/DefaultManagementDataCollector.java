@@ -70,10 +70,13 @@ public class DefaultManagementDataCollector implements ManagementDataCollector<R
     }
 
     private String getEndpointId(UriRoute route) {
-        AnnotationValue<Endpoint> endpoint = ((MethodBasedRoute) route).getTargetMethod()
-                .getAnnotationMetadata().getAnnotation(Endpoint.class);
-        Objects.requireNonNull(endpoint);
-        return endpoint.get("value", String.class)
-                .orElseGet(() -> endpoint.get("id", String.class).get());
+        if (route instanceof MethodBasedRoute) {
+            AnnotationValue<Endpoint> endpoint = ((MethodBasedRoute) route).getTargetMethod()
+                    .getAnnotationMetadata().getAnnotation(Endpoint.class);
+            Objects.requireNonNull(endpoint);
+            return endpoint.get("value", String.class)
+                    .orElseGet(() -> endpoint.get("id", String.class).get());
+        }
+        throw new IllegalArgumentException("Route must be an instance of " + MethodBasedRoute.class.getName());
     }
 }

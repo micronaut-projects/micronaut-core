@@ -1,9 +1,11 @@
 package io.micronaut.management.endpoint.management;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.server.util.HttpHostResolver;
+import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.UriRoute;
 import io.reactivex.Single;
 
@@ -12,13 +14,12 @@ import java.util.stream.Stream;
 /**
  * <p>Exposes the available management endpoints of the application</p>
  *
- * @author Herán Cervera
+ * @author Hernán Cervera
  * @since 3.0.0
  */
 @Controller
+@Requires(beans = EmbeddedServer.class)
 public class ManagementController {
-
-    static final String GET_MANAGEMENT_ROUTES_PATH = "management";
 
     private final HttpHostResolver httpHostResolver;
 
@@ -33,7 +34,7 @@ public class ManagementController {
         this.managementDataCollector = managementDataCollector;
     }
 
-    @Get(GET_MANAGEMENT_ROUTES_PATH)
+    @Get("management")
     public Single<?> getManagementRoutes(HttpRequest<?> httpRequest) {
         String routeBase = httpHostResolver.resolve(httpRequest);
         String managementDiscoveryPath = httpRequest.getPath();
