@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.io.scan.nested
+package io.micronaut.ast.groovy.scan2
 
 import groovy.transform.AutoClone
 
@@ -22,5 +22,5 @@ import groovy.transform.AutoClone
  * @since 1.0
  */
 @AutoClone
-class Foo2 {
+class Foo3 {
 }

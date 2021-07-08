@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.io.scan;
+package io.micronaut.ast.groovy.scan;
 
+import groovyjarjarasm.asm.AnnotationVisitor;
+import groovyjarjarasm.asm.ClassVisitor;
+import groovyjarjarasm.asm.Opcodes;
+import groovyjarjarasm.asm.Type;
 import io.micronaut.core.annotation.AnnotatedTypeInfo;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
-import org.objectweb.asm.AnnotationVisitor;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
 
 import java.util.HashSet;
 import java.util.Set;
