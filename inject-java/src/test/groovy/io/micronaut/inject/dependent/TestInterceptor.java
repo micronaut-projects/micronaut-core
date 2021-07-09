@@ -7,7 +7,7 @@ import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.core.annotation.Nullable;
 
-import javax.annotation.PreDestroy;
+import jakarta.annotation.PreDestroy;
 
 @Bean
 @InterceptorBinding(

@@ -48,7 +48,16 @@ public interface BeanIntrospector {
      * @return A collection of introspections
      */
     @NonNull
-    Collection<BeanIntrospection<Object>> findIntrospections(@NonNull Predicate<? super BeanIntrospectionReference> filter);
+    Collection<BeanIntrospection<Object>> findIntrospections(@NonNull Predicate<? super BeanIntrospectionReference<?>> filter);
+
+    /**
+     * Finds introspections with the given filter.
+     * @param filter A filter that receives a {@link BeanIntrospectionReference}
+     * @return A collection of introspections
+     * @since 3.0
+     */
+    @NonNull
+    Collection<Class<?>> findIntrospectedTypes(@NonNull Predicate<? super BeanIntrospectionReference<?>> filter);
 
     /**
      * Find a {@link BeanIntrospection} for the given bean type.

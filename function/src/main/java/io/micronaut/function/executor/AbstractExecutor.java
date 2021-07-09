@@ -25,8 +25,8 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.inject.ExecutableMethod;
+import jakarta.annotation.PreDestroy;
 
-import javax.annotation.PreDestroy;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Optional;

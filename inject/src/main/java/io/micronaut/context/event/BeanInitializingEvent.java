@@ -20,7 +20,7 @@ import io.micronaut.inject.BeanDefinition;
 
 /**
  * <p>An event fired when a bean's properties have been populated but initialization hooks (such as
- * {@link javax.annotation.PostConstruct} methods) have not yet been triggered.</p>
+ * {@link jakarta.annotation.PostConstruct} methods) have not yet been triggered.</p>
  * <p>
  * <p>To listen to an event for a fully initialized bean see {@link BeanCreatedEvent}</p>
  *

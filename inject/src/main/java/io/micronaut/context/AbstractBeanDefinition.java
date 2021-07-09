@@ -520,28 +520,30 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Argument[] typeArguments,
             boolean requiresReflection) {
-        if (annotationMetadata != null && annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.INJECT)) {
-            requiredComponents.add(fieldType);
-        }
+        FieldInjectionPoint injectionPoint;
         if (requiresReflection) {
-            fieldInjectionPoints.add(new ReflectionFieldInjectionPoint(
+            injectionPoint = new ReflectionFieldInjectionPoint(
                     this,
                     declaringType,
                     fieldType,
                     field,
                     annotationMetadata,
                     typeArguments
-            ));
+            );
         } else {
-            fieldInjectionPoints.add(new DefaultFieldInjectionPoint(
+            injectionPoint = new DefaultFieldInjectionPoint(
                     this,
                     declaringType,
                     fieldType,
                     field,
                     annotationMetadata,
                     typeArguments
-            ));
+            );
         }
+        if (annotationMetadata != null && annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.INJECT)) {
+            addRequiredComponents(injectionPoint.asArgument());
+        }
+        fieldInjectionPoints.add(injectionPoint);
         return this;
     }
 
@@ -2253,7 +2255,13 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     private void addRequiredComponents(Argument... arguments) {
         if (arguments != null) {
             for (Argument argument : arguments) {
-                requiredComponents.add(argument.getType());
+                if (argument.isContainerType() || argument.isProvider()) {
+                    argument.getFirstTypeVariable()
+                            .map(Argument::getType)
+                            .ifPresent(requiredComponents::add);
+                } else {
+                    requiredComponents.add(argument.getType());
+                }
             }
         }
     }

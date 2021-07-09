@@ -25,7 +25,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.core.io.scan.ClassPathAnnotationScanner;
+import io.micronaut.ast.groovy.scan.ClassPathAnnotationScanner;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -162,7 +162,7 @@ public class GroovyVisitorContext implements VisitorContext {
             final String sample = sourceUnit.getSample(expr.getLineNumber(), expr.getColumnNumber(), new Janitor());
             msg.append("\n\n").append(sample);
         }
-        System.out.println(msg.toString());
+        System.out.println(msg);
     }
 
     @Override
@@ -191,7 +191,7 @@ public class GroovyVisitorContext implements VisitorContext {
             final String sample = sourceUnit.getSample(expr.getLineNumber(), expr.getColumnNumber(), new Janitor());
             msg.append("\n\n").append(sample);
         }
-        System.out.println(msg.toString());
+        System.out.println(msg);
 
     }
 

@@ -20,7 +20,7 @@ import jakarta.inject.Singleton;
 import org.junit.Assert;
 import org.junit.Test;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 

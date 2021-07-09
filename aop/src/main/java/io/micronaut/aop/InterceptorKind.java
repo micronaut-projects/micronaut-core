@@ -15,9 +15,10 @@
  */
 package io.micronaut.aop;
 
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
 import java.lang.annotation.Annotation;
+
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 
 /**
  * Enum representing different interceptors kinds.

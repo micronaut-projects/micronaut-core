@@ -44,8 +44,6 @@ class BinaryWebSocketSpec extends Specification {
         fred.session != null
         fred.session.id != null
 
-
-
         then:"A session is established"
         fred.session != null
         fred.session.id != null

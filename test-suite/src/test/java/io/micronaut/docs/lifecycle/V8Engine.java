@@ -16,7 +16,7 @@
 package io.micronaut.docs.lifecycle;
 
 // tag::imports[]
-import javax.annotation.PostConstruct; // <1>
+import jakarta.annotation.PostConstruct; // <1>
 import jakarta.inject.Singleton;
 // end::imports[]
 

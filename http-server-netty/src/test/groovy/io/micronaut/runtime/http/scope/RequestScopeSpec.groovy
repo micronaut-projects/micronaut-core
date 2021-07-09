@@ -22,11 +22,11 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import jakarta.annotation.PreDestroy
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import spock.util.concurrent.PollingConditions
 
-import javax.annotation.PreDestroy
 
 /**
  * @author Marcel Overdijk
