@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.io.scan
+package io.micronaut.ast.groovy.scan
 
 import groovy.transform.AutoClone
+import io.micronaut.ast.groovy.scan.nested.Foo2
+import io.micronaut.ast.groovy.scan2.Foo3
 import org.codehaus.groovy.transform.GroovyASTTransformation
-import io.micronaut.core.io.scan.nested.Foo2
-import io.micronaut.core.io.scan2.Foo3
 import spock.lang.Specification
 
 import java.util.stream.Collectors
@@ -48,7 +48,7 @@ class ClassPathScannerSpec extends Specification {
         ClassPathAnnotationScanner scanner = new ClassPathAnnotationScanner()
 
         when:
-        def classes = scanner.scan(AutoClone, getClass().getPackage().getName(), "io.micronaut.core.io.scan2")
+        def classes = scanner.scan(AutoClone, getClass().getPackage().getName(), "io.micronaut.ast.groovy.scan2")
         def results = classes.collect(Collectors.toList())
 
         then:
