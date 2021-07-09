@@ -24,7 +24,7 @@ dependencies {
     if (!JavaVersion.current().isJava9Compatible()) {
         testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
-    testImplementation "io.micronaut.micrometer:micrometer-core:$micronautMicrometerVersion"
+    testImplementation "io.micronaut.micrometer:micronaut-micrometer-core:$micronautMicrometerVersion"
     testImplementation project(":validation")
     testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
     testImplementation "jakarta.inject:jakarta.inject-api:2.0.0"
