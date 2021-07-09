@@ -8,7 +8,7 @@ import jakarta.inject.Singleton;
 public class SimpleTestAuthorizationBinder implements AnnotatedClientRequestBinder<SimpleTestAuthorization> {
     @Override
     public void bind(MethodInvocationContext<Object, Object> context, ClientRequestUriContext uriContext, MutableHttpRequest<?> request) {
-        request.getParameters().add("name", "admin");
+        uriContext.addQueryParameter("name", "admin");
     }
 
     @Override

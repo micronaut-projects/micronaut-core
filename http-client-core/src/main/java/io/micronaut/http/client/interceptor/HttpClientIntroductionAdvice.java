@@ -189,7 +189,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             Map<String, Object> paramMap = context.getParameterValueMap();
             Map<String, Object> pathParams = new HashMap<>();
-            Map<String, String> queryParams = new LinkedHashMap<>();
+            Map<String, List<String>> queryParams = new LinkedHashMap<>();
+            ClientRequestUriContext uriContext = new ClientRequestUriContext(uriTemplate, pathParams, queryParams);
+
             List<String> uriVariables = uriTemplate.getVariableNames();
             Map<String, MutableArgumentValue<?>> parameters = context.getParameters();
             Argument[] arguments = context.getArguments();
@@ -216,7 +218,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                 .forEach(header -> headers.put(header, version));
 
                         configuration.getParameters()
-                                .forEach(parameter -> queryParams.put(parameter, version));
+                                .forEach(parameter -> uriContext.addQueryParameter(parameter, version));
                     });
 
             Map<String, Object> attributes = new LinkedHashMap<>(ATTRIBUTES_INITIAL_CAPACITY);
@@ -229,8 +231,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     attributes.put(attributeName, attributeValue);
                 }
             }
-
-            ClientRequestUriContext uriContext = new ClientRequestUriContext(uriTemplate, pathParams, queryParams);
 
             if (!headers.isEmpty()) {
                 for (Map.Entry<String, String> entry : headers.entrySet()) {
@@ -331,8 +331,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             // Others need to be still added
             uriVariables.forEach(queryParams::remove);
 
-            String query = request.getUri().getQuery();
-            request.uri(URI.create(appendQuery(uri, query, queryParams)));
+            // The original query can be added by getting it from the request.getUri() and appending
+            request.uri(URI.create(appendQuery(uri, queryParams)));
 
             if (body != null && !request.getContentType().isPresent()) {
                 MediaType[] contentTypes = MediaType.of(context.stringValues(Produces.class));
@@ -613,19 +613,13 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         return clientAnn.stringValue(Client.class).orElse(null);
     }
 
-    private String appendQuery(String uri, String query, Map<String, String> queryParams) {
+    private String appendQuery(String uri, Map<String, List<String>> queryParams) {
         if (!queryParams.isEmpty()) {
             final UriBuilder builder = UriBuilder.of(uri);
-            for (Map.Entry<String, String> entry : queryParams.entrySet()) {
-                builder.queryParam(entry.getKey(), entry.getValue());
-            }
-            if (StringUtils.isNotEmpty(query)) {
-                return builder.toString() + '&' + query;
+            for (Map.Entry<String, List<String>> entry : queryParams.entrySet()) {
+                builder.queryParam(entry.getKey(), entry.getValue().toArray());
             }
             return builder.toString();
-        }
-        if (StringUtils.isNotEmpty(query)) {
-            return uri + '?' + query;
         }
         return uri;
     }

@@ -22,7 +22,6 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.MutableHttpParameters;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.client.bind.AnnotatedClientArgumentRequestBinder;
@@ -43,9 +42,9 @@ import java.util.Optional;
  */
 
 public class QueryValueClientArgumentBinder implements AnnotatedClientArgumentRequestBinder<QueryValue> {
-    private static final String COMMA_DELIMITER = ",";
-    private static final String PIPE_DELIMITER = encodeURIComponent("|");
-    private static final String SPACE_DELIMITER = encodeURIComponent(" ");
+    private static final Character COMMA_DELIMITER = ',';
+    private static final Character PIPE_DELIMITER = '|';
+    private static final Character SPACE_DELIMITER = ' ';
 
     private final ConversionService<?> conversionService;
 
@@ -65,25 +64,23 @@ public class QueryValueClientArgumentBinder implements AnnotatedClientArgumentRe
                      @NonNull Object value,
                      @NonNull MutableHttpRequest<?> request
     ) {
-        String unencodedKey = context.getAnnotationMetadata().stringValue(QueryValue.class)
+        String key = context.getAnnotationMetadata().stringValue(QueryValue.class)
                     .filter(StringUtils::isNotEmpty)
                     .orElse(context.getArgument().getName());
-        String key = encodeURIComponent(unencodedKey);
 
         QueryValue.Format format = context.getAnnotationMetadata()
                 .enumValue(QueryValue.class, "format", QueryValue.Format.class)
                 .orElse(QueryValue.Format.URI_TEMPLATE_FORMAT);
-        MutableHttpParameters parameters = request.getParameters();
 
         if (format == QueryValue.Format.URI_TEMPLATE_FORMAT) {
             uriContext.getPathParameters().put(key, value);
-            convertToString(context, value).ifPresent(v -> uriContext.getQueryParameters().put(key, v));
+            convertToString(context, value).ifPresent(v -> uriContext.addQueryParameter(key, v));
         } else if (format == QueryValue.Format.DEEP_OBJECT) {
-            addDeepObjectParameters(context, value, key, parameters);
+            addDeepObjectParameters(context, value, key, uriContext);
         } else if (format == QueryValue.Format.MULTI) {
-            addMultiParameters(context, value, key, parameters);
+            addMultiParameters(context, value, key, uriContext);
         } else {
-            String delimiter = "";
+            Character delimiter = ' ';
             switch (format) {
                 case SSV:
                     delimiter = SPACE_DELIMITER;
@@ -97,27 +94,27 @@ public class QueryValueClientArgumentBinder implements AnnotatedClientArgumentRe
                 default:
             }
             createSeparatedQueryValue(context, value, delimiter)
-                    .ifPresent(v -> parameters.add(key, v));
+                    .ifPresent(v -> uriContext.addQueryParameter(key, v));
         }
     }
 
     private void addMultiParameters(
-            ArgumentConversionContext<Object> context, Object value, String key, MutableHttpParameters parameters
+            ArgumentConversionContext<Object> context, Object value, String key, ClientRequestUriContext uriContext
     ) {
         if (value instanceof Iterable) {
             // noinspection unechecked
             Iterable<Object> iterable = (Iterable<Object>) value;
 
             for (Object item : iterable) {
-                convertToEncodedURIComponent(context, item).ifPresent(v -> parameters.add(key, v));
+                convertToString(context, item).ifPresent(v -> uriContext.addQueryParameter(key, v));
             }
         } else {
-            convertToEncodedURIComponent(context, value).ifPresent(v -> parameters.add(key, v));
+            convertToString(context, value).ifPresent(v -> uriContext.addQueryParameter(key, v));
         }
     }
 
     private void addDeepObjectParameters(
-            ArgumentConversionContext<Object> context, Object value, String key, MutableHttpParameters parameters
+            ArgumentConversionContext<Object> context, Object value, String key, ClientRequestUriContext uriContext
     ) {
         if (value instanceof Iterable) {
             StringBuilder builder = new StringBuilder(key);
@@ -136,7 +133,7 @@ public class QueryValueClientArgumentBinder implements AnnotatedClientArgumentRe
                 builder.append(index);
                 builder.append(']');
 
-                convertToEncodedURIComponent(context, item).ifPresent(v -> parameters.add(builder.toString(), v));
+                convertToString(context, item).ifPresent(v -> uriContext.addQueryParameter(builder.toString(), v));
                 builder.delete(builder.length() - index.length() - 2, builder.length());
                 i++;
             }
@@ -155,14 +152,14 @@ public class QueryValueClientArgumentBinder implements AnnotatedClientArgumentRe
                 builder.append(property.getName());
                 builder.append(']');
 
-                convertToEncodedURIComponent(context, item).ifPresent(v -> parameters.add(builder.toString(), v));
+                convertToString(context, item).ifPresent(v -> uriContext.addQueryParameter(builder.toString(), v));
                 builder.delete(builder.length() - property.getName().length() - 2, builder.length());
             }
         }
     }
 
     private Optional<String> createSeparatedQueryValue(
-            ArgumentConversionContext<Object> context, Object value, String delimiter
+            ArgumentConversionContext<Object> context, Object value, Character delimiter
     ) {
         if (value instanceof Iterable) {
             StringBuilder builder = new StringBuilder();
@@ -171,7 +168,7 @@ public class QueryValueClientArgumentBinder implements AnnotatedClientArgumentRe
 
             boolean first = true;
             for (Object item : iterable) {
-                Optional<String> opt = convertToEncodedURIComponent(context, item);
+                Optional<String> opt = convertToString(context, item);
                 if (opt.isPresent()) {
                     if (!first) {
                         builder.append(delimiter);
@@ -183,7 +180,7 @@ public class QueryValueClientArgumentBinder implements AnnotatedClientArgumentRe
 
             return Optional.of(builder.toString());
         } else {
-            return convertToEncodedURIComponent(context, value);
+            return convertToString(context, value);
         }
     }
 

@@ -71,19 +71,17 @@ public @interface QueryValue {
         URI_TEMPLATE_FORMAT,
         /**
          * The values of iterator are comma-delimited.
+         * Ambiguity can arise if values of Iterator contain commas inside themselves. In such case, the MUTLI format
+         * should be preferred.
+         * Null values are not supported and will be removed during the conversion process.
          */
         CSV,
         /**
          * The values are space-delimited, similarly to comma-delimited format.
-         * If possible, it is recommended to use a different format, as space is not a reserved symbol by
-         * <a href="https://datatracker.ietf.org/doc/html/rfc3986#section-2.3">rfc3986</a> and thus ambiguity arises
-         * if string values contain spaces themselves.
-         * Null values are not supported and will be removed during the conversion process.
          */
         SSV,
         /**
          * The values a delimited by pipes "|", similarly to comma-delimited format.
-         * This is also not a recommended format for the same reasons as SPACE_DELIMITED
          */
         PIPES,
         /**
