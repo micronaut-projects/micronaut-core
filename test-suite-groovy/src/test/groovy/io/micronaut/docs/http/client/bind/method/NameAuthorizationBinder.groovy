@@ -25,7 +25,7 @@ public class NameAuthorizationBinder implements AnnotatedClientRequestBinder<Nam
             @NonNull MutableHttpRequest<?> request
     ) {
         context.getValue(NameAuthorization.class)
-                .ifPresent(name -> uriContext.getQueryParameters().put("name", String.valueOf(name)))
+                .ifPresent(name -> uriContext.addQueryParameter("name", String.valueOf(name)))
 
     }
 }

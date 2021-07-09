@@ -2,18 +2,13 @@ package io.micronaut.docs.http.client.bind.method;
 
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.client.bind.AnnotatedClientRequestBinder;
 import io.micronaut.http.client.bind.ClientRequestUriContext;
+import jakarta.inject.Singleton;
 import org.jetbrains.annotations.NotNull;
 
-import jakarta.inject.Singleton;
-import java.util.Map;
-
 //tag::clazz[]
-import io.micronaut.http.client.bind.AnnotatedClientRequestBinder;
 
 @Singleton // <1>
 public class NameAuthorizationBinder implements AnnotatedClientRequestBinder<NameAuthorization> { // <2>
@@ -30,7 +25,7 @@ public class NameAuthorizationBinder implements AnnotatedClientRequestBinder<Nam
             @NonNull MutableHttpRequest<?> request
     ) {
         context.getValue(NameAuthorization.class)
-                .ifPresent(name -> uriContext.getQueryParameters().put("name", String.valueOf(name)));
+                .ifPresent(name -> uriContext.addQueryParameter("name", String.valueOf(name)));
 
     }
 }

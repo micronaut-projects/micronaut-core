@@ -23,7 +23,7 @@ class NameAuthorizationBinder: AnnotatedClientRequestBinder<NameAuthorization> {
             @NonNull request: MutableHttpRequest<*>
     ) {
         context.getValue(NameAuthorization::class.java, "name")
-                .ifPresent { name -> uriContext.queryParameters["name"] = name.toString() }
+                .ifPresent { name -> uriContext.addQueryParameter("name", name.toString()) }
 
     }
 }
