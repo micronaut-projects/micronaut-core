@@ -97,6 +97,11 @@ ext {
                     name: 'groovy-bom',
                     version: groovyVersion
             ],
+            'micrometer': [
+                    name   : 'micrometer-bom',
+                    group  : 'io.micrometer',
+                    version: micrometerVersion
+            ],
             'junit5': [
                     group  : 'org.junit',
                     name   : 'junit-bom',
