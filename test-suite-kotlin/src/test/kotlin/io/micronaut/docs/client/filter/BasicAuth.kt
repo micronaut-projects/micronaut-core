@@ -17,10 +17,13 @@ package io.micronaut.docs.client.filter
 
 //tag::class[]
 import io.micronaut.http.annotation.FilterMatcher
+import kotlin.annotation.AnnotationRetention.RUNTIME
+import kotlin.annotation.AnnotationTarget.CLASS
+import kotlin.annotation.AnnotationTarget.VALUE_PARAMETER
 
 @FilterMatcher // <1>
 @MustBeDocumented
-@Retention(AnnotationRetention.RUNTIME)
-@Target(AnnotationTarget.CLASS, AnnotationTarget.VALUE_PARAMETER)
+@Retention(RUNTIME)
+@Target(CLASS, VALUE_PARAMETER)
 annotation class BasicAuth
 //end::class[]

@@ -3,7 +3,7 @@ package io.micronaut.http.server.netty.converters
 import io.micronaut.context.annotation.Property
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.test.annotation.MicronautTest
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.netty.bootstrap.ServerBootstrap
 import io.netty.channel.ChannelOption
 import io.netty.channel.WriteBufferWaterMark

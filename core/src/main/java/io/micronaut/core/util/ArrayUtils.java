@@ -15,9 +15,10 @@
  */
 package io.micronaut.core.util;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.lang.reflect.Array;
 import java.util.*;
+import java.util.function.IntFunction;
 
 /**
  * Utility methods for working with arrays.
@@ -159,6 +160,19 @@ public class ArrayUtils {
     }
 
     /**
+     * Returns an array containing all of the elements in this collection, using the provided generator function to allocate the returned array.
+     *
+     * @param collection The collection
+     * @param createArrayFn The function to create the array
+     * @param <T> The create array function
+     * @return The array
+     */
+    public static <T> T[] toArray(Collection<T> collection, IntFunction<T[]> createArrayFn) {
+        T[] array = createArrayFn.apply(collection.size());
+        return collection.toArray(array);
+    }
+
+    /**
      * Iterator implementation used to efficiently expose contents of an
      * Array as read-only iterator.
      *
@@ -209,7 +223,7 @@ public class ArrayUtils {
 
         private ReverseArrayIterator(T[] a) {
             _a = a;
-            _index = a.length > 0 ? a.length : -1;
+            _index = a.length > 0 ? a.length - 1 : -1;
         }
 
         @Override
@@ -219,7 +233,7 @@ public class ArrayUtils {
 
         @Override
         public T next() {
-            if (_index >= -1) {
+            if (_index <= -1) {
                 throw new NoSuchElementException();
             }
             return _a[_index--];

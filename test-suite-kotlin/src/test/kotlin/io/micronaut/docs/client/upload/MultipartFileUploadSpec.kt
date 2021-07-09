@@ -13,11 +13,12 @@ import io.reactivex.Flowable
 import io.micronaut.http.client.RxHttpClient
 import java.io.File
 import java.io.FileWriter
-
 // end::imports[]
+
 // tag::multipartBodyImports[]
 import io.micronaut.http.client.multipart.MultipartBody
 // end::multipartBodyImports[]
+
 // tag::controllerImports[]
 import io.micronaut.http.annotation.Controller
 // end::controllerImports[]
@@ -26,11 +27,11 @@ import io.micronaut.http.annotation.Controller
 class MultipartFileUploadSpec: StringSpec() {
 
     val embeddedServer = autoClose(
-            ApplicationContext.run(EmbeddedServer::class.java)
+        ApplicationContext.run(EmbeddedServer::class.java)
     )
 
     val client = autoClose(
-            embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
+        embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
     )
 
     init {
@@ -57,11 +58,10 @@ class MultipartFileUploadSpec: StringSpec() {
             val flowable = Flowable.fromPublisher(client!!.exchange(
 
                     // tag::request[]
-                    HttpRequest.POST("/multipart/upload", requestBody)   // <1>
-                            .contentType(MediaType.MULTIPART_FORM_DATA_TYPE) // <2>
-                            // end::request[]
-                            .accept(MediaType.TEXT_PLAIN_TYPE),
-
+                    HttpRequest.POST("/multipart/upload", requestBody)    // <1>
+                               .contentType(MediaType.MULTIPART_FORM_DATA_TYPE) // <2>
+                    // end::request[]
+                               .accept(MediaType.TEXT_PLAIN_TYPE),
                     String::class.java
             ))
             val response = flowable.blockingFirst()
@@ -75,13 +75,12 @@ class MultipartFileUploadSpec: StringSpec() {
             val requestBody = MultipartBody.builder()
                     .addPart("data", "sample.txt", MediaType.TEXT_PLAIN_TYPE, "test content".toByteArray())
                     .build()
-
             // end::multipartBodyBytes[]
 
             val flowable = Flowable.fromPublisher(client!!.exchange(
                     HttpRequest.POST("/multipart/upload", requestBody)
-                            .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
-                            .accept(MediaType.TEXT_PLAIN_TYPE),
+                               .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                               .accept(MediaType.TEXT_PLAIN_TYPE),
                     String::class.java
             ))
             val response = flowable.blockingFirst()
@@ -99,9 +98,9 @@ class MultipartFileUploadSpec: StringSpec() {
             file.createNewFile()
 
             val flowable = Flowable.fromPublisher(client!!.exchange<MultipartBody.Builder, String>(
-                    HttpRequest.POST<MultipartBody.Builder>("/multipart/upload", MultipartBody.builder().addPart("data", file.name, file))
-                            .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
-                            .accept(MediaType.TEXT_PLAIN_TYPE),
+                    HttpRequest.POST("/multipart/upload", MultipartBody.builder().addPart("data", file.name, file))
+                               .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                               .accept(MediaType.TEXT_PLAIN_TYPE),
                     String::class.java
             ))
             val response = flowable.blockingFirst()
@@ -116,7 +115,7 @@ class MultipartFileUploadSpec: StringSpec() {
 
         @Post(value = "/upload", consumes = [MediaType.MULTIPART_FORM_DATA], produces = [MediaType.TEXT_PLAIN])
         fun upload(data: ByteArray): HttpResponse<String> {
-            return HttpResponse.ok("Uploaded " + data.size + " bytes")
+            return HttpResponse.ok("Uploaded ${data.size} bytes")
         }
     }
 }

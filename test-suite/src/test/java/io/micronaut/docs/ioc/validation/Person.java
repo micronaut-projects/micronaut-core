@@ -17,11 +17,15 @@ package io.micronaut.docs.ioc.validation;
 
 // tag::class[]
 import io.micronaut.core.annotation.Introspected;
-import javax.validation.constraints.*;
+
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotBlank;
 
 @Introspected
 public class Person {
+
     private String name;
+
     @Min(18)
     private int age;
 

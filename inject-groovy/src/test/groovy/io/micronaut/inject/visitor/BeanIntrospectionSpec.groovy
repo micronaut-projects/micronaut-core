@@ -1,7 +1,7 @@
 package io.micronaut.inject.visitor
 
 import com.blazebit.persistence.impl.function.entity.ValuesEntity
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.TypeElementVisitorStart
 import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected
@@ -21,6 +21,86 @@ class BeanIntrospectionSpec extends AbstractBeanDefinitionSpec {
 
     def setup() {
         System.setProperty(TypeElementVisitorStart.ELEMENT_VISITORS_PROPERTY, IntrospectedTypeElementVisitor.name)
+    }
+
+    void "test copy constructor via mutate method"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.CopyMe','''\
+package test;
+
+import java.net.URL;
+
+@io.micronaut.core.annotation.Introspected
+class CopyMe {
+
+    URL url
+    boolean enabled = false
+    private final String name
+    private final String another
+    
+    CopyMe(String name, String another) {
+        this.name = name;
+        this.another = another;
+    }
+    
+    String getName() {
+        return name
+    }
+    
+    String getAnother() {
+        return another
+    }
+    
+    public CopyMe withAnother(String a) {
+        return this.another == a ? this : new CopyMe(this.name, a.toUpperCase())
+    }
+}
+''')
+        when:
+        def copyMe = introspection.instantiate("Test", "Another")
+        def expectUrl = new URL("http://test.com")
+        copyMe.url = expectUrl
+
+        then:
+        copyMe.name == 'Test'
+        copyMe.another == "Another"
+        copyMe.url == expectUrl
+
+
+        when:
+        def enabled = introspection.getRequiredProperty("enabled", boolean.class)
+        def urlProperty = introspection.getRequiredProperty("url", URL)
+        def property = introspection.getRequiredProperty("name", String)
+        def another = introspection.getRequiredProperty("another", String)
+        def newInstance = property.withValue(copyMe, "Changed")
+
+        then:
+        !newInstance.is(copyMe)
+        enabled.get(newInstance) == false
+        newInstance.name == 'Changed'
+        newInstance.url == expectUrl
+        newInstance.another == "Another"
+
+        when:"the instance is changed with the same value"
+        def result = property.withValue(newInstance, "Changed")
+
+        then:"The existing instance is returned"
+        newInstance.is(result)
+
+        when:"An explicit with method is used"
+        result = another.withValue(newInstance, "changed")
+
+        then:"It was invoked"
+        !result.is(newInstance)
+        result.another == 'CHANGED'
+
+        when:"a mutable property is used"
+        def anotherUrl = new URL("http://another.com")
+        urlProperty.withValue(result, anotherUrl)
+        enabled.withValue(result, true)
+        then:"it is correct"
+        result.url == anotherUrl
+        result.enabled == true
     }
 
     void "test generate bean method for introspected class"() {

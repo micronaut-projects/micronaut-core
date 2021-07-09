@@ -59,6 +59,11 @@ class StringUtilsSpec extends Specification {
         "/a"  | "/b/" | "/a/b/"
         "/a/" | "/b/" | "/a/b/"
         "/"   | "/b"  | "/b"
+        "/"   | "?x=true"  | "/?x=true"
+        "a"   | "?x=true"  | "a?x=true"
+        "a/"  | "?x=true"  | "a/?x=true"
+        "/a"  | "?x=true"  | "/a?x=true"
+        "/a/" | "?x=true"  | "/a/?x=true"
     }
 
     @Unroll
@@ -102,5 +107,23 @@ class StringUtilsSpec extends Specification {
         'abc'    | 'a' | 'bc'
         'abc'    | 'd' | 'abc'
         '   abc' | ' ' | 'abc'
+    }
+
+    @Unroll
+    void "test split string omit empty #string = #expected"() {
+        expect:
+        StringUtils.splitOmitEmptyStrings(string, ',' as char).toList() == expected
+        StringUtils.splitOmitEmptyStringsList(string, ',' as char) == expected
+
+        where:
+        string     | expected
+        ""         | []
+        ","        | []
+        "a"        | ["a"]
+        "a   "     | ["a   "]
+        ",,,"      | []
+        ",,a,,,"   | ['a']
+        ",a,b,,,c" | ['a', 'b', 'c']
+        "a,b,c"    | ['a', 'b', 'c']
     }
 }

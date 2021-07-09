@@ -1,11 +1,13 @@
 package io.micronaut.inject.visitor.beans
 
 import com.blazebit.persistence.impl.function.entity.ValuesEntity
+import com.fasterxml.jackson.databind.ObjectMapper
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.annotation.processing.test.JavaParser
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
+import io.micronaut.context.annotation.Replaces
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
@@ -20,6 +22,7 @@ import io.micronaut.core.type.Argument
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
+import io.micronaut.jackson.modules.BeanIntrospectionModule
 import spock.lang.IgnoreIf
 
 //import org.objectweb.asm.ClassReader
@@ -29,6 +32,7 @@ import spock.lang.Issue
 import spock.lang.Requires
 
 import javax.annotation.processing.SupportedAnnotationTypes
+import javax.inject.Singleton
 import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.Id
@@ -229,6 +233,89 @@ public class CopyMe {
         then:"It was invoked"
         !result.is(newInstance)
         result.another == 'CHANGED'
+    }
+
+    @Requires({ jvm.isJava14Compatible() })
+    void "test secondary constructor for Java 14+ records"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+import java.util.List;
+import javax.validation.constraints.Min;
+
+@io.micronaut.core.annotation.Introspected
+public record Foo(int x, int y){
+    public Foo(int x) {
+        this(x, 20);
+    }
+    public Foo() {
+        this(20, 20);
+    }
+}
+''')
+        when:
+        def obj = introspection.instantiate(5, 10)
+
+        then:
+        obj.x() == 5
+        obj.y() == 10
+    }
+
+    @Requires({ jvm.isJava14Compatible() })
+    void "test serializing records respects json annotations"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('json.test.Foo', '''
+package json.test;
+
+import io.micronaut.core.annotation.Creator;
+import java.util.List;
+import javax.validation.constraints.Min;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+@io.micronaut.core.annotation.Introspected
+public record Foo(@JsonProperty("other") String name, @JsonIgnore int y) {
+}
+''')
+        when:
+        def obj = introspection.instantiate("test", 10)
+        def result = ApplicationContext.run('bean.introspection.test':'true').withCloseable {
+            it.getBean(StaticBeanIntrospectionModule).introspectionMap[introspection.beanType] = introspection
+            it.getBean(ObjectMapper).writeValueAsString(obj)
+        }
+        then:
+        result == '{"other":"test"}'
+    }
+
+    @Requires({ jvm.isJava14Compatible() })
+    void "test secondary constructor with @Creator for Java 14+ records"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+import java.util.List;
+import javax.validation.constraints.Min;
+
+@io.micronaut.core.annotation.Introspected
+public record Foo(int x, int y){
+    @Creator
+    public Foo(int x) {
+        this(x, 20);
+    }
+    public Foo() {
+        this(20, 20);
+    }
+}
+''')
+        when:
+        def obj = introspection.instantiate(5)
+
+        then:
+        obj.x() == 5
+        obj.y() == 20
     }
 
     @Requires({ jvm.isJava14Compatible() })
@@ -2410,6 +2497,37 @@ class Test extends SuperClass implements IEmail {
         introspection.getIndexedProperties(Constraint).size() == 1
     }
 
+    void "test introspection with single leading lowercase character"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class Test {
+
+    private final String xForwardedFor;
+    
+    Test(String xForwardedFor) {
+        this.xForwardedFor = xForwardedFor;
+    }
+    
+    public String getXForwardedFor() {
+        return xForwardedFor;
+    }
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def obj = introspection.instantiate("localhost")
+
+        then:
+        noExceptionThrown()
+        introspection.getProperty("XForwardedFor", String).get().get(obj) == "localhost"
+    }
 
     @Override
     protected JavaParser newJavaParser() {
@@ -2426,6 +2544,17 @@ class Test extends SuperClass implements IEmail {
         @Override
         protected Collection<TypeElementVisitor> findTypeElementVisitors() {
             return [new IntrospectedTypeElementVisitor()]
+        }
+    }
+
+    @Singleton
+    @Replaces(BeanIntrospectionModule)
+    @io.micronaut.context.annotation.Requires(property = "bean.introspection.test")
+    static class StaticBeanIntrospectionModule extends BeanIntrospectionModule {
+        Map<Class, BeanIntrospection> introspectionMap = [:]
+        @Override
+        protected BeanIntrospection<Object> findIntrospection(Class<?> beanClass) {
+            return introspectionMap.get(beanClass)
         }
     }
 }

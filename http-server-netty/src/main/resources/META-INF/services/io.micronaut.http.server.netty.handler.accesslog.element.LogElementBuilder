@@ -6,6 +6,7 @@ io.micronaut.http.server.netty.handler.accesslog.element.HeaderElementBuilder
 io.micronaut.http.server.netty.handler.accesslog.element.LocalHostElementBuilder
 io.micronaut.http.server.netty.handler.accesslog.element.LocalIpElementBuilder
 io.micronaut.http.server.netty.handler.accesslog.element.LocalPortElementBuilder
+io.micronaut.http.server.netty.handler.accesslog.element.NotImplementedElementBuilder
 io.micronaut.http.server.netty.handler.accesslog.element.RemoteHostElementBuilder
 io.micronaut.http.server.netty.handler.accesslog.element.RemoteIpElementBuilder
 io.micronaut.http.server.netty.handler.accesslog.element.RequestLineElementBuilder

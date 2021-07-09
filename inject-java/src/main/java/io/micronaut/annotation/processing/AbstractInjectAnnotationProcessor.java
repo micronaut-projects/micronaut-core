@@ -20,7 +20,7 @@ import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
@@ -74,14 +74,14 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     @Override
     public SourceVersion getSupportedSourceVersion() {
         SourceVersion sourceVersion = SourceVersion.latest();
-        if (sourceVersion.ordinal() <= 15) {
+        if (sourceVersion.ordinal() <= 16) {
             if (sourceVersion.ordinal() >= 8) {
                 return sourceVersion;
             } else {
                 return SourceVersion.RELEASE_8;
             }
         } else {
-            return (SourceVersion.values())[15];
+            return (SourceVersion.values())[16];
         }
     }
 
@@ -112,6 +112,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
         if (incremental) {
             final Set<String> types = CollectionUtils.setOf(
                     "javax.inject.*",
+                    "jakarta.inject.*",
                     "io.micronaut.*"
             );
             types.addAll(supportedAnnotationTypes);

@@ -36,7 +36,6 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiPredicate;
-import java.util.function.Consumer;
 
 /**
  * A helper class to store references to httpdata and related information.
@@ -80,36 +79,35 @@ public class HttpDataReference {
      * Adds a reference to a section of the http data. Should only
      * be called after data has been added to the underlying http data.
      *
-     * @param onError A consumer to call if an IOException occurs
      * @return The newly added component, or null if an error occurred
      */
-    Component addComponent(Consumer<IOException> onError) {
+    Component addComponent() throws IOException {
         Component component;
-        try {
-            long readable = readableBytes(data);
-            long offset = position.getAndUpdate(p -> readable);
-            int length = (int) (readable - offset);
-            if (length == 0) {
-                return null;
-            }
-            component = new Component(length, offset);
-            components.add(component);
-        } catch (IOException e) {
-            onError.accept(e);
+        long readable = readableBytes(data);
+        long offset = position.getAndUpdate(p -> readable);
+        int length = (int) (readable - offset);
+        if (length == 0) {
             return null;
         }
+        component = new Component(length, offset);
+        components.add(component);
 
         if (!data.isInMemory()) {
+            AtomicReference<IOException> error = new AtomicReference<>();
             fileAccess.getAndUpdate(channel -> {
                 if (channel == null) {
                     try {
                         return new RandomAccessFile(data.getFile(), "r");
                     } catch (IOException e) {
-                        onError.accept(e);
+                        error.set(e);
                     }
                 }
                 return channel;
             });
+            IOException exception = error.get();
+            if (exception != null) {
+                throw exception;
+            }
         }
 
         return component;
@@ -192,6 +190,9 @@ public class HttpDataReference {
         }
 
         private ByteBuf createDelegate(ByteBuf byteBuf, BiPredicate<ByteBuf, Integer> onRelease) {
+            if (byteBuf == null) {
+                return Unpooled.EMPTY_BUFFER;
+            }
             return new ByteBufDelegate(byteBuf) {
                 @Override
                 public boolean release() {

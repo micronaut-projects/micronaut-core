@@ -12,12 +12,12 @@ class IntrospectionSpec extends Specification {
         // tag::usage[]
         def introspection = BeanIntrospection.getIntrospection(Person) // <1>
         Person person = introspection.instantiate("John") // <2>
-        println("Hello ${person.name}")
+        println("Hello $person.name")
 
         BeanProperty<Person, String> property = introspection.getRequiredProperty("name", String) // <3>
         property.set(person, "Fred") // <4>
         String name = property.get(person) // <5>
-        println("Hello ${person.name}")
+        println("Hello $person.name")
         // end::usage[]
 
         expect:
@@ -43,9 +43,9 @@ class IntrospectionSpec extends Specification {
         Vehicle vehicle = introspection.instantiate("Subaru", "WRX", 2)
 
         expect:
-        "Subaru" == vehicle.getMake()
-        "WRX" == vehicle.getModel()
-        2 == vehicle.getAxels()
+        "Subaru" == vehicle.make
+        "WRX" == vehicle.model
+        2 == vehicle.axles
     }
 
     void testBusiness() {
@@ -53,6 +53,6 @@ class IntrospectionSpec extends Specification {
         Business business = introspection.instantiate("Apple")
 
         expect:
-        "Apple" == business.getName()
+        "Apple" == business.name
     }
 }

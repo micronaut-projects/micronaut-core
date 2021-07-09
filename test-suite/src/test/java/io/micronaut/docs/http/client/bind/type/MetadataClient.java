@@ -1,6 +1,5 @@
 package io.micronaut.docs.http.client.bind.type;
 
-import io.micronaut.docs.http.client.bind.type.Metadata;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.client.annotation.Client;
 

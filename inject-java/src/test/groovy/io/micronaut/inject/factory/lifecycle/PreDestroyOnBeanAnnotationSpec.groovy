@@ -1,7 +1,7 @@
 package io.micronaut.inject.factory.lifecycle
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
 import java.util.concurrent.ExecutorService
 

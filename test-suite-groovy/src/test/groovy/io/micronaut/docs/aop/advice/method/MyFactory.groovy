@@ -27,7 +27,7 @@ class MyFactory {
     @Prototype
     @Timed
     MyBean myBean() {
-        return new MyBean()
+        new MyBean()
     }
 }
 // end::class[]

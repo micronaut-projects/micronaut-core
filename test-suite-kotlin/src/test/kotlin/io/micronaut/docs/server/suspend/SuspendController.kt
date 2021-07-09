@@ -54,19 +54,19 @@ class SuspendController(
     // tag::suspendStatus[]
     @Status(HttpStatus.CREATED) // <1>
     @Get("/status")
-    suspend fun status(): Unit {
+    suspend fun status() {
     }
     // end::suspendStatus[]
 
     // tag::suspendStatusDelayed[]
     @Status(HttpStatus.CREATED)
     @Get("/statusDelayed")
-    suspend fun statusDelayed(): Unit {
+    suspend fun statusDelayed() {
         delay(1)
     }
     // end::suspendStatusDelayed[]
 
-    val count: AtomicInteger = AtomicInteger(0)
+    val count = AtomicInteger(0)
 
     @Get("/count")
     suspend fun count(): Int { // <1>
@@ -80,7 +80,7 @@ class SuspendController(
     }
 
     @Get("/illegal")
-    suspend fun illegal(): Unit {
+    suspend fun illegal() {
         throw IllegalArgumentException()
     }
 
@@ -126,5 +126,13 @@ class SuspendController(
         val before = "${suspendRequestScopedService.requestId},${Thread.currentThread().id}"
         val after = async { suspendService.requestScopedCalculation() }.await()
         "$before,$after"
+    }
+
+    @Get("/keepRequestScopeAfterSuspend")
+    suspend fun keepRequestScopeAfterSuspend(): String {
+        val before = "${suspendRequestScopedService.requestId},${Thread.currentThread().id}"
+        delay(10) // suspend
+        val after = "${suspendRequestScopedService.requestId},${Thread.currentThread().id}"
+        return "$before,$after"
     }
 }

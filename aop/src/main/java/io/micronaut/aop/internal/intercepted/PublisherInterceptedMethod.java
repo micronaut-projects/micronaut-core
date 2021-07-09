@@ -22,9 +22,13 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import org.reactivestreams.Publisher;
+
+import java.util.Objects;
+import java.util.concurrent.ExecutorService;
 
 /**
  * The {@link Publisher} method intercept.
@@ -35,6 +39,7 @@ import org.reactivestreams.Publisher;
 @Internal
 @Experimental
 class PublisherInterceptedMethod implements InterceptedMethod {
+    private static final boolean AVAILABLE = ClassUtils.isPresent("io.micronaut.core.async.publisher.Publishers", PublisherInterceptedMethod.class.getClassLoader());
     private final ConversionService<?> conversionService = ConversionService.SHARED;
 
     private final MethodInvocationContext<?, ?> context;
@@ -66,6 +71,13 @@ class PublisherInterceptedMethod implements InterceptedMethod {
     }
 
     @Override
+    public Publisher<?> interceptResultAsPublisher(ExecutorService executorService) {
+        Objects.requireNonNull(executorService);
+        final Publisher<?> actual = interceptResultAsPublisher();
+        return (Publishers.MicronautPublisher<Object>) s -> executorService.submit(() -> actual.subscribe(s));
+    }
+
+    @Override
     public Publisher<?> interceptResult() {
         return interceptResultAsPublisher();
     }
@@ -86,6 +98,15 @@ class PublisherInterceptedMethod implements InterceptedMethod {
     @Override
     public <E extends Throwable> Object handleException(Exception exception) throws E {
         return convertPublisherResult(context.getReturnType(), Publishers.just(exception));
+    }
+
+    /**
+     * Allows for a soft reference on reactive streams.
+     * @param reactiveType The type
+     * @return True if the reactive type is convertible to a reactive streams publisher
+     */
+    static boolean isConvertibleToPublisher(Class<?> reactiveType) {
+        return AVAILABLE && Publishers.isConvertibleToPublisher(reactiveType);
     }
 
     private Object convertPublisherResult(ReturnType<?> returnType, Object result) {

@@ -1,7 +1,7 @@
 package io.micronaut.docs.http.client.bind.annotation;
 
 //tag::clazz[]
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
@@ -21,7 +21,6 @@ public class MetadataClientArgumentBinder implements AnnotatedClientArgumentRequ
     public Class<Metadata> getAnnotationType() {
         return Metadata.class;
     }
-
 
     @Override
     public void bind(@NotNull ArgumentConversionContext<Object> context,

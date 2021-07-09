@@ -18,7 +18,6 @@ class MyConfigurationPropertiesSpec extends Specification {
     )
     //end::runContext[]
 
-
     void "test convert date from map"() {
         when:
         MyConfigurationProperties props = ctx.getBean(MyConfigurationProperties)

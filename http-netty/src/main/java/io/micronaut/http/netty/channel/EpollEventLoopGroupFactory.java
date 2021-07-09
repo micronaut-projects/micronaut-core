@@ -18,8 +18,8 @@ package io.micronaut.http.netty.channel;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -108,8 +108,19 @@ public class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
 
     @NonNull
     @Override
+    public EpollServerSocketChannel serverSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
+        return new EpollServerSocketChannel();
+    }
+
+    @NonNull
+    @Override
     public Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
         return EpollSocketChannel.class;
+    }
+
+    @Override
+    public SocketChannel clientSocketChannelInstance(EventLoopGroupConfiguration configuration) {
+        return new EpollSocketChannel();
     }
 
     @Override

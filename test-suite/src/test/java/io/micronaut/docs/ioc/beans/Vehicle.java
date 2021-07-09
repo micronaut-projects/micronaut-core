@@ -27,17 +27,17 @@ public class Vehicle {
 
     private final String make;
     private final String model;
-    private final int axels;
+    private final int axles;
 
     public Vehicle(String make, String model) {
         this(make, model, 2);
     }
 
     @Creator // <1>
-    public Vehicle(String make, String model, int axels) {
+    public Vehicle(String make, String model, int axles) {
         this.make = make;
         this.model = model;
-        this.axels = axels;
+        this.axles = axles;
     }
 
     public String getMake() {
@@ -48,8 +48,8 @@ public class Vehicle {
         return model;
     }
 
-    public int getAxels() {
-        return axels;
+    public int getAxles() {
+        return axles;
     }
 }
 // end::class[]

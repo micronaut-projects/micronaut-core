@@ -30,7 +30,7 @@ class VehicleSpec extends Specification {
         // tag::start[]
         def context = BeanContext.run()
         Vehicle vehicle = context.getBean(Vehicle)
-        println( vehicle.start() )
+        println vehicle.start()
         // end::start[]
 
         then:

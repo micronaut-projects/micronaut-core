@@ -53,7 +53,7 @@ public class YamlPropertySourceLoader extends AbstractPropertySourceLoader {
             System.setProperty("java.runtime.name", "Unknown");
         }
 
-        Yaml yaml = new Yaml();
+        Yaml yaml = new Yaml(new CustomSafeConstructor());
         Iterable<Object> objects = yaml.loadAll(input);
         Iterator<Object> i = objects.iterator();
         if (i.hasNext()) {

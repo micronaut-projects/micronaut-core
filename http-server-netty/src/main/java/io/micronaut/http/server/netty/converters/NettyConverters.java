@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.converters;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
@@ -37,7 +38,6 @@ import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
 
-import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.io.InputStream;
@@ -57,7 +57,7 @@ import java.util.Optional;
 public class NettyConverters implements TypeConverterRegistrar {
 
     private final ConversionService<?> conversionService;
-    private final Provider<MediaTypeCodecRegistry> decoderRegistryProvider;
+    private final BeanProvider<MediaTypeCodecRegistry> decoderRegistryProvider;
     private final ChannelOptionFactory channelOptionFactory;
 
     /**
@@ -68,7 +68,7 @@ public class NettyConverters implements TypeConverterRegistrar {
      */
     public NettyConverters(ConversionService<?> conversionService,
                            //Prevent early initialization of the codecs
-                           Provider<MediaTypeCodecRegistry> decoderRegistryProvider,
+                           BeanProvider<MediaTypeCodecRegistry> decoderRegistryProvider,
                            ChannelOptionFactory channelOptionFactory) {
         this.conversionService = conversionService;
         this.decoderRegistryProvider = decoderRegistryProvider;
@@ -325,7 +325,7 @@ public class NettyConverters implements TypeConverterRegistrar {
                 String contentType = object.getContentType();
                 ByteBuf byteBuf = object.getByteBuf();
                 if (StringUtils.isNotEmpty(contentType)) {
-                    MediaType mediaType = new MediaType(contentType);
+                    MediaType mediaType = MediaType.of(contentType);
                     Optional<MediaTypeCodec> registered = decoderRegistryProvider.get().findCodec(mediaType);
                     if (registered.isPresent()) {
                         MediaTypeCodec decoder = registered.get();

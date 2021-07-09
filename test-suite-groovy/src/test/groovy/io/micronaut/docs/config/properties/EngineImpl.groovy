@@ -33,7 +33,7 @@ class EngineImpl implements Engine {
 
     @Override
     String start() { // <2>
-        "${config.manufacturer} Engine Starting V${config.cylinders} [rodLength=${config.crankShaft.rodLength.orElse(6.0d)}]"
+        "$config.manufacturer Engine Starting V$config.cylinders [rodLength=${config.crankShaft.rodLength.orElse(6.0d)}]"
     }
 }
 // end::class[]

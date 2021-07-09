@@ -28,8 +28,7 @@ class ConstructorCircularDependencyFailureSpec extends Specification {
 
     void "test simple constructor circular dependency failure"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        ApplicationContext context = ApplicationContext.run(["spec.name": getClass().simpleName])
 
         when:"A bean is obtained that has a setter with @Inject"
         B b =  context.getBean(B)

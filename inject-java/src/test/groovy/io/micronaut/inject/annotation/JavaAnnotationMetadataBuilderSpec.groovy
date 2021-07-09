@@ -23,10 +23,11 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.http.annotation.Header
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.context.scope.ScopedProxy
+import spock.lang.Unroll
 
 import javax.inject.Qualifier
 import javax.inject.Scope
@@ -37,6 +38,40 @@ import javax.inject.Singleton
  * @since 1.0
  */
 class JavaAnnotationMetadataBuilderSpec extends AbstractTypeElementSpec {
+
+    @Unroll
+    void 'test hasPropertyExpressions() returns the correct value for metadata that has expressions for annotation #annotation'() {
+        given:
+        AnnotationMetadata annotationMetadata = buildMethodAnnotationMetadata("""\
+package propertyexpr;
+
+import io.micronaut.inject.annotation.repeatable.*;
+import io.micronaut.context.annotation.*;
+
+@Prototype
+class Test {
+    $annotation  
+    void test() {}
+}
+""", 'test')
+        def loadedMetadata = writeAndLoadMetadata("propertyexpr.Test", annotationMetadata)
+
+        expect:
+        annotationMetadata.hasPropertyExpressions() == hasPropertyExpressions
+        loadedMetadata.hasPropertyExpressions() == hasPropertyExpressions
+
+        where:
+        annotation                                                                   | hasPropertyExpressions
+        '@Value("foo.bar")'                                                          | false
+        '@Value("${foo.bar}")'                                                       | true
+        '@Value("foo.bar")'                                                          | false
+        '@Property(name="${foo.bar}")'                                               | true
+        '@Property(name="foo.bar")'                                                  | false
+        '@Property(name="${foo.bar}") @Property(name="foo.bar")'                     | true
+        '@Property(name="foo.bar") @Property(name="foo.another")'                    | false
+        '@PropertySource({@Property(name="${foo.bar}"), @Property(name="foo.bar")})' | true
+        '@PropertySource({@Property(name="foo.bar"), @Property(name="foo.another")})' | false
+    }
 
     void "test build repeated annotation values"() {
         given:

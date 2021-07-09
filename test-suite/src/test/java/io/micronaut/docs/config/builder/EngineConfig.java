@@ -32,7 +32,9 @@ class EngineConfig {
 
     private SparkPlug.Builder sparkPlug = SparkPlug.builder();
 
-    SparkPlug.Builder getSparkPlug() { return this.sparkPlug; }
+    SparkPlug.Builder getSparkPlug() {
+        return sparkPlug;
+    }
 
     @ConfigurationBuilder(prefixes = "with", configurationPrefix = "spark-plug") // <4>
     void setSparkPlug(SparkPlug.Builder sparkPlug) {

@@ -13,14 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.respondingnotfound;
+package io.micronaut.docs.respondingnotfound
 
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
-import io.reactivex.Maybe;
-
-import java.util.Map;
+import io.micronaut.context.annotation.Requires
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.reactivex.Maybe
 
 @Requires(property = "spec.name", value = "respondingnotfound")
 //tag::clazz[]

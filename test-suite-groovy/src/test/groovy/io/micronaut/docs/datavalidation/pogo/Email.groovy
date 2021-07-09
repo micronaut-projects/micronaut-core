@@ -13,18 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.datavalidation.pogo;
+package io.micronaut.docs.datavalidation.pogo
 
-import io.micronaut.core.annotation.Introspected;
+//tag::clazz[]
+import io.micronaut.core.annotation.Introspected
 
-import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotBlank
 
 @Introspected
 class Email {
 
     @NotBlank // <1>
-    String subject;
+    String subject
 
     @NotBlank // <1>
-    String recipient;
+    String recipient
 }
+//end::clazz[]

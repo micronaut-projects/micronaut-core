@@ -26,7 +26,7 @@ import io.micronaut.inject.ConstructorInjectionPoint;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
 import java.util.Objects;
@@ -68,9 +68,18 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
         if (!(annotationMetadata instanceof DefaultAnnotationMetadata)) {
             this.annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
         } else {
-            this.annotationMetadata = new ConstructorAnnotationMetadata((DefaultAnnotationMetadata) annotationMetadata);
+            if (annotationMetadata.hasPropertyExpressions()) {
+                this.annotationMetadata = new ConstructorAnnotationMetadata((DefaultAnnotationMetadata) annotationMetadata);
+            } else {
+                this.annotationMetadata = annotationMetadata;
+            }
         }
         this.arguments = arguments == null ? Argument.ZERO_ARGUMENTS : arguments;
+    }
+
+    @Override
+    public final boolean hasPropertyExpressions() {
+        return annotationMetadata.hasPropertyExpressions();
     }
 
     @Override

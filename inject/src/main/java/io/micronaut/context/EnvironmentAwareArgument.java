@@ -22,7 +22,7 @@ import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 
 /**
  * An argument that is aware of the environment to resolve property placeholders
@@ -45,6 +45,11 @@ class EnvironmentAwareArgument<T> extends DefaultArgument<T> implements Environm
     EnvironmentAwareArgument(DefaultArgument<T> argument) {
         super(argument.getType(), argument.getName(), argument.getAnnotationMetadata(), argument.getTypeVariables(), argument.getTypeParameters());
         this.annotationMetadata = initAnnotationMetadata(argument.getAnnotationMetadata());
+    }
+
+    @Override
+    public boolean hasPropertyExpressions() {
+        return annotationMetadata.hasPropertyExpressions();
     }
 
     @Override

@@ -15,8 +15,8 @@
  */
 package io.micronaut.inject;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.Qualifier;
@@ -211,7 +211,15 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
             return ReflectionUtils.EMPTY_CLASS_ARRAY;
         } else {
             final List<Argument<?>> typeArguments = getTypeArguments(type);
-            return typeArguments.stream().map(Argument::getType).toArray(Class[]::new);
+            if (typeArguments.size() == 0) {
+                return ReflectionUtils.EMPTY_CLASS_ARRAY;
+            }
+            Class[] params = new Class[typeArguments.size()];
+            int i = 0;
+            for (Argument<?> argument : typeArguments) {
+                params[i++] = argument.getType();
+            }
+            return params;
         }
     }
 

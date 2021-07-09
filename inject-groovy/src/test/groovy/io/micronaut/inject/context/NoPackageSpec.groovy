@@ -1,6 +1,6 @@
 package io.micronaut.inject.context
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 
 class NoPackageSpec extends AbstractBeanDefinitionSpec {
 

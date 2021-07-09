@@ -2,7 +2,7 @@ package io.micronaut.inject.configuration
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
 class ConfigurationBuilderSpec extends AbstractTypeElementSpec {
 
@@ -99,6 +99,7 @@ final class TestProps {
 package test;
 
 import io.micronaut.context.annotation.*;
+import io.micronaut.inject.configuration.AnnWithClass;
 
 @ConfigurationProperties("pool")    
 final class PoolConfig { 
@@ -112,6 +113,7 @@ interface ConnectionPool {
     
     interface Builder {
         Builder maxConcurrency(Integer maxConcurrency);
+        Builder foo(Foo foo);
         ConnectionPool build();
     }
     
@@ -147,10 +149,19 @@ class DefaultConnectionPool implements ConnectionPool {
             return this;
         }
         
+        @Override
+        public ConnectionPool.Builder foo(Foo foo) {
+            return this;
+        }
+        
         public ConnectionPool build() {
             return new DefaultConnectionPool(maxConcurrency);
         }
     }
+}
+
+@AnnWithClass(String.class)
+interface Foo {
 }
 ''')
         ctx.getEnvironment().addPropertySource(PropertySource.of(["pool.max-concurrency": 123]))

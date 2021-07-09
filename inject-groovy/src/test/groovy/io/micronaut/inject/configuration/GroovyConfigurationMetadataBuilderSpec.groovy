@@ -16,7 +16,7 @@
 package io.micronaut.inject.configuration
 
 import groovy.json.JsonSlurper
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.config.GroovyConfigurationMetadataBuilder
 import org.codehaus.groovy.ast.ClassNode
 /**

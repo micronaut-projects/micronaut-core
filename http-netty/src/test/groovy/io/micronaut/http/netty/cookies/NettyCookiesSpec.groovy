@@ -22,7 +22,20 @@ class NettyCookiesSpec extends Specification {
           Cookie cookie = nettyCookies.get("simple-cookie");
           cookie != null;
           cookie.getValue().equals("avalue");
+    }
 
+    void "test using an invalid cookie"() {
+        given:
+        String cookieDef = "cookie_name=cookie value; expires=Mon, 17-May-2021 09:32:59 GMT; path=/; secure; HttpOnly; samesite=none"
+        HttpHeaders httpHeaders = new DefaultHttpHeaders(false).add(HttpHeaderNames.SET_COOKIE, cookieDef)
+
+        when:
+        NettyCookies nettyCookies = new NettyCookies(httpHeaders, ConversionService.SHARED)
+
+        then:
+        noExceptionThrown()
+        Cookie cookie = nettyCookies.get("cookie_name")
+        cookie == null
     }
 
 }

@@ -15,23 +15,25 @@
  */
 package io.micronaut.docs.server.intro;
 
-// tag::imports[]
 import io.micronaut.context.annotation.Property;
+// tag::imports[]
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.micronaut.test.annotation.MicronautTest;
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import org.junit.jupiter.api.Test;
 
 import javax.inject.Inject;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 // end::imports[]
+
 @Property(name = "spec.name", value = "HelloControllerSpec")
 // tag::class[]
 @MicronautTest
 public class HelloControllerSpec {
+
     @Inject
     EmbeddedServer server; // <1>
 
@@ -43,7 +45,7 @@ public class HelloControllerSpec {
     void testHelloWorldResponse() {
         String response = client.toBlocking() // <3>
                 .retrieve(HttpRequest.GET("/hello"));
-        assertEquals("Hello World", response); //) <4>
+        assertEquals("Hello World", response); // <4>
     }
 }
 //end::class[]

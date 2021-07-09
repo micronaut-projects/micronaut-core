@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.value.singletonwithvalue;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 
 import javax.inject.Inject;
@@ -22,6 +23,7 @@ import javax.inject.Singleton;
 import java.net.URL;
 import java.util.Optional;
 
+@Requires(property = "spec.name", value = "ValueSpec")
 @Singleton
 public class A {
     int fromConstructor;

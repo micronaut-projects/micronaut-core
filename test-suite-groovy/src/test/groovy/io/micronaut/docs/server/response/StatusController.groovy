@@ -13,18 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.server.response;
+package io.micronaut.docs.server.response
 
 import io.micronaut.context.annotation.Requires
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
-import io.micronaut.http.annotation.Status;
-import io.reactivex.Maybe;
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Status
+import io.reactivex.Maybe
 
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletableFuture
 
 @Requires(property = "spec.name", value = "httpstatus")
 @Controller("/status")
@@ -39,7 +39,7 @@ class StatusController {
     @Status(HttpStatus.CREATED)
     @Get(produces = MediaType.TEXT_PLAIN)
     String index() {
-        return "success"
+        "success"
     }
     //end::atstatus[]
 

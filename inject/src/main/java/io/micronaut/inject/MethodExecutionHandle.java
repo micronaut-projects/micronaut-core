@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * Represents an execution handle that invokes a method.

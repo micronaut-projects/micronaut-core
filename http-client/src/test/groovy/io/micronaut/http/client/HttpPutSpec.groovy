@@ -15,22 +15,21 @@
  */
 package io.micronaut.http.client
 
-import edu.umd.cs.findbugs.annotations.Nullable
+import io.micronaut.core.annotation.Nullable
 import groovy.transform.EqualsAndHashCode
-import io.micronaut.http.MutableHttpRequest
-import io.micronaut.http.client.annotation.Client
-import io.micronaut.test.annotation.MicronautTest
-import io.reactivex.Flowable
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
+import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Header
-import io.micronaut.http.client.exceptions.HttpClientException
-import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.http.annotation.Put
+import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.exceptions.HttpClientException
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import io.reactivex.Flowable
 import spock.lang.Issue
 import spock.lang.Specification
 
@@ -199,6 +198,14 @@ class HttpPutSpec extends Specification {
         body == "put done"
     }
 
+    void "test http put with empty body"() {
+        when:
+        def res = Flowable.fromPublisher(client.exchange(HttpRequest.PUT('/put/emptyBody', null))).blockingFirst();
+
+        then:
+        res.status == HttpStatus.NO_CONTENT
+    }
+
     @Controller('/put')
     static class PostController {
 
@@ -252,6 +259,11 @@ class HttpPutSpec extends Specification {
                                  @Nullable @Header("foo") final String auth) {
 
             return "put done"
+        }
+
+        @Put(uri = "/emptyBody")
+        HttpResponse emptyBody() {
+            HttpResponse.noContent()
         }
     }
 

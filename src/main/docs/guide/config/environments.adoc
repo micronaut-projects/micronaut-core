@@ -2,11 +2,11 @@ The application environment is modelled by the api:context.env.Environment[] int
 
 snippet::io.micronaut.docs.context.env.EnvironmentSpec[tags="env",indent=0,title="Initializing the Environment"]
 
-The active environment names serve the purpose of allowing loading different configuration files depending on the environment and also using the ann:.context.annotation.Requires[] annotation to conditionally load beans or bean ann:.context.annotation.Configuration[] packages.
+The active environment names allow loading different configuration files depending on the environment, and also using the ann:.context.annotation.Requires[] annotation to conditionally load beans or bean ann:.context.annotation.Configuration[] packages.
 
-In addition, Micronaut will attempt to detect the current environments. For example within a Spock or JUnit test the api:context.env.Environment#TEST[] environment will be automatically active.
+In addition, Micronaut attempts to detect the current environments. For example within a Spock or JUnit test the api:context.env.Environment#TEST[] environment is automatically active.
 
-Additional active environments can be specified using the `micronaut.environments` system property or the `MICRONAUT_ENVIRONMENTS` environment variable. These can be specified as a comma separated list. For example:
+Additional active environments can be specified using the `micronaut.environments` system property or the `MICRONAUT_ENVIRONMENTS` environment variable. These are specified as a comma-separated list. For example:
 
 .Specifying environments
 [source,bash]
@@ -16,26 +16,26 @@ $ java -Dmicronaut.environments=foo,bar -jar myapp.jar
 
 The above activates environments called `foo` and `bar`.
 
-Finally, the Cloud environment names are also detected. See the section on <<cloudConfiguration,Cloud Configuration>> for more information.
+Finally, Cloud environment names are also detected. See the section on <<cloudConfiguration,Cloud Configuration>> for more information.
 
 == Environment Priority
 
-Micronaut will load property sources based off the environments specified, and if the same property key exists in multiple property sources specific to an environment, the environment order determines which value will be used.
+Micronaut loads property sources based on the environments specified, and if the same property key exists in multiple property sources specific to an environment, the environment order determines which value to use.
 
-Micronaut uses the following hierarchy for environment processing (lowest priority to highest priority):
+Micronaut uses the following hierarchy for environment processing (lowest to highest priority):
 
 * Deduced environments
 * Environments from the `micronaut.environments` system property
 * Environments from the `MICRONAUT_ENVIRONMENTS` environment variable
 * Environments specified explicitly through the application context builder
 +
-NOTE: This also applies to `@MicronautTest(environments = )`
+NOTE: This also applies to `@MicronautTest(environments = ...)`
 +
 
 
 == Disabling Environment Detection
 
-The automatic detection of environments can be disabled setting the `micronaut.env.deduction` system property or the `MICRONAUT_ENV_DEDUCTION` environment variable to `false`. This will prevent Micronaut from detecting current environments, while still using any environments that are specifically provided as shown above.
+Automatic detection of environments can be disabled by setting the `micronaut.env.deduction` system property or the `MICRONAUT_ENV_DEDUCTION` environment variable to `false`. This prevents Micronaut from detecting current environments, while still using any environments that are specifically provided as shown above.
 
 .Disabling environment detection via system property
 [source,bash]
@@ -43,7 +43,7 @@ The automatic detection of environments can be disabled setting the `micronaut.e
 $  java -Dmicronaut.env.deduction=false -jar myapp.jar
 ----
 
-Alternatively, you can disable environment deduction using the api:context.ApplicationContextBuilder[]'s `deduceEnvironment` method when setting up your application.
+Alternatively, you can disable environment deduction using the api:context.ApplicationContextBuilder[] `deduceEnvironment` method when setting up your application.
 
 snippet::io.micronaut.docs.context.env.DefaultEnvironmentSpec[tags="disableEnvDeduction",indent=0,title="Using ApplicationContextBuilder to disable environment deduction"]
 
@@ -57,15 +57,15 @@ To set the default environments, modify your application main method:
 ----
 public static void main(String[] args) {
     Micronaut.build(args)
-            .mainClass(Application.class)
-            .defaultEnvironments("dev")
-            .start();
+             .mainClass(Application.class)
+             .defaultEnvironments("dev")
+             .start();
 }
 ----
 
 == Micronaut Banner
 
-Since Micronaut 2.3 a banner is shown when the application starts up. It is enabled by default and it will also show the Micronaut version.
+Since Micronaut 2.3 a banner is shown when the application starts. It is enabled by default and it also shows the Micronaut version.
 
 [source,shell,subs="attributes"]
 ----
@@ -80,10 +80,9 @@ $ ./gradlew run
 17:07:22.997 [main] INFO  io.micronaut.runtime.Micronaut - Startup completed in 611ms. Server Running: http://localhost:8080
 ----
 
-If you want to customize the banner with your own Ascii Art (just plain ascii at this moment) just create the file `src/main/resources/micronaut-banner.txt`
-and it will be used instead.
+To customize the banner with your own ASCII Art (just plain ASCII at this moment), create the file `src/main/resources/micronaut-banner.txt` and it will be used instead.
 
-In case you want to disable it modify your `Application` class:
+To disable it, modify your `Application` class:
 
 [source,java]
 ----
@@ -91,8 +90,8 @@ public class Application {
 
     public static void main(String[] args) {
         Micronaut.build(args)
-                .banner(false) // <1>
-                .start();
+                 .banner(false) // <1>
+                 .start();
     }
 }
 ----

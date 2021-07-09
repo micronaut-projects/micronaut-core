@@ -16,12 +16,11 @@
 package io.micronaut.docs.server.routing
 
 import io.micronaut.context.annotation.Requires
+// tag::imports[]
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-
-// tag::imports[]
-
 // end::imports[]
+
 @Requires(property = "spec.name", value = "BackwardCompatibleControllerSpec")
 // tag::class[]
 @Controller("/hello")

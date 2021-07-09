@@ -15,14 +15,14 @@
  */
 package io.micronaut.docs.context.env;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.util.CollectionUtils;
 import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class EnvironmentSpec {
 
@@ -37,7 +37,6 @@ public class EnvironmentSpec {
         // end::env[]
 
         applicationContext.close();
-
     }
 
     @Test

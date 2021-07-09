@@ -15,8 +15,19 @@
  */
 package io.micronaut.core.util;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
-import java.util.*;
+import io.micronaut.core.annotation.Nullable;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.StringTokenizer;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
@@ -152,15 +163,16 @@ public final class StringUtils {
     /**
      * Parse the given {@code String} value into a {@link Locale}, accepting
      * the {@link Locale#toString} format as well as BCP 47 language tags.
+     *
      * @param localeValue the locale value: following either {@code Locale's}
-     * {@code toString()} format ("en", "en_UK", etc), also accepting spaces as
-     * separators (as an alternative to underscores), or BCP 47 (e.g. "en-UK")
-     * as specified by {@link Locale#forLanguageTag} on Java 7+
-     * <p>Copied from the Spring Framework while retaining all license, copyright and author information.</p>
+     *                    {@code toString()} format ("en", "en_UK", etc), also accepting spaces as
+     *                    separators (as an alternative to underscores), or BCP 47 (e.g. "en-UK")
+     *                    as specified by {@link Locale#forLanguageTag} on Java 7+
+     *                    <p>Copied from the Spring Framework while retaining all license, copyright and author information.</p>
      * @return a corresponding {@code Locale} instance, or {@code null} if none
      * @throws IllegalArgumentException in case of an invalid locale specification
-     * @since 2.3.0
      * @see Locale#forLanguageTag
+     * @since 2.3.0
      */
     @Nullable
     public static Locale parseLocale(String localeValue) {
@@ -213,9 +225,9 @@ public final class StringUtils {
     /**
      * Returns a new string without any leading whitespace.
      *
-     * @since 2.3.0
      * @param str The string
      * @return The string without leading whitespace
+     * @since 2.3.0
      */
     public static String trimLeadingWhitespace(String str) {
         return trimLeading(str, Character::isWhitespace);
@@ -224,10 +236,10 @@ public final class StringUtils {
     /**
      * Returns a new string without any leading characters that match the supplied character.
      *
-     * @since 2.3.0
      * @param str The string
-     * @param c The character to remove
+     * @param c   The character to remove
      * @return The string without leading characters matching the supplied character.
+     * @since 2.3.0
      */
     public static String trimLeadingCharacter(String str, char c) {
         return trimLeading(str, character -> character == c);
@@ -236,10 +248,10 @@ public final class StringUtils {
     /**
      * Returns a new string without any leading characters that match the supplied predicate.
      *
-     * @since 2.3.0
-     * @param str The string
+     * @param str       The string
      * @param predicate The predicate to test characters against
      * @return The string without leading characters matching the supplied predicate.
+     * @since 2.3.0
      */
     public static String trimLeading(String str, Predicate<Character> predicate) {
         if (isEmpty(str)) {
@@ -297,7 +309,7 @@ public final class StringUtils {
      */
     @SuppressWarnings({"unchecked"})
     public static String[] tokenizeToStringArray(
-        String str, String delimiters, boolean trimTokens, boolean ignoreEmptyTokens) {
+            String str, String delimiters, boolean trimTokens, boolean ignoreEmptyTokens) {
 
         if (str == null) {
             return null;
@@ -340,7 +352,7 @@ public final class StringUtils {
             return dottedProperty;
         }
         dottedProperty = dottedProperty.replace('.', '_');
-        return uppercase ?  dottedProperty.toUpperCase() : dottedProperty;
+        return uppercase ? dottedProperty.toUpperCase() : dottedProperty;
     }
 
     /**
@@ -351,11 +363,11 @@ public final class StringUtils {
      * output will be "/foo/bar"
      *
      * @param baseUri The uri to prepend. Eg. /foo
-     * @param uri The uri to combine with the baseUri. Eg. /bar
+     * @param uri     The uri to combine with the baseUri. Eg. /bar
      * @return A combined uri string
      */
     public static String prependUri(String baseUri, String uri) {
-        if (!uri.startsWith("/")) {
+        if (!uri.startsWith("/") && !uri.startsWith("?")) {
             uri = "/" + uri;
         }
         if (uri.length() == 1 && uri.charAt(0) == '/') {
@@ -400,6 +412,7 @@ public final class StringUtils {
 
     /**
      * Is the boolean string true. Values that represent true are: yes, y, on, and true.
+     *
      * @param booleanString The boolean string
      * @return True if it is a valid value
      */
@@ -417,4 +430,133 @@ public final class StringUtils {
                 return false;
         }
     }
+
+    /**
+     * Fast split by one character iterable. Implementation omits empty strings.
+     * This should be a fast alternative to {@link String#split(String)} where it's used with one character.
+     *
+     * @param sequence The sequence to split
+     * @param splitCharacter The split character
+     * @since 2.5.0
+     * @return The iterable of possible sequences
+     */
+    public static Iterable<String> splitOmitEmptyStrings(final CharSequence sequence, final char splitCharacter) {
+        Objects.requireNonNull(sequence);
+        return () -> new SplitOmitEmptyIterator(sequence, splitCharacter);
+    }
+
+    /**
+     * Fast split by one character iterable. Implementation omits empty strings.
+     * This should be a fast alternative to {@link String#split(String)} where it's used with one character.
+     *
+     * @param sequence The sequence to split
+     * @param splitCharacter The split character
+     * @since 2.5.0
+     * @return The list of possible sequences
+     */
+    public static List<String> splitOmitEmptyStringsList(final CharSequence sequence, final char splitCharacter) {
+        Objects.requireNonNull(sequence);
+        int count = 0;
+        for (int i = 0; i < sequence.length(); i++) {
+            if (sequence.charAt(i) == splitCharacter) {
+                count++;
+            }
+        }
+        List<String> result = new ArrayList<>(count + 1);
+        SplitOmitEmptyIterator iterator = new SplitOmitEmptyIterator(sequence, splitCharacter);
+        while (iterator.hasNext()) {
+            result.add(iterator.next());
+        }
+        return result;
+    }
+
+    /**
+     * Fast split by one character iterator. Implementation omits empty strings.
+     * This should be a fast alternative to {@link String#split(String)} where it's used with one character.
+     *
+     * @param sequence The sequence to split
+     * @param splitCharacter The split character
+     * @since 2.5.0
+     * @return The iterator of possible sequences
+     */
+    public static Iterator<String> splitOmitEmptyStringsIterator(final CharSequence sequence, final char splitCharacter) {
+        Objects.requireNonNull(sequence);
+        return new SplitOmitEmptyIterator(sequence, splitCharacter);
+    }
+
+    /**
+     * Fast split by one character iterator.
+     *
+     * @author Denis Stepanov
+     * @since 2.5.0
+     */
+    private static final class SplitOmitEmptyIterator implements Iterator<String> {
+
+        private final CharSequence sequence;
+        private final char splitCharacter;
+        private final int length;
+        private int index = 0;
+        private int fromIndex = 0;
+        private int toIndex = 0;
+        private boolean end = false;
+        private boolean hasNext = true;
+        private boolean adjust = true;
+
+        private SplitOmitEmptyIterator(CharSequence sequence, char splitCharacter) {
+            this.sequence = sequence;
+            this.splitCharacter = splitCharacter;
+            this.length = sequence.length();
+        }
+
+        @Override
+        public boolean hasNext() {
+            if (adjust) {
+                adjust();
+            }
+            return hasNext;
+        }
+
+        @Override
+        public String next() {
+            if (adjust) {
+                adjust();
+            }
+            if (!hasNext) {
+                throw new NoSuchElementException();
+            }
+            hasNext = false;
+            adjust = !end;
+            if (fromIndex == 0 && toIndex == length) {
+                return sequence.toString();
+            }
+            return sequence.subSequence(fromIndex, toIndex).toString();
+        }
+
+        private void adjust() {
+            adjust = false;
+            hasNext = false;
+            fromIndex = index;
+            while (index < length) {
+                if (sequence.charAt(index) == splitCharacter) {
+                    if (fromIndex == index) {
+                        index++;
+                        fromIndex = index;
+                        continue; // Empty string
+                    }
+                    hasNext = true;
+                    toIndex = index;
+                    index++;
+                    return;
+                } else {
+                    index++;
+                }
+            }
+            if (fromIndex != index) {
+                toIndex = length;
+                hasNext = true;
+            }
+            end = true;
+        }
+
+    };
 }

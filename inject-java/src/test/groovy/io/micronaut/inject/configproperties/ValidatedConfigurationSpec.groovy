@@ -19,7 +19,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.BeanInstantiationException
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ValidatedBeanDefinition
 import spock.lang.Specification
@@ -30,8 +30,7 @@ class ValidatedConfigurationSpec extends AbstractTypeElementSpec {
 
     void "test validated config with invalid config"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.start()
+        ApplicationContext applicationContext = ApplicationContext.run(["spec.name": getClass().simpleName], "test")
 
         when:
         ValidatedConfig config = applicationContext.getBean(ValidatedConfig)
@@ -47,7 +46,10 @@ class ValidatedConfigurationSpec extends AbstractTypeElementSpec {
 
     void "test validated config with valid config"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder()
+            .properties(["spec.name": getClass().simpleName])
+            .environments("test")
+            .build()
         applicationContext.environment.addPropertySource(PropertySource.of(
                 'foo.bar.url':'http://localhost',
                 'foo.bar.name':'test'

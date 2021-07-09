@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.beans.visitor;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.AbstractBeanMethod;
@@ -30,6 +30,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.beans.AbstractExecutableBeanMethod;
+import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.writer.AbstractClassFileWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import org.jetbrains.annotations.NotNull;
@@ -75,7 +76,7 @@ final class BeanMethodWriter extends AbstractClassFileWriter implements Named {
             int index,
             MethodElement methodElement) {
         super(methodElement, methodElement.getDeclaringType());
-        this.type = getTypeReference(ClassElement.of(introspectionType.getClassName() + "$$exec" + index));
+        this.type = JavaModelUtils.getTypeReference(ClassElement.of(introspectionType.getClassName() + "$$exec" + index));
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         this.methodElement = methodElement;
         this.introspectionWriter = introspectionWriter;
@@ -122,7 +123,7 @@ final class BeanMethodWriter extends AbstractClassFileWriter implements Named {
         ClassElement declaringType = methodElement.getDeclaringType();
         invokeMethod.visitMethodInsn(
                 declaringType.isInterface() ? INVOKEINTERFACE : INVOKEVIRTUAL,
-                getTypeReference(declaringType).getInternalName(),
+                JavaModelUtils.getTypeReference(declaringType).getInternalName(),
                 methodElement.getName(),
                 methodDescriptor,
                 declaringType.isInterface()

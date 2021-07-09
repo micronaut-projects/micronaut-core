@@ -28,6 +28,7 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
+import io.micronaut.context.BeanProvider;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
@@ -54,7 +55,7 @@ public abstract class JacksonMediaTypeCodec implements MediaTypeCodec {
     protected final List<MediaType> additionalTypes;
     protected final CodecConfiguration codecConfiguration;
     protected final MediaType mediaType;
-    private final Provider<ObjectMapper> objectMapperProvider;
+    private final BeanProvider<ObjectMapper> objectMapperProvider;
     private ObjectMapper objectMapper;
 
     /**
@@ -63,7 +64,21 @@ public abstract class JacksonMediaTypeCodec implements MediaTypeCodec {
      * @param codecConfiguration       The configuration for the codec
      * @param mediaType                Client request/response media type
      */
+    @Deprecated
     public JacksonMediaTypeCodec(Provider<ObjectMapper> objectMapperProvider,
+                                 ApplicationConfiguration applicationConfiguration,
+                                 CodecConfiguration codecConfiguration,
+                                 MediaType mediaType) {
+        this((BeanProvider<ObjectMapper>) objectMapperProvider::get, applicationConfiguration, codecConfiguration, mediaType);
+    }
+
+    /**
+     * @param objectMapperProvider     To read/write JSON
+     * @param applicationConfiguration The common application configurations
+     * @param codecConfiguration       The configuration for the codec
+     * @param mediaType                Client request/response media type
+     */
+    public JacksonMediaTypeCodec(BeanProvider<ObjectMapper> objectMapperProvider,
                                  ApplicationConfiguration applicationConfiguration,
                                  CodecConfiguration codecConfiguration,
                                  MediaType mediaType) {
@@ -88,7 +103,7 @@ public abstract class JacksonMediaTypeCodec implements MediaTypeCodec {
                                  ApplicationConfiguration applicationConfiguration,
                                  CodecConfiguration codecConfiguration,
                                  MediaType mediaType) {
-        this(() -> objectMapper, applicationConfiguration, codecConfiguration, mediaType);
+        this((BeanProvider<ObjectMapper>) () -> objectMapper, applicationConfiguration, codecConfiguration, mediaType);
         ArgumentUtils.requireNonNull("objectMapper", objectMapper);
         this.objectMapper = objectMapper;
     }
@@ -234,8 +249,13 @@ public abstract class JacksonMediaTypeCodec implements MediaTypeCodec {
 
     @Override
     public <T, B> ByteBuffer<B> encode(T object, ByteBufferFactory<?, B> allocator) throws CodecException {
-        byte[] bytes = encode(object);
-        return allocator.copiedBuffer(bytes);
+        if (object instanceof byte[]) {
+            return allocator.copiedBuffer((byte[]) object);
+        }
+        ByteBuffer<B> buffer = allocator.buffer();
+        OutputStream outputStream = buffer.toOutputStream();
+        encode(object, outputStream);
+        return buffer;
     }
 
     private <T> JavaType constructJavaType(Argument<T> type) {

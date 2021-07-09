@@ -88,7 +88,16 @@ httpServer:
   jsonBinding: JSON Binding with Jackson
   datavalidation: Data Validation
   staticResources: Serving Static Resources
-  errorHandling: Error Handling
+  errorHandling:
+    title: Error Handling
+    statusHandlers: Status Handlers
+    localErrorHandling: Local Error Handling
+    globalErrorHandling: Global Error Handling
+    exceptionHandler:
+      title: ExceptionHandler
+      builtInExceptionHandlers: Built-In Exception Handlers
+      customExceptionHandler: Custom Exception Handler
+    errorFormatting: Error Formatting
   apiVersioning: API Versioning
   formData: Handling Form Data
   serverIO: Writing Response Data
@@ -237,6 +246,7 @@ management:
     cachesEndpoint: The Caches Endpoint
     stopEndpoint: The Server Stop Endpoint
     environmentEndpoint: The Environment Endpoint
+    threadDumpEndpoint: The ThreadDump Endpoint
 security:
   title: Security
 multitenancy:

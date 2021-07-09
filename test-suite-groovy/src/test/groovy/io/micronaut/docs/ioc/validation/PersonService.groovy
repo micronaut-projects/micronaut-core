@@ -23,7 +23,6 @@ import javax.validation.constraints.NotBlank
 // tag::class[]
 @Singleton
 class PersonService {
-
     void sayHello(@NotBlank String name) {
         println "Hello $name"
     }

@@ -35,7 +35,7 @@ class IssuesControllerTest extends Specification {
         client.toBlocking().exchange("/issues/hello")
 
         then:
-        HttpClientResponseException e = thrown(HttpClientResponseException)
+        def e = thrown(HttpClientResponseException)
         e.status.code == 400 // <5>
     }
 
@@ -44,7 +44,7 @@ class IssuesControllerTest extends Specification {
         client.toBlocking().exchange("/issues/")
 
         then:
-        HttpClientResponseException e = thrown(HttpClientResponseException)
+        def e = thrown(HttpClientResponseException)
         e.status.code == 404 // <6>
     }
 }

@@ -4,34 +4,32 @@ import io.kotlintest.shouldBe
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
+import io.micronaut.http.HttpRequest.GET
+import io.micronaut.http.HttpRequest.POST
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.uri.UriBuilder
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
-
 import java.util.Collections
-
-import io.micronaut.http.HttpRequest.GET
-import io.micronaut.http.HttpRequest.POST
 
 class HelloControllerSpec: StringSpec() {
 
     val embeddedServer = autoClose(
-            ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to HelloControllerSpec::class.simpleName))
+        ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to HelloControllerSpec::class.simpleName))
     )
 
     val client = autoClose(
-            embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
+        embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
     )
 
     init {
         "test simple retrieve" {
             // tag::simple[]
             val uri = UriBuilder.of("/hello/{name}")
-                    .expand(Collections.singletonMap("name", "John"))
-                    .toString()
+                                .expand(Collections.singletonMap("name", "John"))
+                                .toString()
             uri shouldBe "/hello/John"
 
             val result = client.toBlocking().retrieve(uri)

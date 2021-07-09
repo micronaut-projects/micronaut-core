@@ -2,20 +2,20 @@ The link:{api}/io/micronaut/http/annotation/Controller.html[@Controller] annotat
 
 == URI Paths
 
-The value of the `@Controller` annotation is a https://tools.ietf.org/html/rfc6570[RFC-6570 URI template] you can therefore embed URI variables within the path using the syntax defined by the URI template specification.
+The value of the `@Controller` annotation is a https://tools.ietf.org/html/rfc6570[RFC-6570 URI template], so you can embed URI variables within the path using the syntax defined by the URI template specification.
 
 NOTE: Many other frameworks, including Spring, implement the URI template specification
 
 The actual implementation is handled by the api:http.uri.UriMatchTemplate[] class, which extends api:http.uri.UriTemplate[].
 
-You can use this class explicitly within your application to build URIs. For example:
+You can use this class in your applications to build URIs, for example:
 
 snippet::io.micronaut.docs.server.uris.UriTemplateTest[tags="match", title="Using a UriTemplate",indent=0]
 
-<1> The `match` method can be used to match a path
-<2> The `expand` method can be used to expand a template into a URI.
+<1> Use the `match` method to match a path
+<2> Use the `expand` method to expand a template into a URI
 
-If you have a requirement to build paths to include in your responses you can use api:http.uri.UriTemplate[] to do so.
+You can use api:http.uri.UriTemplate[] to build paths to include in your responses.
 
 == URI Path Variables
 
@@ -24,24 +24,24 @@ URI variables can be referenced via method arguments. For example:
 snippet::io.micronaut.docs.server.routes.IssuesController[tags="imports,class", indent=0, title="URI Variables Example"]
 
 <1> The `@Controller` annotation is specified with a base URI of `/issues`
-<2> The link:{api}/io/micronaut/http/annotation/Get.html[Get] annotation is used to map the method to an HTTP link:{api}/io/micronaut/http/HttpMethod.html#GET[GET] with a URI variable embedded in the URI called `number`
-<3> The method argument can be optionally annotated with link:{api}/io/micronaut/http/annotation/PathVariable.html[PathVariable]
+<2> The link:{api}/io/micronaut/http/annotation/Get.html[Get] annotation maps the method to an HTTP link:{api}/io/micronaut/http/HttpMethod.html#GET[GET] with a URI variable embedded in the URI named `number`
+<3> The method argument can optionally be annotated with link:{api}/io/micronaut/http/annotation/PathVariable.html[PathVariable]
 <4> The value of the URI variable is referenced in the implementation
 
-Micronaut will map the URI `/issues/{number}` for the above controller. We can assert this is the case by writing a set of unit tests:
+Micronaut maps the URI `/issues/{number}` for the above controller. We can assert this is the case by writing unit tests:
 
 snippet::io.micronaut.docs.server.routes.IssuesControllerTest[tags="imports,class", indent=0, title="Testing URI Variables"]
 
-<1> The embedded server and http client is being started
-<2> The server and client will be cleaned up after all of the tests have finished
-<3> The tests sends a request to the URI `/issues/12`
+<1> The embedded server and HTTP client are started
+<2> The server and client are cleaned up after the tests finish
+<3> The tests send a request to the URI `/issues/12`
 <4> And then asserts the response is "Issue # 12"
 <5> Another test asserts a 400 response is returned when an invalid number is sent in the URL
-<6> Another test asserts a 404 response is returned when no number is provided in the URL. The variable being present is required in order for the route to be executed.
+<6> Another test asserts a 404 response is returned when no number is provided in the URL. The variable being present is required for the route to be executed.
 
 Note that the URI template in the previous example requires that the `number` variable is specified. You can specify optional URI templates with the syntax: `/issues{/number}` and by annotating the `number` parameter with `@Nullable`.
 
-The following table provides some examples of URI templates and what they match:
+The following table provides examples of URI templates and what they match:
 
 .URI Template Matching
 |===
@@ -52,7 +52,7 @@ The following table provides some examples of URI templates and what they match:
 | `/books/1`
 
 |`/books/{id:2}`
-| A variable of 2 characters max
+| A variable of two characters max
 | `/books/10`
 
 |`/books{/id}`
@@ -75,16 +75,15 @@ The following table provides some examples of URI templates and what they match:
 
 == URI Reserved Character Matching
 
-By default URI variables as defined by the https://tools.ietf.org/html/rfc6570[RFC-6570 URI template] spec cannot include reserved characters such as `/`, `?` etc.
+By default, URI variables as defined by the https://tools.ietf.org/html/rfc6570[RFC-6570 URI template] spec cannot include reserved characters such as `/`, `?` etc.
 
-If you wish to match or expand entire paths then this can be problematic. As per https://tools.ietf.org/html/rfc6570#section-3.2.3[section 3.2.3 of the specification], you can use reserved expansion or matching using the `+` operator.
+This can be problematic if you wish to match or expand entire paths. As per https://tools.ietf.org/html/rfc6570#section-3.2.3[section 3.2.3 of the specification], you can use reserved expansion or matching using the `+` operator.
 
-For example the URI `/books/{+path}` will match both `/books/foo` and `/books/foo/bar` since the `+` indicates that the variable `path` should include reserved characters (in this case `/`).
+For example the URI `/books/{+path}` matches both `/books/foo` and `/books/foo/bar` since the `+` indicates that the variable `path` should include reserved characters (in this case `/`).
 
 == Routing Annotations
 
-The previous example used the link:{api}/io/micronaut/http/annotation/Get.html[@Get] annotation to add method that accepted HTTP link:{api}/io/micronaut/http/HttpMethod.html#GET[GET] requests. The following tables summarizes the available annotations and how they map to the different HTTP methods:
-
+The previous example uses the link:{api}/io/micronaut/http/annotation/Get.html[@Get] annotation to add a method that accepts HTTP link:{api}/io/micronaut/http/HttpMethod.html#GET[GET] requests. The following table summarizes the available annotations and how they map to HTTP methods:
 
 .HTTP Routing Annotations
 |===
@@ -116,61 +115,61 @@ The previous example used the link:{api}/io/micronaut/http/annotation/Get.html[@
 
 |===
 
-NOTE: All of the method annotations default to `/`.
+NOTE: All the method annotations default to `/`.
 
 == Multiple URIs
 
-Each of the routing annotations support multiple URI templates. For each template, a route will be created. This feature is useful for example to change the path of the API and leaving the existing path as is for backwards compatibility. For example:
+Each of the routing annotations supports multiple URI templates. For each template, a route is created. This feature is useful for example to change the path of the API and leave the existing path as is for backwards compatibility. For example:
 
 snippet::io.micronaut.docs.server.routing.BackwardCompatibleController[tags="imports,class", indent=0, title="Multiple URIs"]
 
 <1> Specify multiple templates
 <2> Bind to the template arguments as normal
 
-NOTE: Route validation is more complicated with multiple templates. If a variable that would normally be required does not exist in all templates, then that variable is considered optional since it may not exist for every execution of the method.
+NOTE: Route validation is more complicated with multiple templates. If a variable that would normally be required does not exist in all templates, that variable is considered optional since it may not exist for every execution of the method.
 
 == Building Routes Programmatically
 
-If you prefer to not use annotations and declare all of your routes in code then never fear, Micronaut has a flexible link:{api}/io/micronaut/web/router/RouteBuilder.html[RouteBuilder] API that makes it a breeze to define routes programmatically.
+If you prefer to not use annotations and instead declare all routes in code then never fear, Micronaut has a flexible link:{api}/io/micronaut/web/router/RouteBuilder.html[RouteBuilder] API that makes it a breeze to define routes programmatically.
 
-To start off with you should subclass link:{api}/io/micronaut/web/router/DefaultRouteBuilder.html[DefaultRouteBuilder] and then simply inject the controller you wish to route to into the method and define your routes:
+To start, subclass link:{api}/io/micronaut/web/router/DefaultRouteBuilder.html[DefaultRouteBuilder] and inject the controller to route to into the method, and define your routes:
 
 snippet::io.micronaut.docs.server.routes.MyRoutes[tags="imports,class", indent=0, title="URI Variables Example"]
 
 <1> Route definitions should subclass link:{api}/io/micronaut/web/router/DefaultRouteBuilder.html[DefaultRouteBuilder]
-<2> Use `@Inject` to inject a method with the controller you want to route to
-<3> Use methods such as link:{api}/io/micronaut/web/router/RouteBuilder.html#GET-java.lang.String-java.lang.Class-java.lang.String-java.lang.Class...-[GET] to route to controller methods. Note that even though the issues controller is being used, the route has no knowledge of its `@Controller` annotation and thus the full path must be specified.
+<2> Use `@Inject` to inject a method with the controller to route to
+<3> Use methods such as link:{api}/io/micronaut/web/router/RouteBuilder.html#GET-java.lang.String-java.lang.Class-java.lang.String-java.lang.Class...-[GET] to route to controller methods. Note that even though the issues controller is used, the route has no knowledge of its `@Controller` annotation and thus the full path must be specified.
 
-TIP: Unfortunately due to type erasure a Java method lambda reference cannot be used with the API. For Groovy there is a `GroovyRouteBuilder` class which can be subclassed that allows passing Groovy method references.
+TIP: Unfortunately due to type erasure, a Java method lambda reference cannot be used with the API. For Groovy there is a `GroovyRouteBuilder` class which can be subclassed that allows passing Groovy method references.
 
-== Route Compile Time Validation
+== Route Compile-Time Validation
 
-Micronaut supports validating route arguments at compile time with the validation library. To get started simply add the `validation` dependency to your build:
+Micronaut supports validating route arguments at compile time with the validation library. To get started, add the `validation` dependency to your build:
 
 [source,groovy]
 .build.gradle
 ----
 annotationProcessor "io.micronaut:micronaut-validation" // Java only
 kapt "io.micronaut:micronaut-validation" // Kotlin only
-compile "io.micronaut:micronaut-validation"
+implementation "io.micronaut:micronaut-validation"
 ----
 
-With the correct dependency on your classpath, route arguments will automatically be checked at compile time. The compilation will fail if any of the following conditions are met:
+With the correct dependency on your classpath, route arguments will automatically be checked at compile time. Compilation will fail if any of the following conditions are met:
 
 * {blank}
  The URI template contains a variable that is optional, but the method parameter is not annotated with `@Nullable` or is an `java.util.Optional`.
 
-An optional variable is one that will allow the route to match a URI even if the value is not present. For example `/foo{/bar}` will match requests to `/foo` and `/foo/abc`. The non optional variant would be `/foo/{bar}`. See the <<_uri_path_variables, URI Path Variables>> section for more information.
+An optional variable is one that allows the route to match a URI even if the value is not present. For example `/foo{/bar}` matches requests to `/foo` and `/foo/abc`. The non-optional variant would be `/foo/{bar}`. See the <<_uri_path_variables, URI Path Variables>> section for more information.
 
 * {blank}
  The URI template contains a variable that is missing from the method arguments.
 
-NOTE: To disable route compile time validation, set the system property `-Dmicronaut.route.validation=false`. For Java and Kotlin users using Gradle, the same effect can be achieved by removing the `validation` dependency from the `annotationProcessor`/`kapt` scope.
+NOTE: To disable route compile-time validation, set the system property `-Dmicronaut.route.validation=false`. For Java and Kotlin users using Gradle, the same effect can be achieved by removing the `validation` dependency from the `annotationProcessor`/`kapt` scope.
 
 == Routing non-standard HTTP methods
 
-It may be necessary to support a non-standard HTTP method for a client or server. Specifications like https://tools.ietf.org/html/rfc4918[RFC-4918 Webdav] require additional methods like REPORT or LOCK for example. To support that use case the @CustomHttpMethod annotation can be used.
- 
+The `@CustomHttpMethod` annotation supports non-standard HTTP methods for a client or server. Specifications like https://tools.ietf.org/html/rfc4918[RFC-4918 Webdav] require additional methods like REPORT or LOCK for example.
+
 .RoutingExample
 [source,java]
 ----
@@ -178,4 +177,4 @@ It may be necessary to support a non-standard HTTP method for a client or server
 String lock(String name)
 ----
 
-The annotation can be used anywhere any of the standard method annotations can be used, including controllers and declarative http clients.
+The annotation can be used anywhere the standard method annotations can be used, including controllers and declarative HTTP clients.

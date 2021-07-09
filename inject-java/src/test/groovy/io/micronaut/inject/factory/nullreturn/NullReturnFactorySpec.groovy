@@ -7,7 +7,7 @@ import io.micronaut.context.exceptions.BeanContextException
 import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.context.exceptions.DependencyInjectionException
 import io.micronaut.context.exceptions.NoSuchBeanException
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
 
@@ -57,7 +57,7 @@ class Test2 {}
 
     void "test factory that returns null"() {
         given:
-        BeanContext beanContext = ApplicationContext.run()
+        BeanContext beanContext = ApplicationContext.run(["spec.name": getClass().simpleName])
         NullableFactory factory = beanContext.getBean(NullableFactory)
 
         when:
@@ -124,7 +124,7 @@ class Test2 {}
 
     void "test it works as expected nested resolution"() {
         given:
-        BeanContext beanContext = ApplicationContext.run()
+        BeanContext beanContext = ApplicationContext.run(["spec.name": getClass().simpleName])
         NullableFactory factory = beanContext.getBean(NullableFactory)
 
         expect:
@@ -141,7 +141,7 @@ class Test2 {}
 
     void "test each bean on a class with null factory"() {
         given:
-        BeanContext beanContext = ApplicationContext.run()
+        BeanContext beanContext = ApplicationContext.run(["spec.name": getClass().simpleName])
 
         expect:
         beanContext.getBeansOfType(DProcessor).size() == 1

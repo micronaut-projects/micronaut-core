@@ -6,7 +6,6 @@ import spock.lang.Specification
 
 class VehicleSpec extends Specification {
 
-
     void "test start vehicle"() {
         given:
         // tag::start[]
@@ -15,12 +14,13 @@ class VehicleSpec extends Specification {
                 "my.engine.crank-shaft.rod-length": "7.0"
         )
 
-        Vehicle vehicle = applicationContext.getBean(Vehicle.class)
+        Vehicle vehicle = applicationContext.getBean(Vehicle)
         System.out.println(vehicle.start())
         // end::start[]
-        expect:
 
+        expect:
         vehicle.start() == "Ford Engine Starting V8 [rodLength=7.0]"
+
         cleanup:
         applicationContext.close()
     }

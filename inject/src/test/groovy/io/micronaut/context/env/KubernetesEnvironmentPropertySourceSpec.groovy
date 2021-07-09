@@ -20,4 +20,14 @@ class KubernetesEnvironmentPropertySourceSpec extends Specification {
         suffix << KubernetesEnvironmentPropertySource.VAR_SUFFIXES
     }
 
+    void "it has the same position and convention than the EnvironmentPropertySource"() {
+        given:
+        KubernetesEnvironmentPropertySource keps = new KubernetesEnvironmentPropertySource()
+        EnvironmentPropertySource eps = new EnvironmentPropertySource()
+
+        expect:
+        keps.order == eps.order
+        keps.convention == eps.convention
+    }
+
 }

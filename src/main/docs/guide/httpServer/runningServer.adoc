@@ -1,16 +1,16 @@
-To run the server simply create an `Application` class with a `static void main` method. For example:
+To run the server, create an `Application` class with a `static void main` method, for example:
 
 .Micronaut Application Class
 snippet::io.micronaut.docs.server.intro.Application[tags="imports,class",indent=0]
 
-To run the application from a unit test you can use the link:{api}/io/micronaut/runtime/server/EmbeddedServer.html[EmbeddedServer] interface:
+To run the application from a unit test, use the link:{api}/io/micronaut/runtime/server/EmbeddedServer.html[EmbeddedServer] interface:
 
 .Micronaut Test Case
 snippet::io.micronaut.docs.server.intro.HelloControllerSpec[tags="imports,class", indent=0]
 
-<1> The `EmbeddedServer` is run and Spock's `@AutoCleanup` annotation ensures the server is stopped after the specification completes.
+<1> The `EmbeddedServer` is run and the Spock `@AutoCleanup` annotation ensures the server is stopped after the specification completes.
 <2> The `EmbeddedServer` interface provides the `URL` of the server under test which runs on a random port.
-<3> The test uses the Micronaut http client to make the call
+<3> The test uses the Micronaut HTTP client to make the call
 <4> The `retrieve` method returns the response of the controller as a `String`
 
-IMPORTANT: Without explicit port configuration, the port will be 8080, unless the application is run under the `test` environment. In that case the port will be random. When the application context is started from the context of a test class, the test environment is added automatically.
+IMPORTANT: Without explicit port configuration, the port will be 8080, unless the application is run under the `test` environment where the port is random. When the application context starts from the context of a test class, the test environment is added automatically.

@@ -1,7 +1,7 @@
 package io.micronaut.inject.factory.enummethod
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
 class FactoryEnumSpec extends AbstractTypeElementSpec {
 

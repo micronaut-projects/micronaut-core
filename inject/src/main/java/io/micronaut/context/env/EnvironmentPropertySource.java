@@ -15,7 +15,7 @@
  */
 package io.micronaut.context.env;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;

@@ -17,7 +17,7 @@ package io.micronaut.docs.ioc.validation.custom
 
 // tag::imports[]
 import javax.validation.Constraint
-import java.lang.annotation.*
+import java.lang.annotation.Retention
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME
 // end::imports[]

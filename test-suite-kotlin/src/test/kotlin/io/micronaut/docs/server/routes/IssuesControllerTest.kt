@@ -1,25 +1,27 @@
 package io.micronaut.docs.server.routes
 
 // tag::imports[]
-import io.micronaut.context.ApplicationContext
-import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.runtime.server.EmbeddedServer
 import io.kotlintest.shouldBe
 import io.kotlintest.shouldNotBe
 import io.kotlintest.shouldThrow
 import io.kotlintest.specs.StringSpec
+import io.micronaut.context.ApplicationContext
 import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.runtime.server.EmbeddedServer
 // end::imports[]
 
 // tag::class[]
 class IssuesControllerTest: StringSpec() {
 
     val embeddedServer = autoClose( // <2>
-            ApplicationContext.run(EmbeddedServer::class.java) // <1>
+        ApplicationContext.run(EmbeddedServer::class.java) // <1>
     )
 
     val client = autoClose( // <2>
-            embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.getURL()) // <1>
+        embeddedServer.applicationContext.createBean(
+            RxHttpClient::class.java,
+            embeddedServer.url) // <1>
     )
 
     init {
@@ -31,13 +33,17 @@ class IssuesControllerTest: StringSpec() {
         }
 
         "test issue with invalid integer" {
-            val e = shouldThrow<HttpClientResponseException> { client.toBlocking().exchange<Any>("/issues/hello") }
+            val e = shouldThrow<HttpClientResponseException> {
+                client.toBlocking().exchange<Any>("/issues/hello")
+            }
 
             e.status.code shouldBe 400 // <5>
         }
 
         "test issue without number" {
-            val e = shouldThrow<HttpClientResponseException> { client.toBlocking().exchange<Any>("/issues/") }
+            val e = shouldThrow<HttpClientResponseException> {
+                client.toBlocking().exchange<Any>("/issues/")
+            }
 
             e.status.code shouldBe 404 // <6>
         }

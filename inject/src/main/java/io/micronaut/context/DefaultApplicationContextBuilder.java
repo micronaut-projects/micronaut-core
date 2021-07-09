@@ -15,8 +15,8 @@
  */
 package io.micronaut.context;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.env.CommandLinePropertySource;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
@@ -52,6 +52,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private Set<Class<? extends Annotation>> eagerInitAnnotated = new HashSet<>(3);
     private String[] overrideConfigLocations;
     private boolean banner = true;
+    private ClassPathResourceLoader classPathResourceLoader;
 
     /**
      * Default constructor.
@@ -100,11 +101,14 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
 
     @Override
     public @NonNull ClassPathResourceLoader getResourceLoader() {
-        if (classLoader != null) {
-            return ClassPathResourceLoader.defaultLoader(classLoader);
-        } else {
-            return ClassPathResourceLoader.defaultLoader(getClass().getClassLoader());
+        if (classPathResourceLoader == null) {
+            if (classLoader != null) {
+                classPathResourceLoader = ClassPathResourceLoader.defaultLoader(classLoader);
+            } else {
+                classPathResourceLoader = ClassPathResourceLoader.defaultLoader(getClass().getClassLoader());
+            }
         }
+        return classPathResourceLoader;
     }
 
     @NonNull

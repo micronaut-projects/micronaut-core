@@ -20,7 +20,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.ValueResolver;
 import io.micronaut.inject.*;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.util.Deque;
 import java.util.Optional;
 
@@ -70,8 +70,9 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     /**
      * Remove the attribute for the given key.
      * @param key the key
+     * @return The previous value
      */
-    void removeAttribute(CharSequence key);
+    Object removeAttribute(CharSequence key);
 
     /**
      * Adds a bean that is created as part of the resolution. This is used to store references to instances passed to {@link BeanContext#inject(Object)}

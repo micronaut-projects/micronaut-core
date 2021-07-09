@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.annotation.Annotation;
@@ -93,11 +94,11 @@ final class ReflectParameterElement implements ParameterElement {
     @Override
     public <T extends Annotation> Element annotate(@NotNull String annotationType, @NotNull Consumer<AnnotationValueBuilder<T>> consumer) {
         if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
-            this.annotationMetadata = new DefaultAnnotationMetadata() {{
-                AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
-                consumer.accept(builder);
-                addDeclaredAnnotation(annotationType, builder.build().getValues());
-            }};
+            final MutableAnnotationMetadata mutableAnnotationMetadata = new MutableAnnotationMetadata();
+            this.annotationMetadata = mutableAnnotationMetadata;
+            AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
+            consumer.accept(builder);
+            mutableAnnotationMetadata.addDeclaredAnnotation(annotationType, builder.build().getValues());
         } else {
             AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
             consumer.accept(builder);

@@ -23,6 +23,8 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.cookie.ClientCookieDecoder;
 import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
@@ -33,6 +35,8 @@ import java.util.*;
  * @since 1.0
  */
 public class NettyCookies implements Cookies {
+
+    private static final Logger LOG = LoggerFactory.getLogger(NettyCookies.class);
 
     private final ConversionService<?> conversionService;
     private final Map<CharSequence, Cookie> cookies;
@@ -75,7 +79,13 @@ public class NettyCookies implements Cookies {
                 cookies = new LinkedHashMap<>();
                 for (String value: values) {
                     io.netty.handler.codec.http.cookie.Cookie nettyCookie = ClientCookieDecoder.STRICT.decode(value);
-                    cookies.put(nettyCookie.name(), new NettyCookie(nettyCookie));
+                    if (nettyCookie != null) {
+                        cookies.put(nettyCookie.name(), new NettyCookie(nettyCookie));
+                    } else {
+                        if (LOG.isTraceEnabled()) {
+                            LOG.trace("Failed to decode cookie value [{}]", value);
+                        }
+                    }
                 }
             } else {
                 cookies = Collections.emptyMap();

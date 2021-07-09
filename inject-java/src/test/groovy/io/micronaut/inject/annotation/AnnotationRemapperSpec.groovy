@@ -1,10 +1,10 @@
 package io.micronaut.inject.annotation
 
-import edu.umd.cs.findbugs.annotations.NonNull
-import edu.umd.cs.findbugs.annotations.Nullable
+import io.micronaut.core.annotation.NonNull
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
 class AnnotationRemapperSpec extends AbstractTypeElementSpec {
 
@@ -13,7 +13,7 @@ class AnnotationRemapperSpec extends AbstractTypeElementSpec {
         AnnotationMetadata metadata = buildMethodArgumentAnnotationMetadata('''
 package test;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 @javax.inject.Singleton
 class Test {
 
@@ -35,7 +35,7 @@ class Test {
         AnnotationMetadata metadata = buildMethodArgumentAnnotationMetadata('''
 package test;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 @javax.inject.Singleton
 class Test {
 
@@ -57,12 +57,12 @@ class Test {
         def definition = buildBeanDefinition('test.Test', '''
 package test;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 @javax.inject.Singleton
 class Test {
 
     @io.micronaut.context.annotation.Executable
-    void test(@NonNull String one, @edu.umd.cs.findbugs.annotations.Nullable String two) {
+    void test(@NonNull String one, @io.micronaut.core.annotation.Nullable String two) {
     
     }
 }

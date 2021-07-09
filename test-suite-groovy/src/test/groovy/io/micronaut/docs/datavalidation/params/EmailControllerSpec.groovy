@@ -19,7 +19,7 @@ class EmailControllerSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient, embeddedServer.getURL())
+    RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.URL)
 
     //tag::paramsvalidated[]
     def "test parameter validation"() {

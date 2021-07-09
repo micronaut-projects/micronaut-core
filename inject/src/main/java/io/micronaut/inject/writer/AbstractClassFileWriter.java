@@ -15,8 +15,8 @@
  */
 package io.micronaut.inject.writer;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;
@@ -28,6 +28,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.*;
+import io.micronaut.inject.processing.JavaModelUtils;
 import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
@@ -65,7 +66,6 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     protected static final Type TYPE_GENERATED = Type.getType(Generated.class);
     protected static final Pattern ARRAY_PATTERN = Pattern.compile("(\\[\\])+$");
 
-    protected static final Map<String, String> NAME_TO_TYPE_MAP = new HashMap<>();
     private static final Method METHOD_CREATE_ARGUMENT_SIMPLE = Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(
                     Argument.class,
@@ -93,18 +93,6 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                     Argument[].class
             )
     );
-
-    static {
-        NAME_TO_TYPE_MAP.put("void", "V");
-        NAME_TO_TYPE_MAP.put("boolean", "Z");
-        NAME_TO_TYPE_MAP.put("char", "C");
-        NAME_TO_TYPE_MAP.put("int", "I");
-        NAME_TO_TYPE_MAP.put("byte", "B");
-        NAME_TO_TYPE_MAP.put("long", "J");
-        NAME_TO_TYPE_MAP.put("double", "D");
-        NAME_TO_TYPE_MAP.put("float", "F");
-        NAME_TO_TYPE_MAP.put("short", "S");
-    }
 
     private final OriginatingElements originatingElements;
 
@@ -193,7 +181,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                 generatorAdapter.push(i);
                 String argumentName = entry.getKey();
                 ClassElement classElement = entry.getValue();
-                Type classReference = getTypeReference(classElement);
+                Type classReference = JavaModelUtils.getTypeReference(classElement);
                 Map<String, ClassElement> typeArguments = classElement.getTypeArguments();
                 if (CollectionUtils.isNotEmpty(typeArguments) || classElement.getAnnotationMetadata() != AnnotationMetadata.EMPTY_METADATA) {
                     buildArgumentWithGenerics(
@@ -371,7 +359,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             AnnotationMetadata annotationMetadata,
             Map<String, ClassElement> typeArguments,
             Map<String, GeneratorAdapter> loadTypeMethods) {
-        Type argumentType = getTypeReference(classElement);
+        Type argumentType = JavaModelUtils.getTypeReference(classElement);
 
         // 1st argument: The type
         generatorAdapter.push(argumentType);
@@ -492,7 +480,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @return The descriptor for the class
      */
     protected static String getTypeDescriptor(TypedElement type) {
-        return getTypeReference(type).getDescriptor();
+        return JavaModelUtils.getTypeReference(type).getDescriptor();
     }
 
     /**
@@ -534,38 +522,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @return The {@link Type}
      */
     protected static Type getTypeReference(TypedElement type) {
-        ClassElement classElement = type.getType();
-        if (type.isPrimitive()) {
-            String internalName = NAME_TO_TYPE_MAP.get(classElement.getName());
-            if (type.isArray()) {
-                StringBuilder name = new StringBuilder(internalName);
-                for (int i = 0; i < type.getArrayDimensions(); i++) {
-                    name.insert(0, "[");
-                }
-                return Type.getObjectType(name.toString());
-            } else {
-                return Type.getType(internalName);
-            }
-        } else {
-            Object nativeType = type.getNativeType();
-            if (nativeType instanceof Class) {
-                Class<?> t = (Class<?>) nativeType;
-                return Type.getType(t);
-            } else {
-                String internalName = type.getType().getName().replace('.', '/');
-                if (type.isArray()) {
-                    StringBuilder name = new StringBuilder(internalName);
-                    name.insert(0, "L");
-                    for (int i = 0; i < type.getArrayDimensions(); i++) {
-                        name.insert(0, "[");
-                    }
-                    name.append(";");
-                    return Type.getObjectType(name.toString());
-                } else {
-                    return Type.getObjectType(internalName);
-                }
-            }
-        }
+        return JavaModelUtils.getTypeReference(type);
     }
 
     /**
@@ -844,10 +801,10 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                     methodVisitor.visitFieldInsn(GETSTATIC, wrapperType.getInternalName(), "TYPE", Type.getDescriptor(Class.class));
                 }
             } else {
-                methodVisitor.push(getTypeReference(type));
+                methodVisitor.push(JavaModelUtils.getTypeReference(type));
             }
         } else {
-            methodVisitor.push(getTypeReference(type));
+            methodVisitor.push(JavaModelUtils.getTypeReference(type));
         }
         // store the type reference
         methodVisitor.arrayStore(TYPE_CLASS);
@@ -866,7 +823,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         Iterator<ClassElement> iter = types.iterator();
         for (int i = 0; i < converted.length; i++) {
             ClassElement type = iter.next();
-            converted[i] = getTypeReference(type);
+            converted[i] = JavaModelUtils.getTypeReference(type);
         }
         return converted;
     }
@@ -898,8 +855,8 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @return The type descriptor as String
      */
     protected static String getTypeDescriptor(String className, String... genericTypes) {
-        if (NAME_TO_TYPE_MAP.containsKey(className)) {
-            return NAME_TO_TYPE_MAP.get(className);
+        if (JavaModelUtils.NAME_TO_TYPE_MAP.containsKey(className)) {
+            return JavaModelUtils.NAME_TO_TYPE_MAP.get(className);
         } else {
             String internalName = getInternalName(className);
             StringBuilder start = new StringBuilder(40);
@@ -1281,10 +1238,10 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             if (pt.isPresent()) {
                 return Type.getInternalName(ReflectionUtils.getWrapperType(pt.get()));
             } else {
-                return getTypeReference(ce).getInternalName();
+                return JavaModelUtils.getTypeReference(ce).getInternalName();
             }
         } else {
-            return getTypeReference(ce).getInternalName();
+            return JavaModelUtils.getTypeReference(ce).getInternalName();
         }
     }
 
@@ -1448,7 +1405,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         ClassElement returnType = method.getReturnType();
         Method targetMethod = new Method(method.getName(), getMethodDescriptor(returnType, Arrays.asList(method.getParameters())));
         ClassElement declaringElement = method.getDeclaringType();
-        Type declaringType = getTypeReference(declaringElement);
+        Type declaringType = JavaModelUtils.getTypeReference(declaringElement);
         if (method.isStatic()) {
             generatorAdapter.invokeStatic(declaringType, targetMethod);
         } else if (declaringElement.isInterface()) {

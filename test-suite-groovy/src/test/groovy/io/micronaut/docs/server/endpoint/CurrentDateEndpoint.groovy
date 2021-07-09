@@ -26,7 +26,6 @@ import io.micronaut.management.endpoint.annotation.Read
 //tag::mediaTypeImport[]
 import io.micronaut.http.MediaType
 import io.micronaut.management.endpoint.annotation.Selector
-
 //end::mediaTypeImport[]
 
 //tag::writeImport[]
@@ -37,9 +36,9 @@ import javax.annotation.PostConstruct
 
 //tag::endpointClassBegin[]
 @Endpoint(id = "date",
-        prefix = "custom",
-        defaultEnabled = true,
-        defaultSensitive = false)
+          prefix = "custom",
+          defaultEnabled = true,
+          defaultSensitive = false)
 class CurrentDateEndpoint {
 //end::endpointClassBegin[]
 
@@ -48,7 +47,7 @@ class CurrentDateEndpoint {
     //end::methodSummary[]
 
     //tag::currentDate[]
-    Date currentDate
+    private Date currentDate
     //end::currentDate[]
 
     @PostConstruct
@@ -59,14 +58,14 @@ class CurrentDateEndpoint {
     //tag::simpleRead[]
     @Read
     Date currentDate() {
-        return currentDate
+        currentDate
     }
     //end::simpleRead[]
 
     //tag::readArg[]
     @Read(produces = MediaType.TEXT_PLAIN) //<1>
     String currentDatePrefix(@Selector String prefix) {
-        return "${prefix}: ${currentDate}"
+        "$prefix: $currentDate"
     }
     //end::readArg[]
 
@@ -81,4 +80,3 @@ class CurrentDateEndpoint {
 //tag::endpointClassEnd[]
 }
 //end::endpointClassEnd[]
-

@@ -20,12 +20,13 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotBlank;
-// end::imports[]
 import java.util.Optional;
+// end::imports[]
 
 // tag::class[]
 @ConfigurationProperties("my.engine") // <1>
 public class EngineConfig {
+
     public String getManufacturer() {
         return manufacturer;
     }
@@ -52,12 +53,17 @@ public class EngineConfig {
 
     @NotBlank // <2>
     private String manufacturer = "Ford"; // <3>
+
     @Min(1L)
     private int cylinders;
+
     private CrankShaft crankShaft = new CrankShaft();
 
     @ConfigurationProperties("crank-shaft")
     public static class CrankShaft { // <4>
+
+        private Optional<Double> rodLength = Optional.empty(); // <5>
+
         public Optional<Double> getRodLength() {
             return rodLength;
         }
@@ -65,8 +71,6 @@ public class EngineConfig {
         public void setRodLength(Optional<Double> rodLength) {
             this.rodLength = rodLength;
         }
-
-        private Optional<Double> rodLength = Optional.empty(); // <5>
     }
 }
 // end::class[]

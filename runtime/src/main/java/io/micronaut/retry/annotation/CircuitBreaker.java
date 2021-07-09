@@ -17,10 +17,7 @@ package io.micronaut.retry.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import io.micronaut.aop.Around;
 import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.context.annotation.Type;
-import io.micronaut.retry.intercept.DefaultRetryInterceptor;
 
 import javax.validation.constraints.Digits;
 import java.lang.annotation.Documented;
@@ -38,8 +35,7 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE, ElementType.ANNOTATION_TYPE})
-@Around
-@Type(DefaultRetryInterceptor.class)
+@Retryable
 public @interface CircuitBreaker {
 
     int MAX_RETRY_ATTEMPTS = 4;

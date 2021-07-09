@@ -6,28 +6,29 @@
 name: Update Dependencies
 on:
   schedule:
-    - cron: '0 4 * * MON-FRI'
+    - cron: '0 4 * * SUN'
 jobs:
   dependency-updates:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.6
         with:
           path: ~/.gradle/caches
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
       - name: Set up JDK
-        uses: actions/setup-java@v1
+        uses: actions/setup-java@v2
         with:
-          java-version: 1.8
+          distribution: 'adopt'
+          java-version: '8'
       - name: Export Gradle Properties
         uses: micronaut-projects/github-actions/export-gradle-properties@master
       - name: Check Dependencies
         run: ./gradlew useLatestVersions
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v2
+        uses: peter-evans/create-pull-request@v3.10.0
         with:
           token: ${{ secrets.GH_TOKEN }}
           committer: micronaut-build <${{ secrets.MICRONAUT_BUILD_EMAIL }}>
@@ -36,5 +37,4 @@ jobs:
           title: 'Dependency upgrades'
           body: Upgrades dependencies to their latest versions
           labels: "type: dependency-upgrade"
-          base: ${{ env.githubBranch }}
           branch: dependency-updates

@@ -27,19 +27,22 @@ import javax.inject.Singleton
 // tag::class[]
 @Singleton
 class V8Engine implements Engine {
+
     int cylinders = 8
     boolean initialized = false // <2>
 
     @Override
     String start() {
-        if(!initialized) throw new IllegalStateException("Engine not initialized!")
+        if (!initialized) {
+            throw new IllegalStateException("Engine not initialized!")
+        }
 
         return "Starting V8"
     }
 
     @PostConstruct // <3>
     void initialize() {
-        this.initialized = true
+        initialized = true
     }
 }
 // end::class[]

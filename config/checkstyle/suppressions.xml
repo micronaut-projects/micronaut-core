@@ -6,7 +6,7 @@
 
 <suppressions>
     <suppress checks="FileLength"
-              files="DefaultBeanContext.java|BeanDefinitionWriter.java|DefaultHttpClient.java|BeanDefinitionInjectProcessor.java|AbstractBeanDefinition.java|DefaultValidator.java"/>
+              files="DefaultBeanContext.java|BeanDefinitionWriter.java|DefaultHttpClient.java|BeanDefinitionInjectProcessor.java|AbstractBeanDefinition.java|DefaultValidator.java|RoutingInBoundHandler.java"/>
     <suppress checks="DeclarationOrder"
               files="UriTemplate.java"/>
     <suppress checks="Header"
@@ -15,4 +15,8 @@
               files="FlowControlHandler.java" />
     <suppress checks="ParameterNumber"
               files="DefaultHttpClient.java" />
+    <!-- <suppress checks="FileLength" -->
+    <!-- files="DefaultBeanContext.java|BeanDefinitionWriter.java|DefaultHttpClient.java"/> -->
+
+    <suppress checks="MissingJavadocType" files=".*doc-examples.*" />
 </suppressions>

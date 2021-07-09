@@ -22,9 +22,6 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Status;
-import io.reactivex.Maybe;
-
-import java.util.concurrent.CompletableFuture;
 
 @Requires(property = "spec.name", value = "httpstatus")
 @Controller("/status")

@@ -21,6 +21,6 @@ dependencies {
     testImplementation "mysql:mysql-connector-java:8.0.23"
 
     compileOnly "ch.qos.logback:logback-classic:1.2.3"
-    compileOnly "org.apache.logging.log4j:log4j-core:2.14.0"
+    compileOnly "org.apache.logging.log4j:log4j-core:2.14.1"
 }
 

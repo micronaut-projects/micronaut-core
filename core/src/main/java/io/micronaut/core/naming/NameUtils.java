@@ -18,12 +18,10 @@ package io.micronaut.core.naming;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import java.util.Arrays;
+import io.micronaut.core.annotation.NonNull;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * <p>Naming convention utilities.</p>
@@ -134,14 +132,16 @@ public class NameUtils {
      * @return The camel case form
      */
     public static String dehyphenate(String name) {
-        return Arrays.stream(name.split("-"))
-            .map(str -> {
-                if (str.length() > 0 && Character.isLetter(str.charAt(0))) {
-                    return Character.toUpperCase(str.charAt(0)) + str.substring(1);
-                }
-                return str;
-            })
-            .collect(Collectors.joining(""));
+        StringBuilder sb = new StringBuilder(name.length());
+        for (String token : StringUtils.splitOmitEmptyStrings(name, '-')) {
+            if (token.length() > 0 && Character.isLetter(token.charAt(0))) {
+                sb.append(Character.toUpperCase(token.charAt(0)));
+                sb.append(token.substring(1));
+            } else {
+                sb.append(token);
+            }
+        }
+        return sb.toString();
     }
 
     /**
@@ -392,7 +392,9 @@ public class NameUtils {
             char[] chars = name.toCharArray();
             boolean first = true;
             char last = '0';
-            for (char c : chars) {
+            char secondLast = separatorChar;
+            for (int i = 0; i < chars.length; i++) {
+                char c = chars[i];
                 if (Character.isLowerCase(c) || !Character.isLetter(c)) {
                     first = false;
                     if (c != separatorChar) {
@@ -406,11 +408,16 @@ public class NameUtils {
                     if (first) {
                         first = false;
                         newName.append(lowerCaseChar);
-                    } else if (Character.isUpperCase(last) || Character.isDigit(last) || last == '.') {
+                    } else if (Character.isUpperCase(last) || last == '.') {
+                        newName.append(lowerCaseChar);
+                    } else if (Character.isDigit(last) && (Character.isUpperCase(secondLast) || secondLast == separatorChar)) {
                         newName.append(lowerCaseChar);
                     } else {
                         newName.append(separatorChar).append(lowerCaseChar);
                     }
+                }
+                if (i > 1) {
+                    secondLast = last;
                 }
                 last = c;
             }
@@ -457,7 +464,12 @@ public class NameUtils {
      * @return The new string in camel case
      */
     public static String camelCase(String str, boolean lowerCaseFirstLetter) {
-        String result = Arrays.stream(str.split("[\\s_-]")).map(NameUtils::capitalize).collect(Collectors.joining(""));
+        StringBuilder sb = new StringBuilder(str.length());
+        for (String s : str.split("[\\s_-]")) {
+            String capitalize = capitalize(s);
+            sb.append(capitalize);
+        }
+        String result = sb.toString();
         if (lowerCaseFirstLetter) {
             return decapitalize(result);
         }

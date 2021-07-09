@@ -37,12 +37,15 @@ import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.bind.WebSocketState;
 import io.micronaut.websocket.bind.WebSocketStateBinderRegistry;
 import io.micronaut.websocket.context.WebSocketBean;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 
 import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.ContinuationWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
@@ -57,6 +60,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Abstract implementation that handles WebSocket frames.
@@ -82,9 +86,11 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     protected final NettyRxWebSocketSession session;
     protected final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected final WebSocketVersion webSocketVersion;
+    protected final String subProtocol;
     protected final WebSocketSessionRepository webSocketSessionRepository;
     private final Argument<?> bodyArgument;
     private final AtomicBoolean closed = new AtomicBoolean(false);
+    private AtomicReference<CompositeByteBuf> frameBuffer = new AtomicReference<>();
 
     /**
      * Default constructor.
@@ -96,6 +102,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param request                    The originating request
      * @param uriVariables               The URI variables
      * @param version                    The websocket version being used
+     * @param subProtocol                The handler sub-protocol
      * @param webSocketSessionRepository The web socket repository if they are supported (like on the server), null otherwise
      */
     protected AbstractNettyWebSocketHandler(
@@ -106,7 +113,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             HttpRequest<?> request,
             Map<String, Object> uriVariables,
             WebSocketVersion version,
+            String subProtocol,
             WebSocketSessionRepository webSocketSessionRepository) {
+        this.subProtocol = subProtocol;
         this.webSocketSessionRepository = webSocketSessionRepository;
         this.webSocketBinder = new WebSocketStateBinderRegistry(binderRegistry);
         this.uriVariables = uriVariables;
@@ -209,6 +218,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        cleanupBuffer();
         Optional<? extends MethodExecutionHandle<?, ?>> opt = webSocketBean.errorMethod();
 
         if (opt.isPresent()) {
@@ -239,7 +249,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         if (throwable != null && LOG.isErrorEnabled()) {
                             LOG.error("Error subscribing to @OnError handler " + target.getClass().getSimpleName() + "." + errorMethod.getExecutableMethod() + ": " + throwable.getMessage(), throwable);
                         }
-                        handleUnexpected(ctx, throwable);
+                        handleUnexpected(ctx, cause);
                     });
                 }
 
@@ -304,7 +314,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param msg The frame
      */
     protected void handleWebSocketFrame(ChannelHandlerContext ctx, WebSocketFrame msg) {
-        if (msg instanceof TextWebSocketFrame || msg instanceof BinaryWebSocketFrame) {
+        if (msg instanceof TextWebSocketFrame || msg instanceof BinaryWebSocketFrame || msg instanceof ContinuationWebSocketFrame) {
 
             if (messageHandler == null) {
                 if (LOG.isDebugEnabled()) {
@@ -315,14 +325,35 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         CloseReason.UNSUPPORTED_DATA
                 );
             } else {
+                ByteBuf msgContent = msg.content().retain();
+                if (!msg.isFinalFragment()) {
+                    frameBuffer.updateAndGet((buffer) -> {
+                        if (buffer == null) {
+                            buffer = ctx.alloc().compositeBuffer();
+                        }
+                        buffer.addComponent(true, msgContent);
+                        return buffer;
+                    });
+                    return;
+                }
+
+                ByteBuf content;
+                CompositeByteBuf buffer = frameBuffer.getAndSet(null);
+                if (buffer == null) {
+                    content = msgContent;
+                } else {
+                    buffer.addComponent(true, msgContent);
+                    content = buffer;
+                }
 
                 Argument<?> bodyArgument = this.getBodyArgument();
-                Optional<?> converted = ConversionService.SHARED.convert(msg.content(), bodyArgument);
+                Optional<?> converted = ConversionService.SHARED.convert(content, bodyArgument);
+                content.release();
 
                 if (!converted.isPresent()) {
                     MediaType mediaType;
                     try {
-                        mediaType = messageHandler.stringValue(Consumes.class).map(MediaType::new).orElse(MediaType.APPLICATION_JSON_TYPE);
+                        mediaType = messageHandler.stringValue(Consumes.class).map(MediaType::of).orElse(MediaType.APPLICATION_JSON_TYPE);
                     } catch (IllegalArgumentException e) {
                         exceptionCaught(ctx, e);
                         return;
@@ -385,7 +416,6 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     );
                 }
             }
-
         } else if (msg instanceof PingWebSocketFrame) {
             // respond with pong
             PingWebSocketFrame frame = (PingWebSocketFrame) msg.retain();
@@ -432,6 +462,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param cr The reason
      */
     private void handleCloseReason(ChannelHandlerContext ctx, CloseReason cr) {
+        cleanupBuffer();
         if (closed.compareAndSet(false, true)) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Closing WebSocket session {} with reason {}", getSession(), cr);
@@ -535,8 +566,16 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     }
 
     private void writeCloseFrameAndTerminate(ChannelHandlerContext ctx, int code, String reason) {
+        cleanupBuffer();
         final CloseWebSocketFrame closeFrame = new CloseWebSocketFrame(code, reason);
         ctx.channel().writeAndFlush(closeFrame)
                      .addListener(future -> handleCloseFrame(ctx, new CloseWebSocketFrame(code, reason)));
+    }
+
+    private void cleanupBuffer() {
+        CompositeByteBuf buffer = frameBuffer.getAndSet(null);
+        if (buffer != null) {
+            buffer.release();
+        }
     }
 }

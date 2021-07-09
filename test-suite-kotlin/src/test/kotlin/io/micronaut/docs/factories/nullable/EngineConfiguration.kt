@@ -23,7 +23,7 @@ import javax.validation.constraints.NotNull
 @EachProperty("engines")
 class EngineConfiguration : Toggleable {
 
-    val enabled = true
+    var enabled = true
 
     @NotNull
     val cylinders: Int? = null

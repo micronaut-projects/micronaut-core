@@ -163,4 +163,9 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
     public boolean isComplete() {
         return fileUpload.isCompleted();
     }
+
+    @Override
+    public void discard() {
+        fileUpload.release();
+    }
 }

@@ -15,8 +15,8 @@
  */
 package io.micronaut.http.netty.channel;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
 import io.netty.channel.EventLoopGroup;
@@ -99,10 +99,20 @@ public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
         return NioServerSocketChannel.class;
     }
 
+    @Override
+    public NioServerSocketChannel serverSocketChannelInstance(EventLoopGroupConfiguration configuration) {
+        return new NioServerSocketChannel();
+    }
+
     @NonNull
     @Override
     public Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
         return NioSocketChannel.class;
+    }
+
+    @Override
+    public SocketChannel clientSocketChannelInstance(EventLoopGroupConfiguration configuration) {
+        return new NioSocketChannel();
     }
 
     private static NioEventLoopGroup withIoRatio(NioEventLoopGroup group, @Nullable Integer ioRatio) {

@@ -16,16 +16,12 @@
 package io.micronaut.docs.client.filter;
 
 import io.micronaut.context.env.Environment;
-import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.RxHttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
-import io.micronaut.test.annotation.MicronautTest;
-import junit.framework.TestCase;
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
 
 import javax.inject.Inject;
 

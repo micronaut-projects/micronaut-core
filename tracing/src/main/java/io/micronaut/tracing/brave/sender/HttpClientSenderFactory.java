@@ -18,9 +18,12 @@ package io.micronaut.tracing.brave.sender;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.client.LoadBalancerResolver;
+import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.tracing.brave.BraveTracerConfiguration;
 import zipkin2.reporter.Sender;
 
+import java.util.List;
+import java.util.stream.Collectors;
 import javax.inject.Provider;
 import javax.inject.Singleton;
 
@@ -33,15 +36,21 @@ import javax.inject.Singleton;
 @Factory
 @Requires(beans = BraveTracerConfiguration.HttpClientSenderConfiguration.class)
 public class HttpClientSenderFactory {
+
     private final BraveTracerConfiguration.HttpClientSenderConfiguration configuration;
+    private final List<Provider<InvocationInstrumenterFactory>> invocationInstrumenterFactories;
 
     /**
      * Initialize the factory for creating Zipkin {@link Sender} with configurations.
      *
      * @param configuration The HTTP client sender configurations
+     * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument http client netty handlers execution with
      */
-    protected HttpClientSenderFactory(BraveTracerConfiguration.HttpClientSenderConfiguration configuration) {
+    protected HttpClientSenderFactory(
+        BraveTracerConfiguration.HttpClientSenderConfiguration configuration,
+        List<Provider<InvocationInstrumenterFactory>> invocationInstrumenterFactories) {
         this.configuration = configuration;
+        this.invocationInstrumenterFactories = invocationInstrumenterFactories;
     }
 
     /**
@@ -51,6 +60,8 @@ public class HttpClientSenderFactory {
     @Singleton
     @Requires(missingBeans = Sender.class)
     Sender zipkinSender(Provider<LoadBalancerResolver> loadBalancerResolver) {
-        return configuration.getBuilder().build(loadBalancerResolver);
+        return configuration.getBuilder()
+            .invocationInstrumenterFactories(invocationInstrumenterFactories.stream().map(Provider::get).collect(Collectors.toList()))
+            .build(loadBalancerResolver);
     }
 }
