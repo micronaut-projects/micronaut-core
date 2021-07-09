@@ -125,6 +125,7 @@ The https://micronaut-projects.github.io/micronaut-cassandra/latest/guide/[Micro
 - Micronaut Liquibase 3.3.1
 - Micronaut Discovery Client 2.4.0
 - Micronaut ElasticSearch 2.3.0
+- Micronaut Cache 3.0.0
 
 === Dependency Upgrades
 
@@ -139,3 +140,6 @@ The https://micronaut-projects.github.io/micronaut-cassandra/latest/guide/[Micro
 - SLF4J 1.7.29
 - Jaeger 1.6.0
 - Testcontainers 1.15.3
+- Infinispan 12.1.6.Final
+- Hazelcast 4.2.1
+- Caffeine 2.9.1
