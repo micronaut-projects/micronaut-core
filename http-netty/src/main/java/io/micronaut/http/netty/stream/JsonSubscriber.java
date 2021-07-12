@@ -57,6 +57,9 @@ public final class JsonSubscriber implements Subscriber<HttpContent> {
 
     @Override
     public void onError(Throwable t) {
+        if (!empty.get()) {
+            upstream.onNext(HttpContentUtil.closeBracket());
+        }
         upstream.onError(t);
     }
 
