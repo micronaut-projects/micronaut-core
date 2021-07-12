@@ -19,12 +19,14 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Import;
 import io.micronaut.context.visitor.BeanImportVisitor;
 import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.annotation.TypeHint;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -32,6 +34,7 @@ import io.micronaut.inject.ast.*;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.GeneratedFile;
+import jakarta.inject.Inject;
 
 import java.io.File;
 import java.io.IOException;
@@ -104,7 +107,11 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         return CollectionUtils.setOf(
                 ReflectiveAccess.class.getName(),
                 TypeHint.class.getName(),
-                Import.class.getName()
+                Import.class.getName(),
+                "javax.persistence.Entity",
+                "jakarta.persistence.Entity",
+                AnnotationUtil.INJECT,
+                Inject.class.getName()
         );
     }
 
@@ -162,6 +169,11 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                     final List<FieldElement> reflectiveFields = beanElement.getEnclosedElements(reflectiveFieldQuery);
                     reflectiveFields.forEach(this::processFieldElement);
                 }
+            } else if (element.hasStereotype(Bean.class) || element.hasStereotype(AnnotationUtil.SCOPE) || element.hasStereotype(AnnotationUtil.QUALIFIER)) {
+                MethodElement me = element.getPrimaryConstructor().orElse(null);
+                if (me != null && me.isPrivate() && !me.hasAnnotation(ReflectiveAccess.class)) {
+                    processMethodElement(me);
+                }
             }
         }
     }
@@ -177,6 +189,8 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     @Override
     public void visitField(FieldElement element, VisitorContext context) {
         if (element.hasStereotype(ReflectiveAccess.class)) {
+            processFieldElement(element);
+        } else if (element.hasDeclaredAnnotation(AnnotationUtil.INJECT) && element.isPrivate()) {
             processFieldElement(element);
         }
     }
@@ -205,6 +219,8 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {
         if (!isSubclass && element.hasDeclaredStereotype(ReflectiveAccess.class)) {
+            processMethodElement(element);
+        } else if (element.hasDeclaredAnnotation(AnnotationUtil.INJECT) && element.isPrivate()) {
             processMethodElement(element);
         }
     }
