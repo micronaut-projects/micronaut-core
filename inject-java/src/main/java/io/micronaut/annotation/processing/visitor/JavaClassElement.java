@@ -821,6 +821,20 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         return createMethodElement(annotationUtils, method);
     }
 
+    @Override
+    public Optional<ClassElement> getEnclosingType() {
+        if (isInner()) {
+            Element enclosingElement = this.classElement.getEnclosingElement();
+            if (enclosingElement instanceof TypeElement) {
+                return Optional.of(visitorContext.getElementFactory().newClassElement(
+                        ((TypeElement) enclosingElement),
+                        visitorContext.getAnnotationUtils().getAnnotationMetadata(enclosingElement)
+                ));
+            }
+        }
+        return Optional.empty();
+    }
+
     private Optional<MethodElement> createMethodElement(AnnotationUtils annotationUtils, ExecutableElement method) {
         return Optional.ofNullable(method).map(executableElement -> {
             final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(executableElement);
