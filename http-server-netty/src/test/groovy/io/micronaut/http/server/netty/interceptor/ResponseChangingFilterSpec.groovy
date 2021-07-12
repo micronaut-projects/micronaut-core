@@ -2,6 +2,7 @@ package io.micronaut.http.server.netty.interceptor
 
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.http.*
 import io.micronaut.http.annotation.Controller
@@ -258,7 +259,8 @@ class ResponseChangingFilterSpec extends Specification {
             CompletableFuture.completedFuture("OK")
         }
 
-        @Get("/reactive{/path:.*}")
+        @Get(value = "/reactive{/path:.*}")
+        @SingleResult
         Publisher<HttpResponse> reactive() {
             Flowable.just(HttpResponse.ok("Reactive"))
         }
