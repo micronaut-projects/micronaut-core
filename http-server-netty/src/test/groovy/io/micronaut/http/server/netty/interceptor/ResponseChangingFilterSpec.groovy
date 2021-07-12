@@ -15,10 +15,10 @@ import io.micronaut.http.sse.Event
 import io.micronaut.test.annotation.MicronautTest
 import io.reactivex.Flowable
 import io.reactivex.Single
+import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import spock.lang.Specification
 
-import javax.inject.Inject
 import java.util.concurrent.CompletableFuture
 
 @MicronautTest
