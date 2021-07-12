@@ -233,8 +233,8 @@ class StreamRequestSpec extends Specification {
         )), Book).toList().blockingGet()
 
         then:
-        def e= thrown(RuntimeException) // TODO: this should be HttpClientException
-        e != null
+        noExceptionThrown()
+        result.size() == 3
 
     }
 
