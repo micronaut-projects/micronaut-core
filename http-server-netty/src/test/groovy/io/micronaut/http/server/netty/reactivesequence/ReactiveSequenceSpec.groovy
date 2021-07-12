@@ -44,6 +44,8 @@ class ReactiveSequenceSpec extends Specification {
         EmbeddedServer inventoryEmbeddedServer = ApplicationContext.run(EmbeddedServer, inventoryConfig)
         EmbeddedServer booksEmbeddedServer = ApplicationContext.run(EmbeddedServer, booksConfig)
         Map<String, Object> conf = gatewayConfig + [
+                'micronaut.http.client.read-idle-timeout': '5s',
+                'micronaut.http.client.read-timeout': '5s',
                 'micronaut.http.services.books.url': booksEmbeddedServer.getURL().toString(),
                 'micronaut.http.services.inventory.url': inventoryEmbeddedServer.getURL().toString(),
         ]
@@ -102,7 +104,7 @@ class ReactiveSequenceSpec extends Specification {
                 return HttpResponse.ok(2)
             } else if (isbn.equals("1680502395")) {
                 if (timeout) {
-                    sleep(35_0000) // sleep for 35 seconds to ensure HTTP Clients timeout when calling
+                    sleep(8_0000) // sleep for 8 seconds to ensure HTTP Clients timeout when calling
                 }
                 return HttpResponse.ok(3)
             } else {
