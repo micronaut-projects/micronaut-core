@@ -37,6 +37,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.HttpAttributes;
@@ -83,6 +84,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -186,11 +188,13 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
 
             Map<String, Object> paramMap = context.getParameterValueMap();
-            Map<String, String> queryParams = new LinkedHashMap<>();
+            Map<String, Object> pathParams = new HashMap<>();
+            Map<String, List<String>> queryParams = new LinkedHashMap<>();
+            ClientRequestUriContext uriContext = new ClientRequestUriContext(uriTemplate, pathParams, queryParams);
+
             List<String> uriVariables = uriTemplate.getVariableNames();
             Map<String, MutableArgumentValue<?>> parameters = context.getParameters();
             Argument[] arguments = context.getArguments();
-
 
             Map<String, String> headers = new LinkedHashMap<>(HEADERS_INITIAL_CAPACITY);
 
@@ -214,7 +218,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                 .forEach(header -> headers.put(header, version));
 
                         configuration.getParameters()
-                                .forEach(parameter -> queryParams.put(parameter, version));
+                                .forEach(parameter -> uriContext.addQueryParameter(parameter, version));
                     });
 
             Map<String, Object> attributes = new LinkedHashMap<>(ATTRIBUTES_INITIAL_CAPACITY);
@@ -227,10 +231,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     attributes.put(attributeName, attributeValue);
                 }
             }
-
-            ConversionService<?> conversionService = ConversionService.SHARED;
-
-            ClientRequestUriContext uriContext = new ClientRequestUriContext(uriTemplate, paramMap, queryParams);
 
             if (!headers.isEmpty()) {
                 for (Map.Entry<String, String> entry : headers.entrySet()) {
@@ -246,75 +246,92 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             List<Argument> bodyArguments = new ArrayList<>();
             ClientArgumentRequestBinder<Object> defaultBinder = (ctx, uriCtx, value, req) -> {
-                if (!uriCtx.getUriTemplate().getVariableNames().contains(ctx.getArgument().getName())) {
+                Argument<?> argument = ctx.getArgument();
+                if (uriCtx.getUriTemplate().getVariableNames().contains(argument.getName())) {
+                    String name = argument.getAnnotationMetadata().stringValue(Bindable.class)
+                            .orElse(argument.getName());
+                    // Convert and put as path param
+                    if (argument.getAnnotationMetadata().hasStereotype(Format.class)) {
+                        ConversionService.SHARED.convert(value,
+                                ConversionContext.of(String.class).with(argument.getAnnotationMetadata()))
+                                .ifPresent(v -> pathParams.put(name, v));
+                    } else {
+                        pathParams.put(name, value);
+                    }
+                } else {
                     bodyArguments.add(ctx.getArgument());
                 }
             };
 
-            for (Argument argument : arguments) {
-                Object definedValue = getValue(argument, context, parameters, paramMap);
-
-                if (argument.getAnnotationMetadata().hasStereotype(Bindable.class)) {
-                    argument.getAnnotationMetadata().stringValue(Bindable.class).ifPresent(name -> {
-                        paramMap.remove(argument.getName());
-                        paramMap.put(name, definedValue);
-                    });
+            // Apply all the method binders
+            List<Class<? extends Annotation>> methodBinderTypes = context.getAnnotationTypesByStereotype(Bindable.class);
+            if (!CollectionUtils.isEmpty(methodBinderTypes)) {
+                for (Class<? extends Annotation> binderType : methodBinderTypes) {
+                    binderRegistry.findAnnotatedBinder(binderType).ifPresent(b -> b.bind(context, uriContext, request));
                 }
-                if (definedValue != null) {
-                    final ClientArgumentRequestBinder<Object> binder = (ClientArgumentRequestBinder<Object>) binderRegistry
-                            .findArgumentBinder((Argument<Object>) argument)
-                            .orElse(defaultBinder);
-                    binder.bind(ConversionContext.of(argument), uriContext, definedValue, request);
+            }
+
+            // Apply all the argument binders
+            if (arguments.length > 0) {
+                for (Argument argument : arguments) {
+                    Object definedValue = getValue(argument, context, parameters, paramMap);
+
+                    if (definedValue != null) {
+                        final ClientArgumentRequestBinder<Object> binder = (ClientArgumentRequestBinder<Object>) binderRegistry
+                                .findArgumentBinder((Argument<Object>) argument)
+                                .orElse(defaultBinder);
+                        binder.bind(ConversionContext.of(argument), uriContext, definedValue, request);
+                    }
                 }
             }
 
             Object body = request.getBody().orElse(null);
+            if (body == null && !bodyArguments.isEmpty()) {
+                Map<String, Object> bodyMap = new LinkedHashMap<>();
 
-            if (HttpMethod.permitsRequestBody(httpMethod)) {
-                if (body == null && !bodyArguments.isEmpty()) {
-                    Map<String, Object> bodyMap = new LinkedHashMap<>();
-
-                    for (Argument bodyArgument : bodyArguments) {
-                        String argumentName = bodyArgument.getName();
-                        MutableArgumentValue<?> value = parameters.get(argumentName);
-                        bodyMap.put(argumentName, value.getValue());
-                    }
-                    body = bodyMap;
-                    request.body(body);
+                for (Argument bodyArgument : bodyArguments) {
+                    String argumentName = bodyArgument.getName();
+                    MutableArgumentValue<?> value = parameters.get(argumentName);
+                    bodyMap.put(argumentName, value.getValue());
                 }
+                body = bodyMap;
+                request.body(body);
+            }
 
-                if (body != null) {
-                    boolean variableSatisfied = uriVariables.isEmpty() || uriVariables.containsAll(paramMap.keySet());
-                    if (!variableSatisfied) {
-                        if (body instanceof Map) {
-                            for (Map.Entry<Object, Object> entry : ((Map<Object, Object>) body).entrySet()) {
-                                String k = entry.getKey().toString();
-                                Object v = entry.getValue();
-                                if (v != null) {
-                                    paramMap.putIfAbsent(k, v);
-                                }
-                            }
-                        } else {
-                            BeanMap<Object> beanMap = BeanMap.of(body);
-                            for (Map.Entry<String, Object> entry : beanMap.entrySet()) {
-                                String k = entry.getKey();
-                                Object v = entry.getValue();
-                                if (v != null) {
-                                    paramMap.putIfAbsent(k, v);
-                                }
-                            }
+            boolean variableSatisfied = uriVariables.isEmpty() || pathParams.keySet().containsAll(uriVariables);
+            if (body != null && !variableSatisfied) {
+                if (body instanceof Map) {
+                    for (Map.Entry<Object, Object> entry : ((Map<Object, Object>) body).entrySet()) {
+                        String k = entry.getKey().toString();
+                        Object v = entry.getValue();
+                        if (v != null) {
+                            pathParams.putIfAbsent(k, v);
+                        }
+                    }
+                } else {
+                    BeanMap<Object> beanMap = BeanMap.of(body);
+                    for (Map.Entry<String, Object> entry : beanMap.entrySet()) {
+                        String k = entry.getKey();
+                        Object v = entry.getValue();
+                        if (v != null) {
+                            pathParams.putIfAbsent(k, v);
                         }
                     }
                 }
-            } else {
+            }
+
+            if (!HttpMethod.permitsRequestBody(httpMethod)) {
                 // If a binder set the body and the method does not permit it, reset to null
                 request.body(null);
                 body = null;
             }
 
-            uri = uriTemplate.expand(paramMap);
+            uri = uriTemplate.expand(pathParams);
+            // Remove all the queryParams that have already been used.
+            // Others need to be still added
             uriVariables.forEach(queryParams::remove);
 
+            // The original query can be added by getting it from the request.getUri() and appending
             request.uri(URI.create(appendQuery(uri, queryParams)));
 
             if (body != null && !request.getContentType().isPresent()) {
@@ -515,22 +532,13 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         Object definedValue = value.getValue();
 
-        if (paramMap.containsKey(argumentName) && argumentMetadata.hasStereotype(Format.class)) {
-            final Object v = paramMap.get(argumentName);
-            if (v != null) {
-                ConversionService.SHARED.convert(v,
-                        ConversionContext.of(String.class)
-                                .with(argument.getAnnotationMetadata()))
-                        .ifPresent(str -> paramMap.put(argumentName, str));
-            }
-        }
         if (definedValue == null) {
             definedValue = argument.getAnnotationMetadata().stringValue(Bindable.class, "defaultValue").orElse(null);
         }
 
         if (definedValue == null && !argument.isNullable()) {
             throw new IllegalArgumentException(
-                    String.format("Argument [%s] is null. Null values are not allowed to be passed to client methods (%s). Add a supported Nullable annotation type if that is the desired behavior", argument.getName(), context.getExecutableMethod().toString())
+                    String.format("Argument [%s] is null. Null values are not allowed to be passed to client methods (%s). Add a supported Nullable annotation type if that is the desired behaviour", argument.getName(), context.getExecutableMethod().toString())
             );
         }
 
@@ -605,11 +613,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         return clientAnn.stringValue(Client.class).orElse(null);
     }
 
-    private String appendQuery(String uri, Map<String, String> queryParams) {
+    private String appendQuery(String uri, Map<String, List<String>> queryParams) {
         if (!queryParams.isEmpty()) {
             final UriBuilder builder = UriBuilder.of(uri);
-            for (Map.Entry<String, String> entry : queryParams.entrySet()) {
-                builder.queryParam(entry.getKey(), entry.getValue());
+            for (Map.Entry<String, List<String>> entry : queryParams.entrySet()) {
+                builder.queryParam(entry.getKey(), entry.getValue().toArray());
             }
             return builder.toString();
         }

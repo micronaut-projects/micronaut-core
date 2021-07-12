@@ -15,38 +15,45 @@
  */
 package io.micronaut.http.client.bind;
 
+import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.http.MutableHttpRequest;
 
+import java.lang.annotation.Annotation;
+
 /**
- * A binder that binds to a {@link MutableHttpRequest}. Argument binders
- * are not able to modify the URI of the request.
+ * A binder that binds to a {@link MutableHttpRequest}.
+ * This binder is used when the annotation is applied to the whole method.
+ * In case of binder for arguments use {@link ClientArgumentRequestBinder}/
  *
- * @param <T> A type
- * @author James Kleeh
- * @since 2.1.0
+ * @param <A> - the annotation type that this binder is applied with
+ *
+ * @author Andriy Dmytruk
+ * @since 3.0.0
  */
 @Experimental
 @BootstrapContextCompatible
-@Indexed(ClientArgumentRequestBinder.class)
-public interface ClientArgumentRequestBinder<T> extends ClientRequestBinder {
+@Indexed(AnnotatedClientRequestBinder.class)
+public interface AnnotatedClientRequestBinder<A extends Annotation> extends ClientRequestBinder {
 
     /**
-     * Bind the given argument to the request. Argument binders
-     * are not able to modify the URI of the request.
+     * Modify the request with the annotation that this binder is applied to.
+     * The URI cannot be changed. The query parameters from the uriContext remain in the resulting request.
      *
-     * @param context The argument context
+     * @param context The context of method invocation
      * @param uriContext The URI context
-     * @param value   The argument value
      * @param request The request
      */
-    void bind(@NonNull ArgumentConversionContext<T> context,
+    void bind(@NonNull MethodInvocationContext<Object, Object> context,
               @NonNull ClientRequestUriContext uriContext,
-              @NonNull T value,
               @NonNull MutableHttpRequest<?> request);
 
+    /**
+     * @return The annotation type.
+     */
+    @NonNull
+    Class<A> getAnnotationType();
 }
