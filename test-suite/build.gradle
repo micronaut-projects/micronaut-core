@@ -54,7 +54,6 @@ dependencies {
     testAnnotationProcessor project(":inject-java")
     testAnnotationProcessor project(":test-suite")
 
-    testRuntimeOnly dependencyVersion("tomcatJdbc")
     testRuntimeOnly dependencyVersion("h2")
     testRuntimeOnly "org.junit.vintage:junit-vintage-engine:$junitVersion"
     testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
