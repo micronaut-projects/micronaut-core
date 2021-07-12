@@ -703,7 +703,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
      */
     @Internal
     @SuppressWarnings("WeakerAccess")
-    protected void invokeMethodWithReflection(BeanResolutionContext resolutionContext, DefaultBeanContext context, int methodIndex, Object bean, Object[] methodArgs) {
+    protected void invokeMethodWithReflection(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, Object bean, Object[] methodArgs) {
         MethodReference methodRef = methodInjection[methodIndex];
         Argument[] methodArgumentTypes = methodRef.arguments == null ? Argument.ZERO_ARGUMENTS : methodRef.arguments;
         if (ClassUtils.REFLECTION_LOGGER.isDebugEnabled()) {
@@ -737,7 +737,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
      */
     @SuppressWarnings("unused")
     @Internal
-    protected final void setFieldWithReflection(BeanResolutionContext resolutionContext, DefaultBeanContext context, int index, Object object, Object value) {
+    protected final void setFieldWithReflection(BeanResolutionContext resolutionContext, BeanContext context, int index, Object object, Object value) {
         FieldReference fieldRef = fieldInjection[index];
         try {
             if (ClassUtils.REFLECTION_LOGGER.isDebugEnabled()) {
@@ -788,7 +788,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
                     Qualifier qualifier = resolveQualifier(resolutionContext, argument, true);
                     if (isCollection) {
                         Collection beans = ((DefaultBeanContext) context).getBeansOfType(resolutionContext, argumentType, qualifier);
-                        return coerceCollectionToCorrectType(argument.getType(), beans);
+                        return coerceCollectionToCorrectType(argument.getType(), beans, resolutionContext, argument);
                     } else {
                         return ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
                     }
@@ -875,19 +875,20 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
      *
      * @param resolutionContext The resolution context
      * @param context           The context
+     * @param methodIndex       The method index
      * @param argumentIndex     The argument index
+     * @param genericType       The generic type
      * @return The resolved bean
      */
     @SuppressWarnings("WeakerAccess")
     @Internal
     @UsedByGeneratedCode
-    protected final Collection<Object> getBeansOfTypeForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argumentIndex) {
+    protected final Collection<Object> getBeansOfTypeForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argumentIndex, Argument genericType) {
         MethodReference methodRef = methodInjection[methodIndex];
         Argument argument = resolveArgument(context, argumentIndex, methodRef.arguments);
-        Argument genericArgument = resolveArgument(context, argumentIndex, methodRef.argumentsGenericTypes);
         try (BeanResolutionContext.Path ignored =
                      resolutionContext.getPath().pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments, methodRef.requiresReflection)) {
-            return resolveBeansOfType(resolutionContext, context, argument, genericArgument);
+            return resolveBeansOfType(resolutionContext, context, argument, resolveEnvironmentArgument(context, genericType));
         }
     }
 
@@ -900,17 +901,17 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
      * @param context           The context
      * @param methodIndex       The method index
      * @param argIndex          The argument index
+     * @param genericType       The generic type
      * @return The resolved bean
      */
     @SuppressWarnings("WeakerAccess")
     @Internal
-    protected final Optional findBeanForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex) {
+    protected final Optional findBeanForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex, Argument genericType) {
         MethodReference methodRef = methodInjection[methodIndex];
         Argument<?> argument = resolveArgument(context, argIndex, methodRef.arguments);
-        Argument<?> resultGenericType = resolveArgument(context, argIndex, methodRef.argumentsGenericTypes);
         try (BeanResolutionContext.Path ignored =
                      resolutionContext.getPath().pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments, methodRef.requiresReflection)) {
-            return resolveOptionalBean(resolutionContext, context, argument, resultGenericType);
+            return resolveOptionalBean(resolutionContext, context, argument, resolveEnvironmentArgument(context, genericType));
         }
     }
 
@@ -923,17 +924,17 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
      * @param context           The context
      * @param methodIndex       The method index
      * @param argIndex          The argument index
+     * @param genericType       The generic type
      * @return The resolved bean
      */
     @Internal
     @UsedByGeneratedCode
-    protected Stream<?> getStreamOfTypeForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex) {
+    protected Stream<?> getStreamOfTypeForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex, Argument genericType) {
         MethodReference methodRef = methodInjection[methodIndex];
         Argument<?> argument = resolveArgument(context, argIndex, methodRef.arguments);
-        Argument<?> resultGenericType = resolveArgument(context, argIndex, methodRef.argumentsGenericTypes);
         try (BeanResolutionContext.Path ignored =
                      resolutionContext.getPath().pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments, methodRef.requiresReflection)) {
-            return resolveStreamOfType(resolutionContext, context, argument, resultGenericType);
+            return resolveStreamOfType(resolutionContext, context, argument, resolveEnvironmentArgument(context, genericType));
         }
     }
 
@@ -1083,17 +1084,17 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
      * @param resolutionContext The resolution context
      * @param context           The context
      * @param argumentIndex     The argument index
+     * @param genericType       The generic type
      * @return The resolved bean
      */
     @SuppressWarnings("WeakerAccess")
     @Internal
     @UsedByGeneratedCode
-    protected final Collection<Object> getBeansOfTypeForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argumentIndex) {
+    protected final Collection<Object> getBeansOfTypeForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argumentIndex, Argument genericType) {
         MethodReference constructorMethodRef = (MethodReference) constructor;
         Argument argument = resolveArgument(context, argumentIndex, constructorMethodRef.arguments);
-        Argument genericArgument = resolveArgument(context, argumentIndex, constructorMethodRef.argumentsGenericTypes);
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(this, argument)) {
-            return resolveBeansOfType(resolutionContext, context, argument, genericArgument);
+            return resolveBeansOfType(resolutionContext, context, argument, resolveEnvironmentArgument(context, genericType));
         }
     }
 
@@ -1105,17 +1106,17 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
      * @param resolutionContext The resolution context
      * @param context           The context
      * @param argumentIndex     The argument index
+     * @param genericType       The generic type
      * @return The resolved bean
      */
     @SuppressWarnings("WeakerAccess")
     @Internal
     @UsedByGeneratedCode
-    protected final Collection<BeanRegistration<Object>> getBeanRegistrationsForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argumentIndex) {
+    protected final Collection<BeanRegistration<Object>> getBeanRegistrationsForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argumentIndex, Argument genericType) {
         MethodReference constructorMethodRef = (MethodReference) constructor;
         Argument<?> argument = resolveArgument(context, argumentIndex, constructorMethodRef.arguments);
-        Argument<?> genericArgument = resolveArgument(context, argumentIndex, constructorMethodRef.argumentsGenericTypes);
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(this, argument)) {
-            return resolveBeanRegistrations(resolutionContext, context, argument, genericArgument);
+            return resolveBeanRegistrations(resolutionContext, context, argument, resolveEnvironmentArgument(context, genericType));
         }
     }
 
@@ -1127,17 +1128,17 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
      * @param resolutionContext The resolution context
      * @param context           The context
      * @param argumentIndex     The arg index
+     * @param genericType       The generic type
      * @return The resolved bean registration
      */
     @SuppressWarnings("WeakerAccess")
     @Internal
     @UsedByGeneratedCode
-    protected final BeanRegistration<?> getBeanRegistrationForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argumentIndex) {
+    protected final BeanRegistration<?> getBeanRegistrationForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argumentIndex, Argument genericType) {
         MethodReference constructorMethodRef = (MethodReference) constructor;
         Argument<?> argument = resolveArgument(context, argumentIndex, constructorMethodRef.arguments);
-        Argument<?> genericArgument = resolveArgument(context, argumentIndex, constructorMethodRef.argumentsGenericTypes);
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(this, argument)) {
-            return resolveBeanRegistration(resolutionContext, context, argument, genericArgument);
+            return resolveBeanRegistration(resolutionContext, context, argument, resolveEnvironmentArgument(context, genericType));
         }
     }
 
@@ -1150,18 +1151,18 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
      * @param context           The context
      * @param methodIndex       The method index
      * @param argIndex          The arg index
+     * @param genericType       The generic type
      * @return The resolved bean
      */
     @SuppressWarnings("WeakerAccess")
     @Internal
     @UsedByGeneratedCode
-    protected final Collection<BeanRegistration<Object>> getBeanRegistrationsForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex) {
+    protected final Collection<BeanRegistration<Object>> getBeanRegistrationsForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex, Argument genericType) {
         MethodReference methodReference = methodInjection[methodIndex];
         Argument<?> argument = resolveArgument(context, argIndex, methodReference.arguments);
-        Argument<?> genericArgument = resolveArgument(context, argIndex, methodReference.argumentsGenericTypes);
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, methodReference.methodName, argument, methodReference.arguments, methodReference.requiresReflection)) {
-            return resolveBeanRegistrations(resolutionContext, context, argument, genericArgument);
+            return resolveBeanRegistrations(resolutionContext, context, argument, resolveEnvironmentArgument(context, genericType));
         }
     }
 
@@ -1174,18 +1175,18 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
      * @param context           The context
      * @param methodIndex       The method index
      * @param argIndex          The arg index
+     * @param genericType       The generic type
      * @return The resolved bean registration
      */
     @SuppressWarnings("WeakerAccess")
     @Internal
     @UsedByGeneratedCode
-    protected final BeanRegistration<?> getBeanRegistrationForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex) {
+    protected final BeanRegistration<?> getBeanRegistrationForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex, Argument genericType) {
         MethodReference methodRef = methodInjection[methodIndex];
         Argument<?> argument = resolveArgument(context, argIndex, methodRef.arguments);
-        Argument<?> genericArgument = resolveArgument(context, argIndex, methodRef.argumentsGenericTypes);
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments, methodRef.requiresReflection)) {
-            return resolveBeanRegistration(resolutionContext, context, argument, genericArgument);
+            return resolveBeanRegistration(resolutionContext, context, argument, resolveEnvironmentArgument(context, genericType));
         }
     }
 
@@ -1197,17 +1198,17 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
      * @param resolutionContext The resolution context
      * @param context           The context
      * @param argIndex          The argument index
+     * @param genericType       The generic type
      * @return The resolved bean
      */
     @SuppressWarnings("WeakerAccess")
     @Internal
     @UsedByGeneratedCode
-    protected Stream<?> getStreamOfTypeForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex) {
+    protected Stream<?> getStreamOfTypeForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex, Argument genericType) {
         MethodReference constructorMethodRef = (MethodReference) constructor;
         Argument<?> argument = resolveArgument(context, argIndex, constructorMethodRef.arguments);
-        Argument<?> resultGenericType = resolveArgument(context, argIndex, constructorMethodRef.argumentsGenericTypes);
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(this, argument)) {
-            return resolveStreamOfType(resolutionContext, context, argument, resultGenericType);
+            return resolveStreamOfType(resolutionContext, context, argument, resolveEnvironmentArgument(context, genericType));
         }
     }
 
@@ -1219,17 +1220,17 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
      * @param resolutionContext The resolution context
      * @param context           The context
      * @param argIndex          The argument index
+     * @param genericType       The generic type
      * @return The resolved bean
      */
     @SuppressWarnings("unused")
     @Internal
     @UsedByGeneratedCode
-    protected final Optional<?> findBeanForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex) {
+    protected final Optional<?> findBeanForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex, Argument genericType) {
         MethodReference constructorMethodRef = (MethodReference) constructor;
         Argument<?> argument = resolveArgument(context, argIndex, constructorMethodRef.arguments);
-        Argument<?> resultGenericType = resolveArgument(context, argIndex, constructorMethodRef.argumentsGenericTypes);
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(this, argument)) {
-            return resolveOptionalBean(resolutionContext, context, argument, resultGenericType);
+            return resolveOptionalBean(resolutionContext, context, argument, resolveEnvironmentArgument(context, genericType));
         }
     }
 
@@ -1282,7 +1283,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
                     Qualifier qualifier = resolveQualifier(resolutionContext, argument, true);
                     if (isCollection) {
                         Collection beans = ((DefaultBeanContext) context).getBeansOfType(resolutionContext, argumentType, qualifier);
-                        return coerceCollectionToCorrectType(argument.getType(), beans);
+                        return coerceCollectionToCorrectType(argument.getType(), beans, resolutionContext, argument);
                     } else {
                         return ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
                     }
@@ -1492,19 +1493,20 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
      * @param resolutionContext The resolution context
      * @param context           The context
      * @param fieldIndex        The field index
+     * @param genericType       The generic type
      * @return The resolved bean
      */
     @SuppressWarnings("WeakerAccess")
     @Internal
     @UsedByGeneratedCode
-    protected final Object getBeansOfTypeForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) {
+    protected final Object getBeansOfTypeForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex, Argument genericType) {
         final FieldReference fieldRef = fieldInjection[fieldIndex];
         final Argument<?> argument = fieldRef.asArgument(environment);
-        if (fieldRef.genericType == null) {
+        if (genericType == null) {
             throw new DependencyInjectionException(resolutionContext, this, fieldRef.fieldName, "Type " + argument.getType() + " has no generic argument");
         }
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushFieldResolve(this, argument, fieldRef.requiresReflection)) {
-            return resolveBeansOfType(resolutionContext, context, argument, resolveEnvironmentArgument(context, fieldRef.genericType));
+            return resolveBeansOfType(resolutionContext, context, argument, resolveEnvironmentArgument(context, genericType));
         }
     }
 
@@ -1516,20 +1518,21 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
      * @param resolutionContext The resolution context
      * @param context           The context
      * @param fieldIndex        The field index
+     * @param genericType       The generic type
      * @return The resolved bean
      */
     @SuppressWarnings("WeakerAccess")
     @Internal
     @UsedByGeneratedCode
-    protected final Object getBeanRegistrationsForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) {
+    protected final Object getBeanRegistrationsForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex, Argument genericType) {
         FieldReference fieldRef = fieldInjection[fieldIndex];
         Argument argument = fieldRef.asArgument(environment);
-        if (fieldRef.genericType == null) {
+        if (genericType == null) {
             throw new DependencyInjectionException(resolutionContext, this, fieldRef.fieldName, "Type " + argument.getType() + " has no generic argument");
         }
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushFieldResolve(this, argument, fieldRef.requiresReflection)) {
-            return resolveBeanRegistrations(resolutionContext, context, argument, resolveEnvironmentArgument(context, fieldRef.genericType));
+            return resolveBeanRegistrations(resolutionContext, context, argument, resolveEnvironmentArgument(context, genericType));
         }
     }
 
@@ -1541,20 +1544,21 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
      * @param resolutionContext The resolution context
      * @param context           The context
      * @param fieldIndex        The field index
+     * @param genericType       The generic type
      * @return The resolved bean registration
      */
     @SuppressWarnings("WeakerAccess")
     @Internal
     @UsedByGeneratedCode
-    protected final BeanRegistration<?> getBeanRegistrationForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) {
+    protected final BeanRegistration<?> getBeanRegistrationForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex, Argument genericType) {
         FieldReference fieldRef = fieldInjection[fieldIndex];
         Argument argument = fieldRef.asArgument(environment);
-        if (fieldRef.genericType == null) {
+        if (genericType == null) {
             throw new DependencyInjectionException(resolutionContext, this, fieldRef.fieldName, "Type " + argument.getType() + " has no generic argument");
         }
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushFieldResolve(this, argument, fieldRef.requiresReflection)) {
-            return resolveBeanRegistration(resolutionContext, context, argument, resolveEnvironmentArgument(context, fieldRef.genericType));
+            return resolveBeanRegistration(resolutionContext, context, argument, resolveEnvironmentArgument(context, genericType));
         }
     }
 
@@ -1566,19 +1570,20 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
      * @param resolutionContext The resolution context
      * @param context           The context
      * @param fieldIndex        The field index
+     * @param genericType       The generic type
      * @return The resolved bean
      */
     @SuppressWarnings("WeakerAccess")
     @Internal
-    protected final Optional findBeanForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) {
+    protected final Optional findBeanForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex, Argument genericType) {
         FieldReference fieldRef = fieldInjection[fieldIndex];
         Argument argument = fieldRef.asArgument(environment);
-        if (fieldRef.genericType == null) {
+        if (genericType == null) {
             throw new DependencyInjectionException(resolutionContext, this, fieldRef.fieldName, "Type " + argument.getType() + " has no generic argument");
         }
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushFieldResolve(this, argument, fieldRef.requiresReflection)) {
-            return resolveOptionalBean(resolutionContext, context, argument, resolveEnvironmentArgument(context, fieldRef.genericType));
+            return resolveOptionalBean(resolutionContext, context, argument, resolveEnvironmentArgument(context, genericType));
         }
     }
 
@@ -1590,61 +1595,53 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
      * @param resolutionContext The resolution context
      * @param context           The context
      * @param fieldIndex        The field index
+     * @param genericType       The generic type
      * @return The resolved bean
      */
     @SuppressWarnings("WeakerAccess")
     @Internal
     @UsedByGeneratedCode
-    protected final Stream getStreamOfTypeForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) {
+    protected final Stream getStreamOfTypeForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex, Argument genericType) {
         FieldReference fieldRef = fieldInjection[fieldIndex];
         Argument argument = fieldRef.asArgument(environment);
-        if (fieldRef.genericType == null) {
+        if (genericType == null) {
             throw new DependencyInjectionException(resolutionContext, this, fieldRef.fieldName, "Type " + argument.getType() + " has no generic argument");
         }
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushFieldResolve(this, argument, fieldRef.requiresReflection)) {
-            return resolveStreamOfType(resolutionContext, context, argument, resolveEnvironmentArgument(context, fieldRef.genericType));
+            return resolveStreamOfType(resolutionContext, context, argument, resolveEnvironmentArgument(context, genericType));
         }
     }
 
     private Object getBeanForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, MethodReference methodRef, Argument argument) {
-        Class argumentType = argument.getType();
-//        if (argumentType.isArray()) {
-//            Collection beansOfType = getBeansOfTypeForMethodArgument(resolutionContext, context, methodRef, argument);
-//            return beansOfType.toArray((Object[]) Array.newInstance(argumentType.getComponentType(), beansOfType.size()));
-//        } else if (Collection.class.isAssignableFrom(argumentType)) {
-//            Collection beansOfType = getBeansOfTypeForMethodArgument(resolutionContext, context, methodRef, argument);
-//            return coerceCollectionToCorrectType(argumentType, beansOfType);
-//        } else if (Stream.class.isAssignableFrom(argumentType)) {
-//            return streamOfTypeForMethodArgument(resolutionContext, context, methodRef, argument);
-//        } else if (Optional.class.isAssignableFrom(argumentType)) {
-//            return findBeanForMethodArgument(resolutionContext, context, methodRef, argument);
-//        } else {
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments, methodRef.requiresReflection)) {
-            try {
-                Qualifier qualifier = resolveQualifier(resolutionContext, argument);
-                return ((DefaultBeanContext) context).getBean(resolutionContext, argument, qualifier);
-            } catch (DisabledBeanException e) {
-                if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                    AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", argumentType.getSimpleName(), e.getMessage());
-                }
-                if (isIterable() && getAnnotationMetadata().hasDeclaredAnnotation(EachBean.class)) {
-                    throw new DisabledBeanException("Bean [" + getBeanType().getSimpleName() + "] disabled by parent: " + e.getMessage());
-                } else {
-                    if (argument.isDeclaredNullable()) {
-                        return null;
-                    }
-                    throw new DependencyInjectionException(resolutionContext, argument, e);
-                }
-            } catch (NoSuchBeanException e) {
+            return resolveBean(resolutionContext, (DefaultBeanContext) context, argument);
+        }
+    }
+
+    private Object resolveBean(BeanResolutionContext resolutionContext, DefaultBeanContext context, Argument argument) {
+        try {
+            Qualifier qualifier = resolveQualifier(resolutionContext, argument);
+            return context.getBean(resolutionContext, argument, qualifier);
+        } catch (DisabledBeanException e) {
+            if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
+                AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", argument.getType().getSimpleName(), e.getMessage());
+            }
+            if (isIterable() && getAnnotationMetadata().hasDeclaredAnnotation(EachBean.class)) {
+                throw new DisabledBeanException("Bean [" + getBeanType().getSimpleName() + "] disabled by parent: " + e.getMessage());
+            } else {
                 if (argument.isDeclaredNullable()) {
                     return null;
                 }
                 throw new DependencyInjectionException(resolutionContext, argument, e);
             }
+        } catch (NoSuchBeanException e) {
+            if (argument.isDeclaredNullable()) {
+                return null;
+            }
+            throw new DependencyInjectionException(resolutionContext, argument, e);
         }
-//        }
     }
 
     private Optional resolveValue(
@@ -1781,7 +1778,8 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
             throw new DependencyInjectionException(resolutionContext, argument, "Type " + argument.getType() + " has no generic argument");
         }
         Qualifier qualifier = resolveQualifier(resolutionContext, argument);
-        return beanContext.getBeansOfType(resolutionContext, resolveEnvironmentArgument(context, resultGenericType), qualifier);
+        Collection beansOfType = beanContext.getBeansOfType(resolutionContext, resolveEnvironmentArgument(context, resultGenericType), qualifier);
+        return coerceCollectionToCorrectType(argument.getType(), beansOfType, resolutionContext, argument);
     }
 
     private Stream<?> resolveStreamOfType(BeanResolutionContext resolutionContext, BeanContext context, Argument<?> argument, Argument<?> resultGenericType) {
@@ -1800,13 +1798,14 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
         return ((DefaultBeanContext) context).findBean(resolutionContext, resultGenericType, qualifier);
     }
 
-    private <B> Collection<BeanRegistration<B>> resolveBeanRegistrations(BeanResolutionContext resolutionContext, BeanContext beanContext, Argument<?> argument, Argument genericArgument) {
+    private <B> Collection<BeanRegistration<B>> resolveBeanRegistrations(BeanResolutionContext resolutionContext, BeanContext beanContext, Argument argument, Argument genericArgument) {
         try {
             if (genericArgument == null) {
                 throw new DependencyInjectionException(resolutionContext, argument, "Cannot resolve bean registrations. Argument [" + argument + "] missing generic type information.");
             }
             Qualifier qualifier = resolveQualifier(resolutionContext, argument);
-            return beanContext.getBeanRegistrations(genericArgument, qualifier);
+            Collection beanRegistrations = ((DefaultBeanContext) beanContext).getBeanRegistrations(resolutionContext, genericArgument, qualifier);
+            return coerceCollectionToCorrectType(argument.getType(), beanRegistrations, resolutionContext, argument);
         } catch (NoSuchBeanException e) {
             if (argument.isNullable()) {
                 return null;
@@ -1911,11 +1910,13 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
     }
 
     @SuppressWarnings("unchecked")
-    private Object coerceCollectionToCorrectType(Class collectionType, Collection beansOfType) {
-        if (collectionType.isInstance(beansOfType)) {
+    private <I, T extends Collection<I>> Collection coerceCollectionToCorrectType(Class<T> collectionType, Collection<I> beansOfType, BeanResolutionContext resolutionContext, Argument argument) {
+        if (argument.isArray() || collectionType.isInstance(beansOfType)) {
+            // Arrays are converted by compile-time code
             return beansOfType;
         } else {
-            return CollectionUtils.convertCollection(collectionType, beansOfType).orElse(null);
+            return (Collection) CollectionUtils.convertCollection(collectionType, beansOfType)
+                    .orElseThrow(() -> new DependencyInjectionException(resolutionContext, argument, "Cannot create a collection of type: " + collectionType.getName()));
         }
     }
 
@@ -1962,41 +1963,35 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
         }
     }
 
+    /**
+     * The data class containing all method reference information.
+     */
+    @Internal
+    @SuppressWarnings("VisibilityModifier")
     public static final class MethodReference extends MethodOrFieldReference {
-        final String methodName;
-        final Argument[] arguments;
-        @Nullable
-        final Argument resultGenericType;
-        @Nullable
-        final Argument[] argumentsGenericTypes;
-        @Nullable
-        final boolean isPreDestroyMethod;
-        final boolean isPostConstructMethod;
+        public final String methodName;
+        public final Argument[] arguments;
+        public final boolean isPreDestroyMethod;
+        public final boolean isPostConstructMethod;
 
         public MethodReference(Class declaringType,
                                String methodName,
-                               Argument resultGenericType,
                                Argument[] arguments,
-                               @Nullable Argument[] argumentsGenericTypes,
                                @Nullable AnnotationMetadata annotationMetadata,
                                boolean requiresReflection) {
-            this(declaringType, methodName, resultGenericType, arguments, argumentsGenericTypes, annotationMetadata, requiresReflection, false, false);
+            this(declaringType, methodName, arguments, annotationMetadata, requiresReflection, false, false);
         }
 
         public MethodReference(Class declaringType,
                                String methodName,
-                               @Nullable Argument resultGenericType,
                                Argument[] arguments,
-                               @Nullable Argument[] argumentsGenericTypes,
                                @Nullable AnnotationMetadata annotationMetadata,
                                boolean requiresReflection,
                                boolean isPostConstructMethod,
                                boolean isPreDestroyMethod) {
             super(declaringType, annotationMetadata, requiresReflection);
             this.methodName = methodName;
-            this.resultGenericType = resultGenericType;
             this.arguments = arguments;
-            this.argumentsGenericTypes = argumentsGenericTypes;
             this.isPostConstructMethod = isPostConstructMethod;
             this.isPreDestroyMethod = isPreDestroyMethod;
         }
@@ -2007,18 +2002,20 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
         }
     }
 
+    /**
+     * The data class containing all filed reference information.
+     */
+    @Internal
+    @SuppressWarnings("VisibilityModifier")
     public static final class FieldReference extends MethodOrFieldReference {
-        final Class fieldType;
-        final String fieldName;
-        @Nullable
-        final Argument genericType;
-        final Argument[] typeArguments;
+        public final Class fieldType;
+        public final String fieldName;
+        public final Argument[] typeArguments;
 
-        public FieldReference(Class declaringType, Class fieldType, String fieldName, AnnotationMetadata annotationMetadata, Argument genericType, Argument[] typeArguments, boolean requiresReflection) {
+        public FieldReference(Class declaringType, Class fieldType, String fieldName, AnnotationMetadata annotationMetadata, Argument[] typeArguments, boolean requiresReflection) {
             super(declaringType, annotationMetadata, requiresReflection);
             this.fieldType = fieldType;
             this.fieldName = fieldName;
-            this.genericType = genericType;
             this.typeArguments = typeArguments;
         }
 
@@ -2053,52 +2050,5 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
         public AnnotationMetadata getAnnotationMetadata() {
             return annotationMetadata;
         }
-    }
-
-    /**
-     * Class used as a method key.
-     */
-    public static final class MethodKey {
-        final String name;
-        final Class[] argumentTypes;
-
-        MethodKey(String name, Class[] argumentTypes) {
-            this.name = name;
-            this.argumentTypes = argumentTypes;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) {
-                return true;
-            }
-            if (o == null || getClass() != o.getClass()) {
-                return false;
-            }
-
-            @SuppressWarnings("unchecked") AbstractBeanDefinition2.MethodKey methodKey = (AbstractBeanDefinition2.MethodKey) o;
-
-            if (!name.equals(methodKey.name)) {
-                return false;
-            }
-            return Arrays.equals(argumentTypes, methodKey.argumentTypes);
-        }
-
-        @Override
-        public int hashCode() {
-            int result = name.hashCode();
-            result = 31 * result + Arrays.hashCode(argumentTypes);
-            return result;
-        }
-    }
-
-
-    /**
-     * Bean resolver.
-     *
-     * @param <T> The type
-     */
-    private interface BeanResolver<T> {
-        T resolveBean(Argument<T> beanType, Qualifier<T> qualifier);
     }
 }
