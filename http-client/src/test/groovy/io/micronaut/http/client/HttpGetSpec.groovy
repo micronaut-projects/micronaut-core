@@ -861,7 +861,7 @@ class HttpGetSpec extends Specification {
         String queryParam(@QueryValue String foo)
 
         @Get("/queryParamExploded{?bar*}")
-        String queryParamExploded(@QueryValue("bar") List<String> foo)
+        String queryParamExploded(@QueryValue(value="bar") List<String> foo)
 
         @Get("/queryParamExploded{?bar*}")
         String queryParamExploded2(@QueryValue List<String> bar)

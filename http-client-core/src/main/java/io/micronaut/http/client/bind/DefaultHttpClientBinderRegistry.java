@@ -36,17 +36,14 @@ import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.annotation.RequestAttribute;
 import io.micronaut.http.annotation.RequestBean;
+import io.micronaut.http.client.bind.binders.QueryValueClientArgumentBinder;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import jakarta.inject.Singleton;
 import kotlin.coroutines.Continuation;
 
 import java.lang.annotation.Annotation;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 import static io.micronaut.core.util.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
 
@@ -63,13 +60,14 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
 
     private final Map<Class<? extends Annotation>, ClientArgumentRequestBinder<?>> byAnnotation = new LinkedHashMap<>();
     private final Map<Integer, ClientArgumentRequestBinder<?>> byType = new LinkedHashMap<>();
+    private final Map<Class<? extends Annotation>, AnnotatedClientRequestBinder<?>> methodByAnnotation = new LinkedHashMap<>();
 
     /**
      * @param conversionService The conversion service
-     * @param binders           The request argument binders
+     * @param binders           The request binders
      */
     protected DefaultHttpClientBinderRegistry(ConversionService<?> conversionService,
-                                              List<ClientArgumentRequestBinder<?>> binders) {
+                                              List<ClientRequestBinder> binders) {
         byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (ClientArgumentRequestBinder<HttpHeaders>) (context, uriContext, value, request) -> {
             value.forEachValue(request::header);
         });
@@ -85,17 +83,7 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
         byType.put(Argument.of(Locale.class).typeHashCode(), (ClientArgumentRequestBinder<Locale>) (context, uriContext, value, request) -> {
             request.header(HttpHeaders.ACCEPT_LANGUAGE, value.toLanguageTag());
         });
-        byAnnotation.put(QueryValue.class, (context, uriContext, value, request) -> {
-            String parameterName = context.getAnnotationMetadata().stringValue(QueryValue.class)
-                    .filter (StringUtils::isNotEmpty)
-                    .orElse(context.getArgument().getName());
-
-            conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
-                    .filter(StringUtils::isNotEmpty)
-                    .ifPresent(o -> {
-                        uriContext.getQueryParameters().put(parameterName, o);
-                    });
-        });
+        byAnnotation.put(QueryValue.class, new QueryValueClientArgumentBinder(conversionService));
         byAnnotation.put(PathVariable.class, (context, uriContext, value, request) -> {
             String parameterName = context.getAnnotationMetadata().stringValue(PathVariable.class)
                     .filter (StringUtils::isNotEmpty)
@@ -130,6 +118,9 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
                     .filter(StringUtils::isNotEmpty)
                     .orElse(NameUtils.hyphenate(context.getArgument().getName()));
             request.getAttributes().put(attributeName, value);
+
+            conversionService.convert(value, String.class)
+                    .ifPresent(v -> uriContext.getPathParameters().put(context.getArgument().getName(), v));
         });
         byAnnotation.put(Body.class, (context, uriContext, value, request) -> {
             request.body(value);
@@ -152,7 +143,7 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
         }
 
         if (CollectionUtils.isNotEmpty(binders)) {
-            for (ClientArgumentRequestBinder<?> binder : binders) {
+            for (ClientRequestBinder binder : binders) {
                 addBinder(binder);
             }
         }
@@ -178,19 +169,27 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
         }
     }
 
+    @Override
+    public Optional<AnnotatedClientRequestBinder<?>> findAnnotatedBinder(@NonNull Class<?> annotationType) {
+        return Optional.ofNullable(methodByAnnotation.get(annotationType));
+    }
+
     /**
      * Adds a binder to the registry.
      *
      * @param binder The binder
      * @param <T> The type
      */
-    public <T> void addBinder(ClientArgumentRequestBinder<T> binder) {
-        if (binder instanceof AnnotatedClientArgumentRequestBinder) {
-            AnnotatedClientArgumentRequestBinder<?> annotatedRequestArgumentBinder = (AnnotatedClientArgumentRequestBinder) binder;
+    public <T> void addBinder(ClientRequestBinder binder) {
+        if (binder instanceof AnnotatedClientRequestBinder) {
+            AnnotatedClientRequestBinder<?> annotatedBinder = (AnnotatedClientRequestBinder<?>) binder;
+            methodByAnnotation.put(annotatedBinder.getAnnotationType(), annotatedBinder);
+        } else if (binder instanceof AnnotatedClientArgumentRequestBinder) {
+            AnnotatedClientArgumentRequestBinder<?> annotatedRequestArgumentBinder = (AnnotatedClientArgumentRequestBinder<?>) binder;
             Class<? extends Annotation> annotationType = annotatedRequestArgumentBinder.getAnnotationType();
             byAnnotation.put(annotationType, annotatedRequestArgumentBinder);
         } else if (binder instanceof TypedClientArgumentRequestBinder) {
-            TypedClientArgumentRequestBinder<?> typedRequestArgumentBinder = (TypedClientArgumentRequestBinder) binder;
+            TypedClientArgumentRequestBinder<?> typedRequestArgumentBinder = (TypedClientArgumentRequestBinder<?>) binder;
             byType.put(typedRequestArgumentBinder.argumentType().typeHashCode(), typedRequestArgumentBinder);
             List<Class<?>> superTypes = typedRequestArgumentBinder.superTypes();
             if (CollectionUtils.isNotEmpty(superTypes)) {

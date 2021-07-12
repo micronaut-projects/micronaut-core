@@ -16,6 +16,7 @@
 package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.QueryValue
@@ -64,23 +65,23 @@ class ParameterSpec extends Specification {
     static class UserController implements MyApi {
 
         @Override
-        User get(@QueryValue('X-username') String username) {
+        User get(@QueryValue('X-username') @Nullable String username) {
             return new User(username:username, age: 10)
         }
 
         @Override
-        User findByAge(@QueryValue('userAge') Integer age) {
+        User findByAge(@QueryValue('userAge') @Nullable Integer age) {
             return new User(username:"John", age: 18)
         }
     }
 
     static interface MyApi {
 
-        @Get('/user/{X-username}')
-        User get(@QueryValue('X-username') String username)
+        @Get('/user{?X-username}')
+        User get(@QueryValue('X-username') @Nullable String username)
 
-        @Get('/user/age/{userAge}')
-        User findByAge(@QueryValue('userAge') Integer age)
+        @Get('/user/age{?userAge}')
+        User findByAge(@QueryValue('userAge') @Nullable Integer age)
     }
 
     static class User {
