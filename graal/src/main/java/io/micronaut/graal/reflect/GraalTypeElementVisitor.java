@@ -130,7 +130,9 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 final String beanName = element.getName();
                 addBean(beanName);
                 resolveClassData(beanName + "[]");
-            } else if (element.hasAnnotation(TypeHint.class)) {
+            }
+
+            if (element.hasAnnotation(TypeHint.class)) {
                 originatingElements.add(element);
                 packages.add(element.getPackageName());
                 final String[] introspectedClasses = element.stringValues(TypeHint.class);
@@ -147,7 +149,9 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                         String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY
                         )
                 );
-            } else if (element.hasAnnotation(Import.class)) {
+            }
+
+            if (element.hasAnnotation(Import.class)) {
                 final List<ClassElement> beanElements = BeanImportVisitor.collectInjectableElements(element, context);
                 for (ClassElement beanElement : beanElements) {
                     final MethodElement constructor = beanElement.getPrimaryConstructor().orElse(null);
@@ -173,6 +177,17 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 MethodElement me = element.getPrimaryConstructor().orElse(null);
                 if (me != null && me.isPrivate() && !me.hasAnnotation(ReflectiveAccess.class)) {
                     processMethodElement(me);
+                }
+            }
+
+            if (element.isInner()) {
+                ClassElement enclosingType = element.getEnclosingType().orElse(null);
+                if (enclosingType != null && enclosingType.hasAnnotation(ReflectiveAccess.class)) {
+                    originatingElements.add(enclosingType);
+                    packages.add(enclosingType.getPackageName());
+                    final String beanName = element.getName();
+                    addBean(beanName);
+                    resolveClassData(beanName + "[]");
                 }
             }
         }

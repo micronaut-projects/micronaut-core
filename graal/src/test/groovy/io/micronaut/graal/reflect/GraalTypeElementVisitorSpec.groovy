@@ -283,6 +283,10 @@ package test;
 @javax.persistence.Entity
 class Test {
 
+
+    enum InnerEnum {
+        ONE, TWO;
+    }
 }
 ''')
 
@@ -300,6 +304,7 @@ class Test {
         entry.methods
         entry.methods[0].name == '<init>'
         entry.methods[0].parameterTypes == []
+        json?.find { it.name == 'test.Test$InnerEnum'}
 
         cleanup:
         reader.close()

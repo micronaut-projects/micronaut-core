@@ -202,6 +202,16 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * Returns the enclosing type if {@link #isInner()} return {@code true}.
+     *
+     * @return The enclosing type if any
+     * @since 3.0.0
+     */
+    default Optional<ClassElement> getEnclosingType() {
+        return Optional.empty();
+    }
+
+    /**
      * Return the first enclosed element matching the given query.
      *
      * @param query The query to use.
