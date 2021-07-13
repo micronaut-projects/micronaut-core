@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.io.scan;
+package io.micronaut.ast.groovy.scan;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.io.scan.AnnotationScanner;
 import io.micronaut.core.reflect.ClassUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,11 +89,11 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
      * @return A stream of classes
      */
     @Override
-    public Stream<Class> scan(String annotation, String pkg) {
+    public Stream<Class<?>> scan(String annotation, String pkg) {
         if (pkg == null) {
             return Stream.empty();
         }
-        List<Class> classes = doScan(annotation, pkg);
+        List<Class<?>> classes = doScan(annotation, pkg);
         return classes.stream();
     }
 
@@ -101,10 +102,10 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
      * @param pkg        The package
      * @return The list of class
      */
-    protected List<Class> doScan(String annotation, String pkg) {
+    protected List<Class<?>> doScan(String annotation, String pkg) {
         try {
             String packagePath = pkg.replace('.', '/').concat("/");
-            List<Class> classes = new ArrayList<>();
+            List<Class<?>> classes = new ArrayList<>();
             Enumeration<URL> resources = classLoader.getResources(packagePath);
             if (!resources.hasMoreElements() && LOG.isDebugEnabled()) {
                 LOG.debug("No resources found under package path: {}", packagePath);
@@ -166,7 +167,7 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
      * @param classes    The classes
      * @param filePath   The filePath
      */
-    protected void traverseFile(String annotation, List<Class> classes, Path filePath) {
+    protected void traverseFile(String annotation, List<Class<?>> classes, Path filePath) {
         if (Files.isDirectory(filePath)) {
             try (DirectoryStream<Path> dirs = Files.newDirectoryStream(filePath)) {
                 dirs.forEach(path -> {
@@ -191,7 +192,7 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
      * @param filePath   The file path
      * @param classes    The classes
      */
-    protected void scanFile(String annotation, Path filePath, List<Class> classes) {
+    protected void scanFile(String annotation, Path filePath, List<Class<?>> classes) {
         String fileName = filePath.getFileName().toString();
         if (fileName.endsWith(".class") && fileName.indexOf('$') == -1) {
             // ignore generated classes
@@ -209,7 +210,7 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
         }
     }
 
-    private void scanInputStream(String annotation, InputStream inputStream, List<Class> classes) throws IOException, ClassNotFoundException {
+    private void scanInputStream(String annotation, InputStream inputStream, List<Class<?>> classes) throws IOException, ClassNotFoundException {
         AnnotationClassReader annotationClassReader = new AnnotationClassReader(inputStream);
         AnnotatedTypeInfoVisitor classVisitor = new AnnotatedTypeInfoVisitor();
         annotationClassReader.accept(classVisitor, AnnotationClassReader.SKIP_DEBUG);

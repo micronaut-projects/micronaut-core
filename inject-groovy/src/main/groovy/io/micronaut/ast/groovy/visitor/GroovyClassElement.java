@@ -358,6 +358,27 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @Override
+    public Optional<ClassElement> getEnclosingType() {
+        if (isInner()) {
+            ClassNode outerClass = classNode.getOuterClass();
+            if (outerClass != null) {
+                return Optional.of(
+                        visitorContext.getElementFactory()
+                            .newClassElement(
+                                    outerClass,
+                                    AstAnnotationUtils.getAnnotationMetadata(
+                                            sourceUnit,
+                                            compilationUnit,
+                                            outerClass
+                                    )
+                            )
+                );
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
     public boolean isInterface() {
         return classNode.isInterface();
     }
