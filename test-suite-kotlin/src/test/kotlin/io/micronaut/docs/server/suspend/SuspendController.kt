@@ -52,14 +52,14 @@ class SuspendController(
     // end::suspendDelayed[]
 
     // tag::suspendStatus[]
-    @Status(HttpStatus.CREATED) // <1>
+    @Status(HttpStatusStandard.CREATED) // <1>
     @Get("/status")
     suspend fun status() {
     }
     // end::suspendStatus[]
 
     // tag::suspendStatusDelayed[]
-    @Status(HttpStatus.CREATED)
+    @Status(HttpStatusStandard.CREATED)
     @Get("/statusDelayed")
     suspend fun statusDelayed() {
         delay(1)
@@ -89,7 +89,7 @@ class SuspendController(
         throw IllegalArgumentException()
     }
 
-    @Status(HttpStatus.BAD_REQUEST)
+    @Status(HttpStatusStandard.BAD_REQUEST)
     @Error(exception = IllegalArgumentException::class)
     @Produces(MediaType.TEXT_PLAIN)
     suspend fun onIllegalArgument(e: IllegalArgumentException): String {

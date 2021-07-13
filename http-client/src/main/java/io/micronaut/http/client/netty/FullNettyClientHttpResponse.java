@@ -90,7 +90,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
             Argument<B> bodyType,
             boolean convertBody) {
 
-        this.status = httpStatus;
+        this.status = HttpStatus.custom(httpStatus.getCode(), fullHttpResponse.status().reasonPhrase());
         this.headers = new NettyHttpHeaders(fullHttpResponse.headers(), ConversionService.SHARED);
         this.attributes = new MutableConvertibleValuesMap<>();
         this.nettyHttpResponse = fullHttpResponse;

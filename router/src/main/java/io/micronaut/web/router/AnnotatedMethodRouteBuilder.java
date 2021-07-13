@@ -24,6 +24,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.HttpStatusStandard;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Error;
 import io.micronaut.http.annotation.*;
@@ -285,7 +286,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             boolean isGlobal = method.isTrue(Error.class, "global");
                 Class declaringType = bean.getBeanType();
                 if (method.isPresent(Error.class, "status")) {
-                    Optional<HttpStatus> value = method.enumValue(Error.class, "status", HttpStatus.class);
+                    Optional<HttpStatusStandard> value = method.enumValue(Error.class, "status", HttpStatusStandard.class);
                     value.ifPresent(httpStatus -> {
                         if (isGlobal) {
                             status(httpStatus, declaringType, method.getMethodName(), method.getArgumentTypes());

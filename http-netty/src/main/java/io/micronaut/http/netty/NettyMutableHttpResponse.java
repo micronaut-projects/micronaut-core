@@ -278,9 +278,8 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
     }
 
     @Override
-    public MutableHttpResponse<B> status(HttpStatus status, CharSequence message) {
-        message = message == null ? status.getReason() : message;
-        httpResponseStatus = new HttpResponseStatus(status.getCode(), message.toString());
+    public MutableHttpResponse<B> status(HttpStatus status) {
+        httpResponseStatus = new HttpResponseStatus(status.getCode(), status.getReason());
         return this;
     }
 

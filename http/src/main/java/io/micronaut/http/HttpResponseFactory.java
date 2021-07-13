@@ -48,6 +48,18 @@ public interface HttpResponseFactory {
     <T> MutableHttpResponse<T> status(HttpStatus status, String reason);
 
     /**
+     * Return a response for the given status, optionally a non-standard status.
+     *
+     * @param statusCode The status code
+     * @param reason An alternatively reason message
+     * @param <T>    The response type
+     * @return The response
+     */
+    default <T> MutableHttpResponse<T> status(int statusCode, String reason) {
+        return status(HttpStatus.valueOf(statusCode), reason);
+    }
+
+    /**
      * Return a response for the given status.
      *
      * @param status The status
@@ -72,5 +84,14 @@ public interface HttpResponseFactory {
      */
     default <T> MutableHttpResponse<T> status(HttpStatus status) {
         return status(status, null);
+    }
+
+    /**
+     * @param statusCode The status code, optionally a non-standard status
+     * @param <T>    The response type
+     * @return The response
+     */
+    default <T> MutableHttpResponse<T> status(int statusCode) {
+        return status(statusCode, null);
     }
 }

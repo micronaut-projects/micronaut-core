@@ -61,42 +61,42 @@ class ErrorMissingArgumentSpec extends Specification {
     @Controller
     static class MissingArgumentController {
         @Get("/header")
-        @Status(HttpStatus.OK)
+        @Status(HttpStatusStandard.OK)
         void header(@Header("X-API-Version") String apiVersion) {
         }
 
         @Get("/headerNoValue")
-        @Status(HttpStatus.OK)
+        @Status(HttpStatusStandard.OK)
         void headerNoValue(@Header String apiVersion) {
         }
 
         @Get("/cookie")
-        @Status(HttpStatus.OK)
+        @Status(HttpStatusStandard.OK)
         void cookie(@CookieValue("myCookie") String myCookie) {
         }
 
         @Get("/cookieNoValue")
-        @Status(HttpStatus.OK)
+        @Status(HttpStatusStandard.OK)
         void cookieNoValue(@CookieValue String myCookie) {
         }
 
         @Get("/queryvalue")
-        @Status(HttpStatus.OK)
+        @Status(HttpStatusStandard.OK)
         void queryvalue(@QueryValue("number-of-items") Integer numberOfItems) {
         }
 
         @Get("/queryvalueNoValue")
-        @Status(HttpStatus.OK)
+        @Status(HttpStatusStandard.OK)
         void queryvalueNoValue(@QueryValue Integer numberOfItems) {
         }
 
         @Get("/queryvalueWithoutAnnotation")
-        @Status(HttpStatus.OK)
+        @Status(HttpStatusStandard.OK)
         void queryvalueWithoutAnnotation(Integer numberOfItems) {
         }
 
         @Get("/body")
-        @Status(HttpStatus.OK)
+        @Status(HttpStatusStandard.OK)
         void body(@Body Integer numberOfItems) {
         }
     }

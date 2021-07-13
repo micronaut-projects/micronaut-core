@@ -18,6 +18,7 @@ package io.micronaut.docs.server.response
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.HttpStatusStandard
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -36,7 +37,7 @@ class StatusController {
     }
 
     //tag::atstatus[]
-    @Status(HttpStatus.CREATED)
+    @Status(HttpStatusStandard.CREATED)
     @Get(produces = MediaType.TEXT_PLAIN)
     String index() {
         "success"
@@ -57,24 +58,24 @@ class StatusController {
     }
     //end::httpresponse[]
 
-    @Status(HttpStatus.CREATED)
+    @Status(HttpStatusStandard.CREATED)
     @Get(value = "/voidreturn")
     void voidReturn() {
     }
 
-    @Status(HttpStatus.CREATED)
+    @Status(HttpStatusStandard.CREATED)
     @Get(value = "/completableVoid")
     CompletableFuture<Void> voidCompletableFuture() {
         CompletableFuture.completedFuture(null)
     }
 
-    @Status(HttpStatus.CREATED)
+    @Status(HttpStatusStandard.CREATED)
     @Get(value = "/maybeVoid")
     Maybe<Void> maybeVoid() {
         Maybe.empty()
     }
 
-    @Status(HttpStatus.NOT_FOUND)
+    @Status(HttpStatusStandard.NOT_FOUND)
     @Get(value = "/simple404", produces = MediaType.TEXT_PLAIN)
     String simple404() {
         "success"

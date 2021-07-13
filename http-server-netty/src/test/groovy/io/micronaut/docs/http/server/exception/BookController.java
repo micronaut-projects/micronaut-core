@@ -17,6 +17,7 @@ package io.micronaut.docs.http.server.exception;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.HttpStatusStandard;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Error;
@@ -62,7 +63,7 @@ public class BookController {
 
     @Error(exception = NullPointerException.class)
     @Produces(MediaType.TEXT_PLAIN)
-    @Status(HttpStatus.MULTI_STATUS)
+    @Status(HttpStatusStandard.MULTI_STATUS)
     String npeHandler() {
         return "NPE";
     }

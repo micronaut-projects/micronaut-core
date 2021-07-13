@@ -25,7 +25,7 @@ import io.micronaut.http.annotation.Status
 class BookController {
 
     @Post(value = "/book/{title}", consumes = [MediaType.APPLICATION_JSON, MediaType.APPLICATION_FORM_URLENCODED])
-    @Status(HttpStatus.CREATED)
+    @Status(HttpStatusStandard.CREATED)
     Book save(String title) {
         return new Book(title)
     }

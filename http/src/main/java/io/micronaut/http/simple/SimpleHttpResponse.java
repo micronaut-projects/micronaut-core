@@ -84,7 +84,7 @@ class SimpleHttpResponse<B> implements MutableHttpResponse<B> {
     }
 
     @Override
-    public MutableHttpResponse<B> status(HttpStatus status, CharSequence message) {
+    public MutableHttpResponse<B> status(HttpStatus status) {
         this.status = status;
         return this;
     }
