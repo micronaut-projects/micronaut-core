@@ -394,6 +394,23 @@ Another change is regarding the GraalVM resources created at compile-time. In pr
 
 === Module Changes
 
+=== GORM Entities need to be annotated with @Introspected
+
+Micronaut 3.0. removes classpath scanning. Because of that, if you are using GORM you need to annotate your GORM Entities with `@Introspected`. For example:
+
+[source,groovy]
+----
+...
+import org.grails.datastore.gorm.GormEntity
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+@Entity
+class Role implements GormEntity<Role> {
+     String authority
+...     
+----
+
 ==== New package for Micronaut Cassandra
 
 The classes in Micronaut Cassandra have been moved from `io.micronaut.configuration.cassandra` to `io.micronaut.cassandra` package.
