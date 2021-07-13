@@ -32,7 +32,7 @@ import io.micronaut.websocket.WebSocketClientFactory;
 import java.net.URL;
 
 /**
- * A factory to create Netty HTTP clients
+ * A factory to create Netty HTTP clients.
  *
  * @author Sergio del Amo
  * @since 3.0
