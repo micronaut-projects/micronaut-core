@@ -125,7 +125,7 @@ The following table summarizes the core Micronaut annotations and which ones are
 |ann:runtime.context.scope.Refreshable[]                              | ❌
 |ann:runtime.context.scope.ScopedProxy[]                              | ❌
 |ann:runtime.context.scope.ThreadLocal[]                              | ❌
-|ann:runtime.event.annotation.EventListener[]                         | ❌
+|ann:runtime.event.annotation.EventListener[]                         | ✅
 |ann:runtime.http.scope.RequestScope[]                                | ❌
 |ann:scheduling.annotation.Async[]                                    | ❌
 |ann:scheduling.annotation.ExecuteOn[]                                | ❌
