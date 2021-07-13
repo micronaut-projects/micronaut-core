@@ -93,8 +93,11 @@ public interface StreamingHttpClient extends HttpClient {
     }
 
     /**
-     * Create a new {@link StreamingHttpClient}. Note that this method should only be used outside of the context of a
-     * Micronaut application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead.
+     * Create a new {@link StreamingHttpClient}.
+     * Note that this method should only be used outside of the context of a Micronaut application.
+     * The returned {@link StreamingHttpClient} is not subject to dependency injection.
+     * The creator is responsible for closing the client to avoid leaking connections.
+     * Within a Micronaut application use {@link jakarta.inject.Inject} to inject a client instead.
      *
      * @param url The base URL
      * @return The client

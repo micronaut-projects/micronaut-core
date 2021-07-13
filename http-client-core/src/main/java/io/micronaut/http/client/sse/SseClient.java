@@ -20,6 +20,7 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.sse.Event;
 import org.reactivestreams.Publisher;
 
@@ -101,8 +102,11 @@ public interface SseClient {
     }
 
     /**
-     * Create a new {@link SseClient}. Note that this method should only be used outside of the context of a
-     * Micronaut application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead.
+     * Create a new {@link SseClient}.
+     * Note that this method should only be used outside of the context of a Micronaut application.
+     * The returned {@link SseClient} is not subject to dependency injection.
+     * The creator is responsible for closing the client to avoid leaking connections.
+     * Within a Micronaut application use {@link jakarta.inject.Inject} to inject a client instead.
      *
      * @param url The base URL
      * @return The client
