@@ -18,7 +18,6 @@ package io.micronaut.http.client.interceptor;
 import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
-import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -50,10 +49,8 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.CustomHttpMethod;
-import io.micronaut.http.annotation.Header;
 import io.micronaut.http.annotation.HttpMethodMapping;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.annotation.RequestAttribute;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.ReactiveClientResultTransformer;
@@ -64,12 +61,10 @@ import io.micronaut.http.client.bind.ClientArgumentRequestBinder;
 import io.micronaut.http.client.bind.ClientRequestUriContext;
 import io.micronaut.http.client.bind.HttpClientBinderRegistry;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
-import io.micronaut.http.client.interceptor.configuration.ClientVersioningConfiguration;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriMatchTemplate;
-import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
@@ -91,7 +86,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -116,8 +110,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
     private static final int HEADERS_INITIAL_CAPACITY = 3;
     private static final int ATTRIBUTES_INITIAL_CAPACITY = 1;
-    private final BeanContext beanContext;
-    private final Map<String, ClientVersioningConfiguration> versioningConfigurations = new ConcurrentHashMap<>(5);
     private final List<ReactiveClientResultTransformer> transformers;
     private final HttpClientBinderRegistry binderRegistry;
     private final JsonMediaTypeCodec jsonMediaTypeCodec;
@@ -126,14 +118,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     /**
      * Constructor for advice class to setup things like Headers, Cookies, Parameters for Clients.
      *
-     * @param beanContext          context to resolve beans
      * @param clientFactory        The client factory
      * @param jsonMediaTypeCodec   The JSON media type codec
      * @param transformers         transformation classes
      * @param binderRegistry       The client binder registry
      */
     public HttpClientIntroductionAdvice(
-            BeanContext beanContext,
             RxHttpClientRegistry clientFactory,
             JsonMediaTypeCodec jsonMediaTypeCodec,
             List<ReactiveClientResultTransformer> transformers,
@@ -141,7 +131,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         this.clientFactory = clientFactory;
         this.jsonMediaTypeCodec = jsonMediaTypeCodec;
-        this.beanContext = beanContext;
         this.transformers = transformers != null ? transformers : Collections.emptyList();
         this.binderRegistry = binderRegistry;
     }
@@ -179,72 +168,22 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             Class<? extends Annotation> annotationType = httpMethodMapping.get();
             HttpMethod httpMethod = HttpMethod.parse(annotationType.getSimpleName().toUpperCase(Locale.ENGLISH));
             String httpMethodName = context.stringValue(CustomHttpMethod.class, "method").orElse(httpMethod.name());
-            MutableHttpRequest<?> request = HttpRequest.create(httpMethod, "", httpMethodName);
 
+            MutableHttpRequest<?> request = HttpRequest.create(httpMethod, "", httpMethodName);
 
             UriMatchTemplate uriTemplate = UriMatchTemplate.of("");
             if (!(uri.length() == 1 && uri.charAt(0) == '/')) {
                 uriTemplate = uriTemplate.nest(uri);
             }
 
-            Map<String, Object> paramMap = context.getParameterValueMap();
             Map<String, Object> pathParams = new HashMap<>();
             Map<String, List<String>> queryParams = new LinkedHashMap<>();
             ClientRequestUriContext uriContext = new ClientRequestUriContext(uriTemplate, pathParams, queryParams);
+            List<Argument> bodyArguments = new ArrayList<>();
 
             List<String> uriVariables = uriTemplate.getVariableNames();
             Map<String, MutableArgumentValue<?>> parameters = context.getParameters();
-            Argument[] arguments = context.getArguments();
 
-            Map<String, String> headers = new LinkedHashMap<>(HEADERS_INITIAL_CAPACITY);
-
-            List<AnnotationValue<Header>> headerAnnotations = context.getAnnotationValuesByType(Header.class);
-            for (AnnotationValue<Header> headerAnnotation : headerAnnotations) {
-                String headerName = headerAnnotation.stringValue("name").orElse(null);
-                String headerValue = headerAnnotation.stringValue().orElse(null);
-                if (StringUtils.isNotEmpty(headerName) && StringUtils.isNotEmpty(headerValue)) {
-                    headers.putIfAbsent(headerName, headerValue);
-                }
-            }
-
-            context.findAnnotation(Version.class)
-                    .flatMap(AnnotationValue::stringValue)
-                    .filter(StringUtils::isNotEmpty)
-                    .ifPresent(version -> {
-
-                        ClientVersioningConfiguration configuration = getVersioningConfiguration(annotationMetadata);
-
-                        configuration.getHeaders()
-                                .forEach(header -> headers.put(header, version));
-
-                        configuration.getParameters()
-                                .forEach(parameter -> uriContext.addQueryParameter(parameter, version));
-                    });
-
-            Map<String, Object> attributes = new LinkedHashMap<>(ATTRIBUTES_INITIAL_CAPACITY);
-
-            List<AnnotationValue<RequestAttribute>> attributeAnnotations = context.getAnnotationValuesByType(RequestAttribute.class);
-            for (AnnotationValue<RequestAttribute> attributeAnnotation : attributeAnnotations) {
-                String attributeName = attributeAnnotation.stringValue("name").orElse(null);
-                Object attributeValue = attributeAnnotation.getValue(Object.class).orElse(null);
-                if (StringUtils.isNotEmpty(attributeName) && attributeValue != null) {
-                    attributes.put(attributeName, attributeValue);
-                }
-            }
-
-            if (!headers.isEmpty()) {
-                for (Map.Entry<String, String> entry : headers.entrySet()) {
-                    request.header(entry.getKey(), entry.getValue());
-                }
-            }
-
-            if (!attributes.isEmpty()) {
-                for (Map.Entry<String, Object> entry : attributes.entrySet()) {
-                    request.setAttribute(entry.getKey(), entry.getValue());
-                }
-            }
-
-            List<Argument> bodyArguments = new ArrayList<>();
             ClientArgumentRequestBinder<Object> defaultBinder = (ctx, uriCtx, value, req) -> {
                 Argument<?> argument = ctx.getArgument();
                 if (uriCtx.getUriTemplate().getVariableNames().contains(argument.getName())) {
@@ -265,6 +204,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             // Apply all the method binders
             List<Class<? extends Annotation>> methodBinderTypes = context.getAnnotationTypesByStereotype(Bindable.class);
+            // @Version is not a bindable, so it needs to looked for separately
+            methodBinderTypes.addAll(context.getAnnotationTypesByStereotype(Version.class));
             if (!CollectionUtils.isEmpty(methodBinderTypes)) {
                 for (Class<? extends Annotation> binderType : methodBinderTypes) {
                     binderRegistry.findAnnotatedBinder(binderType).ifPresent(b -> b.bind(context, uriContext, request));
@@ -272,7 +213,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
 
             // Apply all the argument binders
+            Argument[] arguments = context.getArguments();
             if (arguments.length > 0) {
+                Map<String, Object> paramMap = context.getParameterValueMap();
                 for (Argument argument : arguments) {
                     Object definedValue = getValue(argument, context, parameters, paramMap);
 
@@ -569,16 +512,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 throw t;
             }
         }
-    }
-
-    private ClientVersioningConfiguration getVersioningConfiguration(AnnotationMetadata annotationMetadata) {
-        return versioningConfigurations.computeIfAbsent(getClientId(annotationMetadata), clientId ->
-                beanContext.findBean(ClientVersioningConfiguration.class, Qualifiers.byName(clientId))
-                        .orElseGet(() -> beanContext.findBean(ClientVersioningConfiguration.class, Qualifiers.byName(ClientVersioningConfiguration.DEFAULT))
-                                .orElseThrow(() -> new ConfigurationException("Attempt to apply a '@Version' to the request, but " +
-                                        "versioning configuration found neither for '" + clientId + "' nor '" + ClientVersioningConfiguration.DEFAULT + "' provided.")
-                                )));
-
     }
 
     private boolean isJsonParsedMediaType(MediaType[] acceptTypes) {

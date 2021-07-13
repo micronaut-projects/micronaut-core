@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.bind;
 
+import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -27,6 +28,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.BasicAuth;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.annotation.Body;
@@ -36,6 +38,9 @@ import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.annotation.RequestAttribute;
 import io.micronaut.http.annotation.RequestBean;
+import io.micronaut.http.client.bind.binders.AttributeClientRequestBinder;
+import io.micronaut.http.client.bind.binders.HeaderClientRequestBinder;
+import io.micronaut.http.client.bind.binders.VersionClientRequestBinder;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import jakarta.inject.Singleton;
@@ -68,9 +73,11 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
     /**
      * @param conversionService The conversion service
      * @param binders           The request binders
+     * @param beanContext       The context to resolve beans
      */
     protected DefaultHttpClientBinderRegistry(ConversionService<?> conversionService,
-                                              List<ClientRequestBinder> binders) {
+                                              List<ClientRequestBinder> binders,
+                                              BeanContext beanContext) {
         byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (ClientArgumentRequestBinder<HttpHeaders>) (context, uriContext, value, request) -> {
             value.forEachValue(request::header);
         });
@@ -149,13 +156,17 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
             }
         });
 
+        methodByAnnotation.put(Header.class, new HeaderClientRequestBinder());
+        methodByAnnotation.put(Version.class, new VersionClientRequestBinder(beanContext));
+        methodByAnnotation.put(RequestAttribute.class, new AttributeClientRequestBinder());
+
         if (KOTLIN_COROUTINES_SUPPORTED) {
             //Clients should do nothing with the continuation
             byType.put(Argument.of(Continuation.class).typeHashCode(),  (context, uriContext, value, request) -> { });
         }
 
         if (CollectionUtils.isNotEmpty(binders)) {
-            for (ClientRequestBinder binder : binders) {
+            for (ClientRequestBinder binder: binders) {
                 addBinder(binder);
             }
         }
