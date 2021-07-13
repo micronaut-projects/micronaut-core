@@ -27,7 +27,7 @@ import java.util.ServiceLoader;
  * @since 3.0.0
  */
 @Internal
-class SseClientFactoryResolver {
+final class SseClientFactoryResolver {
 
     private static SseClientFactory factory;
 

@@ -27,7 +27,7 @@ import java.util.ServiceLoader;
  * @since 3.0.0
  */
 @Internal
-class HttpClientFactoryResolver {
+final class HttpClientFactoryResolver {
 
     private static HttpClientFactory factory;
 

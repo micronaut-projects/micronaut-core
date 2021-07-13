@@ -27,7 +27,7 @@ import java.util.ServiceLoader;
  * @since 3.0.0
  */
 @Internal
-class WebSocketClientFactoryResolver {
+final class WebSocketClientFactoryResolver {
 
     private static WebSocketClientFactory factory;
 
