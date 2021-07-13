@@ -126,6 +126,7 @@ The https://micronaut-projects.github.io/micronaut-cassandra/latest/guide/[Micro
 - Micronaut Discovery Client 2.4.0
 - Micronaut ElasticSearch 2.3.0
 - Micronaut Cache 3.0.0
+- Micronaut SQL 4.0.0 
 
 === Dependency Upgrades
 
@@ -143,3 +144,14 @@ The https://micronaut-projects.github.io/micronaut-cassandra/latest/guide/[Micro
 - Infinispan 12.1.6.Final
 - Hazelcast 4.2.1
 - Caffeine 2.9.1
+- Hibernate 5.5.3.Final
+- JDBI 3.20.1
+- JOOQ 3.14.12
+- Vertx SQL Drivers 4.1.1
+- JAsync 1.2.2
+- Tomcat JDBC 10.0.8
+- Hikari 4.0.3
+- Postgres Driver 42.2.23
+- MySQL Driver 8.0.25
+- MariaDB Driver 2.7.3
+- MS SQL Driver 9.2.1.jre8
