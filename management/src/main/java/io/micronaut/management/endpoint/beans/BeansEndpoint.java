@@ -16,6 +16,7 @@
 package io.micronaut.management.endpoint.beans;
 
 import io.micronaut.context.BeanContext;
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
@@ -52,6 +53,7 @@ public class BeansEndpoint {
      * @return A {@link org.reactivestreams.Publisher} with the beans
      */
     @Read
+    @SingleResult
     public Publisher<?> getBeans() {
         List<BeanDefinition<?>> beanDefinitions = beanContext.getAllBeanDefinitions()
                 .stream()
