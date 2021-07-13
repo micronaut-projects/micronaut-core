@@ -236,7 +236,7 @@ class HealthEndpointSpec extends Specification {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': getClass().simpleName,
                 'endpoints.health.sensitive': false,
-                'datasources.one.url': 'jdbc:h2:mem:oneDb;MVCC=TRUE;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=FALSE',
+                'datasources.one.url': 'jdbc:h2:mem:oneDb;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=FALSE',
                 'datasources.two.url': 'jdbc:mysql://localhost:59654/foo'
         ])
         URL server = embeddedServer.getURL()
