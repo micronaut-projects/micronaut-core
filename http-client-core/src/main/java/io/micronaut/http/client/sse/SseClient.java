@@ -20,7 +20,6 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.HttpClientConfiguration;
-import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.sse.Event;
 import org.reactivestreams.Publisher;
 

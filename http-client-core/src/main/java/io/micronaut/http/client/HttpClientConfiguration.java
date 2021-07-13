@@ -42,7 +42,7 @@ import java.util.OptionalInt;
 import java.util.concurrent.ThreadFactory;
 
 /**
- * Configuration for the {@link HttpClient}
+ * Configuration for the {@link HttpClient}.
  *
  * @author Graeme Rocher
  * @since 1.0
