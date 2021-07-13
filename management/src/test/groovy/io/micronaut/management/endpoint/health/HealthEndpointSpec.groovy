@@ -140,8 +140,8 @@ class HealthEndpointSpec extends Specification {
                 'spec.name': getClass().simpleName,
                 'micronaut.application.name': 'foo',
                 'endpoints.health.sensitive': false,
-                'datasources.one.url': 'jdbc:h2:mem:oneDb;MVCC=TRUE;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=FALSE',
-                'datasources.two.url': 'jdbc:h2:mem:twoDb;MVCC=TRUE;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=FALSE'
+                'datasources.one.url': 'jdbc:h2:mem:oneDb;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=FALSE',
+                'datasources.two.url': 'jdbc:h2:mem:twoDb;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=FALSE'
         ])
         URL server = embeddedServer.getURL()
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
@@ -162,10 +162,10 @@ class HealthEndpointSpec extends Specification {
         result.details.jdbc.status == "UP"
         result.details.jdbc.details."jdbc:h2:mem:oneDb".status == "UP"
         result.details.jdbc.details."jdbc:h2:mem:oneDb".details.database == "H2"
-        result.details.jdbc.details."jdbc:h2:mem:oneDb".details.version == "1.4.199 (2019-03-13)"
+        result.details.jdbc.details."jdbc:h2:mem:oneDb".details.version == "1.4.200 (2019-10-14)"
         result.details.jdbc.details."jdbc:h2:mem:twoDb".status == "UP"
         result.details.jdbc.details."jdbc:h2:mem:twoDb".details.database == "H2"
-        result.details.jdbc.details."jdbc:h2:mem:twoDb".details.version == "1.4.199 (2019-03-13)"
+        result.details.jdbc.details."jdbc:h2:mem:twoDb".details.version == "1.4.200 (2019-10-14)"
         result.details.service.status == "UP"
 
         cleanup:
