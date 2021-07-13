@@ -155,3 +155,4 @@ The https://micronaut-projects.github.io/micronaut-cassandra/latest/guide/[Micro
 - MySQL Driver 8.0.25
 - MariaDB Driver 2.7.3
 - MS SQL Driver 9.2.1.jre8
+- H2 Database 1.4.200
