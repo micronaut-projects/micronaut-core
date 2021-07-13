@@ -377,12 +377,6 @@ ext {
                     group:'org.neo4j.driver',
                     name:'neo4j-java-driver'
             ],
-            oracle                      : [
-                    version: ojdbcVersion,
-                    group  : 'com.oracle.database.jdbc',
-                    name   : 'ojdbc8',
-                    modules: ['ucp']
-            ],
             'jcache'                   : [
                     version: jcacheVersion,
                     group  : 'javax.cache',
@@ -528,26 +522,6 @@ ext {
                     version: h2Version,
                     group  : 'com.h2database',
                     name   : 'h2'
-            ],
-            postgres                   : [
-                    version: postgresDriverVersion,
-                    group  : 'org.postgresql',
-                    name   : 'postgresql'
-            ],
-            mysql                   : [
-                    version: mysqlDriverVersion,
-                    group  : 'mysql',
-                    name   : 'mysql-connector-java'
-            ],
-            mariadb                   : [
-                    version: mariadbDriverVersion,
-                    group  : 'org.mariadb.jdbc',
-                    name   : 'mariadb-java-client'
-            ],
-            mssql                   : [
-                    version: mssqlDriverVersion,
-                    group  : 'com.microsoft.sqlserver',
-                    name   : 'mssql-jdbc'
             ],
             liquibase                  : [
                     version: liquibaseVersion,
