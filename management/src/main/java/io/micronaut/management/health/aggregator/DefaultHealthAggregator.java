@@ -50,7 +50,7 @@ import java.util.stream.Collectors;
  */
 @Singleton
 @Requires(beans = HealthEndpoint.class)
-public class RxJavaHealthAggregator implements HealthAggregator<HealthResult> {
+public class DefaultHealthAggregator implements HealthAggregator<HealthResult> {
 
     private final ApplicationConfiguration applicationConfiguration;
 
@@ -58,7 +58,7 @@ public class RxJavaHealthAggregator implements HealthAggregator<HealthResult> {
      * Default constructor.
      * @param applicationConfiguration The application configuration.
      */
-    public RxJavaHealthAggregator(ApplicationConfiguration applicationConfiguration) {
+    public DefaultHealthAggregator(ApplicationConfiguration applicationConfiguration) {
         this.applicationConfiguration = applicationConfiguration;
     }
 

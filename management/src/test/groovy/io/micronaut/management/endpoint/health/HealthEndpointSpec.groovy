@@ -25,7 +25,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.management.health.aggregator.RxJavaHealthAggregator
+import io.micronaut.management.health.aggregator.DefaultHealthAggregator
 import io.micronaut.management.health.indicator.HealthIndicator
 import io.micronaut.management.health.indicator.HealthResult
 import io.micronaut.management.health.indicator.annotation.Liveness
@@ -52,7 +52,7 @@ class HealthEndpointSpec extends Specification {
         expect:
         context.containsBean(HealthEndpoint)
         context.containsBean(DiskSpaceIndicator)
-        context.containsBean(RxJavaHealthAggregator)
+        context.containsBean(DefaultHealthAggregator)
         context.containsBean(JdbcIndicator)
 
         cleanup:
@@ -66,7 +66,7 @@ class HealthEndpointSpec extends Specification {
         expect:
         context.containsBean(HealthEndpoint)
         !context.containsBean(DiskSpaceIndicator)
-        context.containsBean(RxJavaHealthAggregator)
+        context.containsBean(DefaultHealthAggregator)
         !context.containsBean(JdbcIndicator)
 
         cleanup:
@@ -80,7 +80,7 @@ class HealthEndpointSpec extends Specification {
         expect:
         context.containsBean(HealthEndpoint)
         context.containsBean(DiskSpaceIndicator)
-        context.containsBean(RxJavaHealthAggregator)
+        context.containsBean(DefaultHealthAggregator)
         !context.containsBean(JdbcIndicator)
 
         cleanup:
@@ -94,7 +94,7 @@ class HealthEndpointSpec extends Specification {
         expect:
         !context.containsBean(HealthEndpoint)
         !context.containsBean(DiskSpaceIndicator)
-        !context.containsBean(RxJavaHealthAggregator)
+        !context.containsBean(DefaultHealthAggregator)
         !context.containsBean(JdbcIndicator)
 
         cleanup:
@@ -108,7 +108,7 @@ class HealthEndpointSpec extends Specification {
         expect:
         !context.containsBean(HealthEndpoint)
         !context.containsBean(DiskSpaceIndicator)
-        !context.containsBean(RxJavaHealthAggregator)
+        !context.containsBean(DefaultHealthAggregator)
         !context.containsBean(JdbcIndicator)
 
         cleanup:
@@ -124,7 +124,7 @@ class HealthEndpointSpec extends Specification {
         expect:
         context.containsBean(HealthEndpoint)
         context.containsBean(DiskSpaceIndicator)
-        context.containsBean(RxJavaHealthAggregator)
+        context.containsBean(DefaultHealthAggregator)
         !context.containsBean(JdbcIndicator)
 
         cleanup:
