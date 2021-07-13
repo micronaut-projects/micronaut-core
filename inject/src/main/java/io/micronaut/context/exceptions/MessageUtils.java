@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.exceptions;
 
+import io.micronaut.context.AbstractBeanResolutionContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
@@ -60,6 +61,20 @@ class MessageUtils {
             builder.append("Path Taken: ").append(pathString);
         }
         return builder.toString();
+    }
+
+    static String buildMessage(BeanResolutionContext resolutionContext, String message, boolean circular) {
+        BeanResolutionContext.Segment<?> currentSegment = resolutionContext.getPath().peek();
+        if (currentSegment instanceof AbstractBeanResolutionContext.ConstructorSegment) {
+            return buildMessage(resolutionContext, currentSegment.getArgument(), message, circular);
+        }
+        if (currentSegment instanceof AbstractBeanResolutionContext.MethodSegment) {
+            return buildMessageForMethod(resolutionContext, currentSegment.getDeclaringType(), currentSegment.getName(), currentSegment.getArgument(), message, circular);
+        }
+        if (currentSegment instanceof AbstractBeanResolutionContext.FieldSegment) {
+            return buildMessageForField(resolutionContext, currentSegment.getDeclaringType(), currentSegment.getName(), message, circular);
+        }
+        throw new IllegalStateException("Unknown segment: " + currentSegment);
     }
 
     /**

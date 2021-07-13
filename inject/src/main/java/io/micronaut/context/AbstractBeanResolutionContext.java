@@ -314,7 +314,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /**
      * A segment that represents a constructor.
      */
-    static class ConstructorSegment extends AbstractSegment {
+    public static class ConstructorSegment extends AbstractSegment {
 
         private final String methodName;
         private final Argument[] arguments;
@@ -382,7 +382,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /**
      * A segment that represents a method.
      */
-    static class MethodSegment extends AbstractSegment implements ArgumentInjectionPoint, CallableInjectionPoint {
+    public static class MethodSegment extends AbstractSegment implements ArgumentInjectionPoint, CallableInjectionPoint {
 
         private final Argument[] arguments;
         private final boolean requiresReflection;
@@ -443,7 +443,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /**
      * A segment that represents a field.
      */
-    static class FieldSegment extends AbstractSegment implements InjectionPoint, ArgumentCoercible {
+    public static class FieldSegment extends AbstractSegment implements InjectionPoint, ArgumentCoercible {
 
         private final boolean requiresReflection;
 

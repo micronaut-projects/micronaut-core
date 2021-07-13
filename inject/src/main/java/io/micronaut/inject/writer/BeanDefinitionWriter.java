@@ -1512,7 +1512,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // 3rd argument the field index
             injectMethodVisitor.push(currentFieldIndex);
             if (requiresGenericType) {
-                resolveFieldArgumentGenericType(injectMethodVisitor, fieldElement.getGenericField(), currentFieldIndex);
+                resolveFieldArgumentGenericType(injectMethodVisitor, fieldElement.getGenericType(), currentFieldIndex);
             }
             // invoke getBeanForField
             pushInvokeMethodOnSuperClass(injectMethodVisitor, methodToInvoke);
@@ -1526,8 +1526,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (!requiresReflection) {
             injectMethodVisitor.putField(declaringTypeRef, fieldElement.getName(), fieldType);
         } else {
-            int storedIndex = injectMethodVisitor.newLocal(fieldType);
-            injectMethodVisitor.storeLocal(storedIndex, fieldType);
+            pushBoxPrimitiveIfNecessary(fieldType, injectMethodVisitor);
+            int storedIndex = injectMethodVisitor.newLocal(Type.getType(Object.class));
+            injectMethodVisitor.storeLocal(storedIndex);
             injectMethodVisitor.loadThis();
             injectMethodVisitor.loadArg(0);
             injectMethodVisitor.loadArg(1);
@@ -1643,6 +1644,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     pushStoreInArray(injectMethodVisitor, i, argumentTypes.size(), () -> {
                         ParameterElement entry = argIterator.next();
                         pushMethodParameterValue(injectMethodVisitor, finalI, entry);
+                        pushBoxPrimitiveIfNecessary(entry.getType(), injectMethodVisitor);
                     });
                 }
             } else {

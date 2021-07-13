@@ -35,6 +35,14 @@ public class DependencyInjectionException extends BeanCreationException {
 
     /**
      * @param resolutionContext The resolution context
+     * @param cause             The throwable
+     */
+    public DependencyInjectionException(BeanResolutionContext resolutionContext, Throwable cause) {
+        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, !(cause instanceof BeanInstantiationException) ? cause.getMessage() : null, false), cause);
+    }
+
+    /**
+     * @param resolutionContext The resolution context
      * @param argument          The argument
      * @param cause             The throwable
      */
@@ -49,6 +57,14 @@ public class DependencyInjectionException extends BeanCreationException {
      */
     public DependencyInjectionException(BeanResolutionContext resolutionContext, String message, Throwable cause) {
         super(resolutionContext, MessageUtils.buildMessage(resolutionContext, message), cause);
+    }
+
+    /**
+     * @param resolutionContext The resolution context
+     * @param message           The message
+     */
+    public DependencyInjectionException(BeanResolutionContext resolutionContext, String message) {
+        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, message, false));
     }
 
     /**
