@@ -45,7 +45,7 @@ public interface SseClientRegistry<E extends SseClient> {
     E resolveSseClient(@Nullable InjectionPoint<?> injectionPoint,
                        @Nullable LoadBalancer loadBalancer,
                        @Nullable HttpClientConfiguration configuration,
-                       BeanContext beanContext);
+                       @NonNull BeanContext beanContext);
 
     /**
      * Return the client for the given annotation metadata.

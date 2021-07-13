@@ -64,7 +64,7 @@ public interface HttpClientRegistry<T extends HttpClient> {
     T resolveClient(@Nullable InjectionPoint<?> injectionPoint,
                     @Nullable LoadBalancer loadBalancer,
                     @Nullable HttpClientConfiguration configuration,
-                    BeanContext beanContext);
+                    @NonNull BeanContext beanContext);
 
     /**
      * Dispose of the client defined by the given metadata.

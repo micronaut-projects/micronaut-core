@@ -248,43 +248,43 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     public HttpClient resolveClient(@Nullable InjectionPoint<?>  injectionPoint,
                                     @Nullable LoadBalancer loadBalancer,
                                     @Nullable HttpClientConfiguration configuration,
-                                    BeanContext beanContext) {
+                                    @NonNull BeanContext beanContext) {
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
 
     @Override
     @NonNull
     public ProxyHttpClient resolveProxyHttpClient(@Nullable InjectionPoint<?>  injectionPoint,
-                                              @Nullable LoadBalancer loadBalancer,
-                                              @Nullable HttpClientConfiguration configuration,
-                                              BeanContext beanContext) {
+                                                  @Nullable LoadBalancer loadBalancer,
+                                                  @Nullable HttpClientConfiguration configuration,
+                                                  @NonNull BeanContext beanContext) {
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
 
     @Override
     @NonNull
     public SseClient resolveSseClient(@Nullable InjectionPoint<?>  injectionPoint,
-                       @Nullable LoadBalancer loadBalancer,
-                       @Nullable HttpClientConfiguration configuration,
-                       BeanContext beanContext) {
+                                      @Nullable LoadBalancer loadBalancer,
+                                      @Nullable HttpClientConfiguration configuration,
+                                      @NonNull BeanContext beanContext) {
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
 
     @Override
     @NonNull
     public StreamingHttpClient resolveStreamingHttpClient(@Nullable InjectionPoint<?>  injectionPoint,
-                             @Nullable LoadBalancer loadBalancer,
-                             @Nullable HttpClientConfiguration configuration,
-                             BeanContext beanContext) {
+                                                          @Nullable LoadBalancer loadBalancer,
+                                                          @Nullable HttpClientConfiguration configuration,
+                                                          @NonNull BeanContext beanContext) {
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
 
     @Override
     @NonNull
     public WebSocketClient resolveWebSocketClient(@Nullable InjectionPoint<?> injectionPoint,
-                             @Nullable LoadBalancer loadBalancer,
-                             @Nullable HttpClientConfiguration configuration,
-                             BeanContext beanContext) {
+                                                  @Nullable LoadBalancer loadBalancer,
+                                                  @Nullable HttpClientConfiguration configuration,
+                                                  @NonNull BeanContext beanContext) {
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
 
@@ -454,7 +454,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             @Nullable InjectionPoint injectionPoint,
             @Nullable LoadBalancer loadBalancer,
             @Nullable HttpClientConfiguration configuration,
-            BeanContext beanContext) {
+            @NonNull BeanContext beanContext) {
         if (loadBalancer != null) {
             // direct creation via createBean
             List<HttpFilterResolver.FilterEntry<HttpClientFilter>> filterEntries = clientFilterResolver
