@@ -40,4 +40,23 @@ class ClasspathResourceLoaderSpec extends Specification {
         "classpath:/foo" | "classpath:/bar.txt"
         "classpath:foo"  | "classpath:/bar.txt"
     }
+
+    void "test resolving a classpath resource with a relative path"() {
+        given:
+        ClassPathResourceLoader loader = new DefaultClassPathResourceLoader(getClass().getClassLoader(), base)
+
+        expect:
+        loader.getResource(resource).isPresent() == present
+        loader.getResourceAsStream(resource).map({ InputStream io -> io.close(); io})
+                .isPresent() == present
+        loader.getResources(resource).findFirst().isPresent() == present
+
+        where:
+        base             | resource                                        | present
+        "classpath:foo"  | "classpath:../foo/bar.txt"                      | true
+        "classpath:foo"  | "classpath:../other/../foo/bar.txt"             | true
+        "classpath:foo"  | "classpath:../foo/../other/shouldNotAccess.txt" | false
+        "classpath:foo"  | "classpath:../other/shouldNotAccess.txt"        | false
+        "classpath:foo"  | "classpath:foo/../../other/shouldNotAccess.txt" | false
+    }
 }
