@@ -897,6 +897,15 @@ allprojects {
         module {
             outputDir file('build/classes/java/main')
             testOutputDir file('build/classes/groovy/test')
+
+            boolean downloadJavadocValue = System.getenv('MICRONAUT_DOWNLOAD_JAVADOC') != null ?
+                    (System.getenv('MICRONAUT_DOWNLOAD_JAVADOC') == 'true') : (project.properties['micronautDownloadJavadoc'] == 'true')
+
+            boolean downloadSourcesValue = System.getenv('MICRONAUT_DOWNLOAD_SOURCES') != null ?
+                    (System.getenv('MICRONAUT_DOWNLOAD_SOURCES') == 'true') : (project.properties['micronautDownloadSources'] == 'true')
+
+            downloadJavadoc = downloadJavadocValue
+            downloadSources = downloadSourcesValue
         }
     }
 }
