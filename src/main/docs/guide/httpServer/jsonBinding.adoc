@@ -10,11 +10,11 @@ To do so in a non-blocking manner, Micronaut builds on the https://github.com/Fa
 
 == Binding using Reactive Frameworks
 
-From a developer perspective however, you can generally just work with Plain Old Java Objects (POJOs) and can optionally use a Reactive framework such as RxJava or Reactor. The following is an example of a controller that reads and saves an incoming POJO in a non-blocking way from JSON:
+From a developer perspective however, you can generally just work with Plain Old Java Objects (POJOs) and can optionally use a Reactive framework such as https://github.com/ReactiveX/RxJava[RxJava] or https://projectreactor.io[Project Reactor]. The following is an example of a controller that reads and saves an incoming POJO in a non-blocking way from JSON:
 
-snippet::io.micronaut.docs.server.json.PersonController[tags="class,single,endclass", indent=0, title="Using RxJava 2 to Read the JSON"]
+snippet::io.micronaut.docs.server.json.PersonController[tags="class,single,endclass", indent=0, title="Using Reactive Streams to Read the JSON"]
 
-<1> The method receives an RxJava rx:Single[] which emits the POJO once the JSON has been read
+<1> The method receives a `Publisher` which emits the POJO once the JSON has been read
 <2> The `map` method stores the instance in a `Map`
 <3> An api:http.HttpResponse[] is returned
 

@@ -46,6 +46,11 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
         Vector.class,
         ArrayList.class
     );
+    public static final Set<String> PROVIDER_TYPES = CollectionUtils.setOf(
+            "io.micronaut.context.BeanProvider",
+            "javax.inject.Provider",
+            "jakarta.inject.Provider"
+    );
 
     private final Class<T> type;
     private final String name;

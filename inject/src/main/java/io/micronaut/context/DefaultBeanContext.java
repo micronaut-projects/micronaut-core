@@ -54,7 +54,6 @@ import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.Closeable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.*;
@@ -267,7 +266,7 @@ public class DefaultBeanContext implements BeanContext {
 
 
     /**
-     * The close method will shut down the context calling {@link javax.annotation.PreDestroy} hooks on loaded
+     * The close method will shut down the context calling {@link jakarta.annotation.PreDestroy} hooks on loaded
      * singletons.
      */
     @Override
@@ -4271,13 +4270,6 @@ public class DefaultBeanContext implements BeanContext {
             final BT beanToDestroy = getBean();
             if (definition instanceof DisposableBeanDefinition) {
                 ((DisposableBeanDefinition<BT>) definition).dispose(DefaultBeanContext.this, beanToDestroy);
-            }
-            if (beanToDestroy instanceof Closeable) {
-                try {
-                    ((Closeable) beanToDestroy).close();
-                } catch (Throwable e) {
-                    throw new BeanDestructionException(definition, e);
-                }
             }
             if (beanToDestroy instanceof LifeCycle) {
                 try {

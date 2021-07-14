@@ -2,7 +2,7 @@ package io.micronaut.inject.dependent;
 
 import io.micronaut.context.annotation.Bean;
 
-import javax.annotation.PreDestroy;
+import jakarta.annotation.PreDestroy;
 
 @Bean
 public class BeanC {

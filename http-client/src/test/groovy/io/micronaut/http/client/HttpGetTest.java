@@ -22,13 +22,11 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.netty.DefaultHttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.reactivex.Flowable;
 import org.junit.Assert;
 import org.junit.Test;
-
+import reactor.core.publisher.Flux;
 import java.util.List;
 import java.util.Optional;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -38,18 +36,15 @@ import static org.junit.Assert.assertTrue;
  */
 public class HttpGetTest {
 
-
-
     @Test
     public void testSimpleGet() {
         ApplicationContext applicationContext = ApplicationContext.run();
         EmbeddedServer server = applicationContext.getBean(EmbeddedServer.class).start();
 
         HttpClient client = new DefaultHttpClient(server.getURL());
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        HttpResponse<String> response = client.toBlocking().exchange(
                 HttpRequest.GET("/get/simple"), String.class
-        ));
-        HttpResponse<String> response = flowable.blockingFirst();
+        );
 
         Assert.assertEquals(HttpStatus.OK, response.getStatus());
         Optional<String> body = response.getBody(String.class);
@@ -67,10 +62,9 @@ public class HttpGetTest {
 
         HttpClient client = applicationContext.createBean(HttpClient.class, server.getURL());
 
-        Flowable<HttpResponse<List>> flowable = Flowable.fromPublisher(client.exchange(
+        HttpResponse<List> response = client.toBlocking().exchange(
                 HttpRequest.GET("/get/pojoList"), Argument.of(List.class, HttpGetSpec.Book.class)
-        ));
-        HttpResponse<List> response = flowable.blockingFirst();
+        );
 
         assertEquals(HttpStatus.OK, response.getStatus());
         Optional<List> body = response.getBody();

@@ -18,14 +18,14 @@ package io.micronaut.http.client.docs.binding;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.reactivex.Flowable;
 import org.hamcrest.CoreMatchers;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import reactor.core.publisher.Flux;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -44,24 +44,24 @@ public class BookControllerTest {
     @Test
     public void testPostInvalidFormData() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
+        HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL());
 
         // tag::postform[]
         Map<String, String> data = new LinkedHashMap<>();
         data.put("title", "The Stand");
         data.put("pages", "notnumber");
         data.put("url", "noturl");
-        Flowable<HttpResponse<Book>> call = client.exchange(
+        Flux<HttpResponse<Book>> call = Flux.from(client.exchange(
                 POST("/binding/book", data)
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED),
                 Book.class
-        );
+        ));
         // end::postform[]
 
         thrown.expect(HttpClientResponseException.class);
         thrown.expectMessage(CoreMatchers.startsWith("Failed to convert argument [book] for value [null] due to: Cannot deserialize value of type `int` from String \"notnumber\""));
 
-        HttpResponse<Book> response = call.blockingFirst();
+        HttpResponse<Book> response = call.blockFirst();
 
         embeddedServer.stop();
         client.stop();

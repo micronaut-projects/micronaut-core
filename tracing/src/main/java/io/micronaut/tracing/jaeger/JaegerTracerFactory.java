@@ -25,10 +25,10 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Nullable;
 import io.opentracing.Tracer;
 import io.opentracing.util.GlobalTracer;
+import jakarta.annotation.PreDestroy;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
-import javax.annotation.PreDestroy;
 import java.io.Closeable;
 import java.io.IOException;
 

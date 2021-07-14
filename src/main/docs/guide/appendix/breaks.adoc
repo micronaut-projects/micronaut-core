@@ -125,7 +125,7 @@ The following table summarizes the core Micronaut annotations and which ones are
 |ann:runtime.context.scope.Refreshable[]                              | ❌
 |ann:runtime.context.scope.ScopedProxy[]                              | ❌
 |ann:runtime.context.scope.ThreadLocal[]                              | ❌
-|ann:runtime.event.annotation.EventListener[]                         | ❌
+|ann:runtime.event.annotation.EventListener[]                         | ✅
 |ann:runtime.http.scope.RequestScope[]                                | ❌
 |ann:scheduling.annotation.Async[]                                    | ❌
 |ann:scheduling.annotation.ExecuteOn[]                                | ❌
@@ -150,6 +150,12 @@ When upgrading an application you may need to take action if you implement an in
 For example the annotations defined in `javax.validation` are not inherited by default so need to be defined again in any overridden or implemented methods.
 
 This behaviour grants more flexibility if you need to redefine the validation rules. Note that it is still possible to inherit validation rules through meta-annotations. See the section on <<annotationMetadata, Annotation Inheritance>> for more information.
+
+==== Runtime Classpath Scanning Removed
+
+It is no longer possible to scan the classpath at runtime using the `scan` method of the api:context.env.Environment[] interface.
+
+This functionality has not been needed for some time as scanning is implemented at build type through <<introspection, Bean Introspections>>.
 
 ==== Inject Annotations
 
@@ -207,6 +213,12 @@ This can affect many areas of the framework where names like `XForwarded` are us
 
 Previously the default order value for the `@Order` annotation was the lowest precedence.
 It is now 0.
+
+==== Classes Renaming
+
+* `RxJavaRouteDataCollector` has been renamed to `DefaultRouteDataCollector`.
+* `RxJavaBeanDefinitionDataCollector.html` has been renamed to `DefaultBeanDefinitionDataCollector`.
+* `RxJavaHealthAggregator` has been renamed to `DefaultHealthAggregator`
 
 ==== Deprecation Removal
 

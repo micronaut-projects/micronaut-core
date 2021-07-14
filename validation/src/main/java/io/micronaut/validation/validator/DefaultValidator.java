@@ -54,9 +54,9 @@ import io.micronaut.validation.validator.constraints.ConstraintValidatorContext;
 import io.micronaut.validation.validator.constraints.ConstraintValidatorRegistry;
 import io.micronaut.validation.validator.extractors.SimpleValueReceiver;
 import io.micronaut.validation.validator.extractors.ValueExtractorRegistry;
-import io.reactivex.Flowable;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 import javax.validation.ClockProvider;
 import javax.validation.Constraint;
@@ -890,9 +890,9 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             AnnotationMetadata annotationMetadata,
             Object parameterValue,
             boolean isValid) {
-        final Flowable<Object> publisher = Publishers.convertPublisher(parameterValue, Flowable.class);
+        final Publisher<Object> publisher = Publishers.convertPublisher(parameterValue, Publisher.class);
         PathImpl copied = new PathImpl(context.currentPath);
-        final Flowable<Object> finalFlowable = publisher.flatMap(o -> {
+        final Flux<Object> finalFlowable = Flux.from(publisher).flatMap(o -> {
             DefaultConstraintValidatorContext newContext =
                     new DefaultConstraintValidatorContext(
                             object,
@@ -931,12 +931,12 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             }
 
             if (!newViolations.isEmpty()) {
-                return Flowable.error(
+                return Flux.error(
                         new ConstraintViolationException(newViolations)
                 );
             }
 
-            return Flowable.just(o);
+            return Flux.just(o);
         });
         argumentValues[argumentIndex] = Publishers.convertPublisher(finalFlowable, parameterType);
     }
@@ -1590,13 +1590,13 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
     @Override
     public <T> Publisher<T> validatePublisher(@NonNull Publisher<T> publisher, Class<?>... groups) {
         ArgumentUtils.requireNonNull("publisher", publisher);
-        final Flowable<T> flowable = Publishers.convertPublisher(publisher, Flowable.class);
-        return flowable.flatMap(object -> {
+        final Publisher<T> reactiveSequence = Publishers.convertPublisher(publisher, Publisher.class);
+        return Flux.from(reactiveSequence).flatMap(object -> {
             final Set<ConstraintViolation<Object>> constraintViolations = validate(object, groups);
             if (!constraintViolations.isEmpty()) {
-                return Flowable.error(new ConstraintViolationException(constraintViolations));
+                return Flux.error(new ConstraintViolationException(constraintViolations));
             }
-            return Flowable.just(object);
+            return Flux.just(object);
         });
     }
 

@@ -4,6 +4,8 @@ dependencies {
     api project(":router")
     api project(":http-server")
 
+    testImplementation dependencyVersion("reactor")
+
     testImplementation project(":http-client")
     testImplementation project(":inject")
     testImplementation project(":http-server-netty")

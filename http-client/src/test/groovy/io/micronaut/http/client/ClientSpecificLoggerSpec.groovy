@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.netty.DefaultHttpClient
@@ -38,6 +39,7 @@ class ClientSpecificLoggerSpec extends Specification {
         int port = SocketUtils.findAvailableTcpPort()
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
                 ['micronaut.server.port': port,
+                 'spec.name': 'ClientSpecificLoggerSpec',
                 'micronaut.http.services.clientOne.url': "http://localhost:$port",
                 'micronaut.http.services.clientOne.logger-name': "${ClientSpecificLoggerSpec.class}.client.one",
                 'micronaut.http.services.clientOne.read-timeout': '500s']
@@ -49,12 +51,13 @@ class ClientSpecificLoggerSpec extends Specification {
 
         then:
         ((DefaultHttpClient) myService.client).log.name == "${ClientSpecificLoggerSpec.class}.client.one".toString()
-        ((DefaultHttpClient) myService.rxHttpClient).log.name == "${ClientSpecificLoggerSpec.class}.client.two".toString()
+        ((DefaultHttpClient) myService.reactiveHttpClient).log.name == "${ClientSpecificLoggerSpec.class}.client.two".toString()
 
         cleanup:
         context.close()
     }
 
+    @Requires(property = 'spec.name', value = 'ClientSpecificLoggerSpec')
     @Singleton
     static class MyService {
 
@@ -64,10 +67,10 @@ class ClientSpecificLoggerSpec extends Specification {
 
         @Inject
         @Client(value = "client-two", configuration = ClientTwoHttpConfiguration.class)
-        RxHttpClient rxHttpClient
-
+        HttpClient reactiveHttpClient
     }
 
+    @Requires(property = 'spec.name', value = 'ClientSpecificLoggerSpec')
     @Singleton
     static class ClientTwoHttpConfiguration extends HttpClientConfiguration {
 

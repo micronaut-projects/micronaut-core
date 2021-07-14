@@ -17,7 +17,7 @@ package io.micronaut.management.endpoint.loggers
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Shared
@@ -30,7 +30,7 @@ import static io.micronaut.http.HttpRequest.POST
 class LoggersEndpointSpec extends Specification {
 
     @Shared EmbeddedServer server
-    @Shared RxHttpClient client
+    @Shared HttpClient client
 
     // Constants matching LogLevel
     static final ALL = 'ALL'
@@ -63,7 +63,7 @@ class LoggersEndpointSpec extends Specification {
                 'endpoints.loggers.sensitive': false,
                 'endpoints.loggers.write-sensitive': false
         ])
-        client = server.applicationContext.createBean(RxHttpClient, server.URL)
+        client = server.applicationContext.createBean(HttpClient, server.URL)
     }
 
     void cleanup() {
@@ -73,7 +73,7 @@ class LoggersEndpointSpec extends Specification {
 
     void 'test that available log levels are returned from the endpoint'() {
         when:
-        def response = client.exchange(GET('/loggers'), Map).blockingFirst()
+        def response = client.exchange(GET('/loggers'), Map).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -88,7 +88,7 @@ class LoggersEndpointSpec extends Specification {
 
     void 'test that configured loggers are returned from the endpoint'() {
         when:
-        def response = client.exchange(GET('/loggers'), Map).blockingFirst()
+        def response = client.exchange(GET('/loggers'), Map).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -114,7 +114,7 @@ class LoggersEndpointSpec extends Specification {
     @Unroll
     void 'test that a configured logger "#name" can be retrieved by name from the endpoint'() {
         when:
-        def response = client.exchange(GET("/loggers/${name}"), Map).blockingFirst()
+        def response = client.exchange(GET("/loggers/${name}"), Map).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -130,7 +130,7 @@ class LoggersEndpointSpec extends Specification {
         def uri = "/loggers/${name}".toString()
 
         when:
-        def response = client.exchange(GET(uri), Map).blockingFirst()
+        def response = client.exchange(GET(uri), Map).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -138,13 +138,13 @@ class LoggersEndpointSpec extends Specification {
 
         when: 'we request the log level on the logger is changed'
         response = client.exchange(POST(uri, [configuredLevel: level]))
-                .blockingFirst()
+                .blockFirst()
 
         then: 'we get back success'
         response.status == HttpStatus.OK
 
         when: 'we again request info on the logger'
-        response = client.exchange(GET(uri), Map).blockingFirst()
+        response = client.exchange(GET(uri), Map).blockFirst()
 
         then: 'we get back the newly configured level'
         response.status == HttpStatus.OK

@@ -42,7 +42,7 @@ public class PetControllerTest {
         PetClient client = embeddedServer.getApplicationContext().getBean(PetClient.class);
 
         // tag::post[]
-        Pet pet = client.save("Dino", 10).blockingGet();
+        Pet pet = client.save("Dino", 10).block();
 
         assertEquals("Dino", pet.getName());
         assertEquals(10, pet.getAge());
@@ -59,7 +59,7 @@ public class PetControllerTest {
         // tag::error[]
         thrown.expect(ConstraintViolationException.class);
         thrown.expectMessage("save.age: must be greater than or equal to 1");
-        client.save("Fred", -1).blockingGet();
+        client.save("Fred", -1).block();
         // end::error[]
 
 

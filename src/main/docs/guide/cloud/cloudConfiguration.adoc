@@ -98,7 +98,7 @@ To obtain metadata for a service via <<serviceDiscovery,Service Discovery>> use 
 [source,java]
 ----
 LoadBalancer loadBalancer = loadBalancerResolver.resolve("some-service");
-Flowable.fromPublisher(
+Flux.from(
     loadBalancer.select()
 ).subscribe((instance) ->
     ConvertibleValues<String> metaData = instance.getMetadata();

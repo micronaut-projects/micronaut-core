@@ -20,10 +20,11 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.Test;
+import reactor.core.publisher.Flux;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -39,8 +40,8 @@ public class MessageEndpointSpec {
         map.put("endpoints.message.enabled", true);
         map.put("spec.name", MessageEndpointSpec.class.getSimpleName());
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map);
-        RxHttpClient rxClient = server.getApplicationContext().createBean(RxHttpClient.class, server.getURL());
-        HttpResponse<String> response = rxClient.exchange("/message", String.class).blockingFirst();
+        HttpClient rxClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
+        HttpResponse<String> response = rxClient.toBlocking().exchange("/message", String.class);
 
         assertEquals(HttpStatus.OK.getCode(), response.code());
         assertEquals("default message", response.body());
@@ -54,17 +55,17 @@ public class MessageEndpointSpec {
         map.put("endpoints.message.enabled", true);
         map.put("spec.name", MessageEndpointSpec.class.getSimpleName());
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map);
-        RxHttpClient rxClient = server.getApplicationContext().createBean(RxHttpClient.class, server.getURL());
+        HttpClient rxClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
         Map<String, Object> map2 = new HashMap<>();
         map2.put("newMessage", "A new message");
-        HttpResponse<String> response = rxClient.exchange(HttpRequest.POST("/message", map2)
-                    .contentType(MediaType.APPLICATION_FORM_URLENCODED), String.class).blockingFirst();
+        HttpResponse<String> response = Flux.from(rxClient.exchange(HttpRequest.POST("/message", map2)
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED), String.class)).blockFirst();
 
         assertEquals(HttpStatus.OK.getCode(), response.code());
         assertEquals("Message updated", response.body());
         assertEquals(MediaType.TEXT_PLAIN_TYPE, response.getContentType().get());
 
-        response = rxClient.exchange("/message", String.class).blockingFirst();
+        response = rxClient.toBlocking().exchange("/message", String.class);
 
         assertEquals("A new message", response.body());
 
@@ -77,14 +78,14 @@ public class MessageEndpointSpec {
         map.put("endpoints.message.enabled", true);
         map.put("spec.name", MessageEndpointSpec.class.getSimpleName());
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map);
-        RxHttpClient rxClient = server.getApplicationContext().createBean(RxHttpClient.class, server.getURL());
-        HttpResponse<String> response = rxClient.exchange(HttpRequest.DELETE("/message"), String.class).blockingFirst();
+        HttpClient rxClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
+        HttpResponse<String> response = rxClient.toBlocking().exchange(HttpRequest.DELETE("/message"), String.class);
 
         assertEquals(HttpStatus.OK.getCode(), response.code());
         assertEquals("Message deleted", response.body());
 
         try {
-            rxClient.exchange("/message", String.class).blockingFirst();
+            rxClient.toBlocking().exchange("/message", String.class);
         } catch (HttpClientResponseException e) {
             assertEquals(404, e.getStatus().getCode());
         } catch (Exception e) {

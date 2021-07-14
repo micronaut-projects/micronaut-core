@@ -9,6 +9,8 @@ dependencies {
     compileOnly project(":http-server")
     compileOnly project(":http-server-netty")
 
+    implementation dependencyVersion("reactor")
+
     testAnnotationProcessor project(":inject-java")
     testCompileOnly project(":inject-groovy")
     testImplementation project(":inject")

@@ -158,6 +158,44 @@ class Test {
         reader.close()
     }
 
+    void "test write reflect.json for @Inject on private fields or methods"() {
+
+        given:
+        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@jakarta.inject.Singleton
+class Test {
+    
+    @jakarta.inject.Inject
+    private String name;
+    
+    @jakarta.inject.Inject
+    private void setFoo(Other other) {
+    }
+}
+
+class Other {}
+''')
+
+        when:
+        def json = new JsonSlurper().parse(reader)
+        json = json.sort { it.name }
+        def entry = json?.find { it.name == 'test.Test'}
+        then:
+        entry
+        entry.name == 'test.Test'
+        entry.fields
+        entry.fields[0].name == 'name'
+        entry.methods
+        entry.methods[0].name == 'setFoo'
+
+        cleanup:
+        reader.close()
+    }
+
     void "test write reflect.json for @ReflectiveAccess with inheritance"() {
 
         given:
@@ -231,6 +269,42 @@ class Test {
         entry.methods
         entry.methods[0].name == '<init>'
         entry.methods[0].parameterTypes == []
+
+        cleanup:
+        reader.close()
+    }
+
+    void "test write reflect.json for @Entity with classes"() {
+        given:
+        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
+package test;
+
+
+@javax.persistence.Entity
+class Test {
+
+
+    enum InnerEnum {
+        ONE, TWO;
+    }
+}
+''')
+
+        when:
+        def json = new JsonSlurper().parse(reader)
+        json = json.sort { it.name }
+        def entry = json?.find { it.name == 'test.Test'}
+
+        then:
+        entry
+        entry.name == 'test.Test'
+        entry.allDeclaredFields
+        entry.allPublicMethods
+        entry.allDeclaredConstructors
+        entry.methods
+        entry.methods[0].name == '<init>'
+        entry.methods[0].parameterTypes == []
+        json?.find { it.name == 'test.Test$InnerEnum'}
 
         cleanup:
         reader.close()

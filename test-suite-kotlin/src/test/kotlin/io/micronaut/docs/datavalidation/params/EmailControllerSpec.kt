@@ -5,7 +5,7 @@ import io.kotlintest.shouldThrow
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 
@@ -16,7 +16,7 @@ class EmailControllerSpec: StringSpec() {
     )
 
     val client = autoClose(
-        embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
+        embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
     )
 
     init {

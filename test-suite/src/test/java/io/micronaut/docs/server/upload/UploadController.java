@@ -20,9 +20,9 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.multipart.StreamingFileUpload;
-import io.reactivex.Single;
 import org.reactivestreams.Publisher;
-
+import reactor.core.publisher.Mono;
+import io.micronaut.core.async.annotation.SingleResult;
 import java.io.File;
 import java.io.IOException;
 
@@ -34,17 +34,18 @@ import static io.micronaut.http.MediaType.TEXT_PLAIN;
 public class UploadController {
 
     @Post(value = "/", consumes = MULTIPART_FORM_DATA, produces = TEXT_PLAIN) // <1>
-    public Single<HttpResponse<String>> upload(StreamingFileUpload file) { // <2>
+    @SingleResult
+    public Publisher<HttpResponse<String>> upload(StreamingFileUpload file) { // <2>
 
         File tempFile;
         try {
             tempFile = File.createTempFile(file.getFilename(), "temp");
         } catch (IOException e) {
-            return Single.error(e);
+            return Mono.error(e);
         }
         Publisher<Boolean> uploadPublisher = file.transferTo(tempFile); // <3>
 
-        return Single.fromPublisher(uploadPublisher)  // <4>
+        return Mono.from(uploadPublisher)  // <4>
             .map(success -> {
                 if (success) {
                     return HttpResponse.ok("Uploaded");

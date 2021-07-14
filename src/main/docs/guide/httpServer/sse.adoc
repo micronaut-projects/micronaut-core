@@ -8,13 +8,13 @@ Imagine for an example a event stream of news headlines; you may define a data c
 
 snippet::io.micronaut.docs.server.sse.Headline[tags="class", indent=0,title="Headline"]
 
-To emit news headline events, write a controller that returns a rs:Publisher[] of api:http.sse.Event[] instances using whichever Reactive library you prefer. The example below uses RxJava 2's rx:Flowable[] via the `generate` method:
+To emit news headline events, write a controller that returns a rs:Publisher[] of api:http.sse.Event[] instances using whichever Reactive library you prefer. The example below uses https://projectreactor.io[Project Reactor]'s reactor:Flux[] via the `generate` method:
 
 snippet::io.micronaut.docs.server.sse.HeadlineController[tags="imports,class", indent=0,title="Publishing Server Sent Events from a Controller"]
 
 <1> The controller method returns a rs:Publisher[] of api:http.sse.Event[]
 <2> A headline is emitted for each version of Micronaut
-<3> The rx:Flowable[] type's `generate` method generates a rs:Publisher[]. The `generate` method accepts an initial value and a lambda that accepts the value and a rx:Emitter[]. Note that this example executes on the same thread as the controller action, but you could use `subscribeOn` or map an existing "hot" rx:Flowable[].
+<3> The reactor:Flux[] type's `generate` method generates a rs:Publisher[]. The `generate` method accepts an initial value and a lambda that accepts the value and a rx:Emitter[]. Note that this example executes on the same thread as the controller action, but you could use `subscribeOn` or map an existing "hot" rx:Flux[].
 <4> The rx:Emitter[] interface `onNext` method emits objects of type api:http.sse.Event[]. The api:http.sse.Event.of(ET)[] factory method constructs the event.
 <5> The rx:Emitter[] interface `onComplete` method indicates when to finish sending server sent events.
 
