@@ -453,7 +453,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                             }
                             order++;
                         } else {
-                            throw new ConfigurationException("Unsupported properties file format: " + fileName);
+                            throw new ConfigurationException("Unsupported properties file format: " + filePath);
                         }
                     }
                 }
@@ -583,12 +583,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @param fileName             Name of the file to be used as property source name
      * @param filePath             Absolute file path
      * @param propertySourceLoader The appropriate property source loader
-     * @throws ConfigurationException If unable to find the appropriate property soruce loader for the given file
+     * @throws ConfigurationException If unable to find the appropriate property source loader for the given file
      */
     private Optional<Map<String, Object>> readPropertiesFromLoader(String fileName, String filePath, PropertySourceLoader propertySourceLoader) throws ConfigurationException {
-        ResourceResolver resourceResolver = new ResourceResolver();
-        Optional<ResourceLoader> resourceLoader = resourceResolver.getSupportingLoader(filePath);
-        ResourceLoader loader = resourceLoader.orElse(FileSystemResourceLoader.defaultLoader());
+        ResourceLoader loader = new ResourceResolver().getSupportingLoader(filePath)
+                .orElse(FileSystemResourceLoader.defaultLoader());
         try {
             Optional<InputStream> inputStream = loader.getResourceAsStream(filePath);
             if (inputStream.isPresent()) {
