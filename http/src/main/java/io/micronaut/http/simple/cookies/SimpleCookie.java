@@ -211,26 +211,26 @@ public class SimpleCookie implements Cookie {
                 .append('=')
                 .append(getValue());
         if (getDomain() != null) {
-            buf.append(", domain=")
+            buf.append("; Domain=")
                     .append(getDomain());
         }
         if (getPath() != null) {
-            buf.append(", path=")
+            buf.append("; Path=")
                     .append(getPath());
         }
         if (getMaxAge() >= 0) {
-            buf.append(", maxAge=")
-                    .append(getMaxAge())
-                    .append('s');
+            buf.append("; Max-Age=")
+                    .append(getMaxAge());
         }
         if (isSecure()) {
-            buf.append(", secure");
+            buf.append("; Secure");
         }
         if (isHttpOnly()) {
-            buf.append(", HTTPOnly");
+            buf.append("; HttpOnly");
         }
         if (getSameSite().isPresent()) {
-            buf.append(", SameSite=").append(getSameSite().get());
+            buf.append("; SameSite=")
+                    .append(getSameSite().get());
         }
         return buf.toString();
     }
