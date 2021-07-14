@@ -51,6 +51,11 @@ ext {
                     name: 'micronaut-r2dbc-bom',
                     version: micronautR2DBCVersion
             ],
+            'micronaut.micrometer': [
+                    group: 'io.micronaut.micrometer',
+                    name: 'micronaut-micrometer-bom',
+                    version: micronautMicrometerVersion
+            ],
             'micronaut.cache': [
                     group: 'io.micronaut.cache',
                     name: 'micronaut-cache-bom',
@@ -322,31 +327,6 @@ ext {
                 version:micronautXmlVersion,
                 group:'io.micronaut.xml',
                 name:'micronaut-jackson-xml'
-            ],
-            'micronaut.micrometer': [
-                    version:micronautMicrometerVersion,
-                    group:'io.micronaut.micrometer',
-                    name:'micronaut-micrometer-core',
-                    modules:[
-                            'micronaut-micrometer-registry-appoptics',
-                            'micronaut-micrometer-registry-atlas',
-                            'micronaut-micrometer-registry-azure-monitor',
-                            'micronaut-micrometer-registry-cloudwatch',
-                            'micronaut-micrometer-registry-datadog',
-                            'micronaut-micrometer-registry-dynatrace',
-                            'micronaut-micrometer-registry-elastic',
-                            'micronaut-micrometer-registry-ganglia',
-                            'micronaut-micrometer-registry-graphite',
-                            'micronaut-micrometer-registry-humio',
-                            'micronaut-micrometer-registry-influx',
-                            'micronaut-micrometer-registry-jmx',
-                            'micronaut-micrometer-registry-kairos',
-                            'micronaut-micrometer-registry-new-relic',
-                            'micronaut-micrometer-registry-prometheus',
-                            'micronaut-micrometer-registry-signalfx',
-                            'micronaut-micrometer-registry-stackdriver',
-                            'micronaut-micrometer-registry-statsd',
-                            'micronaut-micrometer-registry-wavefront']
             ],
             'micronaut.spring': [
                     version:micronautSpringVersion,
@@ -629,7 +609,7 @@ ext {
             'micronaut.kubernetes': [
                     version:micronautKubernetesVersion,
                     group:'io.micronaut.kubernetes',
-                    modules:['micronaut-kubernetes-discovery-client', 'micronaut-kubernetes-client', 'micronaut-kubernetes-client-processor']
+                    modules: ['micronaut-kubernetes-discovery-client', 'micronaut-kubernetes-client', 'micronaut-kubernetes-client-processor']
             ],
             'micronaut.servlet': [
                 version:micronautServletVersion,
