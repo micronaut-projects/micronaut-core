@@ -113,3 +113,5 @@ To help resolve issues with conditional beans you can enable debug logging for t
 ----
 <logger name="io.micronaut.context.condition" level="DEBUG"/>
 ----
+
+Consult the logging chapter for details <<logging, howto setup logging>>.

@@ -48,40 +48,8 @@ snippet::io.micronaut.docs.basics.HelloController[tags="imports, nonblocking", i
 
 TIP: Using RxJava (or Reactor if you prefer) you can easily and efficiently compose multiple HTTP client calls without blocking (which limits the throughput and scalability of your application).
 
-==== Debugging / Tracing the HTTP Client
+Consult the logging chapter for <<httplogging, howto debugging and Tracing the HTTP Client>>.
 
-To debug requests being sent and received from the HTTP client you can enable tracing logging via your `logback.xml` file:
-
-.logback.xml
-[source,xml]
-----
-<logger name="io.micronaut.http.client" level="TRACE"/>
-----
-
-==== Client Specific Debugging / Tracing
-
-To enable client-specific logging you can configure the default logger for all HTTP clients. You can also configure different loggers for different clients using <<_client_specific_configuration, Client-Specific Configuration>>. For example, in `application.yml`:
-
-.application.yml
-[source,xml]
-----
-micronaut:
-  http:
-    client:
-      logger-name: mylogger
-    services:
-      otherClient:
-        logger-name: other.client
-----
-
-Then enable logging in `logback.yml`:
-
-.logback.xml
-[source,xml]
-----
-<logger name="mylogger" level="DEBUG"/>
-<logger name="other.client" level="TRACE"/>
-----
 
 ==== Customizing the HTTP Request
 
