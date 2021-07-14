@@ -152,7 +152,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final Method CONTAINS_VALUE_FOR_METHOD_ARGUMENT = getBeanLookupMethodForArgument("containsValueForMethodArgument", false);
 
     private static final Type TYPE_ABSTRACT_BEAN_DEFINITION = Type.getType(AbstractBeanDefinition2.class);
-    private static final Type TYPE_ABSTRACT_PARAMETRIZED_BEAN_DEFINITION = Type.getType(AbstractParametrizedBeanDefinition2.class);
+
     private static final org.objectweb.asm.commons.Method METHOD_OPTIONAL_EMPTY = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredMethod(Optional.class, "empty")
     );
@@ -758,6 +758,16 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     public void visitBeanDefinitionEnd() {
         if (classWriter == null) {
             throw new IllegalStateException("At least one called to visitBeanDefinitionConstructor(..) is required");
+        }
+
+        if (constructor instanceof MethodElement) {
+            MethodElement methodElement = (MethodElement) constructor;
+            boolean isParametrized = Arrays.stream(methodElement.getParameters())
+                    .map(AnnotationMetadataProvider::getAnnotationMetadata)
+                    .anyMatch(this::isAnnotatedWithParameter);
+            if (isParametrized) {
+                interfaceTypes.add(ParametrizedBeanFactory.class);
+            }
         }
 
         String[] interfaceInternalNames = new String[interfaceTypes.size()];
@@ -2677,7 +2687,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void defineBuilderMethod(boolean isParametrized) {
         if (isParametrized) {
-            superType = TYPE_ABSTRACT_PARAMETRIZED_BEAN_DEFINITION;
             this.isParametrized = true;
         }
 
@@ -2748,13 +2757,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             ParameterElement[] parameters = methodElement.getParameters();
             List<ParameterElement> parameterList = Arrays.asList(parameters);
             applyDefaultNamedToParameters(parameterList);
-            boolean isParametrized = parameterList
-                    .stream()
-                    .map(AnnotationMetadataProvider::getAnnotationMetadata)
-                    .anyMatch(this::isAnnotatedWithParameter);
-            if (isParametrized) {
-                superType = TYPE_ABSTRACT_PARAMETRIZED_BEAN_DEFINITION;
-            }
 
             pushNewMethodReference(staticInit, JavaModelUtils.getTypeReference(methodElement.getDeclaringType()), methodElement, requiresReflection, false, false);
         } else if (constructor instanceof FieldElement) {
@@ -3004,7 +3006,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         // visit super class
         SignatureVisitor psv = sv.visitSuperclass();
         psv.visitClassType(isSuperFactory ? TYPE_ABSTRACT_BEAN_DEFINITION.getInternalName() : superType.getInternalName());
-        if (superType == TYPE_ABSTRACT_BEAN_DEFINITION || superType == TYPE_ABSTRACT_PARAMETRIZED_BEAN_DEFINITION || isSuperFactory) {
+        if (superType == TYPE_ABSTRACT_BEAN_DEFINITION || isSuperFactory) {
             for (String typeParameter : typeParameters) {
 
                 SignatureVisitor ppsv = psv.visitTypeArgument('=');
