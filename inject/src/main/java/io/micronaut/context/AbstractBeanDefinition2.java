@@ -771,49 +771,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
         Argument argument = methodRef.arguments[argIndex];
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments, methodRef.requiresReflection)) {
-            if (context instanceof ApplicationContext) {
-                // can't use orElseThrow here due to compiler bug
-                String valueAnnStr = argument.getAnnotationMetadata().stringValue(Value.class).orElse(null);
-
-                Argument<?> argumentType;
-                boolean isCollection = false;
-                if (Collection.class.isAssignableFrom(argument.getType())) {
-                    argumentType = argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-                    isCollection = true;
-                } else {
-                    argumentType = argument;
-                }
-
-                if (isInnerConfiguration(argumentType, context)) {
-                    Qualifier qualifier = resolveQualifier(resolutionContext, argument, true);
-                    if (isCollection) {
-                        Collection beans = ((DefaultBeanContext) context).getBeansOfType(resolutionContext, argumentType, qualifier);
-                        return coerceCollectionToCorrectType(argument.getType(), beans, resolutionContext, argument);
-                    } else {
-                        return ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
-                    }
-                } else {
-                    String valString = resolvePropertyValueName(resolutionContext, methodRef.getAnnotationMetadata(), argument, valueAnnStr);
-
-                    ApplicationContext applicationContext = (ApplicationContext) context;
-                    ArgumentConversionContext conversionContext = ConversionContext.of(argument);
-                    Optional value = resolveValue(applicationContext, conversionContext, valueAnnStr != null, valString);
-                    if (argumentType.isOptional()) {
-                        return resolveOptionalObject(value);
-                    } else {
-                        if (value.isPresent()) {
-                            return value.get();
-                        } else {
-                            if (argument.isDeclaredNullable()) {
-                                return null;
-                            }
-                            throw new DependencyInjectionException(resolutionContext, this, methodRef.methodName, conversionContext, valString);
-                        }
-                    }
-                }
-            } else {
-                throw new DependencyInjectionException(resolutionContext, argument, "BeanContext must support property resolution");
-            }
+            return resolveValue(resolutionContext, context, methodRef.annotationMetadata, argument);
         }
     }
 
@@ -829,24 +787,10 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
     @Internal
     @UsedByGeneratedCode
     protected final boolean containsValueForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex) {
-        if (context instanceof ApplicationContext) {
-            MethodReference methodRef = methodInjection[methodIndex];
-            Argument argument = methodRef.arguments[argIndex];
-            String valueAnnStr = argument.getAnnotationMetadata().stringValue(Value.class).orElse(null);
-            String valString = resolvePropertyValueName(resolutionContext, methodRef.annotationMetadata, argument, valueAnnStr);
-            ApplicationContext applicationContext = (ApplicationContext) context;
-            Class type = argument.getType();
-            boolean isConfigProps = type.isAnnotationPresent(ConfigurationProperties.class);
-            boolean result = isConfigProps || Map.class.isAssignableFrom(type) || Collection.class.isAssignableFrom(type) ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
-            if (!result && isConfigurationProperties) {
-                String cliOption = resolveCliOption(argument.getName());
-                if (cliOption != null) {
-                    result = applicationContext.containsProperty(cliOption);
-                }
-            }
-            return result;
-        }
-        return false;
+        MethodReference methodRef = methodInjection[methodIndex];
+        AnnotationMetadata parentAnnotationMetadata = methodRef.annotationMetadata;
+        Argument argument = methodRef.arguments[argIndex];
+        return resolveContainsValue(resolutionContext, context, parentAnnotationMetadata, argument);
     }
 
     /**
@@ -906,6 +850,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
      */
     @SuppressWarnings("WeakerAccess")
     @Internal
+    @UsedByGeneratedCode
     protected final Optional findBeanForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex, Argument genericType) {
         MethodReference methodRef = methodInjection[methodIndex];
         Argument<?> argument = resolveArgument(context, argIndex, methodRef.arguments);
@@ -954,64 +899,15 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
     protected final Object getBeanForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex) {
         MethodReference constructorMethodRef = (MethodReference) constructor;
         Argument<?> argument = resolveArgument(context, argIndex, constructorMethodRef.arguments);
-        final Class<?> beanType = argument.getType();
-        if (beanType == BeanResolutionContext.class) {
-            return resolutionContext;
-//        } else if (argument.isArray()) {
-//            Collection beansOfType = getBeansOfTypeForConstructorArgument(resolutionContext, context, argument);
-//            return beansOfType.toArray((Object[]) Array.newInstance(beanType.getComponentType(), beansOfType.size()));
-//        } else if (Collection.class.isAssignableFrom(beanType)) {
-//            Collection beansOfType = getBeansOfTypeForConstructorArgument(resolutionContext, context, argument);
-//            return coerceCollectionToCorrectType(beanType, beansOfType);
-//        } else if (Stream.class.isAssignableFrom(beanType)) {
-//            return getStreamOfTypeForConstructorArgument(resolutionContext, context, argument, constructorMethodRef.resultGenericType);
-//        } else if (argument.isOptional()) {
-//            return findBeanForConstructorArgument(resolutionContext, context, argument);
-        } else {
+        if (argument.isDeclaredNullable()) {
             BeanResolutionContext.Segment current = resolutionContext.getPath().peek();
-            boolean isNullable = argument.isDeclaredNullable();
-            if (isNullable && current != null && current.getArgument().equals(argument)) {
+            if (current != null && current.getArgument().equals(argument)) {
                 return null;
-            } else {
-                try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
-                        .pushConstructorResolve(this, argument)) {
-                    try {
-                        Object bean;
-                        Qualifier qualifier = resolveQualifier(resolutionContext, argument, isInnerConfiguration(argument, context));
-                        if (Qualifier.class.isAssignableFrom(beanType)) {
-                            bean = qualifier;
-                        } else {
-                            Object previous = !argument.isAnnotationPresent(Parameter.class) ? resolutionContext.removeAttribute(NAMED_ATTRIBUTE) : null;
-                            try {
-                                //noinspection unchecked
-                                bean = ((DefaultBeanContext) context).getBean(resolutionContext, argument, qualifier);
-                            } finally {
-                                if (previous != null) {
-                                    resolutionContext.setAttribute(NAMED_ATTRIBUTE, previous);
-                                }
-                            }
-                        }
-                        return bean;
-                    } catch (DisabledBeanException e) {
-                        if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                            AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", argument.getTypeName(), e.getMessage());
-                        }
-                        if (isIterable() && getAnnotationMetadata().hasDeclaredAnnotation(EachBean.class)) {
-                            throw new DisabledBeanException("Bean [" + getBeanType().getSimpleName() + "] disabled by parent: " + e.getMessage());
-                        } else {
-                            if (isNullable) {
-                                return null;
-                            }
-                            throw new DependencyInjectionException(resolutionContext, argument, e);
-                        }
-                    } catch (NoSuchBeanException e) {
-                        if (isNullable) {
-                            return null;
-                        }
-                        throw new DependencyInjectionException(resolutionContext, argument, e);
-                    }
-                }
             }
+        }
+        try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+                .pushConstructorResolve(this, argument)) {
+            return resolveBean(resolutionContext, context, argument, isInnerConfiguration(argument, context));
         }
     }
 
@@ -1033,32 +929,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
         Argument<?> argument = constructorRef.arguments[argIndex];
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(this, argument)) {
             try {
-                Object result;
-                if (context instanceof ApplicationContext) {
-                    ApplicationContext propertyResolver = (ApplicationContext) context;
-                    AnnotationMetadata argMetadata = argument.getAnnotationMetadata();
-                    Optional<String> valAnn = argMetadata.stringValue(Value.class);
-                    String prop = resolvePropertyValueName(resolutionContext, argMetadata, argument, valAnn.orElse(null));
-                    ArgumentConversionContext<?> conversionContext = ConversionContext.of(argument);
-                    Optional<?> value = resolveValue(propertyResolver, conversionContext, valAnn.isPresent(), prop);
-                    if (argument.getType() == Optional.class) {
-                        return resolveOptionalObject(value);
-                    } else {
-                        // can't use orElseThrow here due to compiler bug
-                        if (value.isPresent()) {
-                            result = value.get();
-                        } else {
-                            if (argument.isDeclaredNullable()) {
-                                result = null;
-                            } else {
-                                result = argMetadata.getValue(Bindable.class, "defaultValue", argument)
-                                        .orElseThrow(() -> new DependencyInjectionException(resolutionContext, conversionContext, prop));
-                            }
-                        }
-                    }
-                } else {
-                    throw new DependencyInjectionException(resolutionContext, argument, "BeanContext must support property resolution");
-                }
+                Object result = resolveValue(resolutionContext, context, constructorRef.annotationMetadata, argument);
 
                 if (this instanceof ValidatedBeanDefinition) {
                     ((ValidatedBeanDefinition) this).validateBeanArgument(
@@ -1270,77 +1141,11 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
     @UsedByGeneratedCode
     protected final Object getValueForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) {
         FieldReference fieldRef = fieldInjection[fieldIndex];
-        Argument argument = fieldRef.asArgument(environment);
+        Argument argument = fieldRef.asArgument(null);
+        final AnnotationMetadata annotationMetadata = fieldRef.annotationMetadata;
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushFieldResolve(this, argument, fieldRef.requiresReflection)) {
-            if (context instanceof PropertyResolver) {
-                final AnnotationMetadata annotationMetadata = fieldRef.getAnnotationMetadata();
-                String valueAnnVal = annotationMetadata.stringValue(Value.class).orElse(null);
-                Argument<?> argumentType;
-                boolean isCollection = false;
-                if (Collection.class.isAssignableFrom(fieldRef.fieldType)) {
-                    argumentType = argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-                    isCollection = true;
-                } else {
-                    argumentType = argument;
-                }
-                if (isInnerConfiguration(argumentType, context)) {
-                    Qualifier qualifier = resolveQualifier(resolutionContext, argument, true);
-                    if (isCollection) {
-                        Collection beans = ((DefaultBeanContext) context).getBeansOfType(resolutionContext, argumentType, qualifier);
-                        return coerceCollectionToCorrectType(argument.getType(), beans, resolutionContext, argument);
-                    } else {
-                        return ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
-                    }
-                } else {
-                    String valString = resolvePropertyValueName(resolutionContext, fieldRef, valueAnnVal, annotationMetadata);
-                    ArgumentConversionContext conversionContext = ConversionContext.of(argument);
-                    Optional value = resolveValue((ApplicationContext) context, conversionContext, valueAnnVal != null, valString);
-                    if (argumentType.isOptional()) {
-                        return resolveOptionalObject(value);
-                    } else {
-                        if (value.isPresent()) {
-                            return value.get();
-                        } else {
-                            if (argument.isDeclaredNullable()) {
-                                return null;
-                            }
-                            throw new DependencyInjectionException(resolutionContext, this, fieldRef.fieldName, "Error resolving field value [" + valString + "]. Property doesn't exist or cannot be converted");
-                        }
-                    }
-                }
-            } else {
-                throw new DependencyInjectionException(resolutionContext, this, fieldRef.fieldName, "@Value requires a BeanContext that implements PropertyResolver");
-            }
+            return resolveValue(resolutionContext, context, annotationMetadata, argument);
         }
-    }
-
-    /**
-     * Resolve a value for the given field of the given type and path. Only
-     * used by applications compiled with versions of Micronaut prior to 1.2.0.
-     *
-     * @param resolutionContext The resolution context
-     * @param context           The bean context
-     * @param propertyType      The required property type
-     * @param propertyPath      The property path
-     * @param <T1>              The generic type
-     * @return An optional value
-     */
-    @SuppressWarnings("unused")
-    @Internal
-    @UsedByGeneratedCode
-    protected final <T1> Optional<T1> getValueForPath(
-            BeanResolutionContext resolutionContext,
-            BeanContext context,
-            Argument<T1> propertyType,
-            String... propertyPath) {
-        if (context instanceof PropertyResolver) {
-            PropertyResolver propertyResolver = (PropertyResolver) context;
-            String pathString = propertyPath.length > 1 ? String.join(".", propertyPath) : propertyPath[0];
-            String valString = resolvePropertyPath(resolutionContext, pathString);
-
-            return propertyResolver.getProperty(valString, ConversionContext.of(propertyType));
-        }
-        return Optional.empty();
     }
 
     /**
@@ -1381,24 +1186,8 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
     @Internal
     @UsedByGeneratedCode
     protected final boolean containsValueForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) {
-        if (context instanceof ApplicationContext) {
-            FieldReference fieldRef = fieldInjection[fieldIndex];
-            final AnnotationMetadata annotationMetadata = fieldRef.annotationMetadata;
-            String valueAnnVal = annotationMetadata.stringValue(Value.class).orElse(null);
-            String valString = resolvePropertyValueName(resolutionContext, fieldRef, valueAnnVal, annotationMetadata);
-            ApplicationContext applicationContext = (ApplicationContext) context;
-            Class fieldType = fieldRef.fieldType;
-            boolean isConfigProps = fieldType.isAnnotationPresent(ConfigurationProperties.class);
-            boolean result = isConfigProps || Map.class.isAssignableFrom(fieldType) || Collection.class.isAssignableFrom(fieldType) ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
-            if (!result && isConfigurationProperties) {
-                String cliOption = resolveCliOption(fieldRef.getName());
-                if (cliOption != null) {
-                    return applicationContext.containsProperty(cliOption);
-                }
-            }
-            return result;
-        }
-        return false;
+        FieldReference fieldRef = fieldInjection[fieldIndex];
+        return resolveContainsValue(resolutionContext, context, fieldRef.annotationMetadata, fieldRef.asArgument(null));
     }
 
     /**
@@ -1554,10 +1343,85 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
         }
     }
 
+    private boolean resolveContainsValue(BeanResolutionContext resolutionContext, BeanContext context, AnnotationMetadata parentAnnotationMetadata, Argument argument) {
+        if (!(context instanceof ApplicationContext)) {
+            return false;
+        }
+        ApplicationContext applicationContext = (ApplicationContext) context;
+        String valueAnnStr = argument.getAnnotationMetadata().stringValue(Value.class).orElse(null);
+        String valString = resolvePropertyValueName(resolutionContext, parentAnnotationMetadata, argument, valueAnnStr);
+        Class type = argument.getType();
+        boolean isConfigProps = type.isAnnotationPresent(ConfigurationProperties.class);
+        boolean result = isConfigProps || Map.class.isAssignableFrom(type) || Collection.class.isAssignableFrom(type) ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
+        if (!result && isConfigurationProperties) {
+            String cliOption = resolveCliOption(argument.getName());
+            if (cliOption != null) {
+                result = applicationContext.containsProperty(cliOption);
+            }
+        }
+        return result;
+    }
+
+    private Object resolveValue(BeanResolutionContext resolutionContext, BeanContext context, AnnotationMetadata parentAnnotationMetadata, Argument<?> argument) {
+        if (!(context instanceof PropertyResolver)) {
+            throw new DependencyInjectionException(resolutionContext, "@Value requires a BeanContext that implements PropertyResolver");
+        }
+        String valueAnnVal = argument.getAnnotationMetadata().stringValue(Value.class).orElse(null);
+        Argument<?> argumentType;
+        boolean isCollection = false;
+        if (Collection.class.isAssignableFrom(argument.getType())) {
+            argumentType = argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            isCollection = true;
+        } else {
+            argumentType = argument;
+        }
+        if (isInnerConfiguration(argumentType, context)) {
+            Qualifier qualifier = resolveQualifier(resolutionContext, argument, true);
+            if (isCollection) {
+                Collection beans = ((DefaultBeanContext) context).getBeansOfType(resolutionContext, argumentType, qualifier);
+                return coerceCollectionToCorrectType((Class) argument.getType(), beans, resolutionContext, argument);
+            } else {
+                return ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
+            }
+        } else {
+            String valString = resolvePropertyValueName(resolutionContext, parentAnnotationMetadata, argument.getAnnotationMetadata(), valueAnnVal);
+            ArgumentConversionContext conversionContext = ConversionContext.of(argument);
+            Optional value = resolveValue((ApplicationContext) context, conversionContext, valueAnnVal != null, valString);
+            if (argumentType.isOptional()) {
+                return resolveOptionalObject(value);
+            } else {
+                if (value.isPresent()) {
+                    return value.get();
+                } else {
+                    if (argument.isDeclaredNullable()) {
+                        return null;
+                    }
+                    return argument.getAnnotationMetadata().getValue(Bindable.class, "defaultValue", argument)
+                            .orElseThrow(() -> DependencyInjectionException.missingProperty(resolutionContext, conversionContext, valString));
+                }
+            }
+        }
+    }
+
     private Object resolveBean(BeanResolutionContext resolutionContext, BeanContext context, Argument argument) {
-        Qualifier qualifier = resolveQualifier(resolutionContext, argument);
+        return resolveBean(resolutionContext, context, argument, false);
+    }
+
+    private Object resolveBean(BeanResolutionContext resolutionContext, BeanContext context, Argument argument, boolean isInnerConfiguration) {
+        Qualifier qualifier = resolveQualifier(resolutionContext, argument, isInnerConfiguration);
+        if (Qualifier.class.isAssignableFrom(argument.getType())) {
+            return qualifier;
+        }
         try {
-            return ((DefaultBeanContext) context).getBean(resolutionContext, argument, qualifier);
+            Object previous = !argument.isAnnotationPresent(Parameter.class) ? resolutionContext.removeAttribute(NAMED_ATTRIBUTE) : null;
+            try {
+                //noinspection unchecked
+                return ((DefaultBeanContext) context).getBean(resolutionContext, argument, qualifier);
+            } finally {
+                if (previous != null) {
+                    resolutionContext.setAttribute(NAMED_ATTRIBUTE, previous);
+                }
+            }
         } catch (DisabledBeanException e) {
             if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
                 AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", argument.getTypeName(), e.getMessage());
@@ -1598,71 +1462,30 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
         }
     }
 
-    private String resolvePropertyValueName(
-            BeanResolutionContext resolutionContext,
-            AnnotationMetadata annotationMetadata,
-            Argument argument,
-            String valueAnnStr) {
-        String valString;
+    private String resolvePropertyValueName(BeanResolutionContext resolutionContext, AnnotationMetadata parentAnnotationMetadata, Argument argument, String valueAnnStr) {
+        return resolvePropertyValueName(resolutionContext, parentAnnotationMetadata, argument.getAnnotationMetadata(), valueAnnStr);
+    }
+
+    private String resolvePropertyValueName(BeanResolutionContext resolutionContext, AnnotationMetadata parentAnnotationMetadata, AnnotationMetadata annotationMetadata, String valueAnnStr) {
         if (valueAnnStr != null) {
-            valString = valueAnnStr;
-        } else {
-            valString = getProperty(resolutionContext, annotationMetadata, argument);
-            valString = substituteWildCards(resolutionContext, valString);
+            return valueAnnStr;
         }
-        return valString;
+        String valString = getProperty(resolutionContext, parentAnnotationMetadata, annotationMetadata);
+        return substituteWildCards(resolutionContext, valString);
     }
 
-    private String getProperty(BeanResolutionContext resolutionContext, AnnotationMetadata annotationMetadata, Argument argument) {
-        Optional<String> property = annotationMetadata.stringValue(Property.class, "name");
+    private String getProperty(BeanResolutionContext resolutionContext, AnnotationMetadata parentAnnotationMetadata, AnnotationMetadata annotationMetadata) {
+        Optional<String> property = parentAnnotationMetadata.stringValue(Property.class, "name");
         if (property.isPresent()) {
             return property.get();
         }
-        property = argument.getAnnotationMetadata().stringValue(Property.class, "name");
-        if (property.isPresent()) {
-            return property.get();
+        if (parentAnnotationMetadata != annotationMetadata) {
+            property = annotationMetadata.stringValue(Property.class, "name");
+            if (property.isPresent()) {
+                return property.get();
+            }
         }
-        throw new DependencyInjectionException(
-                resolutionContext,
-                argument,
-                "Value resolution attempted but @Value annotation is missing"
-        );
-    }
-
-    private String resolvePropertyValueName(
-            BeanResolutionContext resolutionContext,
-            FieldReference fieldRef,
-            String valueAnn,
-            AnnotationMetadata annotationMetadata) {
-        String valString;
-        if (valueAnn != null) {
-            valString = valueAnn;
-        } else {
-            valString = annotationMetadata.stringValue(Property.class, "name")
-                    .orElseThrow(() -> new DependencyInjectionException(resolutionContext, this, fieldRef.fieldName, "Value resolution attempted but @Value annotation is missing"));
-
-            valString = substituteWildCards(resolutionContext, valString);
-        }
-        return valString;
-    }
-
-    private String resolvePropertyPath(
-            BeanResolutionContext resolutionContext,
-            String path) {
-
-        String valString = getConfigurationPropertiesPath(resolutionContext);
-        return valString + "." + path;
-    }
-
-    private String getConfigurationPropertiesPath(BeanResolutionContext resolutionContext) {
-        String valString = getAnnotationMetadata()
-                .stringValue(ConfigurationReader.class, "prefix")
-                .orElseThrow(() -> new IllegalStateException("Resolve property path called for non @ConfigurationProperties bean"));
-        valString = substituteWildCards(
-                resolutionContext,
-                valString
-        );
-        return valString;
+        throw new DependencyInjectionException(resolutionContext, "Value resolution attempted but @Value annotation is missing");
     }
 
     private String substituteWildCards(BeanResolutionContext resolutionContext, String valString) {
@@ -1962,7 +1785,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
             return Argument.of(
                     fieldType,
                     fieldName,
-                    !annotationMetadata.isEmpty() && annotationMetadata.hasPropertyExpressions()
+                    environment != null && !annotationMetadata.isEmpty() && annotationMetadata.hasPropertyExpressions()
                             ? new EnvironmentAnnotationMetadata(annotationMetadata, environment) : annotationMetadata,
                     typeArguments
             );

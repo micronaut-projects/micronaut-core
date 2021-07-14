@@ -277,6 +277,17 @@ public class DependencyInjectionException extends BeanCreationException {
         super(resolutionContext, MessageUtils.buildMessage(resolutionContext, argument, message, circular));
     }
 
+    /**
+     * Builds an error message for attempted argument conversion on a method.
+     *
+     * @param resolutionContext    The resolution context
+     * @param conversionContext    The conversion context
+     * @param property             The property being resolved
+     */
+    public static DependencyInjectionException missingProperty(BeanResolutionContext resolutionContext, ArgumentConversionContext conversionContext, String property) {
+        return new DependencyInjectionException(resolutionContext, MessageUtils.buildMessage(resolutionContext, buildConversionMessage(property, conversionContext), false));
+    }
+
     private static String buildConversionMessage(String property, ArgumentConversionContext conversionContext) {
         Optional<ConversionError> lastError = conversionContext.getLastError();
         if (lastError.isPresent()) {
