@@ -17,8 +17,8 @@ package io.micronaut.management.endpoint.threads;
 
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
-import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 import java.lang.management.ManagementFactory;
 
@@ -48,6 +48,6 @@ public class ThreadDumpEndpoint {
     @Read
     Publisher getThreadDump() {
         return threadInfoMapper.mapThreadInfo(
-                Flowable.fromArray(ManagementFactory.getThreadMXBean().dumpAllThreads(true, true)));
+                Flux.fromArray(ManagementFactory.getThreadMXBean().dumpAllThreads(true, true)));
     }
 }

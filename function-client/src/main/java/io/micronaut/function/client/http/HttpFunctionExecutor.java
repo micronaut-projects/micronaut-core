@@ -27,7 +27,7 @@ import io.micronaut.function.client.exceptions.FunctionNotFoundException;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.client.HttpClient;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
@@ -48,13 +48,13 @@ import java.util.Optional;
 @Singleton
 public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closeable, FunctionInvokerChooser {
 
-    private final RxHttpClient httpClient;
+    private final HttpClient httpClient;
 
     /**
      * Constructor.
      * @param httpClient  The HTTP client
      */
-    public HttpFunctionExecutor(RxHttpClient httpClient) {
+    public HttpFunctionExecutor(HttpClient httpClient) {
         super();
         this.httpClient = httpClient;
     }

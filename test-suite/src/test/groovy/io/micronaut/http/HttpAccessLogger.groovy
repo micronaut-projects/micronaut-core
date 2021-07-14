@@ -22,14 +22,14 @@ import io.micronaut.context.annotation.Property
 import io.micronaut.core.type.Argument
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.session.Session
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
-import io.reactivex.Flowable
 import org.slf4j.LoggerFactory
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 import jakarta.inject.Inject
@@ -49,7 +49,7 @@ class HttpAccessLoggerSpec extends Specification {
 
     @Inject
     @Client("/")
-    RxHttpClient client
+    HttpClient client
 
     static MemoryAppender appender = new MemoryAppender()
 
@@ -59,17 +59,16 @@ class HttpAccessLoggerSpec extends Specification {
         appender.start()
     }
 
-
     @Inject
     EmbeddedServer embeddedServer
 
     void "test simple get request with type - access logger"() {
         when:
         appender.events.clear()
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/get/simple"), String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
+        HttpResponse<String> response = flowable.blockFirst()
         def body = response.getBody()
 
 
@@ -84,10 +83,10 @@ class HttpAccessLoggerSpec extends Specification {
 
         when:
         appender.events.clear()
-        def flowable = Flowable.fromPublisher(client.exchange(
+        def flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/get/doesntexist")
         ))
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -100,10 +99,10 @@ class HttpAccessLoggerSpec extends Specification {
 
         when:
         appender.events.clear()
-        def flowable = Flowable.fromPublisher(client.exchange(
+        def flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/get/error"), Argument.of(String), Argument.of(String)
         ))
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -117,10 +116,10 @@ class HttpAccessLoggerSpec extends Specification {
      void "test simple session - access logger"() {
         when:
         appender.events.clear()
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/sessiontest/simple"), String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
+        HttpResponse<String> response = flowable.blockFirst()
 
         then:
         response.getBody().get() == "not in session"
@@ -131,12 +130,12 @@ class HttpAccessLoggerSpec extends Specification {
 
         when:
         def sessionId = response.header(HttpHeaders.AUTHORIZATION_INFO)
-        flowable = Flowable.fromPublisher(client.exchange(
+        flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/sessiontest/simple")
                         .header(HttpHeaders.AUTHORIZATION_INFO, sessionId)
                 , String
         ))
-        response = flowable.blockingFirst()
+        response = flowable.blockFirst()
 
         then:
         response.getBody().get() == "value in session"

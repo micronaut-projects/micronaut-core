@@ -19,12 +19,12 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.reactivex.Flowable;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import reactor.core.publisher.Flux;
 
 import java.util.Optional;
 
@@ -35,13 +35,13 @@ import static org.junit.Assert.assertTrue;
 public class BookControllerSpec {
 
     private EmbeddedServer embeddedServer;
-    private RxHttpClient client;
+    private HttpClient client;
 
     @Before
     public void setup() {
         embeddedServer = ApplicationContext.run(EmbeddedServer.class);
         client = embeddedServer.getApplicationContext().createBean(
-                RxHttpClient.class,
+                HttpClient.class,
                 embeddedServer.getURL());
     }
 
@@ -54,13 +54,13 @@ public class BookControllerSpec {
     @Test
     public void testPostWithURITemplate() {
         // tag::posturitemplate[]
-        Flowable<HttpResponse<Book>> call = client.exchange(
+        Flux<HttpResponse<Book>> call = Flux.from(client.exchange(
                 POST("/amazon/book/{title}", new Book("The Stand")),
                 Book.class
-        );
+        ));
         // end::posturitemplate[]
 
-        HttpResponse<Book> response = call.blockingFirst();
+        HttpResponse<Book> response = call.blockFirst();
         Optional<Book> message = response.getBody(Book.class); // <2>
         // check the status
         assertEquals(HttpStatus.CREATED, response.getStatus()); // <3>
@@ -72,14 +72,14 @@ public class BookControllerSpec {
     @Test
     public void testPostFormData() {
         // tag::postform[]
-        Flowable<HttpResponse<Book>> call = client.exchange(
+        Flux<HttpResponse<Book>> call = Flux.from(client.exchange(
                 POST("/amazon/book/{title}", new Book("The Stand"))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED),
                 Book.class
-        );
+        ));
         // end::postform[]
 
-        HttpResponse<Book> response = call.blockingFirst();
+        HttpResponse<Book> response = call.blockFirst();
         Optional<Book> message = response.getBody(Book.class); // <2>
         // check the status
         assertEquals(HttpStatus.CREATED, response.getStatus()); // <3>

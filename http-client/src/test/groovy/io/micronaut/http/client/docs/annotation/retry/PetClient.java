@@ -19,7 +19,7 @@ import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.docs.annotation.Pet;
 import io.micronaut.http.client.docs.annotation.PetOperations;
 import io.micronaut.retry.annotation.Retryable;
-import io.reactivex.Single;
+import reactor.core.publisher.Mono;
 
 /**
  * @author graemerocher
@@ -31,7 +31,7 @@ import io.reactivex.Single;
 public interface PetClient extends PetOperations {
 
     @Override
-    Single<Pet> save(String name, int age);
+    Mono<Pet> save(String name, int age);
 }
 // end::class[]
 

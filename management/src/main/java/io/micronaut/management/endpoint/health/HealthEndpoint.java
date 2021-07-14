@@ -28,8 +28,8 @@ import io.micronaut.management.health.indicator.HealthCheckType;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
 import io.micronaut.management.health.indicator.annotation.Liveness;
-import io.reactivex.Single;
 import jakarta.inject.Inject;
+import reactor.core.publisher.Mono;
 
 import java.security.Principal;
 import java.util.Arrays;
@@ -95,13 +95,13 @@ public class HealthEndpoint {
      * Return all health indicators.
      *
      * @param principal Authenticated user
-     * @return The health information as a {@link Single}
+     * @return The health information as a {@link Mono}
      */
     @Read
-    public Single<HealthResult> getHealth(@Nullable Principal principal) {
+    public Mono<HealthResult> getHealth(@Nullable Principal principal) {
         HealthLevelOfDetail detail = levelOfDetail(principal);
 
-        return Single.fromPublisher(
+        return Mono.from(
                 healthAggregator.aggregate(healthIndicators, detail)
         );
     }
@@ -111,10 +111,10 @@ public class HealthEndpoint {
      *
      * @param principal Authenticated user
      * @param selector HealthEndpointSelector
-     * @return The health information as a {@link Single}
+     * @return The health information as a {@link Mono}
      */
     @Read
-    public Single<HealthResult> getHealth(@Nullable Principal principal, @Selector HealthCheckType selector) {
+    public Mono<HealthResult> getHealth(@Nullable Principal principal, @Selector HealthCheckType selector) {
         HealthLevelOfDetail detail = levelOfDetail(principal);
         HealthIndicator[] indicators;
 
@@ -128,7 +128,7 @@ public class HealthEndpoint {
                 break;
         }
 
-        return Single.fromPublisher(
+        return Mono.from(
                 healthAggregator.aggregate(indicators, detail)
         );
     }

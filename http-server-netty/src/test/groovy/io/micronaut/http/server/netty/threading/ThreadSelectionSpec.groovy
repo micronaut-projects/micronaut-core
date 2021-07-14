@@ -20,10 +20,10 @@ import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 import io.micronaut.scheduling.executor.ThreadSelection
 import io.netty.channel.EventLoopGroup
-import io.reactivex.*
-import io.micronaut.core.annotation.NonNull
-import org.jetbrains.annotations.NotNull
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import reactor.core.publisher.FluxSink
+import reactor.core.publisher.Mono
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -132,14 +132,14 @@ class ThreadSelectionSpec extends Specification {
         }
 
         @Get("/reactive")
-        Single<String> reactive() {
-            Single.fromCallable({ -> "thread: ${Thread.currentThread().name}" })
+        Mono<String> reactive() {
+            Mono.fromCallable({ -> "thread: ${Thread.currentThread().name}" })
         }
 
         @Get("/reactiveblocking")
         @Blocking
-        Single<String> reactiveBlocking() {
-            Single.fromCallable({ -> "thread: ${Thread.currentThread().name}" })
+        Mono<String> reactiveBlocking() {
+            Mono.fromCallable({ -> "thread: ${Thread.currentThread().name}" })
         }
 
         @Get("/scheduleblocking")
@@ -162,18 +162,17 @@ class ThreadSelectionSpec extends Specification {
 
         @Get("/schedulereactive")
         @ExecuteOn(TaskExecutors.IO)
-        Single<String> scheduleReactive() {
-            Single.fromCallable({ -> "thread: ${Thread.currentThread().name}" })
+        Mono<String> scheduleReactive() {
+            Mono.fromCallable({ -> "thread: ${Thread.currentThread().name}" })
         }
 
         @ExecuteOn(TaskExecutors.IO)
         @Get(uri = "/scheduleSse", produces = MediaType.TEXT_EVENT_STREAM)
-        Flowable<Event<String>> scheduleSse() {
-            return Flowable
-                    .<Event<String>>create(emitter -> {
-                        emitter.onNext( Event.of("thread: ${Thread.currentThread().name}".toString()))
-                        emitter.onComplete()
-                    }, BackpressureStrategy.BUFFER)
+        Flux<Event<String>> scheduleSse() {
+            return Flux.<Event<String>>create(emitter -> {
+                        emitter.next( Event.of("thread: ${Thread.currentThread().name}".toString()))
+                        emitter.complete()
+                    }, FluxSink.OverflowStrategy.BUFFER)
         }
     }
 
@@ -182,13 +181,10 @@ class ThreadSelectionSpec extends Specification {
 
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-            return Flowable.create(new FlowableOnSubscribe<String>() {
-                @Override
-                void subscribe(@NotNull @NonNull FlowableEmitter<String> emitter) throws Exception {
-                    emitter.onNext("Good")
-                    emitter.onComplete()
-                }
-            }, BackpressureStrategy.LATEST).switchMap({ String it ->
+            return Flux.create(emitter -> {
+                    emitter.next("Good")
+                    emitter.complete()
+            }, FluxSink.OverflowStrategy.LATEST).switchMap({ String it ->
                 return chain.proceed(request)
             })
         }

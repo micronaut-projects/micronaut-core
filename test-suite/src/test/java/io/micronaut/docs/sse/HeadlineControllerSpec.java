@@ -20,6 +20,8 @@ import io.micronaut.docs.streaming.Headline;
 import io.micronaut.http.sse.Event;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.Test;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -34,7 +36,7 @@ public class HeadlineControllerSpec {
                     .getApplicationContext()
                     .getBean(HeadlineClient.class);
 
-            Event<Headline> headline = headlineClient.streamHeadlines().blockingFirst();
+            Event<Headline> headline = Mono.from(headlineClient.streamHeadlines()).block();
 
             assertNotNull( headline );
             assertTrue( headline.getData().getText().startsWith("Latest Headline") );

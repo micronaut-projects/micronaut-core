@@ -3,7 +3,7 @@ package io.micronaut.docs.http.server.stream
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -15,7 +15,7 @@ class StreamControllerSpec extends Specification {
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
 
     @Shared @AutoCleanup
-    RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient, embeddedServer.getURL())
+    HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient, embeddedServer.getURL())
 
     void "test receiving a stream"() {
         when:

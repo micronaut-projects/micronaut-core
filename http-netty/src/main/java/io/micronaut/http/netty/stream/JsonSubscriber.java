@@ -18,20 +18,28 @@ package io.micronaut.http.netty.stream;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.content.HttpContentUtil;
 import io.netty.handler.codec.http.HttpContent;
-import org.reactivestreams.Subscriber;
+import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
+import reactor.core.CoreSubscriber;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Operators;
+import reactor.util.context.Context;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-@SuppressWarnings("ReactiveStreamsSubscriberImplementation")
 @Internal
-public final class JsonSubscriber implements Subscriber<HttpContent> {
+public final class JsonSubscriber implements CoreSubscriber<HttpContent> {
 
     private final AtomicBoolean empty = new AtomicBoolean(true);
-    private final Subscriber<? super HttpContent> upstream;
+    private final CoreSubscriber<? super HttpContent> upstream;
 
-    public JsonSubscriber(Subscriber<? super HttpContent> upstream) {
+    public JsonSubscriber(CoreSubscriber<? super HttpContent> upstream) {
         this.upstream = upstream;
+    }
+
+    @Override
+    public Context currentContext() {
+        return upstream.currentContext();
     }
 
     @Override
@@ -72,5 +80,11 @@ public final class JsonSubscriber implements Subscriber<HttpContent> {
             upstream.onNext(HttpContentUtil.closeBracket());
         }
         upstream.onComplete();
+    }
+
+    public static Flux<HttpContent> lift(Publisher<HttpContent> publisher) {
+        return (Flux<HttpContent>) Operators.<HttpContent, HttpContent>lift(
+                (scannable, subscriber) -> new JsonSubscriber(subscriber)
+        ).apply(publisher);
     }
 }

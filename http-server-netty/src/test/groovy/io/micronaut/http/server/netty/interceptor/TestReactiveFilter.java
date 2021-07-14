@@ -20,8 +20,8 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
-import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 /**
  * @author Graeme Rocher
@@ -47,8 +47,8 @@ public class TestReactiveFilter implements HttpServerFilter{
     }
 
     class SomeService {
-        Flowable<String> getSomething() {
-            return Flowable.just("Test");
+        Flux<String> getSomething() {
+            return Flux.just("Test");
         }
     }
 }

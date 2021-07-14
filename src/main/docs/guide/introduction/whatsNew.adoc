@@ -86,6 +86,11 @@ See the section on <<lifecycleAdvise, Bean Life Cycle Advice>> for more informat
 
 It is now possible to set a max and a range for random numbers in configuration. For example to set an integer between 0 and 9, `${random.int(10)}` can be used as the configuration value. See the <<propertySource, documentation>> under "Using Random Properties" for more information.
 
+==== Project Reactor used internally instead of RxJava2
+
+Micronaut 3 uses internally https://projectreactor.io[Project Reactor] instead https://github.com/ReactiveX/RxJava[RxJava 2]. Project Reactor allows
+Micronaut 3 to simplify instrumentation, thanks to https://projectreactor.io/docs/core/release/api/reactor/util/context/Context.html[Reactor's Context],  simplifies conversion login and eases the integration with R2DBC drivers. We recommend users to migrate to Reactor. However, it is possible to continue to use RxJava. See <<reactiveConfigs, Reactive Programming section>>.
+
 === Module Upgrades
 
 ==== Micronaut Data 2.4.0

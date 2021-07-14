@@ -62,6 +62,4 @@ class ClientVersioningConfSpec extends Specification {
         cleanup:
         context.close()
     }
-
-
 }

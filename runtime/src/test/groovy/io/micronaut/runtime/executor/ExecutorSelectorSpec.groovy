@@ -22,8 +22,8 @@ import io.micronaut.core.annotation.NonBlocking
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.scheduling.executor.ExecutorSelector
 import io.micronaut.scheduling.executor.ThreadSelection
-import io.reactivex.Single
 import jakarta.inject.Singleton
+import reactor.core.publisher.Mono
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -78,10 +78,10 @@ class MyService {
 
     }
 
-    Single someReactiveMethod() {}
+    Mono someReactiveMethod() {}
 
     @Blocking
-    Single someBlockingReactiveMethod() {}
+    Mono someBlockingReactiveMethod() {}
 
     CompletableFuture someFutureMethod() {}
 

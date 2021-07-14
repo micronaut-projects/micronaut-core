@@ -4,13 +4,8 @@ import io.kotlintest.shouldBe
 import io.kotlintest.shouldNotBe
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.docs.annotation.Pet
-import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import org.junit.Assert
-import org.junit.Test
-
-import java.util.Collections
+import reactor.core.publisher.Mono
 
 class HeaderSpec: StringSpec() {
 
@@ -22,7 +17,7 @@ class HeaderSpec: StringSpec() {
         "test sender headers" {
             val client = embeddedServer.applicationContext.getBean(PetClient::class.java)
 
-            val pet = client["Fred"].blockingGet()
+            val pet = Mono.from(client["Fred"]).block()
 
             pet shouldNotBe null
             pet.age.toLong() shouldBe 11

@@ -19,13 +19,13 @@ import io.micronaut.docs.annotation.Pet
 import io.micronaut.docs.annotation.PetOperations
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.retry.annotation.Retryable
-import io.reactivex.Single
+import reactor.core.publisher.Mono
 
 // tag::class[]
 @Client("/pets")
 @Retryable
 interface PetClient : PetOperations {
 
-    override fun save(name: String, age: Int): Single<Pet>
+    override fun save(name: String, age: Int): Mono<Pet>
 }
 // end::class[]
