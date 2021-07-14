@@ -16,6 +16,8 @@
 package io.micronaut.core.util;
 
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
+
 import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.IntFunction;
@@ -31,6 +33,7 @@ public class ArrayUtils {
     /**
      * An empty object array.
      */
+    @UsedByGeneratedCode
     public static final Object[] EMPTY_OBJECT_ARRAY = new Object[0];
 
     /**
