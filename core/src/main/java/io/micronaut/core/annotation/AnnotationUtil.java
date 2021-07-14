@@ -255,6 +255,356 @@ public class AnnotationUtil {
     }
 
     /**
+     * Create a new immutable {@link Map} from an array of values.
+     * String values must be sorted!
+     *
+     * @param array The key,value array
+     * @return The created map
+     */
+    @UsedByGeneratedCode
+    public static Map<String, Object> mapOf(Object... array) {
+        int len = array.length;
+        if (len % 2 != 0) {
+            throw new IllegalArgumentException("Number of arguments should be an even number representing the keys and values");
+        }
+        if (array.length == 0) {
+            return Collections.EMPTY_MAP;
+        }
+        int size = len / 2;
+        String[] keys = new String[size];
+        Object[] values = new Object[size];
+        int k = 0;
+        for (int i = 0, arrayLength = array.length; i < arrayLength; i += 2) {
+            keys[k] = (String) array[i];
+            values[k] = array[i + 1];
+            k++;
+        }
+        return new ImmutableSortedStringsArrayMap(keys, values);
+    }
+
+    /**
+     * Create a new immutable {@link Map}.
+     * String values must be sorted!
+     *
+     * @param key1   The key 1
+     * @param value1 The value 1
+     * @return The created map
+     */
+    @UsedByGeneratedCode
+    public static Map<String, Object> mapOf(String key1, Object value1) {
+        return Collections.singletonMap(key1, value1);
+    }
+
+    /**
+     * Create a new immutable {@link Map}.
+     * String values must be sorted!
+     *
+     * @param key1   The key1
+     * @param value1 The value1
+     * @param key2   The key2
+     * @param value2 The value2
+     * @return The created map
+     */
+    @UsedByGeneratedCode
+    public static Map<String, Object> mapOf(String key1, Object value1, String key2, Object value2) {
+        String[] keys = {
+                key1, key2
+        };
+        Object[] values = {
+                value1, value2
+        };
+        return new ImmutableSortedStringsArrayMap(keys, values);
+    }
+
+    /**
+     * Create a new immutable {@link Map}.
+     * String values must be sorted!
+     *
+     * @param key1   The key1
+     * @param value1 The value1
+     * @param key2   The key2
+     * @param value2 The value2
+     * @param key3   The key3
+     * @param value3 The value3
+     * @return The created map
+     */
+    @UsedByGeneratedCode
+    public static Map<String, Object> mapOf(String key1, Object value1,
+                                            String key2, Object value2,
+                                            String key3, Object value3) {
+        String[] keys = {
+                key1, key2, key3
+        };
+        Object[] values = {
+                value1, value2, value3
+        };
+        return new ImmutableSortedStringsArrayMap(keys, values);
+    }
+
+    /**
+     * Create a new immutable {@link Map}.
+     * String values must be sorted!
+     *
+     * @param key1   The key1
+     * @param value1 The value1
+     * @param key2   The key2
+     * @param value2 The value2
+     * @param key3   The key3
+     * @param value3 The value3
+     * @param key4   The key4
+     * @param value4 The value4
+     * @return The created map
+     */
+    @UsedByGeneratedCode
+    public static Map<String, Object> mapOf(String key1, Object value1,
+                                            String key2, Object value2,
+                                            String key3, Object value3,
+                                            String key4, Object value4) {
+        String[] keys = {
+                key1, key2, key3, key4
+        };
+        Object[] values = {
+                value1, value2, value3, value4
+        };
+        return new ImmutableSortedStringsArrayMap(keys, values);
+    }
+
+    /**
+     * Create a new immutable {@link Map}.
+     * String values must be sorted!
+     *
+     * @param key1   The key1
+     * @param value1 The value1
+     * @param key2   The key2
+     * @param value2 The value2
+     * @param key3   The key3
+     * @param value3 The value3
+     * @param key4   The key4
+     * @param value4 The value4
+     * @param key5   The key5
+     * @param value5 The value5
+     * @return The created map
+     */
+    @UsedByGeneratedCode
+    public static Map<String, Object> mapOf(String key1, Object value1,
+                                            String key2, Object value2,
+                                            String key3, Object value3,
+                                            String key4, Object value4,
+                                            String key5, Object value5) {
+        String[] keys = {
+                key1, key2, key3, key4, key5
+        };
+        Object[] values = {
+                value1, value2, value3, value4, value5
+        };
+        return new ImmutableSortedStringsArrayMap(keys, values);
+    }
+
+    /**
+     * Create a new immutable {@link Map}.
+     * String values must be sorted!
+     *
+     * @param key1   The key1
+     * @param value1 The value1
+     * @param key2   The key2
+     * @param value2 The value2
+     * @param key3   The key3
+     * @param value3 The value3
+     * @param key4   The key4
+     * @param value4 The value4
+     * @param key5   The key5
+     * @param value5 The value5
+     * @param key6   The key6
+     * @param value6 The value6
+     * @return The created map
+     */
+    @UsedByGeneratedCode
+    public static Map<String, Object> mapOf(String key1, Object value1,
+                                            String key2, Object value2,
+                                            String key3, Object value3,
+                                            String key4, Object value4,
+                                            String key5, Object value5,
+                                            String key6, Object value6) {
+        String[] keys = {
+                key1, key2, key3, key4, key5, key6
+        };
+        Object[] values = {
+                value1, value2, value3, value4, value5, value6
+        };
+        return new ImmutableSortedStringsArrayMap(keys, values);
+    }
+
+    /**
+     * Create a new immutable {@link Map}.
+     * String values must be sorted!
+     *
+     * @param key1   The key1
+     * @param value1 The value1
+     * @param key2   The key2
+     * @param value2 The value2
+     * @param key3   The key3
+     * @param value3 The value3
+     * @param key4   The key4
+     * @param value4 The value4
+     * @param key5   The key5
+     * @param value5 The value5
+     * @param key6   The key6
+     * @param value6 The value6
+     * @param key7   The key7
+     * @param value7 The value7
+     * @return The created map
+     */
+    @SuppressWarnings("ParameterNumber")
+    @UsedByGeneratedCode
+    public static Map<String, Object> mapOf(String key1, Object value1,
+                                            String key2, Object value2,
+                                            String key3, Object value3,
+                                            String key4, Object value4,
+                                            String key5, Object value5,
+                                            String key6, Object value6,
+                                            String key7, Object value7) {
+        String[] keys = {
+                key1, key2, key3, key4, key5, key6, key7
+        };
+        Object[] values = {
+                value1, value2, value3, value4, value5, value6, value7
+        };
+        return new ImmutableSortedStringsArrayMap(keys, values);
+    }
+
+    /**
+     * Create a new immutable {@link Map}.
+     * String values must be sorted!
+     *
+     * @param key1   The key1
+     * @param value1 The value1
+     * @param key2   The key2
+     * @param value2 The value2
+     * @param key3   The key3
+     * @param value3 The value3
+     * @param key4   The key4
+     * @param value4 The value4
+     * @param key5   The key5
+     * @param value5 The value5
+     * @param key6   The key6
+     * @param value6 The value6
+     * @param key7   The key7
+     * @param value7 The value7
+     * @param key8   The key8
+     * @param value8 The value8
+     * @return The created map
+     */
+    @SuppressWarnings("ParameterNumber")
+    @UsedByGeneratedCode
+    public static Map<String, Object> mapOf(String key1, Object value1,
+                                            String key2, Object value2,
+                                            String key3, Object value3,
+                                            String key4, Object value4,
+                                            String key5, Object value5,
+                                            String key6, Object value6,
+                                            String key7, Object value7,
+                                            String key8, Object value8) {
+        String[] keys = {
+                key1, key2, key3, key4, key5, key6, key7, key8
+        };
+        Object[] values = {
+                value1, value2, value3, value4, value5, value6, value7, value8
+        };
+        return new ImmutableSortedStringsArrayMap(keys, values);
+    }
+
+    /**
+     * Create a new immutable {@link Map}.
+     * String values must be sorted!
+     *
+     * @param key1   The key1
+     * @param value1 The value1
+     * @param key2   The key2
+     * @param value2 The value2
+     * @param key3   The key3
+     * @param value3 The value3
+     * @param key4   The key4
+     * @param value4 The value4
+     * @param key5   The key5
+     * @param value5 The value5
+     * @param key6   The key6
+     * @param value6 The value6
+     * @param key7   The key7
+     * @param value7 The value7
+     * @param key8   The key8
+     * @param value8 The value8
+     * @param key9   The key9
+     * @param value9 The value9
+     * @return The created map
+     */
+    @SuppressWarnings("ParameterNumber")
+    @UsedByGeneratedCode
+    public static Map<String, Object> mapOf(String key1, Object value1,
+                                            String key2, Object value2,
+                                            String key3, Object value3,
+                                            String key4, Object value4,
+                                            String key5, Object value5,
+                                            String key6, Object value6,
+                                            String key7, Object value7,
+                                            String key8, Object value8,
+                                            String key9, Object value9) {
+        String[] keys = {
+                key1, key2, key3, key4, key5, key6, key7, key8, key9
+        };
+        Object[] values = {
+                value1, value2, value3, value4, value5, value6, value7, value8, value9
+        };
+        return new ImmutableSortedStringsArrayMap(keys, values);
+    }
+
+    /**
+     * Create a new immutable {@link Map}.
+     * String values must be sorted!
+     *
+     * @param key1    The key1
+     * @param value1  The value1
+     * @param key2    The key2
+     * @param value2  The value2
+     * @param key3    The key3
+     * @param value3  The value3
+     * @param key4    The key4
+     * @param value4  The value4
+     * @param key5    The key5
+     * @param value5  The value5
+     * @param key6    The key6
+     * @param value6  The value6
+     * @param key7    The key7
+     * @param value7  The value7
+     * @param key8    The key8
+     * @param value8  The value8
+     * @param key9    The key9
+     * @param value9  The value9
+     * @param key10   The key10
+     * @param value10 The value10
+     * @return The created map
+     */
+    @SuppressWarnings("ParameterNumber")
+    @UsedByGeneratedCode
+    public static Map<String, Object> mapOf(String key1, Object value1,
+                                            String key2, Object value2,
+                                            String key3, Object value3,
+                                            String key4, Object value4,
+                                            String key5, Object value5,
+                                            String key6, Object value6,
+                                            String key7, Object value7,
+                                            String key8, Object value8,
+                                            String key9, Object value9,
+                                            String key10, Object value10) {
+        String[] keys = {
+                key1, key2, key3, key4, key5, key6, key7, key8, key9, key10
+        };
+        Object[] values = {
+                value1, value2, value3, value4, value5, value6, value7, value8, value9, value10
+        };
+        return new ImmutableSortedStringsArrayMap(keys, values);
+    }
+
+    /**
      * Calculates the hash code of annotation values.
      *
      * @param values The map to calculate values' hash code

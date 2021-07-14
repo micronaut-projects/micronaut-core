@@ -112,6 +112,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 /**
@@ -147,13 +148,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             BeanDefinition.class)
             .orElseThrow(() -> new ClassGenerationException("Invalid version of Micronaut present on the class path"));
 
-    private static final org.objectweb.asm.commons.Method METHOD_MAP_OF = org.objectweb.asm.commons.Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(
-                    CollectionUtils.class,
-                    "mapOf",
-                    Object[].class
-            )
-    );
     private static final Method POST_CONSTRUCT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition2.class, "postConstruct", BeanResolutionContext.class, BeanContext.class, Object.class);
 
     private static final Method INJECT_BEAN_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition2.class, "injectBean", BeanResolutionContext.class, BeanContext.class, Object.class);
@@ -902,32 +896,23 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             staticInit.putStatic(beanDefinitionType, FIELD_INJECTION_FIELDS, fieldsFieldType);
         }
 
-        if (!superBeanDefinition && typeArguments != null && !typeArguments.isEmpty()) {
+        if (!superBeanDefinition && hasTypeArguments()) {
             Type typeArgumentsFieldType = Type.getType(Map.class);
             classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_TYPE_ARGUMENTS, typeArgumentsFieldType.getDescriptor(), null, null);
-            int totalSize = typeArguments.size() * 2;
-            // start a new array
-            pushNewArray(staticInit, Object.class, totalSize);
-            int i = 0;
-            for (Map.Entry<String, Map<String, ClassElement>> entry : typeArguments.entrySet()) {
-                // use the property name as the key
-                String typeName = entry.getKey();
-                pushStoreStringInArray(staticInit, i++, totalSize, typeName);
-                // use the property type as the value
-                pushStoreInArray(staticInit, i++, totalSize, () ->
-                        pushTypeArgumentElements(
-                                beanDefinitionType,
-                                classWriter,
-                                staticInit,
-                                beanDefinitionName,
-                                entry.getValue(),
-                                defaultsStorage,
-                                loadTypeMethods
-                        )
-                );
-            }
-            // invoke the AbstractBeanDefinition.createMap method
-            staticInit.invokeStatic(Type.getType(CollectionUtils.class), METHOD_MAP_OF);
+            pushStringMapOf(staticInit, typeArguments, true, null, new Consumer<Map<String, ClassElement>>() {
+                @Override
+                public void accept(Map<String, ClassElement> stringClassElementMap) {
+                    pushTypeArgumentElements(
+                            beanDefinitionType,
+                            classWriter,
+                            staticInit,
+                            beanDefinitionName,
+                            stringClassElementMap,
+                            defaultsStorage,
+                            loadTypeMethods
+                    );
+                }
+            });
             staticInit.putStatic(beanDefinitionType, FIELD_TYPE_ARGUMENTS, typeArgumentsFieldType);
         }
 
@@ -979,6 +964,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
         classWriter.visitEnd();
         this.beanFinalized = true;
+    }
+
+    private boolean hasTypeArguments() {
+        return typeArguments != null && !typeArguments.isEmpty() && typeArguments.entrySet().stream().anyMatch(e -> !e.getValue().isEmpty());
     }
 
     private boolean isSingleton(String scope) {
@@ -2722,7 +2711,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 return false;
             }
             visitor.push(JavaModelUtils.getTypeReference(type.fromArray()));
-            visitor.push(type.getType().getCanonicalName());
+            visitor.push((String) null);
             invokeInterfaceStaticMethod(
                     visitor,
                     Argument.class,
@@ -2915,7 +2904,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 protectedConstructor.invokeConstructor(executableMethodsDefinitionWriter.getClassType(), METHOD_DEFAULT_CONSTRUCTOR);
             }
             // 7: `Map<String, Argument<?>[]>` typeArgumentsMap
-            if (typeArguments == null || typeArguments.isEmpty()) {
+            if (!hasTypeArguments()) {
                 protectedConstructor.push((String) null);
             } else {
                 protectedConstructor.getStatic(beanDefinitionType, FIELD_TYPE_ARGUMENTS, Type.getType(Map.class));

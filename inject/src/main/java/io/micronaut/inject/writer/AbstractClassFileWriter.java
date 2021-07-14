@@ -15,7 +15,12 @@
  */
 package io.micronaut.inject.writer;
 
-import io.micronaut.core.annotation.*;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Generated;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -24,9 +29,18 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
-import io.micronaut.inject.ast.*;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.processing.JavaModelUtils;
-import org.objectweb.asm.*;
+import org.objectweb.asm.AnnotationVisitor;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
@@ -36,10 +50,23 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Array;
 import java.nio.file.Files;
-import java.util.*;
+import java.util.AbstractMap;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Abstract class that writes generated classes to disk and provides convenience methods for building classes.
@@ -87,6 +114,35 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                     Class.class,
                     AnnotationMetadata.class,
                     Class[].class
+            )
+    );
+
+    private static final Type ANNOTATION_UTIL_TYPE = Type.getType(AnnotationUtil.class);
+    private static final Type MAP_TYPE = Type.getType(Map.class);
+    private static final String EMPTY_MAP = "EMPTY_MAP";
+
+    private static final org.objectweb.asm.commons.Method[] MAP_OF;
+    private static final org.objectweb.asm.commons.Method MAP_BY_ARRAY;
+
+    static {
+        MAP_OF = new Method[11];
+        for (int i = 2; i < MAP_OF.length; i++) {
+            Class[] mapArgs = new Class[i * 2];
+            for (int k = 0; k < i * 2; k += 2) {
+                mapArgs[k] = String.class;
+                mapArgs[k + 1] = Object.class;
+            }
+            MAP_OF[i] = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredMethod(AnnotationUtil.class, "mapOf", mapArgs));
+        }
+        MAP_BY_ARRAY = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredMethod(AnnotationUtil.class, "mapOf", Object[].class));
+    }
+
+    private static final org.objectweb.asm.commons.Method INTERN_MAP_OF_METHOD = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(
+                    AnnotationUtil.class,
+                    "internMapOf",
+                    String.class,
+                    Object.class
             )
     );
 
@@ -1552,5 +1608,46 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             generatorAdapter.invokeVirtual(declaringType, targetMethod);
         }
         return returnType;
+    }
+
+    public static <T> void pushStringMapOf(GeneratorAdapter generatorAdapter, Map<? extends CharSequence, T> annotationData,
+                                           boolean skipEmpty,
+                                           T empty,
+                                           Consumer<T> pushValue) {
+        Set<? extends Map.Entry<String, T>> entrySet = annotationData != null ? annotationData.entrySet()
+                .stream()
+                .filter(e -> !skipEmpty || (e.getKey() != null && e.getValue() != null))
+                .map(e -> e.getValue() == null && empty != null ? new AbstractMap.SimpleEntry<>(e.getKey().toString(), empty) : new AbstractMap.SimpleEntry<>(e.getKey().toString(), e.getValue()))
+                .collect(Collectors.toCollection(() -> new TreeSet<>(Map.Entry.comparingByKey()))) : null;
+        if (entrySet == null || entrySet.isEmpty()) {
+            generatorAdapter.getStatic(Type.getType(Collections.class), EMPTY_MAP, MAP_TYPE);
+            return;
+        }
+        if (entrySet.size() == 1) {
+            for (Map.Entry<String, T> entry : entrySet) {
+                generatorAdapter.push(entry.getKey());
+                pushValue.accept(entry.getValue());
+            }
+            generatorAdapter.invokeStatic(ANNOTATION_UTIL_TYPE, INTERN_MAP_OF_METHOD);
+        } else if (entrySet.size() < MAP_OF.length) {
+            for (Map.Entry<String, T> entry : entrySet) {
+                generatorAdapter.push(entry.getKey());
+                pushValue.accept(entry.getValue());
+            }
+            generatorAdapter.invokeStatic(ANNOTATION_UTIL_TYPE, MAP_OF[entrySet.size()]);
+        } else {
+            int totalSize = entrySet.size() * 2;
+            // start a new array
+            pushNewArray(generatorAdapter, Object.class, totalSize);
+            int i = 0;
+            for (Map.Entry<? extends CharSequence, T> entry : entrySet) {
+                // use the property name as the key
+                String memberName = entry.getKey().toString();
+                pushStoreStringInArray(generatorAdapter, i++, totalSize, memberName);
+                // use the property type as the value
+                pushStoreInArray(generatorAdapter, i++, totalSize, () -> pushValue.accept(entry.getValue()));
+            }
+            generatorAdapter.invokeStatic(ANNOTATION_UTIL_TYPE, MAP_BY_ARRAY);
+        }
     }
 }
