@@ -283,6 +283,7 @@ public class DependencyInjectionException extends BeanCreationException {
      * @param resolutionContext    The resolution context
      * @param conversionContext    The conversion context
      * @param property             The property being resolved
+     * @return new instance of {@link DependencyInjectionException}
      */
     public static DependencyInjectionException missingProperty(BeanResolutionContext resolutionContext, ArgumentConversionContext conversionContext, String property) {
         return new DependencyInjectionException(resolutionContext, MessageUtils.buildMessage(resolutionContext, buildConversionMessage(property, conversionContext), false));

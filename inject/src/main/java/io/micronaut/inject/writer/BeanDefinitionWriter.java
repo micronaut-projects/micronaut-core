@@ -45,6 +45,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.TypeVariableResolver;
@@ -81,8 +82,11 @@ import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 import jakarta.inject.Singleton;
 import org.jetbrains.annotations.NotNull;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
-import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.signature.SignatureVisitor;
 import org.objectweb.asm.signature.SignatureWriter;
@@ -436,7 +440,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             if (uniqueIdentifier == null) {
                 throw new IllegalArgumentException("Factory methods require passing a unique identifier");
             }
-            final ClassElement declaringType = factoryMethodElement.getDeclaringType();
+            final ClassElement declaringType = factoryMethodElement.getOwningType();
             this.beanDefinitionName = declaringType.getPackageName() + "." + prefixClassName(declaringType.getSimpleName()) + "$" + upperCaseMethodName + uniqueIdentifier + CLASS_SUFFIX;
         } else if (beanProducingElement instanceof FieldElement) {
             autoApplyNamedToBeanProducingElement(beanProducingElement);
@@ -453,7 +457,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             if (uniqueIdentifier == null) {
                 throw new IllegalArgumentException("Factory fields require passing a unique identifier");
             }
-            final ClassElement declaringType = factoryMethodElement.getDeclaringType();
+            final ClassElement declaringType = factoryMethodElement.getOwningType();
             this.beanDefinitionName = declaringType.getPackageName() + "." + prefixClassName(declaringType.getSimpleName()) + "$" + fieldName + uniqueIdentifier + CLASS_SUFFIX;
         } else if (beanProducingElement instanceof BeanElementBuilder) {
             BeanElementBuilder beanElementBuilder = (BeanElementBuilder) beanProducingElement;
@@ -704,7 +708,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             this.constructorRequiresReflection = requiresReflection;
 
             // now prepare the implementation of the build method. See BeanFactory interface
-            visitBuildMethodDefinition(constructor);
+            visitBuildMethodDefinition(constructor, requiresReflection);
 
             // now override the injectBean method
             visitInjectMethodDefinition();
@@ -789,7 +793,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             constructor = defaultConstructor;
 
             // now prepare the implementation of the build method. See BeanFactory interface
-            visitBuildMethodDefinition(defaultConstructor);
+            visitBuildMethodDefinition(defaultConstructor, false);
             // now override the injectBean method
             visitInjectMethodDefinition();
         }
@@ -1779,7 +1783,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void applyDefaultNamedToParameters(List<ParameterElement> argumentTypes) {
         for (ParameterElement parameterElement : argumentTypes) {
-            autoApplyNamedIfPresent(parameterElement, parameterElement.getAnnotationMetadata());
+            final AnnotationMetadata annotationMetadata = parameterElement.getAnnotationMetadata();
+            DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, annotationMetadata);
+            autoApplyNamedIfPresent(parameterElement, annotationMetadata);
         }
     }
 
@@ -2226,7 +2232,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
     }
 
-    private void visitBuildMethodDefinition(MethodElement constructor) {
+    private void visitBuildMethodDefinition(MethodElement constructor, boolean requiresReflection) {
         if (buildMethodVisitor == null) {
             boolean isIntercepted = isConstructorIntercepted(constructor);
             final ParameterElement[] parameterArray = constructor.getParameters();
@@ -2253,11 +2259,32 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                             new org.objectweb.asm.commons.Method(constructor.getName(), methodDescriptor)
                     );
                 } else {
-                    buildMethodVisitor.visitTypeInsn(NEW, beanType.getInternalName());
-                    buildMethodVisitor.visitInsn(DUP);
-                    pushConstructorArguments(buildMethodVisitor, parameterArray);
-                    String constructorDescriptor = getConstructorDescriptor(parameters);
-                    buildMethodVisitor.visitMethodInsn(INVOKESPECIAL, beanType.getInternalName(), "<init>", constructorDescriptor, false);
+                    if (requiresReflection) {
+                        final int parameterArrayLocalVarIndex = createParameterArray(parameters, buildMethodVisitor);
+                        final int parameterTypeArrayLocalVarIndex = createParameterTypeArray(parameters, buildMethodVisitor);
+                        buildMethodVisitor.push(beanType);
+                        buildMethodVisitor.loadLocal(parameterTypeArrayLocalVarIndex);
+                        buildMethodVisitor.loadLocal(parameterArrayLocalVarIndex);
+                        buildMethodVisitor.invokeStatic(
+                                Type.getType(InstantiationUtils.class),
+                                org.objectweb.asm.commons.Method.getMethod(
+                                        ReflectionUtils.getRequiredInternalMethod(
+                                                InstantiationUtils.class,
+                                                "instantiate",
+                                                Class.class,
+                                                Class[].class,
+                                                Object[].class
+                                        )
+                                )
+                        );
+                        pushCastToType(buildMethodVisitor, beanType);
+                    } else {
+                        buildMethodVisitor.newInstance(beanType);
+                        buildMethodVisitor.dup();
+                        pushConstructorArguments(buildMethodVisitor, parameterArray);
+                        String constructorDescriptor = getConstructorDescriptor(parameters);
+                        buildMethodVisitor.invokeConstructor(beanType, new org.objectweb.asm.commons.Method("<init>", constructorDescriptor));
+                    }
                 }
             }
 
@@ -2480,6 +2507,20 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @NotNull
     private String newInnerClassName() {
         return this.beanDefinitionName + "$" + ++innerClassIndex;
+    }
+
+    private int createParameterTypeArray(List<ParameterElement> parameters, GeneratorAdapter buildMethodVisitor) {
+        final int pLen = parameters.size();
+        pushNewArray(buildMethodVisitor, Class.class, pLen);
+        for (int i = 0; i < pLen; i++) {
+            final ParameterElement parameter = parameters.get(i);
+            pushStoreInArray(buildMethodVisitor, i, pLen, () ->
+                    buildMethodVisitor.push(getTypeReference(parameter))
+            );
+        }
+        int local = buildMethodVisitor.newLocal(Type.getType(Object[].class));
+        buildMethodVisitor.storeLocal(local);
+        return local;
     }
 
     private int createParameterArray(List<ParameterElement> parameters, GeneratorAdapter buildMethodVisitor) {

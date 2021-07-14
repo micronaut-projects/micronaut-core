@@ -77,6 +77,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 /**
@@ -379,7 +380,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
                         fieldConstructor.annotationMetadata
                 );
             }
-            if (environment != null) {
+            if (environment != null && constructorInjectionPoint instanceof EnvironmentConfigurable) {
                 ((EnvironmentConfigurable) constructorInjectionPoint).configure(environment);
             }
         }
@@ -392,12 +393,21 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
             return requiredComponents;
         }
         Set<Class<?>> requiredComponents = new HashSet<>();
+        Consumer<Argument> argumentConsumer = argument -> {
+            if (argument.isContainerType() || argument.isProvider()) {
+                argument.getFirstTypeVariable()
+                        .map(Argument::getType)
+                        .ifPresent(requiredComponents::add);
+            } else {
+                requiredComponents.add(argument.getType());
+            }
+        };
         if (constructor != null) {
             if (constructor instanceof MethodReference) {
                 MethodReference methodConstructor = (MethodReference) constructor;
                 if (methodConstructor.arguments != null && methodConstructor.arguments.length > 0) {
                     for (Argument<?> argument : methodConstructor.arguments) {
-                        requiredComponents.add(argument.getType());
+                        argumentConsumer.accept(argument);
                     }
                 }
             }
@@ -406,15 +416,15 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
             for (MethodReference methodReference : methodInjection) {
                 if (methodReference.arguments != null && methodReference.arguments.length > 0) {
                     for (Argument<?> argument : methodReference.arguments) {
-                        requiredComponents.add(argument.getType());
+                        argumentConsumer.accept(argument);
                     }
                 }
             }
         }
         if (fieldInjection != null) {
             for (FieldReference fieldReference : fieldInjection) {
-                if (fieldReference.annotationMetadata != null && fieldReference.annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.INJECT)) {
-                    requiredComponents.add(fieldReference.fieldType);
+                if (annotationMetadata != null && annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.INJECT)) {
+                    argumentConsumer.accept(fieldReference.asArgument(null));
                 }
             }
         }
@@ -1592,12 +1602,13 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
 
     private boolean isInnerConfiguration(Argument<?> argumentType, BeanContext beanContext) {
         final Class<?> type = argumentType.getType();
-        return isConfigurationProperties &&
-                type.getName().indexOf('$') > -1 &&
+        boolean isInnerClass = type.getName().indexOf('$') > -1 &&
                 !type.isEnum() &&
                 !type.isPrimitive() &&
                 Modifier.isPublic(type.getModifiers()) && Modifier.isStatic(type.getModifiers()) &&
-                isInnerOfAnySuperclass(type) &&
+                isInnerOfAnySuperclass(type);
+        return isConfigurationProperties &&
+                isInnerClass &&
                 beanContext.findBeanDefinition(argumentType).map(bd -> bd.hasStereotype(ConfigurationReader.class) || bd.isIterable()).isPresent();
     }
 

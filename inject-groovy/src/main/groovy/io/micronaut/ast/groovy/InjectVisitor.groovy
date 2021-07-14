@@ -66,7 +66,6 @@ import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.inject.configuration.ConfigurationMetadata
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder
 import io.micronaut.inject.configuration.PropertyMetadata
-import io.micronaut.inject.processing.ProcessedTypes
 import io.micronaut.inject.visitor.VisitorConfiguration
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
@@ -543,16 +542,9 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                                 requiresReflection,
                                 groovyVisitorContext
                         )
-                        if (aopProxyWriter instanceof AopProxyWriter && !((AopProxyWriter)aopProxyWriter).isProxyTarget()) {
-                            aopProxyWriter.visitPostConstructMethod(
-                                    declaringElement,
-                                    groovyMethodElement,
-                                    requiresReflection,
-                                    groovyVisitorContext
-                        )
                     } else if (isDeclaredBean && methodAnnotationMetadata.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)) {
                         defineBeanDefinition(concreteClass)
-                        getBeanWriter().visitPreDestroyMethod(
+                        beanWriter.visitPreDestroyMethod(
                                 declaringElement,
                                 groovyMethodElement,
                                 requiresReflection,

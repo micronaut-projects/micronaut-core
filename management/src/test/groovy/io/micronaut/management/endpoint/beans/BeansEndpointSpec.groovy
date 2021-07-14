@@ -20,7 +20,6 @@ import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpResponse
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.RxHttpClient
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
