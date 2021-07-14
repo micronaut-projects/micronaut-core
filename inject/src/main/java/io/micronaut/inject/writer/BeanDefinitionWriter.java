@@ -15,9 +15,33 @@
  */
 package io.micronaut.inject.writer;
 
-import io.micronaut.context.*;
-import io.micronaut.context.annotation.*;
-import io.micronaut.core.annotation.*;
+import io.micronaut.context.AbstractBeanDefinition2;
+import io.micronaut.context.AbstractConstructorInjectionPoint;
+import io.micronaut.context.AbstractExecutableMethod;
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.DefaultBeanContext;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.ConfigurationBuilder;
+import io.micronaut.context.annotation.ConfigurationInject;
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.context.annotation.DefaultScope;
+import io.micronaut.context.annotation.EachBean;
+import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Property;
+import io.micronaut.context.annotation.Provided;
+import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
@@ -27,11 +51,29 @@ import io.micronaut.core.type.TypeVariableResolver;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.inject.*;
+import io.micronaut.inject.AdvisedBeanType;
+import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.BeanFactory;
+import io.micronaut.inject.ConstructorInjectionPoint;
+import io.micronaut.inject.DisposableBeanDefinition;
+import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.ExecutableMethodsDefinition;
+import io.micronaut.inject.InitializingBeanDefinition;
+import io.micronaut.inject.ParametrizedBeanFactory;
+import io.micronaut.inject.ProxyBeanDefinition;
+import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
-import io.micronaut.inject.ast.*;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.PrimitiveElement;
+import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.PropertyMetadata;
@@ -51,7 +93,20 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
@@ -283,20 +338,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private int currentFieldIndex = 0;
     private int currentMethodIndex = 0;
 
-//    // 0 is this, while 1,2 and 3 are the first 3 parameters in the "build" method signature. See BeanFactory
-//    private int buildMethodLocalCount = 4;
-//
-//    // 0 is this, while 1,2 and 3 are the first 3 parameters in the "initialize" method signature. See InitializingBeanDefinition
-//    private int postConstructMethodLocalCount = 4;
-//
-//    // 0 is this, while 1,2 and 3 are the first 3 parameters in the "dispose" method signature. See DisposableBeanDefinition
-//    private int preDestroyMethodLocalCount = 4;
-
-    // the instance being built position in the index
-    private int _buildInstanceIndex;
-    private int _injectInstanceIndex;
-    private int _postConstructInstanceIndex;
-    private int _preDestroyInstanceIndex;
+    private int buildInstanceLocalVarIndex = -1;
+    private int injectInstanceLocalVarIndex = -1;
+    private int postConstructInstanceLocalVarIndex = -1;
+    private int preDestroyInstanceLocalVarIndex = -1;
     private boolean beanFinalized = false;
     private Type superType = TYPE_ABSTRACT_BEAN_DEFINITION;
     private boolean isParametrized = false;
@@ -310,10 +355,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private int innerClassIndex;
 
-    private List<FieldVisitData> fieldInjectionPoints = new ArrayList<>(2);
-    private List<MethodVisitData> methodInjectionPoints = new ArrayList<>(2);
-    private List<MethodVisitData> postConstructMethodVisits = new ArrayList<>(2);
-    private List<MethodVisitData> preDestroyMethodVisits = new ArrayList<>(2);
+    private final List<FieldVisitData> fieldInjectionPoints = new ArrayList<>(2);
+    private final List<MethodVisitData> methodInjectionPoints = new ArrayList<>(2);
+    private final List<MethodVisitData> postConstructMethodVisits = new ArrayList<>(2);
+    private final List<MethodVisitData> preDestroyMethodVisits = new ArrayList<>(2);
     private ExecutableMethodsDefinitionWriter executableMethodsDefinitionWriter;
 
     private Object constructor; // MethodElement or FieldElement
@@ -908,12 +953,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             injectMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, 10);
         }
         if (postConstructMethodVisitor != null) {
-            postConstructMethodVisitor.loadLocal(_postConstructInstanceIndex);
+            postConstructMethodVisitor.loadLocal(postConstructInstanceLocalVarIndex);
             postConstructMethodVisitor.returnValue();
             postConstructMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, 10);
         }
         if (preDestroyMethodVisitor != null) {
-            preDestroyMethodVisitor.loadLocal(_preDestroyInstanceIndex);
+            preDestroyMethodVisitor.loadLocal(preDestroyInstanceLocalVarIndex);
             preDestroyMethodVisitor.returnValue();
             preDestroyMethodVisitor.visitMaxs(20, 10);
         }
@@ -1038,7 +1083,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (!superBeanDefinition) {
             MethodVisitData methodVisitData = new MethodVisitData(declaringType, methodElement, requiresReflection);
             postConstructMethodVisits.add(methodVisitData);
-            visitMethodInjectionPointInternal(methodVisitData, postConstructMethodVisitor, _postConstructInstanceIndex);
+            visitMethodInjectionPointInternal(methodVisitData, postConstructMethodVisitor, postConstructInstanceLocalVarIndex);
         }
     }
 
@@ -1053,7 +1098,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
             MethodVisitData methodVisitData = new MethodVisitData(declaringType, methodElement, requiresReflection);
             preDestroyMethodVisits.add(methodVisitData);
-            visitMethodInjectionPointInternal(methodVisitData, preDestroyMethodVisitor, _preDestroyInstanceIndex);
+            visitMethodInjectionPointInternal(methodVisitData, preDestroyMethodVisitor, preDestroyInstanceLocalVarIndex);
         }
     }
 
@@ -1065,7 +1110,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
         MethodVisitData methodVisitData = new MethodVisitData(declaringType, methodElement, requiresReflection);
         methodInjectionPoints.add(methodVisitData);
-        visitMethodInjectionPointInternal(methodVisitData, injectMethodVisitor, _injectInstanceIndex);
+        visitMethodInjectionPointInternal(methodVisitData, injectMethodVisitor, injectInstanceLocalVarIndex);
     }
 
     @Override
@@ -1152,7 +1197,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (StringUtils.isNotEmpty(factoryMethod)) {
             Type builderType = JavaModelUtils.getTypeReference(type);
 
-            injectMethodVisitor.loadLocal(_injectInstanceIndex, beanType);
+            injectMethodVisitor.loadLocal(injectInstanceLocalVarIndex, beanType);
             injectMethodVisitor.invokeStatic(
                     builderType,
                     org.objectweb.asm.commons.Method.getMethod(
@@ -1190,7 +1235,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (StringUtils.isNotEmpty(factoryMethod)) {
             Type builderType = JavaModelUtils.getTypeReference(type);
 
-            injectMethodVisitor.loadLocal(_injectInstanceIndex, beanType);
+            injectMethodVisitor.loadLocal(injectInstanceLocalVarIndex, beanType);
             injectMethodVisitor.invokeStatic(
                     builderType,
                     org.objectweb.asm.commons.Method.getMethod(
@@ -1386,7 +1431,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
             injectMethodVisitor.visitLabel(tryStart);
 
-            injectMethodVisitor.loadLocal(_injectInstanceIndex);
+            injectMethodVisitor.loadLocal(injectInstanceLocalVarIndex);
             if (isResolveBuilderViaMethodCall) {
                 String desc = builderType.getClassName() + " " + builderName + "()";
                 injectMethodVisitor.invokeVirtual(beanType, org.objectweb.asm.commons.Method.getMethod(desc));
@@ -1507,7 +1552,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             injectMethodVisitor.visitLabel(trueCondition);
         }
 
-        injectMethodVisitor.loadLocal(_injectInstanceIndex, beanType);
+        injectMethodVisitor.loadLocal(injectInstanceLocalVarIndex, beanType);
 
         if (fieldElement.getGenericField().isAssignable(BeanContext.class)) {
             injectMethodVisitor.loadArg(1);
@@ -1543,7 +1588,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             injectMethodVisitor.loadArg(0);
             injectMethodVisitor.loadArg(1);
             injectMethodVisitor.push(currentFieldIndex);
-            injectMethodVisitor.loadLocal(_injectInstanceIndex);
+            injectMethodVisitor.loadLocal(injectInstanceLocalVarIndex);
             injectMethodVisitor.loadLocal(storedIndex);
             injectMethodVisitor.invokeVirtual(superType, SET_FIELD_WITH_REFLECTION_METHOD);
             injectMethodVisitor.pop();
@@ -1645,7 +1690,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             injectMethodVisitor.loadArg(0);
             injectMethodVisitor.loadArg(1);
             injectMethodVisitor.push(currentMethodIndex);
-            injectMethodVisitor.loadLocal(_injectInstanceIndex, beanType);
+            injectMethodVisitor.loadLocal(injectInstanceLocalVarIndex, beanType);
             if (hasArguments) {
                 pushNewArray(injectMethodVisitor, Object.class, argumentTypes.size());
                 Iterator<ParameterElement> argIterator = argumentTypes.iterator();
@@ -1771,7 +1816,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             injectVisitor.visitLabel(trueCondition);
         }
         // invoke the method on this injected instance
-        injectVisitor.loadLocal(_injectInstanceIndex, beanType);
+        injectVisitor.loadLocal(injectInstanceLocalVarIndex, beanType);
         String methodDescriptor = getMethodDescriptor(returnType, Collections.singletonList(fieldType));
         // first get the value of the field by calling AbstractBeanDefinition.getBeanForField(..)
         // load 'this'
@@ -1828,8 +1873,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             injectMethodVisitor.loadArg(2);
             // store it in a local variable
             injectMethodVisitor.visitTypeInsn(CHECKCAST, beanType.getInternalName());
-            _injectInstanceIndex = injectMethodVisitor.newLocal(beanType);
-            injectMethodVisitor.storeLocal(_injectInstanceIndex);
+            injectInstanceLocalVarIndex = injectMethodVisitor.newLocal(beanType);
+            injectMethodVisitor.storeLocal(injectInstanceLocalVarIndex);
         }
     }
 
@@ -1849,8 +1894,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 postConstructMethodVisitor.loadArg(2);
                 // store it in a local variable
                 postConstructMethodVisitor.visitTypeInsn(CHECKCAST, beanType.getInternalName());
-                _postConstructInstanceIndex = postConstructMethodVisitor.newLocal(beanType);
-                postConstructMethodVisitor.storeLocal(_postConstructInstanceIndex);
+                postConstructInstanceLocalVarIndex = postConstructMethodVisitor.newLocal(beanType);
+                postConstructMethodVisitor.storeLocal(postConstructInstanceLocalVarIndex);
                 invokeSuperInjectMethod(postConstructMethodVisitor, POST_CONSTRUCT_METHOD);
             }
 
@@ -1860,13 +1905,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                         lifeCycleMethodName,
                         lifeCycleMethodName,
                         buildMethodVisitor,
-                        _buildInstanceIndex
+                        buildInstanceLocalVarIndex
                 );
             } else {
                 pushBeanDefinitionMethodInvocation(buildMethodVisitor, lifeCycleMethodName);
             }
             pushCastToType(buildMethodVisitor, beanType);
-            buildMethodVisitor.loadLocal(_buildInstanceIndex);
+            buildMethodVisitor.loadLocal(buildInstanceLocalVarIndex);
             postConstructAdded = true;
         }
     }
@@ -2047,8 +2092,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             preDestroyMethodVisitor.loadArg(2);
             // store it in a local variable
             preDestroyMethodVisitor.visitTypeInsn(CHECKCAST, beanType.getInternalName());
-            _preDestroyInstanceIndex = preDestroyMethodVisitor.newLocal(beanType);
-            preDestroyMethodVisitor.storeLocal(_preDestroyInstanceIndex);
+            preDestroyInstanceLocalVarIndex = preDestroyMethodVisitor.newLocal(beanType);
+            preDestroyMethodVisitor.storeLocal(preDestroyInstanceLocalVarIndex);
 
             invokeSuperInjectMethod(preDestroyMethodVisitor, PRE_DESTROY_METHOD);
         }
@@ -2072,15 +2117,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         // if this is a provided bean then execute "get"
         if (!providedBeanClassName.equals(beanFullClassName)) {
 
-            buildMethodVisitor.storeLocal(_buildInstanceIndex);
-            buildMethodVisitor.loadLocal(_buildInstanceIndex);
+            buildMethodVisitor.storeLocal(buildInstanceLocalVarIndex);
+            buildMethodVisitor.loadLocal(buildInstanceLocalVarIndex);
             buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
                     beanType.getInternalName(),
                     "get",
                     Type.getMethodDescriptor(Type.getType(Object.class)),
                     false);
             pushCastToType(buildMethodVisitor, providedType);
-            buildMethodVisitor.loadLocal(_buildInstanceIndex);
+            buildMethodVisitor.loadLocal(buildInstanceLocalVarIndex);
             pushBeanDefinitionMethodInvocation(buildMethodVisitor, "injectAnother");
             pushCastToType(buildMethodVisitor, providedType);
         }
@@ -2171,12 +2216,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             }
 
 
-            this._buildInstanceIndex = buildMethodVisitor.newLocal(beanType);
-            buildMethodVisitor.storeLocal(_buildInstanceIndex);
+            this.buildInstanceLocalVarIndex = buildMethodVisitor.newLocal(beanType);
+            buildMethodVisitor.storeLocal(buildInstanceLocalVarIndex);
             pushBeanDefinitionMethodInvocation(buildMethodVisitor, "injectBean");
             pushCastToType(buildMethodVisitor, beanType);
-            buildMethodVisitor.storeLocal(_buildInstanceIndex);
-            buildMethodVisitor.loadLocal(_buildInstanceIndex);
+            buildMethodVisitor.storeLocal(buildInstanceLocalVarIndex);
+            buildMethodVisitor.loadLocal(buildInstanceLocalVarIndex);
             initLifeCycleMethodsIfNecessary();
         }
     }
@@ -2216,12 +2261,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 }
             }
 
-            this._buildInstanceIndex = buildMethodVisitor.newLocal(beanType);
-            buildMethodVisitor.storeLocal(_buildInstanceIndex);
+            this.buildInstanceLocalVarIndex = buildMethodVisitor.newLocal(beanType);
+            buildMethodVisitor.storeLocal(buildInstanceLocalVarIndex);
             pushBeanDefinitionMethodInvocation(buildMethodVisitor, "injectBean");
             pushCastToType(buildMethodVisitor, beanType);
-            buildMethodVisitor.storeLocal(_buildInstanceIndex);
-            buildMethodVisitor.loadLocal(_buildInstanceIndex);
+            buildMethodVisitor.storeLocal(buildInstanceLocalVarIndex);
+            buildMethodVisitor.loadLocal(buildInstanceLocalVarIndex);
             initLifeCycleMethodsIfNecessary();
         }
     }
@@ -2737,7 +2782,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         buildMethodVisitor.loadThis();
         buildMethodVisitor.loadArg(0);
         buildMethodVisitor.loadArg(1);
-        buildMethodVisitor.loadLocal(_buildInstanceIndex);
+        buildMethodVisitor.loadLocal(buildInstanceLocalVarIndex);
 
         buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
                 superBeanDefinition ? superType.getInternalName() : beanDefinitionInternalName,
