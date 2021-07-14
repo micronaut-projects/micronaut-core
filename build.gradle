@@ -477,6 +477,12 @@ ext {
                     group  : 'io.micronaut.rxjava3',
                     name   : 'micronaut-rxjava3'
             ],
+            'micronaut.rxjava2'        : [
+                    version: micronautRxJava2Version,
+                    group  : 'io.micronaut.rxjava2',
+                    name   : 'micronaut-rxjava2',
+                    modules: ['micronaut-rxjava2-http-client', 'micronaut-rxjava2-http-server-netty']
+            ],
             'micronaut.rxjava1'        : [
                     version: micronautRxJava1Version,
                     group  : 'io.micronaut.rxjava1',
