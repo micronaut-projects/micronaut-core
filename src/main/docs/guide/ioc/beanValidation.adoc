@@ -55,6 +55,65 @@ TIP: The ann:core.annotation.Introspected[] annotation can be used as a meta-ann
 
 The above example defines a `Person` class that has two properties (`name` and `age`) that have constraints applied. Note that in Java the annotations can be on the field or the getter, and with Kotlin data classes, the annotation should target the field.
 
+By default, `ConstraintExceptionHandler` create different responses when only one rule is violated and N rules are violated.
+
+One rule violated
+----
+{
+  "message": "Person.age: must be greater than or equal 18",
+  "_links": {
+    "self": {
+      "href": "/persons",
+      "templated": false
+    }
+  }
+}
+----
+
+N Rules violated
+----
+{
+  "message": "Bad Request",
+  "_links": {
+    "self": {
+      "href": "/persons",
+      "templated": false
+    }
+  },
+  "_embedded": {
+    "errors": [
+      {
+        "message": "Person.age: must be greater than or equal 18"
+      },
+      {
+        "message": "Person.name: must not be blank"
+      }
+    ]
+  }
+}
+----
+
+In `one rule violated scenario`, the message field has the rule violation message. In `N rules violated scenario`, the message is default bad request message and the rules violation messages are in `_embedded.errors` field. For some scenarios, if you want to create the same response by putting rule violation message for `one rule violated scenario`, you can configure by setting `jackson.always-serialize-errors-as-list` to `true` in `application.yml`. By default, it is set to `false`.
+
+----
+{
+  "message": "Bad Request",
+  "_links": {
+    "self": {
+      "href": "/persons",
+      "templated": false
+    }
+  },
+  "_embedded": {
+    "errors": [
+      {
+        "message": "Person.age: must be greater than or equal 18"
+      }
+    ]
+  }
+}
+----
+
 To validate the class manually, inject an instance of api:validation.validator.Validator[]:
 
 .Manual Validation Example
