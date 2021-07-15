@@ -2002,6 +2002,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     configurationMetadata,
                     interceptorTypes);
 
+            aopProxyWriter.visitTypeArguments(typeElement.getAllTypeArguments());
 
             Set<TypeElement> additionalInterfaces = Arrays.stream(interfaceTypes)
                     .map(ce -> elementUtils.getTypeElement(ce.getName()))
