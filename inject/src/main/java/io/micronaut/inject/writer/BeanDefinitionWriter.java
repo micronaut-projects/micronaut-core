@@ -26,7 +26,6 @@ import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationInject;
-import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.EachBean;
@@ -70,6 +69,7 @@ import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -291,6 +291,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final String FIELD_INJECTION_METHODS = "$INJECTION_METHODS";
     private static final String FIELD_INJECTION_FIELDS = "$INJECTION_FIELDS";
     private static final String FIELD_TYPE_ARGUMENTS = "$TYPE_ARGUMENTS";
+    private static final String FIELD_INNER_CLASSES = "$INNER_CONFIGURATION_CLASSES";
 
     private static final org.objectweb.asm.commons.Method METHOD_REFERENCE_CONSTRUCTOR = new org.objectweb.asm.commons.Method(CONSTRUCTOR_NAME, getConstructorDescriptor(
             Class.class, // declaringType,
@@ -495,7 +496,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.beanDefinitionInternalName = getInternalName(this.beanDefinitionName);
         this.interfaceTypes = new TreeSet<>(Comparator.comparing(Class::getName));
         this.interfaceTypes.add(BeanFactory.class);
-        this.isConfigurationProperties = annotationMetadata.hasDeclaredStereotype(ConfigurationProperties.class);
+        this.isConfigurationProperties = isConfigurationProperties(annotationMetadata);
         validateExposedTypes(annotationMetadata, visitorContext);
 
     }
@@ -933,14 +934,16 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 constructorRequiresReflection
         );
 
+        addInnerConfigurationMethod(staticInit);
+
         staticInit.returnValue();
-        staticInit.visitMaxs(10, defaultsStorage.size() + 3);
+        staticInit.visitMaxs(DEFAULT_MAX_STACK, defaultsStorage.size() + 3);
         staticInit.visitEnd();
 
         finalizeBuildMethod();
 
         if (buildMethodVisitor != null) {
-            buildMethodVisitor.visitInsn(ARETURN);
+            buildMethodVisitor.returnValue();
             buildMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, 10);
         }
         if (injectMethodVisitor != null) {
@@ -959,7 +962,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (preDestroyMethodVisitor != null) {
             preDestroyMethodVisitor.loadLocal(preDestroyInstanceLocalVarIndex);
             preDestroyMethodVisitor.returnValue();
-            preDestroyMethodVisitor.visitMaxs(20, 10);
+            preDestroyMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, 10);
         }
         if (interceptedDisposeMethod != null) {
             interceptedDisposeMethod.visitMaxs(1, 1);
@@ -974,6 +977,52 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
         classWriter.visitEnd();
         this.beanFinalized = true;
+    }
+
+    private void addInnerConfigurationMethod(GeneratorAdapter staticInit) {
+        if (isConfigurationProperties) {
+            String[] innerClasses = beanTypeElement.getEnclosedElements(ElementQuery.of(ClassElement.class))
+                    .stream()
+                    .filter(this::isConfigurationProperties)
+                    .map(Element::getName)
+                    .toArray(String[]::new);
+
+            if (innerClasses.length > 0) {
+                classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_INNER_CLASSES, Type.getType(Collection.class).getDescriptor(), null, null);
+                if (innerClasses.length > 3) {
+                    staticInit.newInstance(Type.getType(HashSet.class));
+                    staticInit.dup();
+                    pushArrayOfClasses(staticInit, innerClasses);
+                    staticInit.invokeStatic(Type.getType(Arrays.class), org.objectweb.asm.commons.Method.getMethod(
+                            ReflectionUtils.getRequiredMethod(Arrays.class, "asList", Object[].class)
+                    ));
+                    staticInit.invokeConstructor(Type.getType(HashSet.class), org.objectweb.asm.commons.Method.getMethod(
+                            ReflectionUtils.findConstructor(HashSet.class, Collection.class).get()
+                    ));
+                } else if (innerClasses.length == 1) {
+                    pushClass(staticInit, innerClasses[0]);
+                    staticInit.invokeStatic(Type.getType(Collections.class), org.objectweb.asm.commons.Method.getMethod(
+                            ReflectionUtils.getRequiredMethod(Collections.class, "singleton", Object.class)
+                    ));
+                } else {
+                    pushArrayOfClasses(staticInit, innerClasses);
+                    staticInit.invokeStatic(Type.getType(Arrays.class), org.objectweb.asm.commons.Method.getMethod(
+                            ReflectionUtils.getRequiredMethod(Arrays.class, "asList", Object[].class)
+                    ));
+                }
+                staticInit.putStatic(beanDefinitionType, FIELD_INNER_CLASSES, Type.getType(Collection.class));
+
+                GeneratorAdapter isInnerConfigurationMethod = startProtectedMethod(classWriter, "isInnerConfiguration", boolean.class.getName(), Class.class.getName());
+                isInnerConfigurationMethod.getStatic(beanDefinitionType, FIELD_INNER_CLASSES, Type.getType(Collection.class));
+                isInnerConfigurationMethod.loadArg(0);
+                isInnerConfigurationMethod.invokeInterface(Type.getType(Collection.class), org.objectweb.asm.commons.Method.getMethod(
+                        ReflectionUtils.getRequiredMethod(Collection.class, "contains", Object.class)
+                ));
+                isInnerConfigurationMethod.returnValue();
+                isInnerConfigurationMethod.visitMaxs(1, 1);
+                isInnerConfigurationMethod.visitEnd();
+            }
+        }
     }
 
     private boolean hasTypeArguments() {
@@ -1613,14 +1662,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         } else {
             String[] byType = element.hasDeclaredAnnotation(io.micronaut.context.annotation.Type.NAME) ? element.stringValues(io.micronaut.context.annotation.Type.NAME) : null;
             if (byType != null && byType.length > 0) {
-                int len = byType.length;
-                pushNewArray(buildMethodVisitor, Class.class, len);
-                for (int i = 0; i < len; i++) {
-                    final String type = byType[i];
-                    pushStoreInArray(buildMethodVisitor, i, len, () ->
-                            buildMethodVisitor.push(Type.getObjectType(type.replace('.', '/')))
-                    );
-                }
+                pushArrayOfClasses(generatorAdapter, byType);
                 generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), org.objectweb.asm.commons.Method.getMethod(
                         ReflectionUtils.getRequiredMethod(Qualifiers.class, "byType", Class[].class)
                 ));
@@ -1628,6 +1670,19 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 generatorAdapter.push((String) null);
             }
         }
+    }
+
+    private void pushArrayOfClasses(GeneratorAdapter writer, String[] byType) {
+        int len = byType.length;
+        pushNewArray(writer, Class.class, len);
+        for (int i = 0; i < len; i++) {
+            final String type = byType[i];
+            pushStoreInArray(writer, i, len, () -> pushClass(writer, type));
+        }
+    }
+
+    private void pushClass(GeneratorAdapter writer, String className) {
+        writer.push(Type.getObjectType(className.replace('.', '/')));
     }
 
     private void convertToArray(ClassElement arrayType, GeneratorAdapter injectMethodVisitor) {
@@ -2992,8 +3047,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     annotationMetadata.hasDeclaredStereotype(Provided.class)
             );
             // 11: `boolean` isIterable
-            boolean isIterable = annotationMetadata.hasDeclaredStereotype(EachProperty.class) || annotationMetadata.hasDeclaredStereotype(EachBean.class);
-            protectedConstructor.push(isIterable);
+            protectedConstructor.push(isIterable(annotationMetadata));
             // 12: `boolean` isSingleton
             protectedConstructor.push(
                     isSingleton(scope)
@@ -3003,9 +3057,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     annotationMetadata.hasDeclaredStereotype(Primary.class)
             );
             // 14: `boolean` isConfigurationProperties
-            protectedConstructor.push(
-                    isIterable || annotationMetadata.hasStereotype(ConfigurationReader.class)
-            );
+            protectedConstructor.push(isConfigurationProperties);
             // 15: hasExposedTypes
             protectedConstructor.push(
                     annotationMetadata.hasDeclaredAnnotation(Bean.class)
@@ -3023,6 +3075,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             protectedConstructor.visitMaxs(20, 1);
             protectedConstructor.visitEnd();
         }
+    }
+
+    private boolean isConfigurationProperties(AnnotationMetadata annotationMetadata) {
+        return isIterable(annotationMetadata) || annotationMetadata.hasStereotype(ConfigurationReader.class);
+    }
+
+    private boolean isIterable(AnnotationMetadata annotationMetadata) {
+        return annotationMetadata.hasDeclaredStereotype(EachProperty.class) || annotationMetadata.hasDeclaredStereotype(EachBean.class);
     }
 
     private void pushNewMethodReference(GeneratorAdapter staticInit, Type beanType, MethodElement methodElement,

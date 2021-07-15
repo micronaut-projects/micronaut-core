@@ -16,7 +16,6 @@
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
@@ -64,7 +63,6 @@ import org.slf4j.LoggerFactory;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -450,7 +448,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
                         methodReference.annotationMetadata
                 );
             } else {
-                methodInjectionPoint = new DefaultMethodInjectionPoint(
+                methodInjectionPoint = new DefaultMethodInjectionPoint<>(
                         this,
                         methodReference.declaringType,
                         methodReference.methodName,
@@ -807,6 +805,18 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
     }
 
     /**
+     * Check if the class is an inner configuration.
+     *
+     * @param clazz The class to check
+     * @return true if the inner configuration
+     */
+    @Internal
+    @UsedByGeneratedCode
+    protected boolean isInnerConfiguration(Class<?> clazz) {
+        return false;
+    }
+
+    /**
      * Invoke a bean method that requires reflection.
      *
      * @param resolutionContext The resolution context
@@ -817,7 +827,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
      */
     @Internal
     @SuppressWarnings("WeakerAccess")
-    protected void invokeMethodWithReflection(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, Object bean, Object[] methodArgs) {
+    protected final void invokeMethodWithReflection(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, Object bean, Object[] methodArgs) {
         MethodReference methodRef = methodInjection[methodIndex];
         Argument[] methodArgumentTypes = methodRef.arguments == null ? Argument.ZERO_ARGUMENTS : methodRef.arguments;
         if (ClassUtils.REFLECTION_LOGGER.isDebugEnabled()) {
@@ -926,7 +936,10 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
     protected final Object getBeanForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex, Qualifier qualifier) {
         MethodReference methodRef = methodInjection[methodIndex];
         Argument argument = resolveArgument(context, argIndex, methodRef.arguments);
-        return getBeanForMethodArgument(resolutionContext, context, methodRef, argument, qualifier);
+        try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+                .pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments, methodRef.requiresReflection)) {
+            return resolveBean(resolutionContext, context, argument, qualifier);
+        }
     }
 
     /**
@@ -991,7 +1004,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
      */
     @Internal
     @UsedByGeneratedCode
-    protected Stream<?> getStreamOfTypeForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex, Argument genericType, Qualifier qualifier) {
+    protected final Stream<?> getStreamOfTypeForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex, Argument genericType, Qualifier qualifier) {
         MethodReference methodRef = methodInjection[methodIndex];
         Argument<?> argument = resolveArgument(context, argIndex, methodRef.arguments);
         try (BeanResolutionContext.Path ignored =
@@ -1024,7 +1037,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
         }
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushConstructorResolve(this, argument)) {
-            return resolveBean(resolutionContext, context, argument, qualifier, isInnerConfiguration(argument, context));
+            return resolveBean(resolutionContext, context, argument, qualifier, true);
         }
     }
 
@@ -1192,7 +1205,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
      */
     @Internal
     @UsedByGeneratedCode
-    protected Stream<?> getStreamOfTypeForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex, Argument genericType, Qualifier qualifier) {
+    protected final Stream<?> getStreamOfTypeForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex, Argument genericType, Qualifier qualifier) {
         MethodReference constructorMethodRef = (MethodReference) constructor;
         Argument<?> argument = resolveArgument(context, argIndex, constructorMethodRef.arguments);
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(this, argument)) {
@@ -1446,13 +1459,6 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
         }
     }
 
-    private Object getBeanForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, MethodReference methodRef, Argument argument, Qualifier qualifier) {
-        try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
-                .pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments, methodRef.requiresReflection)) {
-            return resolveBean(resolutionContext, context, argument, qualifier);
-        }
-    }
-
     private boolean resolveContainsValue(BeanResolutionContext resolutionContext, BeanContext context, AnnotationMetadata parentAnnotationMetadata, Argument argument) {
         if (!(context instanceof ApplicationContext)) {
             return false;
@@ -1485,7 +1491,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
         } else {
             argumentType = argument;
         }
-        if (isInnerConfiguration(argumentType, context)) {
+        if (isInnerConfiguration(argumentType.getType())) {
             qualifier = qualifier == null ? resolveQualifierWithInnerConfiguration(resolutionContext, argument, true) : qualifier;
             if (isCollection) {
                 Collection beans = ((DefaultBeanContext) context).getBeansOfType(resolutionContext, argumentType, qualifier);
@@ -1498,7 +1504,16 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
             ArgumentConversionContext conversionContext = ConversionContext.of(argument);
             Optional value = resolveValue((ApplicationContext) context, conversionContext, valueAnnVal != null, valString);
             if (argumentType.isOptional()) {
-                return resolveOptionalObject(value);
+                if (!value.isPresent()) {
+                    return value;
+                } else {
+                    Object convertedOptional = value.get();
+                    if (convertedOptional instanceof Optional) {
+                        return convertedOptional;
+                    } else {
+                        return value;
+                    }
+                }
             } else {
                 if (value.isPresent()) {
                     return value.get();
@@ -1617,29 +1632,6 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
         return null;
     }
 
-    private boolean isInnerConfiguration(Argument<?> argumentType, BeanContext beanContext) {
-        final Class<?> type = argumentType.getType();
-        boolean isInnerClass = type.getName().indexOf('$') > -1 &&
-                !type.isEnum() &&
-                !type.isPrimitive() &&
-                Modifier.isPublic(type.getModifiers()) && Modifier.isStatic(type.getModifiers()) &&
-                isInnerOfAnySuperclass(type);
-        return isConfigurationProperties &&
-                isInnerClass &&
-                beanContext.findBeanDefinition(argumentType).map(bd -> bd.hasStereotype(ConfigurationReader.class) || bd.isIterable()).isPresent();
-    }
-
-    private boolean isInnerOfAnySuperclass(Class argumentType) {
-        Class beanType = getBeanType();
-        while (beanType != null) {
-            if ((beanType.getName() + "$" + argumentType.getSimpleName()).equals(argumentType.getName())) {
-                return true;
-            }
-            beanType = beanType.getSuperclass();
-        }
-        return false;
-    }
-
     private Collection<Object> resolveBeansOfType(BeanResolutionContext resolutionContext, BeanContext context, Argument argument, Argument resultGenericType, Qualifier qualifier) {
         DefaultBeanContext beanContext = (DefaultBeanContext) context;
         if (resultGenericType == null) {
@@ -1720,7 +1712,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
     }
 
     private Qualifier resolveQualifier(BeanResolutionContext resolutionContext, Argument argument, boolean resolveIsInnerConfiguration) {
-        boolean innerConfiguration = resolveIsInnerConfiguration && isInnerConfiguration(argument, resolutionContext.getContext());
+        boolean innerConfiguration = resolveIsInnerConfiguration && isInnerConfiguration(argument.getType());
         return resolveQualifierWithInnerConfiguration(resolutionContext, argument, innerConfiguration);
     }
 
@@ -1749,19 +1741,6 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
             }
         }
         return qualifier;
-    }
-
-    private Object resolveOptionalObject(Optional value) {
-        if (!value.isPresent()) {
-            return value;
-        } else {
-            Object convertedOptional = value.get();
-            if (convertedOptional instanceof Optional) {
-                return convertedOptional;
-            } else {
-                return value;
-            }
-        }
     }
 
     @SuppressWarnings("unchecked")
@@ -1850,6 +1829,10 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
 
     }
 
+    /**
+     * The shared data class between method and field reference.
+     */
+    @Internal
     public abstract static class MethodOrFieldReference {
         final Class declaringType;
         final boolean requiresReflection;
