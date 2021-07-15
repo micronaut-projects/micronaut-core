@@ -15,25 +15,15 @@
  */
 package io.micronaut.inject.annotation
 
-import io.micronaut.context.annotation.Bean
-import io.micronaut.context.annotation.EachBean
-import io.micronaut.context.annotation.Executable
-import io.micronaut.context.annotation.Factory
-import io.micronaut.context.annotation.Primary
-import io.micronaut.context.annotation.Requirements
-import io.micronaut.context.annotation.Requires
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.annotation.*
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValueProvider
 import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.ExecutableMethod
+import io.micronaut.inject.writer.BeanDefinitionWriter
 import jakarta.inject.Named
 import spock.lang.Issue
-
-import jakarta.inject.Scope
-import jakarta.inject.Singleton
-
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -245,7 +235,7 @@ class Test {
 }
 
 ''')
-        BeanDefinition definition = classLoader.loadClass('test.$Test$ExecutorService0Definition').newInstance()
+        BeanDefinition definition = classLoader.loadClass('test.$Test$ExecutorService0' + BeanDefinitionWriter.CLASS_SUFFIX).newInstance()
         expect:
         definition != null
         definition.hasStereotype(Factory) // inherits the factory annotations as stereotypes
@@ -279,7 +269,7 @@ interface Foo {
 }
 
 ''')
-        BeanDefinition definition = classLoader.loadClass('test.$Test$Foo0Definition').newInstance()
+        BeanDefinition definition = classLoader.loadClass('test.$Test$Foo0' + BeanDefinitionWriter.CLASS_SUFFIX).newInstance()
         expect:
         definition != null
         definition.hasAnnotation(AnnotationUtil.SINGLETON)
@@ -316,7 +306,7 @@ interface Bar {
 
 
 ''')
-        BeanDefinition definition = classLoader.loadClass('test.$Test$Foo0Definition').newInstance()
+        BeanDefinition definition = classLoader.loadClass('test.$Test$Foo0' + BeanDefinitionWriter.CLASS_SUFFIX).newInstance()
         expect:
         definition != null
         definition.hasStereotype(AnnotationUtil.SINGLETON)

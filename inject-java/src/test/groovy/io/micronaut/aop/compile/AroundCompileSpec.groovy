@@ -13,6 +13,7 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.NamedAnnotationMapper
 import io.micronaut.inject.visitor.VisitorContext
+import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Issue
 
 import java.lang.annotation.Annotation
@@ -556,7 +557,7 @@ class TestInterceptor implements Interceptor {
 
     void "test validated on class with generics"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.$BaseEntityServiceDefinition$Intercepted', """
+        BeanDefinition beanDefinition = buildBeanDefinition('test.$BaseEntityService' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, """
 package test;
 
 @io.micronaut.validation.Validated
