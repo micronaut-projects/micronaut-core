@@ -251,6 +251,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     node,
                     annotationMetadata
             )
+            aopProxyWriter.visitTypeArguments(groovyClassElement.getAllTypeArguments())
             populateProxyWriterConstructor(groovyClassElement, aopProxyWriter, groovyClassElement.getPrimaryConstructor().orElse(null))
             beanDefinitionWriters.put(node, aopProxyWriter)
             this.aopProxyWriter = aopProxyWriter

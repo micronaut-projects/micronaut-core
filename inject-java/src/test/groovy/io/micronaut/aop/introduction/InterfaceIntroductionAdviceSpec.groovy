@@ -48,11 +48,15 @@ class InterfaceIntroductionAdviceSpec extends AbstractTypeElementSpec {
 
     void "test injecting an introduction advice with generics"() {
         BeanContext beanContext = new DefaultBeanContext().start()
+
         when:
         InjectParentInterface foo = beanContext.getBean(InjectParentInterface)
 
         then:
         noExceptionThrown()
+
+        cleanup:
+        beanContext.close()
     }
 
     void "test typeArgumentsMap are created for introduction advice"() {
