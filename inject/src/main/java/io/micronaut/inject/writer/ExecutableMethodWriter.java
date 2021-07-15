@@ -252,6 +252,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
                     genericReturnType,
                     genericReturnType.getAnnotationMetadata(),
                     genericReturnType.getTypeArguments(),
+                    new HashMap<>(),
                     loadTypeMethods
             );
         }
@@ -264,6 +265,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
                     classWriter,
                     constructorWriter,
                     argumentTypes,
+                    new HashMap<>(),
                     loadTypeMethods
             );
 

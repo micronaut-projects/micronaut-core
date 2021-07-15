@@ -221,9 +221,10 @@ public class InstantiationUtils {
     /**
      * Instantiate the given class rethrowing any exceptions as {@link InstantiationException}.
      *
-     * @param type The type
-     * @param args The arguments
-     * @param <T>  The generic type
+     * @param type     The type
+     * @param argTypes The arguments
+     * @param args     The values of arguments
+     * @param <T>      The generic type
      * @return The instantiated instance
      * @throws InstantiationException When an error occurs
      * @since 3.0.0

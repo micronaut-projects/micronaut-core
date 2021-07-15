@@ -106,7 +106,7 @@ public interface BeanDefinitionReference<T> extends BeanType<T> {
      * @return Is this bean a configuration properties.
      * @since 2.0
      */
-    default  boolean isConfigurationProperties() {
+    default boolean isConfigurationProperties() {
         return getAnnotationMetadata().hasDeclaredStereotype(ConfigurationReader.class);
     }
 }

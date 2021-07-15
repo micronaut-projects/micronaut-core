@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.ArgumentCoercible;
 import io.micronaut.inject.*;
 
 import java.util.*;
@@ -197,29 +198,38 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         @Override
         public Path pushConstructorResolve(BeanDefinition declaringType, Argument argument) {
             ConstructorInjectionPoint constructor = declaringType.getConstructor();
-            if (constructor instanceof ReflectionMethodConstructorInjectionPoint) {
-                MethodSegment methodSegment = new MethodSegment(declaringType, (MethodInjectionPoint) constructor, argument);
+            if (constructor instanceof MethodInjectionPoint) {
+                MethodInjectionPoint<?, ?> methodInjectionPoint = (MethodInjectionPoint<?, ?>) constructor;
+                return pushConstructorResolve(declaringType, methodInjectionPoint.getName(), argument, constructor.getArguments(), constructor.requiresReflection());
+            }
+            return pushConstructorResolve(declaringType, "<init>", argument, constructor.getArguments(), constructor.requiresReflection());
+        }
+
+        @Override
+        public Path pushConstructorResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments, boolean requiresReflection) {
+            if ("<init>".equals(methodName)) {
+                ConstructorSegment constructorSegment = new ConstructorSegment(declaringType, methodName, argument, arguments);
+                detectCircularDependency(declaringType, argument, constructorSegment);
+            } else {
+                MethodSegment methodSegment = new MethodSegment(declaringType, methodName, argument, arguments, requiresReflection);
                 if (contains(methodSegment)) {
                     throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, "Circular dependency detected");
                 } else {
                     path.push(methodSegment);
                 }
-            } else {
-                ConstructorSegment constructorSegment = new ConstructorSegment(declaringType, argument);
-                detectCircularDependency(declaringType, argument, constructorSegment);
             }
             return this;
         }
 
         @Override
         public Path pushBeanCreate(BeanDefinition<?> declaringType, Argument<?> beanType) {
-            path.push(new ConstructorSegment(declaringType, beanType));
-            return this;
+            return pushConstructorResolve(declaringType, beanType);
         }
 
         @Override
         public Path pushMethodArgumentResolve(BeanDefinition declaringType, MethodInjectionPoint methodInjectionPoint, Argument argument) {
-            MethodSegment methodSegment = new MethodSegment(declaringType, methodInjectionPoint, argument);
+            MethodSegment methodSegment = new MethodSegment(declaringType, methodInjectionPoint.getName(), argument,
+                    methodInjectionPoint.getArguments(), methodInjectionPoint.requiresReflection());
             if (contains(methodSegment)) {
                 throw new CircularDependencyException(AbstractBeanResolutionContext.this, methodInjectionPoint, argument, "Circular dependency detected");
             } else {
@@ -230,10 +240,33 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         @Override
+        public Path pushMethodArgumentResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments, boolean requiresReflection) {
+            MethodSegment methodSegment = new MethodSegment(declaringType, methodName, argument, arguments, requiresReflection);
+            if (contains(methodSegment)) {
+                throw new CircularDependencyException(AbstractBeanResolutionContext.this, declaringType, methodName, argument, "Circular dependency detected");
+            } else {
+                push(methodSegment);
+            }
+
+            return this;
+        }
+
+        @Override
         public Path pushFieldResolve(BeanDefinition declaringType, FieldInjectionPoint fieldInjectionPoint) {
-            FieldSegment fieldSegment = new FieldSegment(declaringType, fieldInjectionPoint);
+            FieldSegment fieldSegment = new FieldSegment(declaringType, fieldInjectionPoint.asArgument(), fieldInjectionPoint.requiresReflection());
             if (contains(fieldSegment)) {
                 throw new CircularDependencyException(AbstractBeanResolutionContext.this, fieldInjectionPoint, "Circular dependency detected");
+            } else {
+                push(fieldSegment);
+            }
+            return this;
+        }
+
+        @Override
+        public Path pushFieldResolve(BeanDefinition declaringType, Argument fieldAsArgument, boolean requiresReflection) {
+            FieldSegment fieldSegment = new FieldSegment(declaringType, fieldAsArgument, requiresReflection);
+            if (contains(fieldSegment)) {
+                throw new CircularDependencyException(AbstractBeanResolutionContext.this, declaringType, fieldAsArgument.getName(), "Circular dependency detected");
             } else {
                 push(fieldSegment);
             }
@@ -281,32 +314,35 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /**
      * A segment that represents a constructor.
      */
-    static class ConstructorSegment extends AbstractSegment {
+    public static class ConstructorSegment extends AbstractSegment {
+
+        private final String methodName;
+        private final Argument[] arguments;
 
         /**
          * @param declaringClass The declaring class
+         * @param methodName     The methodName
          * @param argument       The argument
+         * @param arguments      The arguments
          */
-        ConstructorSegment(BeanDefinition declaringClass, Argument argument) {
+        ConstructorSegment(BeanDefinition declaringClass, String methodName, Argument argument, Argument[] arguments) {
             super(declaringClass, declaringClass.getBeanType().getName(), argument);
+            this.methodName = methodName;
+            this.arguments = arguments;
         }
 
         @Override
         public String toString() {
-            ConstructorInjectionPoint constructorInjectionPoint = getDeclaringType().getConstructor();
-            if (constructorInjectionPoint instanceof MethodInjectionPoint) {
-                MethodInjectionPoint methodInjectionPoint = (MethodInjectionPoint) constructorInjectionPoint;
-                StringBuilder baseString = new StringBuilder(methodInjectionPoint.getDeclaringBean().getBeanType().getSimpleName()).append('.');
-                baseString.append(methodInjectionPoint.getName());
-                outputArguments(baseString, methodInjectionPoint.getArguments());
-                return baseString.toString();
+            StringBuilder baseString;
+            if ("<init>".equals(methodName)) {
+                baseString = new StringBuilder("new ");
+                baseString.append(getDeclaringType().getBeanType().getSimpleName());
             } else {
-                StringBuilder baseString = new StringBuilder("new ");
-                BeanDefinition declaringType = getDeclaringType();
-                baseString.append(declaringType.getBeanType().getSimpleName());
-                outputArguments(declaringType, baseString);
-                return baseString.toString();
+                baseString = new StringBuilder(getDeclaringType().getBeanType().getSimpleName()).append('.');
+                baseString.append(methodName);
             }
+            outputArguments(baseString, arguments);
+            return baseString.toString();
         }
 
         @Override
@@ -346,77 +382,79 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /**
      * A segment that represents a method.
      */
-    static class MethodSegment extends AbstractSegment {
+    public static class MethodSegment extends AbstractSegment implements ArgumentInjectionPoint, CallableInjectionPoint {
 
-        private final MethodInjectionPoint methodInjectionPoint;
+        private final Argument[] arguments;
+        private final boolean requiresReflection;
 
         /**
          * @param declaringType        The declaring type
-         * @param methodInjectionPoint The method injection point
+         * @param methodName           The method name
          * @param argument             The argument
+         * @param arguments            The arguments
+         * @param requiresReflection   Is requires reflection
          */
-        MethodSegment(BeanDefinition declaringType, MethodInjectionPoint methodInjectionPoint, Argument argument) {
-            super(declaringType, methodInjectionPoint.getName(), argument);
-            this.methodInjectionPoint = methodInjectionPoint;
+        MethodSegment(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments, boolean requiresReflection) {
+            super(declaringType, methodName, argument);
+            this.arguments = arguments;
+            this.requiresReflection = requiresReflection;
         }
 
         @Override
         public String toString() {
-            StringBuilder baseString = new StringBuilder(methodInjectionPoint.getDeclaringBean().getBeanType().getSimpleName()).append('.');
+            StringBuilder baseString = new StringBuilder(getDeclaringType().getBeanType().getSimpleName()).append('.');
             baseString.append(getName());
-            outputArguments(baseString, methodInjectionPoint.getArguments());
+            outputArguments(baseString, arguments);
             return baseString.toString();
         }
 
         @Override
         public InjectionPoint getInjectionPoint() {
-            return new ArgumentInjectionPoint() {
-                @NonNull
-                @Override
-                public CallableInjectionPoint getOuterInjectionPoint() {
-                    return methodInjectionPoint;
-                }
+            return this;
+        }
 
-                @NonNull
-                @Override
-                public Argument getArgument() {
-                    return MethodSegment.this.getArgument();
-                }
+        @NonNull
+        @Override
+        public CallableInjectionPoint getOuterInjectionPoint() {
+            return this;
+        }
 
-                @Override
-                public BeanDefinition getDeclaringBean() {
-                    return methodInjectionPoint.getDeclaringBean();
-                }
+        @Override
+        public BeanDefinition getDeclaringBean() {
+            return getDeclaringType();
+        }
 
-                @Override
-                public boolean requiresReflection() {
-                    return methodInjectionPoint.requiresReflection();
-                }
+        @Override
+        public boolean requiresReflection() {
+            return requiresReflection;
+        }
 
-                @Override
-                public AnnotationMetadata getAnnotationMetadata() {
-                    return getArgument().getAnnotationMetadata();
-                }
-            };
+        @Override
+        public Argument<?>[] getArguments() {
+            return arguments;
+        }
+
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return getArgument().getAnnotationMetadata();
         }
     }
 
     /**
      * A segment that represents a field.
      */
-    static class FieldSegment extends AbstractSegment {
+    public static class FieldSegment extends AbstractSegment implements InjectionPoint, ArgumentCoercible {
 
-        private final FieldInjectionPoint injectionPoint;
+        private final boolean requiresReflection;
 
         /**
          * @param declaringClass      The declaring class
-         * @param fieldInjectionPoint The field injection point
+         * @param argument            The argument
+         * @param requiresReflection  Is requires reflection
          */
-        FieldSegment(BeanDefinition declaringClass, FieldInjectionPoint fieldInjectionPoint) {
-            super(declaringClass,
-                fieldInjectionPoint.getName(),
-                fieldInjectionPoint.asArgument());
-            this.injectionPoint = fieldInjectionPoint;
+        FieldSegment(BeanDefinition declaringClass, Argument argument, boolean requiresReflection) {
+            super(declaringClass, argument.getName(), argument);
+            this.requiresReflection = requiresReflection;
         }
 
         @Override
@@ -426,7 +464,27 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         @Override
         public InjectionPoint getInjectionPoint() {
-            return injectionPoint;
+            return this;
+        }
+
+        @Override
+        public BeanDefinition getDeclaringBean() {
+            return getDeclaringType();
+        }
+
+        @Override
+        public boolean requiresReflection() {
+            return requiresReflection;
+        }
+
+        @Override
+        public Argument asArgument() {
+            return getArgument();
+        }
+
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return getArgument().getAnnotationMetadata();
         }
     }
 
@@ -487,15 +545,6 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         /**
-         * @param declaringType The declaring type
-         * @param baseString    The base string
-         */
-        void outputArguments(BeanDefinition declaringType, StringBuilder baseString) {
-            Argument[] arguments = declaringType.getConstructor().getArguments();
-            outputArguments(baseString, arguments);
-        }
-
-        /**
          * @param baseString The base string
          * @param arguments  The arguments
          */
@@ -507,7 +556,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                 if (isInjectedArgument) {
                     baseString.append('[');
                 }
-                baseString.append(argument.toString());
+                baseString.append(argument);
                 if (isInjectedArgument) {
                     baseString.append(']');
                 }

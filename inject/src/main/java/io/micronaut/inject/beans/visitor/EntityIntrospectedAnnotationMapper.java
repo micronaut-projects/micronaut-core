@@ -25,7 +25,6 @@ import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 /**

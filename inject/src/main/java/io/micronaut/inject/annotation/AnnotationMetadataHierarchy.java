@@ -834,4 +834,14 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         }
         return Optional.empty();
     }
+
+    @Override
+    public boolean isEmpty() {
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (!metadata.isEmpty()) {
+                return false;
+            }
+        }
+        return true;
+    }
 }

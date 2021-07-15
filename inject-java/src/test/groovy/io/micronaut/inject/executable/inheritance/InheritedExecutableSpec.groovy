@@ -73,20 +73,7 @@ abstract class GenericController<T> {
         definition.getExecutableMethods().any { it.methodName == "getPath" }
         definition.getExecutableMethods().any { it.methodName == "save" && it.argumentTypes == [String] as Class[] }
         definition.getExecutableMethods().any { it.methodName == "save" && it.argumentTypes.length == 0 }
-
-        when:
-        definition.getClass().getClassLoader().loadClass('test.$StatusControllerDefinition$$exec1')
-        definition.getClass().getClassLoader().loadClass('test.$StatusControllerDefinition$$exec2')
-        definition.getClass().getClassLoader().loadClass('test.$StatusControllerDefinition$$exec3')
-
-        then:
-        noExceptionThrown()
-
-        when: //there should only be 2 executable methods
-        definition.getClass().getClassLoader().loadClass('test.$StatusControllerDefinition$$exec4')
-
-        then:
-        thrown(ClassNotFoundException)
+        definition.getExecutableMethods().size() == 3
     }
 
     void "test with multiple generics"() {
@@ -127,20 +114,7 @@ class StatusController extends GenericController<String, Integer> {
         definition.getExecutableMethods().any { it.methodName == "create" && it.argumentTypes == [Integer] as Class[] }
         definition.getExecutableMethods().any { it.methodName == "save" && it.argumentTypes == [String] as Class[] }
         definition.getExecutableMethods().any { it.methodName == "find" && it.argumentTypes == [Integer] as Class[] }
-
-        when:
-        definition.getClass().getClassLoader().loadClass('test.$StatusControllerDefinition$$exec1')
-        definition.getClass().getClassLoader().loadClass('test.$StatusControllerDefinition$$exec2')
-        definition.getClass().getClassLoader().loadClass('test.$StatusControllerDefinition$$exec3')
-
-        then:
-        noExceptionThrown()
-
-        when: //there should only be 2 executable methods
-        definition.getClass().getClassLoader().loadClass('test.$StatusControllerDefinition$$exec4')
-
-        then:
-        thrown(ClassNotFoundException)
+        definition.getExecutableMethods().size() == 3
     }
 
     void "test multiple inheritance"() {
