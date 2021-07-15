@@ -229,7 +229,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         if (type == null) {
             return Collections.emptyList();
         }
-
         Map<String, Argument<?>[]> typeArguments = getTypeArgumentsMap();
         Argument<?>[] arguments = typeArguments.get(type);
         if (arguments != null) {
