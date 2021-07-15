@@ -95,8 +95,8 @@ import java.util.stream.Stream;
  * @since 3.0
  */
 @Internal
-public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional implements BeanDefinition<T>, EnvironmentConfigurable {
-    private static final Logger LOG = LoggerFactory.getLogger(AbstractBeanDefinition2.class);
+public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextConditional implements BeanDefinition<T>, EnvironmentConfigurable {
+    private static final Logger LOG = LoggerFactory.getLogger(AbstractInitializableBeanDefinition.class);
     private static final String NAMED_ATTRIBUTE = Named.class.getName();
 
     private final Class<T> type;
@@ -108,7 +108,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
     private final boolean isPrimary;
     private final boolean isAbstract;
     private final boolean isConfigurationProperties;
-    private final boolean hasExposedTypes;
+    private final boolean isContainerType;
     private final boolean requiresMethodProcessing;
     @Nullable
     private final MethodOrFieldReference constructor;
@@ -122,9 +122,8 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
     private final Map<String, Argument<?>[]> typeArgumentsMap;
     @Nullable
     private Environment environment;
-    private Set<Class<?>> exposedTypes;
+    @Nullable
     private Optional<Argument<?>> containerElement;
-
     @Nullable
     private ConstructorInjectionPoint<T> constructorInjectionPoint;
     @Nullable
@@ -143,7 +142,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
     @SuppressWarnings("ParameterNumber")
     @Internal
     @UsedByGeneratedCode
-    protected AbstractBeanDefinition2(
+    protected AbstractInitializableBeanDefinition(
             Class<T> beanType,
             @Nullable MethodOrFieldReference constructor,
             @Nullable AnnotationMetadata annotationMetadata,
@@ -158,7 +157,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
             boolean isSingleton,
             boolean isPrimary,
             boolean isConfigurationProperties,
-            boolean hasExposedTypes,
+            boolean isContainerType,
             boolean requiresMethodProcessing) {
         this.scope = scope;
         this.type = beanType;
@@ -184,21 +183,28 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
         this.executableMethodsDefinition = executableMethodsDefinition;
         this.typeArgumentsMap = typeArgumentsMap;
         this.isConfigurationProperties = isConfigurationProperties;
-        this.hasExposedTypes = hasExposedTypes;
+        this.isContainerType = isContainerType;
         this.requiresMethodProcessing = requiresMethodProcessing;
-        Optional<Argument<?>> containerElement = Optional.empty();
-        if (isContainerType()) {
+    }
+
+    @Override
+    public final boolean isContainerType() {
+        return isContainerType;
+    }
+
+    @Override
+    public final Optional<Argument<?>> getContainerElement() {
+        if (isContainerType) {
+            if (containerElement != null) {
+                return containerElement;
+            }
             final List<Argument<?>> iterableArguments = getTypeArguments(Iterable.class);
             if (!iterableArguments.isEmpty()) {
                 containerElement = Optional.of(iterableArguments.iterator().next());
             }
+            return containerElement;
         }
-        this.containerElement = containerElement;
-    }
-
-    @Override
-    public Optional<Argument<?>> getContainerElement() {
-        return containerElement;
+        return Optional.empty();
     }
 
     @Override
@@ -207,7 +213,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
     }
 
     @Override
-    public @NonNull
+    public final @NonNull
     List<Argument<?>> getTypeArguments(String type) {
         if (type == null || typeArgumentsMap == null) {
             return Collections.emptyList();
@@ -251,7 +257,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
     }
 
     @Override
-    public <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class<?>... argumentTypes) {
+    public final <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class<?>... argumentTypes) {
         if (executableMethodsDefinition == null) {
             return Optional.empty();
         }
@@ -259,7 +265,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
     }
 
     @Override
-    public <R> Stream<ExecutableMethod<T, R>> findPossibleMethods(String name) {
+    public final <R> Stream<ExecutableMethod<T, R>> findPossibleMethods(String name) {
         if (executableMethodsDefinition == null) {
             return Stream.empty();
         }
@@ -291,12 +297,12 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
     }
 
     @Override
-    public Optional<Class<? extends Annotation>> getScope() {
+    public final Optional<Class<? extends Annotation>> getScope() {
         return scope.flatMap(scopeClassName -> (Optional) ClassUtils.forName(scopeClassName, getClass().getClassLoader()));
     }
 
     @Override
-    public Optional<String> getScopeName() {
+    public final Optional<String> getScopeName() {
         return scope;
     }
 
@@ -307,14 +313,8 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
 
     @Override
     @NonNull
-    public final Set<Class<?>> getExposedTypes() {
-        if (!hasExposedTypes) {
-            return Collections.EMPTY_SET;
-        }
-        if (this.exposedTypes == null) {
-            this.exposedTypes = BeanDefinition.super.getExposedTypes();
-        }
-        return this.exposedTypes;
+    public Set<Class<?>> getExposedTypes() {
+        return Collections.EMPTY_SET;
     }
 
     @Override
@@ -384,7 +384,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
     }
 
     @Override
-    public Collection<Class<?>> getRequiredComponents() {
+    public final Collection<Class<?>> getRequiredComponents() {
         if (requiredComponents != null) {
             return requiredComponents;
         }
@@ -542,7 +542,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
 
     @Override
     @NonNull
-    public String getName() {
+    public final String getName() {
         return getBeanType().getName();
     }
 
@@ -557,7 +557,7 @@ public class AbstractBeanDefinition2<T> extends AbstractBeanContextConditional i
     }
 
     @Override
-    public Collection<ExecutableMethod<T, ?>> getExecutableMethods() {
+    public final Collection<ExecutableMethod<T, ?>> getExecutableMethods() {
         if (executableMethodsDefinition == null) {
             return Collections.emptyList();
         }

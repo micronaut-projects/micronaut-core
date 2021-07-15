@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.writer;
 
-import io.micronaut.context.AbstractBeanDefinition2;
+import io.micronaut.context.AbstractInitializableBeanDefinition;
 import io.micronaut.context.AbstractConstructorInjectionPoint;
 import io.micronaut.context.AbstractExecutableMethod;
 import io.micronaut.context.BeanContext;
@@ -48,6 +48,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.core.type.TypeVariableResolver;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -150,11 +151,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             BeanDefinition.class)
             .orElseThrow(() -> new ClassGenerationException("Invalid version of Micronaut present on the class path"));
 
-    private static final Method POST_CONSTRUCT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition2.class, "postConstruct", BeanResolutionContext.class, BeanContext.class, Object.class);
+    private static final Method POST_CONSTRUCT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanDefinition.class, "postConstruct", BeanResolutionContext.class, BeanContext.class, Object.class);
 
-    private static final Method INJECT_BEAN_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition2.class, "injectBean", BeanResolutionContext.class, BeanContext.class, Object.class);
+    private static final Method INJECT_BEAN_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanDefinition.class, "injectBean", BeanResolutionContext.class, BeanContext.class, Object.class);
 
-    private static final Method PRE_DESTROY_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition2.class, "preDestroy", BeanResolutionContext.class, BeanContext.class, Object.class);
+    private static final Method PRE_DESTROY_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanDefinition.class, "preDestroy", BeanResolutionContext.class, BeanContext.class, Object.class);
 
     private static final Method GET_BEAN_FOR_CONSTRUCTOR_ARGUMENT = getBeanLookupMethod("getBeanForConstructorArgument", false);
 
@@ -184,17 +185,17 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private static final Method FIND_BEAN_FOR_FIELD = getBeanLookupMethod("findBeanForField", true);
 
-    private static final Method GET_VALUE_FOR_PATH = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition2.class, "getValueForPath", BeanResolutionContext.class, BeanContext.class, Argument.class, String.class);
+    private static final Method GET_VALUE_FOR_PATH = ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanDefinition.class, "getValueForPath", BeanResolutionContext.class, BeanContext.class, Argument.class, String.class);
 
     private static final Method CONTAINS_VALUE_FOR_FIELD = ReflectionUtils.getRequiredInternalMethod(
-            AbstractBeanDefinition2.class,
+            AbstractInitializableBeanDefinition.class,
             "containsValueForField",
             BeanResolutionContext.class,
             BeanContext.class,
             int.class,
             boolean.class);
 
-    private static final Method CONTAINS_PROPERTIES_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition2.class, "containsProperties", BeanResolutionContext.class, BeanContext.class);
+    private static final Method CONTAINS_PROPERTIES_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanDefinition.class, "containsProperties", BeanResolutionContext.class, BeanContext.class);
 
     private static final Method GET_BEAN_FOR_METHOD_ARGUMENT = getBeanLookupMethodForArgument("getBeanForMethodArgument", false);
 
@@ -211,7 +212,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final Method GET_VALUE_FOR_METHOD_ARGUMENT = getBeanLookupMethodForArgument("getValueForMethodArgument", false);
 
     private static final Method CONTAINS_VALUE_FOR_METHOD_ARGUMENT = ReflectionUtils.getRequiredInternalMethod(
-            AbstractBeanDefinition2.class,
+            AbstractInitializableBeanDefinition.class,
             "containsValueForMethodArgument",
             BeanResolutionContext.class,
             BeanContext.class,
@@ -219,7 +220,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             int.class,
             boolean.class);
 
-    private static final Type TYPE_ABSTRACT_BEAN_DEFINITION = Type.getType(AbstractBeanDefinition2.class);
+    private static final Type TYPE_ABSTRACT_BEAN_DEFINITION = Type.getType(AbstractInitializableBeanDefinition.class);
 
     private static final org.objectweb.asm.commons.Method METHOD_OPTIONAL_EMPTY = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredMethod(Optional.class, "empty")
@@ -259,23 +260,23 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private static final org.objectweb.asm.commons.Method PROTECTED_ABSTRACT_BEAN_DEFINITION_CONSTRUCTOR = new org.objectweb.asm.commons.Method(CONSTRUCTOR_NAME, getConstructorDescriptor(
             Class.class, // beanType
-            AbstractBeanDefinition2.MethodOrFieldReference.class // constructor
+            AbstractInitializableBeanDefinition.MethodOrFieldReference.class // constructor
     ));
 
     private static final org.objectweb.asm.commons.Method SET_FIELD_WITH_REFLECTION_METHOD = org.objectweb.asm.commons.Method.getMethod(
-            ReflectionUtils.getRequiredMethod(AbstractBeanDefinition2.class, "setFieldWithReflection", BeanResolutionContext.class, BeanContext.class, int.class, Object.class, Object.class)
+            ReflectionUtils.getRequiredMethod(AbstractInitializableBeanDefinition.class, "setFieldWithReflection", BeanResolutionContext.class, BeanContext.class, int.class, Object.class, Object.class)
     );
 
     private static final org.objectweb.asm.commons.Method INVOKE_WITH_REFLECTION_METHOD = org.objectweb.asm.commons.Method.getMethod(
-            ReflectionUtils.getRequiredMethod(AbstractBeanDefinition2.class, "invokeMethodWithReflection", BeanResolutionContext.class, BeanContext.class, int.class, Object.class, Object[].class)
+            ReflectionUtils.getRequiredMethod(AbstractInitializableBeanDefinition.class, "invokeMethodWithReflection", BeanResolutionContext.class, BeanContext.class, int.class, Object.class, Object[].class)
     );
 
     private static final org.objectweb.asm.commons.Method BEAN_DEFINITION_CLASS_CONSTRUCTOR = new org.objectweb.asm.commons.Method(CONSTRUCTOR_NAME, getConstructorDescriptor(
             Class.class, // beanType
-            AbstractBeanDefinition2.MethodOrFieldReference.class, // constructor
+            AbstractInitializableBeanDefinition.MethodOrFieldReference.class, // constructor
             AnnotationMetadata.class, // annotationMetadata
-            AbstractBeanDefinition2.MethodReference[].class, // methodInjection
-            AbstractBeanDefinition2.FieldReference[].class, // fieldInjection
+            AbstractInitializableBeanDefinition.MethodReference[].class, // methodInjection
+            AbstractInitializableBeanDefinition.FieldReference[].class, // fieldInjection
             ExecutableMethodsDefinition.class, // executableMethodsDefinition
             Map.class, // typeArgumentsMap
             Optional.class, // scope
@@ -285,7 +286,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             boolean.class, // isSingleton
             boolean.class, // isPrimary
             boolean.class, // isConfigurationProperties
-            boolean.class, // hasExposedTypes
+            boolean.class, // isContainerType
             boolean.class  // requiresMethodProcessing
     ));
 
@@ -294,6 +295,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final String FIELD_INJECTION_FIELDS = "$INJECTION_FIELDS";
     private static final String FIELD_TYPE_ARGUMENTS = "$TYPE_ARGUMENTS";
     private static final String FIELD_INNER_CLASSES = "$INNER_CONFIGURATION_CLASSES";
+    private static final String FIELD_EXPOSED_TYPES = "$EXPOSED_TYPES";
 
     private static final org.objectweb.asm.commons.Method METHOD_REFERENCE_CONSTRUCTOR = new org.objectweb.asm.commons.Method(CONSTRUCTOR_NAME, getConstructorDescriptor(
             Class.class, // declaringType,
@@ -846,13 +848,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
 
         classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_CONSTRUCTOR,
-                Type.getType(AbstractBeanDefinition2.MethodOrFieldReference.class).getDescriptor(), null, null);
+                Type.getType(AbstractInitializableBeanDefinition.MethodOrFieldReference.class).getDescriptor(), null, null);
 
         int methodsLength = methodInjectionPoints.size() + postConstructMethodVisits.size() + preDestroyMethodVisits.size();
         if (!superBeanDefinition && methodsLength > 0) {
-            Type methodsFieldType = Type.getType(AbstractBeanDefinition2.MethodReference[].class);
+            Type methodsFieldType = Type.getType(AbstractInitializableBeanDefinition.MethodReference[].class);
             classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_INJECTION_METHODS, methodsFieldType.getDescriptor(), null, null);
-            pushNewArray(staticInit, AbstractBeanDefinition2.MethodReference.class, methodsLength);
+            pushNewArray(staticInit, AbstractInitializableBeanDefinition.MethodReference.class, methodsLength);
             int i = 0;
             for (MethodVisitData methodVisitData : methodInjectionPoints) {
                 pushStoreInArray(staticInit, i++, methodsLength, () ->
@@ -891,10 +893,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
 
         if (!fieldInjectionPoints.isEmpty()) {
-            Type fieldsFieldType = Type.getType(AbstractBeanDefinition2.FieldReference[].class);
+            Type fieldsFieldType = Type.getType(AbstractInitializableBeanDefinition.FieldReference[].class);
             classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_INJECTION_FIELDS, fieldsFieldType.getDescriptor(), null, null);
             int length = fieldInjectionPoints.size();
-            pushNewArray(staticInit, AbstractBeanDefinition2.FieldReference.class, length);
+            pushNewArray(staticInit, AbstractInitializableBeanDefinition.FieldReference.class, length);
             for (int i = 0; i < length; i++) {
                 FieldVisitData fieldVisitData = fieldInjectionPoints.get(i);
                 pushStoreInArray(staticInit, i, length, () ->
@@ -937,6 +939,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         );
 
         addInnerConfigurationMethod(staticInit);
+        addGetExposedTypes(staticInit);
 
         staticInit.returnValue();
         staticInit.visitMaxs(DEFAULT_MAX_STACK, defaultsStorage.size() + 3);
@@ -990,32 +993,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     .toArray(String[]::new);
 
             if (innerClasses.length > 0) {
-                classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_INNER_CLASSES, Type.getType(Collection.class).getDescriptor(), null, null);
-                if (innerClasses.length > 3) {
-                    staticInit.newInstance(Type.getType(HashSet.class));
-                    staticInit.dup();
-                    pushArrayOfClasses(staticInit, innerClasses);
-                    staticInit.invokeStatic(Type.getType(Arrays.class), org.objectweb.asm.commons.Method.getMethod(
-                            ReflectionUtils.getRequiredMethod(Arrays.class, "asList", Object[].class)
-                    ));
-                    staticInit.invokeConstructor(Type.getType(HashSet.class), org.objectweb.asm.commons.Method.getMethod(
-                            ReflectionUtils.findConstructor(HashSet.class, Collection.class).get()
-                    ));
-                } else if (innerClasses.length == 1) {
-                    pushClass(staticInit, innerClasses[0]);
-                    staticInit.invokeStatic(Type.getType(Collections.class), org.objectweb.asm.commons.Method.getMethod(
-                            ReflectionUtils.getRequiredMethod(Collections.class, "singleton", Object.class)
-                    ));
-                } else {
-                    pushArrayOfClasses(staticInit, innerClasses);
-                    staticInit.invokeStatic(Type.getType(Arrays.class), org.objectweb.asm.commons.Method.getMethod(
-                            ReflectionUtils.getRequiredMethod(Arrays.class, "asList", Object[].class)
-                    ));
-                }
-                staticInit.putStatic(beanDefinitionType, FIELD_INNER_CLASSES, Type.getType(Collection.class));
+                classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_INNER_CLASSES, Type.getType(Set.class).getDescriptor(), null, null);
+                pushStoreClassesAsSet(staticInit, innerClasses);
+                staticInit.putStatic(beanDefinitionType, FIELD_INNER_CLASSES, Type.getType(Set.class));
 
                 GeneratorAdapter isInnerConfigurationMethod = startProtectedMethod(classWriter, "isInnerConfiguration", boolean.class.getName(), Class.class.getName());
-                isInnerConfigurationMethod.getStatic(beanDefinitionType, FIELD_INNER_CLASSES, Type.getType(Collection.class));
+                isInnerConfigurationMethod.getStatic(beanDefinitionType, FIELD_INNER_CLASSES, Type.getType(Set.class));
                 isInnerConfigurationMethod.loadArg(0);
                 isInnerConfigurationMethod.invokeInterface(Type.getType(Collection.class), org.objectweb.asm.commons.Method.getMethod(
                         ReflectionUtils.getRequiredMethod(Collection.class, "contains", Object.class)
@@ -1024,6 +1007,47 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 isInnerConfigurationMethod.visitMaxs(1, 1);
                 isInnerConfigurationMethod.visitEnd();
             }
+        }
+    }
+
+    private void addGetExposedTypes(GeneratorAdapter staticInit) {
+        if (annotationMetadata.hasDeclaredAnnotation(Bean.class.getName())) {
+            final String[] exposedTypes = annotationMetadata.stringValues(Bean.class.getName(), "typed");
+            if (exposedTypes.length > 0) {
+                classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_EXPOSED_TYPES, Type.getType(Set.class).getDescriptor(), null, null);
+                pushStoreClassesAsSet(staticInit, exposedTypes);
+                staticInit.putStatic(beanDefinitionType, FIELD_EXPOSED_TYPES, Type.getType(Set.class));
+
+                GeneratorAdapter getExposedTypesMethod = startPublicMethod(classWriter, "getExposedTypes", Set.class.getName());
+                getExposedTypesMethod.getStatic(beanDefinitionType, FIELD_EXPOSED_TYPES, Type.getType(Set.class));
+                getExposedTypesMethod.returnValue();
+                getExposedTypesMethod.visitMaxs(1, 1);
+                getExposedTypesMethod.visitEnd();
+            }
+        }
+    }
+
+    private void pushStoreClassesAsSet(GeneratorAdapter writer, String[] classes) {
+        if (classes.length > 3) {
+            writer.newInstance(Type.getType(HashSet.class));
+            writer.dup();
+            pushArrayOfClasses(writer, classes);
+            writer.invokeStatic(Type.getType(Arrays.class), org.objectweb.asm.commons.Method.getMethod(
+                    ReflectionUtils.getRequiredMethod(Arrays.class, "asList", Object[].class)
+            ));
+            writer.invokeConstructor(Type.getType(HashSet.class), org.objectweb.asm.commons.Method.getMethod(
+                    ReflectionUtils.findConstructor(HashSet.class, Collection.class).get()
+            ));
+        } else if (classes.length == 1) {
+            pushClass(writer, classes[0]);
+            writer.invokeStatic(Type.getType(Collections.class), org.objectweb.asm.commons.Method.getMethod(
+                    ReflectionUtils.getRequiredMethod(Collections.class, "singleton", Object.class)
+            ));
+        } else {
+            pushArrayOfClasses(writer, classes);
+            writer.invokeStatic(Type.getType(Arrays.class), org.objectweb.asm.commons.Method.getMethod(
+                    ReflectionUtils.getRequiredMethod(Arrays.class, "asList", Object[].class)
+            ));
         }
     }
 
@@ -2787,8 +2811,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void resolveConstructorArgument(GeneratorAdapter visitor, int argumentIndex) {
-        Type constructorField = Type.getType(AbstractBeanDefinition2.MethodOrFieldReference.class);
-        Type methodRefType = Type.getType(AbstractBeanDefinition2.MethodReference.class);
+        Type constructorField = Type.getType(AbstractInitializableBeanDefinition.MethodOrFieldReference.class);
+        Type methodRefType = Type.getType(AbstractInitializableBeanDefinition.MethodReference.class);
         visitor.getStatic(beanDefinitionType, FIELD_CONSTRUCTOR, constructorField);
         pushCastToType(visitor, methodRefType);
         visitor.getField(methodRefType, "arguments", Type.getType(Argument[].class));
@@ -2805,8 +2829,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void resolveMethodArgument(GeneratorAdapter visitor, int methodIndex, int argumentIndex) {
-        Type methodsRef = Type.getType(AbstractBeanDefinition2.MethodReference[].class);
-        Type methodRefType = Type.getType(AbstractBeanDefinition2.MethodReference.class);
+        Type methodsRef = Type.getType(AbstractInitializableBeanDefinition.MethodReference[].class);
+        Type methodRefType = Type.getType(AbstractInitializableBeanDefinition.MethodReference.class);
         visitor.getStatic(beanDefinitionType, FIELD_INJECTION_METHODS, methodsRef);
         visitor.push(methodIndex);
         visitor.arrayLoad(methodsRef);
@@ -2824,10 +2848,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void resolveFieldArgument(GeneratorAdapter visitor, int fieldIndex) {
-        visitor.getStatic(beanDefinitionType, FIELD_INJECTION_FIELDS, Type.getType(AbstractBeanDefinition2.FieldReference[].class));
+        visitor.getStatic(beanDefinitionType, FIELD_INJECTION_FIELDS, Type.getType(AbstractInitializableBeanDefinition.FieldReference[].class));
         visitor.push(fieldIndex);
-        visitor.arrayLoad(Type.getType(AbstractBeanDefinition2.FieldReference.class));
-        visitor.getField(Type.getType(AbstractBeanDefinition2.FieldReference.class), "argument", Type.getType(Argument.class));
+        visitor.arrayLoad(Type.getType(AbstractInitializableBeanDefinition.FieldReference.class));
+        visitor.getField(Type.getType(AbstractInitializableBeanDefinition.FieldReference.class), "argument", Type.getType(Argument.class));
     }
 
     private boolean resolveArgumentGenericType(GeneratorAdapter visitor, ClassElement type) {
@@ -2967,7 +2991,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             throw new IllegalArgumentException("Unexpected constructor: " + constructor);
         }
 
-        staticInit.putStatic(beanDefinitionType, FIELD_CONSTRUCTOR, Type.getType(AbstractBeanDefinition2.MethodOrFieldReference.class));
+        staticInit.putStatic(beanDefinitionType, FIELD_CONSTRUCTOR, Type.getType(AbstractInitializableBeanDefinition.MethodOrFieldReference.class));
 
         GeneratorAdapter publicConstructor = new GeneratorAdapter(
                 classWriter.visitMethod(ACC_PUBLIC, CONSTRUCTOR_NAME, DESCRIPTOR_DEFAULT_CONSTRUCTOR, null, null),
@@ -2977,7 +3001,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         );
         publicConstructor.loadThis();
         publicConstructor.push(beanType);
-        publicConstructor.getStatic(beanDefinitionType, FIELD_CONSTRUCTOR, Type.getType(AbstractBeanDefinition2.MethodOrFieldReference.class));
+        publicConstructor.getStatic(beanDefinitionType, FIELD_CONSTRUCTOR, Type.getType(AbstractInitializableBeanDefinition.MethodOrFieldReference.class));
         publicConstructor.invokeConstructor(superBeanDefinition ? superType : beanDefinitionType, PROTECTED_ABSTRACT_BEAN_DEFINITION_CONSTRUCTOR);
         publicConstructor.visitInsn(RETURN);
         publicConstructor.visitMaxs(5, 1);
@@ -3013,13 +3037,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             if (methodInjectionPoints.isEmpty() && preDestroyMethodVisits.isEmpty() && postConstructMethodVisits.isEmpty()) {
                 protectedConstructor.push((String) null);
             } else {
-                protectedConstructor.getStatic(beanDefinitionType, FIELD_INJECTION_METHODS, Type.getType(AbstractBeanDefinition2.MethodReference[].class));
+                protectedConstructor.getStatic(beanDefinitionType, FIELD_INJECTION_METHODS, Type.getType(AbstractInitializableBeanDefinition.MethodReference[].class));
             }
             // 5: `AbstractBeanDefinition2.FieldReference[].class` fieldInjection
             if (fieldInjectionPoints.isEmpty()) {
                 protectedConstructor.push((String) null);
             } else {
-                protectedConstructor.getStatic(beanDefinitionType, FIELD_INJECTION_FIELDS, Type.getType(AbstractBeanDefinition2.FieldReference[].class));
+                protectedConstructor.getStatic(beanDefinitionType, FIELD_INJECTION_FIELDS, Type.getType(AbstractInitializableBeanDefinition.FieldReference[].class));
             }
             // 6: `ExecutableMethod[]` executableMethods
             if (executableMethodsDefinitionWriter == null) {
@@ -3065,11 +3089,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             );
             // 14: `boolean` isConfigurationProperties
             protectedConstructor.push(isConfigurationProperties);
-            // 15: hasExposedTypes
-            protectedConstructor.push(
-                    annotationMetadata.hasDeclaredAnnotation(Bean.class)
-                            && annotationMetadata.stringValues(Bean.class, "typed").length > 0
-            );
+            // 15: isContainerType
+            protectedConstructor.push(isContainerType());
             // 16: requiresMethodProcessing
             protectedConstructor.push(preprocessMethods);
 
@@ -3082,6 +3103,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             protectedConstructor.visitMaxs(20, 1);
             protectedConstructor.visitEnd();
         }
+    }
+
+    private boolean isContainerType() {
+        return DefaultArgument.CONTAINER_TYPES.stream().map(Class::getName).anyMatch(c -> c.equals(beanFullClassName));
     }
 
     private boolean isConfigurationProperties(AnnotationMetadata annotationMetadata) {
@@ -3099,7 +3124,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         for (ParameterElement value : methodElement.getParameters()) {
             DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, value.getAnnotationMetadata());
         }
-        staticInit.newInstance(Type.getType(AbstractBeanDefinition2.MethodReference.class));
+        staticInit.newInstance(Type.getType(AbstractInitializableBeanDefinition.MethodReference.class));
         staticInit.dup();
         // 1: declaringType
         staticInit.push(beanType);
@@ -3128,14 +3153,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             staticInit.push(isPostConstructMethod);
             // 7: isPreDestroyMethod
             staticInit.push(isPreDestroyMethod);
-            staticInit.invokeConstructor(Type.getType(AbstractBeanDefinition2.MethodReference.class), METHOD_REFERENCE_CONSTRUCTOR_POST_PRE);
+            staticInit.invokeConstructor(Type.getType(AbstractInitializableBeanDefinition.MethodReference.class), METHOD_REFERENCE_CONSTRUCTOR_POST_PRE);
         } else {
-            staticInit.invokeConstructor(Type.getType(AbstractBeanDefinition2.MethodReference.class), METHOD_REFERENCE_CONSTRUCTOR);
+            staticInit.invokeConstructor(Type.getType(AbstractInitializableBeanDefinition.MethodReference.class), METHOD_REFERENCE_CONSTRUCTOR);
         }
     }
 
     private void pushNewFieldReference(GeneratorAdapter staticInit, Type declaringType, FieldElement fieldElement, boolean requiresReflection) {
-        staticInit.newInstance(Type.getType(AbstractBeanDefinition2.FieldReference.class));
+        staticInit.newInstance(Type.getType(AbstractInitializableBeanDefinition.FieldReference.class));
         staticInit.dup();
         // 1: declaringType
         staticInit.push(declaringType);
@@ -3154,7 +3179,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         );
         // 3: requiresReflection
         staticInit.push(requiresReflection);
-        staticInit.invokeConstructor(Type.getType(AbstractBeanDefinition2.FieldReference.class), FIELD_REFERENCE_CONSTRUCTOR);
+        staticInit.invokeConstructor(Type.getType(AbstractInitializableBeanDefinition.FieldReference.class), FIELD_REFERENCE_CONSTRUCTOR);
     }
 
     private void pushAnnotationMetadata(GeneratorAdapter staticInit, AnnotationMetadata annotationMetadata) {
@@ -3225,7 +3250,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static Method getBeanLookupMethod(String methodName, boolean requiresGenericType) {
         if (requiresGenericType) {
             return ReflectionUtils.getRequiredInternalMethod(
-                    AbstractBeanDefinition2.class,
+                    AbstractInitializableBeanDefinition.class,
                     methodName,
                     BeanResolutionContext.class,
                     BeanContext.class,
@@ -3234,7 +3259,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     Qualifier.class);
         } else {
             return ReflectionUtils.getRequiredInternalMethod(
-                    AbstractBeanDefinition2.class,
+                    AbstractInitializableBeanDefinition.class,
                     methodName,
                     BeanResolutionContext.class,
                     BeanContext.class,
@@ -3247,7 +3272,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static Method getBeanLookupMethodForArgument(String methodName, boolean requiresGenericType) {
         if (requiresGenericType) {
             return ReflectionUtils.getRequiredInternalMethod(
-                    AbstractBeanDefinition2.class,
+                    AbstractInitializableBeanDefinition.class,
                     methodName,
                     BeanResolutionContext.class,
                     BeanContext.class,
@@ -3257,7 +3282,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     Qualifier.class);
         }
         return ReflectionUtils.getRequiredInternalMethod(
-                AbstractBeanDefinition2.class,
+                AbstractInitializableBeanDefinition.class,
                 methodName,
                 BeanResolutionContext.class,
                 BeanContext.class,

@@ -182,6 +182,7 @@ public class ArrayUtils {
      * @param arrayItemClass The array item class
      * @param <T> The type of the array
      * @return The array
+     * @since 3.0
      */
     public static <T> T[] toArray(Collection<T> collection, Class<T> arrayItemClass) {
         return (T[]) collection.toArray((Object[]) Array.newInstance(arrayItemClass, collection.size()));
