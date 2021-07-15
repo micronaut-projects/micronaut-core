@@ -126,7 +126,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
     static {
         MAP_OF = new Method[11];
-        for (int i = 2; i < MAP_OF.length; i++) {
+        for (int i = 1; i < MAP_OF.length; i++) {
             Class[] mapArgs = new Class[i * 2];
             for (int k = 0; k < i * 2; k += 2) {
                 mapArgs[k] = String.class;
@@ -1623,7 +1623,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             generatorAdapter.getStatic(Type.getType(Collections.class), EMPTY_MAP, MAP_TYPE);
             return;
         }
-        if (entrySet.size() == 1) {
+        if (entrySet.size() == 1 && entrySet.iterator().next().getValue() == Collections.EMPTY_MAP) {
             for (Map.Entry<String, T> entry : entrySet) {
                 generatorAdapter.push(entry.getKey());
                 pushValue.accept(entry.getValue());
