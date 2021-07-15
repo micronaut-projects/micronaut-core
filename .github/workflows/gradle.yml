@@ -21,6 +21,13 @@ jobs:
       matrix:
         java: ['8', '11', '15']
     steps:
+       # https://github.com/actions/virtual-environments/issues/709
+      - name: Free disk space
+        run: |
+         sudo rm -rf "/usr/local/share/boost"
+         sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+         sudo apt-get clean
+         df -h
       - uses: actions/checkout@v2
       - uses: actions/cache@v2.1.6
         with:
@@ -37,9 +44,15 @@ jobs:
         run: |
           [ -f ./setup.sh ] && ./setup.sh || true
       - name: Build with Gradle
-        run: ./gradlew dependencyUpdates check --parallel --continue
+        run: ./gradlew dependencyUpdates check --no-daemon --parallel --continue
         env:
-          TESTCONTAINERS_RYUK_DISABLED: true
+           TESTCONTAINERS_RYUK_DISABLED: true
+      - name: Publish Test Report
+        if: always()
+        uses: mikepenz/action-junit-report@v2
+        with:
+          check_name: Java CI / Test Report (${{ matrix.java }})
+          report_paths: '**/build/test-results/test/TEST-*.xml'
       - name: Publish to Sonatype Snapshots
         if: success() && github.event_name == 'push' && matrix.java == '8'
         env:
