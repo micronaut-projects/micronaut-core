@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
+import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.annotation.Nullable
@@ -30,7 +31,6 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
-import spock.lang.Ignore
 import spock.lang.Issue
 import spock.lang.Specification
 
