@@ -16,7 +16,6 @@
 package io.micronaut.aop;
 
 import io.micronaut.core.annotation.Indexed;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Argument;
 
