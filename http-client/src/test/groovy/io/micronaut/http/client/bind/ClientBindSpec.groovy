@@ -1,5 +1,6 @@
-package io.micronaut.http.client
+package io.micronaut.http.client.bind
 
+import io.micronaut.http.HttpRequest
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.annotation.Controller
@@ -40,6 +41,12 @@ class ClientBindSpec extends Specification {
         ex.message == "Failed to construct the request URI"
     }
 
+    void "test bind to method"() {
+        expect:
+        bindClient.authorizedRequest() == "name=admin"
+        1
+    }
+
     @Requires(property = 'spec.name', value = 'ClientBindSpec')
     @Client("/bind")
     static interface BindClient {
@@ -50,6 +57,9 @@ class ClientBindSpec extends Specification {
         @Get("/pathValue{/x}{/y}")
         String pathValue(String x, Optional<String> y)
 
+        @Get("/queryIdentity")
+        @SimpleTestAuthorization
+        String authorizedRequest()
     }
 
     @Client(value = "/", path = "/{bar}")
@@ -70,6 +80,11 @@ class ClientBindSpec extends Specification {
         @Get("/pathValue{+path}")
         String pathValue(String path) {
             path
+        }
+
+        @Get("/queryIdentity")
+        String queryIdentity(HttpRequest<?> request) {
+            return request.getUri().getQuery()
         }
     }
 }

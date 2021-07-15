@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.HttpClientConfiguration;
-import io.micronaut.http.client.sse.SseClient;
 import org.reactivestreams.Publisher;
 
 import java.net.URI;

@@ -44,8 +44,10 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
 
     private final ClassLoader classLoader;
     private final String basePath;
+    private final URL baseURL;
     private final Map<String, Boolean> isDirectoryCache = new ConcurrentLinkedHashMap.Builder<String, Boolean>()
             .maximumWeightedCapacity(50).build();
+    private final boolean missingPath;
 
     /**
      * Default constructor.
@@ -65,6 +67,8 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
     public DefaultClassPathResourceLoader(ClassLoader classLoader, String basePath) {
         this.classLoader = classLoader;
         this.basePath = normalize(basePath);
+        this.baseURL = basePath != null ? classLoader.getResource(normalize(basePath)) : null;
+        this.missingPath = basePath != null && baseURL == null;
     }
 
     /**
@@ -75,53 +79,59 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      */
     @Override
     public Optional<InputStream> getResourceAsStream(String path) {
+        if (missingPath) {
+            return Optional.empty();
+        }
+
         URL url = classLoader.getResource(prefixPath(path));
         if (url != null) {
-            try {
-                URI uri = url.toURI();
-                if (uri.getScheme().equals("jar")) {
-                    synchronized (DefaultClassPathResourceLoader.class) {
-                        FileSystem fileSystem = null;
-                        try {
+            if (startsWithBase(url)) {
+                try {
+                    URI uri = url.toURI();
+                    if (uri.getScheme().equals("jar")) {
+                        synchronized (DefaultClassPathResourceLoader.class) {
+                            FileSystem fileSystem = null;
                             try {
-                                fileSystem = FileSystems.getFileSystem(uri);
-                            } catch (FileSystemNotFoundException e) {
-                                //no-op
-                            }
-                            if (fileSystem == null || !fileSystem.isOpen()) {
                                 try {
-                                    fileSystem = FileSystems.newFileSystem(uri, Collections.emptyMap(), classLoader);
-                                } catch (FileSystemAlreadyExistsException e) {
                                     fileSystem = FileSystems.getFileSystem(uri);
+                                } catch (FileSystemNotFoundException e) {
+                                    //no-op
                                 }
-                            }
-                            Path pathObject = fileSystem.getPath(path);
-                            if (Files.isDirectory(pathObject)) {
-                                return Optional.empty();
-                            }
-                            return Optional.of(new ByteArrayInputStream(Files.readAllBytes(pathObject)));
-                        } finally {
-                            if (fileSystem != null && fileSystem.isOpen()) {
-                                try {
-                                    fileSystem.close();
-                                } catch (IOException e) {
-                                    if (LOG.isDebugEnabled()) {
-                                        LOG.debug("Error shutting down JAR file system [" + fileSystem + "]: " + e.getMessage(), e);
+                                if (fileSystem == null || !fileSystem.isOpen()) {
+                                    try {
+                                        fileSystem = FileSystems.newFileSystem(uri, Collections.emptyMap(), classLoader);
+                                    } catch (FileSystemAlreadyExistsException e) {
+                                        fileSystem = FileSystems.getFileSystem(uri);
+                                    }
+                                }
+                                Path pathObject = fileSystem.getPath(path);
+                                if (Files.isDirectory(pathObject)) {
+                                    return Optional.empty();
+                                }
+                                return Optional.of(new ByteArrayInputStream(Files.readAllBytes(pathObject)));
+                            } finally {
+                                if (fileSystem != null && fileSystem.isOpen()) {
+                                    try {
+                                        fileSystem.close();
+                                    } catch (IOException e) {
+                                        if (LOG.isDebugEnabled()) {
+                                            LOG.debug("Error shutting down JAR file system [" + fileSystem + "]: " + e.getMessage(), e);
+                                        }
                                     }
                                 }
                             }
                         }
+                    } else if (uri.getScheme().equals("file")) {
+                        Path pathObject = Paths.get(uri);
+                        if (Files.isDirectory(pathObject)) {
+                            return Optional.empty();
+                        }
+                        return Optional.of(Files.newInputStream(pathObject));
                     }
-                } else if (uri.getScheme().equals("file")) {
-                    Path pathObject = Paths.get(uri);
-                    if (Files.isDirectory(pathObject)) {
-                        return Optional.empty();
+                } catch (URISyntaxException | IOException | ProviderNotFoundException e) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Error establishing whether path is a directory: " + e.getMessage(), e);
                     }
-                    return Optional.of(Files.newInputStream(pathObject));
-                }
-            } catch (URISyntaxException | IOException | ProviderNotFoundException e) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Error establishing whether path is a directory: " + e.getMessage(), e);
                 }
             }
         }
@@ -129,7 +139,23 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
         if (path.indexOf('.') == -1) {
             return Optional.empty();
         }
-        return Optional.ofNullable(classLoader.getResourceAsStream(prefixPath(path)));
+        final URL u = getResource(path).orElse(null);
+        if (u != null) {
+            try {
+                return Optional.of(u.openStream());
+            } catch (IOException e) {
+                // fallback to empty
+            }
+        }
+        return Optional.empty();
+    }
+
+    private boolean startsWithBase(URL url) {
+        if (baseURL == null) {
+            return true;
+        } else {
+            return url.toExternalForm().startsWith(baseURL.toExternalForm());
+        }
     }
 
     /**
@@ -140,11 +166,17 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      */
     @Override
     public Optional<URL> getResource(String path) {
+        if (missingPath) {
+            return Optional.empty();
+        }
+
         boolean isDirectory = isDirectory(path);
 
         if (!isDirectory) {
             URL url = classLoader.getResource(prefixPath(path));
-            return Optional.ofNullable(url);
+            if (url != null && startsWithBase(url)) {
+                return Optional.of(url);
+            }
         }
         return Optional.empty();
     }
@@ -166,7 +198,9 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
         Stream.Builder<URL> builder = Stream.builder();
         while (all.hasMoreElements()) {
             URL url = all.nextElement();
-            builder.accept(url);
+            if (startsWithBase(url)) {
+                builder.accept(url);
+            }
         }
         return builder.build();
     }
