@@ -92,7 +92,7 @@ class FieldInjectionSpec extends Specification {
         BeanContext context = ApplicationContext.run()
 
         when:
-        E e = context.getBean(E)
+        F e = context.getBean(F)
 
         then:
         e.d == null
