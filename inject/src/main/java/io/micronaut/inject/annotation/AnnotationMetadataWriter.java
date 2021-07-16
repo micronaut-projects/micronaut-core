@@ -616,7 +616,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             }
             methodVisitor.invokeConstructor(annotationValueType, CONSTRUCTOR_ANNOTATION_VALUE_AND_MAP);
         } else {
-            throw new IllegalStateException("Cannot map unknown value: " + value + " in: " + declaringType.getClassName());
+            methodVisitor.visitInsn(ACONST_NULL);
         }
     }
 
