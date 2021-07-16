@@ -1142,7 +1142,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                         if (statusRoute != null) {
                             incomingRequest.setAttribute(HttpAttributes.ROUTE_MATCH, statusRoute);
-
+                            message.setAttribute(HttpAttributes.ROUTE_MATCH, statusRoute);
                             return executeRoute(
                                     statusRoute,
                                     request,

@@ -83,6 +83,7 @@ class CustomErrorUnsatisfiedRouteSpec extends Specification {
             '/not-found2' | "Page Not Found"
             '/not-found3' | "Page Not Found"
             '/not-found4' | "Page Not Found"
+            '/not-found5' | "Page Not Found"
     }
 
     @Requires(property = 'spec.name', value = 'CustomErrorUnsatisfiedRouteSpec')
@@ -166,6 +167,11 @@ class CustomErrorUnsatisfiedRouteSpec extends Specification {
         @Get("/notfound4")
         void notfound4() {
             throw new HttpStatusException(HttpStatus.NOT_FOUND, ['myMessage': "Message lost"])
+        }
+
+        @Get("/notfound5")
+        HttpStatus notfound5() {
+            HttpStatus.NOT_FOUND
         }
 
         @Error
