@@ -138,14 +138,24 @@ class FilterErrorSpec extends Specification {
         ExceptionRoute filter = ctx.getBean(ExceptionRoute)
 
         when:
-        HttpResponse<String> response = Flux.from(client.exchange("/filter-error-spec-4", String))
+        HttpResponse<String> response = Flux.from(client.exchange("/filter-error-spec-4/exception", String))
                 .blockFirst()
         def match = filter.routeMatch.getAndSet(null)
 
         then:
         response.status() == HttpStatus.OK
         match instanceof MethodBasedRouteMatch
-        ((MethodBasedRouteMatch) match).getName() == "test"
+        ((MethodBasedRouteMatch) match).getName() == "testException"
+
+        when:
+        response = Flux.from(client.exchange("/filter-error-spec-4/status", String))
+                .blockFirst()
+        match = filter.routeMatch.getAndSet(null)
+
+        then:
+        response.status() == HttpStatus.OK
+        match instanceof MethodBasedRouteMatch
+        ((MethodBasedRouteMatch) match).getName() == "testStatus"
 
         cleanup:
         client.close()
@@ -272,13 +282,22 @@ class FilterErrorSpec extends Specification {
     @Controller("/filter-error-spec-4")
     static class HandledByErrorRouteController {
 
-        @Get
-        String get() {
+        @Get("/exception")
+        String getException() {
             throw new FilterExceptionException()
+        }
+
+        @Get("/status")
+        HttpStatus getStatus() {
+            return HttpStatus.NOT_FOUND
         }
 
         @Error(exception = FilterExceptionException)
         @Status(HttpStatus.OK)
-        void test() {}
+        void testException() {}
+
+        @Error(status = HttpStatus.NOT_FOUND)
+        @Status(HttpStatus.OK)
+        void testStatus() {}
     }
 }
