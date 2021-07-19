@@ -247,7 +247,6 @@ public class AnnotationUtil {
     @UsedByGeneratedCode
     public static Map<String, Object> internMapOf(String key, Object value) {
         Objects.requireNonNull(key);
-        Objects.requireNonNull(value);
         if (value == Collections.EMPTY_MAP) {
             return INTERN_MAP_POOL.computeIfAbsent(key, s -> Collections.singletonMap(s, Collections.emptyMap()));
         }
