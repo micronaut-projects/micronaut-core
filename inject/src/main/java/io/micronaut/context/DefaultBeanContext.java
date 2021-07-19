@@ -3602,9 +3602,9 @@ public class DefaultBeanContext implements BeanContext {
     private <T> Stream<BeanDefinition<T>> applyBeanResolutionFilters(@Nullable BeanResolutionContext resolutionContext, Stream<BeanDefinition<T>> candidateStream) {
         candidateStream = candidateStream.filter(c -> !c.isAbstract());
 
-        BeanResolutionContext.Segment segment = resolutionContext != null ? resolutionContext.getPath().peek() : null;
-        if (segment instanceof AbstractBeanResolutionContext.ConstructorSegment) {
-            BeanDefinition declaringBean = segment.getDeclaringType();
+        BeanResolutionContext.Segment<?> segment = resolutionContext != null ? resolutionContext.getPath().peek() : null;
+        if (segment instanceof AbstractBeanResolutionContext.ConstructorSegment || segment instanceof AbstractBeanResolutionContext.MethodSegment) {
+            BeanDefinition<?> declaringBean = segment.getDeclaringType();
             // if the currently injected segment is a constructor argument and the type to be constructed is the
             // same as the candidate, then filter out the candidate to avoid a circular injection problem
             candidateStream = candidateStream.filter(c -> {
