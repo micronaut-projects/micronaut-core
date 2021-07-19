@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.writer;
 
-import io.micronaut.context.AbstractBeanDefinitionReference2;
+import io.micronaut.context.AbstractInitializableBeanDefinitionReference;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -164,7 +164,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
     private ClassWriter generateClassBytes() {
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 
-        Type superType = Type.getType(AbstractBeanDefinitionReference2.class);
+        Type superType = Type.getType(AbstractInitializableBeanDefinitionReference.class);
         String[] interfaceInternalNames;
         if (interceptedType != null) {
             interfaceInternalNames = new String[] { Type.getType(AdvisedBeanType.class).getInternalName() };
@@ -226,7 +226,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
         cv.push(requiresMethodProcessing);
         // (...)
         cv.invokeConstructor(
-                Type.getType(AbstractBeanDefinitionReference2.class),
+                Type.getType(AbstractInitializableBeanDefinitionReference.class),
                 BEAN_DEFINITION_REF_CLASS_CONSTRUCTOR
         );
         // RETURN
