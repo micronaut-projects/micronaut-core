@@ -493,7 +493,7 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
         } else {
             pushBuildArgumentsForMethod(
                     typeReference.getClassName(),
-                    typeReference,
+                    thisType,
                     classWriter,
                     staticInit,
                     Arrays.asList(parameters),
