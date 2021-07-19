@@ -9,6 +9,7 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonUnwrapped
 import com.fasterxml.jackson.annotation.JsonView
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.databind.PropertyNamingStrategy
 import com.fasterxml.jackson.databind.annotation.JsonNaming
 import groovy.transform.EqualsAndHashCode
@@ -540,7 +541,7 @@ class BeanIntrospectionModuleSpec extends Specification {
     static class AllView extends PublicView {}
 
     @Introspected
-    @JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
+    @JsonNaming(value = PropertyNamingStrategies.UpperCamelCaseStrategy.class)
     static class NamingStrategy {
 
         @PackageScope
