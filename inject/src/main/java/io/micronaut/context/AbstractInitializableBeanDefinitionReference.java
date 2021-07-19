@@ -35,9 +35,9 @@ import java.util.Set;
  * @since 3.0
  */
 @Internal
-public abstract class AbstractBeanDefinitionReference2<T> extends AbstractBeanContextConditional implements BeanDefinitionReference<T> {
+public abstract class AbstractInitializableBeanDefinitionReference<T> extends AbstractBeanContextConditional implements BeanDefinitionReference<T> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(AbstractBeanDefinitionReference2.class);
+    private static final Logger LOG = LoggerFactory.getLogger(AbstractInitializableBeanDefinitionReference.class);
     private final String beanTypeName;
     private final String beanDefinitionTypeName;
     private final AnnotationMetadata annotationMetadata;
@@ -66,10 +66,10 @@ public abstract class AbstractBeanDefinitionReference2<T> extends AbstractBeanCo
      * @param hasExposedTypes           Has exposed types?
      * @param requiresMethodProcessing  Is requires method processing?
      */
-    public AbstractBeanDefinitionReference2(String beanTypeName, String beanDefinitionTypeName, AnnotationMetadata annotationMetadata,
-                                            boolean isPrimary, boolean isContextScope, boolean isConditional,
-                                            boolean isContainerType, boolean isSingleton, boolean isConfigurationProperties,
-                                            boolean hasExposedTypes, boolean requiresMethodProcessing) {
+    public AbstractInitializableBeanDefinitionReference(String beanTypeName, String beanDefinitionTypeName, AnnotationMetadata annotationMetadata,
+                                                        boolean isPrimary, boolean isContextScope, boolean isConditional,
+                                                        boolean isContainerType, boolean isSingleton, boolean isConfigurationProperties,
+                                                        boolean hasExposedTypes, boolean requiresMethodProcessing) {
         this.beanTypeName = beanTypeName;
         this.beanDefinitionTypeName = beanDefinitionTypeName;
         this.annotationMetadata = annotationMetadata;
@@ -189,7 +189,7 @@ public abstract class AbstractBeanDefinitionReference2<T> extends AbstractBeanCo
             return false;
         }
 
-        AbstractBeanDefinitionReference2 that = (AbstractBeanDefinitionReference2) o;
+        AbstractInitializableBeanDefinitionReference that = (AbstractInitializableBeanDefinitionReference) o;
         return beanDefinitionTypeName.equals(that.beanDefinitionTypeName);
     }
 
