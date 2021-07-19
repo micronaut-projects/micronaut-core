@@ -20,6 +20,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ContainerNode;
@@ -121,19 +122,19 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
                         if (StringUtils.isNotEmpty(stringValue)) {
                             switch (stringValue) {
                                 case "SNAKE_CASE":
-                                    propertyNamingStrategy = PropertyNamingStrategy.SNAKE_CASE;
+                                    propertyNamingStrategy = PropertyNamingStrategies.SNAKE_CASE;
                                     break;
                                 case "UPPER_CAMEL_CASE":
-                                    propertyNamingStrategy = PropertyNamingStrategy.UPPER_CAMEL_CASE;
+                                    propertyNamingStrategy = PropertyNamingStrategies.UPPER_CAMEL_CASE;
                                     break;
                                 case "LOWER_CASE":
-                                    propertyNamingStrategy = PropertyNamingStrategy.LOWER_CASE;
+                                    propertyNamingStrategy = PropertyNamingStrategies.LOWER_CASE;
                                     break;
                                 case "KEBAB_CASE":
-                                    propertyNamingStrategy = PropertyNamingStrategy.KEBAB_CASE;
+                                    propertyNamingStrategy = PropertyNamingStrategies.KEBAB_CASE;
                                     break;
                                 case "LOWER_CAMEL_CASE":
-                                    propertyNamingStrategy = PropertyNamingStrategy.LOWER_CAMEL_CASE;
+                                    propertyNamingStrategy = PropertyNamingStrategies.LOWER_CAMEL_CASE;
                                     break;
                                 default:
                                     break;
