@@ -31,16 +31,16 @@ For production, see the <<https, configuring HTTPS>> section of the documentatio
 
 Note that if your deployment environment uses JDK 8, or for improved support for OpenSSL, define the following dependencies on Netty Tomcat Native:
 
-dependency:io.netty:netty-tcnative:2.0.29.Final[scope="runtimeOnly"]
+dependency:io.netty:netty-tcnative:2.0.40.Final[scope="runtimeOnly"]
 
-dependency:io.netty:netty-tcnative-boringssl-static:2.0.29.Final[scope="runtimeOnly"]
+dependency:io.netty:netty-tcnative-boringssl-static:2.0.40.Final[scope="runtimeOnly"]
 
 In addition to a dependency on the appropriate native library for your architecture. For example:
 
 .Configuring Tomcat Native
 [source,groovy]
 ----
-runtimeOnly "io.netty:netty-tcnative-boringssl-static:2.0.29.Final:${Os.isFamily(Os.FAMILY_MAC) ? 'osx-x86_64' : 'linux-x86_64'}"
+runtimeOnly "io.netty:netty-tcnative-boringssl-static:2.0.40.Final:${Os.isFamily(Os.FAMILY_MAC) ? 'osx-x86_64' : 'linux-x86_64'}"
 ----
 
 See the documentation on https://netty.io/wiki/forked-tomcat-native.html[Tomcat Native] for more information.
