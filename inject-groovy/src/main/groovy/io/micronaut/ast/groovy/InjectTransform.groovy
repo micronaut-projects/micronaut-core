@@ -136,7 +136,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 )
 
                 beanReferenceWriter.setRequiresMethodProcessing(beanDefWriter.requiresMethodProcessing())
-                beanReferenceWriter.setContextScope(AstAnnotationUtils.hasStereotype(source, unit, beanClassNode, Context))
+                beanReferenceWriter.setContextScope(beanDefWriter.getAnnotationMetadata().hasDeclaredAnnotation(Context))
                 beanDefWriter.visitBeanDefinitionEnd()
                 if (classesDir != null) {
                     beanReferenceWriter.accept(outputVisitor)
