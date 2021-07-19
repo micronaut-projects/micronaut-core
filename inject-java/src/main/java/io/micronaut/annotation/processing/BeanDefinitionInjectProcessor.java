@@ -268,7 +268,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             String className = beanDefinitionReferenceWriter.getBeanDefinitionQualifiedClassName();
             processed.add(className);
             beanDefinitionReferenceWriter.setContextScope(
-                    annotationUtils.hasStereotype(beanClassElement, Context.class));
+                    beanDefinitionWriter.getAnnotationMetadata().hasDeclaredAnnotation(Context.class));
 
             beanDefinitionReferenceWriter.accept(classWriterOutputVisitor);
         } catch (IOException e) {

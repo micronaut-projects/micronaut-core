@@ -112,6 +112,22 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
     }
 
     @CompileStatic
+    BeanDefinitionReference buildBeanDefinitionReference(String className, String classStr) {
+        def classSimpleName = NameUtils.getSimpleName(className)
+        def beanDefName= (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX
+        def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        def classLoader = new InMemoryByteCodeGroovyClassLoader()
+        classLoader.parseClass(classStr)
+        try {
+            return (BeanDefinitionReference) classLoader.loadClass(beanFullName).newInstance()
+        } catch (ClassNotFoundException e) {
+            return null
+        }
+    }
+
+    @CompileStatic
     BeanDefinition buildBeanDefinition(String packageName, String className, String classStr) {
         def beanDefName= (className.startsWith('$') ? '' : '$') + className + BeanDefinitionWriter.CLASS_SUFFIX
         String beanFullName = "${packageName}.${beanDefName}"
