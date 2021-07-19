@@ -27,6 +27,8 @@ import com.fasterxml.jackson.databind.node.ContainerNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.micronaut.context.BeanProvider;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.BeanPropertyBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -114,42 +116,14 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
                 CharSequence.class,
                 PropertyNamingStrategy.class,
                 (charSequence, targetType, context) -> {
-                    PropertyNamingStrategy propertyNamingStrategy = null;
 
-                    if (charSequence != null) {
-                        String stringValue = NameUtils.environmentName(charSequence.toString());
+                    Optional<PropertyNamingStrategy> propertyNamingStrategy = resolvePropertyNamingStrategy(charSequence);
 
-                        if (StringUtils.isNotEmpty(stringValue)) {
-                            switch (stringValue) {
-                                case "SNAKE_CASE":
-                                    propertyNamingStrategy = PropertyNamingStrategies.SNAKE_CASE;
-                                    break;
-                                case "UPPER_CAMEL_CASE":
-                                    propertyNamingStrategy = PropertyNamingStrategies.UPPER_CAMEL_CASE;
-                                    break;
-                                case "LOWER_CASE":
-                                    propertyNamingStrategy = PropertyNamingStrategies.LOWER_CASE;
-                                    break;
-                                case "KEBAB_CASE":
-                                    propertyNamingStrategy = PropertyNamingStrategies.KEBAB_CASE;
-                                    break;
-                                case "LOWER_CAMEL_CASE":
-                                    propertyNamingStrategy = PropertyNamingStrategies.LOWER_CAMEL_CASE;
-                                    break;
-                                case "LOWER_DOT_CASE":
-                                    propertyNamingStrategy = PropertyNamingStrategies.LOWER_DOT_CASE;
-                                    break;
-                                default:
-                                    break;
-                            }
-                        }
-                    }
-
-                    if (propertyNamingStrategy == null) {
+                    if (!propertyNamingStrategy.isPresent()) {
                         context.reject(charSequence, new IllegalArgumentException(String.format("Unable to convert '%s' to a com.fasterxml.jackson.databind.PropertyNamingStrategy", charSequence)));
                     }
 
-                    return Optional.ofNullable(propertyNamingStrategy);
+                    return propertyNamingStrategy;
                 }
         );
     }
@@ -282,5 +256,31 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
                 return Optional.empty();
             }
         };
+    }
+
+    @NonNull
+    private Optional<PropertyNamingStrategy> resolvePropertyNamingStrategy(@Nullable CharSequence charSequence) {
+        if (charSequence != null) {
+            String stringValue = NameUtils.environmentName(charSequence.toString());
+            if (StringUtils.isNotEmpty(stringValue)) {
+                switch (stringValue) {
+                    case "SNAKE_CASE":
+                        return Optional.of(PropertyNamingStrategies.SNAKE_CASE);
+                    case "UPPER_CAMEL_CASE":
+                        return Optional.of(PropertyNamingStrategies.UPPER_CAMEL_CASE);
+                    case "LOWER_CASE":
+                        return Optional.of(PropertyNamingStrategies.LOWER_CASE);
+                    case "KEBAB_CASE":
+                        return Optional.of(PropertyNamingStrategies.KEBAB_CASE);
+                    case "LOWER_CAMEL_CASE":
+                        return Optional.of(PropertyNamingStrategies.LOWER_CAMEL_CASE);
+                    case "LOWER_DOT_CASE":
+                        return Optional.of(PropertyNamingStrategies.LOWER_DOT_CASE);
+                    default:
+                        return Optional.empty();
+                }
+            }
+        }
+        return Optional.empty();
     }
 }
