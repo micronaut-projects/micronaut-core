@@ -49,6 +49,7 @@ class CharSequencePropertyNamingStrategyConverterSpec extends Specification {
         'SNAKE_CASE'                | PropertyNamingStrategies.SNAKE_CASE
         'UPPER_CAMEL_CASE'          | PropertyNamingStrategies.UPPER_CAMEL_CASE
         'LOWER_CAMEL_CASE'          | PropertyNamingStrategies.LOWER_CAMEL_CASE
+        'LOWER_DOT_CASE'            | PropertyNamingStrategies.LOWER_DOT_CASE
         'LOWER_CASE'                | PropertyNamingStrategies.LOWER_CASE
         'KEBAB_CASE'                | PropertyNamingStrategies.KEBAB_CASE
     }

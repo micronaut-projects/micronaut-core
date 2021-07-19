@@ -136,6 +136,9 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
                                 case "LOWER_CAMEL_CASE":
                                     propertyNamingStrategy = PropertyNamingStrategies.LOWER_CAMEL_CASE;
                                     break;
+                                case "LOWER_DOT_CASE":
+                                    propertyNamingStrategy = PropertyNamingStrategies.LOWER_DOT_CASE;
+                                    break;
                                 default:
                                     break;
                             }
