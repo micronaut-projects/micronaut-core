@@ -4,7 +4,7 @@ dependencies {
     api project(':inject')
     api project(':aop')
     api dependencyVersion("validation")
-    compileOnly dependencyVersion("reactive.streams")
+    compileOnly project(':core-reactive')
     testCompileOnly project(":inject-groovy")
     testAnnotationProcessor project(":inject-java")
     testImplementation project(":core-reactive")
