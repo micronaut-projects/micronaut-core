@@ -15,10 +15,18 @@
  */
 package io.micronaut.aop.writer;
 
-import io.micronaut.aop.*;
+import io.micronaut.aop.HotSwappableInterceptedProxy;
+import io.micronaut.aop.Intercepted;
+import io.micronaut.aop.InterceptedProxy;
+import io.micronaut.aop.Interceptor;
+import io.micronaut.aop.Introduced;
 import io.micronaut.aop.chain.InterceptorChain;
 import io.micronaut.aop.chain.MethodInterceptorChain;
-import io.micronaut.context.*;
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanLocator;
+import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.ExecutionHandleLocator;
+import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -34,13 +42,29 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
-import io.micronaut.inject.ast.*;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.configuration.ConfigurationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.inject.writer.*;
-import org.objectweb.asm.*;
+import io.micronaut.inject.writer.AbstractClassFileWriter;
+import io.micronaut.inject.writer.BeanDefinitionVisitor;
+import io.micronaut.inject.writer.BeanDefinitionWriter;
+import io.micronaut.inject.writer.ClassWriterOutputVisitor;
+import io.micronaut.inject.writer.ExecutableMethodsDefinitionWriter;
+import io.micronaut.inject.writer.OriginatingElements;
+import io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
@@ -48,7 +72,17 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Constructor;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -61,7 +95,6 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingBeanDefinitionVisitor {
-    public static final int HASHCODE = 31;
     public static final int MAX_LOCALS = 3;
 
     public static final Method METHOD_GET_PROXY_TARGET = Method.getMethod(
@@ -136,6 +169,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private boolean isProxyTarget;
 
     private MethodVisitor constructorWriter;
+    private final List<MethodRef> proxiedMethods = new ArrayList<>();
     private final Set<MethodRef> proxiedMethodsRefSet = new HashSet<>();
     private final List<MethodRef> proxyTargetMethods = new ArrayList<>();
     private int proxyMethodCount = 0;
@@ -483,7 +517,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         MethodRef methodKey = new MethodRef(methodName, argumentTypeList, returnTypeObject);
 
         if (!proxiedMethodsRefSet.contains(methodKey)) {
-            int index = proxyMethodCount++;
 
             String interceptedProxyClassName = null;
             String interceptedProxyBridgeMethodName = null;
@@ -520,8 +553,10 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                     interceptedProxyClassName,
                     interceptedProxyBridgeMethodName
             );
-            methodKey.methodIndex = methodIndex;
+            int index = proxyMethodCount++;
 
+            methodKey.methodIndex = methodIndex;
+            proxiedMethods.add(methodKey);
             proxiedMethodsRefSet.add(methodKey);
             proxyTargetMethods.add(methodKey);
 
@@ -849,7 +884,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
         // now initialize the held values
         if (isProxyTarget) {
-            if (proxiedMethodsRefSet.size() == proxyMethodCount) {
+            if (proxiedMethods.size() == proxyMethodCount) {
 
                 Iterator<MethodRef> iterator = proxyTargetMethods.iterator();
                 for (int i = 0; i < proxyMethodCount; i++) {
@@ -884,7 +919,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                     pushResolveInterceptorsCall(proxyConstructorGenerator, i, isIntroduction);
                 }
             }
-        } else if (!proxiedMethodsRefSet.isEmpty()) {
+        } else if (!proxiedMethods.isEmpty()) {
             BeanDefinitionWriter beanDefinitionWriter = parentWriter == null ? proxyBeanDefinitionWriter : parentWriter;
             ExecutableMethodsDefinitionWriter executableMethodsDefinitionWriter = beanDefinitionWriter.getExecutableMethodsWriter();
             Type executableMethodsDefinitionType = executableMethodsDefinitionWriter.getClassType();
@@ -899,10 +934,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             int executableMethodsDefinitionIndex = proxyConstructorGenerator.newLocal(executableMethodsDefinitionType);
             proxyConstructorGenerator.storeLocal(executableMethodsDefinitionIndex, executableMethodsDefinitionType);
 
-            List<MethodRef> methods = new ArrayList<>(proxiedMethodsRefSet);
-            methods.sort(Comparator.comparing(methodRef -> methodRef.methodIndex));
-            int i = 0;
-            for (MethodRef methodRef : methods) {
+            for (int i = 0; i < proxyMethodCount; i++) {
+                MethodRef methodRef = proxiedMethods.get(i);
                 int methodIndex = methodRef.methodIndex;
 
                 boolean introduction = isIntroduction && (
@@ -921,8 +954,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 proxyConstructorGenerator.visitInsn(AASTORE);
                 
                 pushResolveInterceptorsCall(proxyConstructorGenerator, i, introduction);
-                
-                i++;
             }
         }
 
