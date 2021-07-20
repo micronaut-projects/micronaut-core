@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.converters;
+package io.micronaut.runtime.converters.reactive;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
@@ -23,11 +24,12 @@ import jakarta.inject.Singleton;
 
 /**
  * Registers converters for Reactive types such as {@link Publisher}.
- * These converters are used in scenarios which don't use netty. E.g. AWS Lambda or Azure.
+ *
  * @author Sergio del Amo
  * @since 3.0.0
  */
 @Singleton
+@Requires(classes = Publishers.class)
 public class ReactiveTypeConverterRegistrar implements TypeConverterRegistrar {
 
     @Override

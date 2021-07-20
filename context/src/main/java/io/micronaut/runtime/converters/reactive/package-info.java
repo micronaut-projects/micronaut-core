@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 /**
- * Contains classes to conversion.
+ * Contains classes for reactive streams conversion.
  *
  * @author Sergio del Amo
- * @since 2.5.x
+ * @since 3.0.0
  */
-package io.micronaut.http.server.converters;
+package io.micronaut.runtime.converters.reactive;

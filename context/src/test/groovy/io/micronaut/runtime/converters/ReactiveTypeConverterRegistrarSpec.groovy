@@ -1,4 +1,4 @@
-package io.micronaut.http.server.converters
+package io.micronaut.runtime.converters
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.ConversionService
@@ -17,11 +17,10 @@ class ReactiveTypeConverterRegistrarSpec extends Specification {
     @Unroll
     void 'test converting reactive type #from.getClass().getSimpleName() to #target'() {
         expect:
-        ConversionService.SHARED.convert(from, target).isPresent()
+        context.getBean(ConversionService).convert(from, target).isPresent()
 
         where:
         from                   | target
         Object                 | Publisher
-
     }
 }
