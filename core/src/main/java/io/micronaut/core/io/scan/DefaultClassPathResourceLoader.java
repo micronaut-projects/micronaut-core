@@ -48,6 +48,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
     private final Map<String, Boolean> isDirectoryCache = new ConcurrentLinkedHashMap.Builder<String, Boolean>()
             .maximumWeightedCapacity(50).build();
     private final boolean missingPath;
+    private final boolean checkBase;
 
     /**
      * Default constructor.
@@ -65,10 +66,22 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      * @param basePath    The path to look for resources under
      */
     public DefaultClassPathResourceLoader(ClassLoader classLoader, String basePath) {
+        this(classLoader, basePath, false);
+    }
+
+    /**
+     * Use when resources should have a standard base path.
+     *
+     * @param classLoader The class loader for loading resources
+     * @param basePath    The path to look for resources under
+     * @param checkBase   If set to {@code true} an extended check for the base path is performed otherwise paths with relative URLs like {@code ../} are prohibited.
+     */
+    public DefaultClassPathResourceLoader(ClassLoader classLoader, String basePath, boolean checkBase) {
         this.classLoader = classLoader;
         this.basePath = normalize(basePath);
-        this.baseURL = basePath != null ? classLoader.getResource(normalize(basePath)) : null;
-        this.missingPath = basePath != null && baseURL == null;
+        this.baseURL = checkBase && basePath != null ? classLoader.getResource(normalize(basePath)) : null;
+        this.missingPath = checkBase && basePath != null && baseURL == null;
+        this.checkBase = checkBase;
     }
 
     /**
@@ -80,6 +93,8 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
     @Override
     public Optional<InputStream> getResourceAsStream(String path) {
         if (missingPath) {
+            return Optional.empty();
+        } else if (isProhibitedRelativePath(path)) {
             return Optional.empty();
         }
 
@@ -151,10 +166,14 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
     }
 
     private boolean startsWithBase(URL url) {
-        if (baseURL == null) {
-            return true;
+        if (checkBase) {
+            if (baseURL == null) {
+                return true;
+            } else {
+                return url.toExternalForm().startsWith(baseURL.toExternalForm());
+            }
         } else {
-            return url.toExternalForm().startsWith(baseURL.toExternalForm());
+            return true;
         }
     }
 
@@ -167,6 +186,8 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
     @Override
     public Optional<URL> getResource(String path) {
         if (missingPath) {
+            return Optional.empty();
+        } else if (isProhibitedRelativePath(path)) {
             return Optional.empty();
         }
 
@@ -181,6 +202,10 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
         return Optional.empty();
     }
 
+    private boolean isProhibitedRelativePath(String path) {
+        return !checkBase && path.replace('\\', '/').contains("../");
+    }
+
     /**
      * Obtains a stream of resource URLs.
      *
@@ -189,6 +214,12 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      */
     @Override
     public Stream<URL> getResources(String path) {
+        if (missingPath) {
+            return Stream.empty();
+        } else if (isProhibitedRelativePath(path)) {
+            return Stream.empty();
+        }
+
         Enumeration<URL> all;
         try {
             all = classLoader.getResources(prefixPath(path));
@@ -215,7 +246,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
 
     /**
      * @param basePath The path to load resources
-     * @return The resouce loader
+     * @return The resource loader
      */
     @Override
     public ResourceLoader forBase(String basePath) {
