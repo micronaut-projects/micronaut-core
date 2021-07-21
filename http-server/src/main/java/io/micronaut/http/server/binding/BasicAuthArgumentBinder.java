@@ -22,6 +22,7 @@ import io.micronaut.http.HttpHeaderValues;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
+import jakarta.inject.Singleton;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -34,6 +35,7 @@ import java.util.Optional;
  * @author James Kleeh
  * @since 1.3.0
  */
+@Singleton
 public class BasicAuthArgumentBinder implements TypedRequestArgumentBinder<BasicAuth> {
 
     @Override
