@@ -314,10 +314,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /**
      * A segment that represents a constructor.
      */
-    public static class ConstructorSegment extends AbstractSegment {
+    public static class ConstructorSegment extends AbstractSegment implements ArgumentInjectionPoint {
 
         private final String methodName;
         private final Argument[] arguments;
+        private final BeanDefinition declaringClass;
 
         /**
          * @param declaringClass The declaring class
@@ -329,6 +330,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             super(declaringClass, declaringClass.getBeanType().getName(), argument);
             this.methodName = methodName;
             this.arguments = arguments;
+            this.declaringClass = declaringClass;
         }
 
         @Override
@@ -376,6 +378,21 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                     return getArgument().getAnnotationMetadata();
                 }
             };
+        }
+
+        @Override
+        public CallableInjectionPoint getOuterInjectionPoint() {
+            throw new UnsupportedOperationException("Outer injection point not retrievable from here");
+        }
+
+        @Override
+        public BeanDefinition getDeclaringBean() {
+            return declaringClass;
+        }
+
+        @Override
+        public boolean requiresReflection() {
+            return false;
         }
     }
 
@@ -443,7 +460,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /**
      * A segment that represents a field.
      */
-    public static class FieldSegment extends AbstractSegment implements InjectionPoint, ArgumentCoercible {
+    public static class FieldSegment extends AbstractSegment implements InjectionPoint, ArgumentCoercible, ArgumentInjectionPoint {
 
         private final boolean requiresReflection;
 
@@ -475,6 +492,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         @Override
         public boolean requiresReflection() {
             return requiresReflection;
+        }
+
+        @Override
+        public CallableInjectionPoint getOuterInjectionPoint() {
+            throw new UnsupportedOperationException("Outer injection point not retrievable from here");
         }
 
         @Override
