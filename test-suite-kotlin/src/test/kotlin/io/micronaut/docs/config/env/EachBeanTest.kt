@@ -1,6 +1,6 @@
 package io.micronaut.docs.config.env
 
-import io.kotlintest.specs.AnnotationSpec
+import io.kotest.core.spec.style.AnnotationSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.docs.config.env.DataSourceFactory.DataSource
