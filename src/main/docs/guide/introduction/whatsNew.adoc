@@ -137,7 +137,7 @@ The https://micronaut-projects.github.io/micronaut-cassandra/latest/guide/[Micro
 
 - Cassandra 4.11.1
 - Kafka 2.8.0
-- GraalVM 21.1.0
+- GraalVM 21.2.0
 - Liquibase 4.3.4
 - Flyway 7.7.3
 - Elasticsearch 7.12.0
