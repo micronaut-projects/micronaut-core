@@ -173,7 +173,7 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     }
 
     @Override
-    public boolean isVariable() {
+    public boolean isTypeVariable() {
         return isTypeVar;
     }
 

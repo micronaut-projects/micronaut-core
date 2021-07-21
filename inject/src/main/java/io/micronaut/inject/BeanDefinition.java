@@ -137,7 +137,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
                         Argument<?> candidateParameter = beanTypeParameters[i];
                         final Argument<?> requestedParameter = typeArguments[i];
                         if (!requestedParameter.isAssignableFrom(candidateParameter.getType())) {
-                            if (!(candidateParameter.isVariable() && candidateParameter.isAssignableFrom(requestedParameter.getType()))) {
+                            if (!(candidateParameter.isTypeVariable() && candidateParameter.isAssignableFrom(requestedParameter.getType()))) {
                                 return false;
                             }
                         }

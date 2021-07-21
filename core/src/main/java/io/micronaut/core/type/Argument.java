@@ -148,7 +148,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * @return True if it is a variable
      * @since 3.0.0
      */
-    default boolean isVariable() {
+    default boolean isTypeVariable() {
         return false;
     }
 
