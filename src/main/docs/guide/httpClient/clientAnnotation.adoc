@@ -54,11 +54,11 @@ The following table illustrates common return types usable with ann:http.client.
 
 |rs:Publisher[]
 |Any type that implements the rs:Publisher[] interface
-|`Flowable<String> hello()`
+|`Flux<String> hello()`
 
 |api:http.HttpResponse[]
 |An api:http.HttpResponse[] and optional response body type
-|`Single<HttpResponse<String>> hello()`
+|`Mono<HttpResponse<String>> hello()`
 
 |rs:Publisher[]
 |A rs:Publisher[] implementation that emits a POJO

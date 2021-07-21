@@ -33,13 +33,13 @@ dependencies {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
-    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-kotlintest"), {
+    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-kotest"), {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
     testImplementation project(":function-client")
     testImplementation project(":function-web")
-    testImplementation 'io.kotlintest:kotlintest-runner-junit5:3.4.2'
+    testImplementation 'io.kotest:kotest-runner-junit5-jvm:4.6.0'
     testImplementation 'org.zalando:logbook-netty:2.4.1'
     testImplementation project(':tracing')
     kaptTest project(':inject-java')
@@ -51,6 +51,8 @@ dependencies {
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
         testImplementation('org.bouncycastle:bcpkix-jdk15on:1.65')
     }
+
+    testImplementation dependencyVersion("reactor")
 }
 
 compileTestKotlin {

@@ -4,24 +4,25 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.core.util.StringUtils
+import io.micronaut.http.HttpAttributes
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.BlockingHttpClient
+import io.micronaut.http.annotation.Status
 import io.micronaut.http.client.HttpClient
-import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.filter.HttpServerFilter
-import io.micronaut.http.filter.OncePerRequestHttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.web.router.MethodBasedRouteMatch
+import io.micronaut.web.router.RouteMatch
 import org.reactivestreams.Publisher
-import spock.lang.Ignore
-import spock.lang.PendingFeature
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 import java.util.concurrent.atomic.AtomicInteger
@@ -32,14 +33,19 @@ class FilterErrorSpec extends Specification {
     void "test errors emitted from filters interacting with exception handlers"() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': FilterErrorSpec.simpleName])
         def ctx = server.applicationContext
-        RxHttpClient client = ctx.createBean(RxHttpClient, server.getURL())
+        HttpClient client = ctx.createBean(HttpClient, server.getURL())
         First first = ctx.getBean(First)
         Next next = ctx.getBean(Next)
 
         when:
-        def response = client.exchange("/filter-error-spec", String)
-                .onErrorReturn(t -> ((HttpClientResponseException)t).response)
-                .blockingFirst()
+        HttpResponse<String> response = Flux.from(client.exchange("/filter-error-spec", String))
+                .onErrorResume(t -> {
+                    if (t instanceof HttpClientResponseException) {
+                        return Flux.just(((HttpClientResponseException) t).response)
+                    }
+                    throw t
+                })
+                .blockFirst()
 
         then:
         response.status() == HttpStatus.BAD_REQUEST
@@ -49,9 +55,14 @@ class FilterErrorSpec extends Specification {
         next.executedCount.get() == 0
 
         when:
-        response = client.exchange(HttpRequest.GET("/filter-error-spec").header("X-Passthru", "true"), String)
-                .onErrorReturn(t -> ((HttpClientResponseException)t).response)
-                .blockingFirst()
+        response = Flux.from(client.exchange(HttpRequest.GET("/filter-error-spec").header("X-Passthru", "true"), String))
+                .onErrorResume(t -> {
+                    if (t instanceof HttpClientResponseException) {
+                        return Flux.just(((HttpClientResponseException)t).response)
+                    }
+                    throw t
+                })
+                .blockFirst()
         def firstResponse = first.response.getAndSet(null)
 
         then:
@@ -69,13 +80,18 @@ class FilterErrorSpec extends Specification {
     void "test non once per request filter throwing error does not loop"() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': FilterErrorSpec.simpleName + '2'])
         def ctx = server.applicationContext
-        RxHttpClient client = ctx.createBean(RxHttpClient, server.getURL())
+        HttpClient client = ctx.createBean(HttpClient, server.getURL())
         FirstEvery filter = ctx.getBean(FirstEvery)
 
         when:
-        def response = client.exchange("/filter-error-spec", String)
-                .onErrorReturn(t -> ((HttpClientResponseException)t).response)
-                .blockingFirst()
+        HttpResponse<String> response = Flux.from(client.exchange("/filter-error-spec", String))
+                .onErrorResume(t -> {
+                    if (t instanceof HttpClientResponseException) {
+                        return Flux.just(((HttpClientResponseException) t).response)
+                    }
+                    throw t
+                })
+                .blockFirst()
 
         then:
         response.status() == HttpStatus.BAD_REQUEST
@@ -90,13 +106,18 @@ class FilterErrorSpec extends Specification {
     void "test filter throwing exception handled by exception handler throwing exception"() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': FilterErrorSpec.simpleName + '3'])
         def ctx = server.applicationContext
-        RxHttpClient client = ctx.createBean(RxHttpClient, server.getURL())
+        HttpClient client = ctx.createBean(HttpClient, server.getURL())
         ExceptionException filter = ctx.getBean(ExceptionException)
 
         when:
-        def response = client.exchange("/filter-error-spec-3", String)
-                .onErrorReturn(t -> ((HttpClientResponseException)t).response)
-                .blockingFirst()
+        HttpResponse<String> response = Flux.from(client.exchange("/filter-error-spec-3", String))
+                .onErrorResume(t -> {
+                    if (t instanceof HttpClientResponseException) {
+                        return Flux.just(((HttpClientResponseException) t).response)
+                    }
+                    throw t
+                })
+                .blockFirst()
         def filterResponse = filter.response.getAndSet(null)
 
         then:
@@ -104,8 +125,42 @@ class FilterErrorSpec extends Specification {
         response.body().contains("from exception handler")
         filter.executedCount.get() == 1
         filterResponse.status() == HttpStatus.INTERNAL_SERVER_ERROR
+
+        cleanup:
+        client.close()
+        ctx.close()
     }
 
+    void "test the error route is the route match"() {
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': FilterErrorSpec.simpleName + '4'])
+        def ctx = server.applicationContext
+        HttpClient client = ctx.createBean(HttpClient, server.getURL())
+        ExceptionRoute filter = ctx.getBean(ExceptionRoute)
+
+        when:
+        HttpResponse<String> response = Flux.from(client.exchange("/filter-error-spec-4/exception", String))
+                .blockFirst()
+        def match = filter.routeMatch.getAndSet(null)
+
+        then:
+        response.status() == HttpStatus.OK
+        match instanceof MethodBasedRouteMatch
+        ((MethodBasedRouteMatch) match).getName() == "testException"
+
+        when:
+        response = Flux.from(client.exchange("/filter-error-spec-4/status", String))
+                .blockFirst()
+        match = filter.routeMatch.getAndSet(null)
+
+        then:
+        response.status() == HttpStatus.OK
+        match instanceof MethodBasedRouteMatch
+        ((MethodBasedRouteMatch) match).getName() == "testStatus"
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
 
     @Requires(property = 'spec.name', value = 'FilterErrorSpec')
     @Filter("/**")
@@ -184,6 +239,26 @@ class FilterErrorSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'FilterErrorSpec4')
+    @Filter("/**")
+    static class ExceptionRoute implements HttpServerFilter {
+
+
+        AtomicReference<RouteMatch<?>> routeMatch = new AtomicReference<>()
+
+        @Override
+        Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+            return Publishers.then(chain.proceed(request), { resp ->
+                routeMatch.set(resp.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch).get())
+            })
+        }
+
+        @Override
+        int getOrder() {
+            10
+        }
+    }
+
     @Controller("/filter-error-spec")
     static class NeverReachedController {
 
@@ -202,5 +277,27 @@ class FilterErrorSpec extends Specification {
             throw new FilterExceptionException()
         }
 
+    }
+
+    @Controller("/filter-error-spec-4")
+    static class HandledByErrorRouteController {
+
+        @Get("/exception")
+        String getException() {
+            throw new FilterExceptionException()
+        }
+
+        @Get("/status")
+        HttpStatus getStatus() {
+            return HttpStatus.NOT_FOUND
+        }
+
+        @Error(exception = FilterExceptionException)
+        @Status(HttpStatus.OK)
+        void testException() {}
+
+        @Error(status = HttpStatus.NOT_FOUND)
+        @Status(HttpStatus.OK)
+        void testStatus() {}
     }
 }

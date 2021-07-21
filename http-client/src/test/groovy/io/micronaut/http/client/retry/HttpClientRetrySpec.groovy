@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.retry
 
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.annotation.Body
@@ -25,7 +26,8 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.retry.annotation.Retryable
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Single
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -72,7 +74,7 @@ class HttpClientRetrySpec extends Specification {
         controller.count = 0
 
         when:"A method is annotated retry"
-        int result = countClient.getCountSingle().blockingGet()
+        int result = Mono.from(countClient.getCountSingle()).block()
 
         then:"It executes until successful"
         result == 3
@@ -80,8 +82,8 @@ class HttpClientRetrySpec extends Specification {
         when:"The threshold can never be met"
         controller.countThreshold = 10
         controller.count = 0
-        def single = countClient.getCountSingle()
-        single.blockingGet()
+        Publisher<Integer> single = countClient.getCountSingle()
+        Mono.from(single).block()
 
         then:"The original exception is thrown"
         def e = thrown(HttpClientResponseException)
@@ -92,7 +94,7 @@ class HttpClientRetrySpec extends Specification {
     void "test retry JSON post"() {
         given:
         RetryableClient client = context.getBean(RetryableClient)
-        def result = client.post(new FooDTO(foo: "Good")).blockingGet()
+        String result = Mono.from(client.post(new FooDTO(foo: "Good"))).block()
 
         expect:
         result == 'Good'
@@ -120,8 +122,9 @@ class HttpClientRetrySpec extends Specification {
         }
 
         @Override
-        Single<Integer> getCountSingle() {
-            Single.fromCallable({->
+        @SingleResult
+        Publisher<Integer> getCountSingle() {
+            Mono.fromCallable({->
                 countRx++
                 if(countRx < countThreshold) {
                     throw new IllegalStateException("Bad count")
@@ -136,13 +139,13 @@ class HttpClientRetrySpec extends Specification {
     static class JsonController {
         boolean first = true
         @Post("/foo")
-        Single<String> post(@Body @NonNull FooDTO foo) {
+        @SingleResult
+        Publisher<String> post(@Body @NonNull FooDTO foo) {
             if (first) {
                 first = false
-                return Single.error(new RuntimeException("First request failed"))
-            } else {
-                Single.just(foo.foo)
+                return Mono.error(new RuntimeException("First request failed"))
             }
+            Mono.just(foo.foo)
         }
     }
 
@@ -151,16 +154,18 @@ class HttpClientRetrySpec extends Specification {
         @Get('/count')
         int getCount()
 
-        @Get('/rx-count')
-        Single<Integer> getCountSingle()
+        @Get('/reactive-count')
+        @SingleResult
+        Publisher<Integer> getCountSingle()
     }
 
     @Client("/retry-test/json")
     @Retryable(delay = "10ms", attempts = "2", maxDelay = "1s")
     static interface RetryableClient {
 
+        @SingleResult
         @Post("/foo")
-        Single<String> post(@Body @NonNull FooDTO foo);
+        Publisher<String> post(@Body @NonNull FooDTO foo);
     }
 
     static class FooDTO {

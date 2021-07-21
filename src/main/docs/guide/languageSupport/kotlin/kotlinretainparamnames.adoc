@@ -2,7 +2,7 @@ Like with Java, the parameter name data for method parameters is not retained at
 
 To enable retention of parameter name data with Kotlin, set the `javaParameters` option to `true` in your `build.gradle`:
 
-.build.gradle
+.configuration in Gradle
 [source,groovy]
 ----
 compileTestKotlin {
@@ -11,4 +11,30 @@ compileTestKotlin {
         javaParameters = true
     }
 }
+----
+
+Or if using Maven configure the Micronaut Maven Plugin accordingly:
+
+.configuration in Maven
+[source,xml]
+----
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <!-- ... -->
+  <build>
+    <plugins>
+      <!-- ... -->
+      <plugin>
+        <artifactId>kotlin-maven-plugin</artifactId>
+        <groupId>org.jetbrains.kotlin</groupId>
+        <configuration>            
+            <javaParameters>true</javaParameters>
+            <!-- ... -->
+        </configuration>
+        <!-- ... -->
+      </plugin>
+      <!-- ... -->
+    </plugins>
+  </build>
+</project>
 ----

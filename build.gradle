@@ -377,12 +377,6 @@ ext {
                     group:'org.neo4j.driver',
                     name:'neo4j-java-driver'
             ],
-            oracle                      : [
-                    version: ojdbcVersion,
-                    group  : 'com.oracle.database.jdbc',
-                    name   : 'ojdbc8',
-                    modules: ['ucp']
-            ],
             'jcache'                   : [
                     version: jcacheVersion,
                     group  : 'javax.cache',
@@ -483,6 +477,12 @@ ext {
                     group  : 'io.micronaut.rxjava3',
                     name   : 'micronaut-rxjava3'
             ],
+            'micronaut.rxjava2'        : [
+                    version: micronautRxJava2Version,
+                    group  : 'io.micronaut.rxjava2',
+                    name   : 'micronaut-rxjava2',
+                    modules: ['micronaut-rxjava2-http-client', 'micronaut-rxjava2-http-server-netty']
+            ],
             'micronaut.rxjava1'        : [
                     version: micronautRxJava1Version,
                     group  : 'io.micronaut.rxjava1',
@@ -528,26 +528,6 @@ ext {
                     version: h2Version,
                     group  : 'com.h2database',
                     name   : 'h2'
-            ],
-            postgres                   : [
-                    version: postgresDriverVersion,
-                    group  : 'org.postgresql',
-                    name   : 'postgresql'
-            ],
-            mysql                   : [
-                    version: mysqlDriverVersion,
-                    group  : 'mysql',
-                    name   : 'mysql-connector-java'
-            ],
-            mariadb                   : [
-                    version: mariadbDriverVersion,
-                    group  : 'org.mariadb.jdbc',
-                    name   : 'mariadb-java-client'
-            ],
-            mssql                   : [
-                    version: mssqlDriverVersion,
-                    group  : 'com.microsoft.sqlserver',
-                    name   : 'mssql-jdbc'
             ],
             liquibase                  : [
                     version: liquibaseVersion,

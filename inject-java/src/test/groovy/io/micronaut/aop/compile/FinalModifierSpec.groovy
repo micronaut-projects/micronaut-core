@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import io.micronaut.aop.Intercepted
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.qualifiers.Qualifiers
+import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Issue
 
 class FinalModifierSpec extends AbstractTypeElementSpec {
@@ -180,7 +181,7 @@ final class MyBean {
 
     void "test final modifier on class with AOP advice doesn't compile"() {
         when:
-        buildBeanDefinition('test.$MyBeanDefinition$Intercepted', '''
+        buildBeanDefinition('test.$MyBean' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.simple.*;
@@ -209,7 +210,7 @@ final class MyBean {
 
     void "test final modifier on method with AOP advice doesn't compile"() {
         when:
-        buildBeanDefinition('test.$MyBeanDefinition$Intercepted', '''
+        buildBeanDefinition('test.$MyBean' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.simple.*;
@@ -238,7 +239,7 @@ class MyBean {
 
     void "test final modifier on method with AOP advice on method doesn't compile"() {
         when:
-        buildBeanDefinition('test.$MyBeanDefinition$Intercepted', '''
+        buildBeanDefinition('test.$MyBean' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.simple.*;

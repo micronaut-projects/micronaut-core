@@ -17,8 +17,8 @@ package io.micronaut.docs.annotation;
 
 // tag::imports[]
 import io.micronaut.http.client.annotation.Client;
-import io.reactivex.Single;
-
+import org.reactivestreams.Publisher;
+import io.micronaut.core.async.annotation.SingleResult;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotBlank;
 // end::imports[]
@@ -28,6 +28,7 @@ import javax.validation.constraints.NotBlank;
 public interface PetClient extends PetOperations { // <2>
 
     @Override
-    Single<Pet> save(@NotBlank String name, @Min(1L) int age); // <3>
+    @SingleResult
+    Publisher<Pet> save(@NotBlank String name, @Min(1L) int age); // <3>
 }
 // end::class[]

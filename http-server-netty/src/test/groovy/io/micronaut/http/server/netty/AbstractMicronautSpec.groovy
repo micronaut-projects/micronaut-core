@@ -16,7 +16,7 @@
 package io.micronaut.http.server.netty
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -37,7 +37,7 @@ abstract class AbstractMicronautSpec extends Specification {
     @Shared int serverPort = embeddedServer.getPort()
     @Shared URL server = embeddedServer.getURL()
     @Shared @AutoCleanup ApplicationContext applicationContext = embeddedServer.applicationContext
-    @Shared @AutoCleanup RxHttpClient rxClient = applicationContext.createBean(RxHttpClient, server)
+    @Shared @AutoCleanup HttpClient rxClient = applicationContext.createBean(HttpClient, server)
 
 
     Collection<String> configurationNames() {

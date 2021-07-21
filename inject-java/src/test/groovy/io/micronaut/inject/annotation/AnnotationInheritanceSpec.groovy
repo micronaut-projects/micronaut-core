@@ -1,6 +1,5 @@
 package io.micronaut.inject.annotation
 
-
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.Intercepted
 import io.micronaut.context.annotation.Prototype
@@ -9,7 +8,7 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
-import org.junit.jupiter.api.Assertions
+import io.micronaut.inject.writer.BeanDefinitionWriter
 
 class AnnotationInheritanceSpec extends AbstractTypeElementSpec {
 
@@ -77,7 +76,7 @@ class ParentFactory {
 }
 
 ''')
-        BeanDefinition definition = classLoader.loadClass('anntest.$TestFactory$Test0Definition').newInstance()
+        BeanDefinition definition = classLoader.loadClass('anntest.$TestFactory$Test0' + BeanDefinitionWriter.CLASS_SUFFIX).newInstance()
 
         expect:"Is a bean"
         definition != null
@@ -555,7 +554,7 @@ class ParentFactory {
 @jakarta.inject.Scope
 @interface MyS {}
 ''')
-        BeanDefinition definition = classLoader.loadClass('anntest.$TestFactory$Test0Definition').newInstance()
+        BeanDefinition definition = classLoader.loadClass('anntest.$TestFactory$Test0' + BeanDefinitionWriter.CLASS_SUFFIX).newInstance()
 
         expect:"inherits annotations declared @Inherited"
         definition.hasAnnotation("anntest.MyQ")
@@ -629,7 +628,7 @@ class ParentFactory {
 @Inherited
 @interface MyAnn {}
 ''')
-        BeanDefinition definition = classLoader.loadClass('anntest.$TestFactory$Test0Definition').newInstance()
+        BeanDefinition definition = classLoader.loadClass('anntest.$TestFactory$Test0' + BeanDefinitionWriter.CLASS_SUFFIX).newInstance()
 
         expect:"inherits the stereotype annotation as an annotation"
         definition.hasAnnotation('anntest.MyAnn')
@@ -703,7 +702,7 @@ class ParentFactory {
 }
 
 ''')
-        BeanDefinition definition = classLoader.loadClass('anntest.$TestFactory$Test0Definition').newInstance()
+        BeanDefinition definition = classLoader.loadClass('anntest.$TestFactory$Test0' + BeanDefinitionWriter.CLASS_SUFFIX).newInstance()
 
         expect:"The type is a bean with a single declared annotation"
         definition.hasDeclaredAnnotation(Prototype)
@@ -763,7 +762,7 @@ class ParentFactory {
 
 ''')
         when:"No bean since no declared scopes/qualifiers"
-        classLoader.loadClass('anntest.$TestFactory$Test0Definition')
+        classLoader.loadClass('anntest.$TestFactory$Test0' + BeanDefinitionWriter.CLASS_SUFFIX)
 
         then:"No bean exists"
         thrown(ClassNotFoundException)

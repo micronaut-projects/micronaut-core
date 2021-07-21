@@ -24,7 +24,7 @@ interface MyPrecompiledInterface<T extends Person> {
 
     def <V extends java.net.URL> java.util.Map<T,V> getPeopleMap();
 
-    io.reactivex.Single<java.util.List<T>> getPeopleSingle();
+    reactor.core.publisher.Mono<List<T>> getPeopleSingle();
 
     T getPerson();
 

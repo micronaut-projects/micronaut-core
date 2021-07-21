@@ -18,7 +18,7 @@ package io.micronaut.management.endpoint.info;
 import io.micronaut.management.endpoint.EndpointConfiguration;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
-import io.reactivex.Single;
+import reactor.core.publisher.Mono;
 
 /**
  * <p>Exposes an {@link Endpoint} to provide information about the application.</p>
@@ -57,7 +57,7 @@ public class InfoEndpoint {
      * @return A {@link org.reactivestreams.Publisher} of the info response
      */
     @Read
-    Single getInfo() {
-        return Single.fromPublisher(infoAggregator.aggregate(infoSources));
+    Mono getInfo() {
+        return Mono.from(infoAggregator.aggregate(infoSources));
     }
 }

@@ -119,16 +119,10 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                             fulfilled.put(argumentName, result.get());
                         } else {
                             Qualifier qualifier = Qualifiers.byName(named.toString());
-                            final BeanResolutionContext.Path path = resolutionContext.getPath();
-                            path.pushConstructorResolve(
-                                    definition,
-                                    argument
-                            );
                             Optional bean;
-                            try {
+                            try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+                                    .pushConstructorResolve(definition, argument)) {
                                 bean = ((DefaultBeanContext) context).findBean(resolutionContext, argument, qualifier);
-                            } finally {
-                                path.pop();
                             }
                             if (bean.isPresent()) {
                                 fulfilled.put(argumentName, bean.get());

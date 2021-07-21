@@ -125,7 +125,7 @@ The following table summarizes the core Micronaut annotations and which ones are
 |ann:runtime.context.scope.Refreshable[]                              | ❌
 |ann:runtime.context.scope.ScopedProxy[]                              | ❌
 |ann:runtime.context.scope.ThreadLocal[]                              | ❌
-|ann:runtime.event.annotation.EventListener[]                         | ❌
+|ann:runtime.event.annotation.EventListener[]                         | ✅
 |ann:runtime.http.scope.RequestScope[]                                | ❌
 |ann:scheduling.annotation.Async[]                                    | ❌
 |ann:scheduling.annotation.ExecuteOn[]                                | ❌
@@ -213,6 +213,12 @@ This can affect many areas of the framework where names like `XForwarded` are us
 
 Previously the default order value for the `@Order` annotation was the lowest precedence.
 It is now 0.
+
+==== Classes Renaming
+
+* `RxJavaRouteDataCollector` has been renamed to `DefaultRouteDataCollector`.
+* `RxJavaBeanDefinitionDataCollector.html` has been renamed to `DefaultBeanDefinitionDataCollector`.
+* `RxJavaHealthAggregator` has been renamed to `DefaultHealthAggregator`
 
 ==== Deprecation Removal
 
@@ -398,3 +404,19 @@ Another change is regarding the GraalVM resources created at compile-time. In pr
 
 The classes in Micronaut Cassandra have been moved from `io.micronaut.configuration.cassandra` to `io.micronaut.cassandra` package.
 
+==== Groovy changes
+
+In previous version the missing property wouldn't set the field value to `null` as it would do for the Java code, in the version 3 it should behave in the same way.
+
+Please refactor to use the default value in the `@Value` annotation:
+
+[source,groovy]
+----
+@Nullable
+@Value('${greeting}')
+protected String before = "Default greeting"
+
+@Nullable
+@Value('${greeting:Default greeting}')
+protected String after
+----

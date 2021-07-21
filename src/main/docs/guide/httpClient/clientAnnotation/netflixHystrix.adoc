@@ -26,7 +26,7 @@ String hello(String name) {
 }
 ----
 
-NOTE: This works for reactive return types such as rx:Flowable[], and the reactive type will be wrapped in a `HystrixObservableCommand`.
+NOTE: This works for reactive return types such as reactor:Flux[], and the reactive type will be wrapped in a `HystrixObservableCommand`.
 
 The ann:configuration.hystrix.annotation.HystrixCommand[] annotation also integrates with Micronaut's support for <<retry, Retry Advice>> and <<clientFallback, Fallbacks>>
 

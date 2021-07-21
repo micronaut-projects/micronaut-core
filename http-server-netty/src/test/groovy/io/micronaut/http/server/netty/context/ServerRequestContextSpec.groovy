@@ -25,11 +25,11 @@ import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.http.server.exceptions.ExceptionHandler
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.TaskExecutors
-import io.reactivex.Single
-import io.reactivex.schedulers.Schedulers
 import jakarta.inject.Inject
 import jakarta.inject.Named
 import jakarta.inject.Singleton
+import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -101,11 +101,11 @@ class ServerRequestContextSpec extends Specification {
         }
 
         @Get("/rxjava")
-        Single<String> rxjava() {
-            Single.fromCallable({ ->
+        Mono<String> rxjava() {
+            Mono.fromCallable({ ->
                 def request = ServerRequestContext.currentRequest().orElseThrow { -> new RuntimeException("no request") }
                 request.uri
-            }).subscribeOn(Schedulers.computation())
+            }).subscribeOn(Schedulers.boundedElastic())
         }
 
         @Get("/thread")

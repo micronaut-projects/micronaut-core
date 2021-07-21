@@ -19,6 +19,7 @@ import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.event.BeanCreatedEventListener
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
+import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Unroll
 
 import javax.validation.ConstraintViolationException
@@ -255,7 +256,7 @@ class TestFactory {
 
     void "test type arguments for factory with AOP advice applied"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('generictest6.$TestFactory$MyFunc0Definition$Intercepted', '''\
+        BeanDefinition definition = buildBeanDefinition('generictest6.$TestFactory$MyFunc0' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''\
 package generictest6;
 
 import io.micronaut.inject.annotation.*;

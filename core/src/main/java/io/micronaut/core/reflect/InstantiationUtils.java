@@ -223,7 +223,7 @@ public class InstantiationUtils {
      *
      * @param type     The type
      * @param argTypes The argument types
-     * @param args     The arguments
+     * @param args     The values of arguments
      * @param <T>      The generic type
      * @return The instantiated instance
      * @throws InstantiationException When an error occurs

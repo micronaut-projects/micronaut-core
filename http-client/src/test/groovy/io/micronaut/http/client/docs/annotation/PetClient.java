@@ -17,7 +17,7 @@ package io.micronaut.http.client.docs.annotation;
 
 // tag::imports[]
 import io.micronaut.http.client.annotation.Client;
-import io.reactivex.Single;
+import reactor.core.publisher.Mono;
 // end::imports[]
 
 
@@ -30,6 +30,6 @@ import io.reactivex.Single;
 public interface PetClient extends PetOperations { // <2>
 
     @Override
-    Single<Pet> save(String name, int age); // <3>
+    Mono<Pet> save(String name, int age); // <3>
 }
 // end::class[]

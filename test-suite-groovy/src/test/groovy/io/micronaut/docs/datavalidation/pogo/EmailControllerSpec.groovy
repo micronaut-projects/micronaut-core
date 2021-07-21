@@ -3,7 +3,7 @@ package io.micronaut.docs.datavalidation.pogo
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
@@ -20,7 +20,7 @@ class EmailControllerSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.URL)
+    HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.URL)
 
     //tag::pojovalidated[]
     def "invoking /email/send parse parameters in a POJO and validates"() {

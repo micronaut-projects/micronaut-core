@@ -1024,13 +1024,10 @@ public class DefaultBeanContext implements BeanContext {
             }
             Argument[] requiredArguments = ((ParametrizedBeanFactory) definition).getRequiredArguments();
             argumentValues = new LinkedHashMap<>(requiredArguments.length);
-            BeanResolutionContext.Path path = resolutionContext.getPath();
+            BeanResolutionContext.Path currentPath = resolutionContext.getPath();
             for (int i = 0; i < requiredArguments.length; i++) {
                 Argument<?> requiredArgument = requiredArguments[i];
-                try {
-                    path.pushConstructorResolve(
-                            definition, requiredArgument
-                    );
+                try (BeanResolutionContext.Path ignored = currentPath.pushConstructorResolve(definition, requiredArgument)) {
                     Class<?> argumentType = requiredArgument.getType();
                     if (args.length > i) {
                         Object val = args[i];
@@ -1058,8 +1055,6 @@ public class DefaultBeanContext implements BeanContext {
                             }
                         }
                     }
-                } finally {
-                    path.pop();
                 }
             }
         } else {
@@ -2338,7 +2333,7 @@ public class DefaultBeanContext implements BeanContext {
 
         if (bean != null) {
             Qualifier<T> finalQualifier = qualifier != null ? qualifier : declaredQualifier;
-            if (!BeanCreatedEventListener.class.isInstance(bean) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
+            if (!(bean instanceof BeanCreatedEventListener) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
                 for (Map.Entry<Class, List<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
                     if (entry.getKey().isAssignableFrom(beanType)) {
                         BeanKey<T> beanKey = new BeanKey<>(beanDefinition, finalQualifier);
@@ -2638,7 +2633,7 @@ public class DefaultBeanContext implements BeanContext {
             return (T) this;
         }
 
-        if (beanClass == InjectionPoint.class) {
+        if (InjectionPoint.class.isAssignableFrom(beanClass)) {
             final BeanResolutionContext.Path path = resolutionContext != null ? resolutionContext.getPath() : null;
 
             if (CollectionUtils.isNotEmpty(path)) {
@@ -2658,16 +2653,21 @@ public class DefaultBeanContext implements BeanContext {
                             segment = i.next();
                         }
                     }
-                    return (T) segment.getInjectionPoint();
+                    T ip = (T) segment.getInjectionPoint();
+                    if (beanClass.isInstance(ip)) {
+                        return ip;
+                    } else {
+                        throw new DependencyInjectionException(resolutionContext, "Failed to obtain injection point. No valid injection path present in path: " + path);
+                    }
                 } else {
                     if (!injectionPointSegment.getArgument().isNullable()) {
-                        throw new BeanContextException("Failed to obtain injection point. No valid injection path present in path: " + path);
+                        throw new DependencyInjectionException(resolutionContext, "Failed to obtain injection point. No valid injection path present in path: " + path);
                     } else {
                         return null;
                     }
                 }
             } else {
-                throw new BeanContextException("Failed to obtain injection point. No valid injection path present in path: " + path);
+                throw new DependencyInjectionException(resolutionContext, "Failed to obtain injection point. No valid injection path present in path: " + path);
             }
         }
         BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
@@ -3607,9 +3607,9 @@ public class DefaultBeanContext implements BeanContext {
     private <T> Stream<BeanDefinition<T>> applyBeanResolutionFilters(@Nullable BeanResolutionContext resolutionContext, Stream<BeanDefinition<T>> candidateStream) {
         candidateStream = candidateStream.filter(c -> !c.isAbstract());
 
-        BeanResolutionContext.Segment segment = resolutionContext != null ? resolutionContext.getPath().peek() : null;
-        if (segment instanceof AbstractBeanResolutionContext.ConstructorSegment) {
-            BeanDefinition declaringBean = segment.getDeclaringType();
+        BeanResolutionContext.Segment<?> segment = resolutionContext != null ? resolutionContext.getPath().peek() : null;
+        if (segment instanceof AbstractBeanResolutionContext.ConstructorSegment || segment instanceof AbstractBeanResolutionContext.MethodSegment) {
+            BeanDefinition<?> declaringBean = segment.getDeclaringType();
             // if the currently injected segment is a constructor argument and the type to be constructed is the
             // same as the candidate, then filter out the candidate to avoid a circular injection problem
             candidateStream = candidateStream.filter(c -> {

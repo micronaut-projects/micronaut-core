@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.type.TypeFactory;
@@ -52,7 +53,7 @@ import java.util.TimeZone;
 @ConfigurationProperties("jackson")
 @TypeHint(
         value = {
-                PropertyNamingStrategy.UpperCamelCaseStrategy.class,
+                PropertyNamingStrategies.UpperCamelCaseStrategy.class,
                 ArrayList.class,
                 LinkedHashMap.class,
                 HashSet.class

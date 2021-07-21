@@ -19,7 +19,7 @@ snippet::io.micronaut.docs.server.intro.HelloClient[tags="imports,class",indent=
 
 <1> The `@Client` annotation is used with a value that is a relative path to the current server
 <2> The same ann:http.annotation.Get[] annotation used on the server is used to define the client mapping
-<3> An RxJava rx:Single[] is returned with the value read from the server
+<3> A `Publisher` annotated with `SingleResult` is returned with the value read from the server
 
 To test the `HelloClient`, retrieve it from the api:context.ApplicationContext[] associated with the server:
 
@@ -29,7 +29,7 @@ snippet::io.micronaut.docs.server.intro.HelloClientSpec[tags="imports,class",ind
 
 <1> The `@MicronautTest` annotation defines the test
 <2> The `HelloClient` is injected from the api:context.ApplicationContext[]
-<3> The client is invoked using the RxJava `blockingGet` method
+<3> The client is invoked using the https://projectreactor.io[Project Reactor] `Mono::block` method
 
 The api:http.client.annotation.Client[] annotation produces an implementation automatically for you at compile time without the using proxies or runtime reflection.
 
