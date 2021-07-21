@@ -44,6 +44,17 @@ public interface ClassElement extends TypedElement {
     boolean isAssignable(String type);
 
     /**
+     * In this case of calling {@link #getTypeArguments()} a returned {@link ClassElement} may represent a type variable
+     * in which case this method will return {@code true}.
+     *
+     * @return Is this type a type variable.
+     * @since 3.0.0
+     */
+    default boolean isTypeVariable() {
+        return false;
+    }
+
+    /**
      * Tests whether one type is assignable to another.
      *
      * @param type The type to check

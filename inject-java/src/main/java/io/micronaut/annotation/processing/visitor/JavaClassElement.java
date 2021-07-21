@@ -53,6 +53,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     protected final TypeElement classElement;
     protected final JavaVisitorContext visitorContext;
     private final int arrayDimensions;
+    private final boolean isTypeVariable;
     private List<PropertyElement> beanProperties;
     private Map<String, Map<String, TypeMirror>> genericTypeInfo;
     private List<? extends Element> enclosedElements;
@@ -67,7 +68,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
      */
     @Internal
     public JavaClassElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
-        this(classElement, annotationMetadata, visitorContext, null, 0);
+        this(classElement, annotationMetadata, visitorContext, null, 0, false);
     }
 
     /**
@@ -81,7 +82,23 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             AnnotationMetadata annotationMetadata,
             JavaVisitorContext visitorContext,
             Map<String, Map<String, TypeMirror>> genericsInfo) {
-        this(classElement, annotationMetadata, visitorContext, genericsInfo, 0);
+        this(classElement, annotationMetadata, visitorContext, genericsInfo, 0, false);
+    }
+
+    /**
+     * @param classElement       The {@link TypeElement}
+     * @param annotationMetadata The annotation metadata
+     * @param visitorContext     The visitor context
+     * @param genericsInfo       The generic type info
+     * @param isTypeVariable     Is the class element a type variable
+     */
+    JavaClassElement(
+            TypeElement classElement,
+            AnnotationMetadata annotationMetadata,
+            JavaVisitorContext visitorContext,
+            Map<String, Map<String, TypeMirror>> genericsInfo,
+            boolean isTypeVariable) {
+        this(classElement, annotationMetadata, visitorContext, genericsInfo, 0, isTypeVariable);
     }
 
     /**
@@ -90,18 +107,26 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
      * @param visitorContext     The visitor context
      * @param genericsInfo       The generic type info
      * @param arrayDimensions    The number of array dimensions
+     * @param isTypeVariable     Is the type a type variable
      */
     JavaClassElement(
             TypeElement classElement,
             AnnotationMetadata annotationMetadata,
             JavaVisitorContext visitorContext,
             Map<String, Map<String, TypeMirror>> genericsInfo,
-            int arrayDimensions) {
+            int arrayDimensions,
+            boolean isTypeVariable) {
         super(classElement, annotationMetadata, visitorContext);
         this.classElement = classElement;
         this.visitorContext = visitorContext;
         this.genericTypeInfo = genericsInfo;
         this.arrayDimensions = arrayDimensions;
+        this.isTypeVariable = isTypeVariable;
+    }
+
+    @Override
+    public boolean isTypeVariable() {
+        return isTypeVariable;
     }
 
     @Override
@@ -734,7 +759,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new JavaClassElement(classElement, getAnnotationMetadata(), visitorContext, getGenericTypeInfo(), arrayDimensions);
+        return new JavaClassElement(classElement, getAnnotationMetadata(), visitorContext, getGenericTypeInfo(), arrayDimensions, false);
     }
 
     @Override
@@ -869,7 +894,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         Map<String, TypeMirror> map = new LinkedHashMap<>();
         while (tpi.hasNext()) {
             TypeParameterElement tpe = tpi.next();
-            JavaClassElement classElement = (JavaClassElement) mirrorToClassElement(tpe.asType(), visitorContext, this.genericTypeInfo, false);
+            TypeMirror t = tpe.asType();
+            JavaClassElement classElement = (JavaClassElement) mirrorToClassElement(t, visitorContext, this.genericTypeInfo, false);
 
             map.put(tpe.toString(), ((TypeElement) classElement.getNativeType()).asType());
         }

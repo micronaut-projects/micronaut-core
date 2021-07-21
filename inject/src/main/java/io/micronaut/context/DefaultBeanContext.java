@@ -2633,7 +2633,7 @@ public class DefaultBeanContext implements BeanContext {
             return (T) this;
         }
 
-        if (beanClass == InjectionPoint.class) {
+        if (InjectionPoint.class.isAssignableFrom(beanClass)) {
             final BeanResolutionContext.Path path = resolutionContext != null ? resolutionContext.getPath() : null;
 
             if (CollectionUtils.isNotEmpty(path)) {
@@ -2653,16 +2653,21 @@ public class DefaultBeanContext implements BeanContext {
                             segment = i.next();
                         }
                     }
-                    return (T) segment.getInjectionPoint();
+                    T ip = (T) segment.getInjectionPoint();
+                    if (beanClass.isInstance(ip)) {
+                        return ip;
+                    } else {
+                        throw new DependencyInjectionException(resolutionContext, "Failed to obtain injection point. No valid injection path present in path: " + path);
+                    }
                 } else {
                     if (!injectionPointSegment.getArgument().isNullable()) {
-                        throw new BeanContextException("Failed to obtain injection point. No valid injection path present in path: " + path);
+                        throw new DependencyInjectionException(resolutionContext, "Failed to obtain injection point. No valid injection path present in path: " + path);
                     } else {
                         return null;
                     }
                 }
             } else {
-                throw new BeanContextException("Failed to obtain injection point. No valid injection path present in path: " + path);
+                throw new DependencyInjectionException(resolutionContext, "Failed to obtain injection point. No valid injection path present in path: " + path);
             }
         }
         BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);

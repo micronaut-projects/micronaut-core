@@ -71,6 +71,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     };
     protected final ClassNode classNode;
     private final int arrayDimensions;
+    private final boolean isTypeVar;
     private Map<String, Map<String, ClassNode>> genericInfo;
 
     /**
@@ -95,6 +96,24 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             AnnotationMetadata annotationMetadata,
             Map<String, Map<String, ClassNode>> genericInfo,
             int arrayDimensions) {
+        this(visitorContext, classNode, annotationMetadata, genericInfo, arrayDimensions, false);
+    }
+
+    /**
+     * @param visitorContext     The visitor context
+     * @param classNode          The {@link ClassNode}
+     * @param annotationMetadata The annotation metadata
+     * @param genericInfo        The generic info
+     * @param arrayDimensions    The number of array dimensions
+     * @param isTypeVar          Is the element a type variable
+     */
+    GroovyClassElement(
+            GroovyVisitorContext visitorContext,
+            ClassNode classNode,
+            AnnotationMetadata annotationMetadata,
+            Map<String, Map<String, ClassNode>> genericInfo,
+            int arrayDimensions,
+            boolean isTypeVar) {
         super(visitorContext, classNode, annotationMetadata);
         this.classNode = classNode;
         this.genericInfo = genericInfo;
@@ -102,6 +121,12 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         if (classNode.isArray()) {
             classNode.setName(classNode.getComponentType().getName());
         }
+        this.isTypeVar = isTypeVar;
+    }
+
+    @Override
+    public boolean isTypeVariable() {
+        return isTypeVar;
     }
 
     @Override
@@ -519,7 +544,8 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                                     cn,
                                     annotationMetadata,
                                     Collections.singletonMap(cn.getName(), newInfo),
-                                    cn.isArray() ? computeDimensions(cn) : 0
+                                    cn.isArray() ? computeDimensions(cn) : 0,
+                                    true
                             ));
                         }
                     } else {
