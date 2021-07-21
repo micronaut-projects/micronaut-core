@@ -6,6 +6,7 @@ dependencies {
     api(dependencyVersion("spock")) {
         exclude module:'groovy-all'
     }
+    api project(":context")
 }
 
 afterEvaluate {

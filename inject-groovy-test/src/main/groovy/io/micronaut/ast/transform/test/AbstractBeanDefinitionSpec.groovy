@@ -276,7 +276,9 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
                     .collect(Collectors.toList())
                 return references + (includeAllBeans ? super.resolveBeanDefinitionReferences(predicate) : [
                         new InterceptorRegistryBean(),
-                        new BeanProviderDefinition()
+                        new BeanProviderDefinition(),
+                        Class.forName('io.micronaut.runtime.event.$ApplicationEventPublisherFactory$Build0$Definition$Reference').newInstance(),
+                        Class.forName('io.micronaut.runtime.event.$ApplicationEventPublisherFactory$Definition$Reference').newInstance()
                 ])
             }
         }.start()

@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -36,6 +37,8 @@ import io.micronaut.http.HttpRequestFactory;
 import io.micronaut.http.HttpResponseFactory;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.context.event.HttpRequestReceivedEvent;
+import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
@@ -191,6 +194,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private EventLoopGroup parentGroup;
     private EmbeddedServerInstance serviceInstance;
     private final Collection<ChannelPipelineListener> pipelineListeners = new ArrayList<>(2);
+    private final ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher;
+    private final ApplicationEventPublisher<HttpRequestReceivedEvent> httpRequestReceivedEventPublisher;
 
     /**
      * @param serverConfiguration                     The Netty HTTP server configuration
@@ -212,6 +217,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * @param channelOptionFactory                    The channel option factory
      * @param errorResponseProcessor                  The factory to create error responses
      * @param hostResolver                            The HTTP host resolver
+     * @param terminateEventPublisher
+     * @param httpRequestReceivedEventPublisher
      */
     @SuppressWarnings("ParameterNumber")
     public NettyHttpServer(
@@ -233,9 +240,11 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             HttpContentProcessorResolver httpContentProcessorResolver,
             ChannelOptionFactory channelOptionFactory,
             ErrorResponseProcessor<?> errorResponseProcessor,
-            HttpHostResolver hostResolver
-    ) {
+            HttpHostResolver hostResolver,
+            ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher, ApplicationEventPublisher<HttpRequestReceivedEvent> httpRequestReceivedEventPublisher) {
         this.httpCompressionStrategy = httpCompressionStrategy;
+        this.terminateEventPublisher = terminateEventPublisher;
+        this.httpRequestReceivedEventPublisher = httpRequestReceivedEventPublisher;
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
         location.ifPresent(dir -> DiskFileUpload.baseDirectory = dir.getAbsolutePath());
         this.applicationContext = applicationContext;
@@ -280,8 +289,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 executorSelector,
                 SupplierUtil.memoized(ioExecutor::get),
                 httpContentProcessorResolver,
-                errorResponseProcessor
-        );
+                errorResponseProcessor,
+                this.terminateEventPublisher);
         this.channelOptionFactory = channelOptionFactory;
         this.hostResolver = hostResolver;
     }
@@ -684,7 +693,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         // all are Sharable
         final HttpAccessLogHandler accessLogHandler = serverConfiguration.getAccessLogger() != null && serverConfiguration.getAccessLogger().isEnabled() ?
                 new HttpAccessLogHandler(serverConfiguration.getAccessLogger().getLoggerName(), serverConfiguration.getAccessLogger().getLogFormat()) : null;
-        final HttpRequestDecoder requestDecoder = new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration);
+        final HttpRequestDecoder requestDecoder = new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration, httpRequestReceivedEventPublisher);
         final HttpResponseEncoder responseDecoder = new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration);
 
         /**

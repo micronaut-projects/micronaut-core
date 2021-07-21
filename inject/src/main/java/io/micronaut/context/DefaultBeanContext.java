@@ -76,7 +76,6 @@ public class DefaultBeanContext implements BeanContext {
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
-    private static final Logger EVENT_LOGGER = LoggerFactory.getLogger(ApplicationEventPublisher.class);
     @SuppressWarnings("rawtypes")
     private static final Qualifier PROXY_TARGET_QUALIFIER = new Qualifier<Object>() {
         @SuppressWarnings("rawtypes")
@@ -131,7 +130,6 @@ public class DefaultBeanContext implements BeanContext {
             BeanContext.class,
             AnnotationMetadataResolver.class,
             BeanLocator.class,
-            ApplicationEventPublisher.class,
             ExecutionHandleLocator.class,
             ApplicationContext.class,
             PropertyResolver.class,
@@ -1642,44 +1640,8 @@ public class DefaultBeanContext implements BeanContext {
     @SuppressWarnings("unchecked")
     @Override
     public void publishEvent(@NonNull Object event) {
-        //noinspection ConstantConditions
         if (event != null) {
-            if (EVENT_LOGGER.isDebugEnabled()) {
-                EVENT_LOGGER.debug("Publishing event: {}", event);
-            }
-            Collection<ApplicationEventListener> eventListeners = getBeansOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(event.getClass()));
-
-            eventListeners = eventListeners.stream().sorted(OrderUtil.COMPARATOR).collect(Collectors.toList());
-
-            notifyEventListeners(event, eventListeners);
-        }
-    }
-
-    private void notifyEventListeners(@NonNull Object event, Collection<ApplicationEventListener> eventListeners) {
-        if (!eventListeners.isEmpty()) {
-            if (EVENT_LOGGER.isTraceEnabled()) {
-                EVENT_LOGGER.trace("Established event listeners {} for event: {}", eventListeners, event);
-            }
-            for (ApplicationEventListener listener : eventListeners) {
-                if (listener.supports(event)) {
-                    try {
-                        if (EVENT_LOGGER.isTraceEnabled()) {
-                            EVENT_LOGGER.trace("Invoking event listener [{}] for event: {}", listener, event);
-                        }
-                        listener.onApplicationEvent(event);
-                    } catch (ClassCastException ex) {
-                        String msg = ex.getMessage();
-                        if (msg == null || msg.startsWith(event.getClass().getName())) {
-                            if (EVENT_LOGGER.isDebugEnabled()) {
-                                EVENT_LOGGER.debug("Incompatible listener for event: " + listener, ex);
-                            }
-                        } else {
-                            throw ex;
-                        }
-                    }
-                }
-
-            }
+            getBean(Argument.of(ApplicationEventPublisher.class, event.getClass())).publishEvent(event);
         }
     }
 
@@ -1687,21 +1649,7 @@ public class DefaultBeanContext implements BeanContext {
     public @NonNull
     Future<Void> publishEventAsync(@NonNull Object event) {
         Objects.requireNonNull(event, "Event cannot be null");
-        CompletableFuture<Void> future = new CompletableFuture<>();
-        Collection<ApplicationEventListener> eventListeners = streamOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(event.getClass()))
-                .sorted(OrderUtil.COMPARATOR).collect(Collectors.toList());
-
-        Executor executor = findBean(Executor.class, Qualifiers.byName("scheduled"))
-                .orElseGet(ForkJoinPool::commonPool);
-        executor.execute(() -> {
-            try {
-                notifyEventListeners(event, eventListeners);
-                future.complete(null);
-            } catch (Exception e) {
-                future.completeExceptionally(e);
-            }
-        });
-        return future;
+        return getBean(Argument.of(ApplicationEventPublisher.class, event.getClass())).publishEventAsync(event);
     }
 
     @Override
@@ -2657,7 +2605,11 @@ public class DefaultBeanContext implements BeanContext {
                     if (beanClass.isInstance(ip)) {
                         return ip;
                     } else {
-                        throw new DependencyInjectionException(resolutionContext, "Failed to obtain injection point. No valid injection path present in path: " + path);
+                        if (!injectionPointSegment.getArgument().isNullable()) {
+                            throw new DependencyInjectionException(resolutionContext, "Failed to obtain injection point. No valid injection path present in path: " + path);
+                        } else {
+                            return null;
+                        }
                     }
                 } else {
                     if (!injectionPointSegment.getArgument().isNullable()) {

@@ -5,7 +5,7 @@ dependencies {
     annotationProcessor project(":inject-java")
     api project(":runtime")
     api project(":http")
-    
+
     compileOnly project(":http-server")
     compileOnly project(":http-server-netty")
 
@@ -13,6 +13,7 @@ dependencies {
 
     testAnnotationProcessor project(":inject-java")
     testCompileOnly project(":inject-groovy")
+    testImplementation project(":context")
     testImplementation project(":inject")
     testImplementation project(":http-netty")
     testImplementation project(":http-server-netty")
