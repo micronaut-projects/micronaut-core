@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.netty;
 
-import com.github.benmanes.caffeine.cache.CacheLoader;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.exceptions.BeanCreationException;
