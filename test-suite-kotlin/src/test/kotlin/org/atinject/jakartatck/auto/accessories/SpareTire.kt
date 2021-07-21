@@ -15,8 +15,8 @@
  */
 package org.atinject.jakartatck.auto.accessories
 
-import org.atinject.javaxtck.auto.FuelTank
-import org.atinject.javaxtck.auto.Tire
+import org.atinject.jakartatck.auto.FuelTank
+import org.atinject.jakartatck.auto.Tire
 
 import jakarta.inject.Inject
 

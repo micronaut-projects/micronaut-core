@@ -15,7 +15,7 @@
  */
 package org.atinject.jakartatck.auto.accessories
 
-import org.atinject.javaxtck.auto.Seat
+import org.atinject.jakartatck.auto.Seat
 
 import jakarta.inject.Inject
 import jakarta.inject.Provider

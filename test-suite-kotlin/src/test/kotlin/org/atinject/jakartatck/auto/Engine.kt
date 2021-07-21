@@ -15,7 +15,7 @@
  */
 package org.atinject.jakartatck.auto
 
-import org.atinject.javaxtck.auto.accessories.SpareTire
+import org.atinject.jakartatck.auto.accessories.SpareTire
 
 import jakarta.inject.Inject
 import jakarta.inject.Named
