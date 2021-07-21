@@ -144,6 +144,15 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     int typeHashCode();
 
     /**
+     * Whether this argument is a type variable used in generics.
+     * @return True if it is a variable
+     * @since 3.0.0
+     */
+    default boolean isVariable() {
+        return false;
+    }
+
+    /**
      * Whether the given argument is an instance.
      * @param o The object
      * @return True if it is an instance of this type
@@ -223,7 +232,43 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
         return new DefaultArgument<>(type, name, AnnotationMetadata.EMPTY_METADATA, typeParameters);
     }
 
+    /**
+     * Creates a new argument for the given type and name that is at type variable.
+     *
+     * @param type           The type
+     * @param name           The name
+     * @param annotationMetadata The annotation metadata
+     * @param typeParameters the type parameters
+     * @param <T>            The generic type
+     * @return The argument instance
+     * @since 3.0.0
+     */
+    @UsedByGeneratedCode
+    @NonNull
+    static <T> Argument<T> ofTypeVariable(
+            @NonNull Class<T> type,
+            @Nullable String name,
+            @Nullable AnnotationMetadata annotationMetadata,
+            @Nullable Argument<?>... typeParameters) {
+        return new DefaultArgument<>(type, name, annotationMetadata, true, typeParameters);
+    }
 
+    /**
+     * Creates a new argument for the given type and name that is at type variable.
+     *
+     * @param type           The type
+     * @param name           The name
+     * @param <T>            The generic type
+     * @return The argument instance
+     * @since 3.0.0
+     */
+    @UsedByGeneratedCode
+    @NonNull
+    static <T> Argument<T> ofTypeVariable(
+            @NonNull Class<T> type,
+            @Nullable String name) {
+        return new DefaultArgument<>(type, name, AnnotationMetadata.EMPTY_METADATA, true);
+    }
 
     /**
      * Creates a new argument for the given type and name.

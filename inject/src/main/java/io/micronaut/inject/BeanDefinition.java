@@ -94,18 +94,22 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
 
     @Override
     default boolean isCandidateBean(@Nullable Argument<?> beanType) {
+        if (beanType == null) {
+            return false;
+        }
         if (BeanType.super.isCandidateBean(beanType)) {
             if (hasStereotype(Any.class)) {
                 return true;
             } else {
                 final Argument<?>[] typeArguments = beanType.getTypeParameters();
                 final int len = typeArguments.length;
+                Class<?> beanClass = beanType.getType();
                 if (len == 0) {
                     if (isContainerType()) {
                         final Optional<Argument<?>> containerElement = getContainerElement();
                         if (containerElement.isPresent()) {
                             final Class<?> t = containerElement.get().getType();
-                            return beanType.isAssignableFrom(t) || beanType.getType() == t;
+                            return beanType.isAssignableFrom(t) || beanClass == t;
                         } else {
                             return false;
                         }
@@ -113,30 +117,30 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
                         return true;
                     }
                 } else {
-                    final Class<?>[] beanTypeParameters;
-                    if (!Iterable.class.isAssignableFrom(beanType.getType())) {
+                    final Argument<?>[] beanTypeParameters;
+                    if (!Iterable.class.isAssignableFrom(beanClass)) {
                         final Optional<Argument<?>> containerElement = getContainerElement();
                         //noinspection OptionalIsPresent
                         if (containerElement.isPresent()) {
-                            beanTypeParameters = Argument.toClassArray(containerElement.get().getTypeParameters());
+                            beanTypeParameters = containerElement.get().getTypeParameters();
                         } else {
-                            beanTypeParameters = getTypeParameters(beanType.getType());
+                            beanTypeParameters = getTypeArguments(beanClass).toArray(Argument.ZERO_ARGUMENTS);
                         }
                     } else {
-                        beanTypeParameters = getTypeParameters(beanType.getType());
+                        beanTypeParameters = getTypeArguments(beanClass).toArray(Argument.ZERO_ARGUMENTS);
                     }
                     if (len != beanTypeParameters.length) {
                         return false;
                     }
 
                     for (int i = 0; i < beanTypeParameters.length; i++) {
-                        Class<?> candidateParameter = beanTypeParameters[i];
+                        Argument<?> candidateParameter = beanTypeParameters[i];
                         final Argument<?> requestedParameter = typeArguments[i];
-
-                        if (!requestedParameter.isAssignableFrom(candidateParameter)) {
-                            return false;
+                        if (!requestedParameter.isAssignableFrom(candidateParameter.getType())) {
+                            if (!(candidateParameter.isVariable() && candidateParameter.isAssignableFrom(requestedParameter.getType()))) {
+                                return false;
+                            }
                         }
-
                     }
                     return true;
                 }

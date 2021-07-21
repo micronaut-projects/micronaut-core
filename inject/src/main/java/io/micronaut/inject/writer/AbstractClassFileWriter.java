@@ -97,10 +97,28 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                     String.class
             )
     );
+    protected static final Method METHOD_CREATE_TYPE_VARIABLE_SIMPLE = Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(
+                    Argument.class,
+                    "ofTypeVariable",
+                    Class.class,
+                    String.class
+            )
+    );
     private static final Method METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS = Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(
                     Argument.class,
                     "of",
+                    Class.class,
+                    String.class,
+                    AnnotationMetadata.class,
+                    Argument[].class
+            )
+    );
+    private static final Method METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS = Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(
+                    Argument.class,
+                    "ofTypeVariable",
                     Class.class,
                     String.class,
                     AnnotationMetadata.class,
@@ -252,7 +270,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                             loadTypeMethods
                     );
                 } else {
-                    buildArgument(generatorAdapter, argumentName, classReference);
+                    buildArgument(generatorAdapter, argumentName, classElement);
                 }
 
                 // store the type reference
@@ -284,6 +302,27 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                 generatorAdapter,
                 Argument.class,
                 METHOD_CREATE_ARGUMENT_SIMPLE
+        );
+    }
+
+    /**
+     * Builds an argument instance.
+     *
+     * @param generatorAdapter The generator adapter.
+     * @param argumentName     The argument name
+     * @param objectType       The object type
+     */
+    protected static void buildArgument(GeneratorAdapter generatorAdapter, String argumentName, ClassElement objectType) {
+        // 1st argument: the type
+        generatorAdapter.push(getTypeReference(objectType));
+        // 2nd argument: the name
+        generatorAdapter.push(argumentName);
+
+        // Argument.create( .. )
+        invokeInterfaceStaticMethod(
+                generatorAdapter,
+                Argument.class,
+                objectType.isTypeVariable() ? METHOD_CREATE_TYPE_VARIABLE_SIMPLE : METHOD_CREATE_ARGUMENT_SIMPLE
         );
     }
 
@@ -359,7 +398,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         invokeInterfaceStaticMethod(
                 generatorAdapter,
                 Argument.class,
-                METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
+                classElement.isTypeVariable() ? METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
         );
     }
 
@@ -575,7 +614,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         invokeInterfaceStaticMethod(
                 generatorAdapter,
                 Argument.class,
-                METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
+                classElement.isTypeVariable() ? METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
         );
     }
 

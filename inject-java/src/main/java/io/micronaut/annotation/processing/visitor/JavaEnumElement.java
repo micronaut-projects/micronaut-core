@@ -50,7 +50,7 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
      * @param arrayDimensions    The number of array dimensions
      */
     JavaEnumElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext, int arrayDimensions) {
-        super(classElement, annotationMetadata, visitorContext, Collections.emptyMap(), arrayDimensions);
+        super(classElement, annotationMetadata, visitorContext, Collections.emptyMap(), arrayDimensions, false);
     }
 
     @Override
