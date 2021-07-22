@@ -646,7 +646,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
         AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(request);
 
-        Flux.from(filterPublisher(requestReference, responsePublisher, ctx))
+        Flux.from(filterPublisher(requestReference, responsePublisher, null, null, ctx))
                 .subscribe(response -> {
                     encodeHttpResponse(
                             ctx,
@@ -1133,27 +1133,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     HttpRequest<?> incomingRequest = requestReference.get();
                     applyConfiguredHeaders(message.getHeaders());
 
-                    HttpStatus status = message.status();
                     boolean errorRoute = message.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class)
                             .filter(RouteMatch::isErrorRoute)
                             .isPresent();
-                    if (status.getCode() >= 400 && !errorRoute) {
-                        RouteMatch<Object> statusRoute = findStatusRoute(incomingRequest, status, routeMatch);
-
-                        if (statusRoute != null) {
-                            incomingRequest.setAttribute(HttpAttributes.ROUTE_MATCH, statusRoute);
-
-                            return executeRoute(
-                                    statusRoute,
-                                    request,
-                                    context,
-                                    executor,
-                                    false,
-                                    null,
-                                    () -> resolveDefaultResponseContentType(request, statusRoute)
-                            );
-                        }
-                    }
 
                     MediaType specifiedMediaType = message.getContentType().orElse(null);
                     MediaType mediaType = specifiedMediaType != null ? specifiedMediaType : defaultResponseMediaType.get();
@@ -1289,16 +1271,50 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
 
         executeRoutePublisher = Flux.from(executeRoutePublisher)
+                .flatMap((response) -> handleStatusException(request, response, finalRoute, executor, context))
                 .onErrorResume((t) -> {
                     final NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) requestReference.get();
                     return exceptionCaughtInternal(context, t, nettyHttpRequest);
                 });
 
         if (executeFilters) {
-            executeRoutePublisher = filterPublisher(requestReference, executeRoutePublisher, context);
+            executeRoutePublisher = filterPublisher(requestReference,
+                    executeRoutePublisher,
+                    finalRoute,
+                    executor,
+                    context);
         }
 
         return Flux.from(executeRoutePublisher);
+    }
+
+    private Publisher<MutableHttpResponse<?>> handleStatusException(NettyHttpRequest<?> request,
+                                                                    MutableHttpResponse<?> response,
+                                                                    RouteMatch<?> routeMatch,
+                                                                    ExecutorService executor,
+                                                                    ChannelHandlerContext context) {
+        HttpStatus status = response.status();
+        boolean errorRoute = response.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class)
+                .filter(RouteMatch::isErrorRoute)
+                .isPresent();
+        if (status.getCode() >= 400 && !errorRoute && routeMatch != null) {
+            RouteMatch<Object> statusRoute = findStatusRoute(request, status, routeMatch);
+
+            if (statusRoute != null) {
+                request.setAttribute(HttpAttributes.ROUTE_MATCH, statusRoute);
+                response.setAttribute(HttpAttributes.ROUTE_MATCH, statusRoute);
+                return executeRoute(
+                        statusRoute,
+                        request,
+                        context,
+                        executor,
+                        false,
+                        null,
+                        () -> resolveDefaultResponseContentType(request, statusRoute)
+                );
+            }
+        }
+        return Flux.just(response);
     }
 
     private Publisher<MutableHttpResponse<?>> createExecuteRoutePublisher(NettyHttpRequest<?> request,
@@ -1922,6 +1938,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private Publisher<MutableHttpResponse<?>> filterPublisher(
             AtomicReference<HttpRequest<?>> requestReference,
             Publisher<MutableHttpResponse<?>> upstreamResponsePublisher,
+            RouteMatch<?> finalRoute,
+            ExecutorService executor,
             ChannelHandlerContext context) {
         List<HttpFilter> httpFilters = router.findFilters(requestReference.get());
         if (httpFilters.isEmpty()) {
@@ -1933,6 +1951,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
         AtomicInteger integer = new AtomicInteger();
         int len = filters.size();
+        final Function<MutableHttpResponse<?>, Publisher<MutableHttpResponse<?>>> handleStatusException = (response) -> {
+            final NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) requestReference.get();
+            return handleStatusException(nettyHttpRequest, response, finalRoute, executor, context);
+        };
+        final Function<Throwable, Publisher<MutableHttpResponse<?>>> onError = (t) -> {
+            final NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) requestReference.get();
+            return exceptionCaughtInternal(context, t, nettyHttpRequest);
+        };
+
         ServerFilterChain filterChain = new ServerFilterChain() {
             @SuppressWarnings("unchecked")
             @Override
@@ -1946,10 +1973,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 }
                 HttpFilter httpFilter = filters.get(pos);
                 return Flux.from((Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.getAndSet(request), this))
-                        .onErrorResume((t) -> {
-                            final NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) requestReference.get();
-                            return exceptionCaughtInternal(context, t, nettyHttpRequest);
-                        });
+                        .flatMap(handleStatusException)
+                        .onErrorResume(onError);
             }
         };
         Optional<HttpRequest<Object>> prevRequest = ServerRequestContext.currentRequest();
@@ -1957,10 +1982,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             ServerRequestContext.set(requestReference.get());
             HttpFilter httpFilter = filters.get(0);
             return Flux.from((Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.get(), filterChain))
-                    .onErrorResume((t) -> {
-                        final NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) requestReference.get();
-                        return exceptionCaughtInternal(context, t, nettyHttpRequest);
-                    });
+                    .flatMap(handleStatusException)
+                    .onErrorResume(onError);
         } finally {
             if (prevRequest.isPresent()) {
                 ServerRequestContext.set(prevRequest.get());

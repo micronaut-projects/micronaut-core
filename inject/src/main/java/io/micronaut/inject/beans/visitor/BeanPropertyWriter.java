@@ -71,6 +71,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
     private final MethodElement writeMethod;
     private final MethodElement withMethod;
     private final HashMap<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
+    private final Map<String, Integer> defaults = new HashMap<>();
     private final TypedElement typeElement;
     private final ClassElement declaringElement;
     private final Type propertyGenericType;
@@ -470,7 +471,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             if (annotationMetadata.isEmpty()) {
                 constructor.visitInsn(ACONST_NULL);
             } else {
-                AnnotationMetadataWriter.instantiateNewMetadata(type, classWriter, constructor, annotationMetadata, loadTypeMethods);
+                AnnotationMetadataWriter.instantiateNewMetadata(type, classWriter, constructor, annotationMetadata, defaults, loadTypeMethods);
             }
         } else {
             constructor.visitInsn(ACONST_NULL);
@@ -484,6 +485,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
                     constructor,
                     typeElement.getName(),
                     typeArguments,
+                    new HashMap<>(),
                     loadTypeMethods
             );
         } else {

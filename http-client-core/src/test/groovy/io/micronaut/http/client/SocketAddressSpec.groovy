@@ -1,12 +1,14 @@
 package io.micronaut.http.client
 
-import io.micronaut.http.client.converters.SocketAddressConverter
+import io.micronaut.context.ApplicationContext
+import io.micronaut.core.convert.ConversionService
 import spock.lang.Specification
 
 class SocketAddressSpec extends Specification {
 
     void "test socket address converter"() {
-        SocketAddressConverter converter = new SocketAddressConverter()
+        def ctx = ApplicationContext.run()
+        ConversionService converter = ctx.getBean(ConversionService)
 
         when:
         Optional<SocketAddress> address = converter.convert("1.2.3.4:8080", SocketAddress.class)
@@ -28,5 +30,8 @@ class SocketAddressSpec extends Specification {
 
         then:
         thrown(IllegalArgumentException)
+
+        cleanup:
+        ctx.close()
     }
 }

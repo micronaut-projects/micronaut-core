@@ -1,10 +1,10 @@
 package io.micronaut.docs.streaming
 
-import io.kotlintest.matchers.string.shouldStartWith
-import io.kotlintest.shouldBe
-import io.kotlintest.shouldNotBe
-import io.kotlintest.shouldThrowExactly
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
+import io.kotest.assertions.throwables.shouldThrowExactly
+import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.string.shouldStartWith
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
@@ -13,7 +13,6 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
-import reactor.core.publisher.Flux
 
 class HeadlineFlowControllerSpec: StringSpec() {
 

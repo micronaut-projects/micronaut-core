@@ -17,6 +17,7 @@ package io.micronaut.discovery;
 
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -60,7 +61,7 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
     }
 
     @Override
-    public Flux<List<ServiceInstance>> getInstances(String serviceId) {
+    public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
         serviceId = NameUtils.hyphenate(serviceId);
         if (ArrayUtils.isEmpty(discoveryClients)) {
             return Flux.just(Collections.emptyList());
@@ -76,7 +77,7 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
     }
 
     @Override
-    public Flux<List<String>> getServiceIds() {
+    public Publisher<List<String>> getServiceIds() {
         if (ArrayUtils.isEmpty(discoveryClients)) {
             return Flux.just(Collections.emptyList());
         }

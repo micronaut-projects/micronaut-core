@@ -20,7 +20,6 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import kotlinx.coroutines.flow.Flow
-
 // end::imports[]
 
 // tag::class[]

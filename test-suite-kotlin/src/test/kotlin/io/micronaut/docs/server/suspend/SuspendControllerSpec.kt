@@ -15,11 +15,11 @@
  */
 package io.micronaut.docs.server.suspend
 
-import io.kotlintest.should
-import io.kotlintest.shouldBe
-import io.kotlintest.shouldNotBe
-import io.kotlintest.shouldThrowExactly
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
+import io.kotest.assertions.throwables.shouldThrowExactly
+import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.should
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpHeaders.*
 import io.micronaut.http.HttpMethod

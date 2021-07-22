@@ -256,12 +256,12 @@ public class Convertible implements Car {
 
         // injected values
 
-        @Test
+/*        @Test
         @Disabled
         public void testQualifiersNotInheritedFromOverriddenMethod() {
             assertTrue(engine.overriddenMethodInjected);
             assertFalse(engine.qualifiersInheritedFromOverriddenMethod);
-        }
+        }*/
 
         @Test
         public void testConstructorInjectionWithValues() {

@@ -33,7 +33,7 @@ import io.micronaut.http.MutableHttpRequest;
 @Experimental
 @BootstrapContextCompatible
 @Indexed(ClientArgumentRequestBinder.class)
-public interface ClientArgumentRequestBinder<T> {
+public interface ClientArgumentRequestBinder<T> extends ClientRequestBinder {
 
     /**
      * Bind the given argument to the request. Argument binders

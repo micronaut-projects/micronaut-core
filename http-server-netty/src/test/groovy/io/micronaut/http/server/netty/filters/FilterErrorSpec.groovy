@@ -4,18 +4,23 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.core.util.StringUtils
+import io.micronaut.http.HttpAttributes
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Status
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.web.router.MethodBasedRouteMatch
+import io.micronaut.web.router.RouteMatch
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import spock.lang.Specification
@@ -120,6 +125,41 @@ class FilterErrorSpec extends Specification {
         response.body().contains("from exception handler")
         filter.executedCount.get() == 1
         filterResponse.status() == HttpStatus.INTERNAL_SERVER_ERROR
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    void "test the error route is the route match"() {
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': FilterErrorSpec.simpleName + '4'])
+        def ctx = server.applicationContext
+        HttpClient client = ctx.createBean(HttpClient, server.getURL())
+        ExceptionRoute filter = ctx.getBean(ExceptionRoute)
+
+        when:
+        HttpResponse<String> response = Flux.from(client.exchange("/filter-error-spec-4/exception", String))
+                .blockFirst()
+        def match = filter.routeMatch.getAndSet(null)
+
+        then:
+        response.status() == HttpStatus.OK
+        match instanceof MethodBasedRouteMatch
+        ((MethodBasedRouteMatch) match).getName() == "testException"
+
+        when:
+        response = Flux.from(client.exchange("/filter-error-spec-4/status", String))
+                .blockFirst()
+        match = filter.routeMatch.getAndSet(null)
+
+        then:
+        response.status() == HttpStatus.OK
+        match instanceof MethodBasedRouteMatch
+        ((MethodBasedRouteMatch) match).getName() == "testStatus"
+
+        cleanup:
+        client.close()
+        ctx.close()
     }
 
     @Requires(property = 'spec.name', value = 'FilterErrorSpec')
@@ -199,6 +239,26 @@ class FilterErrorSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'FilterErrorSpec4')
+    @Filter("/**")
+    static class ExceptionRoute implements HttpServerFilter {
+
+
+        AtomicReference<RouteMatch<?>> routeMatch = new AtomicReference<>()
+
+        @Override
+        Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+            return Publishers.then(chain.proceed(request), { resp ->
+                routeMatch.set(resp.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch).get())
+            })
+        }
+
+        @Override
+        int getOrder() {
+            10
+        }
+    }
+
     @Controller("/filter-error-spec")
     static class NeverReachedController {
 
@@ -217,5 +277,27 @@ class FilterErrorSpec extends Specification {
             throw new FilterExceptionException()
         }
 
+    }
+
+    @Controller("/filter-error-spec-4")
+    static class HandledByErrorRouteController {
+
+        @Get("/exception")
+        String getException() {
+            throw new FilterExceptionException()
+        }
+
+        @Get("/status")
+        HttpStatus getStatus() {
+            return HttpStatus.NOT_FOUND
+        }
+
+        @Error(exception = FilterExceptionException)
+        @Status(HttpStatus.OK)
+        void testException() {}
+
+        @Error(status = HttpStatus.NOT_FOUND)
+        @Status(HttpStatus.OK)
+        void testStatus() {}
     }
 }

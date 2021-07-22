@@ -29,6 +29,7 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import spock.lang.Issue
 import spock.lang.Specification
@@ -37,7 +38,7 @@ import spock.lang.Specification
  * @author Graeme Rocher
  * @since 1.0
  */
-@Requires(property = 'spec.name', value = 'HttpPutSpec')
+@Property(name = 'spec.name', value = 'HttpPutSpec')
 @MicronautTest
 class HttpPutSpec extends Specification {
 
@@ -255,7 +256,7 @@ class HttpPutSpec extends Specification {
         }
 
         @Put(value = "/nullableHeader", consumes = MediaType.ALL, produces = MediaType.TEXT_PLAIN)
-        String putNullableHeader(@Body final Flux<byte[]> contents,
+        String putNullableHeader(@Body final Publisher<byte[]> contents,
                                  @Nullable @Header("foo") final String auth) {
 
             return "put done"
