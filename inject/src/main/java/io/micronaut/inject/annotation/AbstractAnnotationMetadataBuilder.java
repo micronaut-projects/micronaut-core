@@ -666,6 +666,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     protected Map<CharSequence, Object> populateAnnotationData(
             T originatingElement,
+            @Nullable T parent,
             A annotationMirror,
             DefaultAnnotationMetadata metadata,
             boolean isDeclared,
@@ -823,7 +824,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                         mappedAnnotationName,
                                         metadata,
                                         isDeclared,
-                                        isInheritedAnnotationType(annMirror));
+                                        isInheritedAnnotationType(annMirror) || originatingElement == parent);
 
                             });
                         }
@@ -1132,6 +1133,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             RetentionPolicy retentionPolicy = getRetentionPolicy(annotationType);
             Map<CharSequence, Object> annotationValues = populateAnnotationData(
                     element,
+                    parent,
                     annotationMirror,
                     annotationMetadata,
                     isDeclared,
@@ -1230,6 +1232,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
                     Map<CharSequence, Object> data = populateAnnotationData(
                             element,
+                            null,
                             annotationMirror,
                             metadata,
                             isDeclared,
