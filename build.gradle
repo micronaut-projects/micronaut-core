@@ -623,7 +623,7 @@ ext {
             'micronaut.rss': [
                     version:micronautRssVersion,
                     group:'io.micronaut.rss',
-                    modules : ['micronaut-rss', 'micronaut-itunespodcast']
+                    modules : ['micronaut-rss', 'micronaut-rss-core', 'micronaut-rss-language', 'micronaut-itunespodcast', 'micronaut-jsonfeed-core', 'micronaut-jsonfeed']
 
             ],
             'micronaut.kubernetes': [
