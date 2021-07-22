@@ -657,6 +657,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * Populate the annotation data for the given annotation.
      *
      * @param originatingElement The element the annotation data originates from
+     * @param parent  The parent element
      * @param annotationMirror   The annotation
      * @param metadata           the metadata
      * @param isDeclared         Is the annotation a declared annotation

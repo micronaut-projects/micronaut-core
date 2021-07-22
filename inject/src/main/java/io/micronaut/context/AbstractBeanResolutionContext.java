@@ -322,7 +322,6 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             super(declaringType, methodName, argument, arguments);
         }
 
-
         @Override
         public CallableInjectionPoint getOuterInjectionPoint() {
             throw new UnsupportedOperationException("Outer injection point inaccessible from here");
