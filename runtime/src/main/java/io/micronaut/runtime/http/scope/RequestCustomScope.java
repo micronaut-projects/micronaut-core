@@ -81,7 +81,8 @@ class RequestCustomScope implements CustomScope<RequestScope>, LifeCycle<Request
             throw new NoSuchBeanException(beanDefinition.getBeanType(), Qualifiers.byStereotype(RequestScope.class));
         }
         HttpRequest<T> httpRequest = currentRequest.get();
-        return (T) getRequestScopedBeans(httpRequest, true).computeIfAbsent(identifier, i -> {
+        synchronized (httpRequest) {
+            return (T) getRequestScopedBeans(httpRequest, true).computeIfAbsent(identifier, i -> {
                 Object bean = provider.get();
                 if (bean instanceof RequestAware) {
                     ((RequestAware) bean).setRequest(httpRequest);
@@ -89,7 +90,8 @@ class RequestCustomScope implements CustomScope<RequestScope>, LifeCycle<Request
                 getRequestScopedBeanDefinitions(httpRequest, true)
                         .put(identifier, beanDefinition);
                 return bean;
-        });
+            });
+        }
     }
 
     @Override
