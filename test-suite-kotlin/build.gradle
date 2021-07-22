@@ -14,7 +14,6 @@ dependencies {
     api project(':runtime')
 
     testImplementation project(":context")
-    testImplementation "org.jetbrains.kotlin:kotlin-test-junit:$kotlinVersion"
     testImplementation "org.jetbrains.kotlin:kotlin-test:$kotlinVersion"
     testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-rx2:$kotlinCoroutinesVersion"
 
