@@ -4,7 +4,7 @@ package io.micronaut.docs.config.env
 import io.micronaut.context.annotation.Factory
 import io.micronaut.core.annotation.Order
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import java.time.Duration
 
 @Factory

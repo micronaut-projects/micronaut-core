@@ -1,13 +1,13 @@
 package io.micronaut.docs.context.events.listener
 
-import io.kotlintest.shouldBe
-import io.kotlintest.specs.AnnotationSpec
+import io.kotest.core.spec.style.AnnotationSpec
+import io.kotest.matchers.shouldBe
 import io.micronaut.context.ApplicationContext
 import io.micronaut.docs.context.events.SampleEventEmitterBean
 
 // tag::class[]
 class SampleEventListenerSpec : AnnotationSpec() {
-    
+
     @Test
     fun testEventListenerWasNotified() {
         val context = ApplicationContext.run()

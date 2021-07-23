@@ -15,11 +15,11 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
-import java.util.Locale;
-import java.util.Set;
-
 import io.micronaut.http.HttpHeaders;
 import io.netty.channel.socket.SocketChannel;
+
+import java.util.Locale;
+import java.util.Set;
 
 /**
  * RemoteIpElement LogElement. The remote IP address.

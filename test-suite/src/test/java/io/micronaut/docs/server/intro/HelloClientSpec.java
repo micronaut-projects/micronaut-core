@@ -19,8 +19,10 @@ import io.micronaut.context.annotation.Property;
 // tag::imports[]
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import org.junit.jupiter.api.Test;
+import io.micronaut.core.async.annotation.SingleResult;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
+import reactor.core.publisher.Mono;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 // end::imports[]
@@ -35,7 +37,7 @@ public class HelloClientSpec  {
 
     @Test
     public void testHelloWorldResponse(){
-        assertEquals("Hello World", client.hello().blockingGet());// <3>
+        assertEquals("Hello World", Mono.from(client.hello()).block());// <3>
     }
 }
 // end::class[]

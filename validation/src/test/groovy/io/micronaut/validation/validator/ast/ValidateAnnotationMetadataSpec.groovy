@@ -104,7 +104,7 @@ package test;
 
 import io.micronaut.validation.validator.ast.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @io.micronaut.context.annotation.Executable

@@ -15,8 +15,6 @@
  */
 package io.micronaut.jackson.annotation;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
@@ -24,6 +22,8 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Annotation that can be applied to types that use Jackson to customize serialization features.

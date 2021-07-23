@@ -21,15 +21,15 @@ import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
-import io.reactivex.Flowable;
-import io.reactivex.functions.Function;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
-import javax.inject.Singleton;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -54,16 +54,16 @@ public class DiscoveryClientHealthIndicator implements HealthIndicator {
 
     @Override
     public Publisher<HealthResult> getResult() {
-        return Flowable.fromPublisher(discoveryClient.getServiceIds())
+        return Flux.from(discoveryClient.getServiceIds())
             .flatMap((Function<List<String>, Publisher<HealthResult>>) ids -> {
-                List<Flowable<Map<String, List<ServiceInstance>>>> serviceMap = ids.stream()
-                    .map(id -> {
-                        Flowable<List<ServiceInstance>> serviceList = Flowable.fromPublisher(discoveryClient.getInstances(id));
-                        return serviceList
-                            .map(serviceInstances -> Collections.singletonMap(id, serviceInstances));
-                    })
-                    .collect(Collectors.toList());
-                Flowable<Map<String, List<ServiceInstance>>> mergedServiceMap = Flowable.merge(serviceMap);
+                List<Flux<Map<String, List<ServiceInstance>>>> serviceMap = ids.stream()
+                        .map(id -> {
+                            Flux<List<ServiceInstance>> serviceList = Flux.from(discoveryClient.getInstances(id));
+                            return serviceList
+                                    .map(serviceInstances -> Collections.singletonMap(id, serviceInstances));
+                        })
+                        .collect(Collectors.toList());
+                Flux<Map<String, List<ServiceInstance>>> mergedServiceMap = Flux.merge(serviceMap);
 
                 return mergedServiceMap.reduce(new LinkedHashMap<String, List<ServiceInstance>>(), (allServiceMap, service) -> {
                     allServiceMap.putAll(service);
@@ -72,24 +72,24 @@ public class DiscoveryClientHealthIndicator implements HealthIndicator {
                     HealthResult.Builder builder = HealthResult.builder(discoveryClient.getDescription(), HealthStatus.UP);
                     Stream<Map.Entry<String, List<ServiceInstance>>> entryStream = details.entrySet().stream();
                     Map<String, Object> value = entryStream.collect(
-                        Collectors.toMap(Map.Entry::getKey, entry ->
-                            entry
-                                .getValue()
-                                .stream()
-                                .map(ServiceInstance::getURI)
-                                .collect(Collectors.toList())
-                        )
+                            Collectors.toMap(Map.Entry::getKey, entry ->
+                                    entry
+                                            .getValue()
+                                            .stream()
+                                            .map(ServiceInstance::getURI)
+                                            .collect(Collectors.toList())
+                            )
                     );
 
                     builder.details(Collections.singletonMap(
-                        "services", value
+                            "services", value
                     ));
                     return builder.build();
-                }).toFlowable();
-            }).onErrorReturn(throwable -> {
+                }).flux();
+            }).onErrorResume(throwable -> {
                 HealthResult.Builder builder = HealthResult.builder(discoveryClient.getDescription(), HealthStatus.DOWN);
                 builder.exception(throwable);
-                return builder.build();
+                return Flux.just(builder.build());
             });
     }
 }

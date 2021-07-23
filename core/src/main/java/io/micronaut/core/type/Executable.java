@@ -31,11 +31,17 @@ import io.micronaut.core.annotation.AnnotationMetadataProvider;
 public interface Executable<T, R> extends AnnotationMetadataProvider {
 
     /**
+     * @return The declaring type
+     * @since 3.0.0
+     */
+    @NonNull Class<T> getDeclaringType();
+
+    /**
      * The required argument types.
      *
      * @return The arguments
      */
-    @NonNull Argument[] getArguments();
+    @NonNull Argument<?>[] getArguments();
 
     /**
      * Invokes the method.

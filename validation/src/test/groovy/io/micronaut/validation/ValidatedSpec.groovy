@@ -23,6 +23,7 @@ import io.micronaut.aop.MethodInvocationContext
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.exceptions.BeanInstantiationException
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
@@ -37,15 +38,11 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 import javax.validation.ConstraintViolationException
-import javax.validation.constraints.NotBlank
-import javax.validation.constraints.Max
-import javax.validation.constraints.Min
-import javax.validation.constraints.NotNull
-import javax.validation.constraints.Size
+import javax.validation.constraints.*
 
 /**
  * @author Graeme Rocher
@@ -62,12 +59,14 @@ class ValidatedSpec extends Specification {
                 return InterceptPhase.CACHE.getPosition()
             }
 
+            @Nullable
             @Override
             Object intercept(MethodInvocationContext context) {
                 return null
             }
 
             @Override
+            @Nullable
             Object intercept(InvocationContext context) {
                 return null
             }
@@ -288,12 +287,12 @@ class ValidatedSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/validated/args", '{"amount":"xxx"}')
                         .contentType(MediaType.APPLICATION_JSON_TYPE),
                 String
         ))
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -320,12 +319,12 @@ class ValidatedSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/validated/args", '{"amount":"xxx"}')
                         .contentType(MediaType.APPLICATION_JSON_TYPE),
                 String
         ))
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -353,12 +352,12 @@ class ValidatedSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/validated/optional?limit=0"),
                 Argument.STRING,
                 Argument.of(Map, String, Object)
         ))
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -385,12 +384,12 @@ class ValidatedSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/validated/optional?limit=0"),
                 Argument.STRING,
                 Argument.of(Map, String, Object)
         ))
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -416,12 +415,12 @@ class ValidatedSpec extends Specification {
         HttpClient client = server.applicationContext.createBean(HttpClient, server.getURL())
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/validated/optional"),
                 Argument.STRING,
                 Argument.of(Map, String, Object)
         ))
-        def resp = flowable.blockingFirst()
+        def resp = flowable.blockFirst()
 
         then:
         noExceptionThrown()
@@ -440,12 +439,12 @@ class ValidatedSpec extends Specification {
         HttpClient client = server.applicationContext.createBean(HttpClient, server.getURL())
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/validated/optional/notNull"),
                 Argument.STRING,
                 Argument.of(Map, String, Object)
         ))
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -470,12 +469,12 @@ class ValidatedSpec extends Specification {
         HttpClient client = server.applicationContext.createBean(HttpClient, server.getURL())
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/validated/optional/notNull"),
                 Argument.STRING,
                 Argument.of(Map, String, Object)
         ))
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)

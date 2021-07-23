@@ -17,13 +17,19 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 
+import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Predicate;
 
 /**
  * A mutable various of {@link DefaultAnnotationMetadata} that is used only at build time.
@@ -34,9 +40,61 @@ import java.util.Objects;
 public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     private boolean hasPropertyExpressions = false;
 
+    /**
+     * Default constructor.
+     */
+    public MutableAnnotationMetadata() {
+    }
+
+    private MutableAnnotationMetadata(@Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
+                                     @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
+                                     @Nullable Map<String, Map<CharSequence, Object>> allStereotypes,
+                                     @Nullable Map<String, Map<CharSequence, Object>> allAnnotations,
+                                     @Nullable Map<String, List<String>> annotationsByStereotype,
+                                     boolean hasPropertyExpressions) {
+        super(declaredAnnotations,
+              declaredStereotypes,
+              allStereotypes,
+              allAnnotations,
+              annotationsByStereotype,
+              hasPropertyExpressions);
+        this.hasPropertyExpressions = hasPropertyExpressions;
+    }
+
     @Override
     public boolean hasPropertyExpressions() {
         return hasPropertyExpressions;
+    }
+
+    @Override
+    public MutableAnnotationMetadata clone() {
+        final MutableAnnotationMetadata cloned = new MutableAnnotationMetadata(
+                declaredAnnotations != null ? new HashMap<>(declaredAnnotations) : null,
+                declaredStereotypes != null ? new HashMap<>(declaredStereotypes) : null,
+                allStereotypes != null ? new HashMap<>(allStereotypes) : null,
+                allAnnotations != null ? new HashMap<>(allAnnotations) : null,
+                annotationsByStereotype != null ? new HashMap<>(annotationsByStereotype) : null,
+                hasPropertyExpressions
+        );
+        if (annotationDefaultValues != null) {
+            cloned.annotationDefaultValues = new LinkedHashMap<>(annotationDefaultValues);
+        }
+        return cloned;
+    }
+
+    @Override
+    public <A extends Annotation> void removeAnnotationIf(@NonNull Predicate<AnnotationValue<A>> predicate) {
+        super.removeAnnotationIf(predicate);
+    }
+
+    @Override
+    public void removeAnnotation(String annotationType) {
+        super.removeAnnotation(annotationType);
+    }
+
+    @Override
+    public void removeStereotype(String annotationType) {
+        super.removeStereotype(annotationType);
     }
 
     @Override
@@ -78,31 +136,41 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     }
 
     @Override
-    protected void addRepeatable(String annotationName, AnnotationValue annotationValue) {
+    public void addRepeatable(String annotationName, AnnotationValue annotationValue) {
         Objects.requireNonNull(annotationValue, "Annotation Value cannot be null");
         this.hasPropertyExpressions = computeHasPropertyExpressions(annotationValue.getValues(), RetentionPolicy.RUNTIME);
         super.addRepeatable(annotationName, annotationValue);
     }
 
     @Override
-    protected void addRepeatable(String annotationName, AnnotationValue annotationValue, RetentionPolicy retentionPolicy) {
+    public void addRepeatable(String annotationName, AnnotationValue annotationValue, RetentionPolicy retentionPolicy) {
         Objects.requireNonNull(annotationValue, "Annotation Value cannot be null");
         this.hasPropertyExpressions = computeHasPropertyExpressions(annotationValue.getValues(), retentionPolicy);
         super.addRepeatable(annotationName, annotationValue, retentionPolicy);
     }
 
     @Override
-    protected void addDeclaredRepeatable(String annotationName, AnnotationValue annotationValue) {
+    public void addDeclaredRepeatable(String annotationName, AnnotationValue annotationValue) {
         Objects.requireNonNull(annotationValue, "Annotation Value cannot be null");
         this.hasPropertyExpressions = computeHasPropertyExpressions(annotationValue.getValues(), RetentionPolicy.RUNTIME);
         super.addDeclaredRepeatable(annotationName, annotationValue);
     }
 
     @Override
-    protected void addDeclaredRepeatable(String annotationName, AnnotationValue annotationValue, RetentionPolicy retentionPolicy) {
+    public void addDeclaredRepeatable(String annotationName, AnnotationValue annotationValue, RetentionPolicy retentionPolicy) {
         Objects.requireNonNull(annotationValue, "Annotation Value cannot be null");
         this.hasPropertyExpressions = computeHasPropertyExpressions(annotationValue.getValues(), retentionPolicy);
         super.addDeclaredRepeatable(annotationName, annotationValue, retentionPolicy);
+    }
+
+    @Override
+    public void addDeclaredStereotype(List<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values) {
+        super.addDeclaredStereotype(parentAnnotations, stereotype, values);
+    }
+
+    @Override
+    public void addDeclaredStereotype(List<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
+        super.addDeclaredStereotype(parentAnnotations, stereotype, values, retentionPolicy);
     }
 
     private boolean computeHasPropertyExpressions(Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {

@@ -15,9 +15,10 @@
  */
 package io.micronaut.http.client.bind;
 
-import io.micronaut.core.annotation.NonNull;
+import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.bind.annotation.Bindable;
@@ -27,14 +28,30 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.*;
-import io.micronaut.http.annotation.*;
+import io.micronaut.core.version.annotation.Version;
+import io.micronaut.http.BasicAuth;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.CookieValue;
+import io.micronaut.http.annotation.Header;
+import io.micronaut.http.annotation.PathVariable;
+import io.micronaut.http.annotation.QueryValue;
+import io.micronaut.http.annotation.RequestAttribute;
+import io.micronaut.http.annotation.RequestBean;
+import io.micronaut.http.client.bind.binders.AttributeClientRequestBinder;
+import io.micronaut.http.client.bind.binders.HeaderClientRequestBinder;
+import io.micronaut.http.client.bind.binders.VersionClientRequestBinder;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
+import jakarta.inject.Singleton;
 import kotlin.coroutines.Continuation;
-import javax.inject.Singleton;
+
 import java.lang.annotation.Annotation;
-import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 
 import static io.micronaut.core.util.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
 
@@ -51,13 +68,16 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
 
     private final Map<Class<? extends Annotation>, ClientArgumentRequestBinder<?>> byAnnotation = new LinkedHashMap<>();
     private final Map<Integer, ClientArgumentRequestBinder<?>> byType = new LinkedHashMap<>();
+    private final Map<Class<? extends Annotation>, AnnotatedClientRequestBinder<?>> methodByAnnotation = new LinkedHashMap<>();
 
     /**
      * @param conversionService The conversion service
-     * @param binders           The request argument binders
+     * @param binders           The request binders
+     * @param beanContext       The context to resolve beans
      */
     protected DefaultHttpClientBinderRegistry(ConversionService<?> conversionService,
-                                              List<ClientArgumentRequestBinder<?>> binders) {
+                                              List<ClientRequestBinder> binders,
+                                              BeanContext beanContext) {
         byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (ClientArgumentRequestBinder<HttpHeaders>) (context, uriContext, value, request) -> {
             value.forEachValue(request::header);
         });
@@ -78,11 +98,10 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
                     .filter (StringUtils::isNotEmpty)
                     .orElse(context.getArgument().getName());
 
+            uriContext.setPathParameter(parameterName, value);
             conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
                     .filter(StringUtils::isNotEmpty)
-                    .ifPresent(o -> {
-                        uriContext.getQueryParameters().put(parameterName, o);
-                    });
+                    .ifPresent(o -> uriContext.addQueryParameter(parameterName, o));
         });
         byAnnotation.put(PathVariable.class, (context, uriContext, value, request) -> {
             String parameterName = context.getAnnotationMetadata().stringValue(PathVariable.class)
@@ -118,6 +137,9 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
                     .filter(StringUtils::isNotEmpty)
                     .orElse(NameUtils.hyphenate(context.getArgument().getName()));
             request.getAttributes().put(attributeName, value);
+
+            conversionService.convert(value, String.class)
+                    .ifPresent(v -> uriContext.getPathParameters().put(context.getArgument().getName(), v));
         });
         byAnnotation.put(Body.class, (context, uriContext, value, request) -> {
             request.body(value);
@@ -134,13 +156,17 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
             }
         });
 
+        methodByAnnotation.put(Header.class, new HeaderClientRequestBinder());
+        methodByAnnotation.put(Version.class, new VersionClientRequestBinder(beanContext));
+        methodByAnnotation.put(RequestAttribute.class, new AttributeClientRequestBinder());
+
         if (KOTLIN_COROUTINES_SUPPORTED) {
             //Clients should do nothing with the continuation
             byType.put(Argument.of(Continuation.class).typeHashCode(),  (context, uriContext, value, request) -> { });
         }
 
         if (CollectionUtils.isNotEmpty(binders)) {
-            for (ClientArgumentRequestBinder<?> binder : binders) {
+            for (ClientRequestBinder binder: binders) {
                 addBinder(binder);
             }
         }
@@ -166,19 +192,27 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
         }
     }
 
+    @Override
+    public Optional<AnnotatedClientRequestBinder<?>> findAnnotatedBinder(@NonNull Class<?> annotationType) {
+        return Optional.ofNullable(methodByAnnotation.get(annotationType));
+    }
+
     /**
      * Adds a binder to the registry.
      *
      * @param binder The binder
      * @param <T> The type
      */
-    public <T> void addBinder(ClientArgumentRequestBinder<T> binder) {
-        if (binder instanceof AnnotatedClientArgumentRequestBinder) {
-            AnnotatedClientArgumentRequestBinder<?> annotatedRequestArgumentBinder = (AnnotatedClientArgumentRequestBinder) binder;
+    public <T> void addBinder(ClientRequestBinder binder) {
+        if (binder instanceof AnnotatedClientRequestBinder) {
+            AnnotatedClientRequestBinder<?> annotatedBinder = (AnnotatedClientRequestBinder<?>) binder;
+            methodByAnnotation.put(annotatedBinder.getAnnotationType(), annotatedBinder);
+        } else if (binder instanceof AnnotatedClientArgumentRequestBinder) {
+            AnnotatedClientArgumentRequestBinder<?> annotatedRequestArgumentBinder = (AnnotatedClientArgumentRequestBinder<?>) binder;
             Class<? extends Annotation> annotationType = annotatedRequestArgumentBinder.getAnnotationType();
             byAnnotation.put(annotationType, annotatedRequestArgumentBinder);
         } else if (binder instanceof TypedClientArgumentRequestBinder) {
-            TypedClientArgumentRequestBinder<?> typedRequestArgumentBinder = (TypedClientArgumentRequestBinder) binder;
+            TypedClientArgumentRequestBinder<?> typedRequestArgumentBinder = (TypedClientArgumentRequestBinder<?>) binder;
             byType.put(typedRequestArgumentBinder.argumentType().typeHashCode(), typedRequestArgumentBinder);
             List<Class<?>> superTypes = typedRequestArgumentBinder.superTypes();
             if (CollectionUtils.isNotEmpty(superTypes)) {

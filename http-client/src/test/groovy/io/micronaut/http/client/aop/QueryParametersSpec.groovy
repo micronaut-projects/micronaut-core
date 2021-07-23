@@ -17,22 +17,23 @@ package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.beans.exceptions.IntrospectionException
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.QueryValue
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
 import javax.annotation.Nullable
-
 
 class QueryParametersSpec extends Specification {
 
@@ -95,11 +96,11 @@ class QueryParametersSpec extends Specification {
 
     @Unroll
     void "test client mappping URL parameters appended through a POJO with a list (served through #flavour)"() {
-        expect:
-        client.searchExplodedPojo(flavour, new SearchParamsAsList(term: ["Tool", "Agnes Obel"])).albums.size() == 4
+        when:
+        client.searchExplodedPojo("list", new SearchParamsAsList(term: ["Tool", "Agnes Obel"]))
 
-        where:
-        flavour << [ "pojo", "list", "map" ]
+        then:
+        thrown(IntrospectionException)
     }
 
     @Unroll
@@ -129,29 +130,29 @@ class QueryParametersSpec extends Specification {
 
     void "test query value with default value"() {
         given:
-        RxHttpClient lowLevelClient = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL())
+        HttpClient lowLevelClient = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL())
 
         expect:
         client.searchDefault("Riverside").albums.size() == 2
         client.searchDefault(null).albums.size() == 1
-        lowLevelClient.retrieve(HttpRequest.GET('/itunes/search-default'), SearchResult).blockingFirst().albums.size() == 1
+        lowLevelClient.toBlocking().retrieve(HttpRequest.GET('/itunes/search-default'), SearchResult).albums.size() == 1
 
         when:
-        lowLevelClient.retrieve(HttpRequest.GET('/itunes/search-exploded/list'), SearchResult).blockingFirst()
+        lowLevelClient.toBlocking().retrieve(HttpRequest.GET('/itunes/search-exploded/list'), SearchResult)
 
         then:
         def ex = thrown(HttpClientResponseException)
         ex.status == HttpStatus.NOT_FOUND // because null is returned
 
         when:
-        lowLevelClient.retrieve(HttpRequest.GET('/itunes/search-exploded/map'), SearchResult).blockingFirst()
+        lowLevelClient.toBlocking().retrieve(HttpRequest.GET('/itunes/search-exploded/map'), SearchResult)
 
         then:
         ex = thrown(HttpClientResponseException)
         ex.status == HttpStatus.NOT_FOUND // because null is returned
 
         when:
-        lowLevelClient.retrieve(HttpRequest.GET('/itunes/search-exploded/pojo'), SearchResult).blockingFirst()
+        lowLevelClient.toBlocking().retrieve(HttpRequest.GET('/itunes/search-exploded/pojo'), SearchResult)
 
         then:
         ex = thrown(HttpClientResponseException)
@@ -170,10 +171,12 @@ class QueryParametersSpec extends Specification {
         List<String> term // POJO parameters can bind request params to list fields
     }
 
+    @Introspected
     static class SearchParams {
         String term // Now, POJO parameters can bind request params to simple fields, too.
     }
 
+    @Introspected
     static class SearchParams2 {
         String song // Now, POJO parameters can bind request params to multiple POJOs, too.
     }

@@ -26,6 +26,7 @@ import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.io.service.ServiceDefinition
 import io.micronaut.core.io.service.SoftServiceLoader
 import io.micronaut.core.reflect.ClassUtils
+import io.micronaut.core.util.CollectionUtils
 import io.micronaut.core.util.StringUtils
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
@@ -53,6 +54,7 @@ import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.SourceUnit
 
 import java.lang.annotation.Annotation
+import java.lang.annotation.Inherited
 import java.lang.annotation.Repeatable
 import java.lang.annotation.Retention
 import java.lang.annotation.RetentionPolicy
@@ -178,6 +180,21 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     @Override
     protected boolean hasAnnotation(AnnotatedNode element, Class<? extends Annotation> annotation) {
         return !element.getAnnotations(ClassHelper.makeCached(annotation)).isEmpty()
+    }
+
+    @Override
+    protected boolean hasAnnotation(AnnotatedNode element, String annotation) {
+        for (AnnotationNode ann: element.getAnnotations()) {
+            if (ann.getClassNode().getName() == annotation) {
+                return true
+            }
+        }
+        return false
+    }
+
+    @Override
+    protected boolean hasAnnotations(AnnotatedNode element) {
+        return CollectionUtils.isNotEmpty(element.getAnnotations())
     }
 
     @Override
@@ -389,6 +406,16 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
         }
 
         return defaults.get(annotationName) ?: Collections.emptyMap()
+    }
+
+    @Override
+    protected boolean isInheritedAnnotation(@NonNull AnnotationNode annotationMirror) {
+        return annotationMirror?.classNode?.annotations?.any { it?.classNode?.name == Inherited.name }
+    }
+
+    @Override
+    protected boolean isInheritedAnnotationType(@NonNull AnnotatedNode annotationType) {
+        return annotationType?.annotations?.any { it?.classNode?.name == Inherited.name }
     }
 
     @Override

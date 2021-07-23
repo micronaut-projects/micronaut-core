@@ -21,6 +21,8 @@ import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.inject.visitor.TypeElementVisitor;
+
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
@@ -70,6 +72,8 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     protected JavaVisitorContext javaVisitorContext;
     private boolean incremental = false;
     private final Set<String> supportedAnnotationTypes = new HashSet<>(5);
+    private final Map<String, Boolean> isProcessedCache = new HashMap<>(30);
+    private Set<String> processedTypes;
 
     @Override
     public SourceVersion getSupportedSourceVersion() {
@@ -110,6 +114,44 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     @Override
     public Set<String> getSupportedAnnotationTypes() {
         if (incremental) {
+            return getProcessedAnnotationTypePatterns();
+        } else {
+            return Collections.singleton("*");
+        }
+    }
+
+    /**
+     * Return whether the given annotation is processed.
+     * @param annotationName The annotation name
+     * @return True if it is
+     */
+    protected boolean isProcessedAnnotation(String annotationName) {
+        return isProcessedCache.computeIfAbsent(annotationName, (key) -> {
+            final Set<String> patterns = getProcessedAnnotationTypePatterns();
+            for (String pattern : patterns) {
+                if (pattern.endsWith(".*")) {
+                    final String prefix = pattern.substring(0, pattern.length() - 1);
+                    if (annotationName.startsWith(prefix)) {
+                        return true;
+                    }
+                } else {
+                    if (pattern.equals(annotationName)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        });
+    }
+
+    /**
+     * The list of patterns that represent the processed annotation types.
+     * @return A set of patterns
+     */
+    @NonNull
+    private Set<String> getProcessedAnnotationTypePatterns() {
+        if (processedTypes == null) {
+
             final Set<String> types = CollectionUtils.setOf(
                     "javax.inject.*",
                     "jakarta.inject.*",
@@ -122,10 +164,19 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
                     types.add(mappedAnnotationName);
                 }
             }
-            return types;
-        } else {
-            return Collections.singleton("*");
+            final Set<String> annotationPackages = AbstractAnnotationMetadataBuilder.getMappedAnnotationPackages();
+            for (String annotationPackage : annotationPackages) {
+                types.add(annotationPackage + ".*");
+            }
+            Set<String> visitedAnnotationNames = TypeElementVisitorProcessor.getVisitedAnnotationNames();
+            for (String visitedAnnotationName : visitedAnnotationNames) {
+                if (!"*".equals(visitedAnnotationName)) {
+                    types.add(visitedAnnotationName);
+                }
+            }
+            this.processedTypes = types;
         }
+        return this.processedTypes;
     }
 
     @Override
@@ -183,8 +234,18 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
                 modelUtils,
                 genericUtils,
                 filer,
-                visitorAttributes
+                visitorAttributes,
+                getVisitorKind()
         );
+    }
+
+    /**
+     * obtains the visitor kind.
+     * @return The visitor kind
+     */
+    @NonNull
+    protected TypeElementVisitor.VisitorKind getVisitorKind() {
+        return getIncrementalProcessorType().equals(GRADLE_PROCESSING_ISOLATING) ? TypeElementVisitor.VisitorKind.ISOLATING : TypeElementVisitor.VisitorKind.AGGREGATING;
     }
 
     /**

@@ -37,8 +37,10 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
 
     private final JavaVisitorContext visitorContext;
     private final VariableElement variableElement;
-    private ClassElement declaringElement;
+    private JavaClassElement declaringElement;
     private ClassElement typeElement;
+    private ClassElement genericType;
+    private ClassElement resolvedDeclaringClass;
 
     /**
      * @param variableElement    The {@link VariableElement}
@@ -57,12 +59,29 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
      * @param annotationMetadata The annotation metadata
      * @param visitorContext     The visitor context
      */
-    JavaFieldElement(ClassElement declaringElement,
+    JavaFieldElement(JavaClassElement declaringElement,
                      VariableElement variableElement,
                      AnnotationMetadata annotationMetadata,
                      JavaVisitorContext visitorContext) {
         this(variableElement, annotationMetadata, visitorContext);
         this.declaringElement = declaringElement;
+    }
+
+    @Override
+    public ClassElement getGenericType() {
+        if (this.genericType == null) {
+            if (declaringElement == null) {
+                this.genericType = getType();
+            } else {
+                this.genericType = mirrorToClassElement(
+                        variableElement.asType(),
+                        visitorContext,
+                        declaringElement.getGenericTypeInfo(),
+                        false
+                );
+            }
+        }
+        return this.genericType;
     }
 
     @Override
@@ -92,19 +111,20 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
 
     @Override
     public ClassElement getDeclaringType() {
-        if (declaringElement == null) {
+        if (resolvedDeclaringClass == null) {
 
-            final Element enclosingElement = variableElement.getEnclosingElement();
-            if (!(enclosingElement instanceof TypeElement)) {
-                throw new IllegalStateException("Enclosing element should be a type element");
+            Element enclosingElement = variableElement.getEnclosingElement();
+            if (enclosingElement instanceof TypeElement) {
+                TypeElement te = (TypeElement) enclosingElement;
+                if (declaringElement.getName().equals(te.getQualifiedName().toString())) {
+                    resolvedDeclaringClass = declaringElement;
+                } else {
+                    resolvedDeclaringClass = mirrorToClassElement(te.asType(), visitorContext, declaringElement.getGenericTypeInfo());
+                }
+            } else {
+                return declaringElement;
             }
-            declaringElement = new JavaClassElement(
-                    (TypeElement) enclosingElement,
-                    visitorContext.getAnnotationUtils().getAnnotationMetadata(enclosingElement),
-                    visitorContext
-            );
         }
-
-        return declaringElement;
+        return resolvedDeclaringClass;
     }
 }

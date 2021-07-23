@@ -22,7 +22,7 @@ import io.micronaut.context.annotation.Property
 import io.micronaut.context.exceptions.CircularDependencyException
 import spock.lang.Specification
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 class ConstructorCircularDependencyFailureSpec extends Specification {
 
@@ -40,11 +40,11 @@ Failed to inject value for field [a] of class: io.micronaut.inject.failures.ctor
 
 Message: Circular dependency detected
 Path Taken: 
-B.a --> new A([C c]) --> new C([B b])
-^                                  |
-|                                  |
-|                                  |
-+----------------------------------+'''
+new B() --> B.a --> new A([C c]) --> new C([B b])
+^                                              |
+|                                              |
+|                                              |
++----------------------------------------------+'''
     }
 
     void "test multiple optionals do not cause a circular dependency exception"() {

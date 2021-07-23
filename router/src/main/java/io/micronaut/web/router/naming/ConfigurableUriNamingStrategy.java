@@ -19,11 +19,10 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.conventions.PropertyConvention;
 import io.micronaut.inject.BeanDefinition;
-
-import io.micronaut.core.annotation.NonNull;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 /**
  * The configurable {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy}

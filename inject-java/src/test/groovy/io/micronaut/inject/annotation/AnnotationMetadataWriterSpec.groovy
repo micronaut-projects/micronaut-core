@@ -25,14 +25,16 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.context.annotation.Type
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationClassValue
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.TypeHint
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.retry.annotation.Recoverable
 
-import javax.inject.Qualifier
-import javax.inject.Scope
-import javax.inject.Singleton
+import jakarta.inject.Qualifier
+import jakarta.inject.Scope
+import jakarta.inject.Singleton
 import java.lang.annotation.Documented
 import java.lang.annotation.Retention
 
@@ -194,7 +196,7 @@ class Test {
         // the stereotypes should include meta annotation stereotypes
         metadata.getAnnotationNamesByStereotype(Around.class).contains(Recoverable.class.getName())
     }
-    
+
     void "test read annotation with annotation value"() {
         given:
         AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\
@@ -381,12 +383,12 @@ class Test {
         metadata.synthesizeDeclared().size() == 1
         metadata != null
         metadata.hasDeclaredAnnotation(Primary)
-        !metadata.hasDeclaredAnnotation(Singleton)
+        !metadata.hasDeclaredAnnotation(AnnotationUtil.SINGLETON)
         metadata.hasAnnotation(Primary)
         !metadata.hasStereotype(Documented) // ignore internal annotations
         !metadata.hasStereotype(Retention) // ignore internal annotations
-        metadata.hasStereotype(Qualifier)
-        !metadata.hasStereotype(Singleton)
+        metadata.hasStereotype(AnnotationUtil.QUALIFIER)
+        !metadata.hasStereotype(AnnotationUtil.SINGLETON)
     }
 
     void "test write annotation metadata default values"() {
@@ -438,8 +440,8 @@ class Test {
         metadata.hasDeclaredAnnotation(Trace)
         metadata.hasStereotype(Around)
         metadata.hasStereotype(SomeOther)
-        metadata.hasStereotype(Scope)
-        !metadata.hasDeclaredAnnotation(Scope)
+        metadata.hasStereotype(AnnotationUtil.SCOPE)
+        !metadata.hasDeclaredAnnotation(AnnotationUtil.SCOPE)
         !metadata.hasDeclaredAnnotation(Around)
         metadata.getValue(Around, 'hotswap').isPresent()
         metadata.isTrue(Around, 'hotswap')
@@ -481,8 +483,8 @@ interface ITest {
         !metadata.hasDeclaredAnnotation(Trace)
         metadata.hasStereotype(Around)
         metadata.hasStereotype(SomeOther)
-        metadata.hasStereotype(Scope)
-        !metadata.hasDeclaredAnnotation(Scope)
+        metadata.hasStereotype(AnnotationUtil.SCOPE)
+        !metadata.hasDeclaredAnnotation(AnnotationUtil.SCOPE)
         !metadata.hasDeclaredAnnotation(Around)
         metadata.getValue(Around, 'hotswap').isPresent()
         metadata.isTrue(Around, 'hotswap')
@@ -494,7 +496,7 @@ interface ITest {
     }
 
     void "test repeatable annotations are combined"() {
-        AnnotationMetadata toWrite = buildMethodAnnotationMetadata('''\
+        BeanDefinition definition = buildBeanDefinition('test.Test','''\
 package test;
 
 import io.micronaut.inject.annotation.repeatable.*;
@@ -503,19 +505,19 @@ import io.micronaut.context.annotation.*;
 @Property(name="prop1", value="value1")
 @Property(name="prop2", value="value2")
 @Property(name="prop3", value="value3")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @Property(name="prop2", value="value2")    
     @Property(name="prop3", value="value33")    
     @Property(name="prop4", value="value4")    
+    @io.micronaut.context.annotation.Executable
     void someMethod() {}
 }
-''', 'someMethod')
+''')
 
         when:
-        def className = "test"
-        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+        AnnotationMetadata metadata = definition.getRequiredMethod("someMethod").getAnnotationMetadata()
 
         then:
         List<AnnotationValue<Property>> properties = metadata.getAnnotationValuesByType(Property)

@@ -27,6 +27,7 @@ import java.util.EventListener;
  * @since 1.0
  */
 @Indexed(ApplicationEventListener.class)
+@FunctionalInterface
 public interface ApplicationEventListener<E> extends EventListener {
 
     /**

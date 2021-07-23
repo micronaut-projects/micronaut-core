@@ -24,13 +24,13 @@ Suppose you wish to trace each request to the Micronaut "Hello World" example us
 
 You should not block the underlying Netty event loop in your filter; instead the filter should proceed with execution once any I/O is complete.
 
-As an example, consider this `TraceService` that uses RxJava to compose an I/O operation:
+As an example, consider this `TraceService` that uses https://projectreactor.io[Project Reactor] to compose an I/O operation:
 
-snippet::io.micronaut.docs.server.filters.TraceService[tags="imports,class", indent=0, title="A TraceService Example using RxJava"]
+snippet::io.micronaut.docs.server.filters.TraceService[tags="imports,class", indent=0, title="A TraceService Example using Reactive Streams"]
 
-<1> The rx:Flowable[] type creates logic that executes potentially blocking operations to write the trace data from the request
+<1> The reactor:Mono[] type creates logic that executes potentially blocking operations to write the trace data from the request
 <2> Since this is just an example, the logic does nothing yet
-<3> The RxJava I/O scheduler executes the logic
+<3> The `Schedulers.boundedElastic` executes the logic
 
 You can then inject this implementation into your filter definition:
 
@@ -45,12 +45,12 @@ The final step is to write the `doFilter` implementation of the api:http.filter.
 snippet::io.micronaut.docs.server.filters.TraceFilter[tags="doFilter", indent=0, title="The doFilter implementation"]
 
 <1> `TraceService` is invoked to trace the request
-<2> If the call succeeds, the filter resumes request processing using the RxJava `switchMap` method, which invokes the `proceed` method of the api:http.filter.ServerFilterChain[]
-<3> Finally, the RxJava `doOnNext` method adds a `X-Trace-Enabled` header to the response.
+<2> If the call succeeds, the filter resumes request processing using https://projectreactor.io[Project Reactor]'s `switchMap` method, which invokes the `proceed` method of the api:http.filter.ServerFilterChain[]
+<3> Finally, the https://projectreactor.io[Project Reactor]'s `doOnNext` method adds a `X-Trace-Enabled` header to the response.
 
 The previous example demonstrates some key concepts such as executing logic in a non-blocking manner before proceeding with the request and modifying the outgoing response.
 
-TIP: The examples use RxJava, however you can use any reactive framework that supports the Reactive streams specifications
+TIP: The examples use https://projectreactor.io[Project Reactor], however you can use any reactive framework that supports the Reactive streams specifications
 
 The api:http.annotation.Filter[] annotation uses api:core.util.AntPathMatcher[] for path matching. The mapping matches URLs using the following rules:
 
@@ -76,3 +76,7 @@ The api:http.annotation.Filter[] annotation uses api:core.util.AntPathMatcher[] 
 
 |`customer/**/*.html`
 |customer/index.html, customer/adam/profile.html, customer/adam/job/description.html
+
+== Error States
+
+The publisher returned from `chain.proceed` should never emit an error. In the cases where an upstream filter emitted an error or the route itself threw an exception, the error response should be emitted instead of the exception. In some cases it may be desirable to know the cause of the error response and for this purpose an attribute exists on the response if it was created as a result of an exception being emitted or thrown. The original cause is stored as the attribute api:http.HttpAttributes#EXCEPTION[].

@@ -35,7 +35,7 @@ class ConstructorExceptionSpec extends Specification {
 Error instantiating bean of type  [io.micronaut.inject.failures.ctorexception.A]
 
 Message: bad
-Path Taken: B.a --> new A([C c])'''
+Path Taken: new B() --> B.a --> new A([C c])'''
 
         cleanup:
         context.close()

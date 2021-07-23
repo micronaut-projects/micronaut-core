@@ -1,0 +1,9 @@
+dependencies {
+    annotationProcessor project(":inject-java")
+    implementation project(":inject")
+    implementation project(":http-server-netty")
+    implementation project(":websocket")
+
+    testCompileOnly project(":inject-groovy")
+    testImplementation project(":inject-java-test")
+}

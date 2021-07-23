@@ -15,8 +15,8 @@
  */
 package io.micronaut.http.client;
 
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.LifeCycle;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
@@ -230,19 +230,22 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
     }
 
     /**
-     * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of a
-     * Micronaut application. Within Micronaut use {@link javax.inject.Inject} to inject a client instead.
+     * Create a new {@link HttpClient}.
+     * Note that this method should only be used outside of the context of a Micronaut application.
+     * The returned {@link HttpClient} is not subject to dependency injection.
+     * The creator is responsible for closing the client to avoid leaking connections.
+     * Within a Micronaut application use {@link jakarta.inject.Inject} to inject a client instead.
      *
      * @param url The base URL
      * @return The client
      */
     static HttpClient create(@Nullable URL url) {
-        return HttpClientConfiguration.createClient(url);
+        return HttpClientFactoryResolver.getFactory().createClient(url);
     }
 
     /**
      * Create a new {@link HttpClient} with the specified configuration. Note that this method should only be used
-     * outside of the context of an application. Within Micronaut use {@link javax.inject.Inject} to inject a client instead
+     * outside of the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead
      *
      * @param url The base URL
      * @param configuration the client configuration
@@ -250,6 +253,6 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @since 2.2.0
      */
     static HttpClient create(@Nullable URL url, HttpClientConfiguration configuration) {
-        return HttpClientConfiguration.createClient(url, configuration);
+        return HttpClientFactoryResolver.getFactory().createClient(url, configuration);
     }
 }

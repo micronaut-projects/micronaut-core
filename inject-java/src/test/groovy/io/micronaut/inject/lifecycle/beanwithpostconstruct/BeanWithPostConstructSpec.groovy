@@ -28,8 +28,8 @@ class BeanWithPostConstructSpec extends AbstractTypeElementSpec {
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
 package test;
 import javax.annotation.*;
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 import io.micronaut.context.annotation.*;
 
@@ -54,7 +54,7 @@ class MyBean {
 }
 
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Foo {}
 
 ''')

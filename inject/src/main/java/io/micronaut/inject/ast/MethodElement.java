@@ -18,7 +18,7 @@ package io.micronaut.inject.ast;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.util.ArrayUtils;
-import org.jetbrains.annotations.NotNull;
+import io.micronaut.inject.ast.beans.BeanElementBuilder;
 
 import java.util.Arrays;
 import java.util.stream.Collectors;
@@ -49,6 +49,19 @@ public interface MethodElement extends MemberElement {
      * @since 2.3.0
      */
     @NonNull MethodElement withNewParameters(@NonNull ParameterElement...newParameters);
+
+    /**
+     * This method adds an associated bean using this method element as the originating element.
+     *
+     * <p>Note that this method can only be called on classes being directly compiled by Micronaut. If the ClassElement is
+     * loaded from pre-compiled code an {@link UnsupportedOperationException} will be thrown.</p>
+     * @param type The type of the bean
+     * @return A bean builder
+     */
+    default @NonNull
+    BeanElementBuilder addAssociatedBean(@NonNull ClassElement type) {
+        throw new UnsupportedOperationException("Only classes being processed from source code can define associated beans");
+    }
 
     /**
      * If {@link #isSuspend()} returns true this method exposes the continuation parameter in addition to the other parameters of the method.
@@ -125,13 +138,13 @@ public interface MethodElement extends MemberElement {
             @NonNull String name,
             ParameterElement...parameterElements) {
         return new MethodElement() {
-            @NotNull
+            @NonNull
             @Override
             public ClassElement getReturnType() {
                 return returnType;
             }
 
-            @NotNull
+            @NonNull
             @Override
             public ClassElement getGenericReturnType() {
                 return genericReturnType;
@@ -154,7 +167,7 @@ public interface MethodElement extends MemberElement {
                 );
             }
 
-            @NotNull
+            @NonNull
             @Override
             public AnnotationMetadata getAnnotationMetadata() {
                 return annotationMetadata;
@@ -165,7 +178,7 @@ public interface MethodElement extends MemberElement {
                 return declaredType;
             }
 
-            @NotNull
+            @NonNull
             @Override
             public String getName() {
                 return name;
@@ -186,7 +199,7 @@ public interface MethodElement extends MemberElement {
                 return true;
             }
 
-            @NotNull
+            @NonNull
             @Override
             public Object getNativeType() {
                 throw new UnsupportedOperationException("No native method type present");

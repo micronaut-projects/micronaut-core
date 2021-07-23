@@ -20,13 +20,15 @@ import io.micronaut.retry.annotation.RetryPredicate
 import io.micronaut.retry.annotation.Retryable
 import io.micronaut.retry.event.RetryEvent
 import io.micronaut.retry.event.RetryEventListener
-import io.reactivex.Single
+import jakarta.inject.Singleton
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Mono
 import spock.lang.Specification
 
-import javax.inject.Singleton
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.ExecutionException
+import io.micronaut.core.async.annotation.SingleResult
 
 /**
  * @author graemerocher
@@ -68,7 +70,7 @@ class SimpleRetrySpec extends Specification {
         MyRetryListener listener = context.getBean(MyRetryListener)
 
         when:"A method is annotated retry"
-        int result = counterService.getCountSingle().blockingGet()
+        int result = Mono.from(counterService.getCountSingle()).block()
 
         then:"It executes until successful"
         listener.events.size() == 2
@@ -78,11 +80,11 @@ class SimpleRetrySpec extends Specification {
         listener.reset()
         counterService.countThreshold = 10
         counterService.count = 0
-        def single = counterService.getCountSingle()
-        single.blockingGet()
+        Publisher<Integer> single = counterService.getCountSingle()
+        Mono.from(single).block()
 
         then:"The original exception is thrown"
-        def e = thrown(IllegalStateException)
+        IllegalStateException e = thrown()
         e.message == "Bad count"
 
         cleanup:
@@ -96,7 +98,7 @@ class SimpleRetrySpec extends Specification {
             MyRetryListener listener = context.getBean(MyRetryListener)
 
         when:"A method is annotated retry"
-            int result = counterService.getCountSingleRxPreErrors().blockingGet()
+            int result = Mono.from(counterService.getCountSingleRxPreErrors()).block()
 
         then:"It executes until successful"
             listener.events.size() == 4
@@ -107,10 +109,10 @@ class SimpleRetrySpec extends Specification {
             counterService.countThreshold = 10
             counterService.countRx = 0
             counterService.count = 0
-            counterService.getCountSingleRxPreErrors().blockingGet()
+            Mono.from(counterService.getCountSingleRxPreErrors()).block()
 
         then:"The original exception is thrown"
-            def e = thrown(IllegalStateException)
+            IllegalStateException e = thrown()
             e.message == "Bad count"
 
         when:"Pre throws error"
@@ -118,10 +120,10 @@ class SimpleRetrySpec extends Specification {
             counterService.countPreThreshold = 10
             counterService.countPreRx = 0
             counterService.count = 0
-            counterService.getCountSingleRxPreErrors().blockingGet()
+            Mono.from(counterService.getCountSingleRxPreErrors()).block()
 
         then:"The original exception is thrown"
-            def ex = thrown(IllegalStateException)
+            IllegalStateException ex = thrown()
             ex.message == "Bad pre count"
 
         cleanup:
@@ -340,8 +342,9 @@ class SimpleRetrySpec extends Specification {
         }
 
         @Retryable(attempts = '5', delay = '5ms')
-        Single<Integer> getCountSingle() {
-            Single.fromCallable({->
+        @SingleResult
+        Publisher<Integer> getCountSingle() {
+            Mono.fromCallable({->
                 count++
                 if(count < countThreshold) {
                     throw new IllegalStateException("Bad count")
@@ -351,12 +354,13 @@ class SimpleRetrySpec extends Specification {
         }
 
         @Retryable(attempts = '7', delay = '5ms')
-        Single<Integer> getCountSingleRxPreErrors() {
+        @SingleResult
+        Publisher<Integer> getCountSingleRxPreErrors() {
             countPreRx++
             if(countPreRx < countPreThreshold) {
                 throw new IllegalStateException("Bad pre count")
             }
-            Single.fromCallable({->
+            Mono.fromCallable({->
                 countRx++
                 if(countRx < countThreshold) {
                     throw new IllegalStateException("Bad count")

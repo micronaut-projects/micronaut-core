@@ -49,6 +49,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
     protected final Type targetClassType;
     protected final AnnotationMetadata annotationMetadata;
     protected final Map<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
+    protected final Map<String, Integer> defaults = new HashMap<>();
     private final boolean writeAnnotationDefault;
 
     /**
@@ -137,6 +138,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
                         classWriter,
                         staticInit,
                         dam,
+                        defaults,
                         loadTypeMethods
                 );
 
@@ -161,6 +163,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
                     classWriter,
                     staticInit,
                     (DefaultAnnotationMetadata) annotationMetadata,
+                    defaults,
                     loadTypeMethods
             );
         } else if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
@@ -169,6 +172,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
                     classWriter,
                     staticInit,
                     (AnnotationMetadataHierarchy) annotationMetadata,
+                    defaults,
                     loadTypeMethods
             );
         } else {

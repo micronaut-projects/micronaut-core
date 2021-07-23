@@ -15,27 +15,38 @@
  */
 package io.micronaut.http.server.netty;
 
-import io.micronaut.context.BeanProvider;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanLocator;
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.TypeHint;
-import io.micronaut.core.async.SupplierUtil;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.discovery.event.ServiceStoppedEvent;
+import io.micronaut.core.util.SupplierUtil;
+import io.micronaut.discovery.EmbeddedServerInstance;
 import io.micronaut.discovery.event.ServiceReadyEvent;
+import io.micronaut.discovery.event.ServiceStoppedEvent;
 import io.micronaut.http.HttpRequestFactory;
 import io.micronaut.http.HttpResponseFactory;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.context.event.HttpRequestReceivedEvent;
+import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
-import io.micronaut.http.netty.channel.*;
+import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
+import io.micronaut.http.netty.channel.ChannelPipelineListener;
+import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
+import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
+import io.micronaut.http.netty.channel.EventLoopGroupFactory;
+import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
+import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
 import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
 import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
@@ -57,7 +68,6 @@ import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.micronaut.discovery.EmbeddedServerInstance;
 import io.micronaut.runtime.server.event.ServerShutdownEvent;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
 import io.micronaut.scheduling.TaskExecutors;
@@ -66,13 +76,35 @@ import io.micronaut.web.router.Router;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.*;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.ChannelOutboundHandler;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.socket.SocketChannel;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpContentDecompressor;
+import io.netty.handler.codec.http.HttpMessage;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpServerCodec;
+import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
+import io.netty.handler.codec.http.HttpServerUpgradeHandler;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
-import io.netty.handler.codec.http2.*;
+import io.netty.handler.codec.http2.CleartextHttp2ServerUpgradeHandler;
+import io.netty.handler.codec.http2.DefaultHttp2Connection;
+import io.netty.handler.codec.http2.Http2CodecUtil;
+import io.netty.handler.codec.http2.Http2Connection;
+import io.netty.handler.codec.http2.Http2FrameListener;
+import io.netty.handler.codec.http2.Http2FrameLogger;
+import io.netty.handler.codec.http2.Http2ServerUpgradeCodec;
+import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
+import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
 import io.netty.handler.flow.FlowControlHandler;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.ApplicationProtocolNames;
@@ -85,18 +117,26 @@ import io.netty.util.AsciiString;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GlobalEventExecutor;
-import org.jetbrains.annotations.NotNull;
+import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.micronaut.core.annotation.Nullable;
-
-import javax.inject.Singleton;
 import java.io.File;
-import java.net.*;
+import java.net.BindException;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -154,6 +194,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private EventLoopGroup parentGroup;
     private EmbeddedServerInstance serviceInstance;
     private final Collection<ChannelPipelineListener> pipelineListeners = new ArrayList<>(2);
+    private final ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher;
+    private final ApplicationEventPublisher<HttpRequestReceivedEvent> httpRequestReceivedEventPublisher;
 
     /**
      * @param serverConfiguration                     The Netty HTTP server configuration
@@ -175,6 +217,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * @param channelOptionFactory                    The channel option factory
      * @param errorResponseProcessor                  The factory to create error responses
      * @param hostResolver                            The HTTP host resolver
+     * @param terminateEventPublisher
+     * @param httpRequestReceivedEventPublisher
      */
     @SuppressWarnings("ParameterNumber")
     public NettyHttpServer(
@@ -185,8 +229,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
             NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry,
             StaticResourceResolver resourceResolver,
-            @javax.inject.Named(TaskExecutors.IO) BeanProvider<ExecutorService> ioExecutor,
-            @javax.inject.Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
+            @jakarta.inject.Named(TaskExecutors.IO) BeanProvider<ExecutorService> ioExecutor,
+            @jakarta.inject.Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
             ExecutorSelector executorSelector,
             @Nullable ServerSslBuilder serverSslBuilder,
             List<ChannelOutboundHandler> outboundHandlers,
@@ -196,9 +240,11 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             HttpContentProcessorResolver httpContentProcessorResolver,
             ChannelOptionFactory channelOptionFactory,
             ErrorResponseProcessor<?> errorResponseProcessor,
-            HttpHostResolver hostResolver
-    ) {
+            HttpHostResolver hostResolver,
+            ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher, ApplicationEventPublisher<HttpRequestReceivedEvent> httpRequestReceivedEventPublisher) {
         this.httpCompressionStrategy = httpCompressionStrategy;
+        this.terminateEventPublisher = terminateEventPublisher;
+        this.httpRequestReceivedEventPublisher = httpRequestReceivedEventPublisher;
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
         location.ifPresent(dir -> DiskFileUpload.baseDirectory = dir.getAbsolutePath());
         this.applicationContext = applicationContext;
@@ -243,8 +289,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 executorSelector,
                 SupplierUtil.memoized(ioExecutor::get),
                 httpContentProcessorResolver,
-                errorResponseProcessor
-        );
+                errorResponseProcessor,
+                this.terminateEventPublisher);
         this.channelOptionFactory = channelOptionFactory;
         this.hostResolver = hostResolver;
     }
@@ -647,7 +693,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         // all are Sharable
         final HttpAccessLogHandler accessLogHandler = serverConfiguration.getAccessLogger() != null && serverConfiguration.getAccessLogger().isEnabled() ?
                 new HttpAccessLogHandler(serverConfiguration.getAccessLogger().getLoggerName(), serverConfiguration.getAccessLogger().getLogFormat()) : null;
-        final HttpRequestDecoder requestDecoder = new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration);
+        final HttpRequestDecoder requestDecoder = new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration, httpRequestReceivedEventPublisher);
         final HttpResponseEncoder responseDecoder = new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration);
 
         /**
@@ -705,7 +751,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             }
         }
 
-        @NotNull
+        @NonNull
         private Map<String, ChannelHandler> getHandlerForProtocol(@Nullable String protocol) {
             final Duration idleTime = serverConfiguration.getIdleTimeout();
             Map<String, ChannelHandler> handlers = new LinkedHashMap<>(15);

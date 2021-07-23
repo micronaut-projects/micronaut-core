@@ -15,13 +15,19 @@
  */
 package io.micronaut.management.endpoint.loggers;
 
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.type.Argument;
-import io.micronaut.management.endpoint.annotation.*;
 import io.micronaut.management.endpoint.EndpointConfiguration;
-import io.reactivex.Single;
+import io.micronaut.management.endpoint.annotation.Endpoint;
+import io.micronaut.management.endpoint.annotation.Read;
+import io.micronaut.management.endpoint.annotation.Selector;
+import io.micronaut.management.endpoint.annotation.Sensitive;
+import io.micronaut.management.endpoint.annotation.Write;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
 
-import io.micronaut.core.annotation.Nullable;
 import javax.validation.constraints.NotBlank;
 import java.util.Map;
 
@@ -71,11 +77,12 @@ public class LoggersEndpoint {
     }
 
     /**
-     * @return the loggers as a {@link Single}
+     * @return the loggers as a {@link Mono}
      */
     @Read
-    public Single<Map<String, Object>> loggers() {
-        return Single.fromPublisher(loggersManager.getLoggers(loggingSystem));
+    @SingleResult
+    public Publisher<Map<String, Object>> loggers() {
+        return Mono.from(loggersManager.getLoggers(loggingSystem));
     }
 
     /**
@@ -83,8 +90,9 @@ public class LoggersEndpoint {
      * @return the {@link io.micronaut.logging.LogLevel} (both configured and effective) of the named logger
      */
     @Read
-    public Single<Map<String, Object>> logger(@NotBlank @Selector String name) {
-        return Single.fromPublisher(loggersManager.getLogger(loggingSystem, name));
+    @SingleResult
+    public Publisher<Map<String, Object>> logger(@NotBlank @Selector String name) {
+        return Mono.from(loggersManager.getLogger(loggingSystem, name));
     }
 
     /**

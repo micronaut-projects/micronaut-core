@@ -28,6 +28,7 @@ import java.lang.annotation.*;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.ANNOTATION_TYPE, ElementType.PARAMETER, ElementType.METHOD})
+@Inherited
 public @interface Bindable {
 
     /**

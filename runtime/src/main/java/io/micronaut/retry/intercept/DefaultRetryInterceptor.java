@@ -21,6 +21,7 @@ import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.retry.RetryState;
@@ -28,15 +29,15 @@ import io.micronaut.retry.annotation.CircuitBreaker;
 import io.micronaut.retry.annotation.Retryable;
 import io.micronaut.retry.event.RetryEvent;
 import io.micronaut.scheduling.TaskExecutors;
-import io.reactivex.Flowable;
-import io.reactivex.functions.Function;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
 
-import javax.inject.Named;
-import javax.inject.Singleton;
 import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -46,6 +47,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -81,6 +83,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
         return InterceptPhase.RETRY.getPosition();
     }
 
+    @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         Optional<AnnotationValue<Retryable>> opt = context.findAnnotation(Retryable.class);
@@ -117,9 +120,9 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
             Object result = retrySync(context, retryState, interceptedMethod);
             switch (interceptedMethod.resultType()) {
                 case PUBLISHER:
-                    Flowable<Object> flowable = Flowable.fromPublisher((Publisher<?>) result);
+                    Flux<Object> reactiveSequence = Flux.from((Publisher<?>) result);
                     return interceptedMethod.handleResult(
-                            flowable.onErrorResumeNext(retryFlowable(context, retryState, flowable))
+                            reactiveSequence.onErrorResume(retryFlowable(context, retryState, reactiveSequence))
                                     .doOnNext(o -> retryState.close(null))
                     );
                 case COMPLETION_STAGE:
@@ -175,10 +178,10 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
     }
 
     @SuppressWarnings("unchecked")
-    private <T> Function<? super Throwable, ? extends Publisher<? extends T>> retryFlowable(MethodInvocationContext<Object, Object> context, MutableRetryState retryState, Flowable<Object> observable) {
+    private <T> Function<? super Throwable, ? extends Publisher<? extends T>> retryFlowable(MethodInvocationContext<Object, Object> context, MutableRetryState retryState, Flux<Object> observable) {
         return exception -> {
             if (retryState.canRetry(exception)) {
-                Flowable retryObservable = observable.onErrorResumeNext(retryFlowable(context, retryState, observable));
+                Flux retryObservable = observable.onErrorResume(retryFlowable(context, retryState, observable));
                 long delay = retryState.nextDelay();
                 if (eventPublisher != null) {
                     try {
@@ -190,13 +193,13 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Retrying execution for method [{}] after delay of {}ms for exception: {}", context, delay, exception.getMessage(), exception);
                 }
-                return retryObservable.delaySubscription(delay, TimeUnit.MILLISECONDS);
+                return retryObservable.delaySubscription(Duration.of(delay, ChronoUnit.MILLIS));
             } else {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Cannot retry anymore. Rethrowing original exception for method: {}", context);
                 }
                 retryState.close(exception);
-                return Flowable.error(exception);
+                return Flux.error(exception);
             }
         };
     }

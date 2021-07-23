@@ -105,19 +105,34 @@ public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
 
         if (classes.length == 2) {
             Class<?> classType = classes[0];
+            String classTypeName = classType.getName();
             if (classType == Object.class) {
+                classTypeName = getClassType();
+            }
+            if (classTypeName.equals(Object.class.getName())) {
                 return Collections.singleton("*");
             } else {
-                Class<?> methodType = classes[1];
-                if (methodType != Object.class) {
-                    return CollectionUtils.setOf(classType.getName(), methodType.getName());
-                } else {
-                    return CollectionUtils.setOf(classType.getName());
+                Class<?> elementType = classes[1];
+                String elementTypeName = elementType.getName();
+                if (elementTypeName.equals(Object.class.getName())) {
+                    elementTypeName = getElementType();
                 }
-
+                if (elementTypeName.equals(Object.class.getName())) {
+                    return CollectionUtils.setOf(classTypeName);
+                } else {
+                    return CollectionUtils.setOf(classTypeName, elementTypeName);
+                }
             }
         }
         return Collections.singleton("*");
+    }
+
+    default String getClassType() {
+        return Object.class.getName();
+    }
+
+    default String getElementType() {
+        return Object.class.getName();
     }
 
     /**

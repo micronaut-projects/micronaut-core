@@ -19,13 +19,11 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.reactivex.Flowable;
 import org.junit.Test;
-
+import reactor.core.publisher.Flux;
 import java.util.Optional;
-
 import static io.micronaut.http.HttpRequest.POST;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -38,16 +36,16 @@ public class BookControllerTest {
     @Test
     public void testPostWithURITemplate() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
+        HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL());
 
         // tag::posturitemplate[]
-        Flowable<HttpResponse<Book>> call = client.exchange(
+        Flux<HttpResponse<Book>> call = Flux.from(client.exchange(
                 POST("/amazon/book/{title}", new Book("The Stand")),
                 Book.class
-        );
+        ));
         // end::posturitemplate[]
 
-        HttpResponse<Book> response = call.blockingFirst();
+        HttpResponse<Book> response = call.blockFirst();
         Optional<Book> message = response.getBody(Book.class); // <2>
         // check the status
         assertEquals(
@@ -68,17 +66,17 @@ public class BookControllerTest {
     @Test
     public void testPostFormData() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
+        HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL());
 
         // tag::postform[]
-        Flowable<HttpResponse<Book>> call = client.exchange(
+        Flux<HttpResponse<Book>> call = Flux.from(client.exchange(
                 POST("/amazon/book/{title}", new Book("The Stand"))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED),
                 Book.class
-        );
+        ));
         // end::postform[]
 
-        HttpResponse<Book> response = call.blockingFirst();
+        HttpResponse<Book> response = call.blockFirst();
         Optional<Book> message = response.getBody(Book.class); // <2>
         // check the status
         assertEquals(

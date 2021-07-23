@@ -17,7 +17,10 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 
 import javax.lang.model.element.ExecutableElement;
 
@@ -38,5 +41,15 @@ class JavaConstructorElement extends JavaMethodElement implements ConstructorEle
      */
     JavaConstructorElement(JavaClassElement declaringClass, ExecutableElement executableElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
         super(declaringClass, executableElement, annotationMetadata, visitorContext);
+    }
+
+    @Override
+    public MethodElement withNewParameters(ParameterElement... newParameters) {
+        return new JavaConstructorElement(declaringClass, executableElement, getAnnotationMetadata(), visitorContext) {
+            @Override
+            public ParameterElement[] getParameters() {
+                return ArrayUtils.concat(super.getParameters(), newParameters);
+            }
+        };
     }
 }

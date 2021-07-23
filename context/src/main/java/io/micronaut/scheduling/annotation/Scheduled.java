@@ -70,7 +70,7 @@ public @interface Scheduled {
     String fixedRate() default "";
 
     /**
-     * @return The name of a {@link javax.inject.Named} bean that is a
+     * @return The name of a {@link jakarta.inject.Named} bean that is a
      * {@link java.util.concurrent.ScheduledExecutorService} to use to schedule the task
      */
     String scheduler() default TaskExecutors.SCHEDULED;

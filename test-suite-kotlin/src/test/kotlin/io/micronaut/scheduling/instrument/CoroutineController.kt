@@ -3,8 +3,10 @@ package io.micronaut.scheduling.instrument
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.QueryValue
+import io.micronaut.scheduling.TaskExecutors
 import io.reactivex.Observable
 import io.reactivex.schedulers.Schedulers
+import jakarta.inject.Named
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Runnable
@@ -17,7 +19,7 @@ import kotlin.coroutines.CoroutineContext
 
 typealias TokenDetail = String
 @Controller
-class Controller(private val executorService: ExecutorService) : CoroutineScope {
+class Controller(@Named(TaskExecutors.IO) private val executorService: ExecutorService) : CoroutineScope {
 
     override val coroutineContext: CoroutineContext = object : CoroutineDispatcher() {
         override fun dispatch(context: CoroutineContext, block: Runnable) {

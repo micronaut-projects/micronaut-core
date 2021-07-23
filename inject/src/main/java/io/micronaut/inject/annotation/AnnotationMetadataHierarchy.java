@@ -103,6 +103,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
      * @return The metadata that is actually declared in the element
      */
     @NonNull
+    @Override
     public AnnotationMetadata getDeclaredMetadata() {
         return hierarchy[0];
     }
@@ -127,6 +128,24 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         } else {
             return child;
         }
+    }
+
+    @Nullable
+    @Override
+    public <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+        for (AnnotationMetadata annotationMetadata : hierarchy) {
+            final T a = annotationMetadata.synthesize(annotationClass, sourceAnnotation);
+            if (a != null) {
+                return a;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    @Override
+    public <T extends Annotation> T synthesizeDeclared(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+        return hierarchy[0].synthesize(annotationClass, sourceAnnotation);
     }
 
     @Nullable
@@ -192,6 +211,12 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @NonNull
     @Override
     public String[] stringValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
+        return stringValues(annotation.getName(), member);
+    }
+
+    @NonNull
+    @Override
+    public String[] stringValues(@NonNull String annotation, @NonNull String member) {
         String[] values = hierarchy[0].stringValues(annotation, member);
         for (int i = 1; i < hierarchy.length; i++) {
             AnnotationMetadata annotationMetadata = hierarchy[i];
@@ -704,6 +729,19 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         return ArrayUtils.toArray(strings, String[]::new);
     }
 
+    @Override
+    public String[] stringValues(String annotation, String member, Function<Object, Object> valueMapper) {
+        List<String> strings = new ArrayList<>();
+        for (AnnotationMetadata am : hierarchy) {
+            if (am instanceof EnvironmentAnnotationMetadata) {
+                strings.addAll(Arrays.asList(((EnvironmentAnnotationMetadata) am).stringValues(annotation, member, valueMapper)));
+            } else {
+                strings.addAll(Arrays.asList(am.stringValues(annotation, member)));
+            }
+        }
+        return ArrayUtils.toArray(strings, String[]::new);
+    }
+
     @NonNull
     @Override
     public Optional<String> stringValue(@NonNull String annotation, @NonNull String member, @Nullable Function<Object, Object> valueMapper) {
@@ -795,5 +833,15 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
             }
         }
         return Optional.empty();
+    }
+
+    @Override
+    public boolean isEmpty() {
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (!metadata.isEmpty()) {
+                return false;
+            }
+        }
+        return true;
     }
 }

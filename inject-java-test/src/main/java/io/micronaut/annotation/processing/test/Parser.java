@@ -15,10 +15,6 @@
  */
 package io.micronaut.annotation.processing.test;
 
-import com.sun.source.tree.ErroneousTree;
-import com.sun.source.tree.Tree;
-import com.sun.source.util.TreeScanner;
-
 import javax.lang.model.element.Element;
 import javax.tools.JavaFileObject;
 import java.io.File;
@@ -32,42 +28,6 @@ import static java.lang.Boolean.TRUE;
  **/
 @SuppressWarnings("all")
 public final class Parser {
-
-    private static final TreeScanner<Boolean, Boolean> HAS_ERRONEOUS_NODE =
-            new TreeScanner<Boolean, Boolean>() {
-                @Override
-                public Boolean visitErroneous(ErroneousTree node, Boolean p) {
-                    return true;
-                }
-
-                @Override
-                public Boolean scan(Iterable<? extends Tree> nodes, Boolean p) {
-                    for (Tree node : nodes) {
-                        if (isTrue(scan(node, p))) {
-                            return true;
-                        }
-                    }
-                    return p;
-                }
-
-                @Override
-                public Boolean scan(Tree tree, Boolean p) {
-                    return isTrue(p) ? p : super.scan(tree, p);
-                }
-
-                @Override
-                public Boolean reduce(Boolean r1, Boolean r2) {
-                    return isTrue(r1) || isTrue(r2);
-                }
-            };
-
-    /**
-     * Returns {@code true} if the tree contains at least one {@linkplain ErroneousTree "erroneous"}
-     * node.
-     */
-    public static boolean hasErrorNode(Tree tree) {
-        return isTrue(HAS_ERRONEOUS_NODE.scan(tree, false));
-    }
 
     /**
      * Parses {@code sources} into {@linkplain CompilationUnitTree compilation units}. This method

@@ -1,6 +1,7 @@
 package io.micronaut.inject.visitor.beans
 
 import com.blazebit.persistence.impl.function.entity.ValuesEntity
+import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
@@ -9,6 +10,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Replaces
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.beans.BeanConstructor
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
 import io.micronaut.core.beans.BeanIntrospector
@@ -32,7 +34,7 @@ import spock.lang.Issue
 import spock.lang.Requires
 
 import javax.annotation.processing.SupportedAnnotationTypes
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.Id
@@ -44,6 +46,166 @@ import javax.validation.constraints.Size
 import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+
+    void 'test favor method access'() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
+package fieldaccess;
+
+import io.micronaut.core.annotation.*;
+
+
+@Introspected(accessKind={Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD})
+class Test {
+    public String one;
+    public boolean invoked = false;
+    public String getOne() {
+        this.invoked = true;
+        return one;
+    } 
+}
+''');
+        when:
+        def properties = introspection.getBeanProperties()
+        def instance = introspection.instantiate()
+        then:
+        properties.size() == 2
+
+
+        when:'a primitive is changed with copy constructor'
+        def one = introspection.getRequiredProperty("one", String)
+        instance.one = 'test'
+
+
+        then:'the new value is reflected'
+        one.get(instance) == 'test'
+        instance.invoked
+    }
+
+    void 'test favor field access'() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
+package fieldaccess;
+
+import io.micronaut.core.annotation.*;
+
+
+@Introspected(accessKind={Introspected.AccessKind.FIELD, Introspected.AccessKind.METHOD})
+class Test {
+    public String one;
+    public boolean invoked = false;
+    public String getOne() {
+        this.invoked = true;
+        return one;
+    } 
+}
+''');
+        when:
+        def properties = introspection.getBeanProperties()
+        def instance = introspection.instantiate()
+        then:
+        properties.size() == 2
+
+
+        when:'a primitive is changed with copy constructor'
+        def one = introspection.getRequiredProperty("one", String)
+        one.set(instance, "test")
+
+
+        then:'the new value is reflected'
+        one.get(instance) == 'test'
+        !instance.invoked
+    }
+
+    void 'test field access only'() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
+package fieldaccess;
+
+import io.micronaut.core.annotation.*;
+
+
+@Introspected(accessKind=Introspected.AccessKind.FIELD)
+class Test {
+    public String one; // read/write
+    public final int two; // read-only
+    String three; // package protected
+    protected String four; // not included since protected
+    private String five; // not included since private
+    
+    Test(int two) {
+        this.two = two;
+    }
+}
+''');
+        when:
+        def properties = introspection.getBeanProperties()
+
+        then:
+        properties.size() == 3
+
+        def one = introspection.getRequiredProperty("one", String)
+        one.isReadWrite()
+
+        def two = introspection.getRequiredProperty("two", int.class)
+        two.isReadOnly()
+
+        def three = introspection.getRequiredProperty("three", String)
+        three.isReadWrite()
+
+        when:'a field is set'
+        def instance = introspection.instantiate(10)
+        one.set(instance, "test")
+
+        then:'the value is set'
+        one.get(instance) == 'test'
+
+        when:'a primitive is changed with copy constructor'
+        instance = two.withValue(instance, 20)
+
+        then:'the new value is reflected'
+        two.get(instance) == 20
+    }
+
+    void 'test bean constructor'() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('beanctor.Test','''\
+package beanctor;
+
+import java.net.URL;
+
+@io.micronaut.core.annotation.Introspected(withPrefix="alter")
+public class Test {
+
+    private final String another;
+    
+    @com.fasterxml.jackson.annotation.JsonCreator
+    Test(String another) {
+        this.another = another;
+    }
+
+    public String getAnother() {
+        return another;
+    }
+}
+''')
+
+
+        when:
+        def constructor = introspection.getConstructor()
+        def newInstance = constructor.instantiate("test")
+
+        then:
+        newInstance != null
+        newInstance.another == "test"
+        !introspection.getAnnotationMetadata().hasDeclaredAnnotation(JsonCreator)
+        constructor.getAnnotationMetadata().hasDeclaredAnnotation(JsonCreator)
+        !constructor.getAnnotationMetadata().hasDeclaredAnnotation(Introspected)
+        !constructor.getAnnotationMetadata().hasAnnotation(Introspected)
+        !constructor.getAnnotationMetadata().hasStereotype(Introspected)
+        constructor.arguments.length == 1
+        constructor.arguments[0].type == String
+    }
 
     void "test generate bean method for introspected class"() {
         given:
@@ -338,6 +500,7 @@ public record Foo(List<@Min(10) Long> value){
 
         then:
         property != null
+        genericTypeArg.annotationMetadata.hasStereotype(Constraint)
         genericTypeArg.annotationMetadata.hasAnnotation(Min)
         genericTypeArg.annotationMetadata.intValue(Min).getAsInt() == 10
     }
@@ -404,6 +567,7 @@ public record Foo(@javax.validation.constraints.NotBlank String name, int age){
 
         then:
         argument.name == 'name'
+        argument.getAnnotationMetadata().hasStereotype(Constraint)
         argument.getAnnotationMetadata().hasAnnotation(NotBlank)
         test.name == 'test'
         test.name() == 'test'
@@ -932,6 +1096,8 @@ public class ValidatedConfig {
 ''')
         expect:
         introspection != null
+        !introspection.getIndexedProperties(Constraint.class).isEmpty()
+        introspection.getIndexedProperties(Constraint.class).size() == 2
     }
 
     void "test generate bean introspection for @ConfigurationProperties with validation rules"() {
@@ -2526,7 +2692,7 @@ class Test {
 
         then:
         noExceptionThrown()
-        introspection.getProperty("XForwardedFor", String).get().get(obj) == "localhost"
+        introspection.getProperty("xForwardedFor", String).get().get(obj) == "localhost"
     }
 
     @Override

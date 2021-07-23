@@ -65,5 +65,5 @@ Or by specifying the HTTP version to use when injecting the client:
 ----
 @Inject
 @Client(httpVersion=HttpVersion.HTTP_2_0)
-RxHttpClient client;
+ReactorHttpClient client;
 ----

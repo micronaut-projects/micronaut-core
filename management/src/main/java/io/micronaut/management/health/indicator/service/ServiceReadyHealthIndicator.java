@@ -27,10 +27,9 @@ import io.micronaut.management.health.indicator.annotation.Readiness;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.event.annotation.EventListener;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
-import io.reactivex.Flowable;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
-
-import javax.inject.Singleton;
+import reactor.core.publisher.Flux;
 
 /**
  * <p>A {@link io.micronaut.management.health.indicator.HealthIndicator} that signals when the service is ready to
@@ -71,7 +70,7 @@ public class ServiceReadyHealthIndicator implements HealthIndicator {
         } else {
             builder.status(HealthStatus.DOWN);
         }
-        return Flowable.just(builder.build());
+        return Flux.just(builder.build());
     }
 
     /**

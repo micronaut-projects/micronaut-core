@@ -15,20 +15,16 @@
  */
 package io.micronaut.inject.annotation.internal;
 
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.annotation.NamedAnnotationMapper;
-import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import javax.inject.Inject;
-import javax.inject.Named;
 import java.lang.annotation.Annotation;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Allows using the {@link javax.persistence.PersistenceContext} annotation in Micronaut.
@@ -37,9 +33,8 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-public class PersistenceContextAnnotationMapper implements NamedAnnotationMapper {
+public final class PersistenceContextAnnotationMapper implements NamedAnnotationMapper {
 
-    private static final String TARGET_ANNOTATION = "io.micronaut.configuration.hibernate.jpa.scope.CurrentSession";
     private static final String SOURCE_ANNOTATION = "javax.persistence.PersistenceContext";
 
     @Override
@@ -49,23 +44,16 @@ public class PersistenceContextAnnotationMapper implements NamedAnnotationMapper
 
     @Override
     public List<AnnotationValue<?>> map(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
-        Optional<ClassElement> hibernateCurrentSession = visitorContext.getClassElement(TARGET_ANNOTATION);
-        if (hibernateCurrentSession.isPresent()) {
-            String name = annotation.stringValue("name").orElse(null);
-            List<AnnotationValue<?>> annotationValues = new ArrayList<>(3);
-            annotationValues.add(AnnotationValue.builder(Inject.class).build());
-            annotationValues.add(
-                    AnnotationValue.builder(TARGET_ANNOTATION)
-                            .value(name)
-                            .build()
+        final String name = annotation.stringValue("name").orElse(null);
+        if (name != null) {
+            return Arrays.asList(
+                AnnotationValue.builder(AnnotationUtil.INJECT).build(),
+                AnnotationValue.builder(AnnotationUtil.NAMED).value(name).build()
             );
-
-
-            if (StringUtils.isNotEmpty(name)) {
-                annotationValues.add(AnnotationValue.builder(Named.class).value(name).build());
-            }
-            return annotationValues;
+        } else {
+            return Collections.singletonList(
+                AnnotationValue.builder(AnnotationUtil.INJECT).build()
+            );
         }
-        return Collections.emptyList();
     }
 }

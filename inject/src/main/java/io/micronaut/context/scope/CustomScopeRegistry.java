@@ -15,6 +15,10 @@
  */
 package io.micronaut.context.scope;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.type.Argument;
+import io.micronaut.inject.BeanType;
+
 import java.lang.annotation.Annotation;
 import java.util.Optional;
 
@@ -27,12 +31,26 @@ import java.util.Optional;
 public interface CustomScopeRegistry {
 
     /**
-     * Find a custom scope for the given annotation.
+     * Finds the declared scope for the given argument.
      *
-     * @param scopeAnnotation The scope annotation
-     * @return The custom scope
+     * @param argument The argument
+     * @return An optional scope
+     * @since 3.0.0
      */
-    Optional<CustomScope> findScope(String scopeAnnotation);
+    default Optional<CustomScope<?>> findDeclaredScope(@NonNull Argument<?> argument) {
+        return Optional.empty();
+    }
+
+    /**
+     * Finds the declared scope for the given bean type.
+     *
+     * @param beanType The bean type
+     * @return An optional scope
+     * @since 3.0.0
+     */
+    default Optional<CustomScope<?>> findDeclaredScope(@NonNull BeanType<?> beanType) {
+        return Optional.empty();
+    }
 
     /**
      * Find a custom scope for the given annotation.
@@ -40,7 +58,15 @@ public interface CustomScopeRegistry {
      * @param scopeAnnotation The scope annotation
      * @return The custom scope
      */
-    default Optional<CustomScope> findScope(Class<? extends Annotation> scopeAnnotation) {
+    Optional<CustomScope<?>> findScope(String scopeAnnotation);
+
+    /**
+     * Find a custom scope for the given annotation.
+     *
+     * @param scopeAnnotation The scope annotation
+     * @return The custom scope
+     */
+    default Optional<CustomScope<?>> findScope(Class<? extends Annotation> scopeAnnotation) {
         return findScope(scopeAnnotation.getName());
     }
 }

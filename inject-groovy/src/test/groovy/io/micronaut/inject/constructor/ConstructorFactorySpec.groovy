@@ -17,12 +17,13 @@ package io.micronaut.inject.constructor
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Provided
 import spock.lang.Specification
 
-import javax.inject.Inject
-import javax.inject.Provider
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Provider
+import jakarta.inject.Singleton
 
 /**
  * Created by graemerocher on 12/05/2017.
@@ -62,11 +63,10 @@ class ConstructorFactorySpec extends Specification {
 
     }
 
-    @Provided
     static class AImpl implements A {
         final C c
         final C c2
-        @Inject protected D d
+        protected D d
 
         AImpl(C c, C c2) {
             this.c = c
@@ -74,18 +74,22 @@ class ConstructorFactorySpec extends Specification {
         }
     }
 
-    @Singleton
+    @Factory
     static class AProvider implements Provider<A> {
         final C c
         @Inject C another
+        @Inject protected D d
 
         @Inject AProvider(C c) {
             this.c = c
         }
 
         @Override
+        @Singleton
         A get() {
-            new AImpl(c, another)
+            def impl = new AImpl(c, another)
+            impl.d = d
+            return impl
         }
     }
 

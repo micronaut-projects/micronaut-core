@@ -1,0 +1,7 @@
+dependencies {
+    testAnnotationProcessor project(":inject-java")
+    testCompileOnly project(":inject-groovy")
+    testImplementation project(":context")
+    testImplementation project(":inject")
+    testImplementation group: 'javax.inject', name: 'javax.inject', version: '1'
+}

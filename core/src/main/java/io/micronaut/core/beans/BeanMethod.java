@@ -40,4 +40,9 @@ public interface BeanMethod<B, T> extends Executable<B, T>, Named {
      * @return The return type.
      */
     @NonNull ReturnType<T> getReturnType();
+
+    @Override
+    default Class<B> getDeclaringType() {
+        return getDeclaringBean().getBeanType();
+    }
 }

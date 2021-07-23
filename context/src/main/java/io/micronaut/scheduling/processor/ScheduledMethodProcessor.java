@@ -18,6 +18,7 @@ package io.micronaut.scheduling.processor;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -31,11 +32,10 @@ import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.TaskScheduler;
 import io.micronaut.scheduling.annotation.Scheduled;
 import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
+import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Qualifier;
-import javax.inject.Singleton;
 import java.io.Closeable;
 import java.time.Duration;
 import java.util.Collection;
@@ -69,7 +69,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     private final TaskExceptionHandler<?, ?> taskExceptionHandler;
 
     /**
-     * @param beanContext       The bean context for DI of beans annotated with {@link javax.inject.Inject}
+     * @param beanContext       The bean context for DI of beans annotated with @Inject
      * @param conversionService To convert one type to another
      * @param taskExceptionHandler The default task exception handler
      */
@@ -113,7 +113,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
 
             Runnable task = () -> {
                 io.micronaut.context.Qualifier<Object> qualifer = beanDefinition
-                    .getAnnotationTypeByStereotype(Qualifier.class)
+                    .getAnnotationTypeByStereotype(AnnotationUtil.QUALIFIER)
                     .map(type -> Qualifiers.byAnnotation(beanDefinition, type))
                     .orElse(null);
 

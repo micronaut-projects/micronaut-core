@@ -19,12 +19,15 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.web.router.resource.StaticResourceConfiguration
+import reactor.core.publisher.Flux
+
 import java.nio.file.Paths
 import java.time.Instant
 import java.time.ZoneId
@@ -55,9 +58,9 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
 
     void "test resources from the file system are returned"() {
         when:
-        def response = rxClient.exchange(
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.GET('/'+tempFile.getName()), String
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -71,9 +74,9 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
 
     void "test resources from the classpath are returned"() {
         when:
-        def response = rxClient.exchange(
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.GET('/index.html'), String
-        ).blockingFirst()
+        )).blockFirst()
 
         File file = Paths.get(StaticResourceResolutionSpec.classLoader.getResource("public/index.html").toURI()).toFile()
 
@@ -90,9 +93,9 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
 
     void "test index.html will be resolved"() {
         when:
-        def response = rxClient.exchange(
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.GET('/'), String
-        ).blockingFirst()
+        )).blockFirst()
 
         File file = Paths.get(StaticResourceResolutionSpec.classLoader.getResource("public/index.html").toURI()).toFile()
 
@@ -112,13 +115,13 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'micronaut.router.static-resources.default.paths': ['classpath:public', 'file:' + tempFile.parent],
                 'micronaut.router.static-resources.default.mapping': '/static/**'], Environment.TEST)
-        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
 
         when:
-        def response = rxClient.exchange(
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.GET("/static/index.html"), String
-        ).blockingFirst()
+        )).blockFirst()
         File file = Paths.get(StaticResourceResolutionSpec.classLoader.getResource("public/index.html").toURI()).toFile()
 
         then:
@@ -142,15 +145,15 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
                 'micronaut.router.static-resources.cp.mapping': '/static/**',
                 'micronaut.router.static-resources.file.paths': ['file:' + tempFile.parent],
                 'micronaut.router.static-resources.file.mapping': '/file/**'], Environment.TEST)
-        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         expect:
         embeddedServer.applicationContext.getBeansOfType(StaticResourceConfiguration).size() == 2
 
         when:
-        def response = rxClient.exchange(
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.GET("/static/index.html"), String
-        ).blockingFirst()
+        )).blockFirst()
         File file = Paths.get(StaticResourceResolutionSpec.classLoader.getResource("public/index.html").toURI()).toFile()
 
         then:
@@ -164,9 +167,9 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         response.body() == "<html><head></head><body>HTML Page from resources</body></html>"
 
         when:
-        response = rxClient.exchange(
+        response = Flux.from(rxClient.exchange(
                 HttpRequest.GET('/file/'+tempFile.getName()), String
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -189,15 +192,15 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
                 'micronaut.router.static-resources.file.paths': ['file:' + tempFile.parent],
                 'micronaut.router.static-resources.file.enabled': false,
                 'micronaut.router.static-resources.file.mapping': '/file/**'], Environment.TEST)
-        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         expect:
         embeddedServer.applicationContext.getBeansOfType(StaticResourceConfiguration).size() == 2
 
         when:
-        def response = rxClient.exchange(
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.GET("/static/index.html"), String
-        ).blockingFirst()
+        )).blockFirst()
         File file = Paths.get(StaticResourceResolutionSpec.classLoader.getResource("public/index.html").toURI()).toFile()
 
         then:
@@ -211,9 +214,9 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         response.body() == "<html><head></head><body>HTML Page from resources</body></html>"
 
         when:
-        response = rxClient.exchange(
+        response = Flux.from(rxClient.exchange(
                 HttpRequest.GET('/file/'+tempFile.getName()), String
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
         thrown(HttpClientResponseException)
@@ -227,13 +230,13 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'micronaut.router.static-resources.default.paths': ['classpath:public', 'file:' + tempFile.parent],
                 'micronaut.router.static-resources.default.mapping': '/static/**'], Environment.TEST)
-        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
 
         when:
-        def response = rxClient.exchange(
+        def response = Flux.from(rxClient.exchange(
                 HttpRequest.GET("/static"), String
-        ).blockingFirst()
+        )).blockFirst()
         File file = Paths.get(StaticResourceResolutionSpec.classLoader.getResource("public/index.html").toURI()).toFile()
 
         then:
@@ -256,13 +259,12 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'micronaut.router.static-resources.default.paths': ['classpath:public'],
                 'micronaut.router.static-resources.default.mapping': '/static/**'], Environment.TEST)
-        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
-
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        def response = rxClient.exchange(
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.GET("/static/foo"), String
-        ).blockingFirst()
+        )).blockFirst()
         File file = Paths.get(StaticResourceResolutionSpec.classLoader.getResource("public/foo/index.html").toURI()).toFile()
 
         then:
@@ -300,12 +302,12 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'micronaut.router.static-resources.default.paths': ['classpath:public'],
                 'micronaut.router.static-resources.default.mapping': '/static/**'], Environment.TEST)
-        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        def response = rxClient.exchange(
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.GET("/static/%E6%B5%8B%E8%AF%95-0.0.yml"), String
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code

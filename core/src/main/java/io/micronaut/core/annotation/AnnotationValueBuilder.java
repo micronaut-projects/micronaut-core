@@ -19,7 +19,9 @@ import io.micronaut.core.reflect.ReflectionUtils;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -32,8 +34,10 @@ import java.util.Map;
 public class AnnotationValueBuilder<T extends Annotation> {
 
     private final String annotationName;
-    private final Map<CharSequence, Object> values = new HashMap<>(5);
+    private final Map<CharSequence, Object> values = new LinkedHashMap<>(5);
     private final RetentionPolicy retentionPolicy;
+    private final List<AnnotationValue<?>> stereotypes = new ArrayList<>();
+    private final Map<String, Object> defaultValues = new LinkedHashMap<>();
 
     /**
      * Default constructor.
@@ -87,8 +91,37 @@ public class AnnotationValueBuilder<T extends Annotation> {
      */
     @NonNull
     public AnnotationValue<T> build() {
-        return new AnnotationValue<>(annotationName, values, retentionPolicy);
+        return new AnnotationValue<>(annotationName, values, defaultValues, retentionPolicy, stereotypes);
     }
+
+    /**
+     * Adds a stereotype of the annotation.
+     *
+     * @param annotation The stereotype
+     * @return This builder
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> stereotype(AnnotationValue<?> annotation) {
+        if (annotation != null) {
+            stereotypes.add(annotation);
+        }
+        return this;
+    }
+
+    /**
+     * Sets the default values of the annotation.
+     *
+     * @param defaultValues The default values
+     * @return This builder
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> defaultValues(Map<String, Object> defaultValues) {
+        if (defaultValues != null) {
+            this.defaultValues.putAll(defaultValues);
+        }
+        return this;
+    }
+
 
     /**
      * Sets the value member to the given integer value.
@@ -479,6 +512,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
                                     clazz.isEnum() ||
                                     clazz == Class.class ||
                                     clazz == String.class ||
+                                    clazz == Enum.class ||
                                     clazz == AnnotationClassValue.class ||
                                     clazz == AnnotationValue.class
                             );

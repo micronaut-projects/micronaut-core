@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Blocking
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.writer.BeanDefinitionVisitor
+import io.micronaut.inject.writer.BeanDefinitionWriter
 
 /**
  * @author graemerocher
@@ -38,7 +39,7 @@ import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
 
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 interface MyBean extends MyInterface {
 
     @Override
@@ -63,7 +64,7 @@ interface MyInterface {
 
     void "test that annotation metadata is inherited from overridden methods for around advice"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.$MyBeanDefinition$Intercepted', '''
+        BeanDefinition beanDefinition = buildBeanDefinition('test.$MyBean' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.simple.*;
@@ -71,7 +72,7 @@ import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
 
 @Mutating("someVal")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean implements MyInterface {
 
     private String myValue;
@@ -111,7 +112,7 @@ interface MyInterface {
 
     void "test that a bean definition is not created for an abstract class"() {
         when:
-        ApplicationContext ctx = buildContext('test.$ServiceDefinition$Intercepted', '''
+        ApplicationContext ctx = buildContext('test.$Service' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.*;
@@ -119,7 +120,7 @@ import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
 import io.micronaut.core.order.Ordered;
 import java.lang.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 interface ContractService {
 
@@ -169,19 +170,19 @@ class SomeInterceptor implements MethodInterceptor<Object, Object>, Ordered {
         ctx.getBean(clazz)
 
         when:
-        ctx.classLoader.loadClass("test.\$BaseServiceDefinition")
+        ctx.classLoader.loadClass("test.\$BaseService" + BeanDefinitionWriter.CLASS_SUFFIX)
 
         then:
         thrown(ClassNotFoundException)
 
         when:
-        ctx.classLoader.loadClass("test.\$BaseServiceDefinition\$Intercepted")
+        ctx.classLoader.loadClass("test.\$BaseService" + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX)
 
         then:
         thrown(ClassNotFoundException)
 
         when:
-        ctx.classLoader.loadClass("test.\$BaseAnnotatedServiceDefinition")
+        ctx.classLoader.loadClass("test.\$BaseAnnotatedService" + BeanDefinitionWriter.CLASS_SUFFIX)
 
         then:
         thrown(ClassNotFoundException)

@@ -17,7 +17,7 @@ package io.micronaut.aop.introduction
 
 import io.micronaut.aop.interceptors.Mutating
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 /**
  * @author Graeme Rocher

@@ -19,14 +19,21 @@ import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.*;
+import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.netty.NettyHttpHeaders;
-import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.netty.NettyHttpRequest;
@@ -52,18 +59,22 @@ import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.AsciiString;
-import io.reactivex.BackpressureStrategy;
-import io.reactivex.Flowable;
-import io.reactivex.Single;
-import io.reactivex.functions.BiConsumer;
-import io.reactivex.schedulers.Schedulers;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 /**
  * Handles WebSocket upgrade requests.
@@ -139,10 +150,10 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
             List<HttpFilter> filters = router.findFilters(msg);
             AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(msg);
             MutableHttpResponse<?> proceed = HttpResponse.ok();
-            Publisher<MutableHttpResponse<?>> routePublisher = Flowable.create(emitter -> {
-                emitter.onNext(proceed);
-                emitter.onComplete();
-            }, BackpressureStrategy.ERROR);
+            Publisher<MutableHttpResponse<?>> routePublisher = Flux.create(emitter -> {
+                emitter.next(proceed);
+                emitter.complete();
+            }, FluxSink.OverflowStrategy.ERROR);
 
 
             Publisher<? extends MutableHttpResponse<?>> finalPublisher;
@@ -175,48 +186,48 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
             }
 
             Channel channel = ctx.channel();
-            Single.fromPublisher(finalPublisher).subscribeOn(Schedulers.from(channel.eventLoop())).subscribe((BiConsumer<MutableHttpResponse<?>, Throwable>) (actualResponse, throwable) -> {
-                if (throwable != null) {
-                    ctx.fireExceptionCaught(throwable);
-                } else if (actualResponse == proceed) {
-                    //Adding new handler to the existing pipeline to handle WebSocket Messages
-                    WebSocketBean<?> webSocketBean = webSocketBeanRegistry.getWebSocket(rm.getTarget().getClass());
+            Mono.from(finalPublisher)
+                    .subscribeOn(Schedulers.fromExecutorService(channel.eventLoop()))
+                    .subscribe((Consumer<MutableHttpResponse<?>>) actualResponse -> {
+                        if (actualResponse == proceed) {
+                            //Adding new handler to the existing pipeline to handle WebSocket Messages
+                            WebSocketBean<?> webSocketBean = webSocketBeanRegistry.getWebSocket(rm.getTarget().getClass());
 
-                    handleHandshake(ctx, msg, webSocketBean, actualResponse);
+                            handleHandshake(ctx, msg, webSocketBean, actualResponse);
 
-                    ChannelPipeline pipeline = ctx.pipeline();
+                            ChannelPipeline pipeline = ctx.pipeline();
 
-                    try {
-                        // re-configure the pipeline
-                        pipeline.remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
-                        pipeline.remove(NettyServerWebSocketUpgradeHandler.this);
-                        ChannelHandler accessLoggerHandler = pipeline.get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER);
-                        if (accessLoggerHandler !=  null) {
-                            pipeline.remove(accessLoggerHandler);
+                            try {
+                                // re-configure the pipeline
+                                pipeline.remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
+                                pipeline.remove(NettyServerWebSocketUpgradeHandler.this);
+                                ChannelHandler accessLoggerHandler = pipeline.get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER);
+                                if (accessLoggerHandler !=  null) {
+                                    pipeline.remove(accessLoggerHandler);
+                                }
+                                NettyServerWebSocketHandler webSocketHandler = new NettyServerWebSocketHandler(
+                                        webSocketSessionRepository,
+                                        handshaker,
+                                        msg,
+                                        rm,
+                                        webSocketBean,
+                                        binderRegistry,
+                                        mediaTypeCodecRegistry,
+                                        eventPublisher,
+                                        ctx
+                                );
+                                pipeline.addAfter("wsdecoder", NettyServerWebSocketHandler.ID, webSocketHandler);
+
+                            } catch (Throwable e) {
+                                if (LOG.isErrorEnabled()) {
+                                    LOG.error("Error opening WebSocket: " + e.getMessage(), e);
+                                }
+                                ctx.writeAndFlush(new CloseWebSocketFrame(CloseReason.INTERNAL_ERROR.getCode(), CloseReason.INTERNAL_ERROR.getReason()));
+                            }
+                        } else {
+                            ctx.writeAndFlush(actualResponse);
                         }
-                        NettyServerWebSocketHandler webSocketHandler = new NettyServerWebSocketHandler(
-                                webSocketSessionRepository,
-                                handshaker,
-                                msg,
-                                rm,
-                                webSocketBean,
-                                binderRegistry,
-                                mediaTypeCodecRegistry,
-                                eventPublisher,
-                                ctx
-                        );
-                        pipeline.addAfter("wsdecoder", NettyServerWebSocketHandler.ID, webSocketHandler);
-
-                    } catch (Throwable e) {
-                        if (LOG.isErrorEnabled()) {
-                            LOG.error("Error opening WebSocket: " + e.getMessage(), e);
-                        }
-                        ctx.writeAndFlush(new CloseWebSocketFrame(CloseReason.INTERNAL_ERROR.getCode(), CloseReason.INTERNAL_ERROR.getReason()));
-                    }
-                } else {
-                    ctx.writeAndFlush(actualResponse);
-                }
-            });
+                    }, throwable -> ctx.fireExceptionCaught(throwable));
         } else {
             ctx.fireExceptionCaught(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"));
         }

@@ -29,7 +29,7 @@ class ScheduledCustomExecutorSpec extends Specification {
     }
 
     @Requires(property = "spec.name", value = "ScheduledCustomExecutorSpec")
-    @javax.inject.Singleton
+    @jakarta.inject.Singleton
     static class ScheduledBean {
 
         public boolean ran = false

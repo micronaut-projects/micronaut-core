@@ -19,6 +19,7 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
@@ -102,17 +103,19 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
     }
 
     @Override
+    @NonNull
     public Argument<?>[] getArguments() {
         return arguments;
     }
 
     @Override
-    public BeanDefinition getDeclaringBean() {
+    @NonNull
+    public BeanDefinition<T> getDeclaringBean() {
         return declaringBean;
     }
 
     @Override
-    public boolean requiresReflection() {
+    public final boolean requiresReflection() {
         return false;
     }
 

@@ -19,13 +19,68 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.event.BeanCreatedEventListener
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
+import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Unroll
+import zipkin2.Span
+import zipkin2.reporter.AsyncReporter
+import zipkin2.reporter.Reporter
 
 import javax.validation.ConstraintViolationException
 import java.util.function.Function
 import java.util.function.Supplier
 
 class GenericTypeArgumentsSpec extends AbstractTypeElementSpec {
+
+    void "test generic type arguments with inner classes resolve"() {
+        given:
+        def definition = buildBeanDefinition('innergenerics.Outer$FooImpl', '''
+package innergenerics;
+
+class Outer {
+
+    interface Foo<T extends CharSequence> {}
+    
+    @jakarta.inject.Singleton
+    class FooImpl implements Foo<String> {}
+}
+''')
+        def itfe = definition.beanType.classLoader.loadClass('innergenerics.Outer$Foo')
+
+        expect:
+        definition.getTypeParameters(itfe).length == 1
+    }
+
+    void "test type arguments with inherited fields"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('inheritedfields.UserDaoClient', '''
+package inheritedfields;
+
+import jakarta.inject.*;
+
+@Singleton
+class UserDaoClient extends DaoClient<User>{
+}
+
+@Singleton
+class UserDao extends Dao<User> {
+}
+
+class User {
+}
+
+class DaoClient<T> {
+
+    @Inject
+    Dao<T> dao;
+}
+
+class Dao<T> {
+}
+''')
+        expect:
+        definition.injectedFields.first().asArgument().typeParameters.length == 1
+        definition.injectedFields.first().asArgument().typeParameters[0].type.simpleName == "User"
+    }
 
     void "test type arguments for exception handler"() {
         given:
@@ -93,7 +148,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import java.util.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @Executable
@@ -125,7 +180,7 @@ import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import io.micronaut.core.convert.value.ConvertibleValues;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.io.IOException;
 import java.util.Map;
 import io.micronaut.context.annotation.Executable;
@@ -167,7 +222,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 final class TrackedSortedSet<T extends java.lang.Comparable<? super T>> {
  public TrackedSortedSet(java.util.Collection<? extends T> initial) {
         super();
@@ -187,7 +242,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test implements java.util.function.Function<String, Integer>{
 
     public Integer apply(String str) {
@@ -214,7 +269,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test implements Foo {
 
     public Integer apply(String str) {
@@ -241,7 +296,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test implements Bar {
 
     public Integer apply(String str) {
@@ -269,7 +324,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test implements Bar {
 
     public Integer apply(String str) {
@@ -298,7 +353,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test extends Foo {
 
     public Integer apply(String str) {
@@ -325,7 +380,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test extends Foo<String, Integer> {
 
     public Integer apply(String str) {
@@ -392,6 +447,61 @@ class Test {
 }
 
 interface Foo extends java.util.function.Function<String, Integer> {}
+
+''')
+        expect:
+        definition != null
+        definition.getTypeArguments(Function).size() == 2
+        definition.getTypeArguments(Function)[0].name == 'T'
+        definition.getTypeArguments(Function)[1].name == 'R'
+        definition.getTypeArguments(Function)[0].type == String
+        definition.getTypeArguments(Function)[1].type == Integer
+    }
+
+    void "test type arguments for factory with interface"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test$AsyncReporter0', '''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import zipkin2.reporter.*;
+import zipkin2.*;
+
+@Factory
+class Test {
+
+    @jakarta.inject.Singleton
+    AsyncReporter<Span> asyncReporter() {
+        return null;
+    }
+}
+
+''')
+        expect:
+        definition != null
+        definition.getTypeParameters(AsyncReporter) == [Span] as Class[]
+        definition.getTypeParameters(Reporter) == [Span] as Class[]
+
+    }
+
+    void "test type arguments for factory with AOP advice applied"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.$TestFactory$MyFunc0' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+@Factory
+class TestFactory {
+
+    @Bean
+    @io.micronaut.aop.simple.Mutating("foo")
+    java.util.function.Function<String, Integer> myFunc() {
+        return (String str) -> 10;
+    }
+}
 
 ''')
         expect:

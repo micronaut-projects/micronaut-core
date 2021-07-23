@@ -16,17 +16,16 @@
 package io.micronaut.upload;
 
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.validation.Validated;
-import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import reactor.core.publisher.Flux;
 
 @Controller("/upload/validated")
 @Validated
@@ -55,6 +54,6 @@ public class ValidatedController {
 
             }
         });
-        return Flowable.just(HttpResponse.ok());
+        return Flux.just(HttpResponse.ok());
     }
 }

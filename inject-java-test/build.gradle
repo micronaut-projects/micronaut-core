@@ -2,6 +2,7 @@ dependencies {
     annotationProcessor project(":inject-java")
 
     api project(":inject-java")
+    api project(":context")
 //    api "com.google.testing.compile:compile-testing:0.19", {
 //        exclude group:'com.google.truth', module:'truth'
 //    }
@@ -18,7 +19,9 @@ dependencies {
     testImplementation dependencyVersion("validation")
     testImplementation "javax.persistence:javax.persistence-api:2.2"
     testImplementation project(":runtime")
-    api "com.blazebit:blaze-persistence-core-impl:1.6.0-Alpha1"
+    testImplementation group: 'javax.inject', name: 'javax.inject', version: '1'
+    testImplementation "com.blazebit:blaze-persistence-core-impl:1.6.0-Alpha1"
+    testImplementation 'io.smallrye:smallrye-fault-tolerance:5.1.0'
 }
 
 afterEvaluate {

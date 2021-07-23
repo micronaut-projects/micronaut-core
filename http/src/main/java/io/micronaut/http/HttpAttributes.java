@@ -69,6 +69,11 @@ public enum HttpAttributes implements CharSequence {
     INVOCATION_CONTEXT(Constants.PREFIX + ".invocationContext"),
 
     /**
+     * Attribute used to store the cause of an error response.
+     */
+    EXCEPTION(Constants.PREFIX + ".exception"),
+
+    /**
      * Attribute used to store a client Certificate (mutual authentication).
      */
     X509_CERTIFICATE("javax.servlet.request.X509Certificate");

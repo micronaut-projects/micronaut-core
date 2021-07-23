@@ -2,25 +2,98 @@ Micronaut {version} includes the following changes:
 
 === Core Features
 
-==== IO Stream Support
+==== Jakarta Inject
 
-It is now possible to define a body argument of a controller method with an InputStream. For example `@Body InputStream inputStream`. Note that you must offload the execution to another thread pool to avoid blocking the event loop when reading the stream. `InputStream` can also be returned from controller methods. The stream will be read by Micronaut on the IO thread pool if the controller method is executed on the event loop.
+The `jakarta.inject` annotations are now the default injection annotations for Micronaut 3
 
-==== HTTP to HTTPS redirect with Dual Protocol
+==== Support for JSR-330 Bean Import
 
-If Dual Protocol is enabled, now it is possible to redirect all HTTP requests automatically to the HTTPS port. See more information <<dualProtocol, about how to enable and configure it>>.
+Using the ann:context.annotation.Import[] annotation it is now possible to import bean definitions into your application where JSR-330 (either `javax.inject` or `jakarta.inject` annotations) are used in an external library.
 
-==== GraalVM 21.1.0 Support
+See the documentation on <<beanImport, Bean Import>> for more information.
 
-Micronaut has been updated to support the latest GraalVM 21.1.0 release with the Gradle and Maven plugins now defaulting to 21.1.0.
+==== Support for Controlling Annotation Inheritance
 
-==== Support for JDK 16 and Gradle 7.0 in Micronaut Launch
+api:core.annotation.AnnotationMetadata[] inheritance can now be controlled via Java's `@Inherited` annotation. If an annotation is not explicitly annotated with `@Inherited` it will not be included in the metadata. See the <<annotationMetadata, Annotation Inheritance>> section of the documentation for more information.
 
-https://micronaut.io/launch/[Micronaut Launch] has been updated with support for JDK 16 and Gradle 7.0.
+NOTE: This is an important behavioural change from Micronaut 2.x, see the <<breaks, Breaking Changes>> section for information on how to upgrade.
+
+==== Support Narrowing Injection by Generic Type Arguments
+
+Micronaut can now resolve the correct bean to inject based on the generic type arguments specified on the injection point:
+
+snippet::io.micronaut.docs.inject.generics.Vehicle[tags="constructor",indent=0]
+
+For more information see the section on <<qualifiers, Qualifying by Generic Type Arguments>>.
+
+==== Support for using Annotation Members in Qualifiers
+
+You can now use annotation members in qualifiers and specify which members should be excluded with the new ann:context.annotation.NonBinding[] annotation.
+
+For more information see the section on <<qualifiers, Qualifying By Annotation Members>>.
+
+==== Support for Limiting the Injectable Types
+
+You can now limit the exposed types of a bean using the `typed` member of the ann:context.annotation.Bean[] annotation:
+
+snippet::io.micronaut.docs.inject.typed.V8Engine[tags="class",indent=0]
+
+For more information see the section on <<typed, Limiting Injectable Types>>.
+
+==== Factories can produce bean from fields
+
+Beans defined with the ann:context.annotation.Factory[] annotation can now produce beans from public or package protected fields, for example:
+
+snippet::io.micronaut.docs.factories.VehicleMockSpec[tags="class",indent=0]
+
+For more information see the <<factories, Bean Factories>> section of the documentation.
+
+==== Enhanced `BeanProvider` Interface
+
+The api:context.BeanProvider[] interface has been enhanced with new methods such as `iterator()` and `stream()` as well as methods to check for bean existence and uniqueness.
+
+==== New `@Any` Qualifier for use in Bean Factories
+
+A new ann:context.annotation.Any[] qualifier has been introduced to allow injecting any available instance into an injection point and can be used in combination with the new `BeanProvider` interface mentioned above to allow more dynamic behaviour.
+
+snippet::io.micronaut.docs.qualifiers.any.Vehicle[tags="imports,clazz", indent=0, title="Using BeanProvider with Any"]
+
+The annotation can also be used on ann:context.annotation.Factory[] methods to allow customization of how objects are injected via the api:inject.InjectionPoint[] API.
+
+==== Support for Fields in Bean Introspections
+
+Bean introspections on public or package protected fields are now supported:
+
+snippet::io.micronaut.docs.ioc.beans.User[tags="class", indent=0]
+
+For more information see the "Bean Fields" section of the <<introspection, Bean Introspections>> documentation.
+
+==== `ApplicationEventPublisher` has now a generic event type
+
+For the performance reasons it's advised to inject an instance of `ApplicationEventPublisher` with a generic type parameter - `ApplicationEventPublisher<MyEvent>`.
+
+=== AOP Features
+
+==== Support for Constructor Interception
+
+It is now possible to intercept bean construction invocations through the api:aop.ConstructorInterceptor[] interface and ann:aop.AroundConstruct[] annotation.
+
+See the section on <<lifecycleAdvise, Bean Life Cycle Advice>> for more information.
+
+==== Support for `@PostConstruct` & `@PreDestroy` Interception
+
+It is now possible to intercept `@PostConstruct` and `@PreDestroy` method invocations through the api:aop.MethodInterceptor[] interface and ann:aop.InterceptorBinding[] annotation.
+
+See the section on <<lifecycleAdvise, Bean Life Cycle Advice>> for more information.
 
 ==== Random Configuration Values
 
 It is now possible to set a max and a range for random numbers in configuration. For example to set an integer between 0 and 9, `${random.int(10)}` can be used as the configuration value. See the <<propertySource, documentation>> under "Using Random Properties" for more information.
+
+==== Project Reactor used internally instead of RxJava2
+
+Micronaut 3 uses internally https://projectreactor.io[Project Reactor] instead https://github.com/ReactiveX/RxJava[RxJava 2]. Project Reactor allows
+Micronaut 3 to simplify instrumentation, thanks to https://projectreactor.io/docs/core/release/api/reactor/util/context/Context.html[Reactor's Context],  simplifies conversion login and eases the integration with R2DBC drivers. We recommend users to migrate to Reactor. However, it is possible to continue to use RxJava. See <<reactiveConfigs, Reactive Programming section>>.
 
 === Module Upgrades
 
@@ -44,6 +117,11 @@ The https://micronaut-projects.github.io/micronaut-micrometer/latest/guide/[Micr
 
 Micronaut's https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/guide/[Oracle Cloud Integration] has been updated with support for Cloud Monitoring and Tracing.
 
+
+==== Micronaut Cassandra 4.0.0
+
+The https://micronaut-projects.github.io/micronaut-cassandra/latest/guide/[Micronaut Cassandra] integration now includes support for GraalVM out of the box.
+
 ==== Other Modules
 
 - Micronaut Security 2.4.2
@@ -56,11 +134,34 @@ Micronaut's https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/g
 - Micronaut Liquibase 3.3.1
 - Micronaut Discovery Client 2.4.0
 - Micronaut ElasticSearch 2.3.0
+- Micronaut Cache 3.0.0
+- Micronaut SQL 4.0.0 
 
 === Dependency Upgrades
 
+- Cassandra 4.11.1
 - Kafka 2.8.0
-- GraalVM 21.1.0
+- GraalVM 21.2.0
 - Liquibase 4.3.4
 - Flyway 7.7.3
 - Elasticsearch 7.12.0
+- Snake YAML 1.29
+- Jackson 2.12.4
+- SLF4J 1.7.29
+- Jaeger 1.6.0
+- Testcontainers 1.15.3
+- Infinispan 12.1.6.Final
+- Hazelcast 4.2.1
+- Caffeine 2.9.1
+- Hibernate 5.5.3.Final
+- JDBI 3.20.1
+- JOOQ 3.14.12
+- Vertx SQL Drivers 4.1.1
+- JAsync 1.2.2
+- Tomcat JDBC 10.0.8
+- Hikari 4.0.3
+- Postgres Driver 42.2.23
+- MySQL Driver 8.0.25
+- MariaDB Driver 2.7.3
+- MS SQL Driver 9.2.1.jre8
+- H2 Database 1.4.200

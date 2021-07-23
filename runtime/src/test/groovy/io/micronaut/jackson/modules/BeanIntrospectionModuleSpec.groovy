@@ -9,6 +9,7 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonUnwrapped
 import com.fasterxml.jackson.annotation.JsonView
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.databind.PropertyNamingStrategy
 import com.fasterxml.jackson.databind.annotation.JsonNaming
 import groovy.transform.EqualsAndHashCode
@@ -19,12 +20,7 @@ import io.micronaut.http.hateoas.JsonError
 import io.micronaut.jackson.JacksonConfiguration
 import io.micronaut.jackson.modules.testcase.EmailTemplate
 import io.micronaut.jackson.modules.testcase.Notification
-import io.micronaut.jackson.modules.wrappers.BooleanWrapper
-import io.micronaut.jackson.modules.wrappers.DoubleWrapper
-import io.micronaut.jackson.modules.wrappers.IntWrapper
-import io.micronaut.jackson.modules.wrappers.IntegerWrapper
-import io.micronaut.jackson.modules.wrappers.LongWrapper
-import io.micronaut.jackson.modules.wrappers.StringWrapper
+import io.micronaut.jackson.modules.wrappers.*
 import spock.lang.Issue
 import spock.lang.Specification
 
@@ -545,7 +541,7 @@ class BeanIntrospectionModuleSpec extends Specification {
     static class AllView extends PublicView {}
 
     @Introspected
-    @JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
+    @JsonNaming(value = PropertyNamingStrategies.UpperCamelCaseStrategy.class)
     static class NamingStrategy {
 
         @PackageScope

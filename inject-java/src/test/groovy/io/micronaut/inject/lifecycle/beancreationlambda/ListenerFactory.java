@@ -20,7 +20,7 @@ import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.context.event.StartupEvent;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Factory
 public class ListenerFactory {

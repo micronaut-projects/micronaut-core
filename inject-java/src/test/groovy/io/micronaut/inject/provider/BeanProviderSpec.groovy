@@ -22,7 +22,7 @@ import io.micronaut.inject.annotation.TestCachePuts
 
 class BeanProviderSpec extends AbstractTypeElementSpec {
 
-    void "test bean definition reference references correct bean type for Provider"() {
+    void "test bean definition reference references correct bean type for jakarta.inject.Provider"() {
         given:
         BeanDefinitionReference definition = buildBeanDefinitionReference('test.Test','''\
 package test;
@@ -30,8 +30,8 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
-class Test implements javax.inject.Provider<Foo>{
+@jakarta.inject.Singleton
+class Test implements jakarta.inject.Provider<Foo>{
 
     public Foo get() {
         return new Foo();
@@ -42,10 +42,10 @@ class Foo {}
 ''')
         expect:
         definition != null
-        definition.getBeanType().name == 'test.Foo'
+        definition.getBeanType().name == 'test.Test'
     }
 
-    void "test inject bean with provider"() {
+    void "test inject bean with jakarta.inject.Provider"() {
         given:
         BeanDefinitionReference ref = buildBeanDefinitionReference('test.Test','''\
 package test;
@@ -54,10 +54,10 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
-    javax.inject.Provider<Foo> provider;
-    Test(javax.inject.Provider<Foo> provider) {
+    jakarta.inject.Provider<Foo> provider;
+    Test(jakarta.inject.Provider<Foo> provider) {
         this.provider = provider;
     }
     public Foo get() {
@@ -65,7 +65,7 @@ class Test {
     }
 }
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Foo {}
 ''')
         def definition = ref.load()
@@ -76,5 +76,65 @@ class Foo {}
         definition.constructor.arguments[0].typeParameters.length == 1
         definition.constructor.arguments[0].typeParameters.length == 1
         definition.constructor.arguments[0].typeParameters[0].type.name == 'test.Foo'
+        definition.constructor.arguments[0].isProvider()
+        definition.requiredComponents.contains(ref.class.classLoader.loadClass("test.Foo"))
+    }
+
+    void "test bean definition reference references correct bean type for io.micronaut.context.BeanProvider"() {
+        given:
+        BeanDefinitionReference definition = buildBeanDefinitionReference('test.Test','''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+@jakarta.inject.Singleton
+class Test implements io.micronaut.context.BeanProvider<Foo>{
+
+    public Foo get() {
+        return new Foo();
+    }
+}
+
+class Foo {}
+''')
+        expect:
+        definition != null
+        definition.getBeanType().name == 'test.Test'
+    }
+
+    void "test inject bean with io.micronaut.context.BeanProvider"() {
+        given:
+        BeanDefinitionReference ref = buildBeanDefinitionReference('test.Test','''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+
+@jakarta.inject.Singleton
+class Test {
+    io.micronaut.context.BeanProvider<Foo> provider;
+    Test(io.micronaut.context.BeanProvider<Foo> provider) {
+        this.provider = provider;
+    }
+    public Foo get() {
+        return provider.get();
+    }
+}
+
+@jakarta.inject.Singleton
+class Foo {}
+''')
+        def definition = ref.load()
+
+        expect:
+        ref != null
+        ref.getBeanType().name == 'test.Test'
+        definition.constructor.arguments[0].typeParameters.length == 1
+        definition.constructor.arguments[0].typeParameters.length == 1
+        definition.constructor.arguments[0].typeParameters[0].type.name == 'test.Foo'
+        definition.constructor.arguments[0].isProvider()
+        definition.requiredComponents.contains(ref.class.classLoader.loadClass("test.Foo"))
     }
 }

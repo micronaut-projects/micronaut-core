@@ -16,7 +16,7 @@ package test;
 import io.micronaut.aop.introduction.*;
 import io.micronaut.aop.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.lang.annotation.Retention;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 

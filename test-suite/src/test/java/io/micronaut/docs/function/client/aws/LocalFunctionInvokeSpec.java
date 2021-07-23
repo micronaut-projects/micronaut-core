@@ -20,16 +20,15 @@ import io.micronaut.context.ApplicationContext;
 //tag::import[]
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.function.client.FunctionClient;
+import jakarta.inject.Named;
 import org.junit.Test;
-
-import javax.inject.Named;
+import io.micronaut.core.async.annotation.SingleResult;
 import static org.junit.Assert.assertEquals;
 //end::import[]
 
 //tag::rxImport[]
-import io.reactivex.Single;
-
-import java.util.Collections;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
 //end::rxImport[]
 
 public class LocalFunctionInvokeSpec {
@@ -54,7 +53,7 @@ public class LocalFunctionInvokeSpec {
 
     //tag::invokeRxLocalFunction[]
     @Test
-    public void testInvokingALocalFunctionRX() {
+    public void testInvokingALocalFunctionReactive() {
         Sum sum = new Sum();
         sum.setA(5);
         sum.setB(10);
@@ -62,9 +61,9 @@ public class LocalFunctionInvokeSpec {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class);
         RxMathClient mathClient = server.getApplicationContext().getBean(RxMathClient.class);
 
-        assertEquals(Long.valueOf(Integer.MAX_VALUE), mathClient.max().blockingGet());
-        assertEquals(2, mathClient.rnd(1.6f).blockingGet().longValue());
-        assertEquals(15, mathClient.sum(sum).blockingGet().longValue());
+        assertEquals(Long.valueOf(Integer.MAX_VALUE), Mono.from(mathClient.max()).block());
+        assertEquals(2, Mono.from(mathClient.rnd(1.6f)).block().longValue());
+        assertEquals(15, Mono.from(mathClient.sum(sum)).block().longValue());
 
         server.close();
     }
@@ -93,12 +92,15 @@ public class LocalFunctionInvokeSpec {
     //tag::rxFunctionClient[]
     @FunctionClient
     interface RxMathClient {
-        Single<Long> max();
+        @SingleResult
+        Publisher<Long> max();
 
         @Named("round")
-        Single<Integer> rnd(float value);
+        @SingleResult
+        Publisher<Integer> rnd(float value);
 
-        Single<Long> sum(Sum sum);
+        @SingleResult
+        Publisher<Long> sum(Sum sum);
     }
     //end::rxFunctionClient[]
 }

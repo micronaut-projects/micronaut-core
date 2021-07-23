@@ -1,9 +1,9 @@
 package io.micronaut.http.client
 
-import io.micronaut.context.annotation.Requires
-import io.micronaut.core.annotation.Nullable
 import groovy.test.NotYetImplemented
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.core.util.StringUtils
 import io.micronaut.discovery.ServiceInstance
@@ -14,9 +14,9 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Produces
-import io.micronaut.http.uri.UriBuilder
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -24,11 +24,13 @@ import spock.lang.Specification
 class ClientRedirectSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer)
+            ApplicationContext.run(EmbeddedServer, [
+                    'spec.name': 'ClientRedirectSpec',
+            ])
 
     void "test - client: full uri, direct"() {
         given:
-        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange('/test/direct', String)
@@ -44,7 +46,7 @@ class ClientRedirectSpec extends Specification {
 
     void "test - client: full uri, redirect: absolute - follows correctly"() {
         given:
-        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange('/test/redirect', String)
@@ -61,7 +63,7 @@ class ClientRedirectSpec extends Specification {
     @NotYetImplemented
     void "test - client: full uri, redirect: relative"() {
         given:
-        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange('/test/redirect-relative', String)
@@ -77,7 +79,7 @@ class ClientRedirectSpec extends Specification {
 
     void "test - client: relative uri, direct"() {
         given:
-        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, new LoadBalancer() {
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, new LoadBalancer() {
             @Override
             Publisher<ServiceInstance> select(@Nullable Object discriminator) {
                 URL url = embeddedServer.getURL()
@@ -104,7 +106,7 @@ class ClientRedirectSpec extends Specification {
 
     void "test - client: relative uri - no slash"() {
         given:
-        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, new LoadBalancer() {
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, new LoadBalancer() {
             @Override
             Publisher<ServiceInstance> select(@Nullable Object discriminator) {
                 URL url = embeddedServer.getURL()
@@ -130,7 +132,7 @@ class ClientRedirectSpec extends Specification {
 
     void "test - client: relative uri, redirect: absolute "() {
         given:
-        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, new LoadBalancer() {
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, new LoadBalancer() {
             @Override
             Publisher<ServiceInstance> select(@Nullable Object discriminator) {
                 URL url = embeddedServer.getURL()
@@ -156,11 +158,11 @@ class ClientRedirectSpec extends Specification {
     }
 
     void "test the host header is correct for redirect"() {
-        EmbeddedServer otherServer = ApplicationContext.run(EmbeddedServer, ['redirect.server': true])
-        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        EmbeddedServer otherServer = ApplicationContext.run(EmbeddedServer, ['redirect.server': true, 'spec.name': 'ClientRedirectSpec'])
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        String result = client.retrieve(HttpRequest.GET("/test/redirect-host").header("redirect", "http://localhost:${otherServer.getPort()}/test/host-header")).blockingFirst()
+        String result = client.toBlocking().retrieve(HttpRequest.GET("/test/redirect-host").header("redirect", "http://localhost:${otherServer.getPort()}/test/host-header"))
 
         then:
         result == "localhost:${otherServer.getPort()}"
@@ -169,6 +171,7 @@ class ClientRedirectSpec extends Specification {
         otherServer.close()
     }
 
+    @Requires(property = 'spec.name', value = 'ClientRedirectSpec')
     @Controller('/test')
     static class StreamController {
 
@@ -194,6 +197,7 @@ class ClientRedirectSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'ClientRedirectSpec')
     @Requires(property = "redirect.server", value = StringUtils.TRUE)
     @Controller('/test')
     static class RedirectController {

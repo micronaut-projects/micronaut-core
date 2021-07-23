@@ -16,8 +16,7 @@
 package io.micronaut.jackson.serialize;
 
 import com.fasterxml.jackson.databind.module.SimpleModule;
-
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 /**
  * Modifies deserialization for {@link io.micronaut.http.hateoas.Resource}.

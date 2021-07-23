@@ -7,10 +7,10 @@ class PostConstructCompileSpec extends AbstractBeanDefinitionSpec {
 
     void "test that a @PostConstruct method on a type not defined as a bean doesn't create a bean"() {
         when:
-        BeanDefinition definition = buildBeanDefinition('test.Test', '''
-package test;
+        BeanDefinition definition = buildBeanDefinition('io.micronaut.inject.lifecyle.Test', '''
+package io.micronaut.inject.lifecyle;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 
 class Test {
 
@@ -28,11 +28,11 @@ class Test {
 
     void "test visit constructor @Inject"() {
         when:
-        def definition = buildBeanDefinition('test.Test', '''
-package test;
+        def definition = buildBeanDefinition('io.micronaut.inject.lifecyle.Test', '''
+package io.micronaut.inject.lifecyle;
 
-import javax.annotation.PostConstruct;
-import javax.inject.Inject;
+import jakarta.annotation.PostConstruct;
+import jakarta.inject.Inject;
 
 class Test {
 
@@ -52,11 +52,11 @@ class Test {
 
     void "test visit constructor @Inject and @PostConstruct"() {
         when:
-        def definition = buildBeanDefinition('test.Test', '''
-package test;
+        def definition = buildBeanDefinition('io.micronaut.inject.lifecyle.Test', '''
+package io.micronaut.inject.lifecyle;
 
-import javax.annotation.PostConstruct;
-import javax.inject.Inject;
+import jakarta.annotation.PostConstruct;
+import jakarta.inject.Inject;
 
 class Test {
 

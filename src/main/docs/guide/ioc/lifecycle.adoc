@@ -1,6 +1,6 @@
 == When The Context Starts
 
-To invoke a method when a bean is constructed, use the `javax.annotation.PostConstruct` annotation:
+To invoke a method when a bean is constructed, use the `jakarta.annotation.PostConstruct` annotation:
 
 snippet::io.micronaut.docs.lifecycle.V8Engine[tags="imports, class", indent=0]
 

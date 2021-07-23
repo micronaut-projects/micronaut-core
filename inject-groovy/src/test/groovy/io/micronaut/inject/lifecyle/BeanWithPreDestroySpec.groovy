@@ -17,10 +17,10 @@ package io.micronaut.inject.lifecyle
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
+import jakarta.annotation.PreDestroy
 import spock.lang.Specification
-import javax.annotation.PreDestroy
-import javax.inject.Inject
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 
 /**
  * Created by graemerocher on 17/05/2017.

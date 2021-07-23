@@ -30,8 +30,10 @@ import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.io.service.ServiceDefinition
 import io.micronaut.core.io.service.SoftServiceLoader
 import io.micronaut.core.order.OrderUtil
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.visitor.TypeElementVisitor
+import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport
@@ -66,6 +68,7 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
 
     private static ClassNode generatedNode = new ClassNode(Generated)
     protected static Map<String, LoadedVisitor> loadedVisitors = null
+    protected static List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = []
     private CompilationUnit compilationUnit
 
     @Override
@@ -78,7 +81,9 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
         GroovyVisitorContext visitorContext = new GroovyVisitorContext(source, compilationUnit)
         for (ClassNode classNode in classes) {
             if (!(classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers())) && classNode.getAnnotations(generatedNode).empty) {
-                Collection<LoadedVisitor> matchedVisitors = loadedVisitors.values().findAll { v -> v.matches(classNode) }
+                Collection<LoadedVisitor> matchedVisitors = loadedVisitors.values().findAll { v ->
+                    v.matches(classNode)
+                }
 
                 List<LoadedVisitor> values = new ArrayList<>(matchedVisitors)
                 OrderUtil.reverseSort(values)
@@ -98,6 +103,8 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
                 }
             }
         }
+
+        beanDefinitionBuilders.addAll(visitorContext.getBeanElementBuilders())
     }
 
     @Override
@@ -168,7 +175,13 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
         }
 
         void doVisitMethod(MethodNode methodNode) {
-            AnnotationMetadata methodAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, methodNode)
+            AnnotationMetadata methodAnnotationMetadata = AstAnnotationUtils.getMethodAnnotationMetadata(sourceUnit, compilationUnit, methodNode)
+            if (!(methodAnnotationMetadata instanceof AnnotationMetadataHierarchy)) {
+                methodAnnotationMetadata = new AnnotationMetadataHierarchy(
+                        AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, methodNode.declaringClass),
+                        methodAnnotationMetadata
+                );
+            }
             typeElementVisitors.findAll { it.matches(methodAnnotationMetadata) }.each {
                 def element = it.visit(methodNode, methodAnnotationMetadata, visitorContext)
                 if (element != null) {

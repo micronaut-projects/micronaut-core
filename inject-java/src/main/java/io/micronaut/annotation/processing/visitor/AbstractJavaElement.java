@@ -35,8 +35,10 @@ import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import static javax.lang.model.element.Modifier.*;
 
@@ -79,6 +81,61 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 .newAnnotationBuilder()
                 .annotate(annotationMetadata, av);
 
+        updateMetadataCaches();
+        return this;
+    }
+
+    @Override
+    public io.micronaut.inject.ast.Element removeAnnotation(@NonNull String annotationType) {
+        ArgumentUtils.requireNonNull("annotationType", annotationType);
+        try {
+            AnnotationUtils annotationUtils = visitorContext
+                    .getAnnotationUtils();
+            this.annotationMetadata = annotationUtils
+                    .newAnnotationBuilder()
+                    .removeAnnotation(annotationMetadata, annotationType);
+            return this;
+        } finally {
+            updateMetadataCaches();
+        }
+    }
+
+    @Override
+    public <T extends Annotation> io.micronaut.inject.ast.Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+        //noinspection ConstantConditions
+        if (predicate != null) {
+            AnnotationUtils annotationUtils = visitorContext
+                    .getAnnotationUtils();
+            this.annotationMetadata = annotationUtils
+                    .newAnnotationBuilder()
+                    .removeAnnotationIf(annotationMetadata, predicate);
+            return this;
+        }
+        return this;
+    }
+
+    @Override
+    public io.micronaut.inject.ast.Element removeStereotype(@NonNull String annotationType) {
+        ArgumentUtils.requireNonNull("annotationType", annotationType);
+        try {
+            AnnotationUtils annotationUtils = visitorContext
+                    .getAnnotationUtils();
+            this.annotationMetadata = annotationUtils
+                    .newAnnotationBuilder()
+                    .removeStereotype(annotationMetadata, annotationType);
+            return this;
+        } finally {
+            updateMetadataCaches();
+        }
+    }
+
+    private void updateMetadataCaches() {
+        String declaringTypeName = resolveDeclaringTypeName();
+        AbstractAnnotationMetadataBuilder.addMutatedMetadata(declaringTypeName, element, annotationMetadata);
+        AnnotationUtils.invalidateMetadata(element);
+    }
+
+    private String resolveDeclaringTypeName() {
         String declaringTypeName;
         if (this instanceof MemberElement) {
             declaringTypeName = ((MemberElement) this).getOwningType().getName();
@@ -92,10 +149,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         } else {
             declaringTypeName = getName();
         }
-
-        AbstractAnnotationMetadataBuilder.addMutatedMetadata(declaringTypeName, element, annotationMetadata);
-        AnnotationUtils.invalidateMetadata(element);
-        return this;
+        return declaringTypeName;
     }
 
     @Override
@@ -207,6 +261,25 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
      * @return The class element
      */
     protected @NonNull ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext, Map<String, Map<String, TypeMirror>> genericsInfo, boolean includeTypeAnnotations) {
+        return mirrorToClassElement(returnType, visitorContext, genericsInfo, includeTypeAnnotations, returnType instanceof TypeVariable);
+    }
+
+    /**
+     * Obtain the ClassElement for the given mirror.
+     *
+     * @param returnType The return type
+     * @param visitorContext The visitor context
+     * @param genericsInfo The generic information.
+     * @param includeTypeAnnotations Whether to include type level annotations in the metadata for the element
+     * @param isTypeVariable is the type a type variable
+     * @return The class element
+     */
+    protected @NonNull ClassElement mirrorToClassElement(
+            TypeMirror returnType,
+            JavaVisitorContext visitorContext,
+            Map<String, Map<String, TypeMirror>> genericsInfo,
+            boolean includeTypeAnnotations,
+            boolean isTypeVariable) {
         if (genericsInfo == null) {
             genericsInfo = Collections.emptyMap();
         }
@@ -247,7 +320,8 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                                 typeElement,
                                 newAnnotationMetadata,
                                 visitorContext,
-                                genericsInfo
+                                genericsInfo,
+                                isTypeVariable
                         );
                     }
                 }
@@ -261,9 +335,9 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
 
             TypeMirror bound = boundGenerics.get(tv.toString());
             if (bound != null && bound != tv) {
-                return mirrorToClassElement(bound, visitorContext, genericsInfo, includeTypeAnnotations);
+                return mirrorToClassElement(bound, visitorContext, genericsInfo, includeTypeAnnotations, true);
             } else {
-                return mirrorToClassElement(upperBound, visitorContext, genericsInfo, includeTypeAnnotations);
+                return mirrorToClassElement(upperBound, visitorContext, genericsInfo, includeTypeAnnotations, true);
             }
 
         } else if (returnType instanceof ArrayType) {
@@ -293,5 +367,22 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
 
     private boolean hasModifier(Modifier modifier) {
         return element.getModifiers().contains(modifier);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        AbstractJavaElement that = (AbstractJavaElement) o;
+        return element.equals(that.element);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(element);
     }
 }

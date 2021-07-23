@@ -16,14 +16,21 @@
 package io.micronaut.management.endpoint.loggers.impl;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.management.endpoint.loggers.*;
-import io.reactivex.Flowable;
+import io.micronaut.management.endpoint.loggers.LoggerConfiguration;
+import io.micronaut.management.endpoint.loggers.LoggersEndpoint;
+import io.micronaut.management.endpoint.loggers.LoggersManager;
+import io.micronaut.management.endpoint.loggers.ManagedLoggingSystem;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
-import javax.inject.Singleton;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -45,14 +52,13 @@ public class DefaultLoggersManager implements LoggersManager<Map<String, Object>
 
         data.put(LEVELS, getLogLevels());
         data.put(LOGGERS, getLoggerData(loggingSystem.getLoggers()));
-
-        return Flowable.just(data);
+        return Flux.just(data);
     }
 
     @Override
     public Publisher<Map<String, Object>> getLogger(ManagedLoggingSystem loggingSystem,
                                                     String name) {
-        return Flowable.just(getLoggerData(loggingSystem.getLogger(name)));
+        return Flux.just(getLoggerData(loggingSystem.getLogger(name)));
     }
 
     @Override

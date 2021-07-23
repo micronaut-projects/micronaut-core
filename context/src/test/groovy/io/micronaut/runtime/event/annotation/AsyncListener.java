@@ -17,7 +17,7 @@ package io.micronaut.runtime.event.annotation;
 
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.scheduling.annotation.Async;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.concurrent.CompletableFuture;
 
 @Singleton

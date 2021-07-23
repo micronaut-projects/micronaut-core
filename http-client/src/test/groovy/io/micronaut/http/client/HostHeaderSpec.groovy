@@ -40,7 +40,7 @@ class HostHeaderSpec extends Specification {
     @Requires({ SocketUtils.isTcpPortAvailable(80) })
     void "test host header with server on 80"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.builder(['micronaut.server.port': 80]).run(EmbeddedServer)
+        EmbeddedServer embeddedServer = ApplicationContext.builder(['spec.name': 'HostHeaderSpec', 'micronaut.server.port': 80]).run(EmbeddedServer)
         def asyncClient = HttpClient.create(embeddedServer.getURL())
         BlockingHttpClient client = asyncClient.toBlocking()
 
@@ -60,7 +60,7 @@ class HostHeaderSpec extends Specification {
 
     void "test host header with server on random port"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'HostHeaderSpec', ])
         def asyncClient = HttpClient.create(embeddedServer.getURL())
         BlockingHttpClient client = asyncClient.toBlocking()
 
@@ -83,7 +83,7 @@ class HostHeaderSpec extends Specification {
     @Requires({ SocketUtils.isTcpPortAvailable(80) })
     void "test host header with client authority"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.builder(['micronaut.server.port': 80]).run(EmbeddedServer)
+        EmbeddedServer embeddedServer = ApplicationContext.builder(['spec.name': 'HostHeaderSpec', 'micronaut.server.port': 80]).run(EmbeddedServer)
         def asyncClient = HttpClient.create(new URL("http://foo@localhost"))
         BlockingHttpClient client = asyncClient.toBlocking()
 
@@ -106,6 +106,7 @@ class HostHeaderSpec extends Specification {
     void "test host header with https server on 443"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.builder([
+                'spec.name': 'HostHeaderSpec',
                 'micronaut.ssl.enabled': true,
                 'micronaut.ssl.buildSelfSigned': true,
                 'micronaut.ssl.port': 443
@@ -130,6 +131,7 @@ class HostHeaderSpec extends Specification {
     void "test host header with https server on custom port"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.builder([
+                'spec.name': 'HostHeaderSpec',
                 'micronaut.ssl.enabled': true,
                 'micronaut.ssl.buildSelfSigned': true
         ]).run(EmbeddedServer)
@@ -150,6 +152,7 @@ class HostHeaderSpec extends Specification {
         asyncClient.close()
     }
 
+    @io.micronaut.context.annotation.Requires(property = 'spec.name', value = 'HostHeaderSpec')
     @Controller("/echo-host")
     static class EchoHostController {
 

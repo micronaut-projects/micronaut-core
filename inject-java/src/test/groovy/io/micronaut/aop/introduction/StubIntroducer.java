@@ -17,9 +17,10 @@ package io.micronaut.aop.introduction;
 
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.MutableArgumentValue;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.Iterator;
 
 /**
@@ -36,6 +37,7 @@ public class StubIntroducer implements MethodInterceptor<Object,Object> {
         return POSITION;
     }
 
+    @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         Iterator<MutableArgumentValue<?>> iterator = context.getParameters().values().iterator();
