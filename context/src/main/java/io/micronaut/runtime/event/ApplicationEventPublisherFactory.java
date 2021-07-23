@@ -167,7 +167,6 @@ final class ApplicationEventPublisherFactory {
                         }
                     }
                 }
-
             }
         }
     }
