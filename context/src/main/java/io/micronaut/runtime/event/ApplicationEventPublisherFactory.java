@@ -131,9 +131,10 @@ final class ApplicationEventPublisherFactory {
             public Future<Void> publishEventAsync(Object event) {
                 Objects.requireNonNull(event, "Event cannot be null");
                 CompletableFuture<Void> future = new CompletableFuture<>();
+                List<ApplicationEventListener> eventListeners = lazyListeners.get();
                 executorSupplier.get().execute(() -> {
                     try {
-                        notifyEventListeners(event, lazyListeners.get());
+                        notifyEventListeners(event, eventListeners);
                         future.complete(null);
                     } catch (Exception e) {
                         future.completeExceptionally(e);
