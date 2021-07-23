@@ -261,6 +261,25 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
      * @return The class element
      */
     protected @NonNull ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext, Map<String, Map<String, TypeMirror>> genericsInfo, boolean includeTypeAnnotations) {
+        return mirrorToClassElement(returnType, visitorContext, genericsInfo, includeTypeAnnotations, returnType instanceof TypeVariable);
+    }
+
+    /**
+     * Obtain the ClassElement for the given mirror.
+     *
+     * @param returnType The return type
+     * @param visitorContext The visitor context
+     * @param genericsInfo The generic information.
+     * @param includeTypeAnnotations Whether to include type level annotations in the metadata for the element
+     * @param isTypeVariable is the type a type variable
+     * @return The class element
+     */
+    protected @NonNull ClassElement mirrorToClassElement(
+            TypeMirror returnType,
+            JavaVisitorContext visitorContext,
+            Map<String, Map<String, TypeMirror>> genericsInfo,
+            boolean includeTypeAnnotations,
+            boolean isTypeVariable) {
         if (genericsInfo == null) {
             genericsInfo = Collections.emptyMap();
         }
@@ -301,7 +320,8 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                                 typeElement,
                                 newAnnotationMetadata,
                                 visitorContext,
-                                genericsInfo
+                                genericsInfo,
+                                isTypeVariable
                         );
                     }
                 }
@@ -315,9 +335,9 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
 
             TypeMirror bound = boundGenerics.get(tv.toString());
             if (bound != null && bound != tv) {
-                return mirrorToClassElement(bound, visitorContext, genericsInfo, includeTypeAnnotations);
+                return mirrorToClassElement(bound, visitorContext, genericsInfo, includeTypeAnnotations, true);
             } else {
-                return mirrorToClassElement(upperBound, visitorContext, genericsInfo, includeTypeAnnotations);
+                return mirrorToClassElement(upperBound, visitorContext, genericsInfo, includeTypeAnnotations, true);
             }
 
         } else if (returnType instanceof ArrayType) {

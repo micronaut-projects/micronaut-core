@@ -1,8 +1,8 @@
 package io.micronaut.docs.streaming
 
-import io.kotlintest.matchers.string.shouldStartWith
-import io.kotlintest.shouldNotBe
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldNotBe
+import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.string.shouldStartWith
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest.GET
 import io.micronaut.http.client.HttpClient

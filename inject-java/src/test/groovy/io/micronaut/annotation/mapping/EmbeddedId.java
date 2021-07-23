@@ -13,10 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/**
- * HTTP Client response converters.
- *
- * @author Graeme Rocher
- * @since 1.0
- */
-package io.micronaut.http.client.converters;
+package io.micronaut.annotation.mapping;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Documented
+@Target({METHOD, FIELD})
+@Retention(RUNTIME)
+@Id
+public @interface EmbeddedId {
+}

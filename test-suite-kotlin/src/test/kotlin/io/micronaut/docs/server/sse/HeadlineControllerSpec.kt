@@ -1,9 +1,8 @@
 package io.micronaut.docs.server.sse
 
-import io.kotlintest.eventually
-import io.kotlintest.seconds
-import io.kotlintest.shouldBe
-import io.kotlintest.specs.StringSpec
+import io.kotest.assertions.timing.eventually
+import io.kotest.matchers.shouldBe
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.sse.SseClient
@@ -13,7 +12,11 @@ import org.opentest4j.AssertionFailedError
 import reactor.core.publisher.Flux
 
 import java.util.ArrayList
+import kotlin.time.DurationUnit
+import kotlin.time.ExperimentalTime
+import kotlin.time.toDuration
 
+@ExperimentalTime
 class HeadlineControllerSpec: StringSpec() {
 
     val embeddedServer = autoClose(
@@ -30,7 +33,7 @@ class HeadlineControllerSpec: StringSpec() {
                 events.add(it)
             }
 
-            eventually(2.seconds, AssertionFailedError::class.java) {
+            eventually(2.toDuration(DurationUnit.SECONDS), AssertionFailedError::class) {
                 events.size shouldBe 2
                 events[0].data.title shouldBe "Micronaut 1.0 Released"
                 events[0].data.description shouldBe "Come and get it"
