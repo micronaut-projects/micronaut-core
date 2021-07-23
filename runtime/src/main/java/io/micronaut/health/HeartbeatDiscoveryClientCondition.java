@@ -18,6 +18,7 @@ package io.micronaut.health;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.discovery.CompositeDiscoveryClient;
 
@@ -30,6 +31,7 @@ import static java.lang.Boolean.FALSE;
  * @since 1.1
  */
 @Introspected
+@ReflectiveAccess
 public final class HeartbeatDiscoveryClientCondition implements Condition {
     @Override
     public boolean matches(ConditionContext context) {
