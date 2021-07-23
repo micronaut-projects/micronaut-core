@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty.converters;
+package io.micronaut.http.server.exceptions;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
