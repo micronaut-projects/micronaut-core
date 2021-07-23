@@ -114,6 +114,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private final HttpClientBinderRegistry binderRegistry;
     private final JsonMediaTypeCodec jsonMediaTypeCodec;
     private final HttpClientRegistry<?> clientFactory;
+    private final ConversionService<?> conversionService;
 
     /**
      * Constructor for advice class to setup things like Headers, Cookies, Parameters for Clients.
@@ -122,17 +123,19 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      * @param jsonMediaTypeCodec   The JSON media type codec
      * @param transformers         transformation classes
      * @param binderRegistry       The client binder registry
+     * @param conversionService    The bean conversion context
      */
     public HttpClientIntroductionAdvice(
             HttpClientRegistry<?> clientFactory,
             JsonMediaTypeCodec jsonMediaTypeCodec,
             List<ReactiveClientResultTransformer> transformers,
-            HttpClientBinderRegistry binderRegistry) {
-
+            HttpClientBinderRegistry binderRegistry,
+            ConversionService<?> conversionService) {
         this.clientFactory = clientFactory;
         this.jsonMediaTypeCodec = jsonMediaTypeCodec;
         this.transformers = transformers != null ? transformers : Collections.emptyList();
         this.binderRegistry = binderRegistry;
+        this.conversionService = conversionService;
     }
 
     /**
@@ -270,12 +273,13 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
 
             uri = uriTemplate.expand(pathParams);
-            // Remove all the queryParams that have already been used.
-            // Others need to be still added
-            uriVariables.forEach(queryParams::remove);
+            // Remove all the pathParams that have already been used.
+            // Other path parameters are added to query
+            uriVariables.forEach(pathParams::remove);
+            addParametersToQuery(pathParams, uriContext);
 
             // The original query can be added by getting it from the request.getUri() and appending
-            request.uri(URI.create(appendQuery(uri, queryParams)));
+            request.uri(URI.create(appendQuery(uri, uriContext.getQueryParameters())));
 
             if (body != null && !request.getContentType().isPresent()) {
                 MediaType[] contentTypes = MediaType.of(context.stringValues(Produces.class));
@@ -544,6 +548,16 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
     private String getClientId(AnnotationMetadata clientAnn) {
         return clientAnn.stringValue(Client.class).orElse(null);
+    }
+
+    private void addParametersToQuery(Map<String, Object> parameters, ClientRequestUriContext uriContext) {
+        for (Map.Entry<String, Object> entry: parameters.entrySet()) {
+            conversionService.convert(entry.getValue(), ConversionContext.STRING).ifPresent(v -> {
+                conversionService.convert(entry.getKey(), ConversionContext.STRING).ifPresent(k -> {
+                    uriContext.addQueryParameter(k, v);
+                });
+            });
+        }
     }
 
     private String appendQuery(String uri, Map<String, List<String>> queryParams) {
