@@ -20,6 +20,8 @@ import io.micronaut.core.type.ArgumentCoercible;
 class MyBean {
     @Inject
     public Cache<String, Integer> fieldInject;
+    @Inject
+    public BaseCache<String, Integer> fieldInjectBase;
     public Cache<StringBuilder, Float> methodInject;
     
     @Inject
@@ -45,7 +47,9 @@ class CacheFactory {
     }
 }
 
-interface Cache<K, V> {}
+interface BaseCache<K, V> {}
+
+interface Cache<K, V> extends BaseCache<K, V> {}
 
 class CacheImpl implements Cache {
     public final Class<?> keyType;
@@ -63,6 +67,8 @@ class CacheImpl implements Cache {
         then:
         bean.fieldInject.keyType == String
         bean.fieldInject.valueType == Integer
+        bean.fieldInjectBase.keyType == String
+        bean.fieldInjectBase.valueType == Integer
         bean.methodInject.keyType == StringBuilder
         bean.methodInject.valueType == Float
 

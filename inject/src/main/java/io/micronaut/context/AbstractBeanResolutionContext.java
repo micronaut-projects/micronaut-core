@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
 import io.micronaut.inject.*;
@@ -540,7 +541,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /**
      * Abstract class for a Segment.
      */
-    abstract static class AbstractSegment implements Segment {
+    abstract static class AbstractSegment implements Segment, Named {
         private final BeanDefinition declaringComponent;
         private final String name;
         private final Argument argument;
