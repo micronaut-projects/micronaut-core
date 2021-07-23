@@ -62,7 +62,7 @@ final class ApplicationEventPublisherFactory {
             return beanLocator.findBean(Executor.class, Qualifiers.byName("scheduled")).orElseGet(ForkJoinPool::commonPool);
         }
     });
-    private final Map<Argument, ApplicationEventPublisher> publishers = new ConcurrentHashMap<>();
+    private final Map<Argument, Supplier<ApplicationEventPublisher>> publishers = new ConcurrentHashMap<>();
     private ApplicationEventPublisher applicationObjectEventPublisher;
 
     ApplicationEventPublisherFactory(BeanLocator beanLocator) {
@@ -103,25 +103,27 @@ final class ApplicationEventPublisherFactory {
     }
 
     private ApplicationEventPublisher getTypedEventPublisher(Argument eventType) {
-        return publishers.computeIfAbsent(eventType, this::createEventPublisher);
+        return publishers.computeIfAbsent(eventType, argument -> SupplierUtil.memoized(() -> createEventPublisher(argument))).get();
     }
 
     private ApplicationEventPublisher<Object> createEventPublisher(Argument<?> eventType) {
-        List<ApplicationEventListener> eventListeners = new ArrayList<>(
-                beanLocator.getBeansOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(eventType.getType()))
-        );
-        if (eventListeners.isEmpty()) {
-            return (ApplicationEventPublisher<Object>) ApplicationEventPublisher.NO_OP;
-        }
-        eventListeners.sort(OrderUtil.COMPARATOR);
         return new ApplicationEventPublisher<Object>() {
+
+            private final Supplier<List<ApplicationEventListener>> lazyListeners = SupplierUtil.memoizedNonEmpty(() -> {
+                List<ApplicationEventListener> listeners = new ArrayList<>(
+                        beanLocator.getBeansOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(eventType.getType()))
+                );
+                listeners.sort(OrderUtil.COMPARATOR);
+                return listeners;
+            });
+
             @Override
             public void publishEvent(Object event) {
                 if (event != null) {
                     if (EVENT_LOGGER.isDebugEnabled()) {
                         EVENT_LOGGER.debug("Publishing event: {}", event);
                     }
-                    notifyEventListeners(event, eventListeners);
+                    notifyEventListeners(event, lazyListeners.get());
                 }
             }
 
@@ -131,7 +133,7 @@ final class ApplicationEventPublisherFactory {
                 CompletableFuture<Void> future = new CompletableFuture<>();
                 executorSupplier.get().execute(() -> {
                     try {
-                        notifyEventListeners(event, eventListeners);
+                        notifyEventListeners(event, lazyListeners.get());
                         future.complete(null);
                     } catch (Exception e) {
                         future.completeExceptionally(e);
