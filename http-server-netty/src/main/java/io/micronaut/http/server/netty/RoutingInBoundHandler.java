@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.context.exceptions.BeanCreationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -187,6 +188,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private final String serverHeader;
     private final boolean multipartEnabled;
     private ExecutorService ioExecutor;
+    private final ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher;
 
     /**
      * @param beanContext                             The bean locator
@@ -200,6 +202,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
      * @param ioExecutor                              The IO executor
      * @param httpContentProcessorResolver            The http content processor resolver
      * @param errorResponseProcessor                  The factory to create error responses
+     * @param terminateEventPublisher                 The terminate event publisher
      */
     RoutingInBoundHandler(
             BeanContext beanContext,
@@ -212,7 +215,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             ExecutorSelector executorSelector,
             Supplier<ExecutorService> ioExecutor,
             HttpContentProcessorResolver httpContentProcessorResolver,
-            ErrorResponseProcessor<?> errorResponseProcessor) {
+            ErrorResponseProcessor<?> errorResponseProcessor, ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher) {
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.customizableResponseTypeHandlerRegistry = customizableResponseTypeHandlerRegistry;
         this.beanContext = beanContext;
@@ -225,6 +228,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         this.serverHeader = serverConfiguration.getServerHeader().orElse(null);
         this.httpContentProcessorResolver = httpContentProcessorResolver;
         this.errorResponseProcessor = errorResponseProcessor;
+        this.terminateEventPublisher = terminateEventPublisher;
         Optional<Boolean> multipartEnabled = serverConfiguration.getMultipart().getEnabled();
         this.multipartEnabled = !multipartEnabled.isPresent() || multipartEnabled.get();
     }
@@ -252,19 +256,17 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         try {
             request.release();
         } finally {
-            ctx.executor().execute(() -> {
-                try {
-                    beanContext.publishEvent(
-                            new HttpRequestTerminatedEvent(
-                                    request
-                            )
-                    );
-                } catch (Exception e) {
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error("Error publishing request terminated event: " + e.getMessage(), e);
+            if (terminateEventPublisher != ApplicationEventPublisher.NO_OP) {
+                ctx.executor().execute(() -> {
+                    try {
+                        terminateEventPublisher.publishEvent(new HttpRequestTerminatedEvent(request));
+                    } catch (Exception e) {
+                        if (LOG.isErrorEnabled()) {
+                            LOG.error("Error publishing request terminated event: " + e.getMessage(), e);
+                        }
                     }
-                }
-            });
+                });
+            }
         }
     }
 

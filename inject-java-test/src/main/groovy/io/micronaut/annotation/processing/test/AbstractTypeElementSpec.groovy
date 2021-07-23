@@ -237,7 +237,9 @@ class Test {
                 return references + (includeAllBeans ? super.resolveBeanDefinitionReferences(predicate) : [
                         new InterceptorRegistryBean(),
                         new BeanProviderDefinition(),
-                        new JakartaProviderBeanDefinition()
+                        new JakartaProviderBeanDefinition(),
+                        Class.forName('io.micronaut.runtime.event.$ApplicationEventPublisherFactory$Build0$Definition$Reference').newInstance(),
+                        Class.forName('io.micronaut.runtime.event.$ApplicationEventPublisherFactory$Definition$Reference').newInstance()
                 ])
             }
         }.start()

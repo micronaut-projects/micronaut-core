@@ -15,6 +15,7 @@ dependencies {
     compileOnly dependencyVersion("validation")
 
     testImplementation dependencyVersion("validation")
+    testImplementation project(":context")
     testImplementation project(":inject-groovy")
     testImplementation project(":inject-test-utils")
     testImplementation "com.github.stefanbirkner:system-lambda:1.2.0"
