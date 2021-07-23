@@ -398,6 +398,22 @@ If you need to declare a class to be accessed by reflection, use the `@Reflectiv
 
 Another change is regarding the GraalVM resources created at compile-time. In previous versions of Micronaut adding a dependency on `io.micronaut:micronaut-graal` triggered the generation of the GraalVM `resource-config.json` that included all the resources in `src/main/resources` so they were included in the native image. Starting in Micronaut 3.x that is done in either the Gradle or Maven plugins.
 
+=== Exception Handler Moves
+
+Two exception handlers that were in `micronaut-server-netty` have now been moved to `micronaut-server` since they were not specific to Netty. Their package has also changed as a result.
+
+.Package changes
+|===
+|Old |New
+
+| http-server-netty/src/main/java/io/micronaut/http/server/netty/converters/DuplicateRouteHandler.java
+| http-server/src/main/java/io/micronaut/http/server/exceptions/DuplicateRouteHandler.java
+
+| http-server-netty/src/main/java/io/micronaut/http/server/netty/converters/UnsatisfiedRouteHandler.java
+| http-server/src/main/java/io/micronaut/http/server/exceptions/UnsatisfiedRouteHandler.java
+
+|===
+
 === Module Changes
 
 ==== New package for Micronaut Cassandra
