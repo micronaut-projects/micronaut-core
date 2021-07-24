@@ -90,7 +90,7 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
 
     @Override
     public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
-        if (annotationMetadata.hasDeclaredAnnotation(Any.class)) {
+        if (beanType != Object.class && annotationMetadata.hasDeclaredAnnotation(Any.class)) {
             return candidates;
         }
         String name;

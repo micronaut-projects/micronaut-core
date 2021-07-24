@@ -2322,14 +2322,7 @@ public class DefaultBeanContext implements BeanContext {
         if (qualifier instanceof AnyQualifier) {
             return candidates.iterator().next();
         } else {
-            final List<BeanDefinition<T>> withoutAnyBeans =
-                    candidates.stream().filter(bd -> !bd.hasDeclaredAnnotation(Any.class))
-                    .collect(Collectors.toList());
-            if (withoutAnyBeans.size() == 1) {
-                return withoutAnyBeans.iterator().next();
-            } else {
-                throw new NonUniqueBeanException(beanType, candidates.iterator());
-            }
+            throw new NonUniqueBeanException(beanType, candidates.iterator());
         }
     }
 
@@ -3667,7 +3660,6 @@ public class DefaultBeanContext implements BeanContext {
             filterReplacedBeans(null, candidates);
             Stream<BeanDefinition<T>> stream = candidates.stream();
             if (qualifier != null && !(qualifier instanceof AnyQualifier)) {
-                stream = stream.filter(bd -> !bd.hasDeclaredAnnotation(Any.class));
                 stream = qualifier.reduce(beanType.getType(), stream);
             }
             return stream.count() > 0;
