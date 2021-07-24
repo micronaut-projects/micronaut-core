@@ -16,7 +16,6 @@
 package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
-import io.micronaut.context.annotation.Any;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
 
@@ -39,10 +38,7 @@ public final class AnyQualifier<T> implements Qualifier<T> {
 
     @Override
     public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
-        return candidates.filter(candidate -> {
-            Class<T> candidateType = candidate.getBeanType();
-            return true;
-        });
+        return candidates;
     }
 
     @Override

@@ -48,7 +48,7 @@ import java.util.Optional;
  */
 public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>, BeanFactory<T>, BeanDefinitionReference<T> {
 
-    private final static Argument<Object> TYPE_VARIABLE = Argument.ofTypeVariable(Object.class, "T");
+    private static final Argument<Object> TYPE_VARIABLE = Argument.ofTypeVariable(Object.class, "T");
     private final AnnotationMetadata annotationMetadata;
 
     public AbstractProviderDefinition() {
