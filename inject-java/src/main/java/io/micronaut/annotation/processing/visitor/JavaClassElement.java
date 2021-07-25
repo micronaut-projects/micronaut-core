@@ -90,6 +90,22 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
      * @param annotationMetadata The annotation metadata
      * @param visitorContext     The visitor context
      * @param genericsInfo       The generic type info
+     * @param arrayDimensions    The number of array dimensions
+     */
+    JavaClassElement(
+            TypeElement classElement,
+            AnnotationMetadata annotationMetadata,
+            JavaVisitorContext visitorContext,
+            Map<String, Map<String, TypeMirror>> genericsInfo,
+            int arrayDimensions) {
+        this(classElement, annotationMetadata, visitorContext, genericsInfo, arrayDimensions, false);
+    }
+
+    /**
+     * @param classElement       The {@link TypeElement}
+     * @param annotationMetadata The annotation metadata
+     * @param visitorContext     The visitor context
+     * @param genericsInfo       The generic type info
      * @param isTypeVariable     Is the class element a type variable
      */
     JavaClassElement(
