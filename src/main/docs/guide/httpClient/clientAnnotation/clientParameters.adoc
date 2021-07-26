@@ -76,6 +76,10 @@ The following table summarizes the parameter annotations and their purpose, and 
 
 IMPORTANT: Always use ann:http.annotation.Produces[] or ann:http.annotation.Consumes[] instead of supplying a header for `Content-Type` or `Accept`.
 
+==== Query value formatting
+
+The link:{api}/io/micronaut/core/convert/format/Format.html[Format] annotation can be used together with `@QueryValue` annotation to format query values. More information is given in the HTTP Server section, Simple Request Binding subsection.
+
 ==== Type-Based Binding Parameters
 
 Some parameters are recognized by their type instead of their annotation. The following table summarizes these parameter types and their purpose, and provides an example:
