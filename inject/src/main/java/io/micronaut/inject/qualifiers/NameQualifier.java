@@ -63,7 +63,7 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
             if (!beanType.isAssignableFrom(candidate.getBeanType())) {
                 return false;
             }
-            if (candidate.getAnnotationMetadata().hasDeclaredAnnotation(Any.class)) {
+            if (beanType != Object.class && candidate.getAnnotationMetadata().hasDeclaredAnnotation(Any.class)) {
                 return true;
             }
             String typeName;
@@ -124,7 +124,7 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
         return candidates.filter(candidate -> {
                 if (candidate.isPrimary() && Primary.class.getSimpleName().equals(annotationName)) {
                     return true;
-                } else if (candidate.getAnnotationMetadata().hasDeclaredAnnotation(Any.class)) {
+                } else if (beanType != Object.class && candidate.getAnnotationMetadata().hasDeclaredAnnotation(Any.class)) {
                     return true;
                 }
                 String candidateName;
