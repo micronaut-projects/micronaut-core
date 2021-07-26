@@ -1,5 +1,6 @@
 package io.micronaut.core.beans
 
+import io.micronaut.core.annotation.Creator
 import io.micronaut.core.annotation.Introspected
 
 @Introspected
