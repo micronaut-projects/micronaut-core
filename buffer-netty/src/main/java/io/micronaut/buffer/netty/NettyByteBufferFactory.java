@@ -23,6 +23,7 @@ import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 /**
@@ -56,6 +57,7 @@ public class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocato
     /**
      * Default constructor.
      */
+    @Inject
     public NettyByteBufferFactory() {
         this.allocator = ByteBufAllocator.DEFAULT;
     }
