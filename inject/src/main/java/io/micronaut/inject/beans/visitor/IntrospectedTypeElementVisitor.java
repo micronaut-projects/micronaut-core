@@ -293,7 +293,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             ClassElement ce,
             BeanIntrospectionWriter writer,
             Introspected.AccessKind...accessKinds) {
-        Optional<MethodElement> constructorElement = ce.getPrimaryConstructor();
+        Optional<MethodElement> constructorElement = ce.getPrimaryConstructor(ClassElement.ConstructorSelectionStrategy.MOST_ARGUMENTS);
         if (ce.isAbstract() && !constructorElement.isPresent() && ce.hasStereotype(Introspected.class)) {
             currentAbstractIntrospection = new AbstractIntrospection(
                     writer,

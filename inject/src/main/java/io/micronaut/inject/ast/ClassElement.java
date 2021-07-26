@@ -126,6 +126,15 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * Same as {@link #getPrimaryConstructor()} except allows to customize which constructor is selected in the case where multiple candidates exist.
+     *
+     * @return The primary constructor if one is present
+     */
+    default @NonNull Optional<MethodElement> getPrimaryConstructor(@Nullable ConstructorSelectionStrategy selectionStrategy) {
+        return getPrimaryConstructor();
+    }
+
+    /**
      * Find and return a single default constructor. A default constructor is one
      * without arguments that is accessible.
      *
@@ -411,5 +420,19 @@ public interface ClassElement extends TypedElement {
     @Internal
     static @NonNull ClassElement of(@NonNull String typeName, boolean isInterface, @Nullable AnnotationMetadata annotationMetadata, Map<String, ClassElement> typeArguments) {
         return new SimpleClassElement(typeName, isInterface, annotationMetadata);
+    }
+
+    /**
+     * Enum used to dictate how a constructor is selected given multiple candidates.
+     */
+    enum ConstructorSelectionStrategy {
+        /**
+         * The constructor with the most arguments is selected.
+         */
+        MOST_ARGUMENTS,
+        /**
+         * The first found as defined by the order in the class definition is selected.
+         */
+        FIRST_FOUND
     }
 }

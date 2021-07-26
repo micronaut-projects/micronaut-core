@@ -833,15 +833,20 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @NonNull
     @Override
     public Optional<MethodElement> getPrimaryConstructor() {
+        return getPrimaryConstructor(ConstructorSelectionStrategy.FIRST_FOUND);
+    }
+
+    @Override
+    public Optional<MethodElement> getPrimaryConstructor(ConstructorSelectionStrategy selectionStrategy) {
         final AnnotationUtils annotationUtils = visitorContext.getAnnotationUtils();
         final ModelUtils modelUtils = visitorContext.getModelUtils();
-        ExecutableElement method = modelUtils.staticCreatorFor(classElement, annotationUtils);
+        ExecutableElement method = modelUtils.staticCreatorFor(classElement, annotationUtils, selectionStrategy);
         if (method == null) {
             if (isInner() && !isStatic()) {
                 // only static inner classes can be constructed
                 return Optional.empty();
             }
-            method = modelUtils.concreteConstructorFor(classElement, annotationUtils);
+            method = modelUtils.concreteConstructorFor(classElement, annotationUtils, selectionStrategy);
         }
 
         return createMethodElement(annotationUtils, method);

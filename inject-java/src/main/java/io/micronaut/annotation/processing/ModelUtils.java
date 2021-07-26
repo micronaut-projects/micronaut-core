@@ -195,10 +195,13 @@ public class ModelUtils {
      *
      * @param classElement The class element
      * @param annotationUtils The annotation utilities
+     * @param selectionStrategy
      * @return The constructor
      */
     @Nullable
-    public ExecutableElement concreteConstructorFor(TypeElement classElement, AnnotationUtils annotationUtils) {
+    public ExecutableElement concreteConstructorFor(TypeElement classElement,
+                                                    AnnotationUtils annotationUtils,
+                                                    ClassElement.ConstructorSelectionStrategy selectionStrategy) {
         if (JavaModelUtils.isRecord(classElement)) {
             final List<ExecutableElement> constructors = ElementFilter
                     .constructorsIn(classElement.getEnclosedElements());
@@ -221,11 +224,13 @@ public class ModelUtils {
 
             Optional<ExecutableElement> element = findAnnotatedConstructor(annotationUtils, constructors);
             if (!element.isPresent()) {
-                final Comparator<ExecutableElement> comparator = Comparator.comparingInt(e -> e.getParameters().size());
-                element = constructors.stream()
-                        .sorted(comparator.reversed())
-                        .filter(ctor ->
-                        ctor.getModifiers().contains(PUBLIC)
+                Stream<ExecutableElement> stream = constructors.stream();
+                if (selectionStrategy == ClassElement.ConstructorSelectionStrategy.MOST_ARGUMENTS) {
+                    final Comparator<ExecutableElement> comparator = Comparator.comparingInt(e -> e.getParameters().size());
+                    stream = stream.sorted(comparator.reversed());
+                }
+                element = stream.filter(ctor ->
+                    ctor.getModifiers().contains(PUBLIC)
                 ).findFirst();
             }
             return element.orElse(null);
@@ -246,10 +251,13 @@ public class ModelUtils {
      *
      * @param classElement The class element
      * @param annotationUtils The annotation utilities
+     * @param selectionStrategy The constructor selection strategy
      * @return The creator method
      */
     @Nullable
-    public ExecutableElement staticCreatorFor(TypeElement classElement, AnnotationUtils annotationUtils) {
+    public ExecutableElement staticCreatorFor(TypeElement classElement,
+                                              AnnotationUtils annotationUtils,
+                                              @Nullable ClassElement.ConstructorSelectionStrategy selectionStrategy) {
          List<ExecutableElement> creators = findNonPrivateStaticCreators(classElement, annotationUtils);
 
         if (creators.isEmpty()) {
@@ -261,6 +269,7 @@ public class ModelUtils {
 
         //Can be multiple static @Creator methods. Prefer one with args here. The no arg method (if present) will
         //be picked up by staticDefaultCreatorFor
+
         List<ExecutableElement> withArgs = creators.stream().filter(method -> !method.getParameters().isEmpty()).collect(Collectors.toList());
 
         if (withArgs.size() == 1) {
@@ -269,7 +278,14 @@ public class ModelUtils {
             creators = withArgs;
         }
 
-        return creators.stream().filter(method -> method.getModifiers().contains(PUBLIC)).findFirst().orElse(null);
+        if (selectionStrategy == ClassElement.ConstructorSelectionStrategy.MOST_ARGUMENTS) {
+            final Comparator<ExecutableElement> comparator = Comparator.comparingInt(e -> e.getParameters().size());
+            return creators.stream()
+                    .sorted(comparator.reversed())
+                    .filter(method -> method.getModifiers().contains(PUBLIC)).findFirst().orElse(null);
+        } else {
+            return creators.stream().filter(method -> method.getModifiers().contains(PUBLIC)).findFirst().orElse(null);
+        }
     }
 
     /**
