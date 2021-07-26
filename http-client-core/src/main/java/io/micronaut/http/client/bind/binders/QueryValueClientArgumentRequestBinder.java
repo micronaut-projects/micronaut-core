@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2021 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.http.client.bind.binders;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -35,8 +50,6 @@ import java.util.function.Consumer;
  * @since 3.0.0
  */
 public class QueryValueClientArgumentRequestBinder implements AnnotatedClientArgumentRequestBinder<QueryValue> {
-    private final ConversionService<?> conversionService;
-
     /**
      * Values separated with commas ",". In case of iterables, the values are converted to {@link String} and joined
      * with comma delimiter. In case of {@link Map} or a POJO {@link Object} the keys and values are alternating and all
@@ -51,11 +64,11 @@ public class QueryValueClientArgumentRequestBinder implements AnnotatedClientArg
      */
     public static final String QUERY_VALUE_FORMAT_CSV = "CSV";
     /**
-     * Values separated with spaces " " similarly to CSV being separated with commas
+     * Values separated with spaces " " similarly to CSV being separated with commas.
      */
     public static final String QUERY_VALUE_FORMAT_SSV = "SSV";
     /**
-     * Values separated with the pipe "|" symbol similarly to CSV being separated with commas
+     * Values separated with the pipe "|" symbol similarly to CSV being separated with commas.
      */
     public static final String QUERY_VALUE_FORMAT_PIPES = "PIPES";
     /**
@@ -84,6 +97,8 @@ public class QueryValueClientArgumentRequestBinder implements AnnotatedClientArg
     private static final String CSV_DELIMITER = ",";
     private static final String SSV_DELIMITER = " ";
     private static final String PIPES_DELIMITER = "|";
+
+    private final ConversionService<?> conversionService;
 
     public QueryValueClientArgumentRequestBinder(ConversionService<?> conversionService) {
         this.conversionService = conversionService;
@@ -157,7 +172,35 @@ public class QueryValueClientArgumentRequestBinder implements AnnotatedClientArg
     }
 
     /**
-     * An abstract class to convert to ConvertibleMultiValues
+     * Join strings given a delimiter.
+     * @param strings strings to join
+     * @param delimiter the delimiter
+     * @return joined string
+     */
+    private String joinStrings(Iterable<String> strings, String delimiter) {
+        if (strings == null) {
+            return "";
+        }
+
+        StringBuilder builder = new StringBuilder();
+
+        boolean first = true;
+        for (String value: strings) {
+            if (value != null) {
+                if (!first) {
+                    builder.append(delimiter);
+                } else {
+                    first = false;
+                }
+                builder.append(value);
+            }
+        }
+
+        return builder.toString();
+    }
+
+    /**
+     * An abstract class to convert to ConvertibleMultiValues.
      * @param <T> The class from which to convert
      */
     public abstract class AbstractMultiValuesConverter<T> implements FormattingTypeConverter<T, ConvertibleMultiValues, Format> {
@@ -187,7 +230,7 @@ public class QueryValueClientArgumentRequestBinder implements AnnotatedClientArg
                 return Optional.of(parameters);
             }
 
-            switch(format) {
+            switch (format) {
                 case QUERY_VALUE_FORMAT_CSV:
                     addSeparatedValues(context, name, object, parameters, CSV_DELIMITER);
                     break;
@@ -237,6 +280,7 @@ public class QueryValueClientArgumentRequestBinder implements AnnotatedClientArg
             }
         }
 
+        @Override
         protected void addSeparatedValues(ArgumentConversionContext<Object> context, String name,
                 Iterable object, MutableConvertibleMultiValuesMap<String> parameters, String delimiter) {
             List<String> strings = new ArrayList<>();
@@ -244,11 +288,13 @@ public class QueryValueClientArgumentRequestBinder implements AnnotatedClientArg
             parameters.add(name, joinStrings(strings, delimiter));
         }
 
+        @Override
         protected void addMutliValues(ArgumentConversionContext<Object> context, String name,
                 Iterable object, MutableConvertibleMultiValuesMap<String> parameters) {
             processValues(context, object, v -> parameters.add(name, v));
         }
 
+        @Override
         protected void addDeepObjectValues(ArgumentConversionContext<Object> context, String name,
                 Iterable object, MutableConvertibleMultiValuesMap<String> parameters) {
             ArgumentConversionContext<String> conversionContext = ConversionContext.STRING.with(
@@ -287,6 +333,7 @@ public class QueryValueClientArgumentRequestBinder implements AnnotatedClientArg
             }
         }
 
+        @Override
         protected void addSeparatedValues(ArgumentConversionContext<Object> context, String name,
                Map object, MutableConvertibleMultiValuesMap<String> parameters, String delimiter) {
             List<String> values = new ArrayList<>();
@@ -297,11 +344,13 @@ public class QueryValueClientArgumentRequestBinder implements AnnotatedClientArg
             parameters.add(name, joinStrings(values, delimiter));
         }
 
+        @Override
         protected void addMutliValues(ArgumentConversionContext<Object> context, String name,
                 Map object, MutableConvertibleMultiValuesMap<String> parameters) {
             processValues(context, object, parameters::add);
         }
 
+        @Override
         protected void addDeepObjectValues(ArgumentConversionContext<Object> context, String name,
                 Map object, MutableConvertibleMultiValuesMap<String> parameters) {
            processValues(context, object, (k, v) -> parameters.add(name + "[" + k + "]", v));
@@ -325,6 +374,7 @@ public class QueryValueClientArgumentRequestBinder implements AnnotatedClientArg
             }
         }
 
+        @Override
         protected void addSeparatedValues(ArgumentConversionContext<Object> context, String name,
                 Object object, MutableConvertibleMultiValuesMap<String> parameters, String delimiter) {
             List<String> values = new ArrayList<>();
@@ -335,42 +385,16 @@ public class QueryValueClientArgumentRequestBinder implements AnnotatedClientArg
             parameters.add(name, joinStrings(values, delimiter));
         }
 
+        @Override
         protected void addMutliValues(ArgumentConversionContext<Object> context, String name,
                  Object object, MutableConvertibleMultiValuesMap<String> parameters) {
             processValues(object, parameters::add);
         }
 
+        @Override
         protected void addDeepObjectValues(ArgumentConversionContext<Object> context, String name,
                 Object object, MutableConvertibleMultiValuesMap<String> parameters) {
             processValues(object, (k, v) -> parameters.add(name + "[" + k + "]", v));
         }
-    }
-
-    /**
-     * Join strings given a delimiter.
-     * @param strings strings to join
-     * @param delimiter the delimiter
-     * @return joined string
-     */
-    private String joinStrings(Iterable<String> strings, String delimiter) {
-        if (strings == null) {
-            return "";
-        }
-
-        StringBuilder builder = new StringBuilder();
-
-        boolean first = true;
-        for (String value: strings) {
-            if (value != null) {
-                if (!first) {
-                    builder.append(delimiter);
-                } else {
-                    first = false;
-                }
-                builder.append(value);
-            }
-        }
-
-        return builder.toString();
     }
 }

@@ -68,11 +68,11 @@ public class QueryValueArgumentBinder<T> extends AbstractAnnotatedArgumentBinder
      */
     public static final String QUERY_VALUE_FORMAT_CSV = "CSV";
     /**
-     * Values separated with spaces " " similarly to CSV being separated with commas
+     * Values separated with spaces " " similarly to CSV being separated with commas.
      */
     public static final String QUERY_VALUE_FORMAT_SSV = "SSV";
     /**
-     * Values separated with the pipe "|" symbol similarly to CSV being separated with commas
+     * Values separated with the pipe "|" symbol similarly to CSV being separated with commas.
      */
     public static final String QUERY_VALUE_FORMAT_PIPES = "PIPES";
     /**
@@ -180,6 +180,83 @@ public class QueryValueArgumentBinder<T> extends AbstractAnnotatedArgumentBinder
         return result;
     }
 
+    /**
+     * A common function for {@link MapConverter} and {@link ObjectConverter}.
+     */
+    private Map<String, String> getSeparatedMapParameters(
+            ConvertibleMultiValues<String> parameters, String name, Optional<String> defaultValue, Character delimiter
+    ) {
+        List<String> paramValues = parameters.getAll(name);
+
+        if (paramValues.size() == 0 && defaultValue.isPresent()) {
+            paramValues.add(defaultValue.get());
+        }
+
+        Map<String, String> values = new HashMap<>();
+        for (String value: paramValues) {
+            List<String> delimited = splitByDelimiter(value, delimiter);
+            for (int i = 1; i < delimited.size(); i += 2) {
+                values.put(delimited.get(i - 1), delimited.get(i));
+            }
+        }
+
+        return values;
+    }
+
+    /**
+     * A common function for {@link MapConverter} and {@link ObjectConverter}.
+     */
+    private Map<String, String> getMultiMapParameters(
+            ConvertibleMultiValues<String> parameters, String name, Optional<String> defaultValue
+    ) {
+        // Convert to map of strings - if multiple values are present, the first one is taken
+        Map values = parameters.asMap().entrySet().stream()
+                .filter(v -> !v.getValue().isEmpty())
+                .collect(Collectors.toMap(v -> v.getKey(), v -> v.getValue().get(0)));
+        return values;
+    }
+
+    /**
+     * A common function for {@link MapConverter} and {@link ObjectConverter}.
+     */
+    private Map<String, String> getDeepObjectMapParameters(
+            ConvertibleMultiValues<String> parameters, String name, Optional<String> defaultValue
+    ) {
+        Map<String, List<String>> paramValues = parameters.asMap();
+        Map<String, String> values = new HashMap<>();
+
+        // Convert to map of strings - if multiple values are present, only first one is taken
+        for (Map.Entry<String, List<String>> param: paramValues.entrySet()) {
+            String key = param.getKey();
+            if (key.startsWith(name) && key.length() > name.length() &&
+                    key.charAt(name.length()) == '[' && key.charAt(key.length() - 1) == ']' &&
+                    param.getValue().size() > 0
+            ) {
+                String mapKey = key.substring(name.length() + 1, key.length() - 1);
+                values.put(mapKey, param.getValue().get(0));
+            }
+        }
+
+        return values;
+    }
+
+    private List<String> splitByDelimiter(String value, Character delimiter) {
+        List<String> result = new ArrayList<>();
+        int startI = 0;
+
+        for (int i = 0; i < value.length(); ++i) {
+            if (value.charAt(i) == delimiter) {
+                result.add(value.substring(startI, i));
+                startI = i + 1;
+            }
+        }
+        if (startI != 0) {
+            result.add(value.substring(startI));
+        }
+
+        return result;
+    }
+
     public abstract class AbstractMultiValuesConverter<T> implements FormattingTypeConverter<ConvertibleMultiValues, T, Format> {
         @Override
         public Optional<T> convert(
@@ -207,7 +284,7 @@ public class QueryValueArgumentBinder<T> extends AbstractAnnotatedArgumentBinder
             Optional<String> defaultValue = conversionContext.getAnnotationMetadata()
                     .getValue(Bindable.class, "defaultValue", String.class);
 
-            switch(format) {
+            switch (format) {
                 case QUERY_VALUE_FORMAT_CSV:
                     return retrieveSeparatedValue(context, name, parameters, defaultValue, CSV_DELIMITER);
                 case QUERY_VALUE_FORMAT_SSV:
@@ -239,7 +316,7 @@ public class QueryValueArgumentBinder<T> extends AbstractAnnotatedArgumentBinder
     }
 
     /**
-     * A converter to convert from {@link ConvertibleMultiValues} to an {@link Iterable}
+     * A converter to convert from {@link ConvertibleMultiValues} to an {@link Iterable}.
      */
     public class IterableConverter extends AbstractMultiValuesConverter<Iterable> {
         @Override
@@ -305,7 +382,7 @@ public class QueryValueArgumentBinder<T> extends AbstractAnnotatedArgumentBinder
     }
 
     /**
-     * A converter to convert from {@link ConvertibleMultiValues} to an {@link Map}
+     * A converter to convert from {@link ConvertibleMultiValues} to an {@link Map}.
      */
     public class MapConverter extends AbstractMultiValuesConverter<Map> {
         @Override
@@ -372,7 +449,7 @@ public class QueryValueArgumentBinder<T> extends AbstractAnnotatedArgumentBinder
     }
 
     /**
-     * A converter to convert from {@link ConvertibleMultiValues} to a POJO {@link Object}
+     * A converter to convert from {@link ConvertibleMultiValues} to a POJO {@link Object}.
      */
     public class ObjectConverter extends AbstractMultiValuesConverter<Object> {
         @Override
@@ -417,7 +494,7 @@ public class QueryValueArgumentBinder<T> extends AbstractAnnotatedArgumentBinder
 
             // Set the remaining properties with wrapper
             BeanWrapper<Object> wrapper = BeanWrapper.getWrapper(result);
-            for (BeanProperty<Object,Object> property: wrapper.getBeanProperties()) {
+            for (BeanProperty<Object, Object> property: wrapper.getBeanProperties()) {
                 String name = property.getName();
 
                 if (!property.isReadOnly() && values.containsKey(name)) {
@@ -428,82 +505,5 @@ public class QueryValueArgumentBinder<T> extends AbstractAnnotatedArgumentBinder
 
             return Optional.of(result);
         }
-    }
-
-    /**
-     * A common function for {@link MapConverter} and {@link ObjectConverter}
-     */
-    private Map<String, String> getSeparatedMapParameters(
-            ConvertibleMultiValues<String> parameters, String name, Optional<String> defaultValue, Character delimiter
-    ) {
-        List<String> paramValues = parameters.getAll(name);
-
-        if (paramValues.size() == 0 && defaultValue.isPresent()) {
-            paramValues.add(defaultValue.get());
-        }
-
-        Map<String, String> values = new HashMap<>();
-        for (String value: paramValues) {
-            List<String> delimited = splitByDelimiter(value, delimiter);
-            for (int i = 1; i < delimited.size(); i += 2) {
-                values.put(delimited.get(i - 1), delimited.get(i));
-            }
-        }
-
-        return values;
-    }
-
-    /**
-     * A common function for {@link MapConverter} and {@link ObjectConverter}
-     */
-    private Map<String, String> getMultiMapParameters(
-            ConvertibleMultiValues<String> parameters, String name, Optional<String> defaultValue
-    ) {
-        // Convert to map of strings - if multiple values are present, the first one is taken
-        Map values = parameters.asMap().entrySet().stream()
-                .filter(v -> !v.getValue().isEmpty())
-                .collect(Collectors.toMap(v -> v.getKey(), v -> v.getValue().get(0)));
-        return values;
-    }
-
-    /**
-     * A common function for {@link MapConverter} and {@link ObjectConverter}
-     */
-    private Map<String, String> getDeepObjectMapParameters(
-            ConvertibleMultiValues<String> parameters, String name, Optional<String> defaultValue
-    ) {
-        Map<String, List<String>> paramValues = parameters.asMap();
-        Map<String, String> values = new HashMap<>();
-
-        // Convert to map of strings - if multiple values are present, only first one is taken
-        for (Map.Entry<String, List<String>> param: paramValues.entrySet()) {
-            String key = param.getKey();
-            if (key.startsWith(name) && key.length() > name.length() &&
-                    key.charAt(name.length()) == '[' && key.charAt(key.length() - 1) == ']' &&
-                    param.getValue().size() > 0
-            ) {
-                String mapKey = key.substring(name.length() + 1, key.length() - 1);
-                values.put(mapKey, param.getValue().get(0));
-            }
-        }
-
-        return values;
-    }
-
-    private List<String> splitByDelimiter(String value, Character delimiter) {
-        List<String> result = new ArrayList<>();
-        int startI = 0;
-
-        for (int i = 0; i < value.length(); ++i) {
-            if (value.charAt(i) == delimiter) {
-                result.add(value.substring(startI, i));
-                startI = i + 1;
-            }
-        }
-        if (startI != 0) {
-            result.add(value.substring(startI));
-        }
-
-        return result;
     }
 }
