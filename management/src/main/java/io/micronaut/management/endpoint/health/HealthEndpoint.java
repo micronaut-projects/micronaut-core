@@ -17,6 +17,7 @@ package io.micronaut.management.endpoint.health;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.management.endpoint.EndpointConfiguration;
@@ -29,6 +30,7 @@ import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
 import io.micronaut.management.health.indicator.annotation.Liveness;
 import jakarta.inject.Inject;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
 import java.security.Principal;
@@ -98,7 +100,8 @@ public class HealthEndpoint {
      * @return The health information as a {@link Mono}
      */
     @Read
-    public Mono<HealthResult> getHealth(@Nullable Principal principal) {
+    @SingleResult
+    public Publisher<HealthResult> getHealth(@Nullable Principal principal) {
         HealthLevelOfDetail detail = levelOfDetail(principal);
 
         return Mono.from(
@@ -114,7 +117,8 @@ public class HealthEndpoint {
      * @return The health information as a {@link Mono}
      */
     @Read
-    public Mono<HealthResult> getHealth(@Nullable Principal principal, @Selector HealthCheckType selector) {
+    @SingleResult
+    public Publisher<HealthResult> getHealth(@Nullable Principal principal, @Selector HealthCheckType selector) {
         HealthLevelOfDetail detail = levelOfDetail(principal);
         HealthIndicator[] indicators;
 

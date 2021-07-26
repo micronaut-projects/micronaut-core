@@ -90,6 +90,22 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
      * @param annotationMetadata The annotation metadata
      * @param visitorContext     The visitor context
      * @param genericsInfo       The generic type info
+     * @param arrayDimensions    The number of array dimensions
+     */
+    JavaClassElement(
+            TypeElement classElement,
+            AnnotationMetadata annotationMetadata,
+            JavaVisitorContext visitorContext,
+            Map<String, Map<String, TypeMirror>> genericsInfo,
+            int arrayDimensions) {
+        this(classElement, annotationMetadata, visitorContext, genericsInfo, arrayDimensions, false);
+    }
+
+    /**
+     * @param classElement       The {@link TypeElement}
+     * @param annotationMetadata The annotation metadata
+     * @param visitorContext     The visitor context
+     * @param genericsInfo       The generic type info
      * @param isTypeVariable     Is the class element a type variable
      */
     JavaClassElement(
@@ -895,9 +911,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         while (tpi.hasNext()) {
             TypeParameterElement tpe = tpi.next();
             TypeMirror t = tpe.asType();
-            JavaClassElement classElement = (JavaClassElement) mirrorToClassElement(t, visitorContext, this.genericTypeInfo, false);
-
-            map.put(tpe.toString(), ((TypeElement) classElement.getNativeType()).asType());
+            map.put(tpe.toString(), t);
         }
 
         return Collections.unmodifiableMap(map);
@@ -917,7 +931,21 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         info.forEach((name, generics) -> {
             Map<String, ClassElement> resolved = new LinkedHashMap<>(generics.size());
             generics.forEach((variable, mirror) -> {
-                ClassElement classElement = mirrorToClassElement(mirror, visitorContext, info, visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments());
+                final Map<String, TypeMirror> typeInfo = this.genericTypeInfo != null ? this.genericTypeInfo.get(getName()) : null;
+                TypeMirror resolvedType = mirror;
+                if (mirror instanceof TypeVariable && typeInfo != null) {
+                    final TypeMirror tm = typeInfo.get(mirror.toString());
+                    if (tm != null) {
+                        resolvedType = tm;
+                    }
+                }
+                ClassElement classElement = mirrorToClassElement(
+                        resolvedType,
+                        visitorContext,
+                        info,
+                        visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments(),
+                        mirror instanceof TypeVariable
+                );
                 resolved.put(variable, classElement);
             });
             result.put(name, resolved);

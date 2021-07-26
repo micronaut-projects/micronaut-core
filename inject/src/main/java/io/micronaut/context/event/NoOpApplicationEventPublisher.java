@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,22 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.context.events
+package io.micronaut.context.event;
 
-// tag::class[]
-import io.micronaut.context.event.ApplicationEventPublisher
-import jakarta.inject.Inject
-import jakarta.inject.Singleton
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
 
-@Singleton
-class SampleEventEmitterBean {
+/**
+ * No-op event publisher.
+ *
+ * @author Denis Stepanov
+ * @since 3.0
+ */
+final class NoOpApplicationEventPublisher implements ApplicationEventPublisher<Object> {
 
-    @Inject
-    ApplicationEventPublisher<SampleEvent> eventPublisher
-
-    void publishSampleEvent() {
-        eventPublisher.publishEvent(new SampleEvent())
+    @Override
+    public void publishEvent(Object event) {
     }
 
+    @Override
+    public Future<Void> publishEventAsync(Object event) {
+        return CompletableFuture.completedFuture(null);
+    }
 }
-// end::class[]

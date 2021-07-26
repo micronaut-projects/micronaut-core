@@ -1,6 +1,7 @@
 dependencies {
     testAnnotationProcessor project(":inject-java")
     testAnnotationProcessor project(":graal")
+    testImplementation project(":context")
     testImplementation project(":graal")
     testImplementation project(":inject")
     testImplementation 'jakarta.inject:jakarta.inject-tck:2.0.1'

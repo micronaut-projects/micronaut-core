@@ -16,6 +16,7 @@ dependencies {
     annotationProcessor project(":inject-java")
     api project(":inject")
 
+    testImplementation project(":context")
     testImplementation dependencyModuleVersion("netty", "netty-codec-http")
     testImplementation project(":http-server-netty")
     testImplementation project(":http-client")

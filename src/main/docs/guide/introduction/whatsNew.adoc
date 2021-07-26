@@ -68,6 +68,10 @@ snippet::io.micronaut.docs.ioc.beans.User[tags="class", indent=0]
 
 For more information see the "Bean Fields" section of the <<introspection, Bean Introspections>> documentation.
 
+==== `ApplicationEventPublisher` has now a generic event type
+
+For the performance reasons it's advised to inject an instance of `ApplicationEventPublisher` with a generic type parameter - `ApplicationEventPublisher<MyEvent>`.
+
 === AOP Features
 
 ==== Support for Constructor Interception

@@ -480,8 +480,9 @@ class Test {
 ''')
         expect:
         definition != null
-        definition.getTypeParameters(Reporter) == [Span] as Class[]
         definition.getTypeParameters(AsyncReporter) == [Span] as Class[]
+        definition.getTypeParameters(Reporter) == [Span] as Class[]
+
     }
 
     void "test type arguments for factory with AOP advice applied"() {

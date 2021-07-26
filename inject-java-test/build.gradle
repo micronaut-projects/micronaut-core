@@ -2,6 +2,7 @@ dependencies {
     annotationProcessor project(":inject-java")
 
     api project(":inject-java")
+    api project(":context")
 //    api "com.google.testing.compile:compile-testing:0.19", {
 //        exclude group:'com.google.truth', module:'truth'
 //    }
