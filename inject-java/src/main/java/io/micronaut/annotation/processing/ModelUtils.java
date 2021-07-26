@@ -221,7 +221,10 @@ public class ModelUtils {
 
             Optional<ExecutableElement> element = findAnnotatedConstructor(annotationUtils, constructors);
             if (!element.isPresent()) {
-                element = constructors.stream().filter(ctor ->
+                final Comparator<ExecutableElement> comparator = Comparator.comparingInt(e -> e.getParameters().size());
+                element = constructors.stream()
+                        .sorted(comparator.reversed())
+                        .filter(ctor ->
                         ctor.getModifiers().contains(PUBLIC)
                 ).findFirst();
             }
