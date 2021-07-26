@@ -11,6 +11,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.format.FormattingTypeConverter;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
+import io.micronaut.core.convert.value.ConvertibleMultiValuesMap;
 import io.micronaut.core.convert.value.MutableConvertibleMultiValuesMap;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MutableHttpRequest;
@@ -123,9 +124,14 @@ public class QueryValueClientArgumentRequestBinder implements AnnotatedClientArg
         Optional<ConvertibleMultiValues> convertedValue = conversionService.convert(value, conversionContext);
 
         if (convertedValue.isPresent()) {
-            // TODO How should I check it? Put a try-catch block?
-            // noinspection unchecked
-            ConvertibleMultiValues<String> multiValues = convertedValue.get();
+            // TODO How should I check if it is truely a List of Strings?
+            ConvertibleMultiValues<String> multiValues;
+            try {
+                // noinspection unchecked
+                multiValues = convertedValue.get();
+            } catch (Exception e) {
+                multiValues = new ConvertibleMultiValuesMap<>();
+            }
             Map<String, List<String>> queryParameters = uriContext.getQueryParameters();
 
             // Add all the parameters
