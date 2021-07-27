@@ -63,7 +63,7 @@ object KotlinCompileHelper {
     }
 
     fun run(className: String, code: String): Result {
-        val tmp = Files.createTempDirectory("abc")
+        val tmp = Files.createTempDirectory("KotlinCompileHelper")
         try {
             return run0(tmp, className, code)
         } finally {
@@ -196,7 +196,7 @@ object KotlinCompileHelper {
             cl.files[outDir.relativize(p).toString()] = Files.readAllBytes(p)
         }
 
-        return Result(URLClassLoader(arrayOf(outDir.toUri().toURL()), cl), cl.files.keys)
+        return Result(cl, cl.files.keys)
     }
 
     private fun getClasspath(cl: ClassLoader): List<File> =

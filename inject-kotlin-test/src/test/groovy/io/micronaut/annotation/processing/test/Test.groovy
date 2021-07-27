@@ -51,4 +51,19 @@ class Bar {
         expect:
         bean.bar != null
     }
+
+    void "build bean definition"() {
+        given:
+        def definition = buildBeanDefinition('test.Test', '''
+package test;
+import javax.inject.Singleton;
+
+@Singleton
+class Test {
+}
+''')
+
+        expect:
+        definition != null
+    }
 }

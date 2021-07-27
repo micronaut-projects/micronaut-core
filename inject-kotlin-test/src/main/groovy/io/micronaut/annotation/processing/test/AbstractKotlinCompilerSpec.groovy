@@ -21,6 +21,7 @@ import io.micronaut.context.Qualifier
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.core.naming.NameUtils
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import org.intellij.lang.annotations.Language
 import spock.lang.Specification
@@ -52,7 +53,7 @@ class AbstractKotlinCompilerSpec extends Specification {
      * Build and return a {@link io.micronaut.core.beans.BeanIntrospection} for the given class name and class data.
      *
      * @return the introspection if it is correct
-     * */
+     */
     protected ApplicationContext buildContext(String className, @Language("kotlin") String cls) {
         def result = KotlinCompileHelper.INSTANCE.run(className, cls)
         ClassLoader classLoader = result.classLoader
@@ -72,5 +73,18 @@ class AbstractKotlinCompilerSpec extends Specification {
 
     Object getBean(ApplicationContext context, String className, Qualifier qualifier = null) {
         context.getBean(context.classLoader.loadClass(className), qualifier)
+    }
+
+    protected BeanDefinition buildBeanDefinition(String className, @Language("kotlin") String cls) {
+        def beanDefName= '$' + NameUtils.getSimpleName(className) + 'Definition'
+        def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(className, cls)
+        try {
+            return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
+        } catch (ClassNotFoundException e) {
+            return null
+        }
     }
 }
