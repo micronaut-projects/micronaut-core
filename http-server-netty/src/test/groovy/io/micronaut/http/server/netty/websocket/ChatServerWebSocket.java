@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.websocket;
 
 //tag::clazz[]
+import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.websocket.WebSocketBroadcaster;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.annotation.*;
@@ -34,6 +35,7 @@ public class ChatServerWebSocket {
     public void onOpen(String topic, String username, WebSocketSession session) {
         this.subProtocol = session.getSubprotocol().orElse(null);
         String msg = "[" + username + "] Joined!";
+        assert ServerRequestContext.currentRequest().isPresent();
         broadcaster.broadcastSync(msg, isValid(topic, session));
     }
 
@@ -44,6 +46,7 @@ public class ChatServerWebSocket {
             String message,
             WebSocketSession session) {
         String msg = "[" + username + "] " + message;
+        assert ServerRequestContext.currentRequest().isPresent();
         broadcaster.broadcastSync(msg, isValid(topic, session)); // <4>
     }
 
@@ -53,6 +56,7 @@ public class ChatServerWebSocket {
             String username,
             WebSocketSession session) {
         String msg = "[" + username + "] Disconnected!";
+        assert ServerRequestContext.currentRequest().isPresent();
         broadcaster.broadcastSync(msg, isValid(topic, session));
     }
 
