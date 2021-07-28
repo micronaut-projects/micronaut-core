@@ -376,8 +376,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private ExecutableMethodsDefinitionWriter executableMethodsDefinitionWriter;
 
     private Object constructor; // MethodElement or FieldElement
-
-
+    private boolean constructorRequiresReflection;
+    
     /**
      * Creates a bean definition writer.
      *
@@ -390,7 +390,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                 VisitorContext visitorContext) {
         this(classElement, OriginatingElements.of(classElement), metadataBuilder, visitorContext, null);
     }
-    private boolean constructorRequiresReflection;
+
 
     /**
      * Creates a bean definition writer.
