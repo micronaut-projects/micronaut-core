@@ -113,7 +113,6 @@ class AnotherInterceptor implements Interceptor {
 
         then:"The interceptors that apply to post construction are invoked"
         interceptor.invoked == 1
-        (proxyTarget ? instance.interceptedTarget() : instance).invoked == 1
         constructorInterceptor.invoked == 1
         anotherInterceptor.invoked == 0
         destroyInterceptor.invoked == 0
