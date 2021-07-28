@@ -372,11 +372,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private final List<MethodVisitData> methodInjectionPoints = new ArrayList<>(2);
     private final List<MethodVisitData> postConstructMethodVisits = new ArrayList<>(2);
     private final List<MethodVisitData> preDestroyMethodVisits = new ArrayList<>(2);
+    private final Map<String, Boolean> isLifeCycleCache = new HashMap<>(2);
     private ExecutableMethodsDefinitionWriter executableMethodsDefinitionWriter;
 
     private Object constructor; // MethodElement or FieldElement
     private boolean constructorRequiresReflection;
-
+    
     /**
      * Creates a bean definition writer.
      *
@@ -389,6 +390,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                 VisitorContext visitorContext) {
         this(classElement, OriginatingElements.of(classElement), metadataBuilder, visitorContext, null);
     }
+
 
     /**
      * Creates a bean definition writer.
@@ -1150,7 +1152,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
         visitPostConstructMethodDefinition(false);
         // for "super bean definitions" we just delegate to super
-        if (!superBeanDefinition) {
+        if (!superBeanDefinition || isInterceptedLifeCycleByType(this.annotationMetadata, "POST_CONSTRUCT")) {
             MethodVisitData methodVisitData = new MethodVisitData(declaringType, methodElement, requiresReflection);
             postConstructMethodVisits.add(methodVisitData);
             visitMethodInjectionPointInternal(methodVisitData, postConstructMethodVisitor, postConstructInstanceLocalVarIndex);
@@ -1163,7 +1165,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                       boolean requiresReflection,
                                       VisitorContext visitorContext) {
         // for "super bean definitions" we just delegate to super
-        if (!superBeanDefinition) {
+        if (!superBeanDefinition || isInterceptedLifeCycleByType(this.annotationMetadata, "PRE_DESTROY")) {
             visitPreDestroyMethodDefinition(false);
 
             MethodVisitData methodVisitData = new MethodVisitData(declaringType, methodElement, requiresReflection);
@@ -2017,7 +2019,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             final String lifeCycleMethodName = "initialize";
 
             //  for "super bean definition" we only add code to trigger "initialize"
-            if (!superBeanDefinition) {
+            if (!superBeanDefinition || intercepted) {
                 interfaceTypes.add(InitializingBeanDefinition.class);
 
                 GeneratorAdapter postConstructMethodVisitor = newLifeCycleMethod(lifeCycleMethodName);
@@ -2681,40 +2683,42 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private boolean isInterceptedLifeCycleByType(AnnotationMetadata annotationMetadata, String interceptType) {
-        if (this.beanTypeElement.isAssignable("io.micronaut.aop.Interceptor")) {
-            // interceptor beans cannot have lifecycle methods intercepted
-            return false;
-        }
-        final Element originatingElement = getOriginatingElements()[0];
-        final boolean isFactoryMethod = (originatingElement instanceof MethodElement && !(originatingElement instanceof ConstructorElement));
-        final boolean isProxyTarget = annotationMetadata.booleanValue(AnnotationUtil.ANN_AROUND, "proxyTarget").orElse(false) || isFactoryMethod;
-        // for beans that are @Around(proxyTarget=false) only the generated AOP impl should be intercepted
-        final boolean isAopType = StringUtils.isNotEmpty(interceptedType);
-        final boolean isConstructorInterceptionCandidate = (isProxyTarget && !isAopType) || (isAopType && !isProxyTarget);
-        final boolean hasAroundConstruct;
-        final AnnotationValue<Annotation> interceptorBindings
-                = annotationMetadata.getAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
-        final List<AnnotationValue<Annotation>> interceptorBindingAnnotations;
-        if (interceptorBindings != null) {
-            interceptorBindingAnnotations = interceptorBindings.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
-            hasAroundConstruct = interceptorBindingAnnotations
-                    .stream()
-                    .anyMatch(av -> av.stringValue("kind").map(k -> k.equals(interceptType)).orElse(false));
-        } else {
-            interceptorBindingAnnotations = Collections.emptyList();
-            hasAroundConstruct = false;
-        }
+        return isLifeCycleCache.computeIfAbsent(interceptType, s -> {
+            if (this.beanTypeElement.isAssignable("io.micronaut.aop.Interceptor")) {
+                // interceptor beans cannot have lifecycle methods intercepted
+                return false;
+            }
+            final Element originatingElement = getOriginatingElements()[0];
+            final boolean isFactoryMethod = (originatingElement instanceof MethodElement && !(originatingElement instanceof ConstructorElement));
+            final boolean isProxyTarget = annotationMetadata.booleanValue(AnnotationUtil.ANN_AROUND, "proxyTarget").orElse(false) || isFactoryMethod;
+            // for beans that are @Around(proxyTarget=false) only the generated AOP impl should be intercepted
+            final boolean isAopType = StringUtils.isNotEmpty(interceptedType);
+            final boolean isConstructorInterceptionCandidate = (isProxyTarget && !isAopType) || (isAopType && !isProxyTarget);
+            final boolean hasAroundConstruct;
+            final AnnotationValue<Annotation> interceptorBindings
+                    = annotationMetadata.getAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
+            final List<AnnotationValue<Annotation>> interceptorBindingAnnotations;
+            if (interceptorBindings != null) {
+                interceptorBindingAnnotations = interceptorBindings.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
+                hasAroundConstruct = interceptorBindingAnnotations
+                        .stream()
+                        .anyMatch(av -> av.stringValue("kind").map(k -> k.equals(interceptType)).orElse(false));
+            } else {
+                interceptorBindingAnnotations = Collections.emptyList();
+                hasAroundConstruct = false;
+            }
 
-        if (isConstructorInterceptionCandidate) {
-            return hasAroundConstruct;
-        } else if (hasAroundConstruct) {
-            // if no other AOP advice is applied
-            return interceptorBindingAnnotations
-                    .stream()
-                    .noneMatch(av -> av.stringValue("kind").map(k -> k.equals("AROUND")).orElse(false));
-        } else {
-            return false;
-        }
+            if (isConstructorInterceptionCandidate) {
+                return hasAroundConstruct;
+            } else if (hasAroundConstruct) {
+                // if no other AOP advice is applied
+                return interceptorBindingAnnotations
+                        .stream()
+                        .noneMatch(av -> av.stringValue("kind").map(k -> k.equals("AROUND")).orElse(false));
+            } else {
+                return false;
+            }
+        });
     }
 
     private void pushConstructorArguments(GeneratorAdapter buildMethodVisitor,
