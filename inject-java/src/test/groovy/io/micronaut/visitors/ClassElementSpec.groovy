@@ -23,6 +23,7 @@ import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.EnumElement
 import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.ast.PackageElement
 import spock.lang.IgnoreIf
 import spock.lang.Issue
 import spock.util.environment.Jvm
@@ -30,6 +31,22 @@ import spock.util.environment.Jvm
 import java.util.function.Supplier
 
 class ClassElementSpec extends AbstractTypeElementSpec {
+
+    void "test get package element"() {
+        given:
+        def element = buildClassElement('''
+package pkgeltest;
+
+class PckElementTest {
+
+}
+''')
+        PackageElement pe = element.getPackage()
+
+        expect:
+        pe.name == 'pkgeltest'
+        pe.getClass().name.contains("JavaPackageElement")
+    }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/5611')
     void 'test visit enum with custom annotation'() {

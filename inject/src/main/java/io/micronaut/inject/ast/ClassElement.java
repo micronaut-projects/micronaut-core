@@ -170,6 +170,16 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * The package name.
+     *
+     * @return The package name
+     * @since 3.0.0
+     */
+    default PackageElement getPackage() {
+        return PackageElement.of(getPackageName());
+    }
+
+    /**
      * Returns the bean properties (getters and setters) for this class element.
      *
      * @return The bean properties for this class element
