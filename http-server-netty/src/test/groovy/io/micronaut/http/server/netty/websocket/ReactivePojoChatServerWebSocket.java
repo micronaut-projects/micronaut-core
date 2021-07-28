@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.websocket;
 
+import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.websocket.WebSocketBroadcaster;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.annotation.OnClose;
@@ -38,6 +39,7 @@ public class ReactivePojoChatServerWebSocket {
     public Publisher<Message> onOpen(String topic, String username, WebSocketSession session) {
         String text = "[" + username + "] Joined!";
         Message message = new Message(text);
+        assert ServerRequestContext.currentRequest().isPresent();
         return broadcaster.broadcast(message, isValid(topic, session));
     }
 
@@ -51,6 +53,7 @@ public class ReactivePojoChatServerWebSocket {
 
         String text = "[" + username + "] " + message.getText();
         Message newMessage = new Message(text);
+        assert ServerRequestContext.currentRequest().isPresent();
         return broadcaster.broadcast(newMessage, isValid(topic, session));
     }
     // end::onmessage[]
@@ -63,6 +66,7 @@ public class ReactivePojoChatServerWebSocket {
 
         String text = "[" + username + "] Disconnected!";
         Message message = new Message(text);
+        assert ServerRequestContext.currentRequest().isPresent();
         return broadcaster.broadcast(message, isValid(topic, session));
     }
 
