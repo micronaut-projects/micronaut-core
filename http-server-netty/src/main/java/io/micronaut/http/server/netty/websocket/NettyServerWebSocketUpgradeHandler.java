@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.*;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.filter.HttpServerFilter;
@@ -167,9 +168,18 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
                         return (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.getAndSet(request), this);
                     }
                 };
-                HttpFilter httpFilter = filters.get(0);
-                Publisher<? extends HttpResponse<?>> resultingPublisher = httpFilter.doFilter(requestReference.get(), filterChain);
-                finalPublisher = (Publisher<? extends MutableHttpResponse<?>>) resultingPublisher;
+                Optional<HttpRequest<Object>> prevRequest = ServerRequestContext.currentRequest();
+                try {
+                    ServerRequestContext.set(requestReference.get());
+                    HttpFilter httpFilter = filters.get(0);
+                    finalPublisher =  (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.get(), filterChain);
+                } finally {
+                    if (prevRequest.isPresent()) {
+                        ServerRequestContext.set(prevRequest.get());
+                    } else {
+                        ServerRequestContext.set(null);
+                    }
+                }
             } else {
                 finalPublisher = routePublisher;
             }
