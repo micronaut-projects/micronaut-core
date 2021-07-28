@@ -30,6 +30,7 @@ class MyBean {
 
     @PostConstruct
     void init() {
+        System.out.println("INVOKED POST CONSTRUCT");
         this.invoked++;
     }
 }
