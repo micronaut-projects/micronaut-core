@@ -877,6 +877,25 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @Override
+    public PackageElement getPackage() {
+        final PackageNode aPackage = classNode.getPackage();
+        if (aPackage != null) {
+
+            return new GroovyPackageElement(
+                    visitorContext,
+                    aPackage,
+                    AstAnnotationUtils.getAnnotationMetadata(
+                            sourceUnit,
+                            compilationUnit,
+                            aPackage
+                    )
+            );
+        } else {
+            return PackageElement.DEFAULT_PACKAGE;
+        }
+    }
+
+    @Override
     public boolean isAbstract() {
         return classNode.isAbstract();
     }

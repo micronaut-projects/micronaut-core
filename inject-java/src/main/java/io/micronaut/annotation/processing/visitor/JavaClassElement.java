@@ -27,6 +27,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.*;
+import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.lang.model.element.Element;
@@ -800,6 +801,24 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             packageName = JavaModelUtils.getPackageName(classElement);
         }
         return packageName;
+    }
+
+    @Override
+    public PackageElement getPackage() {
+        Element enclosingElement = classElement.getEnclosingElement();
+        while (enclosingElement != null && enclosingElement.getKind() != ElementKind.PACKAGE) {
+            enclosingElement = enclosingElement.getEnclosingElement();
+        }
+        if (enclosingElement instanceof javax.lang.model.element.PackageElement) {
+            return new JavaPackageElement(
+                    ((javax.lang.model.element.PackageElement) enclosingElement),
+                    visitorContext.getAnnotationUtils().getAnnotationMetadata(enclosingElement),
+                    visitorContext
+            );
+        } else {
+            return PackageElement.DEFAULT_PACKAGE;
+        }
+
     }
 
     @Override

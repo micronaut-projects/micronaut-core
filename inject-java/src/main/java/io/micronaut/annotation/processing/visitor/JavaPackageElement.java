@@ -27,7 +27,7 @@ import javax.lang.model.element.PackageElement;
  * @since 2.0.0
  */
 @Internal
-public class JavaPackageElement extends AbstractJavaElement {
+public class JavaPackageElement extends AbstractJavaElement implements io.micronaut.inject.ast.PackageElement {
     /**
      * @param element            The {@link PackageElement}
      * @param annotationMetadata The Annotation metadata
