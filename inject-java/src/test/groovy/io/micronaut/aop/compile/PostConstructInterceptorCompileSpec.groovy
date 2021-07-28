@@ -113,6 +113,7 @@ class AnotherInterceptor implements Interceptor {
         def instance = getBean(context, 'annbinding1.MyBean')
 
         then:"The interceptors that apply to post construction are invoked"
+        (proxyTarget ? instance.interceptedTarget() : instance).invoked == 1
         interceptor.invoked == 1
         constructorInterceptor.invoked == 1
         anotherInterceptor.invoked == 0
