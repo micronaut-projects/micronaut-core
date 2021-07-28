@@ -2017,7 +2017,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             final String lifeCycleMethodName = "initialize";
 
             //  for "super bean definition" we only add code to trigger "initialize"
-            if (!superBeanDefinition) {
+            if (!superBeanDefinition || intercepted) {
                 interfaceTypes.add(InitializingBeanDefinition.class);
 
                 GeneratorAdapter postConstructMethodVisitor = newLifeCycleMethod(lifeCycleMethodName);
