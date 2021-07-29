@@ -39,6 +39,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -72,16 +73,19 @@ import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.ast.beans.BeanElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.inject.visitor.BeanElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import jakarta.inject.Singleton;
 import org.jetbrains.annotations.NotNull;
@@ -116,7 +120,10 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
+
+import static io.micronaut.inject.visitor.BeanElementVisitor.VISITORS;
 
 /**
  * <p>Responsible for building {@link BeanDefinition} instances at compile time. Uses ASM build the class definition.</p>
@@ -142,7 +149,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-public class BeanDefinitionWriter extends AbstractClassFileWriter implements BeanDefinitionVisitor {
+public class BeanDefinitionWriter extends AbstractClassFileWriter implements BeanDefinitionVisitor, BeanElement {
     public static final String CLASS_SUFFIX = "$Definition";
     private static final String ANN_CONSTRAINT = "javax.validation.Constraint";
 
@@ -341,6 +348,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private final ConfigurationMetadataBuilder<?> metadataBuilder;
     private final Element beanProducingElement;
     private final ClassElement beanTypeElement;
+    private final VisitorContext visitorContext;
     private GeneratorAdapter buildMethodVisitor;
     private GeneratorAdapter injectMethodVisitor;
     private Label injectEnd = null;
@@ -390,7 +398,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                 VisitorContext visitorContext) {
         this(classElement, OriginatingElements.of(classElement), metadataBuilder, visitorContext, null);
     }
-
 
     /**
      * Creates a bean definition writer.
@@ -504,7 +511,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.interfaceTypes.add(BeanFactory.class);
         this.isConfigurationProperties = isConfigurationProperties(annotationMetadata);
         validateExposedTypes(annotationMetadata, visitorContext);
-
+        this.visitorContext = visitorContext;
     }
 
     /**
@@ -820,6 +827,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             throw new IllegalStateException("At least one called to visitBeanDefinitionConstructor(..) is required");
         }
 
+        processAllBeanElementVisitors();
+
         if (constructor instanceof MethodElement) {
             MethodElement methodElement = (MethodElement) constructor;
             boolean isParametrized = Arrays.stream(methodElement.getParameters())
@@ -984,6 +993,22 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
         classWriter.visitEnd();
         this.beanFinalized = true;
+    }
+
+    private void processAllBeanElementVisitors() {
+        for (BeanElementVisitor<?> visitor : VISITORS) {
+            if (visitor.isEnabled() && visitor.supports(this)) {
+                try {
+                    visitor.visitBeanElement(this, visitorContext);
+                } catch (Exception e) {
+                    visitorContext.fail(
+                            "Error occurred visiting BeanElementVisitor of type [" + visitor.getClass().getName() + "]: " + e.getMessage(),
+                            this
+                    );
+                    break;
+                }
+            }
+        }
     }
 
     private void addInnerConfigurationMethod(GeneratorAdapter staticInit) {
@@ -3293,6 +3318,142 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 int.class,
                 int.class,
                 Qualifier.class);
+    }
+
+    @Override
+    public String getName() {
+        return beanDefinitionName;
+    }
+
+    @Override
+    public boolean isProtected() {
+        return false;
+    }
+
+    @Override
+    public boolean isPublic() {
+        return true;
+    }
+
+    @Override
+    public Object getNativeType() {
+        return this;
+    }
+
+    @Override
+    public Collection<Element> getInjectionPoints() {
+        if (fieldInjectionPoints.isEmpty() && methodInjectionPoints.isEmpty()) {
+            return Collections.emptyList();
+        } else {
+            Collection<Element> injectionPoints = new ArrayList<>();
+            for (FieldVisitData fieldInjectionPoint : fieldInjectionPoints) {
+                injectionPoints.add(fieldInjectionPoint.fieldElement);
+            }
+            for (MethodVisitData methodInjectionPoint : methodInjectionPoints) {
+                injectionPoints.add(methodInjectionPoint.methodElement);
+            }
+            return Collections.unmodifiableCollection(injectionPoints);
+        }
+    }
+
+    @Override
+    public boolean isAbstract() {
+        return this.isAbstract;
+    }
+
+    @Override
+    public <T extends Annotation> Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+        this.beanProducingElement.annotate(annotationType, consumer);
+        return this;
+    }
+
+    @Override
+    public Element removeAnnotation(String annotationType) {
+        this.beanProducingElement.removeAnnotation(annotationType);
+        return this;
+    }
+
+    @Override
+    public <T extends Annotation> Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
+        this.beanProducingElement.removeAnnotationIf(predicate);
+        return this;
+    }
+
+    @Override
+    public Element removeStereotype(String annotationType) {
+        this.beanProducingElement.removeStereotype(annotationType);
+        return this;
+    }
+
+    @Override
+    public ClassElement getDeclaringClass() {
+        final Element beanProducingElement = this.beanProducingElement;
+        return getDeclaringType(beanProducingElement);
+    }
+
+    private ClassElement getDeclaringType(Element beanProducingElement) {
+        if (beanProducingElement instanceof ClassElement) {
+            return (ClassElement) beanProducingElement;
+        } else if (beanProducingElement instanceof MemberElement) {
+            return ((MemberElement) beanProducingElement).getDeclaringType();
+        } else if (beanProducingElement instanceof BeanElementBuilder) {
+            final Element originatingElement = ((BeanElementBuilder) beanProducingElement).getOriginatingElement();
+            return getDeclaringType(originatingElement);
+        } else {
+            return this.beanTypeElement;
+        }
+    }
+
+    @Override
+    public Element getProducingElement() {
+        return beanProducingElement;
+    }
+
+    @Override
+    public Set<String> getBeanTypes() {
+        final String[] types = this.annotationMetadata.stringValues(Bean.class, "typed");
+        if (ArrayUtils.isNotEmpty(types)) {
+            return CollectionUtils.setOf(types);
+        } else {
+            final Optional<ClassElement> superType = beanTypeElement.getSuperType();
+            final Collection<ClassElement> interfaces = beanTypeElement.getInterfaces();
+            if (superType.isPresent() || !interfaces.isEmpty()) {
+                Set<String> beanTypes = new HashSet<>();
+                beanTypes.add(beanTypeElement.getName());
+                populateBeanTypes(beanTypes, superType.orElse(null), interfaces);
+                return Collections.unmodifiableSet(beanTypes);
+            } else {
+                return Collections.singleton(beanTypeElement.getName());
+            }
+        }
+    }
+
+    private void populateBeanTypes(Set<String> beanTypes, ClassElement superType, Collection<ClassElement> interfaces) {
+        for (ClassElement anInterface : interfaces) {
+            final String n = anInterface.getName();
+            if (!beanTypes.contains(n)) {
+                beanTypes.add(n);
+                populateBeanTypes(beanTypes, null, anInterface.getInterfaces());
+            }
+        }
+        if (superType != null) {
+            final String n = superType.getName();
+            if (!beanTypes.contains(n)) {
+                beanTypes.add(n);
+                final ClassElement next = superType.getSuperType().orElse(null);
+                populateBeanTypes(beanTypes, next, superType.getInterfaces());
+            }
+        }
+    }
+
+    @Override
+    public Optional<String> getScope() {
+        return annotationMetadata.getAnnotationNameByStereotype(AnnotationUtil.SCOPE);
+    }
+
+    @Override
+    public Collection<String> getQualifiers() {
+        return Collections.unmodifiableList(annotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER));
     }
 
     @Internal
