@@ -17,6 +17,7 @@ package io.micronaut.core.convert;
 
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.convert.converters.MultiValuesConverterFactory;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.format.FormattingTypeConverter;
@@ -915,6 +916,21 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of(result);
         });
 
+        // ConvertibleMultiValues -> [?]
+        addConverter(io.micronaut.core.convert.value.ConvertibleMultiValues.class, Iterable.class,
+                new MultiValuesConverterFactory.MultiValuesToIterableConverter(this));
+        addConverter(io.micronaut.core.convert.value.ConvertibleMultiValues.class, Map.class,
+                new MultiValuesConverterFactory.MultiValuesToMapConverter(this));
+        addConverter(io.micronaut.core.convert.value.ConvertibleMultiValues.class, Object.class,
+                new MultiValuesConverterFactory.MultiValuesToObjectConverter(this));
+
+        // [?] -> ConvertibleMultiValues
+        addConverter(Iterable.class, io.micronaut.core.convert.value.ConvertibleMultiValues.class,
+                new MultiValuesConverterFactory.IterableToMultiValuesConverter(this));
+        addConverter(Map.class, io.micronaut.core.convert.value.ConvertibleMultiValues.class,
+                new MultiValuesConverterFactory.MapToMultiValuesConverter(this));
+        addConverter(Object.class, io.micronaut.core.convert.value.ConvertibleMultiValues.class,
+                new MultiValuesConverterFactory.ObjectToMultiValuesConverter(this));
     }
 
     /**

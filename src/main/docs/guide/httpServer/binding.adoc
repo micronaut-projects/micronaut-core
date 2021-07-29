@@ -76,31 +76,30 @@ The supported values are: `"CSV"`, `"SSV"`, `"PIPES"`, `"MULTI"` and `"DEEP_OBJE
 The format can only be applied to `java.lang.Iterable`, `java.util.Map` or POJO with link:{api}/io/micronaut/core/annotation/Introspected.html[Introspected] annotation. Examples of how different values will be formatted are given in the table below:
 
 |===
-| Format | Iterable example | Map example | Object example
+| Format | Iterable example | Map or POJO example
+
+| Original value
+| `["Mike", "Adam", "Kate"]`
+| `{"name": "Mike", "age": 30"}`
 
 | `"CSV"`
 | `"param=Mike,Adam,Kate"`
-| `"param=name,Mike,age,30"`
 | `"param=name,Mike,age,30"`
 
 | `"SSV"`
 | `"param=Mike Adam Kate"`
 | `"param=name Mike age 30"`
-| `"param=name Mike age 30"`
 
 | `"PIPES"`
 | `"param=Mike\|Adam\|Kate"`
-| `"param=name\|Mike\|age\|30"`
 | `"param=name\|Mike\|age\|30"`
 
 | `"MULTI"`
 | `"param=Mike&param=Adam&param=Kate"`
 | `"name=Mike&age=30"`
-| `"name=Mike&age=30"`
 
 | `"DEEP_OBJECT"`
 | `"param[0]=Mike&param[1]=Adam&param[2]=Kate"`
-| `"param[name]=Mike&param[age]=30"`
 | `"param[name]=Mike&param[age]=30"`
 
 |===
