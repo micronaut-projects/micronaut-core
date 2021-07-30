@@ -24,6 +24,7 @@ import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.Qualifier
+import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.annotation.Nullable
@@ -239,8 +240,7 @@ class Test {
                         new InterceptorRegistryBean(),
                         new BeanProviderDefinition(),
                         new JakartaProviderBeanDefinition(),
-                        Class.forName('io.micronaut.runtime.event.$ApplicationEventPublisherFactory$Build0$Definition$Reference').newInstance(),
-                        Class.forName('io.micronaut.runtime.event.$ApplicationEventPublisherFactory$Definition$Reference').newInstance()
+                        new ApplicationEventPublisherFactory<>()
                 ])
             }
         }.start()

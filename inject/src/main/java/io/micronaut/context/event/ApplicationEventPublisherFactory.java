@@ -178,6 +178,20 @@ public final class ApplicationEventPublisherFactory<T>
         return Collections.singletonList(TYPE_VARIABLE);
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        return o != null && getClass() == o.getClass();
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
+    }
+
+
     private ApplicationEventPublisher<Object> createObjectEventPublisher(BeanContext beanContext) {
         return new ApplicationEventPublisher<Object>() {
             @Override
