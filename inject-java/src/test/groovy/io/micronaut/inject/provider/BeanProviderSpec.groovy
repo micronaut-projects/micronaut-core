@@ -16,13 +16,16 @@
 package io.micronaut.inject.provider
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.BeanContext
+import io.micronaut.context.BeanContextConfiguration
+import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.TestCachePuts
 
 class BeanProviderSpec extends AbstractTypeElementSpec {
 
-    void "test bean definition reference references correct bean type for jakarta.inject.Provider"() {
+     void "test bean definition reference references correct bean type for jakarta.inject.Provider"() {
         given:
         BeanDefinitionReference definition = buildBeanDefinitionReference('test.Test','''\
 package test;

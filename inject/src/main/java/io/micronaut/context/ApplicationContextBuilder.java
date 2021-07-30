@@ -206,6 +206,15 @@ public interface ApplicationContextBuilder {
     @NonNull ApplicationContextBuilder banner(boolean isEnabled);
 
     /**
+     * Whether to error on a missing bean provider.
+     *
+     * @param shouldError True if an error should occur
+     * @return This application
+     * @since 3.0.0
+     */
+    @NonNull ApplicationContextBuilder errorOnMissingBeanProvider(boolean shouldError);
+
+    /**
      * Set the command line arguments.
      *
      * @param args The arguments

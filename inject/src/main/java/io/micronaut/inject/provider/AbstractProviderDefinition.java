@@ -154,7 +154,7 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
                         } else if (injectionPointArgument.isNullable()) {
                             throw new DisabledBeanException("Nullable bean doesn't exist");
                         } else {
-                            if (qualifier instanceof AnyQualifier) {
+                            if (qualifier instanceof AnyQualifier || !context.getContextConfiguration().isErrorOnMissingProvider()) {
                                 return buildProvider(
                                         resolutionContext,
                                         context,

@@ -22,6 +22,8 @@ import io.micronaut.annotation.processing.visitor.JavaElementFactory
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext
 import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.ApplicationContextBuilder
+import io.micronaut.context.ApplicationContextConfiguration
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.Qualifier
 import io.micronaut.core.annotation.AnnotationMetadata
@@ -29,7 +31,6 @@ import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
-import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.BeanDefinition
@@ -220,7 +221,11 @@ class Test {
             }
         }
 
-        return new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(classLoader), "test") {
+        def builder = ApplicationContext.builder()
+        builder.classLoader(classLoader)
+        builder.environments("test")
+        configureContext(builder)
+        return new DefaultApplicationContext((ApplicationContextConfiguration) builder) {
             @Override
             protected List<BeanDefinitionReference> resolveBeanDefinitionReferences(Predicate<BeanDefinitionReference> predicate) {
                 def references = StreamSupport.stream(files.spliterator(), false)
@@ -526,6 +531,13 @@ class Test {
             }
         }
         return builder
+    }
+
+    /**
+     * Allows configuring the context
+     * @param contextBuilder The context builder
+     */
+    protected void configureContext(ApplicationContextBuilder contextBuilder) {
     }
 
     static class TypeElementInfo {

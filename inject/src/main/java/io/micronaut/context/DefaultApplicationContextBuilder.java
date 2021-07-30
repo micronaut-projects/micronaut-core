@@ -53,11 +53,17 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private String[] overrideConfigLocations;
     private boolean banner = true;
     private ClassPathResourceLoader classPathResourceLoader;
+    private boolean errorOnMissingProvider = true;
 
     /**
      * Default constructor.
      */
     protected DefaultApplicationContextBuilder() {
+    }
+
+    @Override
+    public boolean isErrorOnMissingProvider() {
+        return errorOnMissingProvider;
     }
 
     @NonNull
@@ -327,6 +333,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public @NonNull ApplicationContextBuilder banner(boolean isEnabled) {
         this.banner = isEnabled;
+        return this;
+    }
+
+    @Override
+    public ApplicationContextBuilder errorOnMissingBeanProvider(boolean shouldError) {
+        this.errorOnMissingProvider = shouldError;
         return this;
     }
 }
