@@ -236,14 +236,21 @@ class Test {
                         .filter({ bdr -> predicate == null || predicate.test(bdr) })
                         .collect(Collectors.toList())
 
-                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences(predicate) : [
-                        new InterceptorRegistryBean(),
-                        new BeanProviderDefinition(),
-                        new JakartaProviderBeanDefinition(),
-                        new ApplicationEventPublisherFactory<>()
-                ])
+                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences(predicate) : getBuiltInBeanReferences())
             }
         }.start()
+    }
+
+    /**
+     * @return Obtains the built in bean references required for the context to function correctly
+     */
+    List<BeanDefinitionReference<?>> getBuiltInBeanReferences() {
+        return [
+                new InterceptorRegistryBean(),
+                new BeanProviderDefinition(),
+                new JakartaProviderBeanDefinition(),
+                new ApplicationEventPublisherFactory<>()
+        ]
     }
 
     /**
