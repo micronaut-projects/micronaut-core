@@ -92,6 +92,14 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
     }
 
     /**
+     * Returns the wrapped type in the case where {@link #isWrapperType()} returns true.
+     * @return The wrapped type
+     */
+    default Argument<?> getWrappedType() {
+        return RuntimeTypeInformation.getWrappedType(this);
+    }
+
+    /**
      * @return Is the return the return type a reactive completable type.
      * @since 2.0.0
      */
