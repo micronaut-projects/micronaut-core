@@ -12,7 +12,7 @@ class DisableErrorOnMissingBeanProviderSpec extends AbstractTypeElementSpec {
 
     boolean shouldError = false
 
-    void "test should error on missing bean provider"() {
+    void "test should not error on missing bean provider if disabled"() {
         given:
         def context = buildContext('''
 package missingprov;
@@ -37,6 +37,84 @@ class Test {
 
         then:
         thrown(NoSuchBeanException)
+
+        cleanup:
+        context.close()
+    }
+
+    void "test should not error on missing bean provider with qualifier if disabled"() {
+        given:
+        def context = buildContext('''
+package missingprov;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import jakarta.inject.*;
+
+@Singleton
+class Test {
+    @Inject
+    @MyQualifier
+    Provider<String> stringProvider;
+}
+
+@Qualifier
+@Retention(RetentionPolicy.RUNTIME)
+@interface MyQualifier {}
+''')
+        when:
+        def bean = getBean(context, 'missingprov.Test')
+
+        then:
+        bean
+        bean.stringProvider
+
+        when:
+        bean.stringProvider.get()
+
+        then:
+        def e = thrown(NoSuchBeanException)
+        e.message.contains("No bean of type [java.lang.String] exists for the given qualifier: @MyQualifier")
+
+        cleanup:
+        context.close()
+    }
+
+    void "test should not error on missing bean provider with qualifier with annotation members if disabled"() {
+        given:
+        def context = buildContext('''
+package missingprov;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import jakarta.inject.*;
+
+@Singleton
+class Test {
+    @Inject
+    @MyQualifier(name="Bob")
+    Provider<String> stringProvider;
+}
+
+@Qualifier
+@Retention(RetentionPolicy.RUNTIME)
+@interface MyQualifier {
+    String name();
+}
+''')
+        when:
+        def bean = getBean(context, 'missingprov.Test')
+
+        then:
+        bean
+        bean.stringProvider
+
+        when:
+        bean.stringProvider.get()
+
+        then:
+        def e = thrown(NoSuchBeanException)
+        e.message.contains("No bean of type [java.lang.String] exists for the given qualifier: @MyQualifier")
 
         cleanup:
         context.close()
