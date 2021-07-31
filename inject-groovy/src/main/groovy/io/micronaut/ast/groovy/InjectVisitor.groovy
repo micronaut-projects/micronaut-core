@@ -1091,7 +1091,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             }
             return
         }
-        boolean isInject = fieldAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT)
+        boolean isInject = isFieldInjected(fieldNode, fieldAnnotationMetadata)
         boolean isValue = isValueInjection(fieldNode, fieldAnnotationMetadata)
         FieldElement fieldElement = elementFactory.newFieldElement(fieldNode, fieldAnnotationMetadata)
 
@@ -1195,7 +1195,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             }
             return
         }
-        boolean isInject = fieldNode != null && fieldAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT)
+        boolean isInject = isFieldInjected(fieldNode, fieldAnnotationMetadata)
         boolean isValue = isValueInjection(fieldNode, fieldAnnotationMetadata)
 
         String propertyName = propertyNode.name
@@ -1328,6 +1328,10 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 visitFactoryProperty(propertyNode, fieldNode, fieldAnnotationMetadata)
             }
         }
+    }
+
+    private boolean isFieldInjected(FieldNode fieldNode, AnnotationMetadata fieldAnnotationMetadata) {
+        fieldNode != null && (fieldAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT) || (fieldAnnotationMetadata.hasDeclaredStereotype(AnnotationUtil.QUALIFIER)) && !fieldAnnotationMetadata.hasDeclaredAnnotation(Bean))
     }
 
     private void visitFactoryProperty(PropertyNode propertyNode, FieldNode fieldNode, AnnotationMetadata fieldAnnotationMetadata) {
