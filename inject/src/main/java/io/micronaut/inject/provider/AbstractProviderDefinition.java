@@ -154,7 +154,7 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
                         } else if (injectionPointArgument.isNullable()) {
                             throw new DisabledBeanException("Nullable bean doesn't exist");
                         } else {
-                            if (qualifier instanceof AnyQualifier || !context.getContextConfiguration().isErrorOnMissingProvider()) {
+                            if (qualifier instanceof AnyQualifier || isAllowMissingProviders(context)) {
                                 return buildProvider(
                                         resolutionContext,
                                         context,
@@ -172,6 +172,15 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
             }
         }
         throw new UnsupportedOperationException("Cannot inject provider for Object type");
+    }
+
+    /**
+     * Return whether missing providers are allowed for this implementation. If {@code false} a {@link io.micronaut.context.exceptions.NoSuchBeanException} is thrown.
+     * @param context The context
+     * @return Returns {@code true} if missing providers are allowed
+     */
+    protected boolean isAllowMissingProviders(BeanContext context) {
+        return !context.getContextConfiguration().isErrorOnMissingProvider();
     }
 
     @Override

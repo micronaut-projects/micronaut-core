@@ -16,6 +16,7 @@
 package io.micronaut.inject.provider
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.BeanContextConfiguration
 import io.micronaut.context.DefaultBeanContext
@@ -139,5 +140,42 @@ class Foo {}
         definition.constructor.arguments[0].typeParameters[0].type.name == 'test.Foo'
         definition.constructor.arguments[0].isProvider()
         definition.requiredComponents.contains(ref.class.classLoader.loadClass("test.Foo"))
+    }
+
+    void 'test inject missing provider'() {
+        given:
+        ApplicationContext context = buildContext('''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import io.micronaut.context.BeanProvider;
+
+@jakarta.inject.Singleton
+class Test {
+    public BeanProvider<Foo> provider;
+    public BeanProvider<Bar> barProvider;
+    Test(BeanProvider<Foo> provider, BeanProvider<Bar> barProvider) {
+        this.provider = provider;
+        this.barProvider = barProvider;
+    }
+    public Foo get() {
+        return provider.get();
+    }
+}
+
+@jakarta.inject.Singleton
+class Foo {}
+
+class Bar {}
+''')
+        def bean = getBean(context, 'test.Test')
+
+        expect:
+        bean.provider.isPresent()
+        !bean.barProvider.isPresent()
+
+        cleanup:
+        context.close()
     }
 }
