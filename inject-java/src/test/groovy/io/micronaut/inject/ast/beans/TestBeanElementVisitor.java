@@ -7,6 +7,12 @@ import io.micronaut.inject.visitor.VisitorContext;
 public class TestBeanElementVisitor implements BeanElementVisitor<Prototype> {
     static BeanElement theBeanElement;
     static Boolean first;
+
+    public TestBeanElementVisitor() {
+        theBeanElement = null;
+        first = null;
+    }
+
     @Override
     public void visitBeanElement(BeanElement beanElement, VisitorContext visitorContext) {
         if (first == null) {

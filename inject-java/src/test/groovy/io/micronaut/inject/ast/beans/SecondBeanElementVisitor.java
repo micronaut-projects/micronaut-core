@@ -9,6 +9,10 @@ import io.micronaut.inject.visitor.VisitorContext;
 public class SecondBeanElementVisitor implements BeanElementVisitor<Annotation> {
     static Boolean first;
 
+    public SecondBeanElementVisitor() {
+        first = null;
+    }
+
     @Override
     public void visitBeanElement(BeanElement beanElement, VisitorContext visitorContext) {
         if (first == null) {
