@@ -36,8 +36,8 @@ public interface BeanContextConfiguration {
      * @return If a {@link io.micronaut.context.exceptions.NoSuchBeanException} should be thrown on a missing {@link io.micronaut.context.BeanProvider} or {@link jakarta.inject.Provider}
      * @since 3.0.0
      */
-    default boolean isErrorOnMissingProvider() {
-        return true;
+    default boolean isAllowEmptyProviders() {
+        return false;
     }
 
     /**

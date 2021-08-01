@@ -1,7 +1,6 @@
 package io.micronaut.inject.provider
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextBuilder
 import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.context.exceptions.NoSuchBeanException
@@ -10,7 +9,7 @@ import spock.lang.Stepwise
 @Stepwise
 class DisableErrorOnMissingBeanProviderSpec extends AbstractTypeElementSpec {
 
-    boolean shouldError = false
+    boolean allowEmptyProviders = true
 
     void "test should not error on missing bean provider if disabled"() {
         given:
@@ -122,7 +121,7 @@ class Test {
 
     void "test default error on missing bean provider"() {
         given:
-        shouldError = true
+        allowEmptyProviders = false
         def context = buildContext('''
 package missingprov;
 
@@ -146,6 +145,6 @@ class Test {
 
     @Override
     protected void configureContext(ApplicationContextBuilder contextBuilder) {
-        contextBuilder.errorOnMissingBeanProvider(shouldError)
+        contextBuilder.allowEmptyProviders(allowEmptyProviders)
     }
 }

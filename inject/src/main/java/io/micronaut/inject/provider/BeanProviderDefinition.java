@@ -99,7 +99,7 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
     }
 
     @Override
-    protected boolean isAllowMissingProviders(BeanContext context) {
+    protected boolean isAllowEmptyProviders(BeanContext context) {
         return true;
     }
 }

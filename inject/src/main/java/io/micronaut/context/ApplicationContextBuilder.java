@@ -206,13 +206,13 @@ public interface ApplicationContextBuilder {
     @NonNull ApplicationContextBuilder banner(boolean isEnabled);
 
     /**
-     * Whether to error on a missing bean provider.
+     * Whether to error on an empty bean provider. Defaults to {@code false}.
      *
-     * @param shouldError True if an error should occur
+     * @param shouldAllow True if empty {@link jakarta.inject.Provider} instances are allowed
      * @return This application
      * @since 3.0.0
      */
-    @NonNull ApplicationContextBuilder errorOnMissingBeanProvider(boolean shouldError);
+    @NonNull ApplicationContextBuilder allowEmptyProviders(boolean shouldAllow);
 
     /**
      * Set the command line arguments.
