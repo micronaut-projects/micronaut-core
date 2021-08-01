@@ -10,7 +10,7 @@ import java.util.Collections;
 import java.util.List;
 
 public class TestInterceptorBindingTransformer implements TypedAnnotationTransformer<SomeInterceptorBinding> {
-    private static final List<AnnotationValue<?>> ANNOTATION_VALUES = Arrays.asList(
+    static final List<AnnotationValue<?>> ANNOTATION_VALUES = Arrays.asList(
             AnnotationValue.builder(io.micronaut.aop.InterceptorBinding.class)
                     .member("kind", InterceptorKind.AROUND)
                     .build(),

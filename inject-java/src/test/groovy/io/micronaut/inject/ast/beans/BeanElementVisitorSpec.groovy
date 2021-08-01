@@ -2,6 +2,7 @@ package io.micronaut.inject.ast.beans
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.annotation.Prototype
+import io.micronaut.inject.visitor.BeanElementVisitor
 
 class BeanElementVisitorSpec extends AbstractTypeElementSpec {
 
@@ -35,8 +36,7 @@ class Test implements Runnable {
         BeanElement beanElement = TestBeanElementVisitor.theBeanElement
 
         expect:
-        TestBeanElementVisitor.first
-        !SecondBeanElementVisitor.first
+        BeanElementVisitor.VISITORS.first() instanceof TestBeanElementVisitor
         beanElement != null
         beanElement.scope.get() == Prototype.name
         beanElement.qualifiers.size() == 1
