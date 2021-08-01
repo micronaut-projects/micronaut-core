@@ -15,10 +15,32 @@
  */
 package io.micronaut.inject.property
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
-class PropertyAnnotationSpec extends Specification {
+class PropertyAnnotationSpec extends AbstractTypeElementSpec {
+
+    void "test inject with property"() {
+        given:
+        def context = buildContext('''
+package injectwithcontext;
+
+import io.micronaut.context.annotation.Property;
+import jakarta.inject.Inject;
+
+class Test {
+    @Inject
+    @Property(name="foo", defaultValue = "10")
+    public int value;
+}
+''')
+        expect:
+        getBean(context, 'injectwithcontext.Test').value == 10
+
+        cleanup:
+        context.close()
+    }
 
     void "test inject properties"() {
         given:
