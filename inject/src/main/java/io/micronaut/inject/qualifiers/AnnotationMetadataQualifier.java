@@ -104,6 +104,9 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
             if (qualifierAnn != null) {
                 return reduced
                         .filter(candidate -> {
+                            if (beanType != Object.class && candidate.getAnnotationMetadata().hasDeclaredAnnotation(Any.class)) {
+                                return true;
+                            }
                             final AnnotationMetadata annotationMetadata = candidate.getAnnotationMetadata();
                             final AnnotationValue<Annotation> av = candidate.getAnnotation(qualifiedName);
                             if (av != null) {
@@ -168,6 +171,11 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
 
     @Override
     public String toString() {
-        return annotationType == null ? super.toString() : "@" + annotationType.getSimpleName();
+        String annName = annotationType == null ? super.toString() : "@" + annotationType.getSimpleName();
+        if (this.qualifierAnn != null) {
+            final Map<CharSequence, Object> values = qualifierAnn.getValues();
+            annName += "(" + values.entrySet().stream().map(entry -> entry.getKey() + "=" + entry.getValue()).collect(Collectors.joining(", ")) + ")";
+        }
+        return annName;
     }
 }

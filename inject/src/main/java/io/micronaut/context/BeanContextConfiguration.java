@@ -33,6 +33,14 @@ import java.util.Set;
 public interface BeanContextConfiguration {
 
     /**
+     * @return If a {@link io.micronaut.context.exceptions.NoSuchBeanException} should be thrown on a missing {@link io.micronaut.context.BeanProvider} or {@link jakarta.inject.Provider}
+     * @since 3.0.0
+     */
+    default boolean isAllowEmptyProviders() {
+        return false;
+    }
+
+    /**
      * The class loader to use.
      * @return The class loader.
      */
