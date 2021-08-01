@@ -7,21 +7,14 @@ import io.micronaut.inject.visitor.BeanElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
 public class SecondBeanElementVisitor implements BeanElementVisitor<Annotation> {
-    static Boolean first;
-
-    public SecondBeanElementVisitor() {
-        first = null;
-    }
-
-    @Override
-    public void visitBeanElement(BeanElement beanElement, VisitorContext visitorContext) {
-        if (first == null) {
-            first = TestBeanElementVisitor.first == null;
-        }
-    }
 
     @Override
     public int getOrder() {
         return Ordered.LOWEST_PRECEDENCE;
+    }
+
+    @Override
+    public void visitBeanElement(BeanElement beanElement, VisitorContext visitorContext) {
+        // noop
     }
 }
