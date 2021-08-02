@@ -27,6 +27,7 @@ public class TestBeanElementVisitor implements BeanElementVisitor<Prototype> {
 
     @Override
     public void start(VisitorContext visitorContext) {
+        theBeanElement = null;
         initialized = true;
     }
 
