@@ -146,7 +146,22 @@ public class RouteExecutor {
                     if (optionalMethod.isPresent()) {
                         routeInfo = new ExecutableRouteInfo(optionalMethod.get(), true);
                     } else {
-                        routeInfo = RouteInfo.DEFAULT_ERROR;
+                        routeInfo = new RouteInfo<Object>() {
+                            @Override
+                            public ReturnType<Object> getReturnType() {
+                                return ReturnType.of(Object.class);
+                            }
+
+                            @Override
+                            public Class<?> getDeclaringType() {
+                                return Object.class;
+                            }
+
+                            @Override
+                            public boolean isErrorRoute() {
+                                return true;
+                            }
+                        };
                     }
                     return createResponseForBody(httpRequest, result, routeInfo)
                             .doOnNext(response -> {

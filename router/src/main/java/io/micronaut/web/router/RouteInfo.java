@@ -43,23 +43,6 @@ import java.util.Optional;
  */
 public interface RouteInfo<R> extends AnnotationMetadataProvider {
 
-    RouteInfo<Object> DEFAULT_ERROR = new RouteInfo<Object>() {
-        @Override
-        public ReturnType<Object> getReturnType() {
-            return ReturnType.of(Object.class);
-        }
-
-        @Override
-        public Class<?> getDeclaringType() {
-            return Object.class;
-        }
-
-        @Override
-        public boolean isErrorRoute() {
-            return true;
-        }
-    };
-
     /**
      * @return The return type
      */
