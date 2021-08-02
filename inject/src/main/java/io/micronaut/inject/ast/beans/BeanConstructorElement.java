@@ -21,6 +21,12 @@ import java.util.function.Consumer;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ConstructorElement;
 
+/**
+ * Represents the current bean constructor when used through the {@link io.micronaut.inject.ast.beans.BeanElementBuilder} API.
+ *
+ * @author graemerocher
+ * @since 3.0.0
+ */
 public interface BeanConstructorElement extends ConstructorElement {
 
     /**
