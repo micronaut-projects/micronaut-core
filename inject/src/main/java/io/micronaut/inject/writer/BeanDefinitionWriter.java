@@ -54,6 +54,7 @@ import io.micronaut.core.type.TypeVariableResolver;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.Toggleable;
 import io.micronaut.inject.AdvisedBeanType;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanFactory;
@@ -150,7 +151,7 @@ import static io.micronaut.inject.visitor.BeanElementVisitor.VISITORS;
  * @since 1.0
  */
 @Internal
-public class BeanDefinitionWriter extends AbstractClassFileWriter implements BeanDefinitionVisitor, BeanElement {
+public class BeanDefinitionWriter extends AbstractClassFileWriter implements BeanDefinitionVisitor, BeanElement, Toggleable {
     public static final String CLASS_SUFFIX = "$Definition";
     private static final String ANN_CONSTRAINT = "javax.validation.Constraint";
 
@@ -386,7 +387,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private Object constructor; // MethodElement or FieldElement
     private boolean constructorRequiresReflection;
-    
+    private boolean disabled = false;
+
     /**
      * Creates a bean definition writer.
      *
@@ -513,6 +515,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.isConfigurationProperties = isConfigurationProperties(annotationMetadata);
         validateExposedTypes(annotationMetadata, visitorContext);
         this.visitorContext = visitorContext;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return !disabled;
     }
 
     /**
@@ -1000,7 +1007,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         for (BeanElementVisitor<?> visitor : VISITORS) {
             if (visitor.isEnabled() && visitor.supports(this)) {
                 try {
-                    visitor.visitBeanElement(this, visitorContext);
+                    this.disabled = visitor.visitBeanElement(this, visitorContext) == null;
+                    if (disabled) {
+                        break;
+                    }
                 } catch (Exception e) {
                     visitorContext.fail(
                             "Error occurred visiting BeanElementVisitor of type [" + visitor.getClass().getName() + "]: " + e.getMessage(),
@@ -1125,6 +1135,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public void accept(ClassWriterOutputVisitor visitor) throws IOException {
+        if (disabled) {
+            return;
+        }
         try (OutputStream out = visitor.visitClass(getBeanDefinitionName(), getOriginatingElements())) {
             if (!innerClasses.isEmpty()) {
                 for (Map.Entry<String, ClassWriter> entry : innerClasses.entrySet()) {

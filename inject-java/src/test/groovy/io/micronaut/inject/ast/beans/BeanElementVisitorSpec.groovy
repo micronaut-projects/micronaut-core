@@ -32,11 +32,17 @@ class Test implements Runnable {
     
     }
 }
+
+@Prototype
+class Excluded {
+    
+}
 ''')
 
         expect:
         getBean(context, 'testbe2.Test')
         context.getBean(String) == 'test' // produced from TestBeanElementVisitor
+        !context.containsBean(context.classLoader.loadClass('testbe2.Excluded'))
 
         cleanup:
         context.close()
@@ -121,6 +127,7 @@ class TestFactory implements Runnable {
 }
 
 class Test {}
+
 ''')
 
         expect:

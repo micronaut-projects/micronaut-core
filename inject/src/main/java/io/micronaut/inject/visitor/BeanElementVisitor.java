@@ -19,6 +19,7 @@ import java.lang.annotation.Annotation;
 import java.util.List;
 
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.util.Toggleable;
@@ -43,8 +44,9 @@ public interface BeanElementVisitor<A extends Annotation> extends Ordered, Toggl
      *
      * @param beanElement The bean element
      * @param visitorContext The visitor context
+     * @return The bean element or {@code null} if the bean should not be written
      */
-    void visitBeanElement(@NonNull BeanElement beanElement, @NonNull VisitorContext visitorContext);
+    @Nullable BeanElement visitBeanElement(@NonNull BeanElement beanElement, @NonNull VisitorContext visitorContext);
 
     /**
      * Called once when visitor processing starts.

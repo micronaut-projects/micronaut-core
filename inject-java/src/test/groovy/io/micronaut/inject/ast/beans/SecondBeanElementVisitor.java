@@ -14,7 +14,7 @@ public class SecondBeanElementVisitor implements BeanElementVisitor<Annotation> 
     }
 
     @Override
-    public void visitBeanElement(BeanElement beanElement, VisitorContext visitorContext) {
-        // noop
+    public BeanElement visitBeanElement(BeanElement beanElement, VisitorContext visitorContext) {
+        return beanElement;
     }
 }

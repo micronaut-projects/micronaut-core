@@ -229,7 +229,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         visitor.getBeanDefinitionWriters().forEach((name, writer) -> {
                             String beanDefinitionName = writer.getBeanDefinitionName();
                             if (processed.add(beanDefinitionName)) {
-                                processBeanDefinitions(refreshedClassElement, writer);
+                                processBeanDefinitions(writer);
                             }
                         });
                         AnnotationUtils.invalidateMetadata(refreshedClassElement);
@@ -288,21 +288,23 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
     }
 
-    private void processBeanDefinitions(TypeElement beanClassElement, BeanDefinitionVisitor beanDefinitionWriter) {
+    private void processBeanDefinitions(BeanDefinitionVisitor beanDefinitionWriter) {
         try {
             beanDefinitionWriter.visitBeanDefinitionEnd();
-            beanDefinitionWriter.accept(classWriterOutputVisitor);
-            String beanTypeName = beanDefinitionWriter.getBeanTypeName();
-            BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
-                    new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionWriter);
-            beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
+            if (beanDefinitionWriter.isEnabled()) {
+                beanDefinitionWriter.accept(classWriterOutputVisitor);
+                String beanTypeName = beanDefinitionWriter.getBeanTypeName();
+                BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
+                        new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionWriter);
+                beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
 
-            String className = beanDefinitionReferenceWriter.getBeanDefinitionQualifiedClassName();
-            processed.add(className);
-            beanDefinitionReferenceWriter.setContextScope(
-                    beanDefinitionWriter.getAnnotationMetadata().hasDeclaredAnnotation(Context.class));
+                String className = beanDefinitionReferenceWriter.getBeanDefinitionQualifiedClassName();
+                processed.add(className);
+                beanDefinitionReferenceWriter.setContextScope(
+                        beanDefinitionWriter.getAnnotationMetadata().hasDeclaredAnnotation(Context.class));
 
-            beanDefinitionReferenceWriter.accept(classWriterOutputVisitor);
+                beanDefinitionReferenceWriter.accept(classWriterOutputVisitor);
+            }
         } catch (IOException e) {
             // raise a compile error
             String message = e.getMessage();

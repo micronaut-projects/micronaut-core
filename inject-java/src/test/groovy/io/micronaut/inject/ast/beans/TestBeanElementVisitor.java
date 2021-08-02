@@ -15,14 +15,20 @@ public class TestBeanElementVisitor implements BeanElementVisitor<Prototype> {
 
 
     @Override
-    public void visitBeanElement(BeanElement beanElement, VisitorContext visitorContext) {
+    public BeanElement visitBeanElement(BeanElement beanElement, VisitorContext visitorContext) {
         Element producingElement = beanElement.getProducingElement();
         if (producingElement instanceof MemberElement) {
             producingElement = ((MemberElement) producingElement).getDeclaringType();
         }
-        if (producingElement.getName().startsWith("testbe")) {
+        final String name = producingElement.getName();
+        if (name.startsWith("testbe")) {
             theBeanElement = beanElement;
         }
+        if (name.equals("testbe2.Excluded")) {
+            // tests bean veto
+            return null;
+        }
+        return beanElement;
     }
 
     @Override
