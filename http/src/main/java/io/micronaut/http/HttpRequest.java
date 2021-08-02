@@ -201,14 +201,6 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
-     * Cleanup any data stored in the request
-     * @since 3.0.0
-     */
-    default void cleanup() {
-
-    }
-
-    /**
      * Return a {@link MutableHttpRequest} for a {@link HttpMethod#GET} request for the given URI.
      *
      * @param uri The URI

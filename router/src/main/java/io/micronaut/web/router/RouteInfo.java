@@ -77,7 +77,11 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
             }
             return reactiveType;
         } else if (HttpResponse.class.isAssignableFrom(returnType.getType())) {
-            return returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            Argument<?> responseType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            if (responseType.isAsyncOrReactive()) {
+                return responseType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            }
+            return responseType;
         }
         return returnType.asArgument();
     }
@@ -86,7 +90,6 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
      * @return The declaring type of the route.
      */
     Class<?> getDeclaringType();
-
 
     /**
      * The media types able to produced by this route.
@@ -104,7 +107,6 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
             return Route.DEFAULT_PRODUCES;
         }
     }
-
 
     /**
      * The media types able to produced by this route.

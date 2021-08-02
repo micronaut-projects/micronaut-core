@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2021 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.http.server.netty;
 
 import io.micronaut.context.BeanContext;
@@ -403,7 +418,8 @@ class RouteExecutor {
         MutableHttpResponse<?> outgoingResponse;
         if (body instanceof HttpResponse) {
             outgoingResponse = toMutableResponse((HttpResponse<?>) body);
-            if (routeInfo.getBodyType().isAsyncOrReactive()) {
+            final Argument<?> bodyArgument = routeInfo.getReturnType().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            if (bodyArgument.isAsyncOrReactive()) {
                 outgoingResponse = processPublisherBody(request, outgoingResponse, routeInfo);
             }
         } else {
@@ -510,7 +526,10 @@ class RouteExecutor {
                                 }
                                 if (o instanceof HttpResponse) {
                                     singleResponse = toMutableResponse((HttpResponse<?>) o);
-                                    if (routeInfo.getBodyType().isAsyncOrReactive()) {
+                                    final Argument<?> bodyArgument = routeInfo.getReturnType() //Mono
+                                            .getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT) //HttpResponse
+                                            .getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT); //Mono
+                                    if (bodyArgument.isAsyncOrReactive()) {
                                         singleResponse = processPublisherBody(request, singleResponse, routeInfo);
                                     }
                                 } else if (o instanceof HttpStatus) {
@@ -537,21 +556,22 @@ class RouteExecutor {
                         });
                     } else {
                         // streaming case
-                        Flux<MutableHttpResponse<?>> response;
                         Argument<?> typeArgument = routeInfo.getReturnType().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
                         if (HttpResponse.class.isAssignableFrom(typeArgument.getType())) {
                             // a response stream
                             Publisher<HttpResponse<?>> bodyPublisher = Publishers.convertPublisher(body, Publisher.class);
-                            response = Flux.from(bodyPublisher)
+                            Flux<MutableHttpResponse<?>> response = Flux.from(bodyPublisher)
                                     .map(this::toMutableResponse);
-
+                            Argument<?> bodyArgument = typeArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+                            if (bodyArgument.isAsyncOrReactive()) {
+                                return response.map((resp) ->
+                                        processPublisherBody(request, resp, routeInfo));
+                            }
+                            return response;
                         } else {
-                            response = Flux.just(forStatus(routeInfo, defaultHttpStatus).body(body));
+                            MutableHttpResponse<?> response = forStatus(routeInfo, defaultHttpStatus).body(body);
+                            return Flux.just(processPublisherBody(request, response, routeInfo));
                         }
-                        if (routeInfo.getBodyType().isAsyncOrReactive()) {
-                            response = response.map(resp -> processPublisherBody(request, resp, routeInfo));
-                        }
-                        return response;
                     }
                 }
                 // now we have the raw result, transform it as necessary
@@ -569,7 +589,8 @@ class RouteExecutor {
                                         MutableHttpResponse<?> response;
                                         if (obj instanceof HttpResponse) {
                                             response = toMutableResponse((HttpResponse<?>) obj);
-                                            if (routeInfo.getBodyType().isAsyncOrReactive()) {
+                                            final Argument<?> bodyArgument = routeInfo.getReturnType().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+                                            if (bodyArgument.isAsyncOrReactive()) {
                                                 response = processPublisherBody(request, response, routeInfo);
                                             }
                                         } else {

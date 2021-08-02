@@ -15,14 +15,11 @@
  */
 package io.micronaut.web.router;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Status;
 
 import java.util.*;
 import java.util.concurrent.Callable;
@@ -198,7 +195,5 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Rout
         Object val = getVariableValues().get(name);
         return val != null && !(val instanceof UnresolvedArgument);
     }
-
-
 
 }
