@@ -30,6 +30,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.beans.BeanElement;
 import io.micronaut.inject.util.VisitorContextUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -212,6 +213,9 @@ public class JavaVisitorContext implements VisitorContext {
 
     private void printMessage(String message, Diagnostic.Kind kind, @Nullable io.micronaut.inject.ast.Element element) {
         if (StringUtils.isNotEmpty(message)) {
+            if (element instanceof BeanElement) {
+                element = ((BeanElement) element).getDeclaringClass();
+            }
             if (element instanceof AbstractJavaElement) {
                 Element el = (Element) element.getNativeType();
                 messager.printMessage(kind, message, el);

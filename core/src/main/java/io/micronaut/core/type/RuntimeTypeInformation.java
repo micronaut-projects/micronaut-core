@@ -17,8 +17,19 @@ package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
+import java.util.ServiceLoader;
 
 /**
  * Abstracts how types are interpreted by the core API.
@@ -28,9 +39,13 @@ import java.util.*;
  */
 @Internal
 final class RuntimeTypeInformation {
+    private static final Map<Class<?>, Argument<?>> WRAPPER_TO_TYPE = new HashMap<>(3);
     private static final Collection<TypeInformationProvider> TYPE_INFORMATION_PROVIDERS;
 
     static {
+        WRAPPER_TO_TYPE.put(OptionalDouble.class, Argument.DOUBLE);
+        WRAPPER_TO_TYPE.put(OptionalLong.class, Argument.LONG);
+        WRAPPER_TO_TYPE.put(OptionalInt.class, Argument.INT);
         final ServiceLoader<TypeInformationProvider> loader = ServiceLoader.load(TypeInformationProvider.class);
         List<TypeInformationProvider> informationProviders = new ArrayList<>(2);
         for (TypeInformationProvider informationProvider : loader) {
@@ -109,6 +124,20 @@ final class RuntimeTypeInformation {
                 return true;
             }
         }
-        return false;
+        return type == Optional.class || WRAPPER_TO_TYPE.containsKey(type);
+    }
+
+    /**
+     * Obtains the wrapped type for the given type info.
+     * @param typeInfo The type info
+     * @param <T> The generic type
+     * @return The wrapped type
+     */
+    static <T> Argument<?> getWrappedType(@NonNull TypeInformation<?> typeInfo) {
+        final Argument<?> a = WRAPPER_TO_TYPE.get(typeInfo.getType());
+        if (a != null) {
+            return a;
+        }
+        return typeInfo.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
     }
 }

@@ -18,6 +18,7 @@ package io.micronaut.annotation.processing.test
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.Qualifier
+import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.core.naming.NameUtils
@@ -72,8 +73,7 @@ class AbstractKotlinCompilerSpec extends Specification {
                         new InterceptorRegistryBean(),
                         new BeanProviderDefinition(),
                         new JakartaProviderBeanDefinition(),
-                        Class.forName('io.micronaut.runtime.event.$ApplicationEventPublisherFactory$Build0$Definition$Reference').newInstance(),
-                        Class.forName('io.micronaut.runtime.event.$ApplicationEventPublisherFactory$Definition$Reference').newInstance()
+                        new ApplicationEventPublisherFactory<>()
                 ])
             }
         }.start()

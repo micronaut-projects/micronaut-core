@@ -190,6 +190,17 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     }
 
     @Override
+    public Collection<ClassElement> getInterfaces() {
+        final List<? extends TypeMirror> interfaces = classElement.getInterfaces();
+        if (!interfaces.isEmpty()) {
+            return Collections.unmodifiableList(interfaces.stream().map((mirror) ->
+                mirrorToClassElement(mirror, visitorContext, genericTypeInfo)).collect(Collectors.toList())
+            );
+        }
+        return Collections.emptyList();
+    }
+
+    @Override
     public Optional<ClassElement> getSuperType() {
         final TypeMirror superclass = classElement.getSuperclass();
         if (superclass != null) {

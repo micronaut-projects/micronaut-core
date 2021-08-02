@@ -144,6 +144,13 @@ public interface ClassElement extends TypedElement {
         return Optional.empty();
     }
 
+    /**
+     * @return The interfaces implemented by this class element
+     */
+    default Collection<ClassElement> getInterfaces() {
+        return Collections.emptyList();
+    }
+
     @NonNull
     @Override
     default ClassElement getType() {

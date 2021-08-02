@@ -50,7 +50,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * Names of annotations that should produce deprecation warnings.
      * The key in the map is the deprecated annotation the value the replacement.
      */
-    @SuppressWarnings("unchecked")
     private static final Map<String, String> DEPRECATED_ANNOTATION_NAMES = Collections.emptyMap();
     private static final Map<String, List<AnnotationMapper<?>>> ANNOTATION_MAPPERS = new HashMap<>(10);
     private static final Map<String, List<AnnotationTransformer<Annotation>>> ANNOTATION_TRANSFORMERS = new HashMap<>(5);
@@ -1620,8 +1619,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                 break;
                             } else {
                                 wasRemapped = true;
-                                final String transformedAnnotationName = annotationValue.getAnnotationName();
-                                addAnnotation.accept(transformedAnnotationName, annotationValue.getValues(), annotationValue.getRetentionPolicy());
+                                final String transformedAnnotationName = handleTransformedAnnotationValue(parents,
+                                                                                                          interceptorBindings,
+                                                                                                          addRepeatableAnnotation,
+                                                                                                          addAnnotation,
+                                                                                                          annotationValue
+                                );
                                 if (CollectionUtils.isNotEmpty(annotationValue.getStereotypes())) {
                                     addTransformedStereotypes(annotationMetadata, isDeclared, annotationValue, parents);
                                 } else {
@@ -1642,44 +1645,76 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 for (AnnotationTransformer<Annotation> annotationTransformer : annotationTransformers) {
                     final List<AnnotationValue<?>> transformedValues = annotationTransformer.transform(av, visitorContext);
                     for (AnnotationValue<?> transformedValue : transformedValues) {
-                        final String transformedAnnotationName = transformedValue.getAnnotationName();
-                        if (interceptorBindings != null && !parents.isEmpty() && AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(transformedAnnotationName)) {
-                            final AnnotationValueBuilder<Annotation> newBuilder = AnnotationValue
-                                    .builder(transformedAnnotationName, transformedValue.getRetentionPolicy())
-                                    .members(transformedValue.getValues());
-                            if (!transformedValue.contains(AnnotationMetadata.VALUE_MEMBER)) {
-                                newBuilder.value(parents.get(parents.size() - 1));
-                            }
-                            interceptorBindings.add(newBuilder);
-                        }
-                        final String transformedRepeatableName;
+                        final String transformedAnnotationName = handleTransformedAnnotationValue(parents,
+                                                                           interceptorBindings,
+                                                                           addRepeatableAnnotation,
+                                                                           addAnnotation,
+                                                                           transformedValue
 
-                        if (isRepeatableCandidate(transformedAnnotationName)) {
-                            String resolvedName = null;
-                            // wrap with exception handling just in case there is any problems loading the type
-                            try {
-                                resolvedName = getAnnotationMirror(transformedAnnotationName)
-                                        .map(this::getRepeatableNameForType)
-                                        .orElse(null);
-                            } catch (Exception e) {
-                                // ignore
-                            }
-                            transformedRepeatableName = resolvedName;
+                        );
+                        if (CollectionUtils.isNotEmpty(transformedValue.getStereotypes())) {
+                            addTransformedStereotypes(annotationMetadata, isDeclared, transformedValue, parents);
                         } else {
-                            transformedRepeatableName = null;
+                            addTransformedStereotypes(annotationMetadata, isDeclared, transformedAnnotationName, parents);
                         }
-
-                        if (transformedRepeatableName != null) {
-                            addRepeatableAnnotation.accept(transformedRepeatableName, transformedValue);
-                        } else {
-                            addAnnotation.accept(transformedAnnotationName,
-                                    transformedValue.getValues(),
-                                    transformedValue.getRetentionPolicy());
-                        }
-                        addTransformedStereotypes(annotationMetadata, isDeclared, transformedAnnotationName, parents);
                     }
                 }
             }
+        }
+    }
+
+    private String handleTransformedAnnotationValue(List<String> parents,
+                             LinkedList<AnnotationValueBuilder<?>> interceptorBindings,
+                             BiConsumer<String, AnnotationValue> addRepeatableAnnotation,
+                             TriConsumer<String, Map<CharSequence, Object>, RetentionPolicy> addAnnotation,
+                             AnnotationValue<?> transformedValue) {
+        final String transformedAnnotationName = transformedValue.getAnnotationName();
+        addTransformedInterceptorBindingsIfNecessary(
+                parents,
+                interceptorBindings,
+                transformedValue,
+                transformedAnnotationName
+        );
+        final String transformedRepeatableName;
+
+        if (isRepeatableCandidate(transformedAnnotationName)) {
+            String resolvedName = null;
+            // wrap with exception handling just in case there is any problems loading the type
+            try {
+                resolvedName = getAnnotationMirror(transformedAnnotationName)
+                        .map(this::getRepeatableNameForType)
+                        .orElse(null);
+            } catch (Exception e) {
+                // ignore
+            }
+            transformedRepeatableName = resolvedName;
+        } else {
+            transformedRepeatableName = null;
+        }
+
+        if (transformedRepeatableName != null) {
+            addRepeatableAnnotation.accept(transformedRepeatableName, transformedValue);
+        } else {
+            addAnnotation.accept(transformedAnnotationName,
+                                 transformedValue.getValues(),
+                                 transformedValue.getRetentionPolicy());
+        }
+        return transformedAnnotationName;
+    }
+
+    private void addTransformedInterceptorBindingsIfNecessary(List<String> parents,
+                                                              LinkedList<AnnotationValueBuilder<?>> interceptorBindings,
+                                                              AnnotationValue<?> transformedValue,
+                                                              String transformedAnnotationName) {
+        if (interceptorBindings != null && !parents.isEmpty() && AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(
+                transformedAnnotationName)) {
+            final AnnotationValueBuilder<Annotation> newBuilder = AnnotationValue
+                    .builder(transformedAnnotationName, transformedValue.getRetentionPolicy())
+                    .members(transformedValue.getValues());
+            if (!transformedValue.contains(AnnotationMetadata.VALUE_MEMBER)) {
+                newBuilder.value(parents.get(parents.size() - 1));
+            }
+            interceptorBindings.add(newBuilder);
         }
     }
 

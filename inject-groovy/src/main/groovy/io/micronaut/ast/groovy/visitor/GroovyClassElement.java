@@ -23,6 +23,7 @@ import io.micronaut.ast.groovy.utils.PublicMethodVisitor;
 import io.micronaut.core.annotation.*;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.*;
 import org.apache.groovy.ast.tools.ClassNodeUtils;
@@ -411,6 +412,18 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     @Override
     public boolean isPrimitive() {
         return classNode.isArray() && ClassUtils.getPrimitiveType(classNode.getComponentType().getName()).isPresent();
+    }
+
+    @Override
+    public Collection<ClassElement> getInterfaces() {
+        final ClassNode[] interfaces = classNode.getInterfaces();
+        if (ArrayUtils.isNotEmpty(interfaces)) {
+            return Arrays.stream(interfaces).map((cn) -> visitorContext.getElementFactory().newClassElement(
+                    cn,
+                    AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn)
+            )).collect(Collectors.toList());
+        }
+        return Collections.emptyList();
     }
 
     @Override
