@@ -18,12 +18,14 @@ package io.micronaut.visitors
 import io.micronaut.annotation.processing.visitor.JavaClassElement
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.EnumElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PackageElement
+import jakarta.inject.Singleton
 import spock.lang.IgnoreIf
 import spock.lang.Issue
 import spock.util.environment.Jvm
@@ -31,6 +33,26 @@ import spock.util.environment.Jvm
 import java.util.function.Supplier
 
 class ClassElementSpec extends AbstractTypeElementSpec {
+
+    void "test annotate applies transformations"() {
+        when:
+        def element = buildClassElement('''
+package anntransform;
+
+class Test {
+}
+''')
+        then:
+        !element.hasAnnotation(AnnotationUtil.SINGLETON)
+
+        when:
+        element.annotate(Singleton)
+
+        then:
+        !element.hasAnnotation(Singleton)
+        element.hasAnnotation(AnnotationUtil.SINGLETON)
+    }
+
 
     void "test get package element"() {
         given:
