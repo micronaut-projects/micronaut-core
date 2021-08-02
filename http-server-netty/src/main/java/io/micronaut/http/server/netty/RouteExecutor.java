@@ -78,7 +78,7 @@ import java.util.regex.Pattern;
 import static io.micronaut.core.util.KotlinUtils.isKotlinCoroutineSuspended;
 import static io.micronaut.inject.util.KotlinExecutableMethodUtils.isKotlinFunctionReturnTypeUnit;
 
-class RouteExecutor {
+public class RouteExecutor {
 
     private static final Logger LOG = LoggerFactory.getLogger(RouteExecutor.class);
     private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(

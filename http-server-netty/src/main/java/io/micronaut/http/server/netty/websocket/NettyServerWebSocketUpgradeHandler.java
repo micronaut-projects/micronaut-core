@@ -38,6 +38,7 @@ import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.http.server.netty.RouteExecutor;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.websocket.CloseReason;
@@ -66,6 +67,7 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.ArrayList;
@@ -99,6 +101,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final WebSocketSessionRepository webSocketSessionRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final RouteExecutor routeExecutor;
     private WebSocketServerHandshaker handshaker;
 
     /**
@@ -117,13 +120,15 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
             RequestBinderRegistry binderRegistry,
             WebSocketBeanRegistry webSocketBeanRegistry,
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
-            ApplicationEventPublisher eventPublisher) {
+            ApplicationEventPublisher eventPublisher,
+            RouteExecutor routeExecutor) {
         this.router = router;
         this.binderRegistry = binderRegistry;
         this.webSocketBeanRegistry = webSocketBeanRegistry;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.webSocketSessionRepository = webSocketSessionRepository;
         this.eventPublisher = eventPublisher;
+        this.routeExecutor = routeExecutor;
     }
 
     @Override
@@ -148,56 +153,15 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
         if (routeMatch.isPresent()) {
             UriRouteMatch<Object, Object> rm = routeMatch.get();
             msg.setAttribute(HttpAttributes.ROUTE_MATCH, rm);
-            List<HttpFilter> filters = router.findFilters(msg);
             AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(msg);
             MutableHttpResponse<?> proceed = HttpResponse.ok();
-            Publisher<MutableHttpResponse<?>> routePublisher = Flux.create(emitter -> {
-                emitter.next(proceed);
-                emitter.complete();
-            }, FluxSink.OverflowStrategy.ERROR);
 
+            Publisher<? extends MutableHttpResponse<?>> finalPublisher = routeExecutor.filterPublisher(requestReference, Flux.just(proceed));
 
-            Publisher<? extends MutableHttpResponse<?>> finalPublisher;
-
-            if (!filters.isEmpty()) {
-                // make the action executor the last filter in the chain
-                filters = new ArrayList<>(filters);
-                filters.add((HttpServerFilter) (req, chain) -> routePublisher);
-
-                AtomicInteger integer = new AtomicInteger();
-                int len = filters.size();
-                List<HttpFilter> finalFilters = filters;
-                ServerFilterChain filterChain = new ServerFilterChain() {
-                    @SuppressWarnings("unchecked")
-                    @Override
-                    public Publisher<MutableHttpResponse<?>> proceed(io.micronaut.http.HttpRequest<?> request) {
-                        int pos = integer.incrementAndGet();
-                        if (pos > len) {
-                            throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
-                        }
-                        HttpFilter httpFilter = finalFilters.get(pos);
-                        return (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.getAndSet(request), this);
-                    }
-                };
-                Optional<HttpRequest<Object>> prevRequest = ServerRequestContext.currentRequest();
-                try {
-                    ServerRequestContext.set(requestReference.get());
-                    HttpFilter httpFilter = filters.get(0);
-                    finalPublisher =  (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.get(), filterChain);
-                } finally {
-                    if (prevRequest.isPresent()) {
-                        ServerRequestContext.set(prevRequest.get());
-                    } else {
-                        ServerRequestContext.set(null);
-                    }
-                }
-            } else {
-                finalPublisher = routePublisher;
-            }
-
-            Channel channel = ctx.channel();
+            final Scheduler scheduler = Schedulers.fromExecutorService(ctx.channel().eventLoop());
             Mono.from(finalPublisher)
-                    .subscribeOn(Schedulers.fromExecutorService(channel.eventLoop()))
+                    .subscribeOn(scheduler)
+                    .subscribeOn(scheduler)
                     .subscribe((Consumer<MutableHttpResponse<?>>) actualResponse -> {
                         if (actualResponse == proceed) {
                             //Adding new handler to the existing pipeline to handle WebSocket Messages
@@ -237,7 +201,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
                         } else {
                             ctx.writeAndFlush(actualResponse);
                         }
-                    }, throwable -> ctx.fireExceptionCaught(throwable));
+                    });
         } else {
             ctx.fireExceptionCaught(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"));
         }

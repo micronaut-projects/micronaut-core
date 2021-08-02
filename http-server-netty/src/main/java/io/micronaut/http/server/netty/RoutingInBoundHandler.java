@@ -147,9 +147,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             "^.*(?:connection.*(?:reset|closed|abort|broken)|broken.*pipe).*$", Pattern.CASE_INSENSITIVE);
     private static final Argument ARGUMENT_PART_DATA = Argument.of(PartData.class);
     private final Router router;
-    private final ExecutorSelector executorSelector;
     private final StaticResourceResolver staticResourceResolver;
-    private final BeanContext beanContext;
     private final NettyHttpServerConfiguration serverConfiguration;
     private final HttpContentProcessorResolver httpContentProcessorResolver;
     private final ErrorResponseProcessor<?> errorResponseProcessor;
@@ -177,23 +175,21 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
      * @param terminateEventPublisher                 The terminate event publisher
      */
     RoutingInBoundHandler(
-            BeanContext beanContext,
             Router router,
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
             NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry,
             StaticResourceResolver staticResourceResolver,
             NettyHttpServerConfiguration serverConfiguration,
             RequestArgumentSatisfier requestArgumentSatisfier,
-            ExecutorSelector executorSelector,
             Supplier<ExecutorService> ioExecutor,
             HttpContentProcessorResolver httpContentProcessorResolver,
-            ErrorResponseProcessor<?> errorResponseProcessor, ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher) {
+            ErrorResponseProcessor<?> errorResponseProcessor,
+            ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher,
+            RouteExecutor routeExecutor) {
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.customizableResponseTypeHandlerRegistry = customizableResponseTypeHandlerRegistry;
-        this.beanContext = beanContext;
         this.staticResourceResolver = staticResourceResolver;
         this.ioExecutorSupplier = ioExecutor;
-        this.executorSelector = executorSelector;
         this.router = router;
         this.requestArgumentSatisfier = requestArgumentSatisfier;
         this.serverConfiguration = serverConfiguration;
@@ -202,7 +198,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         this.terminateEventPublisher = terminateEventPublisher;
         Optional<Boolean> multipartEnabled = serverConfiguration.getMultipart().getEnabled();
         this.multipartEnabled = !multipartEnabled.isPresent() || multipartEnabled.get();
-        this.routeExecutor = new RouteExecutor(router, beanContext, requestArgumentSatisfier, serverConfiguration, errorResponseProcessor, executorSelector);
+        this.routeExecutor = routeExecutor;
     }
 
     @Override
