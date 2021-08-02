@@ -95,7 +95,6 @@ class WebFunctionSpec extends Specification {
         response.body() == '{"title":"The Stand"}'
         response.header(HttpHeaders.CONTENT_TYPE) == "application/json"
 
-
         cleanup:
         embeddedServer.stop()
     }
@@ -162,7 +161,6 @@ class WebFunctionSpec extends Specification {
 
         when:
         HttpResponse<?> response = client.toBlocking().exchange(HttpRequest.POST('/consumer/pojo', data))
-
 
         then:
         response.code() == HttpStatus.OK.code

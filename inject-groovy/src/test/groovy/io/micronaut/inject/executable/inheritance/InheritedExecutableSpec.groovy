@@ -152,4 +152,31 @@ class Z extends Y {
         definition != null
         definition.executableMethods.size() == 1
     }
+
+    void "test inherited from interface"() {
+        BeanDefinition definition = buildBeanDefinition("test.Test", """
+package test
+
+import io.micronaut.inject.annotation.*
+import io.micronaut.context.annotation.*
+import jakarta.inject.Singleton
+
+interface Parent<X> {
+    @Executable
+    void test(X x);
+}
+
+@Singleton
+class Test implements Parent<String> {
+
+   @Override
+   public void test(String str) {
+            
+   }
+}
+""")
+        expect:
+        definition != null
+        definition.executableMethods.size() == 1
+    }
 }

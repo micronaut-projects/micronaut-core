@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
 import io.micronaut.http.HttpRequest;
+import org.reactivestreams.Publisher;
 
 /**
  * The holder for the current {@link HttpRequest} that is bound to instrumented threads.

@@ -35,6 +35,8 @@ import java.util.*;
 @SuppressWarnings("MethodName")
 public interface HttpRequest<B> extends HttpMessage<B> {
 
+    String KEY = "micronaut.http.request";
+
     /**
      * Constant for HTTP scheme.
      */
@@ -196,6 +198,14 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      */
     default Optional<Certificate> getCertificate() {
         return this.getAttribute(HttpAttributes.X509_CERTIFICATE, Certificate.class);
+    }
+
+    /**
+     * Cleanup any data stored in the request
+     * @since 3.0.0
+     */
+    default void cleanup() {
+
     }
 
     /**

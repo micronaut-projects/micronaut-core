@@ -39,13 +39,6 @@ import java.util.function.Predicate;
 public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, RouteInfo<R> {
 
     /**
-     * The declaring type of the route.
-     *
-     * @return The declaring type
-     */
-    Class<?> getDeclaringType();
-
-    /**
      * @return The variable values following a successful match.
      */
     Map<String, Object> getVariableValues();
@@ -206,30 +199,6 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Rout
         return val != null && !(val instanceof UnresolvedArgument);
     }
 
-    default boolean isErrorRoute() {
-        return false;
-    }
 
-    /**
-     * Finds predefined route http status or uses default.
-     *
-     * @param defaultStatus The default status
-     * @return The status
-     * @since 2.5.2
-     */
-    @NonNull
-    default HttpStatus findStatus(HttpStatus defaultStatus) {
-        return getAnnotationMetadata().enumValue(Status.class, HttpStatus.class).orElse(defaultStatus);
-    }
-
-    /**
-     * Checks if route is for web socket.
-     *
-     * @return true if it's web socket route
-     * @since 2.5.2
-     */
-    default boolean isWebSocketRoute() {
-        return getAnnotationMetadata().hasAnnotation("io.micronaut.websocket.annotation.OnMessage");
-    }
 
 }

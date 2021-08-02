@@ -44,6 +44,11 @@ public enum HttpAttributes implements CharSequence {
     ROUTE_MATCH(Constants.PREFIX + ".route.match"),
 
     /**
+     * Attribute used to store the object that represents the Route metadata.
+     */
+    ROUTE_INFO(Constants.PREFIX + ".route.info"),
+
+    /**
      * Attribute used to store the URI template defined by the route.
      */
     URI_TEMPLATE(Constants.PREFIX + ".route.template"),

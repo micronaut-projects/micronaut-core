@@ -160,7 +160,6 @@ class HttpHeadSpec extends Specification {
     }
 
     void "test simple exchange request with POJO"() {
-
         when:
         Flux<HttpResponse<Book>> flowable = Flux.from(client.exchange(
                 HttpRequest.HEAD("/head/pojo"), Book
