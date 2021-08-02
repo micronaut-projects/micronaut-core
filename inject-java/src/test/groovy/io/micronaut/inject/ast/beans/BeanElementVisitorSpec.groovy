@@ -89,7 +89,7 @@ class Test implements Runnable {
         beanElement.injectionPoints.size() == 2
         beanElement.declaringClass.name == 'testbe.Test'
         beanElement.producingElement.name == 'testbe.Test'
-        beanElement.beanTypes == ['testbe.Test', 'java.lang.Runnable'] as Set
+        beanElement.beanTypes*.getName() as Set == ['testbe.Test', 'java.lang.Runnable'] as Set
 
     }
 
@@ -140,7 +140,7 @@ class Test {}
         beanElement.injectionPoints.size() == 0
         beanElement.declaringClass.name == 'testbe.TestFactory'
         beanElement.producingElement.name == 'test'
-        beanElement.beanTypes == ['testbe.Test'] as Set
+        beanElement.beanTypes*.getName() as Set == ['testbe.Test'] as Set
 
     }
 }

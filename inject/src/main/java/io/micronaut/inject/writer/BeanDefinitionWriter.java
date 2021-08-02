@@ -3424,38 +3424,44 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
-    public Set<String> getBeanTypes() {
+    public Set<ClassElement> getBeanTypes() {
         final String[] types = this.annotationMetadata.stringValues(Bean.class, "typed");
         if (ArrayUtils.isNotEmpty(types)) {
-            return CollectionUtils.setOf(types);
+            HashSet<ClassElement> classElements = new HashSet<>();
+            for (String type : types) {
+                visitorContext.getClassElement(type).ifPresent(classElements::add);
+            }
+            return Collections.unmodifiableSet(classElements);
         } else {
             final Optional<ClassElement> superType = beanTypeElement.getSuperType();
             final Collection<ClassElement> interfaces = beanTypeElement.getInterfaces();
             if (superType.isPresent() || !interfaces.isEmpty()) {
-                Set<String> beanTypes = new HashSet<>();
-                beanTypes.add(beanTypeElement.getName());
-                populateBeanTypes(beanTypes, superType.orElse(null), interfaces);
+                Set<ClassElement> beanTypes = new HashSet<>();
+                beanTypes.add(beanTypeElement);
+                populateBeanTypes(new HashSet<>(), beanTypes, superType.orElse(null), interfaces);
                 return Collections.unmodifiableSet(beanTypes);
             } else {
-                return Collections.singleton(beanTypeElement.getName());
+                return Collections.singleton(beanTypeElement);
             }
         }
     }
 
-    private void populateBeanTypes(Set<String> beanTypes, ClassElement superType, Collection<ClassElement> interfaces) {
+    private void populateBeanTypes(Set<String> processedTypes, Set<ClassElement> beanTypes, ClassElement superType, Collection<ClassElement> interfaces) {
         for (ClassElement anInterface : interfaces) {
             final String n = anInterface.getName();
-            if (!beanTypes.contains(n)) {
-                beanTypes.add(n);
-                populateBeanTypes(beanTypes, null, anInterface.getInterfaces());
+            if (!processedTypes.contains(n)) {
+                processedTypes.add(n);
+                beanTypes.add(anInterface);
+                populateBeanTypes(processedTypes, beanTypes, null, anInterface.getInterfaces());
             }
         }
         if (superType != null) {
             final String n = superType.getName();
-            if (!beanTypes.contains(n)) {
-                beanTypes.add(n);
+            if (!processedTypes.contains(n)) {
+                processedTypes.add(n);
+                beanTypes.add(superType);
                 final ClassElement next = superType.getSuperType().orElse(null);
-                populateBeanTypes(beanTypes, next, superType.getInterfaces());
+                populateBeanTypes(processedTypes, beanTypes, next, superType.getInterfaces());
             }
         }
     }

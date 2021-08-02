@@ -63,7 +63,7 @@ public interface BeanElement extends Element {
      * @return A set of types
      */
     @NonNull
-    Set<String> getBeanTypes();
+    Set<ClassElement> getBeanTypes();
 
     /**
      * The scope of the bean.
