@@ -27,7 +27,6 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementFactory;
 import io.micronaut.inject.ast.ElementModifier;
@@ -36,6 +35,7 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.beans.BeanConstructorElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.ast.beans.BeanFieldElement;
 import io.micronaut.inject.ast.beans.BeanMethodElement;
@@ -102,9 +102,8 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     private final List<BeanMethodElement> preDestroyMethods = new ArrayList<>(5);
     private final List<BeanMethodElement> postConstructMethods = new ArrayList<>(5);
     private final List<BeanFieldElement> injectedFields = new ArrayList<>(5);
-    private MethodElement constructorElement;
+    private BeanConstructorElement constructorElement;
     private Map<String, Map<String, ClassElement>> typeArguments;
-    private BeanParameterElement[] beanElementParameters;
     private ClassElement[] exposedTypes;
 
     /**
@@ -139,8 +138,15 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             this.annotationMetadata = new MutableAnnotationMetadata();
         }
         this.annotationMetadata.addDeclaredAnnotation(Bean.class.getName(), Collections.emptyMap());
-        final ParameterElement[] constructorParameters = beanType.getPrimaryConstructor().map(MethodElement::getParameters).orElse(null);
-        this.beanElementParameters = initBeanParameters(constructorParameters);
+        this.constructorElement = initConstructor(beanType);
+    }
+
+    private InternalBeanConstructorElement initConstructor(ClassElement beanType) {
+        return beanType.getPrimaryConstructor().map(m -> new InternalBeanConstructorElement(
+                m,
+                !m.isPublic(),
+                initBeanParameters(m.getParameters())
+        )).orElse(null);
     }
 
     @Override
@@ -235,8 +241,11 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         // TODO: handle factories, static methods etc.
         //noinspection ConstantConditions
         if (element != null) {
-            constructorElement = element;
-            this.beanElementParameters = initBeanParameters(element.getParameters());
+            constructorElement = new InternalBeanConstructorElement(
+                    element,
+                    element.isPrivate(),
+                    initBeanParameters(element.getParameters())
+            );
         }
         return this;
     }
@@ -294,6 +303,14 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         return resolvedTypes;
     }
 
+    @Override
+    public BeanElementBuilder withConstructor(Consumer<BeanConstructorElement> constructorElement) {
+        if (constructorElement != null && this.constructorElement != null) {
+            constructorElement.accept(this.constructorElement);
+        }
+        return this;
+    }
+
     @NonNull
     @Override
     public BeanElementBuilder withMethods(
@@ -325,8 +342,8 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     @NonNull
     @Override
     public BeanElementBuilder withParameters(Consumer<BeanParameterElement[]> parameters) {
-        if (parameters != null) {
-            parameters.accept(beanElementParameters);
+        if (parameters != null && this.constructorElement != null) {
+            parameters.accept(constructorElement.getParameters());
         }
         return this;
     }
@@ -401,22 +418,16 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         }
 
         if (constructorElement == null) {
-            constructorElement = beanType.getPrimaryConstructor().orElse(null);
+            constructorElement = initConstructor(beanType);
         }
 
         if (constructorElement == null) {
             visitorContext.fail("Cannot create associated bean with no accessible primary constructor. Consider supply the constructor with createWith(..)", originatingElement);
             return null;
         } else {
-            MethodElement finalConstructor;
-            if (constructorElement instanceof ConstructorElement) {
-                finalConstructor = new InternalConstructorElement(beanElementParameters);
-            } else {
-                finalConstructor = new InternalBeanElementMethod(constructorElement, !constructorElement.isPublic(), beanElementParameters);
-            }
             beanDefinitionWriter.visitBeanDefinitionConstructor(
-                    finalConstructor,
-                    !finalConstructor.isPublic(),
+                    constructorElement,
+                    !constructorElement.isPublic(),
                     visitorContext
             );
         }
@@ -783,6 +794,110 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     }
 
     /**
+     * Models a {@link io.micronaut.inject.ast.beans.BeanConstructorElement}.
+     */
+    private final class InternalBeanConstructorElement extends InternalBeanElement<MethodElement> implements
+                                                                                                       BeanConstructorElement {
+
+        private final MethodElement methodElement;
+        private final boolean requiresReflection;
+        private BeanParameterElement[] beanParameters;
+
+        private InternalBeanConstructorElement(MethodElement methodElement,
+                                          boolean requiresReflection,
+                                          BeanParameterElement[] beanParameters) {
+            super(methodElement);
+            this.methodElement = methodElement;
+            this.requiresReflection = requiresReflection;
+            this.beanParameters = beanParameters;
+        }
+
+        public boolean isRequiresReflection() {
+            return requiresReflection;
+        }
+
+        @Override
+        public boolean isPackagePrivate() {
+            return methodElement.isPackagePrivate();
+        }
+
+        @Override
+        public boolean isAbstract() {
+            return methodElement.isAbstract();
+        }
+
+        @Override
+        public boolean isStatic() {
+            return methodElement.isStatic();
+        }
+
+        @Override
+        public boolean isPrivate() {
+            return methodElement.isPrivate();
+        }
+
+        @Override
+        public boolean isFinal() {
+            return methodElement.isFinal();
+        }
+
+        @Override
+        public boolean isSuspend() {
+            return methodElement.isSuspend();
+        }
+
+        @Override
+        public boolean isDefault() {
+            return methodElement.isDefault();
+        }
+
+        @Override
+        public boolean isProtected() {
+            return methodElement.isProtected();
+        }
+
+        @Override
+        public boolean isPublic() {
+            return methodElement.isPublic();
+        }
+
+        @NonNull
+        @Override
+        public BeanParameterElement[] getParameters() {
+            return this.beanParameters;
+        }
+
+        @NonNull
+        @Override
+        public ClassElement getReturnType() {
+            return methodElement.getReturnType();
+        }
+
+        @NonNull
+        @Override
+        public ClassElement getGenericReturnType() {
+            return methodElement.getGenericReturnType();
+        }
+
+        @NonNull
+        @Override
+        public MethodElement withNewParameters(@NonNull ParameterElement... newParameters) {
+            this.beanParameters = initBeanParameters(ArrayUtils.concat(beanParameters, newParameters));
+            return this;
+        }
+
+        @Override
+        public ClassElement getDeclaringType() {
+            return methodElement.getDeclaringType();
+        }
+
+        @Override
+        public ClassElement getOwningType() {
+            return AbstractBeanDefinitionBuilder.this.beanType;
+        }
+    }
+
+    /**
      * Models a {@link BeanFieldElement}.
      */
     private final class InternalBeanElementField extends InternalBeanElement<FieldElement> implements BeanFieldElement {
@@ -906,53 +1021,6 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                 );
             }
             return this;
-        }
-    }
-
-    private final class InternalConstructorElement implements ConstructorElement {
-        private final ParameterElement[] parameterElements;
-
-        private InternalConstructorElement(ParameterElement[] parameterElements) {
-            this.parameterElements = parameterElements;
-        }
-
-        @NonNull
-        @Override
-        public ParameterElement[] getParameters() {
-            return parameterElements;
-        }
-
-        @NonNull
-        @Override
-        public MethodElement withNewParameters(@NonNull ParameterElement... newParameters) {
-            return new InternalConstructorElement(ArrayUtils.concat(parameterElements, newParameters));
-        }
-
-        @NonNull
-        @Override
-        public AnnotationMetadata getAnnotationMetadata() {
-            return constructorElement.getAnnotationMetadata();
-        }
-
-        @Override
-        public ClassElement getDeclaringType() {
-            return beanType;
-        }
-
-        @Override
-        public boolean isProtected() {
-            return constructorElement.isProtected();
-        }
-
-        @Override
-        public boolean isPublic() {
-            return constructorElement.isPublic();
-        }
-
-        @NonNull
-        @Override
-        public Object getNativeType() {
-            return constructorElement.getNativeType();
         }
     }
 }

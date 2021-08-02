@@ -22,6 +22,9 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.visitor.TypeElementVisitor;
+import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
+import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
+import io.micronaut.inject.writer.BeanDefinitionWriter;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
@@ -32,6 +35,8 @@ import javax.lang.model.element.Element;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
+
+import java.io.IOException;
 import java.util.*;
 
 /**
@@ -347,5 +352,26 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
             return Boolean.parseBoolean(v);
         }
         return false;
+    }
+
+    protected void writeBeanDefinitionBuilders(List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders) {
+        for (AbstractBeanDefinitionBuilder beanDefinitionBuilder : beanDefinitionBuilders) {
+            final BeanDefinitionWriter beanDefinitionWriter = beanDefinitionBuilder.build();
+            if (beanDefinitionWriter != null) {
+                try {
+                    beanDefinitionWriter.accept(classWriterOutputVisitor);
+                    String beanTypeName = beanDefinitionWriter.getBeanTypeName();
+                    BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
+                            new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionWriter);
+                    beanDefinitionReferenceWriter
+                            .setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
+                    beanDefinitionReferenceWriter.accept(classWriterOutputVisitor);
+                } catch (IOException e) {
+                    // raise a compile error
+                    String message = e.getMessage();
+                    error("Unexpected error: %s", message != null ? message : e.getClass().getSimpleName());
+                }
+            }
+        }
     }
 }

@@ -119,6 +119,13 @@ public interface BeanElementBuilder extends ConfigurableElement {
     }
 
     /**
+     * Allows configuring the bean constructor.
+     * @param constructorElement The constructor element
+     * @return This bean builder
+     */
+    @NonNull BeanElementBuilder withConstructor(@NonNull Consumer<BeanConstructorElement> constructorElement);
+
+    /**
      * Allows configuring methods of the bean.
      * @param methods The {@link ElementQuery} to locate selected methods.
      * @param beanMethods A consumer that receives each {@link BeanMethodElement}

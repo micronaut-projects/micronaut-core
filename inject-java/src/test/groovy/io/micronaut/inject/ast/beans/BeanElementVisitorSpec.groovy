@@ -1,10 +1,48 @@
 package io.micronaut.inject.ast.beans
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.inject.visitor.BeanElementVisitor
 
 class BeanElementVisitorSpec extends AbstractTypeElementSpec {
+
+    void "test produce another bean from a bean element visitor"() {
+        given:
+        def context = buildContext('''
+package testbe2;
+
+import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.env.Environment;
+import io.micronaut.core.convert.ConversionService;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
+
+@Prototype
+@Named("blah")
+class Test implements Runnable {
+    @Inject ConversionService<?> conversionService;
+    
+    @Inject
+    void setEnvironment(Environment environment) {
+        
+    }
+    
+    @Override public void run() {
+    
+    }
+}
+''')
+
+        expect:
+        getBean(context, 'testbe2.Test')
+        context.getBean(String) == 'test' // produced from TestBeanElementVisitor
+
+        cleanup:
+        context.close()
+
+    }
 
     void "test visit bean element for simple bean"() {
         given:
@@ -33,10 +71,13 @@ class Test implements Runnable {
     }
 }
 ''')
-        BeanElement beanElement = TestBeanElementVisitor.theBeanElement
 
         expect:
         BeanElementVisitor.VISITORS.first() instanceof TestBeanElementVisitor
+        TestBeanElementVisitor visitor = BeanElementVisitor.VISITORS.first()
+        BeanElement beanElement = visitor.theBeanElement
+        visitor.terminated
+        visitor.intialized
         beanElement != null
         beanElement.scope.get() == Prototype.name
         beanElement.qualifiers.size() == 1
@@ -82,9 +123,11 @@ class TestFactory implements Runnable {
 
 class Test {}
 ''')
-        BeanElement beanElement = TestBeanElementVisitor.theBeanElement
 
         expect:
+        BeanElementVisitor.VISITORS.first() instanceof TestBeanElementVisitor
+        BeanElement beanElement = BeanElementVisitor.VISITORS.first().theBeanElement
+
         beanElement != null
         beanElement.scope.get() == Prototype.name
         beanElement.qualifiers.size() == 0

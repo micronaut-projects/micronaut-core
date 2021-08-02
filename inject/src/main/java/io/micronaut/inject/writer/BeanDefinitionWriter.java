@@ -86,6 +86,7 @@ import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.visitor.BeanElementVisitor;
+import io.micronaut.inject.visitor.BeanElementVisitorContext;
 import io.micronaut.inject.visitor.VisitorContext;
 import jakarta.inject.Singleton;
 import org.jetbrains.annotations.NotNull;
@@ -3454,6 +3455,21 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @Override
     public Collection<String> getQualifiers() {
         return Collections.unmodifiableList(annotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER));
+    }
+
+    @Override
+    public BeanElementBuilder addAssociatedBean(ClassElement type) {
+        if (visitorContext instanceof BeanElementVisitorContext) {
+            final Element[] originatingElements = getOriginatingElements();
+            return ((BeanElementVisitorContext) this.visitorContext)
+                        .addAssociatedBean(originatingElements[0], type);
+        }
+        return BeanElement.super.addAssociatedBean(type);
+    }
+
+    @Override
+    public Element[] getOriginatingElements() {
+        return this.originatingElements.getOriginatingElements();
     }
 
     @Internal

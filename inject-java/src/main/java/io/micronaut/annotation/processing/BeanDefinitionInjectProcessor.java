@@ -28,6 +28,7 @@ import io.micronaut.core.annotation.*;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
@@ -38,6 +39,7 @@ import io.micronaut.inject.configuration.ConfigurationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.JavaModelUtils;
+import io.micronaut.inject.visitor.BeanElementVisitor;
 import io.micronaut.inject.visitor.VisitorConfiguration;
 import io.micronaut.inject.writer.*;
 
@@ -116,6 +118,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         this.metadataBuilder = new JavaConfigurationMetadataBuilder(elementUtils, typeUtils, annotationUtils);
         ConfigurationMetadataBuilder.setConfigurationMetadataBuilder(metadataBuilder);
         this.beanDefinitions = new LinkedHashSet<>();
+
+        for (BeanElementVisitor<?> visitor : BeanElementVisitor.VISITORS) {
+            if (visitor.isEnabled()) {
+                try {
+                    visitor.start(javaVisitorContext);
+                } catch (Exception e) {
+                    javaVisitorContext.fail("Error initializing bean element visitor [" + visitor.getClass().getName() + "]: " + e.getMessage(), null);
+                }
+            }
+        }
     }
 
     @NonNull
@@ -236,6 +248,19 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         if (processingOver) {
             try {
                 writeBeanDefinitionsToMetaInf();
+                for (BeanElementVisitor<?> visitor : BeanElementVisitor.VISITORS) {
+                    if (visitor.isEnabled()) {
+                        try {
+                            visitor.finish(javaVisitorContext);
+                        } catch (Exception e) {
+                            javaVisitorContext.fail("Error finalizing bean element visitor [" + visitor.getClass().getName() + "]: " + e.getMessage(), null);
+                        }
+                    }
+                }
+                final List<AbstractBeanDefinitionBuilder> beanElementBuilders = javaVisitorContext.getBeanElementBuilders();
+                if (CollectionUtils.isNotEmpty(beanElementBuilders)) {
+                    writeBeanDefinitionBuilders(beanElementBuilders);
+                }
             } finally {
                 AnnotationUtils.invalidateCache();
                 AbstractAnnotationMetadataBuilder.clearMutated();

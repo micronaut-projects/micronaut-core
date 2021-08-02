@@ -77,4 +77,17 @@ public interface BeanElement extends Element {
      */
     @NonNull
     Collection<String> getQualifiers();
+
+    /**
+     * This method adds an associated bean using this class element as the originating element.
+     *
+     * <p>Note that this method can only be called on classes being directly compiled by Micronaut. If the ClassElement is
+     * loaded from pre-compiled code an {@link UnsupportedOperationException} will be thrown.</p>
+     * @param type The type of the bean
+     * @return A bean builder
+     */
+    default @NonNull
+    BeanElementBuilder addAssociatedBean(@NonNull ClassElement type) {
+        throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support adding associated beans at compilation time");
+    }
 }

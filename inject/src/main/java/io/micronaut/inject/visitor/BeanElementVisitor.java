@@ -47,6 +47,24 @@ public interface BeanElementVisitor<A extends Annotation> extends Ordered, Toggl
     void visitBeanElement(@NonNull BeanElement beanElement, @NonNull VisitorContext visitorContext);
 
     /**
+     * Called once when visitor processing starts.
+     *
+     * @param visitorContext The visitor context
+     */
+    default void start(VisitorContext visitorContext) {
+        // no-op
+    }
+
+    /**
+     * Called once when visitor processing finishes.
+     *
+     * @param visitorContext The visitor context
+     */
+    default void finish(VisitorContext visitorContext) {
+        // no-op
+    }
+
+    /**
      * Returns whether this visitor supports visiting the specified element.
      * @param beanElement The bean element
      * @return True if it does
