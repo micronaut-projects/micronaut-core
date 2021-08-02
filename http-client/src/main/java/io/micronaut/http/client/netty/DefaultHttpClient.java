@@ -1023,7 +1023,7 @@ public class DefaultHttpClient implements
                 return httpContentReactiveSequence
                         .filter(message -> !(message.content() instanceof EmptyByteBuf))
                         .map(contentMapper);
-            })
+            },0)
             .doOnTerminate(() -> {
                 final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
                 if (o instanceof Channel) {

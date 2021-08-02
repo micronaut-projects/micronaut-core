@@ -66,6 +66,23 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
     ReturnType<? extends R> getReturnType();
 
     /**
+     * @return The argument representing the data type being produced.
+     */
+    default Argument<?> getBodyType() {
+        final ReturnType<? extends R> returnType = getReturnType();
+        if (returnType.isAsyncOrReactive()) {
+            Argument<?> reactiveType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            if (HttpResponse.class.isAssignableFrom(reactiveType.getType())) {
+                reactiveType = reactiveType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            }
+            return reactiveType;
+        } else if (HttpResponse.class.isAssignableFrom(returnType.getType())) {
+            return returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+        }
+        return returnType.asArgument();
+    }
+
+    /**
      * @return The declaring type of the route.
      */
     Class<?> getDeclaringType();
