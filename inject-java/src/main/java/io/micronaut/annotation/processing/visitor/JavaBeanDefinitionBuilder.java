@@ -20,15 +20,23 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementFactory;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
+import io.micronaut.inject.writer.BeanDefinitionWriter;
 
 import java.lang.annotation.Annotation;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.VariableElement;
 
 /**
  * Java implementation of {@link AbstractBeanDefinitionBuilder}.
@@ -36,7 +44,7 @@ import java.util.function.Predicate;
  * @author graemerocher
  * @since 3.0.0
  */
-final class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
+class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     private final JavaVisitorContext javaVisitorContext;
 
     /**
@@ -51,10 +59,71 @@ final class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
         super(originatingElement, beanType, metadataBuilder, visitorContext);
         this.javaVisitorContext = visitorContext;
         if (visitorContext.getVisitorKind() == TypeElementVisitor.VisitorKind.ISOLATING) {
-            visitorContext.addBeanDefinitionBuilder(this);
+            if (getClass() == JavaBeanDefinitionBuilder.class) {
+                visitorContext.addBeanDefinitionBuilder(this);
+            }
         } else {
             visitorContext.fail("Cannot add bean definition using addAssociatedBean(..) from a AGGREGATING TypeElementVisitor, consider overriding getVisitorKind()", originatingElement);
         }
+    }
+
+    @Override
+    protected AbstractBeanDefinitionBuilder createChildBean(FieldElement producerField) {
+        final ClassElement parentType = getBeanType();
+        return new JavaBeanDefinitionBuilder(
+                JavaBeanDefinitionBuilder.this.getOriginatingElement(),
+                producerField.getGenericField().getType(),
+                JavaBeanDefinitionBuilder.this.metadataBuilder,
+                (JavaVisitorContext) JavaBeanDefinitionBuilder.this.visitorContext
+        ) {
+            @Override
+            protected BeanDefinitionWriter createBeanDefinitionWriter() {
+                final BeanDefinitionWriter writer = super.createBeanDefinitionWriter();
+                final JavaElementFactory elementFactory = ((JavaVisitorContext) visitorContext).getElementFactory();
+                final VariableElement variableElement = (VariableElement) producerField.getNativeType();
+                writer.visitBeanFactoryField(
+                        parentType,
+                        elementFactory.newFieldElement(
+                                parentType,
+                                variableElement,
+                                new AnnotationMetadataHierarchy(parentType.getDeclaredMetadata(), producerField.getDeclaredMetadata())
+                        )
+                );
+                return writer;
+            }
+        };
+    }
+
+    @Override
+    protected BeanDefinitionWriter createBeanDefinitionWriter() {
+        return super.createBeanDefinitionWriter();
+    }
+
+    @Override
+    protected AbstractBeanDefinitionBuilder createChildBean(MethodElement producerMethod) {
+        final ClassElement parentType = getBeanType();
+        return new JavaBeanDefinitionBuilder(
+                JavaBeanDefinitionBuilder.this.getOriginatingElement(),
+                producerMethod.getGenericReturnType(),
+                JavaBeanDefinitionBuilder.this.metadataBuilder,
+                (JavaVisitorContext) JavaBeanDefinitionBuilder.this.visitorContext
+        ) {
+            @Override
+            protected BeanDefinitionWriter createBeanDefinitionWriter() {
+                final BeanDefinitionWriter writer = super.createBeanDefinitionWriter();
+                final JavaElementFactory elementFactory = ((JavaVisitorContext) visitorContext).getElementFactory();
+                final ExecutableElement variableElement = (ExecutableElement) producerMethod.getNativeType();
+                writer.visitBeanFactoryMethod(
+                        parentType,
+                        elementFactory.newMethodElement(
+                                parentType,
+                                variableElement,
+                                new AnnotationMetadataHierarchy(parentType.getDeclaredMetadata(), producerMethod.getDeclaredMetadata())
+                        )
+                );
+                return writer;
+            }
+        };
     }
 
     @Override

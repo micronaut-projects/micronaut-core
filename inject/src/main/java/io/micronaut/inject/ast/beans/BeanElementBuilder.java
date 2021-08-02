@@ -24,6 +24,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 
 import java.lang.annotation.Annotation;
@@ -52,7 +53,6 @@ public interface BeanElementBuilder extends ConfigurableElement {
     @NonNull
     ClassElement getBeanType();
 
-
     /**
      * Specifies the bean will created with the given method element. If
      * not specified the bean will be created with {@link ClassElement#getPrimaryConstructor()}.
@@ -62,20 +62,21 @@ public interface BeanElementBuilder extends ConfigurableElement {
      * <ul>
      *     <li>An accessible constructor on the bean type being generated</li>
      *     <li>An accessible static method on the bean type being generated</li>
-     *     <li>An accessible instance method on a concrete type that returns the bean type and is present on another type that represents the factory for creating the instance.</li>
      * </ul>
      *
      * @param element The element
      * @return This bean builder
      */
-    @NonNull BeanElementBuilder createWith(@NonNull MethodElement element);
+    @NonNull
+    BeanElementBuilder createWith(@NonNull MethodElement element);
 
     /**
      * Alters the exposed types for the bean limiting the exposed type to the given types.
      * @param types 1 or more types to expose
      * @return This builder
      */
-    @NonNull BeanElementBuilder typed(ClassElement...types);
+    @NonNull
+    BeanElementBuilder typed(ClassElement... types);
 
     /**
      * Fills the type arguments for the bean with the given types.
@@ -83,8 +84,8 @@ public interface BeanElementBuilder extends ConfigurableElement {
      * @return This bean builder
      */
     @Override
-    @NonNull BeanElementBuilder typeArguments(@NonNull ClassElement...types);
-
+    @NonNull
+    BeanElementBuilder typeArguments(@NonNull ClassElement... types);
 
     /**
      * Fills the type arguments for the given interface or super class with the given types.
@@ -92,7 +93,8 @@ public interface BeanElementBuilder extends ConfigurableElement {
      * @param types The types
      * @return This bean builder
      */
-    @NonNull BeanElementBuilder typeArgumentsForType(@Nullable ClassElement type, @NonNull ClassElement...types);
+    @NonNull
+    BeanElementBuilder typeArgumentsForType(@Nullable ClassElement type, @NonNull ClassElement... types);
 
     /**
      * Adds a scope for the given annotation value to the bean.
@@ -100,7 +102,8 @@ public interface BeanElementBuilder extends ConfigurableElement {
      * @param scope The scope
      * @return This bean element builder
      */
-    default @NonNull BeanElementBuilder scope(@NonNull AnnotationValue<?> scope) {
+    default @NonNull
+    BeanElementBuilder scope(@NonNull AnnotationValue<?> scope) {
         Objects.requireNonNull(scope, "Scope cannot be null");
         annotate(scope.getAnnotationName(), (builder) -> builder.members(scope.getValues()));
         return this;
@@ -112,7 +115,8 @@ public interface BeanElementBuilder extends ConfigurableElement {
      * @param scope The full qualified scope annotation name
      * @return This bean element builder
      */
-    default @NonNull BeanElementBuilder scope(@NonNull String scope) {
+    default @NonNull
+    BeanElementBuilder scope(@NonNull String scope) {
         Objects.requireNonNull(scope, "Scope cannot be null");
         annotate(scope);
         return this;
@@ -123,7 +127,8 @@ public interface BeanElementBuilder extends ConfigurableElement {
      * @param constructorElement The constructor element
      * @return This bean builder
      */
-    @NonNull BeanElementBuilder withConstructor(@NonNull Consumer<BeanConstructorElement> constructorElement);
+    @NonNull
+    BeanElementBuilder withConstructor(@NonNull Consumer<BeanConstructorElement> constructorElement);
 
     /**
      * Allows configuring methods of the bean.
@@ -131,7 +136,8 @@ public interface BeanElementBuilder extends ConfigurableElement {
      * @param beanMethods A consumer that receives each {@link BeanMethodElement}
      * @return This builder
      */
-    @NonNull BeanElementBuilder withMethods(
+    @NonNull
+    BeanElementBuilder withMethods(
             @NonNull ElementQuery<MethodElement> methods,
             @NonNull Consumer<BeanMethodElement> beanMethods);
 
@@ -141,7 +147,8 @@ public interface BeanElementBuilder extends ConfigurableElement {
      * @param beanFields The bean fields
      * @return This builder
      */
-    @NonNull BeanElementBuilder withFields(
+    @NonNull
+    BeanElementBuilder withFields(
             @NonNull ElementQuery<FieldElement> fields,
             @NonNull Consumer<BeanFieldElement> beanFields);
 
@@ -150,7 +157,8 @@ public interface BeanElementBuilder extends ConfigurableElement {
      * @param parameters The parameters
      * @return This builder
      */
-    @NonNull BeanElementBuilder withParameters(Consumer<BeanParameterElement[]> parameters);
+    @NonNull
+    BeanElementBuilder withParameters(Consumer<BeanParameterElement[]> parameters);
 
     @NonNull
     @Override
@@ -166,7 +174,8 @@ public interface BeanElementBuilder extends ConfigurableElement {
 
     @NonNull
     @Override
-    default <T extends Annotation> BeanElementBuilder annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
+    default <T extends Annotation> BeanElementBuilder annotate(@NonNull String annotationType,
+                                                               @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
         return (BeanElementBuilder) ConfigurableElement.super.annotate(annotationType, consumer);
     }
 
@@ -203,7 +212,8 @@ public interface BeanElementBuilder extends ConfigurableElement {
 
     @NonNull
     @Override
-    default <T extends Annotation> BeanElementBuilder annotate(@NonNull Class<T> annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
+    default <T extends Annotation> BeanElementBuilder annotate(@NonNull Class<T> annotationType,
+                                                               @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
         return (BeanElementBuilder) ConfigurableElement.super.annotate(annotationType, consumer);
     }
 
@@ -218,4 +228,23 @@ public interface BeanElementBuilder extends ConfigurableElement {
      * @return this bean builder
      */
     BeanElementBuilder inject();
+
+    /**
+     * Produce additional beans from the given methods.
+     * @param methodsOrFields The {@link io.micronaut.inject.ast.ElementQuery} representing the methods or fields
+     * @param childBeanBuilder Configure the child bean builder
+     * @return This bean builder
+     * @param <E> A type variable to
+     */
+    <E extends MemberElement> BeanElementBuilder produceBeans(ElementQuery<E> methodsOrFields, @Nullable Consumer<BeanElementBuilder> childBeanBuilder);
+
+    /**
+     * Produce additional beans from the given methods.
+     * @param methodsOrFields The {@link io.micronaut.inject.ast.ElementQuery} representing the methods or fields
+     * @return This bean builder
+     * @param <E> A type variable to
+     */
+    default <E extends MemberElement> BeanElementBuilder produceBeans(ElementQuery<E> methodsOrFields) {
+        return produceBeans(methodsOrFields, null);
+    }
 }

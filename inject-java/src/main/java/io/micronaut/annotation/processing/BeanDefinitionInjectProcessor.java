@@ -259,7 +259,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
                 final List<AbstractBeanDefinitionBuilder> beanElementBuilders = javaVisitorContext.getBeanElementBuilders();
                 if (CollectionUtils.isNotEmpty(beanElementBuilders)) {
-                    writeBeanDefinitionBuilders(beanElementBuilders);
+                    try {
+                        AbstractBeanDefinitionBuilder.writeBeanDefinitionBuilders(classWriterOutputVisitor, beanElementBuilders);
+                    } catch (IOException e) {
+                        // raise a compile error
+                        String message = e.getMessage();
+                        error("Unexpected error: %s", message != null ? message : e.getClass().getSimpleName());
+                    }
                 }
             } finally {
                 AnnotationUtils.invalidateCache();

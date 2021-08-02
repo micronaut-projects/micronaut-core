@@ -20,14 +20,22 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
+import io.micronaut.inject.writer.BeanDefinitionWriter;
+import org.codehaus.groovy.ast.FieldNode;
+import org.codehaus.groovy.ast.MethodNode;
 
 import java.lang.annotation.Annotation;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+
+import javax.lang.model.element.VariableElement;
 
 /**
  * Groovy version implementation of {@link AbstractBeanDefinitionBuilder}.
@@ -36,7 +44,7 @@ import java.util.function.Predicate;
  * @since 3.0.0
  */
 @Internal
-final class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
+class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     private final GroovyVisitorContext visitorContext;
 
     /**
@@ -53,8 +61,64 @@ final class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             ConfigurationMetadataBuilder<?> metadataBuilder,
             GroovyVisitorContext visitorContext) {
         super(originatingElement, beanType, metadataBuilder, visitorContext);
-        visitorContext.addBeanDefinitionBuilder(this);
+        if (getClass() == GroovyBeanDefinitionBuilder.class) {
+            visitorContext.addBeanDefinitionBuilder(this);
+        }
         this.visitorContext = visitorContext;
+    }
+
+    @Override
+    protected AbstractBeanDefinitionBuilder createChildBean(FieldElement producerField) {
+        final ClassElement parentType = getBeanType();
+        return new GroovyBeanDefinitionBuilder(
+                GroovyBeanDefinitionBuilder.this.getOriginatingElement(),
+                producerField.getGenericField().getType(),
+                GroovyBeanDefinitionBuilder.this.metadataBuilder,
+                GroovyBeanDefinitionBuilder.this.visitorContext
+        ) {
+            @Override
+            protected BeanDefinitionWriter createBeanDefinitionWriter() {
+                final BeanDefinitionWriter writer = super.createBeanDefinitionWriter();
+                final GroovyElementFactory elementFactory = ((GroovyVisitorContext) visitorContext).getElementFactory();
+                final FieldNode fieldNode = (FieldNode) producerField.getNativeType();
+                writer.visitBeanFactoryField(
+                        parentType,
+                        elementFactory.newFieldElement(
+                                parentType,
+                                fieldNode,
+                                new AnnotationMetadataHierarchy(parentType.getDeclaredMetadata(), producerField.getDeclaredMetadata())
+                        )
+                );
+                return writer;
+            }
+        };
+    }
+
+    @Override
+    protected AbstractBeanDefinitionBuilder createChildBean(MethodElement producerMethod) {
+        final ClassElement parentType = getBeanType();
+        return new GroovyBeanDefinitionBuilder(
+                GroovyBeanDefinitionBuilder.this.getOriginatingElement(),
+                producerMethod.getGenericReturnType().getType(),
+                GroovyBeanDefinitionBuilder.this.metadataBuilder,
+                GroovyBeanDefinitionBuilder.this.visitorContext
+        ) {
+            @Override
+            protected BeanDefinitionWriter createBeanDefinitionWriter() {
+                final BeanDefinitionWriter writer = super.createBeanDefinitionWriter();
+                final GroovyElementFactory elementFactory = ((GroovyVisitorContext) visitorContext).getElementFactory();
+                final MethodNode methodNode = (MethodNode) producerMethod.getNativeType();
+                writer.visitBeanFactoryMethod(
+                        parentType,
+                        elementFactory.newMethodElement(
+                                parentType,
+                                methodNode,
+                                new AnnotationMetadataHierarchy(parentType.getDeclaredMetadata(), producerMethod.getDeclaredMetadata())
+                        )
+                );
+                return writer;
+            }
+        };
     }
 
     @Override

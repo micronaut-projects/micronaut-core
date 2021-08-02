@@ -34,8 +34,6 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
-import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
-import io.micronaut.inject.writer.BeanDefinitionWriter;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
@@ -250,7 +248,13 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = javaVisitorContext.getBeanElementBuilders();
         if (CollectionUtils.isNotEmpty(beanDefinitionBuilders)) {
-            writeBeanDefinitionBuilders(beanDefinitionBuilders);
+            try {
+                AbstractBeanDefinitionBuilder.writeBeanDefinitionBuilders(classWriterOutputVisitor, beanDefinitionBuilders);
+            } catch (IOException e) {
+                // raise a compile error
+                String message = e.getMessage();
+                error("Unexpected error: %s", message != null ? message : e.getClass().getSimpleName());
+            }
         }
 
         if (roundEnv.processingOver()) {
