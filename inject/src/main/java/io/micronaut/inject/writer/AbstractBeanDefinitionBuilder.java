@@ -16,6 +16,7 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -622,7 +623,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     private void visitField(BeanDefinitionWriter beanDefinitionWriter,
                            BeanFieldElement injectedField,
                            InternalBeanElementField ibf) {
-        if (injectedField.hasAnnotation(Value.class)) {
+        if (injectedField.hasAnnotation(Value.class) || injectedField.hasAnnotation(Property.class)) {
             beanDefinitionWriter.visitFieldValue(
                     injectedField.getDeclaringType(),
                     injectedField,
