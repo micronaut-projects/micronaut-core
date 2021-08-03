@@ -940,8 +940,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 DelegateStreamedHttpResponse streamedResponse = new DelegateStreamedHttpResponse(
                         toNettyResponse(response).toHttpResponse(),
                         mapToHttpContent(nettyRequest, response, body, context)
-                            .onErrorResume(t -> routeExecutor.onError(t, nettyRequest)
-                                    .flatMap(resp -> mapToHttpContent(nettyRequest, resp, resp.body(), context)))
                 );
                 context.writeAndFlush(streamedResponse);
                 context.read();
