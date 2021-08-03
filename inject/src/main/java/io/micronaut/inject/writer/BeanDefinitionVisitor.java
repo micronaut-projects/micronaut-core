@@ -46,9 +46,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
 
     /**
      * @return The element where the bean definition originated from.
-     * @deprecated Use {@link #getOriginatingElements()} instead
      */
-    @Deprecated
     @Nullable
     Element getOriginatingElement();
 

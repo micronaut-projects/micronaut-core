@@ -77,6 +77,16 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
                 (JavaVisitorContext) JavaBeanDefinitionBuilder.this.visitorContext
         ) {
             @Override
+            public Element getProducingElement() {
+                return producerField;
+            }
+
+            @Override
+            public ClassElement getDeclaringElement() {
+                return producerField.getDeclaringType();
+            }
+
+            @Override
             protected BeanDefinitionWriter createBeanDefinitionWriter() {
                 final BeanDefinitionWriter writer = super.createBeanDefinitionWriter();
                 final JavaElementFactory elementFactory = ((JavaVisitorContext) visitorContext).getElementFactory();
@@ -108,6 +118,16 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
                 JavaBeanDefinitionBuilder.this.metadataBuilder,
                 (JavaVisitorContext) JavaBeanDefinitionBuilder.this.visitorContext
         ) {
+            @Override
+            public Element getProducingElement() {
+                return producerMethod;
+            }
+
+            @Override
+            public ClassElement getDeclaringElement() {
+                return producerMethod.getDeclaringType();
+            }
+
             @Override
             protected BeanDefinitionWriter createBeanDefinitionWriter() {
                 final BeanDefinitionWriter writer = super.createBeanDefinitionWriter();

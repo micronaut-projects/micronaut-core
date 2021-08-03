@@ -41,6 +41,12 @@ public interface BeanElement extends Element {
     Collection<Element> getInjectionPoints();
 
     /**
+     * @return The originating element.
+     */
+    @NonNull
+    Element getOriginatingElement();
+
+    /**
      * Returns the declaring {@link io.micronaut.inject.ast.ClassElement} which may differ
      * from the {@link #getBeanTypes()} in the case of factory beans.
      *

@@ -54,6 +54,24 @@ public interface BeanElementBuilder extends ConfigurableElement {
     ClassElement getBeanType();
 
     /**
+     * @return The element that produces the bean.
+     */
+    @NonNull
+    default Element getProducingElement() {
+        return getBeanType();
+    }
+
+    /**
+     * Returns the class that declares the bean. In case of a bean defined by a class, that is the bean class directly. In case of a producer method or field, that is the class that declares the producer method or field.
+     *
+     * @return The element declares the bean.
+     */
+    @NonNull
+    default ClassElement getDeclaringElement() {
+        return getBeanType();
+    }
+
+    /**
      * Specifies the bean will created with the given method element. If
      * not specified the bean will be created with {@link ClassElement#getPrimaryConstructor()}.
      *

@@ -3411,8 +3411,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         } else if (beanProducingElement instanceof MemberElement) {
             return ((MemberElement) beanProducingElement).getDeclaringType();
         } else if (beanProducingElement instanceof BeanElementBuilder) {
-            final Element originatingElement = ((BeanElementBuilder) beanProducingElement).getOriginatingElement();
-            return getDeclaringType(originatingElement);
+            return ((BeanElementBuilder) beanProducingElement).getDeclaringElement();
         } else {
             return this.beanTypeElement;
         }

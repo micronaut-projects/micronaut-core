@@ -77,6 +77,16 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
                 GroovyBeanDefinitionBuilder.this.visitorContext
         ) {
             @Override
+            public Element getProducingElement() {
+                return producerField;
+            }
+
+            @Override
+            public ClassElement getDeclaringElement() {
+                return producerField.getDeclaringType();
+            }
+
+            @Override
             protected BeanDefinitionWriter createBeanDefinitionWriter() {
                 final BeanDefinitionWriter writer = super.createBeanDefinitionWriter();
                 final GroovyElementFactory elementFactory = ((GroovyVisitorContext) visitorContext).getElementFactory();
@@ -103,6 +113,16 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
                 GroovyBeanDefinitionBuilder.this.metadataBuilder,
                 GroovyBeanDefinitionBuilder.this.visitorContext
         ) {
+            @Override
+            public Element getProducingElement() {
+                return producerMethod;
+            }
+
+            @Override
+            public ClassElement getDeclaringElement() {
+                return producerMethod.getDeclaringType();
+            }
+
             @Override
             protected BeanDefinitionWriter createBeanDefinitionWriter() {
                 final BeanDefinitionWriter writer = super.createBeanDefinitionWriter();
