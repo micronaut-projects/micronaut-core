@@ -940,6 +940,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 DelegateStreamedHttpResponse streamedResponse = new DelegateStreamedHttpResponse(
                         toNettyResponse(response).toHttpResponse(),
                         mapToHttpContent(nettyRequest, response, body, context)
+                            .onErrorResume(t -> routeExecutor.onError(t, nettyRequest)
+                                    .flatMap(resp -> mapToHttpContent(nettyRequest, resp, resp.body(), context)))
                 );
                 context.writeAndFlush(streamedResponse);
                 context.read();
@@ -968,7 +970,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
     }
 
-    private Publisher<HttpContent> mapToHttpContent(NettyHttpRequest<?> request,
+    private Flux<HttpContent> mapToHttpContent(NettyHttpRequest<?> request,
                                   MutableHttpResponse<?> response,
                                   Object body,
                                   ChannelHandlerContext context) {
@@ -1302,26 +1304,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         return byteBuf;
     }
 
-    private void logException(Throwable cause) {
-        //handling connection reset by peer exceptions
-        if (isIgnorable(cause)) {
-            logIgnoredException(cause);
-        } else {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("Unexpected error occurred: " + cause.getMessage(), cause);
-            }
-        }
-    }
-
     private boolean isIgnorable(Throwable cause) {
         String message = cause.getMessage();
         return cause instanceof IOException && message != null && IGNORABLE_ERROR_MESSAGE.matcher(message).matches();
-    }
-
-    private void logIgnoredException(Throwable cause) {
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Swallowed an IOException caused by client connectivity: " + cause.getMessage(), cause);
-        }
     }
 
     /**

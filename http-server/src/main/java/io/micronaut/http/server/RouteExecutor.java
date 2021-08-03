@@ -22,15 +22,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
-import io.micronaut.http.HttpAttributes;
-import io.micronaut.http.HttpHeaders;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpHeaders;
-import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.*;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.HttpFilter;
@@ -129,7 +121,7 @@ public final class RouteExecutor {
      * @param httpRequest The request that caused the exception
      * @return A response publisher
      */
-    public Publisher<MutableHttpResponse<?>> onError(Throwable t, HttpRequest<?> httpRequest) {
+    public Flux<MutableHttpResponse<?>> onError(Throwable t, HttpRequest<?> httpRequest) {
         // find the origination of of the route
         Class declaringType = httpRequest.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).map(RouteInfo::getDeclaringType).orElse(null);
 
@@ -144,70 +136,81 @@ public final class RouteExecutor {
         RouteMatch<?> errorRoute = findErrorRoute(cause, declaringType, httpRequest);
 
         if (errorRoute != null) {
+            if (serverConfiguration.isLogHandledExceptions()) {
+                logException(cause);
+            }
             try {
-                return executeRoute(
-                        httpRequest,
-                        false,
-                        Flux.just(errorRoute)
-                ).doOnNext(response -> response.setAttribute(HttpAttributes.EXCEPTION, cause));
+                AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(httpRequest);
+                return buildRouteResponsePublisher(
+                        requestReference,
+                        Flux.just(errorRoute))
+                    .doOnNext(response -> response.setAttribute(HttpAttributes.EXCEPTION, cause))
+                    .onErrorResume(throwable -> createDefaultErrorResponsePublisher(requestReference.get(), throwable));
             } catch (Throwable e) {
-                return createDefaultErrorResponsePublisher(httpRequest, e);
+                return createDefaultErrorResponsePublisher(httpRequest, e).flux();
             }
         } else {
             Optional<BeanDefinition<ExceptionHandler>> optionalDefinition = beanContext.findBeanDefinition(ExceptionHandler.class, Qualifiers.byTypeArgumentsClosest(cause.getClass(), Object.class));
 
             if (optionalDefinition.isPresent()) {
                 BeanDefinition<ExceptionHandler> handlerDefinition = optionalDefinition.get();
-                ExceptionHandler handler = beanContext.getBean(handlerDefinition);
-                try {
-                    if (serverConfiguration.isLogHandledExceptions()) {
-                        logException(cause);
-                    }
-                    Object result = handler.handle(httpRequest, cause);
-                    final Optional<ExecutableMethod<ExceptionHandler, Object>> optionalMethod = handlerDefinition.findPossibleMethods("handle").findFirst();
-                    RouteInfo<Object> routeInfo;
-                    if (optionalMethod.isPresent()) {
-                        routeInfo = new ExecutableRouteInfo(optionalMethod.get(), true);
-                    } else {
-                        routeInfo = new RouteInfo<Object>() {
-                            @Override
-                            public ReturnType<?> getReturnType() {
-                                return ReturnType.of(result.getClass());
-                            }
+                final Optional<ExecutableMethod<ExceptionHandler, Object>> optionalMethod = handlerDefinition.findPossibleMethods("handle").findFirst();
+                RouteInfo<Object> routeInfo;
+                if (optionalMethod.isPresent()) {
+                    routeInfo = new ExecutableRouteInfo(optionalMethod.get(), true);
+                } else {
+                    routeInfo = new RouteInfo<Object>() {
+                        @Override
+                        public ReturnType<?> getReturnType() {
+                            return ReturnType.of(Object.class);
+                        }
 
-                            @Override
-                            public Class<?> getDeclaringType() {
-                                return handler.getClass();
-                            }
+                        @Override
+                        public Class<?> getDeclaringType() {
+                            return handlerDefinition.getBeanType();
+                        }
 
-                            @Override
-                            public boolean isErrorRoute() {
-                                return true;
-                            }
+                        @Override
+                        public boolean isErrorRoute() {
+                            return true;
+                        }
 
-                            @Override
-                            public List<MediaType> getProduces() {
-                                return MediaType.fromType(getDeclaringType())
-                                        .map(Collections::singletonList)
-                                        .orElse(Collections.emptyList());
-                            }
-                        };
-                    }
-                    return createResponseForBody(httpRequest, result, routeInfo)
-                            .doOnNext(response -> {
-                                response.setAttribute(HttpAttributes.EXCEPTION, cause);
-                            });
-                } catch (Throwable e) {
-                    return createDefaultErrorResponsePublisher(httpRequest, e);
+                        @Override
+                        public List<MediaType> getProduces() {
+                            return MediaType.fromType(getDeclaringType())
+                                    .map(Collections::singletonList)
+                                    .orElse(Collections.emptyList());
+                        }
+                    };
                 }
+                Flux<MutableHttpResponse<?>> reactiveSequence = Flux.defer(() -> {
+                    ExceptionHandler handler = beanContext.getBean(handlerDefinition);
+                    try {
+                        if (serverConfiguration.isLogHandledExceptions()) {
+                            logException(cause);
+                        }
+                        Object result = handler.handle(httpRequest, cause);
+
+                        return createResponseForBody(httpRequest, result, routeInfo);
+                    } catch (Throwable e) {
+                        return createDefaultErrorResponsePublisher(httpRequest, e);
+                    }
+                });
+                final ExecutorService executor = findExecutor(routeInfo);
+                if (executor != null) {
+                    reactiveSequence = applyExecutorToPublisher(reactiveSequence, executor);
+                }
+                return reactiveSequence
+                        .doOnNext(response -> response.setAttribute(HttpAttributes.EXCEPTION, cause))
+                        .onErrorResume(throwable -> createDefaultErrorResponsePublisher(httpRequest, throwable));
             } else {
                 if (isIgnorable(cause)) {
                     logIgnoredException(cause);
-                    return Publishers.empty();
+                    return Flux.empty();
                 } else {
                     return createDefaultErrorResponsePublisher(
                             httpRequest,
-                            cause);
+                            cause).flux();
                 }
             }
         }
@@ -543,18 +546,38 @@ public final class RouteExecutor {
         return outgoingResponse;
     }
 
+    private Flux<MutableHttpResponse<?>> buildRouteResponsePublisher(AtomicReference<HttpRequest<?>> requestReference,
+                                                                     Flux<RouteMatch<?>> routeMatchPublisher) {
+        // build the result emitter. This result emitter emits the response from a controller action
+        return routeMatchPublisher
+                .flatMap((route) -> {
+                    final ExecutorService executor = findExecutor(route);
+                    Flux<MutableHttpResponse<?>> reactiveSequence = executeRoute(requestReference, route);
+                    if (executor != null) {
+                        reactiveSequence = applyExecutorToPublisher(reactiveSequence, executor);
+                    }
+                    return reactiveSequence;
+                });
+    }
+
+    private Flux<MutableHttpResponse<?>> buildResponsePublisher(HttpRequest<?> request,
+                                                                RouteInfo<?> routeInfo,
+                                                                Flux<Object> body) {
+        // build the result emitter. This result emitter emits the response from a controller action
+        final ExecutorService executor = findExecutor(routeInfo);
+        Flux<MutableHttpResponse<?>> reactiveSequence = body.flatMap(obj -> createResponseForBody(request, obj, routeInfo));
+        if (executor != null) {
+            reactiveSequence = applyExecutorToPublisher(reactiveSequence, executor);
+        }
+        return reactiveSequence;
+    }
+
     private Flux<MutableHttpResponse<?>> buildResultEmitter(
             AtomicReference<HttpRequest<?>> requestReference,
             boolean executeFilters,
             Flux<RouteMatch<?>> routeMatchPublisher) {
-        // build the result emitter. This result emitter emits the response from a controller action
-        Publisher<MutableHttpResponse<?>> executeRoutePublisher = routeMatchPublisher
-                .flatMap((route) -> {
-                    final ExecutorService executor = findExecutor(route);
-                    return createExecuteRoutePublisher(requestReference, route, executor);
-                });
 
-        executeRoutePublisher = Flux.from(executeRoutePublisher)
+        Publisher<MutableHttpResponse<?>> executeRoutePublisher = buildRouteResponsePublisher(requestReference, routeMatchPublisher)
                 .flatMap((response) -> handleStatusException(requestReference.get(), response))
                 .onErrorResume((t) -> onError(t, requestReference.get()));
 
@@ -565,21 +588,11 @@ public final class RouteExecutor {
         return Flux.from(executeRoutePublisher);
     }
 
-    private Publisher<MutableHttpResponse<?>> createExecuteRoutePublisher(AtomicReference<HttpRequest<?>> requestReference,
-                                                                          RouteMatch<?> routeMatch,
-                                                                          ExecutorService executor) {
-
-        Flux<MutableHttpResponse<?>> reactiveSequence = executeRoute(requestReference, routeMatch);
-        if (executor != null) {
-            reactiveSequence = applyExecutorToPublisher(reactiveSequence, executor);
-        }
-        return reactiveSequence;
-    }
-
     private Flux<MutableHttpResponse<?>> executeRoute(AtomicReference<HttpRequest<?>> requestReference,
-                                                           RouteMatch<?> routeMatch) {
-        try {
-            return Flux.defer(() -> {
+                                                      RouteMatch<?> routeMatch) {
+
+        return Flux.defer(() -> {
+            try {
                 final RouteMatch<?> finalRoute;
 
                 // ensure the route requirements are completely satisfied
@@ -596,10 +609,10 @@ public final class RouteExecutor {
                 }
 
                 return createResponseForBody(requestReference.get(), body, finalRoute);
-            });
-        } catch (Throwable e) {
-            return Flux.error(e);
-        }
+            } catch (Throwable e) {
+                return Flux.error(e);
+            }
+        });
     }
 
     private Flux<MutableHttpResponse<?>> createResponseForBody(HttpRequest<?> request,
