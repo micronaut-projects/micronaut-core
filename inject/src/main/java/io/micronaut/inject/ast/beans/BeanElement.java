@@ -22,6 +22,7 @@ import java.util.Set;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.visitor.VisitorContext;
 
 /**
  * Models a bean that will be produced by Micronaut.
@@ -39,6 +40,12 @@ public interface BeanElement extends Element {
      */
     @NonNull
     Collection<Element> getInjectionPoints();
+
+    /**
+     * @return The originating element.
+     */
+    @NonNull
+    Element getOriginatingElement();
 
     /**
      * Returns the declaring {@link io.micronaut.inject.ast.ClassElement} which may differ
@@ -63,7 +70,7 @@ public interface BeanElement extends Element {
      * @return A set of types
      */
     @NonNull
-    Set<String> getBeanTypes();
+    Set<ClassElement> getBeanTypes();
 
     /**
      * The scope of the bean.
@@ -77,4 +84,18 @@ public interface BeanElement extends Element {
      */
     @NonNull
     Collection<String> getQualifiers();
+
+    /**
+     * This method adds an associated bean using this class element as the originating element.
+     *
+     * <p>Note that this method can only be called on classes being directly compiled by Micronaut. If the ClassElement is
+     * loaded from pre-compiled code an {@link UnsupportedOperationException} will be thrown.</p>
+     * @param type The type of the bean
+     * @param visitorContext The visitor context
+     * @return A bean builder
+     */
+    default @NonNull
+    BeanElementBuilder addAssociatedBean(@NonNull ClassElement type, @NonNull VisitorContext visitorContext) {
+        throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support adding associated beans at compilation time");
+    }
 }

@@ -11,6 +11,7 @@ class BeanElementBuilderSpec extends AbstractBeanDefinitionSpec {
     }
 
     def cleanup() {
+        System.setProperty(TypeElementVisitorStart.ELEMENT_VISITORS_PROPERTY, "")
         AllElementsVisitor.clearVisited()
     }
 

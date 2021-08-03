@@ -78,26 +78,17 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
             } else {
                 classWriterOutputVisitor = new DirectoryClassWriterOutputVisitor(classesDir)
             }
-            for (AbstractBeanDefinitionBuilder beanDefinitionBuilder : beanDefinitionBuilders) {
-                final BeanDefinitionWriter beanDefinitionWriter = beanDefinitionBuilder.build()
-                if (beanDefinitionWriter != null) {
-                    try {
-                        beanDefinitionWriter.accept(classWriterOutputVisitor)
-                        String beanTypeName = beanDefinitionWriter.getBeanTypeName()
-                        BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
-                                new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionWriter)
-                        beanDefinitionReferenceWriter
-                                .setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing())
-                        beanDefinitionReferenceWriter.accept(classWriterOutputVisitor)
-                    } catch (IOException e) {
-                        // raise a compile error
-                        AstMessageUtils.error(
-                                source,
-                                source.getAST(),
-                                "Error writing bean definitions: $e.message")
-
-                    }
-                }
+            try {
+                AbstractBeanDefinitionBuilder.writeBeanDefinitionBuilders(
+                        classWriterOutputVisitor,
+                        beanDefinitionBuilders
+                )
+            } catch (IOException e) {
+                // raise a compile error
+                AstMessageUtils.error(
+                        source,
+                        source.getAST(),
+                        "Error writing bean definitions: $e.message")
             }
             classWriterOutputVisitor.finish()
         }

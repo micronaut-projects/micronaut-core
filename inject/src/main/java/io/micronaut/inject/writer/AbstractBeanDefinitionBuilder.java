@@ -16,6 +16,7 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -36,6 +37,7 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.beans.BeanConstructorElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.ast.beans.BeanFieldElement;
 import io.micronaut.inject.ast.beans.BeanMethodElement;
@@ -43,6 +45,7 @@ import io.micronaut.inject.ast.beans.BeanParameterElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.VisitorContext;
 
+import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -90,21 +93,21 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             }
         }
     };
+    protected final ConfigurationMetadataBuilder<?> metadataBuilder;
+    protected final VisitorContext visitorContext;
     private final Element originatingElement;
     private final ClassElement originatingType;
     private final ClassElement beanType;
-    private final ConfigurationMetadataBuilder<?> metadataBuilder;
-    private final VisitorContext visitorContext;
     private final int identifier;
     private final MutableAnnotationMetadata annotationMetadata;
     private final List<BeanMethodElement> executableMethods = new ArrayList<>(5);
+    private final List<AbstractBeanDefinitionBuilder> childBeans = new ArrayList<>(5);
     private final List<BeanMethodElement> injectedMethods = new ArrayList<>(5);
     private final List<BeanMethodElement> preDestroyMethods = new ArrayList<>(5);
     private final List<BeanMethodElement> postConstructMethods = new ArrayList<>(5);
     private final List<BeanFieldElement> injectedFields = new ArrayList<>(5);
-    private MethodElement constructorElement;
+    private BeanConstructorElement constructorElement;
     private Map<String, Map<String, ClassElement>> typeArguments;
-    private BeanParameterElement[] beanElementParameters;
     private ClassElement[] exposedTypes;
 
     /**
@@ -139,8 +142,42 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             this.annotationMetadata = new MutableAnnotationMetadata();
         }
         this.annotationMetadata.addDeclaredAnnotation(Bean.class.getName(), Collections.emptyMap());
-        final ParameterElement[] constructorParameters = beanType.getPrimaryConstructor().map(MethodElement::getParameters).orElse(null);
-        this.beanElementParameters = initBeanParameters(constructorParameters);
+        this.constructorElement = initConstructor(beanType);
+    }
+
+    @Internal
+    public static void writeBeanDefinitionBuilders(ClassWriterOutputVisitor classWriterOutputVisitor,
+                                                   List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders)
+            throws IOException {
+        for (AbstractBeanDefinitionBuilder beanDefinitionBuilder : beanDefinitionBuilders) {
+            writeBeanDefinition(classWriterOutputVisitor, beanDefinitionBuilder);
+            final List<AbstractBeanDefinitionBuilder> childBeans = beanDefinitionBuilder.getChildBeans();
+            for (AbstractBeanDefinitionBuilder childBean : childBeans) {
+                writeBeanDefinition(classWriterOutputVisitor, childBean);
+            }
+        }
+    }
+
+    private static void writeBeanDefinition(ClassWriterOutputVisitor classWriterOutputVisitor, AbstractBeanDefinitionBuilder beanDefinitionBuilder)
+            throws IOException {
+        final BeanDefinitionWriter beanDefinitionWriter = beanDefinitionBuilder.build();
+        if (beanDefinitionWriter != null) {
+            beanDefinitionWriter.accept(classWriterOutputVisitor);
+            String beanTypeName = beanDefinitionWriter.getBeanTypeName();
+            BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
+                    new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionWriter);
+            beanDefinitionReferenceWriter
+                    .setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
+            beanDefinitionReferenceWriter.accept(classWriterOutputVisitor);
+        }
+    }
+
+    private InternalBeanConstructorElement initConstructor(ClassElement beanType) {
+        return beanType.getPrimaryConstructor().map(m -> new InternalBeanConstructorElement(
+                m,
+                !m.isPublic(),
+                initBeanParameters(m.getParameters())
+        )).orElse(null);
     }
 
     @Override
@@ -148,6 +185,14 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         processInjectedMethods();
         processInjectedFields();
         return this;
+    }
+
+    /**
+     * Any child bean definitions.
+     * @return The child beans
+     */
+    public List<AbstractBeanDefinitionBuilder> getChildBeans() {
+        return childBeans;
     }
 
     private void processInjectedFields() {
@@ -235,8 +280,11 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         // TODO: handle factories, static methods etc.
         //noinspection ConstantConditions
         if (element != null) {
-            constructorElement = element;
-            this.beanElementParameters = initBeanParameters(element.getParameters());
+            constructorElement = new InternalBeanConstructorElement(
+                    element,
+                    !element.isPublic(),
+                    initBeanParameters(element.getParameters())
+            );
         }
         return this;
     }
@@ -294,6 +342,14 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         return resolvedTypes;
     }
 
+    @Override
+    public BeanElementBuilder withConstructor(Consumer<BeanConstructorElement> constructorElement) {
+        if (constructorElement != null && this.constructorElement != null) {
+            constructorElement.accept(this.constructorElement);
+        }
+        return this;
+    }
+
     @NonNull
     @Override
     public BeanElementBuilder withMethods(
@@ -325,8 +381,8 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     @NonNull
     @Override
     public BeanElementBuilder withParameters(Consumer<BeanParameterElement[]> parameters) {
-        if (parameters != null) {
-            parameters.accept(beanElementParameters);
+        if (parameters != null && this.constructorElement != null) {
+            parameters.accept(constructorElement.getParameters());
         }
         return this;
     }
@@ -378,6 +434,66 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         return this;
     }
 
+    private BeanElementBuilder addChildBean(@NonNull MethodElement producerMethod, Consumer<BeanElementBuilder> childBeanBuilder) {
+        final AbstractBeanDefinitionBuilder childBuilder = createChildBean(producerMethod);
+        this.childBeans.add(childBuilder);
+        if (childBeanBuilder != null) {
+            childBeanBuilder.accept(childBuilder);
+        }
+        return this;
+    }
+
+    private BeanElementBuilder addChildBean(@NonNull FieldElement producerMethod, Consumer<BeanElementBuilder> childBeanBuilder) {
+        final AbstractBeanDefinitionBuilder childBuilder = createChildBean(producerMethod);
+        this.childBeans.add(childBuilder);
+        if (childBeanBuilder != null) {
+            childBeanBuilder.accept(childBuilder);
+        }
+        return this;
+    }
+
+    @Override
+    public <E extends MemberElement> BeanElementBuilder produceBeans(ElementQuery<E> methodsOrFields,
+                                                                     Consumer<BeanElementBuilder> childBeanBuilder) {
+        methodsOrFields = methodsOrFields
+                .onlyConcrete()
+                .onlyInstance()
+                .modifiers((modifiers) -> modifiers.contains(ElementModifier.PUBLIC));
+        final List<E> enclosedElements = this.beanType.getEnclosedElements(methodsOrFields);
+        for (E enclosedElement : enclosedElements) {
+            if (enclosedElement instanceof FieldElement) {
+                FieldElement fe = (FieldElement) enclosedElement;
+                final ClassElement type = fe.getGenericField().getType();
+                if (type.isPublic() && !type.isPrimitive()) {
+                    return addChildBean(fe, childBeanBuilder);
+                }
+            }
+
+            if (enclosedElement instanceof MethodElement && !(enclosedElement instanceof ConstructorElement)) {
+                MethodElement me = (MethodElement) enclosedElement;
+                final ClassElement type = me.getGenericReturnType().getType();
+                if (type.isPublic() && !type.isPrimitive()) {
+                    return addChildBean(me, childBeanBuilder);
+                }
+            }
+        }
+        return this;
+    }
+
+    /**
+     * Creates a child bean for the given producer field.
+     * @param producerField The producer field
+     * @return The child bean builder
+     */
+    protected abstract @NonNull AbstractBeanDefinitionBuilder createChildBean(FieldElement producerField);
+
+    /**
+     * Creates a child bean for the given producer method.
+     * @param producerMethod The producer method
+     * @return The child bean builder
+     */
+    protected abstract @NonNull AbstractBeanDefinitionBuilder createChildBean(MethodElement producerMethod);
+
     /**
      * Build the bean definition writer.
      * @return The writer, possibly null if it wasn't possible to build it
@@ -389,34 +505,22 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                     Arrays.stream(exposedTypes).map(ce -> new AnnotationClassValue<>(ce.getName())).toArray(AnnotationClassValue[]::new);
             annotate(Bean.class, (builder) -> builder.member("typed", annotationClassValues));
         }
-        final BeanDefinitionWriter beanDefinitionWriter = new BeanDefinitionWriter(
-                this,
-                OriginatingElements.of(originatingElement),
-                metadataBuilder,
-                visitorContext,
-                identifier
-        );
+        final BeanDefinitionWriter beanDefinitionWriter = createBeanDefinitionWriter();
         if (typeArguments != null) {
             beanDefinitionWriter.visitTypeArguments(this.typeArguments);
         }
 
         if (constructorElement == null) {
-            constructorElement = beanType.getPrimaryConstructor().orElse(null);
+            constructorElement = initConstructor(beanType);
         }
 
         if (constructorElement == null) {
             visitorContext.fail("Cannot create associated bean with no accessible primary constructor. Consider supply the constructor with createWith(..)", originatingElement);
             return null;
         } else {
-            MethodElement finalConstructor;
-            if (constructorElement instanceof ConstructorElement) {
-                finalConstructor = new InternalConstructorElement(beanElementParameters);
-            } else {
-                finalConstructor = new InternalBeanElementMethod(constructorElement, !constructorElement.isPublic(), beanElementParameters);
-            }
             beanDefinitionWriter.visitBeanDefinitionConstructor(
-                    finalConstructor,
-                    !finalConstructor.isPublic(),
+                    constructorElement,
+                    !constructorElement.isPublic(),
                     visitorContext
             );
         }
@@ -503,10 +607,23 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         return beanDefinitionWriter;
     }
 
+    /**
+     * @return Creates the bean definition writer.
+     */
+    protected BeanDefinitionWriter createBeanDefinitionWriter() {
+        return new BeanDefinitionWriter(
+                this,
+                OriginatingElements.of(originatingElement),
+                metadataBuilder,
+                visitorContext,
+                identifier
+        );
+    }
+
     private void visitField(BeanDefinitionWriter beanDefinitionWriter,
                            BeanFieldElement injectedField,
                            InternalBeanElementField ibf) {
-        if (injectedField.hasAnnotation(Value.class)) {
+        if (injectedField.hasAnnotation(Value.class) || injectedField.hasAnnotation(Property.class)) {
             beanDefinitionWriter.visitFieldValue(
                     injectedField.getDeclaringType(),
                     injectedField,
@@ -783,6 +900,110 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     }
 
     /**
+     * Models a {@link io.micronaut.inject.ast.beans.BeanConstructorElement}.
+     */
+    private final class InternalBeanConstructorElement extends InternalBeanElement<MethodElement> implements
+                                                                                                       BeanConstructorElement {
+
+        private final MethodElement methodElement;
+        private final boolean requiresReflection;
+        private BeanParameterElement[] beanParameters;
+
+        private InternalBeanConstructorElement(MethodElement methodElement,
+                                          boolean requiresReflection,
+                                          BeanParameterElement[] beanParameters) {
+            super(methodElement);
+            this.methodElement = methodElement;
+            this.requiresReflection = requiresReflection;
+            this.beanParameters = beanParameters;
+        }
+
+        public boolean isRequiresReflection() {
+            return requiresReflection;
+        }
+
+        @Override
+        public boolean isPackagePrivate() {
+            return methodElement.isPackagePrivate();
+        }
+
+        @Override
+        public boolean isAbstract() {
+            return methodElement.isAbstract();
+        }
+
+        @Override
+        public boolean isStatic() {
+            return methodElement.isStatic();
+        }
+
+        @Override
+        public boolean isPrivate() {
+            return methodElement.isPrivate();
+        }
+
+        @Override
+        public boolean isFinal() {
+            return methodElement.isFinal();
+        }
+
+        @Override
+        public boolean isSuspend() {
+            return methodElement.isSuspend();
+        }
+
+        @Override
+        public boolean isDefault() {
+            return methodElement.isDefault();
+        }
+
+        @Override
+        public boolean isProtected() {
+            return methodElement.isProtected();
+        }
+
+        @Override
+        public boolean isPublic() {
+            return methodElement.isPublic();
+        }
+
+        @NonNull
+        @Override
+        public BeanParameterElement[] getParameters() {
+            return this.beanParameters;
+        }
+
+        @NonNull
+        @Override
+        public ClassElement getReturnType() {
+            return methodElement.getReturnType();
+        }
+
+        @NonNull
+        @Override
+        public ClassElement getGenericReturnType() {
+            return methodElement.getGenericReturnType();
+        }
+
+        @NonNull
+        @Override
+        public MethodElement withNewParameters(@NonNull ParameterElement... newParameters) {
+            this.beanParameters = initBeanParameters(ArrayUtils.concat(beanParameters, newParameters));
+            return this;
+        }
+
+        @Override
+        public ClassElement getDeclaringType() {
+            return methodElement.getDeclaringType();
+        }
+
+        @Override
+        public ClassElement getOwningType() {
+            return AbstractBeanDefinitionBuilder.this.beanType;
+        }
+    }
+
+    /**
      * Models a {@link BeanFieldElement}.
      */
     private final class InternalBeanElementField extends InternalBeanElement<FieldElement> implements BeanFieldElement {
@@ -906,53 +1127,6 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                 );
             }
             return this;
-        }
-    }
-
-    private final class InternalConstructorElement implements ConstructorElement {
-        private final ParameterElement[] parameterElements;
-
-        private InternalConstructorElement(ParameterElement[] parameterElements) {
-            this.parameterElements = parameterElements;
-        }
-
-        @NonNull
-        @Override
-        public ParameterElement[] getParameters() {
-            return parameterElements;
-        }
-
-        @NonNull
-        @Override
-        public MethodElement withNewParameters(@NonNull ParameterElement... newParameters) {
-            return new InternalConstructorElement(ArrayUtils.concat(parameterElements, newParameters));
-        }
-
-        @NonNull
-        @Override
-        public AnnotationMetadata getAnnotationMetadata() {
-            return constructorElement.getAnnotationMetadata();
-        }
-
-        @Override
-        public ClassElement getDeclaringType() {
-            return beanType;
-        }
-
-        @Override
-        public boolean isProtected() {
-            return constructorElement.isProtected();
-        }
-
-        @Override
-        public boolean isPublic() {
-            return constructorElement.isPublic();
-        }
-
-        @NonNull
-        @Override
-        public Object getNativeType() {
-            return constructorElement.getNativeType();
         }
     }
 }

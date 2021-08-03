@@ -28,6 +28,7 @@ import io.micronaut.core.annotation.*;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
@@ -38,6 +39,7 @@ import io.micronaut.inject.configuration.ConfigurationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.JavaModelUtils;
+import io.micronaut.inject.visitor.BeanElementVisitor;
 import io.micronaut.inject.visitor.VisitorConfiguration;
 import io.micronaut.inject.writer.*;
 
@@ -116,6 +118,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         this.metadataBuilder = new JavaConfigurationMetadataBuilder(elementUtils, typeUtils, annotationUtils);
         ConfigurationMetadataBuilder.setConfigurationMetadataBuilder(metadataBuilder);
         this.beanDefinitions = new LinkedHashSet<>();
+
+        for (BeanElementVisitor<?> visitor : BeanElementVisitor.VISITORS) {
+            if (visitor.isEnabled()) {
+                try {
+                    visitor.start(javaVisitorContext);
+                } catch (Exception e) {
+                    javaVisitorContext.fail("Error initializing bean element visitor [" + visitor.getClass().getName() + "]: " + e.getMessage(), null);
+                }
+            }
+        }
     }
 
     @NonNull
@@ -217,7 +229,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         visitor.getBeanDefinitionWriters().forEach((name, writer) -> {
                             String beanDefinitionName = writer.getBeanDefinitionName();
                             if (processed.add(beanDefinitionName)) {
-                                processBeanDefinitions(refreshedClassElement, writer);
+                                processBeanDefinitions(writer);
                             }
                         });
                         AnnotationUtils.invalidateMetadata(refreshedClassElement);
@@ -236,6 +248,25 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         if (processingOver) {
             try {
                 writeBeanDefinitionsToMetaInf();
+                for (BeanElementVisitor<?> visitor : BeanElementVisitor.VISITORS) {
+                    if (visitor.isEnabled()) {
+                        try {
+                            visitor.finish(javaVisitorContext);
+                        } catch (Exception e) {
+                            javaVisitorContext.fail("Error finalizing bean element visitor [" + visitor.getClass().getName() + "]: " + e.getMessage(), null);
+                        }
+                    }
+                }
+                final List<AbstractBeanDefinitionBuilder> beanElementBuilders = javaVisitorContext.getBeanElementBuilders();
+                if (CollectionUtils.isNotEmpty(beanElementBuilders)) {
+                    try {
+                        AbstractBeanDefinitionBuilder.writeBeanDefinitionBuilders(classWriterOutputVisitor, beanElementBuilders);
+                    } catch (IOException e) {
+                        // raise a compile error
+                        String message = e.getMessage();
+                        error("Unexpected error: %s", message != null ? message : e.getClass().getSimpleName());
+                    }
+                }
             } finally {
                 AnnotationUtils.invalidateCache();
                 AbstractAnnotationMetadataBuilder.clearMutated();
@@ -257,21 +288,23 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
     }
 
-    private void processBeanDefinitions(TypeElement beanClassElement, BeanDefinitionVisitor beanDefinitionWriter) {
+    private void processBeanDefinitions(BeanDefinitionVisitor beanDefinitionWriter) {
         try {
             beanDefinitionWriter.visitBeanDefinitionEnd();
-            beanDefinitionWriter.accept(classWriterOutputVisitor);
-            String beanTypeName = beanDefinitionWriter.getBeanTypeName();
-            BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
-                    new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionWriter);
-            beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
+            if (beanDefinitionWriter.isEnabled()) {
+                beanDefinitionWriter.accept(classWriterOutputVisitor);
+                String beanTypeName = beanDefinitionWriter.getBeanTypeName();
+                BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
+                        new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionWriter);
+                beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
 
-            String className = beanDefinitionReferenceWriter.getBeanDefinitionQualifiedClassName();
-            processed.add(className);
-            beanDefinitionReferenceWriter.setContextScope(
-                    beanDefinitionWriter.getAnnotationMetadata().hasDeclaredAnnotation(Context.class));
+                String className = beanDefinitionReferenceWriter.getBeanDefinitionQualifiedClassName();
+                processed.add(className);
+                beanDefinitionReferenceWriter.setContextScope(
+                        beanDefinitionWriter.getAnnotationMetadata().hasDeclaredAnnotation(Context.class));
 
-            beanDefinitionReferenceWriter.accept(classWriterOutputVisitor);
+                beanDefinitionReferenceWriter.accept(classWriterOutputVisitor);
+            }
         } catch (IOException e) {
             // raise a compile error
             String message = e.getMessage();

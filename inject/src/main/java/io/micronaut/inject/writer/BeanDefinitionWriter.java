@@ -54,6 +54,7 @@ import io.micronaut.core.type.TypeVariableResolver;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.Toggleable;
 import io.micronaut.inject.AdvisedBeanType;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanFactory;
@@ -86,6 +87,7 @@ import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.visitor.BeanElementVisitor;
+import io.micronaut.inject.visitor.BeanElementVisitorContext;
 import io.micronaut.inject.visitor.VisitorContext;
 import jakarta.inject.Singleton;
 import org.jetbrains.annotations.NotNull;
@@ -149,7 +151,7 @@ import static io.micronaut.inject.visitor.BeanElementVisitor.VISITORS;
  * @since 1.0
  */
 @Internal
-public class BeanDefinitionWriter extends AbstractClassFileWriter implements BeanDefinitionVisitor, BeanElement {
+public class BeanDefinitionWriter extends AbstractClassFileWriter implements BeanDefinitionVisitor, BeanElement, Toggleable {
     public static final String CLASS_SUFFIX = "$Definition";
     private static final String ANN_CONSTRAINT = "javax.validation.Constraint";
 
@@ -385,7 +387,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private Object constructor; // MethodElement or FieldElement
     private boolean constructorRequiresReflection;
-    
+    private boolean disabled = false;
+
     /**
      * Creates a bean definition writer.
      *
@@ -512,6 +515,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.isConfigurationProperties = isConfigurationProperties(annotationMetadata);
         validateExposedTypes(annotationMetadata, visitorContext);
         this.visitorContext = visitorContext;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return !disabled;
     }
 
     /**
@@ -999,7 +1007,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         for (BeanElementVisitor<?> visitor : VISITORS) {
             if (visitor.isEnabled() && visitor.supports(this)) {
                 try {
-                    visitor.visitBeanElement(this, visitorContext);
+                    this.disabled = visitor.visitBeanElement(this, visitorContext) == null;
+                    if (disabled) {
+                        break;
+                    }
                 } catch (Exception e) {
                     visitorContext.fail(
                             "Error occurred visiting BeanElementVisitor of type [" + visitor.getClass().getName() + "]: " + e.getMessage(),
@@ -1124,6 +1135,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public void accept(ClassWriterOutputVisitor visitor) throws IOException {
+        if (disabled) {
+            return;
+        }
         try (OutputStream out = visitor.visitClass(getBeanDefinitionName(), getOriginatingElements())) {
             if (!innerClasses.isEmpty()) {
                 for (Map.Entry<String, ClassWriter> entry : innerClasses.entrySet()) {
@@ -3397,8 +3411,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         } else if (beanProducingElement instanceof MemberElement) {
             return ((MemberElement) beanProducingElement).getDeclaringType();
         } else if (beanProducingElement instanceof BeanElementBuilder) {
-            final Element originatingElement = ((BeanElementBuilder) beanProducingElement).getOriginatingElement();
-            return getDeclaringType(originatingElement);
+            return ((BeanElementBuilder) beanProducingElement).getDeclaringElement();
         } else {
             return this.beanTypeElement;
         }
@@ -3410,38 +3423,44 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
-    public Set<String> getBeanTypes() {
+    public Set<ClassElement> getBeanTypes() {
         final String[] types = this.annotationMetadata.stringValues(Bean.class, "typed");
         if (ArrayUtils.isNotEmpty(types)) {
-            return CollectionUtils.setOf(types);
+            HashSet<ClassElement> classElements = new HashSet<>();
+            for (String type : types) {
+                visitorContext.getClassElement(type).ifPresent(classElements::add);
+            }
+            return Collections.unmodifiableSet(classElements);
         } else {
             final Optional<ClassElement> superType = beanTypeElement.getSuperType();
             final Collection<ClassElement> interfaces = beanTypeElement.getInterfaces();
             if (superType.isPresent() || !interfaces.isEmpty()) {
-                Set<String> beanTypes = new HashSet<>();
-                beanTypes.add(beanTypeElement.getName());
-                populateBeanTypes(beanTypes, superType.orElse(null), interfaces);
+                Set<ClassElement> beanTypes = new HashSet<>();
+                beanTypes.add(beanTypeElement);
+                populateBeanTypes(new HashSet<>(), beanTypes, superType.orElse(null), interfaces);
                 return Collections.unmodifiableSet(beanTypes);
             } else {
-                return Collections.singleton(beanTypeElement.getName());
+                return Collections.singleton(beanTypeElement);
             }
         }
     }
 
-    private void populateBeanTypes(Set<String> beanTypes, ClassElement superType, Collection<ClassElement> interfaces) {
+    private void populateBeanTypes(Set<String> processedTypes, Set<ClassElement> beanTypes, ClassElement superType, Collection<ClassElement> interfaces) {
         for (ClassElement anInterface : interfaces) {
             final String n = anInterface.getName();
-            if (!beanTypes.contains(n)) {
-                beanTypes.add(n);
-                populateBeanTypes(beanTypes, null, anInterface.getInterfaces());
+            if (!processedTypes.contains(n)) {
+                processedTypes.add(n);
+                beanTypes.add(anInterface);
+                populateBeanTypes(processedTypes, beanTypes, null, anInterface.getInterfaces());
             }
         }
         if (superType != null) {
             final String n = superType.getName();
-            if (!beanTypes.contains(n)) {
-                beanTypes.add(n);
+            if (!processedTypes.contains(n)) {
+                processedTypes.add(n);
+                beanTypes.add(superType);
                 final ClassElement next = superType.getSuperType().orElse(null);
-                populateBeanTypes(beanTypes, next, superType.getInterfaces());
+                populateBeanTypes(processedTypes, beanTypes, next, superType.getInterfaces());
             }
         }
     }
@@ -3454,6 +3473,21 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @Override
     public Collection<String> getQualifiers() {
         return Collections.unmodifiableList(annotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER));
+    }
+
+    @Override
+    public BeanElementBuilder addAssociatedBean(ClassElement type, VisitorContext visitorContext) {
+        if (visitorContext instanceof BeanElementVisitorContext) {
+            final Element[] originatingElements = getOriginatingElements();
+            return ((BeanElementVisitorContext) visitorContext)
+                        .addAssociatedBean(originatingElements[0], type);
+        }
+        return BeanElement.super.addAssociatedBean(type, visitorContext);
+    }
+
+    @Override
+    public Element[] getOriginatingElements() {
+        return this.originatingElements.getOriginatingElements();
     }
 
     @Internal

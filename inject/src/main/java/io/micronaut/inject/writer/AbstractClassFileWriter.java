@@ -651,7 +651,6 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     /**
      * @return The originating element
      */
-    @Deprecated
     public @Nullable
     Element getOriginatingElement() {
         Element[] originatingElements = getOriginatingElements();
