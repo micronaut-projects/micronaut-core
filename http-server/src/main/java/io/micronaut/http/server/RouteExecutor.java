@@ -61,6 +61,7 @@ import reactor.core.scheduler.Schedulers;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -170,18 +171,25 @@ public final class RouteExecutor {
                     } else {
                         routeInfo = new RouteInfo<Object>() {
                             @Override
-                            public ReturnType<Object> getReturnType() {
-                                return ReturnType.of(Object.class);
+                            public ReturnType<?> getReturnType() {
+                                return ReturnType.of(result.getClass());
                             }
 
                             @Override
                             public Class<?> getDeclaringType() {
-                                return Object.class;
+                                return handler.getClass();
                             }
 
                             @Override
                             public boolean isErrorRoute() {
                                 return true;
+                            }
+
+                            @Override
+                            public List<MediaType> getProduces() {
+                                return MediaType.fromType(getDeclaringType())
+                                        .map(Collections::singletonList)
+                                        .orElse(Collections.emptyList());
                             }
                         };
                     }
