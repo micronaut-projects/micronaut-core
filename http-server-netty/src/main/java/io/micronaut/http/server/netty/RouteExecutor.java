@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.exceptions.BeanCreationException;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ReferenceCounted;
@@ -84,7 +85,7 @@ import static io.micronaut.inject.util.KotlinExecutableMethodUtils.isKotlinFunct
  * @author James Kleeh
  * @since 3.0.0
  */
-public class RouteExecutor {
+public final class RouteExecutor {
 
     private static final Logger LOG = LoggerFactory.getLogger(RouteExecutor.class);
     private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
