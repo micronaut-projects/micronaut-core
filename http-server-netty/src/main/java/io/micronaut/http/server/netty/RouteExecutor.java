@@ -78,6 +78,12 @@ import java.util.regex.Pattern;
 import static io.micronaut.core.util.KotlinUtils.isKotlinCoroutineSuspended;
 import static io.micronaut.inject.util.KotlinExecutableMethodUtils.isKotlinFunctionReturnTypeUnit;
 
+/**
+ * A class responsible for executing routes.
+ *
+ * @author James Kleeh
+ * @since 3.0.0
+ */
 public class RouteExecutor {
 
     private static final Logger LOG = LoggerFactory.getLogger(RouteExecutor.class);
@@ -105,8 +111,15 @@ public class RouteExecutor {
         this.executorSelector = executorSelector;
     }
 
-    Publisher<MutableHttpResponse<?>> onError(Throwable t,
-                                              HttpRequest<?> httpRequest) {
+    /**
+     * Creates a response publisher to represent the response after being handled
+     * by any available error route or exception handler.
+     *
+     * @param t The exception that occurred
+     * @param httpRequest The request that caused the exception
+     * @return A response publisher
+     */
+    Publisher<MutableHttpResponse<?>> onError(Throwable t, HttpRequest<?> httpRequest) {
         // find the origination of of the route
         Class declaringType = httpRequest.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).map(RouteInfo::getDeclaringType).orElse(null);
 
@@ -183,8 +196,16 @@ public class RouteExecutor {
         }
     }
 
+    /**
+     * Creates a default error response. Should be used when a response could not be retrieved
+     * from any other method.
+     *
+     * @param httpRequest The request that case the exception
+     * @param cause The exception that occurred
+     * @return A response to represent the exception
+     */
     public MutableHttpResponse<?> createDefaultErrorResponse(HttpRequest<?> httpRequest,
-                                                              Throwable cause) {
+                                                             Throwable cause) {
         logException(cause);
         final MutableHttpResponse<Object> response = HttpResponse.serverError();
         response.setAttribute(HttpAttributes.EXCEPTION, cause);
@@ -214,6 +235,103 @@ public class RouteExecutor {
             return mutableHttpResponse.contentType(MediaType.APPLICATION_JSON_TYPE);
         }
         return mutableHttpResponse;
+    }
+
+    /**
+     * @param request The request
+     * @param finalRoute The route
+     * @return The default content type declared on the route
+     */
+    public MediaType resolveDefaultResponseContentType(HttpRequest<?> request, RouteInfo<?> finalRoute) {
+        final List<MediaType> producesList = finalRoute.getProduces();
+        if (request != null) {
+            final Iterator<MediaType> i = request.accept().iterator();
+            if (i.hasNext()) {
+                final MediaType mt = i.next();
+                if (producesList.contains(mt)) {
+                    return mt;
+                }
+            }
+        }
+
+        MediaType defaultResponseMediaType;
+        final Iterator<MediaType> produces = producesList.iterator();
+        if (produces.hasNext()) {
+            defaultResponseMediaType = produces.next();
+        } else {
+            defaultResponseMediaType = MediaType.APPLICATION_JSON_TYPE;
+        }
+        return defaultResponseMediaType;
+    }
+
+    /**
+     * Executes a route.
+     *
+     * @param request The request that matched to the route
+     * @param executeFilters Whether or not to execute server filters
+     * @param routePublisher The route match publisher
+     * @return A response publisher
+     */
+    public Flux<MutableHttpResponse<?>> executeRoute(
+            HttpRequest<?> request,
+            boolean executeFilters,
+            Flux<RouteMatch<?>> routePublisher) {
+        AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(request);
+        final Flux<MutableHttpResponse<?>> resultEmitter = buildResultEmitter(
+                requestReference,
+                executeFilters,
+                routePublisher
+        );
+        return resultEmitter;
+    }
+
+
+    /**
+     * Applies server filters to a request/response.
+     *
+     * @param requestReference The request reference
+     * @param upstreamResponsePublisher The original response publisher
+     * @return A new response publisher that executes server filters
+     */
+    public Publisher<MutableHttpResponse<?>> filterPublisher(
+            AtomicReference<HttpRequest<?>> requestReference,
+            Publisher<MutableHttpResponse<?>> upstreamResponsePublisher) {
+        List<HttpFilter> httpFilters = router.findFilters(requestReference.get());
+        if (httpFilters.isEmpty()) {
+            return upstreamResponsePublisher;
+        }
+        List<HttpFilter> filters = new ArrayList<>(httpFilters);
+        if (filters.isEmpty()) {
+            return upstreamResponsePublisher;
+        }
+        AtomicInteger integer = new AtomicInteger();
+        int len = filters.size();
+        final Function<MutableHttpResponse<?>, Publisher<MutableHttpResponse<?>>> handleStatusException = (response) ->
+                handleStatusException(requestReference.get(), response);
+        final Function<Throwable, Publisher<MutableHttpResponse<?>>> onError = (t) ->
+                onError(t, requestReference.get());
+
+        ServerFilterChain filterChain = new ServerFilterChain() {
+            @SuppressWarnings("unchecked")
+            @Override
+            public Publisher<MutableHttpResponse<?>> proceed(io.micronaut.http.HttpRequest<?> request) {
+                int pos = integer.incrementAndGet();
+                if (pos > len) {
+                    throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
+                }
+                if (pos == len) {
+                    return upstreamResponsePublisher;
+                }
+                HttpFilter httpFilter = filters.get(pos);
+                return Flux.from((Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.getAndSet(request), this))
+                        .flatMap(handleStatusException)
+                        .onErrorResume(onError);
+            }
+        };
+        HttpFilter httpFilter = filters.get(0);
+        return Flux.from((Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.get(), filterChain))
+                .flatMap(handleStatusException)
+                .onErrorResume(onError);
     }
 
     private Mono<MutableHttpResponse<?>> createDefaultErrorResponsePublisher(HttpRequest<?> httpRequest,
@@ -315,8 +433,8 @@ public class RouteExecutor {
         return errorRoute;
     }
 
-    public Publisher<MutableHttpResponse<?>> handleStatusException(HttpRequest<?> request,
-                                                                   MutableHttpResponse<?> response) {
+    private Publisher<MutableHttpResponse<?>> handleStatusException(HttpRequest<?> request,
+                                                                    MutableHttpResponse<?> response) {
         HttpStatus status = response.status();
         RouteInfo<?> routeInfo = response.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).orElse(null);
 
@@ -334,7 +452,6 @@ public class RouteExecutor {
         return Flux.just(response);
     }
 
-    @Nullable
     private RouteMatch<Object> findStatusRoute(HttpRequest<?> incomingRequest, HttpStatus status, RouteInfo<?> finalRoute) {
         Class<?> declaringType = finalRoute.getDeclaringType();
         // handle re-mapping of errors
@@ -345,41 +462,6 @@ public class RouteExecutor {
                     .orElseGet(() -> router.findStatusRoute(status, incomingRequest).orElse(null));
         }
         return statusRoute;
-    }
-
-    public MediaType resolveDefaultResponseContentType(HttpRequest<?> request, RouteInfo<?> finalRoute) {
-        final List<MediaType> producesList = finalRoute.getProduces();
-        if (request != null) {
-            final Iterator<MediaType> i = request.accept().iterator();
-            if (i.hasNext()) {
-                final MediaType mt = i.next();
-                if (producesList.contains(mt)) {
-                    return mt;
-                }
-            }
-        }
-
-        MediaType defaultResponseMediaType;
-        final Iterator<MediaType> produces = producesList.iterator();
-        if (produces.hasNext()) {
-            defaultResponseMediaType = produces.next();
-        } else {
-            defaultResponseMediaType = MediaType.APPLICATION_JSON_TYPE;
-        }
-        return defaultResponseMediaType;
-    }
-
-    public Flux<MutableHttpResponse<?>> executeRoute(
-            HttpRequest<?> request,
-            boolean executeFilters,
-            Flux<RouteMatch<?>> routePublisher) {
-        AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(request);
-        final Flux<MutableHttpResponse<?>> resultEmitter = buildResultEmitter(
-                requestReference,
-                executeFilters,
-                routePublisher
-        );
-        return resultEmitter;
     }
 
     private ExecutorService findExecutor(RouteInfo<?> routeMatch) {
@@ -685,44 +767,4 @@ public class RouteExecutor {
         return HttpResponse.status(status);
     }
 
-    public Publisher<MutableHttpResponse<?>> filterPublisher(
-            AtomicReference<HttpRequest<?>> requestReference,
-            Publisher<MutableHttpResponse<?>> upstreamResponsePublisher) {
-        List<HttpFilter> httpFilters = router.findFilters(requestReference.get());
-        if (httpFilters.isEmpty()) {
-            return upstreamResponsePublisher;
-        }
-        List<HttpFilter> filters = new ArrayList<>(httpFilters);
-        if (filters.isEmpty()) {
-            return upstreamResponsePublisher;
-        }
-        AtomicInteger integer = new AtomicInteger();
-        int len = filters.size();
-        final Function<MutableHttpResponse<?>, Publisher<MutableHttpResponse<?>>> handleStatusException = (response) ->
-                handleStatusException(requestReference.get(), response);
-        final Function<Throwable, Publisher<MutableHttpResponse<?>>> onError = (t) ->
-                onError(t, requestReference.get());
-
-        ServerFilterChain filterChain = new ServerFilterChain() {
-            @SuppressWarnings("unchecked")
-            @Override
-            public Publisher<MutableHttpResponse<?>> proceed(io.micronaut.http.HttpRequest<?> request) {
-                int pos = integer.incrementAndGet();
-                if (pos > len) {
-                    throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
-                }
-                if (pos == len) {
-                    return upstreamResponsePublisher;
-                }
-                HttpFilter httpFilter = filters.get(pos);
-                return Flux.from((Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.getAndSet(request), this))
-                        .flatMap(handleStatusException)
-                        .onErrorResume(onError);
-            }
-        };
-        HttpFilter httpFilter = filters.get(0);
-        return Flux.from((Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.get(), filterChain))
-                .flatMap(handleStatusException)
-                .onErrorResume(onError);
-    }
 }
