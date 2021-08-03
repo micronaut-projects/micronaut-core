@@ -42,7 +42,7 @@ public class TestBeanElementVisitor implements BeanElementVisitor<Prototype> {
         if (theBeanElement != null) {
 
             visitorContext.getClassElement(String.class)
-                    .ifPresent(e -> theBeanElement.addAssociatedBean(e)
+                    .ifPresent(e -> theBeanElement.addAssociatedBean(e, visitorContext)
                             .createWith(
                                     e.getEnclosedElement(
                                             ElementQuery.of(ConstructorElement.class)

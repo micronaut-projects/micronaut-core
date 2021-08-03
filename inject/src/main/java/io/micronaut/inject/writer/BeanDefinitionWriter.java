@@ -3476,13 +3476,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
-    public BeanElementBuilder addAssociatedBean(ClassElement type) {
+    public BeanElementBuilder addAssociatedBean(ClassElement type, VisitorContext visitorContext) {
         if (visitorContext instanceof BeanElementVisitorContext) {
             final Element[] originatingElements = getOriginatingElements();
-            return ((BeanElementVisitorContext) this.visitorContext)
+            return ((BeanElementVisitorContext) visitorContext)
                         .addAssociatedBean(originatingElements[0], type);
         }
-        return BeanElement.super.addAssociatedBean(type);
+        return BeanElement.super.addAssociatedBean(type, visitorContext);
     }
 
     @Override
