@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty;
+package io.micronaut.http.server;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.exceptions.BeanCreationException;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ReferenceCounted;
@@ -36,7 +35,6 @@ import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.filter.ServerFilterChain;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
@@ -98,12 +96,22 @@ public final class RouteExecutor {
     private final ErrorResponseProcessor<?> errorResponseProcessor;
     private final ExecutorSelector executorSelector;
 
-    RouteExecutor(Router router,
-                  BeanContext beanContext,
-                  RequestArgumentSatisfier requestArgumentSatisfier,
-                  HttpServerConfiguration serverConfiguration,
-                  ErrorResponseProcessor<?> errorResponseProcessor,
-                  ExecutorSelector executorSelector) {
+    /**
+     * Default constructor.
+     *
+     * @param router                   The router
+     * @param beanContext              The bean context
+     * @param requestArgumentSatisfier The request argument satisfier
+     * @param serverConfiguration      The server configuration
+     * @param errorResponseProcessor   The error response processor
+     * @param executorSelector         The executor selector
+     */
+    public RouteExecutor(Router router,
+                         BeanContext beanContext,
+                         RequestArgumentSatisfier requestArgumentSatisfier,
+                         HttpServerConfiguration serverConfiguration,
+                         ErrorResponseProcessor<?> errorResponseProcessor,
+                         ExecutorSelector executorSelector) {
         this.router = router;
         this.beanContext = beanContext;
         this.requestArgumentSatisfier = requestArgumentSatisfier;
@@ -120,7 +128,7 @@ public final class RouteExecutor {
      * @param httpRequest The request that caused the exception
      * @return A response publisher
      */
-    Publisher<MutableHttpResponse<?>> onError(Throwable t, HttpRequest<?> httpRequest) {
+    public Publisher<MutableHttpResponse<?>> onError(Throwable t, HttpRequest<?> httpRequest) {
         // find the origination of of the route
         Class declaringType = httpRequest.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).map(RouteInfo::getDeclaringType).orElse(null);
 
