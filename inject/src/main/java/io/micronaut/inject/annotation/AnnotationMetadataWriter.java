@@ -406,7 +406,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 invokeLoadClassValueMethod(owningType, classWriter, staticInit, loadTypeMethods, new AnnotationClassValue(annotationName));
 
                 if (!typeOnly) {
-                    pushStringMapOf(staticInit, annotationValues, true, null, v -> pushValue(owningType, classWriter, staticInit, v, defaultsStorage, loadTypeMethods));
+                    pushStringMapOf(staticInit, annotationValues, true, null, v -> pushValue(owningType, classWriter, staticInit, v, defaultsStorage, loadTypeMethods, true));
                     staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_ANNOTATION_DEFAULTS);
                 } else {
                     staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_ANNOTATION_TYPE);
@@ -516,20 +516,26 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             }
         }
 
-        pushStringMapOf(methodVisitor, annotationData, false, Collections.emptyMap(), attributes -> {
-            pushStringMapOf(methodVisitor, attributes, true, null, v -> pushValue(declaringType, declaringClassWriter, methodVisitor, v, defaultsStorage, loadTypeMethods));
-        });
+        pushStringMapOf(methodVisitor, annotationData, false, Collections.emptyMap(), attributes ->
+                pushStringMapOf(methodVisitor, attributes, true, null, v ->
+                    pushValue(declaringType, declaringClassWriter, methodVisitor, v, defaultsStorage, loadTypeMethods, true)
+                )
+        );
     }
 
     private static void pushValue(Type declaringType, ClassVisitor declaringClassWriter,
-                                  GeneratorAdapter methodVisitor, Object value,
+                                  GeneratorAdapter methodVisitor,
+                                  Object value,
                                   Map<String, Integer> defaultsStorage,
-                                  Map<String, GeneratorAdapter> loadTypeMethods) {
+                                  Map<String, GeneratorAdapter> loadTypeMethods,
+                                  boolean boxValue) {
         if (value == null) {
             throw new IllegalStateException("Cannot map null value in: " + declaringType.getClassName());
         } else if (value instanceof Boolean) {
             methodVisitor.push((Boolean) value);
-            pushBoxPrimitiveIfNecessary(boolean.class, methodVisitor);
+            if (boxValue) {
+                pushBoxPrimitiveIfNecessary(boolean.class, methodVisitor);
+            }
         } else if (value instanceof String) {
             methodVisitor.push(value.toString());
         } else if (value instanceof AnnotationClassValue) {
@@ -550,16 +556,17 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             Type t = Type.getType(declaringClass);
             methodVisitor.getStatic(t, enumObject.name(), t);
         } else if (value.getClass().isArray()) {
-            final Class<?> componentType = ReflectionUtils.getWrapperType(value.getClass().getComponentType());
+            Class<?> jt = ReflectionUtils.getPrimitiveType(value.getClass().getComponentType());
+            final Type componentType = Type.getType(jt);
             int len = Array.getLength(value);
-            if (Object.class == componentType && len == 0) {
+            if (Object.class == jt && len == 0) {
                 pushEmptyObjectsArray(methodVisitor);
             } else {
-                pushNewArray(methodVisitor, componentType, len);
+                pushNewArray(methodVisitor, jt, len);
                 for (int i = 0; i < len; i++) {
                     final Object v = Array.get(value, i);
-                    pushStoreInArray(methodVisitor, i, len, () ->
-                            pushValue(declaringType, declaringClassWriter, methodVisitor, v, defaultsStorage, loadTypeMethods)
+                    pushStoreInArray(methodVisitor, componentType, i, len, () ->
+                            pushValue(declaringType, declaringClassWriter, methodVisitor, v, defaultsStorage, loadTypeMethods, !jt.isPrimitive())
                     );
                 }
             }
@@ -570,28 +577,56 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 List array = Arrays.asList(((Collection) value).toArray());
                 int len = array.size();
                 boolean first = true;
+                Class<?> arrayType = Object.class;
                 for (int i = 0; i < len; i++) {
                     Object v = array.get(i);
+
                     if (first) {
-                        Class type = v == null ? Object.class : v.getClass();
-                        pushNewArray(methodVisitor, type, len);
+                        arrayType = v == null ? Object.class : v.getClass();
+                        pushNewArray(methodVisitor, arrayType, len);
                         first = false;
                     }
-                    pushStoreInArray(methodVisitor, i, len, () -> pushValue(declaringType, declaringClassWriter, methodVisitor, v, defaultsStorage, loadTypeMethods));
+                    Class<?> finalArrayType = arrayType;
+                    pushStoreInArray(methodVisitor, Type.getType(arrayType), i, len, () ->
+                        pushValue(declaringType, declaringClassWriter, methodVisitor, v, defaultsStorage, loadTypeMethods, !finalArrayType.isPrimitive())
+                    );
                 }
             }
         } else if (value instanceof Long) {
             methodVisitor.push(((Long) value));
-            pushBoxPrimitiveIfNecessary(long.class, methodVisitor);
+            if (boxValue) {
+                pushBoxPrimitiveIfNecessary(long.class, methodVisitor);
+            }
         } else if (value instanceof Double) {
             methodVisitor.push(((Double) value));
-            pushBoxPrimitiveIfNecessary(double.class, methodVisitor);
+            if (boxValue) {
+                pushBoxPrimitiveIfNecessary(double.class, methodVisitor);
+            }
         } else if (value instanceof Float) {
             methodVisitor.push(((Float) value));
-            pushBoxPrimitiveIfNecessary(float.class, methodVisitor);
+            if (boxValue) {
+                pushBoxPrimitiveIfNecessary(float.class, methodVisitor);
+            }
+        } else if (value instanceof Byte) {
+            methodVisitor.push(((Byte) value));
+            if (boxValue) {
+                pushBoxPrimitiveIfNecessary(byte.class, methodVisitor);
+            }
+        } else if (value instanceof Short) {
+            methodVisitor.push(((Short) value));
+            if (boxValue) {
+                pushBoxPrimitiveIfNecessary(short.class, methodVisitor);
+            }
+        } else if (value instanceof Character) {
+            methodVisitor.push(((Character) value));
+            if (boxValue) {
+                pushBoxPrimitiveIfNecessary(char.class, methodVisitor);
+            }
         } else if (value instanceof Number) {
             methodVisitor.push(((Number) value).intValue());
-            pushBoxPrimitiveIfNecessary(ReflectionUtils.getPrimitiveType(value.getClass()), methodVisitor);
+            if (boxValue) {
+                pushBoxPrimitiveIfNecessary(ReflectionUtils.getPrimitiveType(value.getClass()), methodVisitor);
+            }
         } else if (value instanceof io.micronaut.core.annotation.AnnotationValue) {
             io.micronaut.core.annotation.AnnotationValue data = (io.micronaut.core.annotation.AnnotationValue) value;
             String annotationName = data.getAnnotationName();
@@ -601,7 +636,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             methodVisitor.dup();
             methodVisitor.push(annotationName);
 
-            pushStringMapOf(methodVisitor, values, true, null, v -> pushValue(declaringType, declaringClassWriter, methodVisitor, v, defaultsStorage, loadTypeMethods));
+            pushStringMapOf(methodVisitor, values, true, null, v -> pushValue(declaringType, declaringClassWriter, methodVisitor, v, defaultsStorage, loadTypeMethods, true));
 
             Integer defaultIndex = defaultsStorage.get(annotationName);
             if (defaultIndex == null) {

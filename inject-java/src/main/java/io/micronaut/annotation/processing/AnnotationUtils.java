@@ -101,7 +101,11 @@ public class AnnotationUtils {
         while (i.hasNext()) {
             final ServiceDefinition<AnnotatedElementValidator> validator = i.next();
             if (validator.isPresent()) {
-                elementValidator = validator.load();
+                try {
+                    elementValidator = validator.load();
+                } catch (Throwable e) {
+                    // probably missing required dependencies to load the validator
+                }
                 break;
             }
         }

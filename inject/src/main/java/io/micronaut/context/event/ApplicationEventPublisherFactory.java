@@ -191,7 +191,6 @@ public final class ApplicationEventPublisherFactory<T>
         return getClass().hashCode();
     }
 
-
     private ApplicationEventPublisher<Object> createObjectEventPublisher(BeanContext beanContext) {
         return new ApplicationEventPublisher<Object>() {
             @Override
