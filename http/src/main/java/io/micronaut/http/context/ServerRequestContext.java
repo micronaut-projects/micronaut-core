@@ -21,7 +21,6 @@ import java.util.function.Supplier;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-
 import io.micronaut.http.HttpRequest;
 
 /**

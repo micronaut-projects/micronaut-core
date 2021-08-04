@@ -52,6 +52,7 @@ import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
 import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.HttpServerConfiguration;
+import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
@@ -180,6 +181,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private final HttpVersion httpVersion;
     private final HttpRequestCertificateHandler requestCertificateHandler;
     private final RoutingInBoundHandler routingHandler;
+    private final RouteExecutor routeExecutor;
     private volatile int serverPort;
     private final ApplicationContext applicationContext;
     private final SslContext sslContext;
@@ -278,19 +280,19 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         this.eventLoopGroupFactory = eventLoopGroupFactory;
         this.eventLoopGroupRegistry = eventLoopGroupRegistry;
         this.requestCertificateHandler = new HttpRequestCertificateHandler();
+        this.routeExecutor = new RouteExecutor(router, applicationContext, requestArgumentSatisfier, serverConfiguration, errorResponseProcessor, executorSelector);
         this.routingHandler = new RoutingInBoundHandler(
-                applicationContext,
                 router,
                 mediaTypeCodecRegistry,
                 customizableResponseTypeHandlerRegistry,
                 staticResourceResolver,
                 serverConfiguration,
                 requestArgumentSatisfier,
-                executorSelector,
                 SupplierUtil.memoized(ioExecutor::get),
                 httpContentProcessorResolver,
                 errorResponseProcessor,
-                this.terminateEventPublisher);
+                this.terminateEventPublisher,
+                this.routeExecutor);
         this.channelOptionFactory = channelOptionFactory;
         this.hostResolver = hostResolver;
     }
@@ -807,7 +809,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                     requestArgumentSatisfier.getBinderRegistry(),
                     webSocketBeanRegistry,
                     mediaTypeCodecRegistry,
-                    applicationContext
+                    applicationContext,
+                    routeExecutor
             ));
             handlers.put(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, routingHandler);
             return handlers;

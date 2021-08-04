@@ -75,6 +75,42 @@ class ErrorSpec extends AbstractMicronautSpec {
         response.getBody(JsonError).get().message == 'Internal Server Error: null'
     }
 
+    void "test an error route throwing the same exception it handles"() {
+        given:
+        HttpResponse response = Flux.from(rxClient.exchange(
+                HttpRequest.GET('/errors/loop')
+
+        )).onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
+
+        expect:
+        response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
+        response.getBody(JsonError).get().message == 'Internal Server Error: null'
+    }
+
+    void "test an exception handler throwing the same exception it handles"() {
+        given:
+        HttpResponse response = Flux.from(rxClient.exchange(
+                HttpRequest.GET('/errors/loop/handler')
+
+        )).onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
+
+        expect:
+        response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
+        response.getBody(JsonError).get().message == 'Internal Server Error: null'
+    }
+
     void "test 404 error"() {
         when:
         HttpResponse response = Flux.from(rxClient.exchange(
@@ -176,6 +212,29 @@ class ErrorSpec extends AbstractMicronautSpec {
         }
     }
 
+    @Controller('/errors/loop')
+    static class ErrorLoopController {
+
+        @Get()
+        String serverError() {
+            throw new LoopingException()
+        }
+
+        @Error(LoopingException)
+        String loop() {
+            throw new LoopingException()
+        }
+    }
+
+    @Controller('/errors/loop/handler')
+    static class ErrorLoopHandlerController {
+
+        @Get()
+        String serverError() {
+            throw new LoopingException()
+        }
+    }
+
     @Controller('/errors/injection')
     static class ErrorInjectionController {
 
@@ -205,4 +264,13 @@ class ErrorSpec extends AbstractMicronautSpec {
 
     static class ContentTypeExceptionHandlerException extends RuntimeException {}
 
+    static class LoopingException extends RuntimeException {}
+
+    @Singleton
+    static class LoopingExceptionHandler implements ExceptionHandler<LoopingException, String> {
+        @Override
+        String handle(HttpRequest request, LoopingException exception) {
+            throw new LoopingException()
+        }
+    }
 }

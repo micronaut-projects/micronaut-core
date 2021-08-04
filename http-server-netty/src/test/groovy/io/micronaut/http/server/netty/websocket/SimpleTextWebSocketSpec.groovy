@@ -16,9 +16,11 @@
 package io.micronaut.http.server.netty.websocket
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.util.StreamUtils
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.websocket.WebSocketClient
+import io.micronaut.websocket.exceptions.WebSocketClientException
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import reactor.core.publisher.Flux
@@ -207,6 +209,34 @@ class SimpleTextWebSocketSpec extends Specification {
         embeddedServer.close()
     }
 
+    void "test a filter responding to a websocket upgrade request"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.builder(
+                'websocket-filter-respond': true
+        ).run(EmbeddedServer)
+
+        when:
+        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
+        Flux.from(wsClient.connect(ChatClientWebSocket, "/chat/stuff/fred")).blockFirst()
+
+        then:
+        def ex = thrown(WebSocketClientException)
+        ex.message.contains("Invalid handshake response getStatus: 200 OK")
+    }
+
+    void "test filters are invoked for web socket requests that don't match any routes"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.builder().run(EmbeddedServer)
+
+        when:
+        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
+        Flux.from(wsClient.connect(ChatClientWebSocket, "/abc/def/ghi")).blockFirst()
+
+        then:
+        def ex = thrown(WebSocketClientException)
+        ex.message.contains("Invalid handshake response getStatus: 404 Not Found")
+        embeddedServer.applicationContext.getBean(WebSocketContextValidationFilter).executeCount.get() == 1
+    }
 
     @Singleton
     static class MyBean {

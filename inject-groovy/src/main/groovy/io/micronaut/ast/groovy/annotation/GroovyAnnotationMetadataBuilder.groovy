@@ -15,6 +15,7 @@
  */
 package io.micronaut.ast.groovy.annotation
 
+import io.micronaut.ast.groovy.utils.AstGenericUtils
 import io.micronaut.core.annotation.NonNull
 import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstMessageUtils
@@ -50,6 +51,7 @@ import org.codehaus.groovy.ast.expr.PropertyExpression
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.ast.stmt.Statement
+import org.codehaus.groovy.ast.tools.ParameterUtils
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.SourceUnit
 
@@ -583,29 +585,58 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
         ClassNode classNode = methodNode.getDeclaringClass()
 
         String methodName = methodNode.name
-        Parameter[] methodParameters = methodNode.parameters
+        Map<String, Map<String, ClassNode>> genericsInfo = AstGenericUtils.buildAllGenericElementInfo(classNode, createVisitorContext())
 
+        classLoop:
         while (classNode != null && classNode.name != Object.name) {
-
             for (i in classNode.getAllInterfaces()) {
-                MethodNode parent = i.getDeclaredMethod(methodName, methodParameters)
-                if (parent != null) {
-                    overriddenMethods.add(parent)
+                for (MethodNode parent: i.getMethods(methodName)) {
+                    if (methodOverrides(methodNode, parent, genericsInfo.get(i.name))) {
+                        overriddenMethods.add(parent)
+                    }
                 }
             }
             classNode = classNode.superClass
             if (classNode != null && classNode.name != Object.name) {
-                MethodNode parent = classNode.getDeclaredMethod(methodName, methodParameters)
-                if (parent != null) {
-                    if (!parent.isPrivate()) {
-                        overriddenMethods.add(parent)
-                    }
-                    if (parent.getAnnotations(ANN_OVERRIDE).isEmpty()) {
-                        break
+
+                for (MethodNode parent: classNode.getMethods(methodName)) {
+                    if (methodOverrides(methodNode, parent, genericsInfo.get(classNode.name))) {
+                        if (!parent.isPrivate()) {
+                            overriddenMethods.add(parent)
+                        }
+                        if (parent.getAnnotations(ANN_OVERRIDE).isEmpty()) {
+                            break classLoop
+                        }
                     }
                 }
             }
         }
         return overriddenMethods
+    }
+
+    private boolean methodOverrides(MethodNode child,
+                                    MethodNode parent,
+                                    Map<String, ClassNode> genericsSpec) {
+        Parameter[] childParameters = child.parameters
+        Parameter[] parentParameters = parent.parameters
+        if (childParameters.length == parentParameters.length) {
+            for (int i = 0, n = childParameters.length; i < n; i += 1) {
+                ClassNode aType = childParameters[i].getType()
+                ClassNode bType = parentParameters[i].getType()
+
+                if (aType != bType) {
+                    if (bType.isGenericsPlaceHolder() && genericsSpec != null) {
+                        def classNode = genericsSpec.get(bType.getUnresolvedName())
+                        if (!classNode || aType != classNode) {
+                            return false
+                        }
+                    } else {
+                        return false
+                    }
+                }
+            }
+            return true
+        }
+        return false
     }
 }

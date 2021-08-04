@@ -28,6 +28,7 @@ import io.micronaut.scheduling.TaskExecutors
 import jakarta.inject.Inject
 import jakarta.inject.Named
 import jakarta.inject.Singleton
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 import spock.lang.AutoCleanup
@@ -60,10 +61,19 @@ class ServerRequestContextSpec extends Specification {
         where:
         method          | uri
         "method"        | '/test-context/method'
-        "rxjava"        | '/test-context/rxjava'
+        "reactor"       | '/test-context/reactor'
         "thread"        | '/test-context/thread'
         "error"         | '/test-context/error'
         "handlerError"  | '/test-context/handler-error'
+    }
+
+    void "test the request is part of the reactor context"() {
+        given:
+        TestClient testClient = embeddedServer.getApplicationContext().getBean(TestClient)
+
+        expect:
+        testClient.reactorContext() == '/test-context/reactor-context'
+        testClient.reactorContextStream() == '/test-context/reactor-context-stream'
     }
 
     @Client('/test-context')
@@ -73,8 +83,14 @@ class ServerRequestContextSpec extends Specification {
         @Get("/method")
         String method()
 
-        @Get("/rxjava")
-        String rxjava()
+        @Get("/reactor")
+        String reactor()
+
+        @Get("/reactor-context")
+        String reactorContext()
+
+        @Get("/reactor-context-stream")
+        String reactorContextStream()
 
         @Get("/thread")
         String thread()
@@ -100,13 +116,30 @@ class ServerRequestContextSpec extends Specification {
             request.uri
         }
 
-        @Get("/rxjava")
-        Mono<String> rxjava() {
+        @Get("/reactor")
+        Mono<String> reactor() {
             Mono.fromCallable({ ->
                 def request = ServerRequestContext.currentRequest().orElseThrow { -> new RuntimeException("no request") }
                 request.uri
             }).subscribeOn(Schedulers.boundedElastic())
         }
+
+        @Get("/reactor-context")
+        Mono<String> reactorContext() {
+            Mono.deferContextual({ ctx ->
+                def request = (HttpRequest) ctx.get(HttpRequest.KEY)
+                return Mono.just(request.uri)
+            })
+        }
+
+        @Get("/reactor-context-stream")
+        Flux<String> reactorContextStream() {
+            Flux.deferContextual({ ctx ->
+                def request = (HttpRequest) ctx.get(HttpRequest.KEY)
+                return Mono.just(request.uri)
+            })
+        }
+
 
         @Get("/thread")
         String thread() {

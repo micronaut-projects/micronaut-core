@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Blocking
 import io.micronaut.core.annotation.NonBlocking
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Body
@@ -14,12 +15,14 @@ import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
+import io.micronaut.http.server.exceptions.ExceptionHandler
 import io.micronaut.http.sse.Event
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 import io.micronaut.scheduling.executor.ThreadSelection
 import io.netty.channel.EventLoopGroup
+import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.FluxSink
@@ -30,6 +33,9 @@ import spock.lang.Unroll
 import java.util.concurrent.ExecutorService
 
 class ThreadSelectionSpec extends Specification {
+
+    static final String IO = "io-executor-thread-"
+    static final String LOOP = "default-nioEventLoopGroup"
 
     @Unroll
     void "test thread selection strategy #strategy"() {
@@ -47,10 +53,10 @@ class ThreadSelectionSpec extends Specification {
         embeddedServer.close()
 
         where:
-        strategy               | blocking                    | nonBlocking                 | scheduleBlocking
-        ThreadSelection.AUTO   | 'io-executor-thread-'       | 'default-nioEventLoopGroup' | "io-executor-thread-"
-        ThreadSelection.IO     | 'io-executor-thread-'       | 'io-executor-thread-'       | "io-executor-thread-"
-        ThreadSelection.MANUAL | 'default-nioEventLoopGroup' | 'default-nioEventLoopGroup' | "io-executor-thread-"
+        strategy               | blocking | nonBlocking | scheduleBlocking
+        ThreadSelection.AUTO   | IO       | LOOP        | IO
+        ThreadSelection.IO     | IO       | IO          | IO
+        ThreadSelection.MANUAL | LOOP     | LOOP        | IO
     }
 
     @Unroll
@@ -70,10 +76,35 @@ class ThreadSelectionSpec extends Specification {
         embeddedServer.close()
 
         where:
-        strategy               |  reactive                    | blockingReactive            | scheduleSse           | scheduleReactive
-        ThreadSelection.AUTO   |  'default-nioEventLoopGroup' | 'io-executor-thread-'       | "io-executor-thread-" | "io-executor-thread-"
-        ThreadSelection.IO     |  'io-executor-thread-'       | 'io-executor-thread-'       | "io-executor-thread-" | "io-executor-thread-"
-        ThreadSelection.MANUAL |  'default-nioEventLoopGroup' | 'default-nioEventLoopGroup' | "io-executor-thread-" | "io-executor-thread-"
+        strategy               |  reactive | blockingReactive | scheduleSse | scheduleReactive
+        ThreadSelection.AUTO   |  LOOP     | IO               | IO          | IO
+        ThreadSelection.IO     |  IO       | IO               | IO          | IO
+        ThreadSelection.MANUAL |  LOOP     | LOOP             | IO          | IO
+    }
+
+    void "test thread selection for exception handlers"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.thread-selection': strategy])
+        ThreadSelectionClient client = embeddedServer.applicationContext.getBean(ThreadSelectionClient)
+
+        when:
+        def exResult = client.exception()
+        def scheduledResult = client.scheduleException()
+
+        then:
+        exResult.contains(controller)
+        exResult.contains(handler)
+        scheduledResult.contains(controller)
+        scheduledResult.contains(scheduledHandler)
+
+        cleanup:
+        embeddedServer.close()
+
+        where:
+        strategy               |  controller          | handler          | scheduledHandler
+        ThreadSelection.AUTO   |  "controller: $IO"   | "handler: $IO"   | "handler: $IO"
+        ThreadSelection.IO     |  "controller: $IO"   | "handler: $IO"   | "handler: $IO"
+        ThreadSelection.MANUAL |  "controller: $LOOP" | "handler: $LOOP" | "handler: $IO"
     }
 
     void "test injecting an executor service does not inject the Netty event loop"() {
@@ -116,6 +147,12 @@ class ThreadSelectionSpec extends Specification {
 
         @Get(value = "/scheduleSse", consumes = MediaType.TEXT_EVENT_STREAM)
         String scheduleSse()
+
+        @Get("/exception")
+        String exception()
+
+        @Get("/scheduleexception")
+        String scheduleException()
     }
 
     @Controller("/thread-selection")
@@ -174,6 +211,16 @@ class ThreadSelectionSpec extends Specification {
                         emitter.complete()
                     }, FluxSink.OverflowStrategy.BUFFER)
         }
+
+        @Get("/exception")
+        String throwsEx() {
+            throw new MyException()
+        }
+
+        @Get("/scheduleexception")
+        String throwsScheduledEx() {
+            throw new MyExceptionScheduled()
+        }
     }
 
     @Filter("/thread-selection/alter**")
@@ -187,6 +234,40 @@ class ThreadSelectionSpec extends Specification {
             }, FluxSink.OverflowStrategy.LATEST).switchMap({ String it ->
                 return chain.proceed(request)
             })
+        }
+    }
+
+    static class MyException extends RuntimeException {
+
+        MyException() {
+            super(Thread.currentThread().getName())
+        }
+
+    }
+
+    static class MyExceptionScheduled extends RuntimeException {
+
+        MyExceptionScheduled() {
+            super(Thread.currentThread().getName())
+        }
+    }
+
+    @Singleton
+    static class MyExceptionHandler implements ExceptionHandler<MyException, HttpResponse> {
+
+        @Override
+        HttpResponse handle(HttpRequest request, MyException exception) {
+            return HttpResponse.ok("handler: ${Thread.currentThread().name}, controller: " + exception.getMessage())
+        }
+    }
+
+    @Singleton
+    static class MyScheduledExceptionHandler implements ExceptionHandler<MyExceptionScheduled, HttpResponse> {
+
+        @Override
+        @ExecuteOn(TaskExecutors.IO)
+        HttpResponse handle(HttpRequest request, MyExceptionScheduled exception) {
+            return HttpResponse.ok("handler: ${Thread.currentThread().name}, controller: " + exception.getMessage())
         }
     }
 }
