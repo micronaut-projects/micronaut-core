@@ -54,5 +54,15 @@ public class MessageControllerSpec {
 
         assertNotNull(body);
         assertEquals("Hello John!!", body);
+
+        body = client.toBlocking().retrieve("/request/hello-static?name=John");
+
+        assertNotNull(body);
+        assertEquals("Hello John!!", body);
+
+        body = client.toBlocking().retrieve("/request/hello-reactor?name=John");
+
+        assertNotNull(body);
+        assertEquals("Hello John!!", body);
     }
 }

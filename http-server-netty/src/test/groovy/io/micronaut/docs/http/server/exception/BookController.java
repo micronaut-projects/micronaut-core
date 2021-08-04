@@ -16,6 +16,7 @@
 package io.micronaut.docs.http.server.exception;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -63,6 +64,7 @@ public class BookController {
     }
 
     @Get("/reactive")
+    @SingleResult
     Publisher<String> reactive() {
         return Publishers.just(new ReactiveException());
     }

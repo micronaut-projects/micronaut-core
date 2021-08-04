@@ -571,7 +571,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 true,
                 routeMatchPublisher
         );
-        routeResponse.contextWrite(ctx -> ctx.put(HttpRequest.KEY, request))
+        routeResponse
+                .contextWrite(ctx -> ctx.put(HttpRequest.KEY, request))
                 .subscribe(new CompletionAwareSubscriber<HttpResponse<?>>() {
             @Override
             protected void doOnSubscribe(Subscription subscription) {
@@ -969,9 +970,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private Flux<HttpContent> mapToHttpContent(NettyHttpRequest<?> request,
-                                  MutableHttpResponse<?> response,
-                                  Object body,
-                                  ChannelHandlerContext context) {
+                                               MutableHttpResponse<?> response,
+                                               Object body,
+                                               ChannelHandlerContext context) {
         final Optional<RouteInfo> optionalRoute = response.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class);
         MediaType mediaType = response.getContentType().orElseGet(() -> optionalRoute
                     .map(routeInfo -> routeExecutor.resolveDefaultResponseContentType(request, routeInfo))
@@ -1019,6 +1020,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
 
         httpContentPublisher = httpContentPublisher
+                .contextWrite(reactorContext -> reactorContext.put(HttpRequest.KEY, request))
                 .doOnNext(httpContent ->
                         // once an http content is written, read the next item if it is available
                         context.read())

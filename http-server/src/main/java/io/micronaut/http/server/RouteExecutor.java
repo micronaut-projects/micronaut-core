@@ -639,48 +639,44 @@ public final class RouteExecutor {
                     if (isSingle || isCompletable) {
                         // full response case
                         Publisher<Object> publisher = Publishers.convertPublisher(body, Publisher.class);
-                        return Publishers.mapOrSupplyEmpty(publisher, new Publishers.MapOrSupplyEmpty<Object, MutableHttpResponse<?>>() {
-                            @Override
-                            public MutableHttpResponse<?>  map(Object o) {
-                                MutableHttpResponse<?> singleResponse;
-                                if (o instanceof Optional) {
-                                    Optional optional = (Optional) o;
-                                    if (optional.isPresent()) {
-                                        o = ((Optional<?>) o).get();
+                        Supplier<MutableHttpResponse<?>> emptyResponse = () -> {
+                            MutableHttpResponse<?> singleResponse;
+                            if (isCompletable || routeInfo.isVoid()) {
+                                singleResponse = forStatus(routeInfo, HttpStatus.OK)
+                                        .header(HttpHeaders.CONTENT_LENGTH, "0");
+                            } else {
+                                singleResponse = newNotFoundError(request);
+                            }
+                            return singleResponse;
+                        };
+                        return Flux.from(publisher)
+                                .map(o -> {
+                                    MutableHttpResponse<?> singleResponse;
+                                    if (o instanceof Optional) {
+                                        Optional optional = (Optional) o;
+                                        if (optional.isPresent()) {
+                                            o = ((Optional<?>) o).get();
+                                        } else {
+                                            return emptyResponse.get();
+                                        }
+                                    }
+                                    if (o instanceof HttpResponse) {
+                                        singleResponse = toMutableResponse((HttpResponse<?>) o);
+                                        final Argument<?> bodyArgument = routeInfo.getReturnType() //Mono
+                                                .getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT) //HttpResponse
+                                                .getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT); //Mono
+                                        if (bodyArgument.isAsyncOrReactive()) {
+                                            singleResponse = processPublisherBody(request, singleResponse, routeInfo);
+                                        }
+                                    } else if (o instanceof HttpStatus) {
+                                        singleResponse = forStatus(routeInfo, (HttpStatus) o);
                                     } else {
-                                        return supplyEmpty();
+                                        singleResponse = forStatus(routeInfo, defaultHttpStatus)
+                                                .body(o);
                                     }
-                                }
-                                if (o instanceof HttpResponse) {
-                                    singleResponse = toMutableResponse((HttpResponse<?>) o);
-                                    final Argument<?> bodyArgument = routeInfo.getReturnType() //Mono
-                                            .getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT) //HttpResponse
-                                            .getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT); //Mono
-                                    if (bodyArgument.isAsyncOrReactive()) {
-                                        singleResponse = processPublisherBody(request, singleResponse, routeInfo);
-                                    }
-                                } else if (o instanceof HttpStatus) {
-                                    singleResponse = forStatus(routeInfo, (HttpStatus) o);
-                                } else {
-                                    singleResponse = forStatus(routeInfo, defaultHttpStatus)
-                                            .body(o);
-                                }
-                                return singleResponse;
-                            }
-
-                            @Override
-                            public MutableHttpResponse<?> supplyEmpty() {
-                                MutableHttpResponse<?> singleResponse;
-                                if (isCompletable || routeInfo.isVoid()) {
-                                    singleResponse = forStatus(routeInfo, HttpStatus.OK)
-                                            .header(HttpHeaders.CONTENT_LENGTH, "0");
-                                } else {
-                                    singleResponse = newNotFoundError(request);
-                                }
-                                return singleResponse;
-                            }
-
-                        });
+                                    return singleResponse;
+                                })
+                                .switchIfEmpty(Mono.fromSupplier(emptyResponse));
                     } else {
                         // streaming case
                         Argument<?> typeArgument = routeInfo.getReturnType().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
