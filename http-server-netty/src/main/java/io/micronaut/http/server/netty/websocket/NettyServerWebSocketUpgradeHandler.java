@@ -154,7 +154,9 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
         if (optionalRoute.isPresent()) {
             UriRouteMatch<Object, Object> rm = optionalRoute.get();
             msg.setAttribute(HttpAttributes.ROUTE_MATCH, rm);
+            msg.setAttribute(HttpAttributes.ROUTE_INFO, rm);
             proceed.setAttribute(HttpAttributes.ROUTE_MATCH, rm);
+            proceed.setAttribute(HttpAttributes.ROUTE_INFO, rm);
             responsePublisher = Flux.just(proceed);
         } else {
             responsePublisher = routeExecutor.onError(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"), msg);

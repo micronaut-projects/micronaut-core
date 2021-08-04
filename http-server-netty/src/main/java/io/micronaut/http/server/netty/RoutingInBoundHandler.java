@@ -546,8 +546,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         // try to fulfill the argument requirements of the route
         RouteMatch<?> route = requestArgumentSatisfier.fulfillArgumentRequirements(originalRoute, request, false);
 
-        request.setAttribute(HttpAttributes.ROUTE_INFO, route);
-
         Optional<Argument<?>> bodyArgument = route.getBodyArgument()
             .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class));
 
