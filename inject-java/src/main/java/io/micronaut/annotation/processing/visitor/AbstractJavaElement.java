@@ -86,6 +86,20 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
     }
 
     @Override
+    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(AnnotationValue<T> annotationValue) {
+        ArgumentUtils.requireNonNull("annotationValue", annotationValue);
+
+        AnnotationUtils annotationUtils = visitorContext
+                .getAnnotationUtils();
+        this.annotationMetadata = annotationUtils
+                .newAnnotationBuilder()
+                .annotate(annotationMetadata, annotationValue);
+
+        updateMetadataCaches();
+        return this;
+    }
+
+    @Override
     public io.micronaut.inject.ast.Element removeAnnotation(@NonNull String annotationType) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
         try {
