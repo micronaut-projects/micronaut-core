@@ -1,5 +1,33 @@
 This section covers the steps required to upgrade a Micronaut 2.x application to Micronaut 3.0.0.
 
+=== Version Update
+
+If you use Gradle, update the `micronautVersion` property in `gradle.properties`, e.g.
+
+.gradle.properties
+[source,properties,subs="attributes+"]
+----
+micronautVersion={version}
+----
+
+If you use Maven, update the parent POM version and `micronaut.version` property in `pom.xml`, e.g.
+
+.pom.xml
+[source,xml,subs="attributes+"]
+----
+<parent>
+  <groupId>io.micronaut</groupId>
+  <artifactId>micronaut-parent</artifactId>
+  <version>{version}</version>
+</parent>
+
+<properties>
+  ...
+  <micronaut.version>{version}</micronaut.version>
+  ...
+</properties>
+----
+
 === Inject Annotations
 
 The `javax.inject` annotations are no longer a transitive dependency. Micronaut now ships with the Jakarta inject annotations. To upgrade, either add a dependency on `javax-inject`, or replace all `javax.inject` imports with `jakarta.inject`.
@@ -50,3 +78,7 @@ If the Netty based server implementation is being used, another dependency must 
 dependency:io.micronaut.rxjava2:micronaut-rxjava2-http-server-netty[gradleScope="implementation"]
 
 NOTE: We recommend switching to Project Reactor as that is the implementation used internally by Micronaut. Adding a dependency to RxJava2 will result in both implementations in the runtime classpath of your application.
+
+=== Breaking Changes
+
+Review the section on <<breaks, Breaking Changes>> and update your affected application code.
