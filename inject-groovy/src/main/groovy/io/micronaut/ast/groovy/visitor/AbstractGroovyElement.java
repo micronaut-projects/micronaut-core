@@ -102,6 +102,17 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
     }
 
     @Override
+    public <T extends Annotation> Element annotate(AnnotationValue<T> annotationValue) {
+        ArgumentUtils.requireNonNull("annotationValue", annotationValue);
+        this.annotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).annotate(
+                this.annotationMetadata,
+                annotationValue
+        );
+        updateAnnotationCaches();
+        return this;
+    }
+
+    @Override
     public Element removeAnnotation(@NonNull String annotationType) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
         this.annotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).removeAnnotation(

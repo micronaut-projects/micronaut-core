@@ -950,7 +950,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         // the size of the array
         methodVisitor.push(size);
         // define the array
-        methodVisitor.visitTypeInsn(ANEWARRAY, Type.getInternalName(arrayType));
+        methodVisitor.newArray(Type.getType(arrayType));
         // add a reference to the array on the stack
         if (size > 0) {
             methodVisitor.visitInsn(DUP);
@@ -983,12 +983,23 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param runnable      The runnable
      */
     protected static void pushStoreInArray(GeneratorAdapter methodVisitor, int index, int size, Runnable runnable) {
+        pushStoreInArray(methodVisitor, TYPE_OBJECT, index, size, runnable);
+    }
+
+    /**
+     * @param methodVisitor The method visitor as {@link GeneratorAdapter}
+     * @param type          The type of the array
+     * @param index         The index
+     * @param size          The size
+     * @param runnable      The runnable
+     */
+    protected static void pushStoreInArray(GeneratorAdapter methodVisitor, Type type, int index, int size, Runnable runnable) {
         // the array index position
         methodVisitor.push(index);
         // load the constant string
         runnable.run();
         // store the string in the position
-        methodVisitor.visitInsn(AASTORE);
+        methodVisitor.arrayStore(type);
         if (index != (size - 1)) {
             // if we are not at the end of the array duplicate array onto the stack
             methodVisitor.dup();

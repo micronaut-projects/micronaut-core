@@ -46,8 +46,8 @@ class AnnotationValueBuilderSpec extends Specification {
     void "test custom retention policy"() {
         given:
         def av = AnnotationValue.builder(AnnotationValue.builder("Foo")
-                    .value(String.class)
-                    .build(), RetentionPolicy.SOURCE).build()
+                .value(String.class)
+                .build(), RetentionPolicy.SOURCE).build()
 
         expect:
         av.retentionPolicy == RetentionPolicy.SOURCE
@@ -65,12 +65,74 @@ class AnnotationValueBuilderSpec extends Specification {
         av.getValue(type).get() == val
 
         where:
-        val   | type
-        1     | Integer
-        1L    | Long
-        true  | Boolean
-        "str" | String
+        val                           | type
+        true                          | Boolean
+        20 as Byte                    | Byte
+        'c' as char                   | Character
+        1.1 as double                 | Double
+        1.1 as float                  | Float
+        1                             | Integer
+        1L                            | Long
+        "str"                         | String
+        1 as short                    | Short
+        String                        | Class
+        Introspected.AccessKind.FIELD | Enum
     }
+
+    @Unroll
+    void "test member for #type"() {
+        given:
+        def av = AnnotationValue.builder("Foo")
+                .member("foo", val)
+                .build()
+
+        expect:
+        av.get("foo", type).isPresent()
+        av.get("foo", type).get() == val
+        (method == 'enum' ? av.enumValue("foo", Introspected.AccessKind) : av."${method}Value"("foo")).isPresent()
+
+        where:
+        val                           | method    | type
+        true                          | "boolean" | Boolean
+        20 as Byte                    | "byte"    | Byte
+        'c' as char                   | "char"    | Character
+        Double.MAX_VALUE              | "double"  | Double
+        Float.MAX_VALUE               | "float"   | Float
+        Integer.MAX_VALUE             | "int"     | Integer
+        Long.MAX_VALUE                | "long"    | Long
+        Short.MAX_VALUE               | "short"   | Short
+        "str"                         | "string"  | String
+        String                        | "class"   | Class
+        Introspected.AccessKind.FIELD | "enum"    | Enum
+    }
+
+    @Unroll
+    void "test member for array type #type"() {
+        given:
+        def av = AnnotationValue.builder("Foo")
+                .member("foo", val)
+                .build()
+
+        expect:
+        av.get("foo", type).isPresent()
+        av.get("foo", type).get() == val
+        (method == 'enum' ? av.enumValues("foo", Introspected.AccessKind) : av."${method}Values"("foo")) == val
+
+        where:
+        val                                       | method    | type
+        [true] as boolean[]                       | "boolean" | boolean[].class
+        [20 as byte] as byte[]                    | "byte"    | byte[].class
+        ['c' as char] as char[]                   | "char"    | char[].class
+        [Double.MAX_VALUE] as double[]            | "double"  | double[].class
+        [Float.MAX_VALUE] as float[]              | "float"   | float[].class
+        [Integer.MAX_VALUE] as int[]              | "int"     | int[].class
+        [Long.MAX_VALUE] as long[]                | "long"    | long[].class
+        [Short.MAX_VALUE] as short[]              | "short"   | short[].class
+        ["str"] as String[]                       | "string"  | String[].class
+        [String] as Class[]                       | "class"   | Class[].class
+        [Introspected.AccessKind.FIELD] as Enum[] | "enum"    | Enum[].class
+    }
+
 
     void "test passing a map of members"() {
         when:
@@ -87,7 +149,7 @@ class AnnotationValueBuilderSpec extends Specification {
         when:
         av = AnnotationValue.builder("Foo")
                 .members([
-                        "multidimensional array": new int[][] { new int[] {1}, new int[] {2}}
+                        "multidimensional array": new int[][]{new int[]{1}, new int[]{2}}
                 ])
                 .build()
 
@@ -98,7 +160,7 @@ class AnnotationValueBuilderSpec extends Specification {
         when:
         av = AnnotationValue.builder("Foo")
                 .members([
-                        "primitive wrapper array": new Long[] { 1L }
+                        "primitive wrapper array": new Long[]{1L}
                 ])
                 .build()
 
@@ -109,26 +171,26 @@ class AnnotationValueBuilderSpec extends Specification {
         when:
         av = AnnotationValue.builder("Foo")
                 .members([
-                        "primitive": 1L,
-                        "primitive wrapper": Long.valueOf(1),
-                        "primitive array": new int[] {1, 2},
-                        "enum": RetentionPolicy.RUNTIME,
-                        "enum array": new RetentionPolicy[] {
+                        "primitive"             : 1L,
+                        "primitive wrapper"     : Long.valueOf(1),
+                        "primitive array"       : new int[]{1, 2},
+                        "enum"                  : RetentionPolicy.RUNTIME,
+                        "enum array"            : new RetentionPolicy[]{
                                 RetentionPolicy.RUNTIME,
                                 RetentionPolicy.SOURCE
                         },
-                        "class": String.class,
-                        "class array": new Class[] {
+                        "class"                 : String.class,
+                        "class array"           : new Class[]{
                                 String.class,
                                 Long.class
                         },
-                        "annotation class": new AnnotationClassValue<>(String.class),
-                        "annotation class array": new AnnotationClassValue<>[] {
+                        "annotation class"      : new AnnotationClassValue<>(String.class),
+                        "annotation class array": new AnnotationClassValue<>[]{
                                 new AnnotationClassValue<>(String.class),
                                 new AnnotationClassValue<>(Long.class)
                         },
-                        "annotation": AnnotationValue.builder("Bar").value(true).build(),
-                        "annotation array": new AnnotationValue[] {
+                        "annotation"            : AnnotationValue.builder("Bar").value(true).build(),
+                        "annotation array"      : new AnnotationValue[]{
                                 AnnotationValue.builder("Bar").value(true).build(),
                                 AnnotationValue.builder("Bar").value(false).build()
                         }
