@@ -367,14 +367,29 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
         return Objects.hash(annotatedNode);
     }
 
+    /**
+     * Resolve modifiers for a method node.
+     * @param classNode The method node
+     * @return The modifiers
+     */
     protected Set<ElementModifier> resolveModifiers(MethodNode methodNode) {
         return resolveModifiers(methodNode.getModifiers());
     }
 
+    /**
+     * Resolve modifiers for a field node.
+     * @param classNode The field node
+     * @return The modifiers
+     */
     protected Set<ElementModifier> resolveModifiers(FieldNode fieldNode) {
         return resolveModifiers(fieldNode.getModifiers());
     }
 
+    /**
+     * Resolve modifiers for a class node.
+     * @param classNode The class node
+     * @return The modifiers
+     */
     protected Set<ElementModifier> resolveModifiers(ClassNode classNode) {
         return resolveModifiers(classNode.getModifiers());
     }

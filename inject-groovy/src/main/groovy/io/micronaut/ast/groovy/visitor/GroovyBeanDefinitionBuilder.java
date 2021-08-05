@@ -35,8 +35,6 @@ import java.lang.annotation.Annotation;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-import javax.lang.model.element.VariableElement;
-
 /**
  * Groovy version implementation of {@link AbstractBeanDefinitionBuilder}.
  *
