@@ -1,21 +1,21 @@
-This section will document breaking changes between Micronaut 2.x and Micronaut 3.x
+This section documents breaking changes between Micronaut 2.x and Micronaut 3.x
 
 === Core Changes
 
 ==== Annotation Inheritance
 
-Possibly the most important change in Micronaut 3.0 is a difference in how annotations are inherited from parent classes, methods and interfaces.
+Possibly the most important change in Micronaut 3.0 is how annotations are inherited from parent classes, methods and interfaces.
 
-Micronaut 2.x did not respect the rules defined in the jdk:java.lang.reflect.AnnotatedElement[] and inherited all annotations from parent interfaces and types regardless of the presence of the jdk:java.lang.annotation.Inherited[] annotation.
+Micronaut 2.x did not respect the rules defined in the jdk:java.lang.reflect.AnnotatedElement[], and inherited all annotations from parent interfaces and types regardless of the presence of the jdk:java.lang.annotation.Inherited[] annotation.
 
-With Micronaut 3.x and above only annotations that are explicitly meta-annotated with jdk:java.lang.annotation.Inherited[] are now in fact inherited from parent classes and interfaces.
-This applies to types in the case where one type extends another and methods in the case where one method overrides another.
+With Micronaut 3.x and above only annotations that are explicitly meta-annotated with jdk:java.lang.annotation.Inherited[] are now inherited from parent classes and interfaces.
+This applies to types in the case where one extends another, and methods in the case where one overrides another.
 
-Many of Micronaut's core annotations have been annotated with `@Inherited` so no change will be required, but some annotations that are either outside Micronaut or defined by user code will need changes to code or the annotation.
+Many of Micronaut's core annotations have been annotated with `@Inherited`, so no change will be required, but some annotations that are either outside Micronaut or defined by user code will need changes to code or the annotation.
 
-In general behaviour which you may wish to override is not inherited by default in Micronaut 3.x and above including <<scopes, Bean Scopes>>, <<qualifiers, Bean Qualifiers>>, <<conditionalBeans, Bean Conditions>>, <<validation, Validation Rules>> and so on.
+In general, behaviour which you wish to override is not inherited by default in Micronaut 3.x and above including <<scopes, Bean Scopes>>, <<qualifiers, Bean Qualifiers>>, <<conditionalBeans, Bean Conditions>>, <<validation, Validation Rules>> and so on.
 
-The following table summarizes the core Micronaut annotations and which ones are inherited and which annotations are not:
+The following table summarizes the core Micronaut annotations and which are inherited and which are not:
 
 .Annotation Inheritance in Micronaut 3.x and above
 [width="80%",frame="topbot",options="header"]
@@ -145,9 +145,9 @@ The following table summarizes the core Micronaut annotations and which ones are
 |ann:websocket.annotation.WebSocketMapping[]                          | ✅
 |======================
 
-When upgrading an application you may need to take action if you implement an interface or subclass a super class and override a method.
+When upgrading an application you may need to take action if you implement an interface or subclass a superclass and override a method.
 
-For example the annotations defined in `javax.validation` are not inherited by default so need to be defined again in any overridden or implemented methods.
+For example the annotations defined in `javax.validation` are not inherited by default, so they must be defined again in any overridden or implemented methods.
 
 This behaviour grants more flexibility if you need to redefine the validation rules. Note that it is still possible to inherit validation rules through meta-annotations. See the section on <<annotationMetadata, Annotation Inheritance>> for more information.
 
@@ -155,7 +155,7 @@ This behaviour grants more flexibility if you need to redefine the validation ru
 
 It is no longer possible to scan the classpath at runtime using the `scan` method of the api:context.env.Environment[] interface.
 
-This functionality has not been needed for some time as scanning is implemented at build type through <<introspection, Bean Introspections>>.
+This functionality has not been needed for some time as scanning is implemented at build time through <<introspection, Bean Introspections>>.
 
 ==== Inject Annotations
 
@@ -176,7 +176,7 @@ warning: unknown enum constant When.MAYBE
   reason: class file for javax.annotation.meta.When not found
 ```
 
-This warning is harmless and can be ignored. If you want to eliminate this warning, add the following dependency to your project's annotation processor classpath:
+This warning is harmless and can be ignored. To eliminate this warning, add the following dependency to your project's annotation processor classpath:
 
 dependency:com.google.code.findbugs:jsr305[gradleScope="annotationProcessor"]
 
@@ -222,7 +222,7 @@ It is now 0.
 
 ==== Deprecation Removal
 
-Classes, constructors, etc that have been deprecated in previous versions of Micronaut have been removed.
+Classes, constructors, etc. that have been deprecated in previous versions of Micronaut have been removed.
 
 ==== Reflective Bean Map
 
@@ -386,7 +386,7 @@ This resulted in generating executable method all non-private methods of classes
 
 In Micronaut 3.x and above the ann:context.annotation.Executable[] has been moved to a meta-annotation of ann:http.annotation.HttpMethodMapping[] and ann:messaging.annotation.MessageMapping[] instead to reduce memory consumption and improve efficiency.
 
-If you were relying on the present of these executable methods you will need to annotate explicitly methods in your classes with ann:context.annotation.Executable[] to restore this behaviour.
+If you were relying on the presence of these executable methods you must explicitly annotate methods in your classes with ann:context.annotation.Executable[] to restore this behaviour.
 
 ==== GraalVM changes
 

@@ -2,8 +2,7 @@ You can use the ann:context.annotation.Import[] annotation to import beans from 
 
 NOTE: Bean import is currently only supported in the Java language as other languages have limitations on classpath scanning during source code processing.
 
-
-For example, to import the JSR-330 TCK into an application add dependency on the TCK:
+For example, to import the JSR-330 TCK into an application, add a dependency on the TCK:
 
 dependency::jakarta.inject:jakarta.inject-tck:2.0.1[]
 

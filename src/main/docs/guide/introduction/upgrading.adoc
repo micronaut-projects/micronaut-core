@@ -6,17 +6,17 @@ The `javax.inject` annotations are no longer a transitive dependency. Micronaut 
 
 dependency:javax.inject:javax.inject:1[]
 
-Any code that relied on the presence of the inject annotations to be present in the annotation metadata will still work as expected, however any code that interacts with them will need to be changed to no longer reference the annotation classes themselves. A set of static variables in the link:{api}/io/micronaut/core/annotation/AnnotationUtil.html[AnnotationUtil] class can be used in place of the annotation classes when working with annotation metadata.
+Any code that relied on the inject annotations being present in the annotation metadata will still work as expected, however any code that interacts with them must be changed to no longer reference the annotation classes themselves. Static variables in the link:{api}/io/micronaut/core/annotation/AnnotationUtil.html[AnnotationUtil] class (e.g. `AnnotationUtil.INJECT`, `AnnotationUtil.SINGLETON`, etc.) should be used in place of the annotation classes when working with annotation metadata.
 
 === Nullability Annotations
 
-Micronaut now only comes with its own set of annotations to declare nullability. The findbugs, javax, or jetbrains annotations are all still supported, however it will require an explicit dependency in your build to use them. To upgrade, either add the dependency to the set of annotations you wish to use or switch to the Micronaut ann:core.annotation.Nullable[] / ann:core.annotation.NonNull[] annotations.
+Micronaut now only comes with its own set of annotations to declare nullability. The findbugs, javax, or jetbrains annotations are all still supported, however it will require an explicit dependency in your build to use them. To upgrade, either add a dependency for the annotation library you wish to use, or switch to the Micronaut ann:core.annotation.Nullable[] / ann:core.annotation.NonNull[] annotations.
 
 === RxJava2
 
-Micronaut no longer ships any reactive implementation as a default in any of our modules or core libraries. Upgrading to Micronaut 3 requires a choice to be made about which reactive streams implementation to use and then to add the relevant dependency to allow for usage of it with the framework.
+Micronaut no longer ships any reactive implementation as a default in any of our modules or core libraries. Upgrading to Micronaut 3 requires choosing which reactive streams implementation to use, and then adding the relevant dependency.
 
-For those already using RxJava3 or Project Reactor, there should be no changes required to upgrade to Micronaut 3. For those using RxJava2 and wish to continue using RxJava2, a dependency must be added:
+For those already using RxJava3 or Project Reactor, there should be no changes required to upgrade to Micronaut 3. If you use RxJava2 and wish to continue using it, you must add a dependency:
 
 dependency:io.micronaut.rxjava2:micronaut-rxjava2[gradleScope="implementation"]
 
