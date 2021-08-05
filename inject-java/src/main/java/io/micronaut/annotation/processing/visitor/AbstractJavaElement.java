@@ -22,14 +22,12 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.MemberElement;
+import io.micronaut.inject.ast.*;
 
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.ast.PrimitiveElement;
 
 import javax.lang.model.element.*;
+import javax.lang.model.element.Element;
 import javax.lang.model.type.*;
 import java.lang.annotation.Annotation;
 import java.util.Collections;
@@ -39,6 +37,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import static javax.lang.model.element.Modifier.*;
 
@@ -177,6 +176,14 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
     @Override
     public String getName() {
         return element.getSimpleName().toString();
+    }
+
+    @Override
+    public Set<ElementModifier> getModifiers() {
+        return this.element
+                .getModifiers().stream()
+                .map(m -> ElementModifier.valueOf(m.name()))
+                .collect(Collectors.toSet());
     }
 
     @Override
