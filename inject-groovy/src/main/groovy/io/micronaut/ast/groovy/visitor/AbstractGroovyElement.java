@@ -369,7 +369,7 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
 
     /**
      * Resolve modifiers for a method node.
-     * @param classNode The method node
+     * @param methodNode The method node
      * @return The modifiers
      */
     protected Set<ElementModifier> resolveModifiers(MethodNode methodNode) {
@@ -378,7 +378,7 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
 
     /**
      * Resolve modifiers for a field node.
-     * @param classNode The field node
+     * @param fieldNode The field node
      * @return The modifiers
      */
     protected Set<ElementModifier> resolveModifiers(FieldNode fieldNode) {
