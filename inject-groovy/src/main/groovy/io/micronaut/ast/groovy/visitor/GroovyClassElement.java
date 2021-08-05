@@ -346,36 +346,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         return (fn.getModifiers() & (ACC_PUBLIC | ACC_PRIVATE | ACC_PROTECTED)) == 0;
     }
 
-    private Set<ElementModifier> resolveModifiers(MethodNode methodNode) {
-        return resolveModifiers(methodNode.getModifiers());
-    }
-
-    private Set<ElementModifier> resolveModifiers(FieldNode fieldNode) {
-        return resolveModifiers(fieldNode.getModifiers());
-    }
-
-    private Set<ElementModifier> resolveModifiers(ClassNode classNode) {
-        return resolveModifiers(classNode.getModifiers());
-    }
-
-    private Set<ElementModifier> resolveModifiers(int mod) {
-        Set<ElementModifier> modifiers = new HashSet<>(5);
-        if (Modifier.isPrivate(mod)) {
-            modifiers.add(ElementModifier.PRIVATE);
-        } else if (Modifier.isProtected(mod)) {
-            modifiers.add(ElementModifier.PROTECTED);
-        } else if (Modifier.isPublic(mod)) {
-            modifiers.add(ElementModifier.PUBLIC);
-        }
-        if (Modifier.isAbstract(mod)) {
-            modifiers.add(ElementModifier.ABSTRACT);
-        } else if (Modifier.isStatic(mod)) {
-            modifiers.add(ElementModifier.STATIC);
-        }
-        if (Modifier.isFinal(mod)) {
-            modifiers.add(ElementModifier.FINAL);
-        }
-        return modifiers;
+    @Override
+    public Set<ElementModifier> getModifiers() {
+        return resolveModifiers(this.classNode);
     }
 
     @Override

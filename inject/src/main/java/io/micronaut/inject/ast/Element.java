@@ -24,8 +24,10 @@ import io.micronaut.core.util.ArgumentUtils;
 
 import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
+import java.util.Collections;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -74,6 +76,14 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement, D
      * @return The native type
      */
     @NonNull Object getNativeType();
+
+    /**
+     * @return The {@link ElementModifier} types for this class element
+     * @since 3.0.0
+     */
+    default Set<ElementModifier> getModifiers() {
+        return Collections.emptySet();
+    }
 
     /**
      * Annotate this element with the given annotation type. If the annotation is already present then

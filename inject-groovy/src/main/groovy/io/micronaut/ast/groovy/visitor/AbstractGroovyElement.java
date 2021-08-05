@@ -30,15 +30,19 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.MemberElement;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.MethodNode;
+import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
 import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -361,6 +365,38 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
     @Override
     public int hashCode() {
         return Objects.hash(annotatedNode);
+    }
+
+    protected Set<ElementModifier> resolveModifiers(MethodNode methodNode) {
+        return resolveModifiers(methodNode.getModifiers());
+    }
+
+    protected Set<ElementModifier> resolveModifiers(FieldNode fieldNode) {
+        return resolveModifiers(fieldNode.getModifiers());
+    }
+
+    protected Set<ElementModifier> resolveModifiers(ClassNode classNode) {
+        return resolveModifiers(classNode.getModifiers());
+    }
+
+    private Set<ElementModifier> resolveModifiers(int mod) {
+        Set<ElementModifier> modifiers = new HashSet<>(5);
+        if (Modifier.isPrivate(mod)) {
+            modifiers.add(ElementModifier.PRIVATE);
+        } else if (Modifier.isProtected(mod)) {
+            modifiers.add(ElementModifier.PROTECTED);
+        } else if (Modifier.isPublic(mod)) {
+            modifiers.add(ElementModifier.PUBLIC);
+        }
+        if (Modifier.isAbstract(mod)) {
+            modifiers.add(ElementModifier.ABSTRACT);
+        } else if (Modifier.isStatic(mod)) {
+            modifiers.add(ElementModifier.STATIC);
+        }
+        if (Modifier.isFinal(mod)) {
+            modifiers.add(ElementModifier.FINAL);
+        }
+        return modifiers;
     }
 }
 

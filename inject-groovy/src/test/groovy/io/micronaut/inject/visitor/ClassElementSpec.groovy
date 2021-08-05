@@ -38,6 +38,30 @@ class ClassElementSpec extends AbstractBeanDefinitionSpec {
         AllElementsVisitor.clearVisited()
     }
 
+    void "test modifiers #modifiers"() {
+        given:
+        def element = buildClassElement("""
+package modtest;
+
+class Test {
+    ${modifiers*.toString().join(' ')} String test = "test";
+
+    ${modifiers*.toString().join(' ')} void test() {};
+}
+""")
+
+        expect:
+        element.getEnclosedElement(ElementQuery.ALL_FIELDS).get().modifiers == modifiers
+        element.getEnclosedElement(ElementQuery.ALL_METHODS).get().modifiers == modifiers
+
+        where:
+        modifiers << [
+                [ElementModifier.PUBLIC] as Set,
+                [ElementModifier.PUBLIC, ElementModifier.STATIC] as Set,
+                [ElementModifier.PUBLIC, ElementModifier.STATIC, ElementModifier.FINAL] as Set,
+        ]
+    }
+
     void "test get package element"() {
         given:
         def element = buildClassElement('''
