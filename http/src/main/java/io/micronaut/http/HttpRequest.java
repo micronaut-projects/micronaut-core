@@ -35,8 +35,6 @@ import java.util.*;
 @SuppressWarnings("MethodName")
 public interface HttpRequest<B> extends HttpMessage<B> {
 
-    String KEY = "micronaut.http.request";
-
     /**
      * Constant for HTTP scheme.
      */

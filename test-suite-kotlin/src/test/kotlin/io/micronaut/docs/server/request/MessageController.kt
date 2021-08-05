@@ -60,7 +60,7 @@ class MessageController {
     @Get("/hello-reactor")
     fun helloReactor(): Mono<HttpResponse<String>?>? {
         return Mono.deferContextual { ctx: ContextView ->  // <1>
-            val request = ctx.get<HttpRequest<*>>(HttpRequest.KEY) // <2>
+            val request = ctx.get<HttpRequest<*>>(ServerRequestContext.KEY) // <2>
             val name = request.parameters
                 .getFirst("name")
                 .orElse("Nobody")

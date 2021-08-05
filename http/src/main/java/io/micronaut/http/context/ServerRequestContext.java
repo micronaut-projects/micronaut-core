@@ -33,6 +33,7 @@ import io.micronaut.http.HttpRequest;
 public final class ServerRequestContext {
 
     private static final ThreadLocal<HttpRequest> REQUEST = new ThreadLocal<>();
+    public static final String KEY = "micronaut.http.server.request";
 
     private ServerRequestContext() {
     }

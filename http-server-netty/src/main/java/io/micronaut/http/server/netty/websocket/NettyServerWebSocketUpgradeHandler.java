@@ -168,7 +168,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
         Mono.from(finalPublisher)
                 .publishOn(scheduler)
                 .subscribeOn(scheduler)
-                .contextWrite(reactorContext -> reactorContext.put(HttpRequest.KEY, requestReference.get()))
+                .contextWrite(reactorContext -> reactorContext.put(ServerRequestContext.KEY, requestReference.get()))
                 .subscribe((Consumer<MutableHttpResponse<?>>) actualResponse -> {
                     if (actualResponse == proceed) {
                         UriRouteMatch routeMatch = actualResponse.getAttribute(HttpAttributes.ROUTE_MATCH, UriRouteMatch.class).get();
