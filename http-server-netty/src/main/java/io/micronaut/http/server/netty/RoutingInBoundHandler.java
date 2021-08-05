@@ -473,7 +473,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(request);
 
         Flux.from(routeExecutor.filterPublisher(requestReference, responsePublisher))
-                .contextWrite(ctx -> ctx.put(HttpRequest.KEY, request))
+                .contextWrite(ctx -> ctx.put(ServerRequestContext.KEY, request))
                 .subscribe(new Subscriber<MutableHttpResponse<?>>() {
                     Subscription subscription;
                     AtomicBoolean empty = new AtomicBoolean();
@@ -570,7 +570,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 routeMatchPublisher
         );
         routeResponse
-                .contextWrite(ctx -> ctx.put(HttpRequest.KEY, request))
+                .contextWrite(ctx -> ctx.put(ServerRequestContext.KEY, request))
                 .subscribe(new CompletionAwareSubscriber<HttpResponse<?>>() {
             @Override
             protected void doOnSubscribe(Subscription subscription) {
@@ -1018,7 +1018,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
 
         httpContentPublisher = httpContentPublisher
-                .contextWrite(reactorContext -> reactorContext.put(HttpRequest.KEY, request))
+                .contextWrite(reactorContext -> reactorContext.put(ServerRequestContext.KEY, request))
                 .doOnNext(httpContent ->
                         // once an http content is written, read the next item if it is available
                         context.read())

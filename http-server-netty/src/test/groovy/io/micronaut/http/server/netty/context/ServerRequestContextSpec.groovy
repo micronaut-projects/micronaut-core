@@ -127,7 +127,7 @@ class ServerRequestContextSpec extends Specification {
         @Get("/reactor-context")
         Mono<String> reactorContext() {
             Mono.deferContextual({ ctx ->
-                def request = (HttpRequest) ctx.get(HttpRequest.KEY)
+                def request = (HttpRequest) ctx.get(ServerRequestContext.KEY)
                 return Mono.just(request.uri)
             })
         }
@@ -135,7 +135,7 @@ class ServerRequestContextSpec extends Specification {
         @Get("/reactor-context-stream")
         Flux<String> reactorContextStream() {
             Flux.deferContextual({ ctx ->
-                def request = (HttpRequest) ctx.get(HttpRequest.KEY)
+                def request = (HttpRequest) ctx.get(ServerRequestContext.KEY)
                 return Mono.just(request.uri)
             })
         }
