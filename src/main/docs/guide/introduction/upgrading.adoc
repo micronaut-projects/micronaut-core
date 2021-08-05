@@ -82,3 +82,67 @@ NOTE: We recommend switching to Project Reactor as that is the implementation us
 === Breaking Changes
 
 Review the section on <<breaks, Breaking Changes>> and update your affected application code.
+
+=== Automating Upgrades with OpenRewrite
+
+https://docs.openrewrite.org/[OpenRewrite^] is an automated refactoring tool that you can use to make many of the required upgrade changes. This works with Micronaut applications written in Java, but OpenRewrite doesn't currently support Kotlin or Groovy. Like any automated tool it does much of the work for you, but be sure to review the resulting changes and manually make any changes that aren't supported by OpenRewrite, for example converting from RxJava2 to Reactor.
+
+Adding OpenRewrite support to your build is easy, it just requires adding the Gradle or Maven plugin and configuring the plugin to use the Micronaut upgrade recipe.
+
+See the https://micronaut.io/launch?features=openrewrite&lang=JAVA&build=GRADLE&activity=diff[Gradle feature diff^] or the https://micronaut.io/launch?features=acme&lang=JAVA&build=MAVEN&activity=diff[Maven feature diff^] to see the required build script changes.
+
+Once you've made the build script changes, you can "dry-run" the Micronaut upgrade recipe to see what changes would be made.
+
+For Gradle, run
+
+[source,bash]
+----
+$ ./gradlew rewriteDryRun
+----
+
+and view the diff report generated in `build/reports/rewrite/rewrite.patch`
+
+and for Maven, run
+
+[source,bash]
+----
+$ ./mvnw rewrite:dryRun
+----
+
+and view the diff report generated in `target/site/rewrite/rewrite.patch`.
+
+Then you can run the recipe for real, letting OpenRewrite update your code.
+
+For Gradle, run
+
+[source,bash]
+----
+$ ./gradlew rewriteRun
+----
+
+and for Maven, run
+
+[source,bash]
+----
+$ ./mvnw rewrite:run
+----
+
+Once the changes have been made, you could remove the plugin, but it's fine to leave it since OpenRewrite doesn't run automatically, only when you run one of its commands. And there are many more recipes available beyond the Micronaut upgrade recipe that you might want to include to automate other code changes.
+
+The plugin includes another command to list all recipes currently in the classpath (in this case the core recipes plus those added by the `rewrite-micronaut` module).
+
+For Gradle, run
+
+[source,bash]
+----
+$ ./gradlew rewriteDiscover
+----
+
+and for Maven, run
+
+[source,bash]
+----
+$ ./mvnw rewrite:discover
+----
+
+and the available recipes and styles will be output to the console. Check out the https://docs.openrewrite.org/[OpenRewrite documentation] for more information and to see the many other available recipes available.
