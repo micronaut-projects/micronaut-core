@@ -27,6 +27,7 @@ import com.fasterxml.jackson.databind.node.ContainerNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.micronaut.context.BeanProvider;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.bind.ArgumentBinder;
@@ -58,6 +59,7 @@ import java.util.Optional;
  * @since 2.0
  */
 @Singleton
+@Internal
 public class JacksonConverterRegistrar implements TypeConverterRegistrar {
 
     private final BeanProvider<ObjectMapper> objectMapper;
