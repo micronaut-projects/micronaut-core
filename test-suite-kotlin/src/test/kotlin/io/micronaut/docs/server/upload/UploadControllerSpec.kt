@@ -88,8 +88,11 @@ class UploadControllerSpec: StringSpec() {
             ))
 
             val ex = shouldThrow<HttpClientResponseException> { flowable.blockFirst() }
+            val response = ex.response
+            val embedded: Map<*, *> = response.getBody(Map::class.java).get().get("_embedded") as Map<*, *>
+            val message = ((embedded.get("errors") as java.util.List<*>).get(0) as Map<*, *>).get("message")
 
-            ex.message shouldBe "Required argument [CompletedFileUpload file] not specified"
+            message shouldBe "Required argument [CompletedFileUpload file] not specified"
         }
 
         "test completed file upload with no filename and no bytes"() {
@@ -105,8 +108,11 @@ class UploadControllerSpec: StringSpec() {
             ))
 
             val ex = shouldThrow<HttpClientResponseException> { flowable.blockFirst() }
+            val response = ex.response
+            val embedded: Map<*, *> = response.getBody(Map::class.java).get().get("_embedded") as Map<*, *>
+            val message = ((embedded.get("errors") as java.util.List<*>).get(0) as Map<*, *>).get("message")
 
-            ex.message shouldBe "Required argument [CompletedFileUpload file] not specified"
+            message shouldBe "Required argument [CompletedFileUpload file] not specified"
         }
 
         "test completed file upload with no part"() {
@@ -121,8 +127,11 @@ class UploadControllerSpec: StringSpec() {
                     String::class.java
             ))
             val ex = shouldThrow<HttpClientResponseException> { flowable.blockFirst() }
+            val response = ex.response
+            val embedded: Map<*, *> = response.getBody(Map::class.java).get().get("_embedded") as Map<*, *>
+            val message = ((embedded.get("errors") as java.util.List<*>).get(0) as Map<*, *>).get("message")
 
-            ex.message shouldBe "Required argument [CompletedFileUpload file] not specified"
+            message shouldBe "Required argument [CompletedFileUpload file] not specified"
         }
 
         "test file bytes uploaded"() {

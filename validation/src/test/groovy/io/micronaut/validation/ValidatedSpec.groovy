@@ -205,7 +205,7 @@ class ValidatedSpec extends Specification {
         def result = new JsonSlurper().parseText((String) e.response.getBody().get())
 
         then:
-        result.message == 'pojo.email: Email should be valid'
+        result._embedded.errors[0].message == 'pojo.email: Email should be valid'
 
         cleanup:
         server.close()
@@ -302,7 +302,7 @@ class ValidatedSpec extends Specification {
         def result = new JsonSlurper().parseText((String) e.response.getBody().get())
 
         then:
-        result.message == 'amount: numeric value out of bounds (<3 digits>.<2 digits> expected)'
+        result._embedded.errors[0].message == 'amount: numeric value out of bounds (<3 digits>.<2 digits> expected)'
 
         cleanup:
         server.close()
@@ -367,7 +367,7 @@ class ValidatedSpec extends Specification {
         Map result = e.response.getBody(Argument.of(Map, String, Object)).get()
 
         then:
-        result.message == 'limit: must be greater than or equal to 1'
+        result._embedded.errors[0].message == 'limit: must be greater than or equal to 1'
 
         cleanup:
         server.close()
@@ -454,7 +454,7 @@ class ValidatedSpec extends Specification {
         Map result = e.response.getBody(Argument.of(Map, String, Object)).get()
 
         then:
-        result.message == 'limit: must not be null'
+        result._embedded.errors[0].message == 'limit: must not be null'
 
         cleanup:
         server.close()
@@ -502,8 +502,7 @@ class ValidatedSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == 'value: size must be between 2 and 2147483647'
-
+        e.response.getBody(Map).get()._embedded.errors[0].message == 'value: size must be between 2 and 2147483647'
 
         cleanup:
         server.close()
@@ -544,8 +543,7 @@ class ValidatedSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == 'something is invalid'
-
+        e.response.getBody(Map).get()._embedded.errors[0].message == 'something is invalid'
 
         cleanup:
         server.close()
@@ -561,7 +559,7 @@ class ValidatedSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == 'another thing is invalid'
+        e.response.getBody(Map).get()._embedded.errors[0].message == 'another thing is invalid'
 
         cleanup:
         server.close()
@@ -618,7 +616,7 @@ class ValidatedSpec extends Specification {
         def result = new JsonSlurper().parseText((String) e.response.getBody().get())
 
         then:
-        result.message == 'pojo: Cannot validate io.micronaut.validation.PojoNoIntrospection. No bean introspection present. Please add @Introspected to the class and ensure Micronaut annotation processing is enabled'
+        result._embedded.errors[0].message == 'pojo: Cannot validate io.micronaut.validation.PojoNoIntrospection. No bean introspection present. Please add @Introspected to the class and ensure Micronaut annotation processing is enabled'
 
         cleanup:
         server.close()

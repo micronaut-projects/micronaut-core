@@ -180,7 +180,7 @@ class HttpTracingSpec extends Specification {
             span.tags.get('http.path') == '/traced/error/John'
             span.tags.get('http.status_code') == 500
             span.tags.get('http.method') == 'GET'
-            span.tags.get('error') == 'Internal Server Error: bad'
+            span.tags.get('error') == 'Internal Server Error'
             span.operationName == 'GET /traced/error/John'
             def serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
             serverSpan.tags.get('http.path') == '/traced/error/John'
@@ -213,7 +213,7 @@ class HttpTracingSpec extends Specification {
             span.tags.get('http.path') == '/traced/blocking/error/John'
             span.tags.get('http.status_code') == 500
             span.tags.get('http.method') == 'GET'
-            span.tags.get('error') == 'Internal Server Error: bad'
+            span.tags.get('error') == 'Internal Server Error'
             span.operationName == 'GET /traced/blocking/error/John'
             JaegerSpan serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
             serverSpan.tags.get('http.path') == '/traced/blocking/error/John'
@@ -246,7 +246,7 @@ class HttpTracingSpec extends Specification {
             span.tags.get('http.path') == '/traced/reactiveError/John'
             span.tags.get('http.status_code') == 500
             span.tags.get('http.method') == 'GET'
-            span.tags.get('error') == 'Internal Server Error: bad'
+            span.tags.get('error') == 'Internal Server Error'
             span.operationName == 'GET /traced/reactiveError/John'
             JaegerSpan serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
             serverSpan.tags.get('http.path') == '/traced/reactiveError/John'
@@ -312,7 +312,7 @@ class HttpTracingSpec extends Specification {
             span.tags.get('http.path') == '/traced/delayed-error/2s'
             span.tags.get('http.status_code') == 500
             span.tags.get('http.method') == 'GET'
-            span.tags.get('error') == 'Internal Server Error: delayed error'
+            span.tags.get('error') == 'Internal Server Error'
             span.operationName == 'GET /traced/delayed-error/2s'
             JaegerSpan serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
             serverSpan.tags.get('http.path') == '/traced/delayed-error/2s'
@@ -583,7 +583,7 @@ class HttpTracingSpec extends Specification {
                 it.operationName == 'GET /traced/error/{name}' &&
                         it.tags.get('http.path') == '/traced/error/John' &&
                         it.tags.get('http.status_code') == 500 &&
-                        it.tags.get('error') == 'Internal Server Error: bad' &&
+                        it.tags.get('error') == 'Internal Server Error' &&
                         it.tags.get('http.client')
             } != null
             reporter.spans.find {
@@ -632,7 +632,7 @@ class HttpTracingSpec extends Specification {
                 it.operationName == 'GET /traced/blocking/error/{name}' &&
                         it.tags.get('http.path') == '/traced/blocking/error/John' &&
                         it.tags.get('http.status_code') == 500 &&
-                        it.tags.get('error') == 'Internal Server Error: bad' &&
+                        it.tags.get('error') == 'Internal Server Error' &&
                         it.tags.get('http.client')
             } != null
             reporter.spans.find {
