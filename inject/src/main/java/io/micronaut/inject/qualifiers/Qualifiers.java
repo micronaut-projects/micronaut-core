@@ -134,6 +134,29 @@ public class Qualifiers {
     }
 
     /**
+     * Build a qualifier for the given annotations or return null of the array is empty.
+     *
+     * @param annotations The annotations
+     * @param <T>        The component type
+     * @return The qualifier
+     * @since 3.0.0
+     */
+    @Nullable
+    public static <T> Qualifier<T> byAnnotations(@Nullable Annotation... annotations) {
+        if (annotations == null || annotations.length == 0) {
+            return null;
+        }
+        if (annotations.length == 1) {
+            return Qualifiers.byAnnotation(annotations[0]);
+        }
+        Qualifier<T>[] qualifiers = new Qualifier[annotations.length];
+        for (int i = 0; i < annotations.length; i++) {
+            qualifiers[i] = Qualifiers.byAnnotation(annotations[i]);
+        }
+        return Qualifiers.byQualifiers(qualifiers);
+    }
+
+    /**
      * Build a qualifier for the given annotation.
      *
      * @param metadata The metadata
