@@ -18,6 +18,7 @@ package io.micronaut.jackson.env;
 import com.fasterxml.jackson.core.JsonParseException;
 import io.micronaut.context.env.MapPropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceLoader;
 
 import java.io.IOException;
@@ -35,6 +36,7 @@ import java.util.Set;
  * @author Fabian Nonnenmacher
  * @since 2.0
  */
+@Internal
 public class CloudFoundryVcapServicesPropertySourceLoader extends EnvJsonPropertySourceLoader {
 
     /**

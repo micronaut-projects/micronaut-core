@@ -16,6 +16,7 @@
 package io.micronaut.jackson.env;
 
 import io.micronaut.context.env.SystemPropertiesPropertySource;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceLoader;
 
 import java.io.ByteArrayInputStream;
@@ -30,6 +31,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class EnvJsonPropertySourceLoader extends JsonPropertySourceLoader {
 
     /**
