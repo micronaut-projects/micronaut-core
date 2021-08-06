@@ -27,13 +27,10 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.core.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * An abstract implementation of {@link Resource}.
