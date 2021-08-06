@@ -175,6 +175,37 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     }
 
     /**
+     * Checks if the argument can be assigned to this argument.
+     * @param candidateArgument The candidate argument
+     * @return True if it is assignable from.
+     * @since 3.0.0
+     */
+    default boolean isAssignableFrom(@NonNull Argument<?> candidateArgument) {
+        Objects.requireNonNull(candidateArgument, "Candidate type cannot be null");
+        if (!isAssignableFrom(candidateArgument.getType())) {
+            return false;
+        }
+        Argument[] typeParameters = getTypeParameters();
+        Argument[] candidateArgumentTypeParameters = candidateArgument.getTypeParameters();
+        if (typeParameters.length == 0) {
+            // Wildcard or no type parameters
+            return candidateArgumentTypeParameters.length >= 0;
+        }
+        if (candidateArgumentTypeParameters.length == 0) {
+            // Wildcard
+            return false;
+        }
+        for (int i = 0; i < typeParameters.length; i++) {
+            Argument typeParameter = typeParameters[i];
+            Argument candidateArgumentTypeParameter = candidateArgumentTypeParameters[i];
+            if (!typeParameter.isAssignableFrom(candidateArgumentTypeParameter)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * Convert an argument array to a class array.
      *
      * @param arguments The arguments
