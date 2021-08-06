@@ -469,6 +469,61 @@ public class MediaType implements CharSequence {
         this.strRepr = toString0();
     }
 
+    private static Optional<MediaType> optionalOf(String mediaType) {
+        switch (mediaType) {
+            case ALL:
+                return Optional.of(ALL_TYPE);
+            case APPLICATION_FORM_URLENCODED:
+                return Optional.of(APPLICATION_FORM_URLENCODED_TYPE);
+            case MULTIPART_FORM_DATA:
+                return Optional.of(MULTIPART_FORM_DATA_TYPE);
+            case TEXT_HTML:
+                return Optional.of(TEXT_HTML_TYPE);
+            case APPLICATION_XHTML:
+                return Optional.of(APPLICATION_XHTML_TYPE);
+            case APPLICATION_XML:
+                return Optional.of(APPLICATION_XML_TYPE);
+            case APPLICATION_JSON:
+                return Optional.of(APPLICATION_JSON_TYPE);
+            case APPLICATION_YAML:
+                return Optional.of(APPLICATION_YAML_TYPE);
+            case TEXT_XML:
+                return Optional.of(TEXT_XML_TYPE);
+            case TEXT_JSON:
+                return Optional.of(TEXT_JSON_TYPE);
+            case TEXT_PLAIN:
+                return Optional.of(TEXT_PLAIN_TYPE);
+            case APPLICATION_HAL_JSON:
+                return Optional.of(APPLICATION_HAL_JSON_TYPE);
+            case APPLICATION_HAL_XML:
+                return Optional.of(APPLICATION_HAL_XML_TYPE);
+            case APPLICATION_ATOM_XML:
+                return Optional.of(APPLICATION_ATOM_XML_TYPE);
+            case APPLICATION_VND_ERROR:
+                return Optional.of(APPLICATION_VND_ERROR_TYPE);
+            case TEXT_EVENT_STREAM:
+                return Optional.of(TEXT_EVENT_STREAM_TYPE);
+            case APPLICATION_JSON_STREAM:
+                return Optional.of(APPLICATION_JSON_STREAM_TYPE);
+            case APPLICATION_OCTET_STREAM:
+                return Optional.of(APPLICATION_OCTET_STREAM_TYPE);
+            case APPLICATION_GRAPHQL:
+                return Optional.of(APPLICATION_GRAPHQL_TYPE);
+            case APPLICATION_PDF:
+                return Optional.of(APPLICATION_PDF_TYPE);
+            case IMAGE_PNG:
+                return Optional.of(IMAGE_PNG_TYPE);
+            case IMAGE_JPEG:
+                return Optional.of(IMAGE_JPEG_TYPE);
+            case IMAGE_GIF:
+                return Optional.of(IMAGE_GIF_TYPE);
+            case IMAGE_WEBP:
+                return Optional.of(IMAGE_WEBP_TYPE);
+            default:
+                return Optional.empty();
+        }
+    }
+
     /**
      * Create a new or get a {@link MediaType} from the given text.
      *
@@ -476,58 +531,18 @@ public class MediaType implements CharSequence {
      * @return The {@link MediaType}
      */
     public static MediaType of(String mediaType) {
-        switch (mediaType) {
-            case ALL:
-                return ALL_TYPE;
-            case APPLICATION_FORM_URLENCODED:
-                return APPLICATION_FORM_URLENCODED_TYPE;
-            case MULTIPART_FORM_DATA:
-                return MULTIPART_FORM_DATA_TYPE;
-            case TEXT_HTML:
-                return TEXT_HTML_TYPE;
-            case APPLICATION_XHTML:
-                return APPLICATION_XHTML_TYPE;
-            case APPLICATION_XML:
-                return APPLICATION_XML_TYPE;
-            case APPLICATION_JSON:
-                return APPLICATION_JSON_TYPE;
-            case APPLICATION_YAML:
-                return APPLICATION_YAML_TYPE;
-            case TEXT_XML:
-                return TEXT_XML_TYPE;
-            case TEXT_JSON:
-                return TEXT_JSON_TYPE;
-            case TEXT_PLAIN:
-                return TEXT_PLAIN_TYPE;
-            case APPLICATION_HAL_JSON:
-                return APPLICATION_HAL_JSON_TYPE;
-            case APPLICATION_HAL_XML:
-                return APPLICATION_HAL_XML_TYPE;
-            case APPLICATION_ATOM_XML:
-                return APPLICATION_ATOM_XML_TYPE;
-            case APPLICATION_VND_ERROR:
-                return APPLICATION_VND_ERROR_TYPE;
-            case TEXT_EVENT_STREAM:
-                return TEXT_EVENT_STREAM_TYPE;
-            case APPLICATION_JSON_STREAM:
-                return APPLICATION_JSON_STREAM_TYPE;
-            case APPLICATION_OCTET_STREAM:
-                return APPLICATION_OCTET_STREAM_TYPE;
-            case APPLICATION_GRAPHQL:
-                return APPLICATION_GRAPHQL_TYPE;
-            case APPLICATION_PDF:
-                return APPLICATION_PDF_TYPE;
-            case IMAGE_PNG:
-                return IMAGE_PNG_TYPE;
-            case IMAGE_JPEG:
-                return IMAGE_JPEG_TYPE;
-            case IMAGE_GIF:
-                return IMAGE_GIF_TYPE;
-            case IMAGE_WEBP:
-                return IMAGE_WEBP_TYPE;
-            default:
-                return new MediaType(mediaType);
-        }
+        return optionalOf(mediaType).orElse(new MediaType(mediaType));
+    }
+
+    /**
+     * Create a new or get a {@link MediaType} from the given text.
+     * If there is no match mediaType, it will also use extension to construct a new MediaType.
+     *
+     * @param mediaType The text
+     * @return The {@link MediaType}
+     */
+    public static MediaType of(String mediaType, String extension) {
+        return optionalOf(mediaType).orElse(new MediaType(mediaType, extension));
     }
 
     /**
