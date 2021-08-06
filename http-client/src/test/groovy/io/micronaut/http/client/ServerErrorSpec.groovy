@@ -62,7 +62,7 @@ class ServerErrorSpec extends Specification {
 
         then:
         HttpClientResponseException e = thrown()
-        e.message == "Internal Server Error: Bad things happening"
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad things happening"
     }
 
     void "test exception error - mono"() {
@@ -71,7 +71,7 @@ class ServerErrorSpec extends Specification {
 
         then:
         HttpClientResponseException e = thrown()
-        e.message == "Internal Server Error: Bad things happening"
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad things happening"
     }
 
     void "test single error"() {
@@ -80,7 +80,7 @@ class ServerErrorSpec extends Specification {
 
         then:
         HttpClientResponseException e = thrown()
-        e.message == "Internal Server Error: Bad things happening"
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad things happening"
     }
 
     void "test single error - single"() {
@@ -89,7 +89,7 @@ class ServerErrorSpec extends Specification {
 
         then:
         HttpClientResponseException e = thrown()
-        e.message == "Internal Server Error: Bad things happening"
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad things happening"
     }
 
     void "test flowable error - flowable"() {

@@ -54,7 +54,7 @@ class ErrorSpec extends AbstractMicronautSpec {
         expect:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
         response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
-        response.getBody(JsonError).get().message == 'Internal Server Error: bad'
+        response.getBody(Map).get()._embedded.errors[0].message == 'Internal Server Error: bad'
     }
 
     void "test 500 server error IOException"() {
@@ -72,7 +72,7 @@ class ErrorSpec extends AbstractMicronautSpec {
         expect:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
         response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
-        response.getBody(JsonError).get().message == 'Internal Server Error: null'
+        response.getBody(Map).get()._embedded.errors[0].message == 'Internal Server Error: null'
     }
 
     void "test an error route throwing the same exception it handles"() {
@@ -90,7 +90,7 @@ class ErrorSpec extends AbstractMicronautSpec {
         expect:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
         response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
-        response.getBody(JsonError).get().message == 'Internal Server Error: null'
+        response.getBody(Map).get()._embedded.errors[0].message == 'Internal Server Error: null'
     }
 
     void "test an exception handler throwing the same exception it handles"() {
@@ -108,7 +108,7 @@ class ErrorSpec extends AbstractMicronautSpec {
         expect:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
         response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
-        response.getBody(JsonError).get().message == 'Internal Server Error: null'
+        response.getBody(Map).get()._embedded.errors[0].message == 'Internal Server Error: null'
     }
 
     void "test 404 error"() {
@@ -130,7 +130,7 @@ class ErrorSpec extends AbstractMicronautSpec {
         def json = new JsonSlurper().parseText(response.getBody(String).orElse(null))
 
         then:
-        json.message == 'Page Not Found'
+        json._embedded.errors[0].message == 'Page Not Found'
         json._links.self.href == '/errors/blah'
     }
 
@@ -153,7 +153,7 @@ class ErrorSpec extends AbstractMicronautSpec {
         def json = new JsonSlurper().parseText(response.getBody(String).orElse(null))
 
         then:
-        json.message.matches('Method \\[POST\\] not allowed for URI \\[/errors/server-error\\]. Allowed methods: \\[(GET|HEAD), (GET|HEAD)\\]')
+        json._embedded.errors[0].message.matches('Method \\[POST\\] not allowed for URI \\[/errors/server-error\\]. Allowed methods: \\[(GET|HEAD), (GET|HEAD)\\]')
         json._links.self.href == '/errors/server-error'
     }
 
@@ -187,7 +187,7 @@ class ErrorSpec extends AbstractMicronautSpec {
 
         expect:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
-        response.getBody(JsonError).get().message.contains("Failed to inject value for parameter [prop]")
+        response.getBody(Map).get()._embedded.errors[0].message.contains("Failed to inject value for parameter [prop]")
     }
 
     @Controller('/errors')

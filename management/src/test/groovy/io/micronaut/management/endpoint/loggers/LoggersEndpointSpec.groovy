@@ -185,7 +185,7 @@ class LoggersEndpointSpec extends Specification {
 
         and:
         e.response.status == HttpStatus.BAD_REQUEST
-        e.message.contains 'Cannot deserialize value of type `io.micronaut.logging.LogLevel` from String "FOO"'
+        e.response.getBody(Map).get()._embedded.errors[0].message.contains 'Cannot deserialize value of type `io.micronaut.logging.LogLevel` from String "FOO"'
     }
 
     void 'test that an attempt to set ROOT logger to NOT_SPECIFIED level will fail'() {
@@ -200,7 +200,7 @@ class LoggersEndpointSpec extends Specification {
 
         and:
         e.response.status == HttpStatus.BAD_REQUEST
-        e.message == 'Argument [LogLevel configuredLevel] not satisfied: Invalid log level specified: NOT_SPECIFIED'
+        e.response.getBody(Map).get()._embedded.errors[0].message == 'Argument [LogLevel configuredLevel] not satisfied: Invalid log level specified: NOT_SPECIFIED'
     }
 
 }

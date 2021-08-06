@@ -151,6 +151,26 @@ For example the annotations defined in `javax.validation` are not inherited by d
 
 This behaviour grants more flexibility if you need to redefine the validation rules. Note that it is still possible to inherit validation rules through meta-annotations. See the section on <<annotationMetadata, Annotation Inheritance>> for more information.
 
+==== Error Response Format
+
+The default value of `jackson.always-serialize-errors-as-list` is now true. That means by default the Hateoas JSON errors will always be a list. For example:
+
+.Example error response
+----
+{
+  ...
+  "_embedded": {
+    "errors": [
+      {
+        "message": "Person.name: must not be blank"
+      }
+    ]
+  }
+}
+----
+
+To revert to the previous behavior where a singular error was populated in the message field instead of including `_embedded.errors`, set the configuration setting to false.
+
 ==== Runtime Classpath Scanning Removed
 
 It is no longer possible to scan the classpath at runtime using the `scan` method of the api:context.env.Environment[] interface.
@@ -419,6 +439,10 @@ Two exception handlers that were in `micronaut-server-netty` have now been moved
 ==== New package for Micronaut Cassandra
 
 The classes in Micronaut Cassandra have been moved from `io.micronaut.configuration.cassandra` to `io.micronaut.cassandra` package.
+
+==== Micronaut Security
+
+Many of the APIs in the Micronaut Security module have undergone changes. Please see the link:https://micronaut-projects.github.io/micronaut-security/{micronautSecurityVersion}/guide[Micronaut Security] documentation for the details.
 
 ==== Groovy changes
 

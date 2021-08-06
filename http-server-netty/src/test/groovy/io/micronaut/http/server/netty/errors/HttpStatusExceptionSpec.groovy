@@ -53,7 +53,7 @@ class HttpStatusExceptionSpec extends AbstractMicronautSpec {
         def json = new JsonSlurper().parseText(response.getBody(String).orElse(null))
 
         then:
-        json.message == 'The error message'
+        json._embedded.errors[0].message == 'The error message'
         json._links.self.href == '/errors'
     }
 

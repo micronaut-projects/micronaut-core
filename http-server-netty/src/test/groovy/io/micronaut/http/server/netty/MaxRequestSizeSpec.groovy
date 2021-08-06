@@ -36,7 +36,7 @@ class MaxRequestSizeSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "The content length [10241] exceeds the maximum allowed content length [10240]"
+        ex.response.getBody(Map).get()._embedded.errors[0].message == "The content length [10241] exceeds the maximum allowed content length [10240]"
 
         cleanup:
         client.close()
@@ -60,7 +60,7 @@ class MaxRequestSizeSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "The content length [10241] exceeds the maximum allowed content length [10240]"
+        ex.response.getBody(Map).get()._embedded.errors[0].message == "The content length [10241] exceeds the maximum allowed content length [10240]"
 
         cleanup:
         client.close()
@@ -98,7 +98,7 @@ class MaxRequestSizeSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "The content length [10241] exceeds the maximum allowed content length [10240]"
+        ex.response.getBody(Map).get()._embedded.errors[0].message == "The content length [10241] exceeds the maximum allowed content length [10240]"
 
         cleanup:
         client.close()
@@ -137,7 +137,7 @@ class MaxRequestSizeSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "The part named [e] exceeds the maximum allowed content length [1024]"
+        ex.response.getBody(Map).get()._embedded.errors[0].message == "The part named [e] exceeds the maximum allowed content length [1024]"
 
         cleanup:
         client.close()
@@ -176,7 +176,7 @@ class MaxRequestSizeSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "The part named [e] exceeds the maximum allowed content length [1024]"
+        ex.response.getBody(Map).get()._embedded.errors[0].message == "The part named [e] exceeds the maximum allowed content length [1024]"
 
         cleanup:
         client.close()
@@ -200,7 +200,7 @@ class MaxRequestSizeSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message.contains("exceeds the maximum allowed content length [10240]")
+        ex.response.getBody(Map).get()._embedded.errors[0].message.contains("exceeds the maximum allowed content length [10240]")
 
         cleanup:
         client.close()
