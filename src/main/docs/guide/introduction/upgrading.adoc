@@ -28,6 +28,14 @@ If you use Maven, update the parent POM version and `micronaut.version` property
 </properties>
 ----
 
+=== Build Plugin Update
+
+If you use the Micronaut Gradle plugin, update the version to `2.0.3`
+
+`id("io.micronaut.application") version "2.0.3"`
+
+For Maven users the version is updated automatically.
+
 === Inject Annotations
 
 The `javax.inject` annotations are no longer a transitive dependency. Micronaut now ships with the Jakarta inject annotations. To upgrade, either add a dependency on `javax-inject`, or replace all `javax.inject` imports with `jakarta.inject`.
