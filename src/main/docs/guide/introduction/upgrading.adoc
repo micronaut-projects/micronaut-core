@@ -97,7 +97,7 @@ https://docs.openrewrite.org/[OpenRewrite^] is an automated refactoring tool tha
 
 Adding OpenRewrite support to your build is easy, it just requires adding the Gradle or Maven plugin and configuring the plugin to use the Micronaut upgrade recipe.
 
-See the https://micronaut.io/launch?features=openrewrite&lang=JAVA&build=GRADLE&activity=diff[Gradle feature diff^] or the https://micronaut.io/launch?features=acme&lang=JAVA&build=MAVEN&activity=diff[Maven feature diff^] to see the required build script changes.
+See the https://micronaut.io/launch?features=openrewrite&lang=JAVA&build=GRADLE&activity=diff[Gradle feature diff^] or the https://micronaut.io/launch?features=openrewrite&lang=JAVA&build=MAVEN&activity=diff[Maven feature diff^] to see the required build script changes.
 
 Once you've made the build script changes, you can "dry-run" the Micronaut upgrade recipe to see what changes would be made.
 
