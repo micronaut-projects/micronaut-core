@@ -274,7 +274,7 @@ public class MediaType implements CharSequence {
      * PDF: application/pdf.
      */
     public static final MediaType APPLICATION_PDF_TYPE = new MediaType(APPLICATION_PDF);
-    
+
     /**
      * Png Image: image/png.
      */
@@ -340,7 +340,8 @@ public class MediaType implements CharSequence {
 
     @SuppressWarnings("ConstantName")
     private static final String MIME_TYPES_FILE_NAME = "META-INF/http/mime.types";
-    private static Map<String, String> mediaTypeFileExtensions;
+    private static Map<String, String> fileExtensionToMediaType;
+    private static Map<String, String> mediaTypeToFileExtension;
     @SuppressWarnings("ConstantName")
     private static final List<Pattern> textTypePatterns = new ArrayList<>(4);
 
@@ -476,18 +477,58 @@ public class MediaType implements CharSequence {
      * @return The {@link MediaType}
      */
     public static MediaType of(String mediaType) {
-        return optionalOf(mediaType).orElse(new MediaType(mediaType));
-    }
-
-    /**
-     * Create a new or get a {@link MediaType} from the given text.
-     * If there is no match mediaType, it will also use extension to construct a new MediaType.
-     *
-     * @param mediaType The text
-     * @return The {@link MediaType}
-     */
-    public static MediaType of(String mediaType, String extension) {
-        return optionalOf(mediaType).orElse(new MediaType(mediaType, extension));
+        switch (mediaType) {
+            case ALL:
+                return ALL_TYPE;
+            case APPLICATION_FORM_URLENCODED:
+                return APPLICATION_FORM_URLENCODED_TYPE;
+            case MULTIPART_FORM_DATA:
+                return MULTIPART_FORM_DATA_TYPE;
+            case TEXT_HTML:
+                return TEXT_HTML_TYPE;
+            case APPLICATION_XHTML:
+                return APPLICATION_XHTML_TYPE;
+            case APPLICATION_XML:
+                return APPLICATION_XML_TYPE;
+            case APPLICATION_JSON:
+                return APPLICATION_JSON_TYPE;
+            case APPLICATION_YAML:
+                return APPLICATION_YAML_TYPE;
+            case TEXT_XML:
+                return TEXT_XML_TYPE;
+            case TEXT_JSON:
+                return TEXT_JSON_TYPE;
+            case TEXT_PLAIN:
+                return TEXT_PLAIN_TYPE;
+            case APPLICATION_HAL_JSON:
+                return APPLICATION_HAL_JSON_TYPE;
+            case APPLICATION_HAL_XML:
+                return APPLICATION_HAL_XML_TYPE;
+            case APPLICATION_ATOM_XML:
+                return APPLICATION_ATOM_XML_TYPE;
+            case APPLICATION_VND_ERROR:
+                return APPLICATION_VND_ERROR_TYPE;
+            case TEXT_EVENT_STREAM:
+                return TEXT_EVENT_STREAM_TYPE;
+            case APPLICATION_JSON_STREAM:
+                return APPLICATION_JSON_STREAM_TYPE;
+            case APPLICATION_OCTET_STREAM:
+                return APPLICATION_OCTET_STREAM_TYPE;
+            case APPLICATION_GRAPHQL:
+                return APPLICATION_GRAPHQL_TYPE;
+            case APPLICATION_PDF:
+                return APPLICATION_PDF_TYPE;
+            case IMAGE_PNG:
+                return IMAGE_PNG_TYPE;
+            case IMAGE_JPEG:
+                return IMAGE_JPEG_TYPE;
+            case IMAGE_GIF:
+                return IMAGE_GIF_TYPE;
+            case IMAGE_WEBP:
+                return IMAGE_WEBP_TYPE;
+            default:
+                return new MediaType(mediaType);
+        }
     }
 
     /**
@@ -755,7 +796,7 @@ public class MediaType implements CharSequence {
      */
     public static Optional<MediaType> forExtension(String extension) {
         if (StringUtils.isNotEmpty(extension)) {
-            String type = getMediaTypeFileExtensions().get(extension);
+            String type = getFileExtensionToMediaType().get(extension);
             if (type != null) {
                 return Optional.of(new MediaType(type, extension));
             }
@@ -777,18 +818,34 @@ public class MediaType implements CharSequence {
         return MediaType.TEXT_PLAIN_TYPE;
     }
 
+    /**
+     * Resolve the {@link MediaType} for the given media/content type text.
+     *
+     * @param mediaType The media/content type text
+     * @return An {@link Optional} of {@link MediaType}
+     */
+    public static Optional<MediaType> forMediaType(String mediaType) {
+        if (StringUtils.isNotEmpty(mediaType)) {
+            String extension = getMediaTypeToFileExtension().get(mediaType);
+            if (extension != null) {
+                return Optional.of(new MediaType(mediaType, extension));
+            }
+        }
+        return Optional.empty();
+    }
+
     @SuppressWarnings("MagicNumber")
-    private static Map<String, String> getMediaTypeFileExtensions() {
-        Map<String, String> extensions = mediaTypeFileExtensions;
+    private static Map<String, String> getFileExtensionToMediaType() {
+        Map<String, String> extensions = fileExtensionToMediaType;
         if (extensions == null) {
             synchronized (MediaType.class) { // double check
-                extensions = mediaTypeFileExtensions;
+                extensions = fileExtensionToMediaType;
                 if (extensions == null) {
                     try {
-                        extensions = loadMimeTypes();
-                        mediaTypeFileExtensions = extensions;
+                        extensions = loadMimeTypes(true);
+                        fileExtensionToMediaType = extensions;
                     } catch (Exception e) {
-                        mediaTypeFileExtensions = Collections.emptyMap();
+                        fileExtensionToMediaType = Collections.emptyMap();
                     }
                 }
             }
@@ -796,8 +853,27 @@ public class MediaType implements CharSequence {
         return extensions;
     }
 
+    private static Map<String, String> getMediaTypeToFileExtension() {
+        Map<String, String> extensions = mediaTypeToFileExtension;
+        if (extensions == null) {
+            synchronized (MediaType.class) { // double check
+                extensions = mediaTypeToFileExtension;
+                if (extensions == null) {
+                    try {
+                        extensions = loadMimeTypes(false);
+                        mediaTypeToFileExtension = extensions;
+                    } catch (Exception e) {
+                        mediaTypeToFileExtension = Collections.emptyMap();
+                    }
+                }
+            }
+        }
+        return extensions;
+    }
+
+
     @SuppressWarnings("MagicNumber")
-    private static Map<String, String> loadMimeTypes() {
+    private static Map<String, String> loadMimeTypes(boolean keyedByExtension) {
         try (InputStream is = MediaType.class.getClassLoader().getResourceAsStream(MIME_TYPES_FILE_NAME)) {
             BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.US_ASCII));
             Map<String, String> result = new LinkedHashMap<>(100);
@@ -810,7 +886,11 @@ public class MediaType implements CharSequence {
                 String[] tokens = formattedLine.split("\\|");
                 for (int i = 1; i < tokens.length; i++) {
                     String fileExtension = tokens[i].toLowerCase(Locale.ENGLISH);
-                    result.put(fileExtension, tokens[0]);
+                    if (keyedByExtension) {
+                        result.put(fileExtension, tokens[0]);
+                    } else {
+                        result.put(tokens[0], fileExtension);
+                    }
                 }
             }
             return result;
@@ -822,66 +902,5 @@ public class MediaType implements CharSequence {
         }
 
         return Collections.emptyMap();
-    }
-
-    /**
-     * Get a {@link MediaType} from the given text or empty Optional if it doesn't exist.
-     *
-     * @param mediaType The text
-     * @return An {@link Optional} of the {@link MediaType}
-     */
-    private static Optional<MediaType> optionalOf(String mediaType) {
-        switch (mediaType) {
-            case ALL:
-                return Optional.of(ALL_TYPE);
-            case APPLICATION_FORM_URLENCODED:
-                return Optional.of(APPLICATION_FORM_URLENCODED_TYPE);
-            case MULTIPART_FORM_DATA:
-                return Optional.of(MULTIPART_FORM_DATA_TYPE);
-            case TEXT_HTML:
-                return Optional.of(TEXT_HTML_TYPE);
-            case APPLICATION_XHTML:
-                return Optional.of(APPLICATION_XHTML_TYPE);
-            case APPLICATION_XML:
-                return Optional.of(APPLICATION_XML_TYPE);
-            case APPLICATION_JSON:
-                return Optional.of(APPLICATION_JSON_TYPE);
-            case APPLICATION_YAML:
-                return Optional.of(APPLICATION_YAML_TYPE);
-            case TEXT_XML:
-                return Optional.of(TEXT_XML_TYPE);
-            case TEXT_JSON:
-                return Optional.of(TEXT_JSON_TYPE);
-            case TEXT_PLAIN:
-                return Optional.of(TEXT_PLAIN_TYPE);
-            case APPLICATION_HAL_JSON:
-                return Optional.of(APPLICATION_HAL_JSON_TYPE);
-            case APPLICATION_HAL_XML:
-                return Optional.of(APPLICATION_HAL_XML_TYPE);
-            case APPLICATION_ATOM_XML:
-                return Optional.of(APPLICATION_ATOM_XML_TYPE);
-            case APPLICATION_VND_ERROR:
-                return Optional.of(APPLICATION_VND_ERROR_TYPE);
-            case TEXT_EVENT_STREAM:
-                return Optional.of(TEXT_EVENT_STREAM_TYPE);
-            case APPLICATION_JSON_STREAM:
-                return Optional.of(APPLICATION_JSON_STREAM_TYPE);
-            case APPLICATION_OCTET_STREAM:
-                return Optional.of(APPLICATION_OCTET_STREAM_TYPE);
-            case APPLICATION_GRAPHQL:
-                return Optional.of(APPLICATION_GRAPHQL_TYPE);
-            case APPLICATION_PDF:
-                return Optional.of(APPLICATION_PDF_TYPE);
-            case IMAGE_PNG:
-                return Optional.of(IMAGE_PNG_TYPE);
-            case IMAGE_JPEG:
-                return Optional.of(IMAGE_JPEG_TYPE);
-            case IMAGE_GIF:
-                return Optional.of(IMAGE_GIF_TYPE);
-            case IMAGE_WEBP:
-                return Optional.of(IMAGE_WEBP_TYPE);
-            default:
-                return Optional.empty();
-        }
     }
 }
