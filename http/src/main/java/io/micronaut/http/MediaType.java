@@ -340,8 +340,7 @@ public class MediaType implements CharSequence {
 
     @SuppressWarnings("ConstantName")
     private static final String MIME_TYPES_FILE_NAME = "META-INF/http/mime.types";
-    private static Map<String, String> fileExtensionToMediaType;
-    private static Map<String, String> mediaTypeToFileExtension;
+    private static Map<String, String> mediaTypeFileExtensions;
     @SuppressWarnings("ConstantName")
     private static final List<Pattern> textTypePatterns = new ArrayList<>(4);
 
@@ -796,10 +795,24 @@ public class MediaType implements CharSequence {
      */
     public static Optional<MediaType> forExtension(String extension) {
         if (StringUtils.isNotEmpty(extension)) {
-            String type = getFileExtensionToMediaType().get(extension);
+            String type = getMediaTypeFileExtensions().get(extension);
             if (type != null) {
                 return Optional.of(new MediaType(type, extension));
             }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Resolve the {@link MediaType} for the given file name only if mediaType matches the name.
+     *
+     * @param mediaType The text
+     * @param filename The file name
+     * @return The {@link MediaType}
+     */
+    public static Optional<MediaType> forMediaTypeAndFilename(String mediaType, String filename) {
+        if (StringUtils.isNotEmpty(mediaType) && StringUtils.isNotEmpty(mediaType)) {
+            return forExtension(NameUtils.extension(filename)).filter(m -> m.getName().equals(mediaType));
         }
         return Optional.empty();
     }
@@ -818,34 +831,18 @@ public class MediaType implements CharSequence {
         return MediaType.TEXT_PLAIN_TYPE;
     }
 
-    /**
-     * Resolve the {@link MediaType} for the given media/content type text.
-     *
-     * @param mediaType The media/content type text
-     * @return An {@link Optional} of {@link MediaType}
-     */
-    public static Optional<MediaType> forMediaType(String mediaType) {
-        if (StringUtils.isNotEmpty(mediaType)) {
-            String extension = getMediaTypeToFileExtension().get(mediaType);
-            if (extension != null) {
-                return Optional.of(new MediaType(mediaType, extension));
-            }
-        }
-        return Optional.empty();
-    }
-
     @SuppressWarnings("MagicNumber")
-    private static Map<String, String> getFileExtensionToMediaType() {
-        Map<String, String> extensions = fileExtensionToMediaType;
+    private static Map<String, String> getMediaTypeFileExtensions() {
+        Map<String, String> extensions = mediaTypeFileExtensions;
         if (extensions == null) {
             synchronized (MediaType.class) { // double check
-                extensions = fileExtensionToMediaType;
+                extensions = mediaTypeFileExtensions;
                 if (extensions == null) {
                     try {
-                        extensions = loadMimeTypes(true);
-                        fileExtensionToMediaType = extensions;
+                        extensions = loadMimeTypes();
+                        mediaTypeFileExtensions = extensions;
                     } catch (Exception e) {
-                        fileExtensionToMediaType = Collections.emptyMap();
+                        mediaTypeFileExtensions = Collections.emptyMap();
                     }
                 }
             }
@@ -853,27 +850,8 @@ public class MediaType implements CharSequence {
         return extensions;
     }
 
-    private static Map<String, String> getMediaTypeToFileExtension() {
-        Map<String, String> extensions = mediaTypeToFileExtension;
-        if (extensions == null) {
-            synchronized (MediaType.class) { // double check
-                extensions = mediaTypeToFileExtension;
-                if (extensions == null) {
-                    try {
-                        extensions = loadMimeTypes(false);
-                        mediaTypeToFileExtension = extensions;
-                    } catch (Exception e) {
-                        mediaTypeToFileExtension = Collections.emptyMap();
-                    }
-                }
-            }
-        }
-        return extensions;
-    }
-
-
     @SuppressWarnings("MagicNumber")
-    private static Map<String, String> loadMimeTypes(boolean keyedByExtension) {
+    private static Map<String, String> loadMimeTypes() {
         try (InputStream is = MediaType.class.getClassLoader().getResourceAsStream(MIME_TYPES_FILE_NAME)) {
             BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.US_ASCII));
             Map<String, String> result = new LinkedHashMap<>(100);
@@ -886,11 +864,7 @@ public class MediaType implements CharSequence {
                 String[] tokens = formattedLine.split("\\|");
                 for (int i = 1; i < tokens.length; i++) {
                     String fileExtension = tokens[i].toLowerCase(Locale.ENGLISH);
-                    if (keyedByExtension) {
-                        result.put(fileExtension, tokens[0]);
-                    } else {
-                        result.put(tokens[0], fileExtension);
-                    }
+                    result.put(fileExtension, tokens[0]);
                 }
             }
             return result;

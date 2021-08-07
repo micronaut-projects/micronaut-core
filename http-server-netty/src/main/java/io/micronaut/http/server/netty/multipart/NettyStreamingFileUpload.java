@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.multipart.PartData;
@@ -73,7 +74,10 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
     @Override
     public Optional<MediaType> getContentType() {
         try {
-            return MediaType.forMediaType(fileUpload.getContentType());
+            return Optional.of(
+                    MediaType.forMediaTypeAndFilename(fileUpload.getContentType(), fileUpload.getFilename())
+                            .orElse(MediaType.of(fileUpload.getContentType()))
+            );
         } catch (IllegalArgumentException e) {
             return Optional.empty();
         }
