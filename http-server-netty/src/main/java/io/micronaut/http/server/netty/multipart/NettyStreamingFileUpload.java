@@ -17,7 +17,6 @@ package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
-import io.micronaut.core.naming.NameUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.multipart.PartData;

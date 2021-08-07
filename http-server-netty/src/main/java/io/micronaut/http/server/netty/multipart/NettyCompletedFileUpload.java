@@ -16,7 +16,6 @@
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.naming.NameUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import io.netty.buffer.ByteBuf;
@@ -28,7 +27,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.util.Map;
 import java.util.Optional;
 
 /**
