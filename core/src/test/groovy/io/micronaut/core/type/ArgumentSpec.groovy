@@ -28,9 +28,11 @@ class ArgumentSpec extends Specification {
     private Map<String, Integer> mapStringInteger
     private Map<String, ?> mapStringWildcardInteger
     private Map<?, ?> wildcardMap
+    private Map<Object, Object> objectMap
     private Map noTypeMap
     private List noTypeList
     private List<?> wildcardList
+    private List<Object> objectList
     private List<Argument<?>> nestedWildcardList;
     private List<Argument<String>> nestedStringList;
     private List<Argument<Integer>> nestedIntegerList;
@@ -65,13 +67,16 @@ class ArgumentSpec extends Specification {
             field                      | candidateField             | result
             "noTypeList"               | "wildcardList"             | true
             "wildcardList"             | "wildcardList"             | true
+            "objectList"               | "wildcardList"             | true
             "stringList"               | "integerList"              | false
             "wildcardList"             | "integerList"              | true
             "wildcardList"             | "stringList"               | true
+            "objectList"               | "integerList"              | true
+            "objectList"               | "stringList"               | true
             "wildcardList"             | "mapStringInteger"         | false
-            "noTypeList"               | "wildcardList"             | true
             "stringList"               | "wildcardList"             | false
             "integerList"              | "wildcardList"             | false
+            "integerList"              | "objectList"               | false
             "nestedWildcardList"       | "nestedStringList"         | true
             "nestedWildcardList"       | "nestedIntegerList"        | true
             "nestedStringList"         | "nestedWildcardList"       | false
@@ -83,10 +88,13 @@ class ArgumentSpec extends Specification {
             "wildcardList"             | "nestedIntegerList"        | true
             "mapStringWildcardInteger" | "mapStringInteger"         | true
             "mapStringInteger"         | "mapStringWildcardInteger" | false
+            "mapStringInteger"         | "objectMap"                | false
             "wildcardMap"              | "mapStringInteger"         | true
             "wildcardMap"              | "mapStringWildcardInteger" | true
             "noTypeMap"                | "mapStringInteger"         | true
             "noTypeMap"                | "mapStringWildcardInteger" | true
+            "objectMap"                | "mapStringInteger"         | true
+            "objectMap"                | "mapStringWildcardInteger" | true
     }
 
     void "test as parameterized type"() {
