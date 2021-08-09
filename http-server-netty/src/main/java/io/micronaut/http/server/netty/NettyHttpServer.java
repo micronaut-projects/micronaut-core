@@ -832,7 +832,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             int port = ch.localAddress().getPort();
             boolean ssl = sslContext != null && sslConfiguration != null && port == serverPort;
             if (ssl) {
-                pipeline.addLast(sslContext.newHandler(ch.alloc()));
+                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslContext.newHandler(ch.alloc()));
             }
 
             if (loggingHandler != null) {
