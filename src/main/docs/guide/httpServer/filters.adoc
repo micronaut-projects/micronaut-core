@@ -52,13 +52,13 @@ The previous example demonstrates some key concepts such as executing logic in a
 
 TIP: The examples use https://projectreactor.io[Project Reactor], however you can use any reactive framework that supports the Reactive streams specifications
 
-The api:http.annotation.Filter[] annotation uses api:core.util.AntPathMatcher[] for path matching. The mapping matches URLs using the following rules:
+The api:http.annotation.Filter[] can use different styles of pattern for path matching by setting `patternStyle`. By default, it uses api:core.util.AntPathMatcher[] for path matching. When using Ant, the mapping matches URLs using the following rules:
 
 * ? matches one character
 * * matches zero or more characters
 * ** matches zero or more subdirectories in a path
 
-.@Fitler Annotation Path Matching Examples
+.@Filter Annotation Path Matching Examples
 |===
 |Pattern|Example Matched Paths
 
@@ -76,6 +76,11 @@ The api:http.annotation.Filter[] annotation uses api:core.util.AntPathMatcher[] 
 
 |`customer/**/*.html`
 |customer/index.html, customer/adam/profile.html, customer/adam/job/description.html
+
+
+When using `patternStyle = FilterPatternStyle.REGEX`, the `pattern` attribute is expected to contain a regular expression which will be matched against the URLs.
+
+NOTE: Using `FilterPatternStyle.ANT` is preferred as the pattern matching is more performant than using regular expressions. `FilterPatternStyle.REGEX` should be used when your pattern cannot be written properly using Ant.
 
 == Error States
 
