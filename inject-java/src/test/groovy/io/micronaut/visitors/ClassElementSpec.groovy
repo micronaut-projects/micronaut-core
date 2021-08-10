@@ -20,6 +20,7 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ConstructorElement
 import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.EnumElement
@@ -292,6 +293,40 @@ interface AnotherInterface {
         then:"we get everything"
         accessibleFields.size() == 2
         accessibleFields*.name as Set == ['s1', 't1'] as Set
+    }
+
+    void "test find matching constructors using ElementQuery"() {
+        given:
+        ClassElement classElement = buildClassElement('''
+package elementquery;
+
+class Test extends SuperType {
+    static {}
+    
+    Test() {}
+    
+    Test(int i) {}
+}
+
+class SuperType {
+    static {}
+    
+    SuperType() {}
+    
+    SuperType(String s) {}
+}
+''')
+        when:
+        def constructors = classElement.getEnclosedElements(ElementQuery.CONSTRUCTORS)
+
+        then:"only our own instance constructors"
+        constructors.size() == 2
+
+        when:
+        def allConstructors = classElement.getEnclosedElements(ElementQuery.of(ConstructorElement.class))
+
+        then:"superclass constructors, but not including static initializers"
+        allConstructors.size() == 4
     }
 
     void "test visit inherited controller classes"() {

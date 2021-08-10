@@ -215,6 +215,54 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             if (!typePredicates.isEmpty()) {
                 elements.removeIf(e -> !typePredicates.stream().allMatch(p -> p.test(((MethodElement) e).getGenericReturnType())));
             }
+        } else if (elementType == ConstructorElement.class) {
+            List<ConstructorNode> constructors = new ArrayList<>(classNode.getDeclaredConstructors());
+            if (!onlyDeclared) {
+                ClassNode superClass = classNode.getSuperClass();
+                while (superClass != null) {
+                    // don't include constructors on enum, record... – matches behavior of JavaClassElement
+                    if (superClass.getPackageName().equals("java.lang")) {
+                        break;
+                    }
+                    constructors.addAll(superClass.getDeclaredConstructors());
+                    superClass = superClass.getSuperClass();
+                }
+            }
+            for (Iterator<ConstructorNode> i = constructors.iterator(); i.hasNext(); ) {
+                ConstructorNode constructor = i.next();
+                // we don't listen to the user here, we never return static initializers. This matches behavior of JavaClassElement
+                if (constructor.isStatic()) {
+                    i.remove();
+                    continue;
+                }
+                if (onlyAccessible) {
+                    final ClassElement accessibleFromType = result.getOnlyAccessibleFromType().orElse(this);
+                    if (constructor.isPrivate()) {
+                        i.remove();
+                        continue;
+                    } else if (!constructor.getDeclaringClass().getName().equals(accessibleFromType.getName())) {
+                        // inaccessible through package scope
+                        if (constructor.isPackageScope() && !constructor.getDeclaringClass().getPackageName().equals(accessibleFromType.getPackageName())) {
+                            i.remove();
+                            continue;
+                        }
+                    }
+                }
+                if (!modifierPredicates.isEmpty()) {
+                    Set<ElementModifier> elementModifiers = resolveModifiers(constructor);
+                    if (!modifierPredicates.stream().allMatch(p -> p.test(elementModifiers))) {
+                        i.remove();
+                    }
+                }
+            }
+
+            //noinspection unchecked
+            elements = constructors.stream().map(constructorNode -> (T) new GroovyConstructorElement(
+                    this,
+                    visitorContext,
+                    constructorNode,
+                    AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, constructorNode)
+            )).collect(Collectors.toList());
         } else if (elementType == FieldElement.class) {
             List<FieldNode> fields;
             if (onlyDeclared) {
