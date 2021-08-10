@@ -44,6 +44,12 @@ public interface ElementQuery<T extends Element> {
     ElementQuery<MethodElement> ALL_METHODS = ElementQuery.of(MethodElement.class);
 
     /**
+     * Constant to retrieve instance constructors, not including those of the parent class.
+     */
+    // static initializers are never returned, so we don't need onlyInstance()
+    ElementQuery<ConstructorElement> CONSTRUCTORS = ElementQuery.of(ConstructorElement.class).onlyDeclared();
+
+    /**
      * Indicates that only declared members should be returned and not members from parent classes.
      *
      * @return This query
