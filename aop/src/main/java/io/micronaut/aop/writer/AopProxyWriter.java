@@ -958,7 +958,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 proxyConstructorGenerator.push(methodIndex);
                 proxyConstructorGenerator.invokeVirtual(executableMethodsDefinitionType, ExecutableMethodsDefinitionWriter.GET_EXECUTABLE_AT_INDEX_METHOD);
                 proxyConstructorGenerator.visitInsn(AASTORE);
-                
+
                 pushResolveInterceptorsCall(proxyConstructorGenerator, i, introduction);
             }
         }
@@ -1435,8 +1435,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         protected final String name;
         protected final List<ClassElement> argumentTypes;
         protected final Type returnType;
-        private final List<String> rawTypes;
         int methodIndex;
+        private final List<String> rawTypes;
 
         public MethodRef(String name, List<ParameterElement> argumentTypes, Type returnType) {
             this.name = name;

@@ -36,54 +36,54 @@ class CustomErrorUnsatisfiedRouteSpec extends Specification {
     @Unroll("for missing #uri message is #message")
     void "should properly map errors"(HttpStatus status, String uri, String message) {
         when:
-            client.exchange(HttpRequest.GET(uri), Map)
+        client.exchange(HttpRequest.GET(uri), Map)
 
         then:
-            HttpClientResponseException ex = thrown()
-            ex.response.status == status
+        HttpClientResponseException ex = thrown()
+        ex.response.status == status
 
         when:
-            Map payload = ex.response.body()
+        Map payload = ex.response.body()
 
         then:
-            payload.myMessage == message
+        payload.myMessage == message
 
         where:
-            status                 | uri                  | message
-            HttpStatus.BAD_REQUEST | '/header'            | 'Oh no: Required Header [X-API-Version] not specified'
-            HttpStatus.BAD_REQUEST | '/cookie'            | 'Custom: Required CookieValue [myCookie] not specified'
-            HttpStatus.BAD_REQUEST | '/headerNoValue'     | 'Oh no: Required Header [apiVersion] not specified'
-            HttpStatus.BAD_REQUEST | '/cookieNoValue'     | 'Custom: Required CookieValue [myCookie] not specified'
-            HttpStatus.BAD_REQUEST | '/queryvalue'        | 'Custom: Required QueryValue [number-of-items] not specified'
-            HttpStatus.BAD_REQUEST | '/queryvalueNoValue' | 'Custom: Required QueryValue [numberOfItems] not specified'
-            HttpStatus.BAD_REQUEST | '/body'              | 'Custom: Required Body [numberOfItems] not specified'
-            HttpStatus.BAD_REQUEST | '/somethingbad1'     | 'Something bad'
-            HttpStatus.BAD_REQUEST | '/somethingbad2'     | 'Something bad'
-            HttpStatus.BAD_REQUEST | '/somethingbad3'     | 'Something bad'
-            HttpStatus.I_AM_A_TEAPOT | '/somethingbad4'     | 'teapot'
+        status                 | uri                  | message
+        HttpStatus.BAD_REQUEST | '/header'            | 'Oh no: Required Header [X-API-Version] not specified'
+        HttpStatus.BAD_REQUEST | '/cookie'            | 'Custom: Required CookieValue [myCookie] not specified'
+        HttpStatus.BAD_REQUEST | '/headerNoValue'     | 'Oh no: Required Header [apiVersion] not specified'
+        HttpStatus.BAD_REQUEST | '/cookieNoValue'     | 'Custom: Required CookieValue [myCookie] not specified'
+        HttpStatus.BAD_REQUEST | '/queryvalue'        | 'Custom: Required QueryValue [number-of-items] not specified'
+        HttpStatus.BAD_REQUEST | '/queryvalueNoValue' | 'Custom: Required QueryValue [numberOfItems] not specified'
+        HttpStatus.BAD_REQUEST | '/body'              | 'Custom: Required Body [numberOfItems] not specified'
+        HttpStatus.BAD_REQUEST | '/somethingbad1'     | 'Something bad'
+        HttpStatus.BAD_REQUEST | '/somethingbad2'     | 'Something bad'
+        HttpStatus.BAD_REQUEST | '/somethingbad3'     | 'Something bad'
+        HttpStatus.I_AM_A_TEAPOT | '/somethingbad4'     | 'teapot'
     }
 
     void "not found is not mapped"(String uri) {
         when:
-            client.exchange(HttpRequest.GET(uri), Map)
+        client.exchange(HttpRequest.GET(uri), Map)
 
         then:
-            HttpClientResponseException ex = thrown()
-            ex.response.status == HttpStatus.NOT_FOUND
+        HttpClientResponseException ex = thrown()
+        ex.response.status == HttpStatus.NOT_FOUND
 
         when:
-            Map payload = ex.response.body()
+        Map payload = ex.response.body()
 
         then:
-            payload.message == message
+        payload._embedded.errors[0].message == message
 
         where:
-            uri           | message
-            '/not-found1' | "Page Not Found"
-            '/not-found2' | "Page Not Found"
-            '/not-found3' | "Page Not Found"
-            '/not-found4' | "Page Not Found"
-            '/not-found5' | "Page Not Found"
+        uri           | message
+        '/not-found1' | "Page Not Found"
+        '/not-found2' | "Page Not Found"
+        '/not-found3' | "Page Not Found"
+        '/not-found4' | "Page Not Found"
+        '/not-found5' | "Page Not Found"
     }
 
     @Requires(property = 'spec.name', value = 'CustomErrorUnsatisfiedRouteSpec')

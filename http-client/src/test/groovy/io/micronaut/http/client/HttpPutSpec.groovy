@@ -65,7 +65,7 @@ class HttpPutSpec extends Specification {
 
         then:
         def e = thrown(HttpClientException)
-        e.message == "Method [PATCH] not allowed for URI [/put/simple]. Allowed methods: [PUT]"
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Method [PATCH] not allowed for URI [/put/simple]. Allowed methods: [PUT]"
     }
     void "test simple post request with JSON"() {
         given:

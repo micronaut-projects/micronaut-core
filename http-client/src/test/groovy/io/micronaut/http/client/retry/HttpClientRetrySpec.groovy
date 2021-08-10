@@ -63,7 +63,7 @@ class HttpClientRetrySpec extends Specification {
 
         then:"The original exception is thrown"
         def e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error: Bad count"
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad count"
     }
 
     void "test simply retry with rxjava"() {
@@ -87,7 +87,7 @@ class HttpClientRetrySpec extends Specification {
 
         then:"The original exception is thrown"
         def e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error: Bad count"
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad count"
 
     }
 

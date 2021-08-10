@@ -93,7 +93,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "Required argument [CompletedFileUpload file] not specified"
+        ex.response.getBody(Map).get()._embedded.errors[0].message == "Required argument [CompletedFileUpload file] not specified"
     }
 
     void "test completed file upload with no file name and no bytes"() {
@@ -113,7 +113,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "Required argument [CompletedFileUpload file] not specified"
+        ex.response.getBody(Map).get()._embedded.errors[0].message == "Required argument [CompletedFileUpload file] not specified"
     }
 
     void "test completed file upload with no part"() {
@@ -133,7 +133,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "Required argument [CompletedFileUpload file] not specified"
+        ex.response.getBody(Map).get()._embedded.errors[0].message == "Required argument [CompletedFileUpload file] not specified"
     }
 
     void "test file bytes upload"() {

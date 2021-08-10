@@ -90,7 +90,7 @@ class HttpAccessLoggerSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Page Not Found"
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Page Not Found"
         e.status == HttpStatus.NOT_FOUND
        appender.headLog(10).contains("" + HttpStatus.NOT_FOUND.getCode())
     }

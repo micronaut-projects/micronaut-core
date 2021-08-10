@@ -28,8 +28,7 @@ class ShoppingCartControllerSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.getMessage() == "Required ShoppingCart [sessionId] not specified"
-
+        ex.response.getBody(Map).get()._embedded.errors[0].message == "Required ShoppingCart [sessionId] not specified"
     }
 
     void testAnnotationBinding() {
