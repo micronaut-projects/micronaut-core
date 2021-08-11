@@ -342,6 +342,7 @@ ext {
                             'micronaut-micrometer-registry-jmx',
                             'micronaut-micrometer-registry-kairos',
                             'micronaut-micrometer-registry-new-relic',
+                            'micronaut-micrometer-registry-new-relic-telemetry',
                             'micronaut-micrometer-registry-prometheus',
                             'micronaut-micrometer-registry-signalfx',
                             'micronaut-micrometer-registry-stackdriver',
