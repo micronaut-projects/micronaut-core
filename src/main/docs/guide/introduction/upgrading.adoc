@@ -58,7 +58,7 @@ dependency:io.micronaut.rxjava2:micronaut-rxjava2[gradleScope="implementation"]
 
 In addition, if any of the `Rx` HTTP client interfaces were used, a dependency must be added and the imports must be updated.
 
-dependency:io.micronaut.rxjava2:micronaut-rxjava2-http-clent[gradleScope="implementation"]
+dependency:io.micronaut.rxjava2:micronaut-rxjava2-http-client[gradleScope="implementation"]
 
 .RxJava2 HTTP Client Imports
 |===
