@@ -12,7 +12,7 @@ The following cache annotations are supported:
 - link:{micronautcacheapi}/annotation/CachePut.html[@CachePut] - Indicates that the return value of a method invocation should be cached. Unlike `@Cacheable` the original operation is never skipped.
 - link:{micronautcacheapi}/annotation/CacheInvalidate.html[@CacheInvalidate] - Indicates the invocation of a method should cause the invalidation of one or more caches.
 
-Using one of these annotations activates the api:cache.interceptor.CacheInterceptor[], which in the case of `@Cacheable` caches the return value of the method.
+Using one of these annotations activates the link:{micronautcacheapi}/interceptor/CacheInterceptor[CacheInterceptor], which in the case of `@Cacheable` caches the return value of the method.
 
 The emitted result is cached if the method return type is a non-blocking type (either link:{jdkapi}/java/util/concurrent/CompletableFuture.html[CompletableFuture] or an instance of rs:Publisher[]) .
 
