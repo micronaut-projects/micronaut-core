@@ -92,15 +92,15 @@ This behaviour can be changed by setting `micronaut.heartbeat.enabled` to `true`
 Many `TypeConverter` instances that were previously beans are no longer beans and are deprecated including:
 
 * api:http.MediaTypeConverter[]
-* api:convext.converters.StringToClassConverter[]
-* api:convext.converters.StringArrayToClassArrayConverter[]
+* api:context.converters.StringToClassConverter[]
+* api:context.converters.StringArrayToClassArrayConverter[]
 * api:http.client.converters.SocketAddressConverter[]
-* api:reactive.reactor.converters.PublisherToMonoConverter[]
-* api:reactive.reactor.converters.PublisherToFluxConverter[]
-* api:reactive.reactor.converters.ObjectToFluxConverter[]
-* api:reactive.reactor.converters.ObjectToMonoConverter[]
+* `io.micronaut.reactive.reactor.converters.PublisherToMonoConverter`
+* `io.micronaut.reactive.reactor.converters.PublisherToFluxConverter`
+* `io.micronaut.reactive.reactor.converters.ObjectToFluxConverter`
+* `io.micronaut.reactive.reactor.converters.ObjectToMonoConverter`
 * api:jackson.convert.JsonNodeToObjectConverter[]
-* api:jackson.convert.MapToObjectConverter[]
+* api:jackson.bind.MapToObjectConverter[]
 * api:jackson.convert.ObjectToJsonNodeConverter[]
 * api:jackson.convert.ArrayNodeToArrayConverter[]
 * api:jackson.convert.ArrayNodeToIterableConverter[]
@@ -113,7 +113,7 @@ These should not be injected directly but instead used through the api:core.conv
 
 In Micronaut 1.x the ann:context.annotation.Executable[] annotation was a meta-annotation specified on the ann:aop.Around[] and ann:aop.Introduction[] annotations. This meant that an api:inject.ExecutableMethod[] reference was generated for every usage of AOP advice which consumed additional memory unnecessarily.
 
-In Micronaut 2.x and above this is no longer the case. If you need an api:inject.ExecutableMethod[] generated, add the ann:context.annotation.Executable[] annotation to any custom AOP advice, otherwise the method will not be available via the api:inject.BeanDefinition[] interface (using for example the api:BeanDefinition.getExecutableMethods[] method).
+In Micronaut 2.x and above this is no longer the case. If you need an api:inject.ExecutableMethod[] generated, add the ann:context.annotation.Executable[] annotation to any custom AOP advice, otherwise the method will not be available via the api:inject.BeanDefinition[] interface (using for example the api:inject.BeanDefinition[] `getExecutableMethods` method).
 
 === Spot Bugs Instead of JSR-305 Nullable/NonNull Annotations
 
