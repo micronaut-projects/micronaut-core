@@ -48,7 +48,7 @@ In addition, the following built-in endpoint(s) are provided by the `management`
 |===
 |Endpoint|URI|Description
 
-|api:management.endpoint.caches.CachesEndpoint[]
+|<<cachesEndpoint, CachesEndpoint>>
 | `/caches`
 |Returns information about the caches and permits invalidating them (see <<cachesEndpoint, CachesEndpoint>>)
 
