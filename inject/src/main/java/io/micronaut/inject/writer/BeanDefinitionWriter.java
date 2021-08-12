@@ -552,7 +552,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 if (exposedType == null) {
                     visitorContext.fail("Bean defines an exposed type [" + name + "] that is not on the classpath", beanProducingElement);
                 } else if (!beanTypeElement.isAssignable(exposedType)) {
-                    visitorContext.fail("Bean defines an exposed type [" + name + "] that is not implemented by the bean type", beanProducingElement);
+                    // for classes the exposed type cannot be a subclass
+                    if (beanProducingElement instanceof ClassElement) {
+                        visitorContext.fail("Bean defines an exposed type [" + name + "] that is not implemented by the bean type", beanProducingElement);
+                    // for methods it has to be a child or parent class
+                    } else if (!exposedType.isAssignable(beanTypeElement)) {
+                        visitorContext.fail("Bean defines an exposed type [" + name + "] that is not a parent or child class of the bean type", beanProducingElement);
+                    }
                 }
             }
         }
@@ -1066,7 +1072,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void pushStoreClassesAsSet(GeneratorAdapter writer, String[] classes) {
-        if (classes.length > 3) {
+        if (classes.length > 1) {
             writer.newInstance(Type.getType(HashSet.class));
             writer.dup();
             pushArrayOfClasses(writer, classes);
@@ -1076,15 +1082,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             writer.invokeConstructor(Type.getType(HashSet.class), org.objectweb.asm.commons.Method.getMethod(
                     ReflectionUtils.findConstructor(HashSet.class, Collection.class).get()
             ));
-        } else if (classes.length == 1) {
+        } else {
             pushClass(writer, classes[0]);
             writer.invokeStatic(Type.getType(Collections.class), org.objectweb.asm.commons.Method.getMethod(
                     ReflectionUtils.getRequiredMethod(Collections.class, "singleton", Object.class)
-            ));
-        } else {
-            pushArrayOfClasses(writer, classes);
-            writer.invokeStatic(Type.getType(Arrays.class), org.objectweb.asm.commons.Method.getMethod(
-                    ReflectionUtils.getRequiredMethod(Arrays.class, "asList", Object[].class)
             ));
         }
     }

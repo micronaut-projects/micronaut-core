@@ -90,6 +90,92 @@ class Test {
         e.message.contains("Bean defines an exposed type [java.lang.Runnable] that is not implemented by the bean type")
     }
 
+    void "test fail compilation on exposed subclass of bean type"() {
+        when:
+        buildBeanDefinition('limittypes.Test', '''
+package limittypes;
+
+import io.micronaut.context.annotation.*;
+import jakarta.inject.*;
+
+@Singleton
+@Bean(typed = X.class)
+class Test {
+
+}
+
+class X extends Test {}
+
+''')
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Bean defines an exposed type [limittypes.X] that is not implemented by the bean type")
+    }
+
+    void "test exposed bean types with factory"() {
+        given:
+        def context = buildContext('limittypes.Test$Method0', '''
+package limittypes;
+
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Singleton;
+
+@Factory
+class Test {
+
+    @Singleton
+    @Bean(typed = {X.class, Y.class})
+    X method() {
+        return new Y();
+    }
+}
+
+interface X {
+    
+}
+class Y implements X {
+    
+}
+
+''', false)
+
+        when:
+        Class yType = context.getClassLoader().loadClass("limittypes.Y")
+        Class xType = context.getClassLoader().loadClass("limittypes.X")
+
+        then:
+        context.findBean(yType).isPresent()
+        context.findBean(xType).isPresent()
+    }
+
+    void "test exposed bean types with factory invalid type"() {
+        when:
+        buildBeanDefinition('limittypes.Test$Method0', '''
+package limittypes;
+
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Singleton;
+
+@Factory
+class Test {
+
+    @Singleton
+    @Bean(typed = {Z.class})
+    X method() {
+        return new Y();
+    }
+}
+
+interface Z { }
+interface X { }
+class Y implements X { }
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Bean defines an exposed type [limittypes.Z] that is not a parent or child class of the bean type")
+    }
+
     void 'test order annotation'() {
         given:
         def definition = buildBeanDefinition('test.TestOrder', '''
