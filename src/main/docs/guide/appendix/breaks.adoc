@@ -196,9 +196,9 @@ warning: unknown enum constant When.MAYBE
   reason: class file for javax.annotation.meta.When not found
 ```
 
-This warning is harmless and can be ignored. To eliminate this warning, add the following dependency to your project's annotation processor classpath:
+This warning is harmless and can be ignored. To eliminate this warning, add the following dependency to your project's compile only classpath:
 
-dependency:com.google.code.findbugs:jsr305[gradleScope="annotationProcessor"]
+dependency:com.google.code.findbugs:jsr305[gradleScope="compileOnly"]
 
 ==== Server Filter Behavior
 
