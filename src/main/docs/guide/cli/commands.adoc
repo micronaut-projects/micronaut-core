@@ -177,7 +177,7 @@ $ mn create-client Book
 |
 |===
 
-The `create-websocket-server` command generates a simple api:websocket.WebSocketServer[] class. It follows a `*Server` convention for generating the class name. It does not create an associated test.
+The `create-websocket-server` command generates a simple api:websocket.annotation.ServerWebSocket[] class. It follows a `*Server` convention for generating the class name. It does not create an associated test.
 
 [source,bash]
 ----

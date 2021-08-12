@@ -1,4 +1,4 @@
-The ann:http.client.Client[] annotation can also handle streaming HTTP responses.
+The ann:http.client.annotation.Client[] annotation can also handle streaming HTTP responses.
 
 === Streaming JSON with @Client
 
@@ -70,7 +70,7 @@ You can use this client to stream SSE events from any server that emits them.
 
 NOTE: Although SSE streams are typically consumed by a browser `EventSource`, there are cases where you may wish to consume an SSE stream via api:http.client.sse.SseClient[], such as in unit tests or when a Micronaut service acts as a gateway for another service.
 
-The ann:http.client.Client[] annotation also supports consuming SSE streams. For example, consider the following controller method that produces a stream of SSE events:
+The ann:http.client.annotation.Client[] annotation also supports consuming SSE streams. For example, consider the following controller method that produces a stream of SSE events:
 
 snippet::io.micronaut.docs.sse.HeadlineController[tags="streaming", indent=0, title="SSE Controller"]
 

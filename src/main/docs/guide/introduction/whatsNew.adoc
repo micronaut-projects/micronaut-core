@@ -86,6 +86,7 @@ It is now possible to intercept `@PostConstruct` and `@PreDestroy` method invoca
 
 See the section on <<lifecycleAdvise, Bean Life Cycle Advice>> for more information.
 
+
 ==== Random Configuration Values
 
 It is now possible to set a max and a range for random numbers in configuration. For example to set an integer between 0 and 9, `${random.int(10)}` can be used as the configuration value. See the <<propertySource, documentation>> under "Using Random Properties" for more information.
