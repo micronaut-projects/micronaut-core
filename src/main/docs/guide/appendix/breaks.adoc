@@ -292,10 +292,11 @@ In previous versions of Micronaut it was possible to inject an link:{jdkapi}/jav
 Because the event loop should not be used for general purpose use cases, the injection will now fail by default with a non unique bean exception.
 The injection point should be qualified for which executor service is desired.
 
-==== Only the Exported Type from Factories is Injectable
+==== Subclasses Returned From Factories Not Injectable
 
-It is no longer possible to inject the internal implementation type from beans produced via factories.
-For example in the following example:
+It is no longer possible to inject the internal implementation type from beans produced via factories. The type returned from the factory or any of its super types are able to be injected.
+
+For example:
 
 [source,java]
 ----
@@ -311,22 +312,21 @@ public class ExecutorFactory {
 }
 ----
 
-In the above case, if the `ExecutorService` had been created previously a call to `context.getBean(ForkJoinPool.class)` would locate the already created bean.
+In the above case, if the `ExecutorService` had been already been retrieved from the context in previous logic, a call to `context.getBean(ForkJoinPool.class)` would locate the already created bean.
 This behaviour was inconsistent because if the bean had not yet been created then this lookup would not work.
 In Micronaut 3 for consistency this is no longer possible.
 
-You can however restore the behaviour by using the new `typed` member of the ann:context.annotation.Bean[] annotation:
+You can however restore the behaviour by changing the factory to return the implementation type:
 
 [source,java]
 ----
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ExecutorService;
 import javax.inject.Singleton;
-import io.micronaut.context.annotation.Bean;
 public class ExecutorFactory {
+
     @Singleton
-    @Bean(typed = { ExecutorService.class, ForkJoinPool.class })
-    public ExecutorService executorService() {
+    public ForkJoinPool executorService() {
         return ForkJoinPool.commonPool();
     }
 }

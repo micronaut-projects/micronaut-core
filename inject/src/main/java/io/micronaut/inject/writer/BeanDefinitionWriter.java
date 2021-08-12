@@ -546,7 +546,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void validateExposedTypes(AnnotationMetadata annotationMetadata, VisitorContext visitorContext) {
         final String[] types = annotationMetadata.stringValues(Bean.class, "typed");
-        if (ArrayUtils.isNotEmpty(types)) {
+        if (ArrayUtils.isNotEmpty(types) && !beanTypeElement.isProxy()) {
             for (String name : types) {
                 final ClassElement exposedType = visitorContext.getClassElement(name).orElse(null);
                 if (exposedType == null) {
@@ -1066,7 +1066,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void pushStoreClassesAsSet(GeneratorAdapter writer, String[] classes) {
-        if (classes.length > 3) {
+        if (classes.length > 1) {
             writer.newInstance(Type.getType(HashSet.class));
             writer.dup();
             pushArrayOfClasses(writer, classes);
@@ -1076,15 +1076,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             writer.invokeConstructor(Type.getType(HashSet.class), org.objectweb.asm.commons.Method.getMethod(
                     ReflectionUtils.findConstructor(HashSet.class, Collection.class).get()
             ));
-        } else if (classes.length == 1) {
+        } else {
             pushClass(writer, classes[0]);
             writer.invokeStatic(Type.getType(Collections.class), org.objectweb.asm.commons.Method.getMethod(
                     ReflectionUtils.getRequiredMethod(Collections.class, "singleton", Object.class)
-            ));
-        } else {
-            pushArrayOfClasses(writer, classes);
-            writer.invokeStatic(Type.getType(Arrays.class), org.objectweb.asm.commons.Method.getMethod(
-                    ReflectionUtils.getRequiredMethod(Arrays.class, "asList", Object[].class)
             ));
         }
     }
