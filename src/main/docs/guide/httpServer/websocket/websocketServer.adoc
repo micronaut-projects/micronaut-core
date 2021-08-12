@@ -57,7 +57,7 @@ NOTE: When sessions are backed by a persistent store such as Redis, after each m
 [TIP]
 .Using the CLI
 ====
-If you created your project using the Micronaut CLI and the default (`service`) profile, you can use the `create-websocket-server` command to create a class with api:websocket.WebSocketServer[].
+If you created your project using Application Type `Micronaut Application`, you can use the `create-websocket-server` command with the Micronaut CLI to create a class annotated with api:websocket.annotation.ServerWebSocket[].
 
 ----
 $ mn create-websocket-server MyChat
