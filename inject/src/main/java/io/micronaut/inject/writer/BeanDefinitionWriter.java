@@ -546,19 +546,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void validateExposedTypes(AnnotationMetadata annotationMetadata, VisitorContext visitorContext) {
         final String[] types = annotationMetadata.stringValues(Bean.class, "typed");
-        if (ArrayUtils.isNotEmpty(types)) {
+        if (ArrayUtils.isNotEmpty(types) && !beanTypeElement.isProxy()) {
             for (String name : types) {
                 final ClassElement exposedType = visitorContext.getClassElement(name).orElse(null);
                 if (exposedType == null) {
                     visitorContext.fail("Bean defines an exposed type [" + name + "] that is not on the classpath", beanProducingElement);
                 } else if (!beanTypeElement.isAssignable(exposedType)) {
-                    // for classes the exposed type cannot be a subclass
-                    if (beanProducingElement instanceof ClassElement) {
-                        visitorContext.fail("Bean defines an exposed type [" + name + "] that is not implemented by the bean type", beanProducingElement);
-                    // for methods it has to be a child or parent class
-                    } else if (!exposedType.isAssignable(beanTypeElement)) {
-                        visitorContext.fail("Bean defines an exposed type [" + name + "] that is not a parent or child class of the bean type", beanProducingElement);
-                    }
+                    visitorContext.fail("Bean defines an exposed type [" + name + "] that is not implemented by the bean type", beanProducingElement);
                 }
             }
         }

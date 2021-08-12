@@ -26,6 +26,8 @@ import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import java.util.*;
 import java.util.function.Predicate;
 
+import static io.micronaut.inject.writer.BeanDefinitionVisitor.PROXY_SUFFIX;
+
 /**
  * Stores data about an element that references a class.
  *
@@ -113,6 +115,13 @@ public interface ClassElement extends TypedElement {
      */
     default boolean isEnum() {
         return this instanceof EnumElement;
+    }
+
+    /**
+     * @return True if the class represents a proxy
+     */
+    default boolean isProxy() {
+        return getSimpleName().endsWith(PROXY_SUFFIX);
     }
 
     /**

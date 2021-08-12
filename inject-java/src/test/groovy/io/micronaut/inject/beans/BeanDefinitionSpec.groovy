@@ -112,9 +112,9 @@ class X extends Test {}
         e.message.contains("Bean defines an exposed type [limittypes.X] that is not implemented by the bean type")
     }
 
-    void "test exposed bean types with factory"() {
-        given:
-        def context = buildContext('limittypes.Test$Method0', '''
+    void "test fail compilation on exposed subclass of bean type with factory"() {
+        when:
+        buildBeanDefinition('limittypes.Test$Method0', '''
 package limittypes;
 
 import io.micronaut.context.annotation.*;
@@ -137,15 +137,11 @@ class Y implements X {
     
 }
 
-''', false)
-
-        when:
-        Class yType = context.getClassLoader().loadClass("limittypes.Y")
-        Class xType = context.getClassLoader().loadClass("limittypes.X")
+''')
 
         then:
-        context.findBean(yType).isPresent()
-        context.findBean(xType).isPresent()
+        def e = thrown(RuntimeException)
+        e.message.contains("Bean defines an exposed type [limittypes.Y] that is not implemented by the bean type")
     }
 
     void "test exposed bean types with factory invalid type"() {
@@ -173,7 +169,7 @@ class Y implements X { }
 
         then:
         def e = thrown(RuntimeException)
-        e.message.contains("Bean defines an exposed type [limittypes.Z] that is not a parent or child class of the bean type")
+        e.message.contains("Bean defines an exposed type [limittypes.Z] that is not implemented by the bean type")
     }
 
     void 'test order annotation'() {
