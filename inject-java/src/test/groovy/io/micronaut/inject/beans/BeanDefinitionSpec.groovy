@@ -90,6 +90,39 @@ class Test {
         e.message.contains("Bean defines an exposed type [java.lang.Runnable] that is not implemented by the bean type")
     }
 
+    void "test exposed types on factory with AOP"() {
+        when:
+        buildBeanDefinition('limittypes.Test$Method0', '''
+package limittypes;
+
+import io.micronaut.aop.Logged;
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Singleton;
+
+@Factory
+class Test {
+
+    @Singleton
+    @Bean(typed = {X.class})
+    @Logged
+    Y method() {
+        return new Y();
+    }
+}
+
+interface X {
+    
+}
+class Y implements X {
+    
+}
+
+''')
+
+        then:
+        noExceptionThrown()
+    }
+
     void "test fail compilation on exposed subclass of bean type"() {
         when:
         buildBeanDefinition('limittypes.Test', '''

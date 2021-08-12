@@ -43,6 +43,39 @@ class Test implements Runnable {
         reference.exposedTypes == [Runnable] as Set
     }
 
+    void "test exposed types on factory with AOP"() {
+        when:
+        buildBeanDefinition('limittypes.Test$Method0', '''
+package limittypes
+
+import io.micronaut.aop.Logged
+import io.micronaut.context.annotation.*
+import jakarta.inject.Singleton
+
+@Factory
+class Test {
+
+    @Singleton
+    @Bean(typed = X)
+    @Logged
+    Y method() {
+        new Y()
+    }
+}
+
+interface X {
+    
+}
+class Y implements X {
+    
+}
+
+''')
+
+        then:
+        noExceptionThrown()
+    }
+
     void "test fail compilation on invalid exposed bean type"() {
         when:
         buildBeanDefinition('limittypes.Test', '''
