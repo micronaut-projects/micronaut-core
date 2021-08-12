@@ -86,7 +86,8 @@ TIP: As of Micronaut 2.1.x this logic depends on the presence of the appropriate
 
 All this data is merged together into the `metadata` property for the running api:discovery.ServiceInstance[].
 
-To access the metadata for your application instance you can use the interface api:runtime.server.EmbeddedServerInstance[], and call `getMetadata()` which returns a Map of the metadata.
+
+To access the metadata for your application instance you can use the interface api:discovery.EmbeddedServerInstance[], and call `getMetadata()` which returns a Map of the metadata.
 
 If you connect remotely via a client, the instance metadata can be referenced once you have retrieved a api:io.micronaut.discovery.ServiceInstance[] from either the api:http.client.LoadBalancer[] or api:discovery.DiscoveryClient[] APIs.
 
@@ -106,7 +107,7 @@ Flowable.fromPublisher(
 );
 ----
 
-The api:runtime.server.EmbeddedServerInstance[] is available through event listeners that listen for the api:discovery.event.ServiceReadyEvent[]. The ann:runtime.event.annotation.EventListener[] annotation makes it easy to listen for the event in your beans.
+The api:discovery.EmbeddedServerInstance[] is available through event listeners that listen for the api:discovery.event.ServiceReadyEvent[]. The ann:runtime.event.annotation.EventListener[] annotation makes it easy to listen for the event in your beans.
 
 To obtain metadata for the locally running server, use an <<events,EventListener>> for the api:discovery.event.ServiceReadyEvent[]:
 
