@@ -109,7 +109,7 @@ class Y implements X {}
 
         then:
         def e = thrown(RuntimeException)
-        e.message.contains("Bean defines an exposed type [limittypes.Y] that is not a parent or child class of the bean type")
+        e.message.contains("Bean defines an exposed type [limittypes.Y] that is not implemented by the bean type")
     }
 
     void "test exposed bean types with factory invalid type"() {
