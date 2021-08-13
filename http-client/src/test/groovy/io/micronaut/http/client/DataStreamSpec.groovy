@@ -158,7 +158,6 @@ class DataStreamSpec extends Specification {
         then:
         def ex = thrown(CodecException)
         ex.message.startsWith("Cannot encode value")
-
     }
 
     void "test streaming ByteBuffer"() {
@@ -215,7 +214,22 @@ class DataStreamSpec extends Specification {
 
     void "test returning a data stream directly mapping to byte array"() {
         long bodyLength
-        client.dataStream(HttpRequest.GET("/datastream/direct"))
+        client.dataStream(HttpRequest.GET("/datastream/direct-bytes"))
+                .subscribe(buffer -> {
+                    bodyLength += buffer.toByteArray().length
+                })
+
+        expect:
+        new PollingConditions(timeout: 3).eventually {
+            assert bodyLength == 5000
+        }
+    }
+
+    @Issue(["https://github.com/micronaut-projects/micronaut-core/issues/4834",
+            "https://github.com/micronaut-projects/micronaut-core/issues/5967"])
+    void "test returning a data stream directly"() {
+        long bodyLength
+        client.dataStream(HttpRequest.GET("/datastream/direct-buffer"))
                 .subscribe(buffer -> {
                     bodyLength += buffer.toByteArray().length
                 })
@@ -259,11 +273,18 @@ class DataStreamSpec extends Specification {
             new byte[5000]
         }
 
-        @Get("/direct")
-        Flux<byte[]> direct() {
+        @Get("/direct-bytes")
+        Flux<byte[]> directBytes() {
             client.dataStream(HttpRequest.GET(
                     '/datastream/bigdata'
             )).map(buffer -> buffer.toByteArray())
+        }
+
+        @Get("/direct-buffer")
+        Flux<ByteBuffer<?>> directBuffer() {
+            client.dataStream(HttpRequest.GET(
+                    '/datastream/bigdata'
+            ))
         }
 
         @Post(uri = "/upload", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)

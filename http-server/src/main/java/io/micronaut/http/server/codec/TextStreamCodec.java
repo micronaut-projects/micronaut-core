@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecConfiguration;
@@ -180,6 +181,9 @@ public class TextStreamCodec implements MediaTypeCodec {
             byte[] line = new byte[length];
             body.read(line, 0, length);
             eventData.write(DATA_PREFIX).write(line);
+        }
+        if (body instanceof ReferenceCounted) {
+            ((ReferenceCounted) body).release();
         }
 
         // Write new lines for event separation

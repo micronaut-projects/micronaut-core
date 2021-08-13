@@ -1,1 +1,1 @@
-io.micronaut.http.client.ContextLossTrackingGlobalExtension
+io.micronaut.http.client.GlobalSpockExtension
