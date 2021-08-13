@@ -507,8 +507,9 @@ ext {
             'micronaut.rxjava3'        : [
                     version: micronautRxJava3Version,
                     group  : 'io.micronaut.rxjava3',
-                    name   : 'micronaut-rxjava3'
+                    modules : ['micronaut-rxjava3', 'micronaut-rxjava3-http-client']
             ],
+
             'micronaut.rxjava1'        : [
                     version: micronautRxJava1Version,
                     group  : 'io.micronaut.rxjava1',
