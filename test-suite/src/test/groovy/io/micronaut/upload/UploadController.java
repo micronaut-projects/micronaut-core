@@ -41,6 +41,7 @@ import org.reactivestreams.Subscription;
 
 import javax.inject.Singleton;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.ArrayList;
@@ -87,6 +88,26 @@ public class UploadController {
             return e.getMessage();
         }
     }
+
+    @Post(value = "/receive-completed-file-upload-stream", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
+    public String receiveCompletedFileUploadStream(CompletedFileUpload data) {
+        try {
+            InputStream is = data.getInputStream();
+            int size = 1024;
+            byte[] buf = new byte[size];
+            int total = 0;
+            int len;
+            while ((len = is.read(buf, 0, size)) != -1) {
+                total += len;
+            }
+            is.close();
+            is.close(); //intentionally close the stream twice to ensure it doesn't throw an exception
+            return data.getFilename() + ": " + total;
+        } catch (IOException e) {
+            return e.getMessage();
+        }
+    }
+
 
     @Post(value = "/receive-publisher", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
     public Single<HttpResponse> receivePublisher(Flowable<byte[]> data) {
