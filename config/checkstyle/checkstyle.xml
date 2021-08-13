@@ -96,6 +96,7 @@
         </module>
         <module name="JavadocType"/>
         <module name="JavadocStyle"/>
+        <module name="MissingJavadocType"/>
 
         <!-- Checks for Naming Conventions.                  -->
         <!-- See https://checkstyle.org/config_naming.html -->
@@ -164,8 +165,8 @@
         <module name="IllegalInstantiation"/>
         <module name="InnerAssignment"/>
         <!--<module name="MagicNumber">-->
-        <!--<property name="ignoreFieldDeclaration" value="true"/>-->
-        <!--<property name="ignoreHashCodeMethod" value="true"/>-->
+            <!--<property name="ignoreFieldDeclaration" value="true"/>-->
+            <!--<property name="ignoreHashCodeMethod" value="true"/>-->
         <!--</module>-->
         <module name="MissingSwitchDefault"/>
         <module name="SimplifyBooleanExpression"/>
