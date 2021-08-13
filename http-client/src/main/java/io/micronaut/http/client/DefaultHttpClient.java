@@ -1009,25 +1009,36 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         Future<Channel> channelFuture = channelPool.acquire();
                         channelFuture.addListener(future -> {
                             if (future.isSuccess()) {
-                                Channel channel = (Channel) future.get();
-                                try {
-                                    sendRequestThroughChannel(
-                                            requestWrapper,
-                                            bodyType,
-                                            errorType,
-                                            emitter,
-                                            channel,
-                                            channelPool
-                                    );
-                                } catch (Exception e) {
-                                    emitter.onError(e);
+                                if (emitter.isCancelled()) {
+                                    if (log.isTraceEnabled()) {
+                                        LOG.trace("Connection succeeded after emitter already cancelled.");
+                                    }
+                                } else {
+                                    Channel channel = (Channel) future.get();
+                                    try {
+                                        sendRequestThroughChannel(
+                                                requestWrapper,
+                                                bodyType,
+                                                errorType,
+                                                emitter,
+                                                channel,
+                                                channelPool
+                                        );
+                                    } catch (Exception e) {
+                                        emitter.onError(e);
+                                    }
                                 }
-
                             } else {
                                 Throwable cause = future.cause();
-                                emitter.onError(
-                                        new HttpClientException("Connect Error: " + cause.getMessage(), cause)
-                                );
+                                if (emitter.isCancelled()) {
+                                    if (log.isTraceEnabled()) {
+                                        LOG.trace("Connection failed after emitter already cancelled.", cause);
+                                    }
+                                } else {
+                                    emitter.onError(
+                                            new HttpClientException("Connect Error: " + cause.getMessage(), cause)
+                                    );
+                                }
                             }
                         });
                     } catch (HttpClientException e) {
@@ -1038,23 +1049,35 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     ChannelFuture connectionFuture = doConnect(request, requestURI, sslContext, false);
                     connectionFuture.addListener(future -> {
                         if (future.isSuccess()) {
-                            try {
-                                Channel channel = connectionFuture.channel();
-                                sendRequestThroughChannel(
-                                        requestWrapper,
-                                        bodyType,
-                                        errorType,
-                                        emitter,
-                                        channel,
-                                        null);
-                            } catch (Exception e) {
-                                emitter.onError(e);
+                            if (emitter.isCancelled()) {
+                                if (log.isTraceEnabled()) {
+                                    LOG.trace("Connection succeeded after emitter already cancelled.");
+                                }
+                            } else {
+                                try {
+                                    Channel channel = connectionFuture.channel();
+                                    sendRequestThroughChannel(
+                                            requestWrapper,
+                                            bodyType,
+                                            errorType,
+                                            emitter,
+                                            channel,
+                                            null);
+                                } catch (Exception e) {
+                                    emitter.onError(e);
+                                }
                             }
                         } else {
                             Throwable cause = future.cause();
-                            emitter.onError(
-                                    new HttpClientException("Connect Error: " + cause.getMessage(), cause)
-                            );
+                            if (emitter.isCancelled()) {
+                                if (log.isTraceEnabled()) {
+                                    LOG.trace("Connection failed after emitter already cancelled.", cause);
+                                }
+                            } else {
+                                emitter.onError(
+                                        new HttpClientException("Connect Error: " + cause.getMessage(), cause)
+                                );
+                            }
                         }
                     });
                 }
