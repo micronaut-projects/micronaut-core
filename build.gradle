@@ -514,10 +514,10 @@ ext {
                     group  : 'io.micronaut.rxjava1',
                     name   : 'micronaut-rxjava1'
             ],
-            'micronaut.reactor'        : [
+            'micronaut.reactor': [
                     version: micronautReactorVersion,
-                    group  : 'io.micronaut.reactor',
-                    name   : 'micronaut-reactor'
+                    group:'io.micronaut.reactor',
+                    modules : ['micronaut-reactor', 'micronaut-reactor-http-client']
             ],
             'micronaut.problem': [
                     version: micronautProblemJsonVersion,
