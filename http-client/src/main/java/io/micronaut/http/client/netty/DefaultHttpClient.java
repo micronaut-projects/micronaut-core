@@ -1112,7 +1112,6 @@ public class DefaultHttpClient implements
                                 } catch (Exception e) {
                                     emitter.onError(e);
                                 }
-
                             } else {
                                 Throwable cause = future.cause();
                                 emitter.onError(
@@ -1129,9 +1128,13 @@ public class DefaultHttpClient implements
                     addInstrumentedListener(connectionFuture, future -> {
                         if (!future.isSuccess()) {
                             Throwable cause = future.cause();
-                            emitter.onError(
-                                    new HttpClientException("Connect Error: " + cause.getMessage(), cause)
-                            );
+                            if (emitter.isCancelled()) {
+                                log.trace("Connection to {} failed, but emitter already cancelled.", requestURI, cause);
+                            } else {
+                                emitter.onError(
+                                        new HttpClientException("Connect Error: " + cause.getMessage(), cause)
+                                );
+                            }
                         } else {
                             try {
                                 sendRequestThroughChannel(
