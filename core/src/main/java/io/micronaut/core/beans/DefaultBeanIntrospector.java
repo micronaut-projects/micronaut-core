@@ -15,16 +15,17 @@
  */
 package io.micronaut.core.beans;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.beans.exceptions.IntrospectionException;
-import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import org.slf4j.Logger;
 
-import io.micronaut.core.annotation.NonNull;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -99,20 +100,12 @@ class DefaultBeanIntrospector implements BeanIntrospector {
             synchronized (this) { // double check
                 introspectionMap = this.introspectionMap;
                 if (introspectionMap == null) {
-                    introspectionMap = new HashMap<>(30);
-                    final SoftServiceLoader<BeanIntrospectionReference> services = SoftServiceLoader.load(BeanIntrospectionReference.class);
-
-                    for (ServiceDefinition<BeanIntrospectionReference> definition : services) {
-                        if (definition.isPresent()) {
-                            final BeanIntrospectionReference ref = definition.load();
-                            introspectionMap.put(ref.getName(), ref);
-                        } else {
-                            if (LOG.isDebugEnabled()) {
-                                LOG.debug("BeanIntrospection {} not loaded since associated bean is not present on the classpath", definition.getName());
-                            }
-                        }
+                    List<BeanIntrospectionReference> result = new ArrayList<>(30);
+                    SoftServiceLoader.load(BeanIntrospectionReference.class).collectAll(result);
+                    introspectionMap = new HashMap<>(result.size());
+                    for (BeanIntrospectionReference ref : result) {
+                        introspectionMap.put(ref.getName(), ref);
                     }
-
                     this.introspectionMap = introspectionMap;
                 }
             }

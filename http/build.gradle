@@ -8,6 +8,7 @@ dependencies {
     api project(":inject")
     api project(":core-reactive")
     compileOnly "org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinCoroutinesVersion"
+    compileOnly "org.graalvm.nativeimage:svm:$graalVersion"
 
     testCompileOnly project(":inject-groovy")
     testAnnotationProcessor project(":inject-java")

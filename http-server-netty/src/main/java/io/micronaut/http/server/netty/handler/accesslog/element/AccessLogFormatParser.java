@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
-import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
 import io.netty.channel.ChannelHandlerContext;
@@ -83,7 +82,7 @@ public class AccessLogFormatParser {
      */
     public static final String COMMON_LOG_FORMAT = "%h %l %u %t \"%r\" %s %b";
 
-    private static final List<LogElementBuilder> LOG_ELEMENT_BUILDERS;
+    private static List<LogElementBuilder> LOG_ELEMENT_BUILDERS;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AccessLogFormatParser.class);
 
@@ -94,24 +93,20 @@ public class AccessLogFormatParser {
     private final List<IndexedLogElement> constantElements = new ArrayList<>();
     private String[] elements;
 
-    static {
-        SoftServiceLoader<LogElementBuilder> builders = SoftServiceLoader.load(LogElementBuilder.class, LogElementBuilder.class.getClassLoader());
-        LOG_ELEMENT_BUILDERS = new ArrayList<>();
-        for (ServiceDefinition<LogElementBuilder> definition : builders) {
-            if (definition.isPresent()) {
-                LOG_ELEMENT_BUILDERS.add(definition.load());
-            }
-        }
-        OrderUtil.sort(LOG_ELEMENT_BUILDERS);
-        trimToSize(LOG_ELEMENT_BUILDERS);
-    }
-
     /**
      * Creates an AccessLogFormatParser.
      *
      * @param spec The log format. When null the Common Log Format is used.
      */
     public AccessLogFormatParser(String spec) {
+        if (LOG_ELEMENT_BUILDERS == null) {
+            List<LogElementBuilder> logElements = new ArrayList<>();
+            SoftServiceLoader.load(LogElementBuilder.class, LogElementBuilder.class.getClassLoader())
+                    .collectAll(logElements);
+            OrderUtil.sort(logElements);
+            trimToSize(logElements);
+            LOG_ELEMENT_BUILDERS = logElements;
+        }
         parse(spec);
     }
 

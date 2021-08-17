@@ -18,6 +18,7 @@ package io.micronaut.core.type;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.io.service.SoftServiceLoader;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -29,7 +30,6 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
-import java.util.ServiceLoader;
 
 /**
  * Abstracts how types are interpreted by the core API.
@@ -46,12 +46,8 @@ final class RuntimeTypeInformation {
         WRAPPER_TO_TYPE.put(OptionalDouble.class, Argument.DOUBLE);
         WRAPPER_TO_TYPE.put(OptionalLong.class, Argument.LONG);
         WRAPPER_TO_TYPE.put(OptionalInt.class, Argument.INT);
-        final ServiceLoader<TypeInformationProvider> loader = ServiceLoader.load(TypeInformationProvider.class);
-        List<TypeInformationProvider> informationProviders = new ArrayList<>(2);
-        for (TypeInformationProvider informationProvider : loader) {
-            informationProviders.add(informationProvider);
-        }
-
+        List<TypeInformationProvider> informationProviders = new ArrayList<>(3);
+        SoftServiceLoader.load(TypeInformationProvider.class).collectAll(informationProviders);
         TYPE_INFORMATION_PROVIDERS = Collections.unmodifiableList(informationProviders);
     }
 

@@ -9,6 +9,8 @@ dependencies {
     api project(':core')
     api dependencyVersion("snakeyaml")
 
+    compileOnly "org.graalvm.nativeimage:svm:$graalVersion"
+
     compileOnly "javax.persistence:javax.persistence-api:2.2"
     compileOnly dependencyModuleVersion("groovy", "groovy")
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"

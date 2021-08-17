@@ -15,6 +15,8 @@
  */
 package io.micronaut.core.io.service;
 
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.reflect.ClassUtils;
@@ -24,8 +26,10 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -56,6 +60,8 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     private final Iterator<ServiceDefinition<S>> unloadedServices;
     private final Predicate<String> condition;
 
+    private static final Map<Class<?>, List<?>> PRE_CACHED = new HashMap<>();
+
     private SoftServiceLoader(Class<S> serviceType, ClassLoader classLoader) {
         this(serviceType, classLoader, (String name) -> true);
     }
@@ -65,6 +71,21 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         this.classLoader = classLoader == null ? ClassLoader.getSystemClassLoader() : classLoader;
         this.unloadedServices = new ServiceLoaderIterator();
         this.condition = condition == null ? (String name) -> true : condition;
+    }
+
+    @Internal
+    @Experimental
+    public static <S> List<S> preCache(Class<S> serviceClass, ClassLoader classLoader) {
+        return preCache(serviceClass, null, classLoader);
+    }
+
+    @Internal
+    @Experimental
+    public static <S> List<S> preCache(Class<S> serviceClass, Predicate<S> predicate, ClassLoader classLoader) {
+        List<S> result = new ArrayList<>();
+        new SoftServiceLoader<>(serviceClass, classLoader).collectAll(result, predicate);
+        PRE_CACHED.put(serviceClass, result);
+        return result;
     }
 
     /**
@@ -142,9 +163,24 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * @param predicate The predicated to filter the instances or null if not needed.
      */
     public void collectAll(@NonNull Collection<S> values, @Nullable Predicate<S> predicate) {
-        ServicesLoader<S> servicesLoader = new ServicesLoader<>(serviceType.getName(), condition, classLoader, predicate);
-        ForkJoinPool.commonPool().invoke(servicesLoader);
-        servicesLoader.collect(values);
+        List<S> preCached = (List<S>) PRE_CACHED.get(serviceType);
+        if (preCached != null) {
+            System.out.println("CACHE HIT: " + serviceType);
+            if (predicate == null) {
+                values.addAll(preCached);
+            } else {
+                for (S value : preCached) {
+                    if (predicate.test(value)) {
+                        values.add(value);
+                    }
+                }
+            }
+        } else {
+            System.out.println("CACHE MISS: " + serviceType);
+            ServicesLoader<S> servicesLoader = new ServicesLoader<>(serviceType.getName(), condition, classLoader, predicate);
+            ForkJoinPool.commonPool().invoke(servicesLoader);
+            servicesLoader.collect(values);
+        }
     }
 
     /**
@@ -399,6 +435,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                     result = null;
                 }
             } catch (NoClassDefFoundError | ClassNotFoundException e) {
+                System.out.println("NOT FOUND ON SERVICE LOAD: " + e.getMessage());
                 // Ignore
             } catch (Throwable e) {
                 throwable = e;
