@@ -4,18 +4,20 @@ package io.micronaut.http.client
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
-import io.reactivex.Single
+import jakarta.inject.Inject
+import org.reactivestreams.Publisher
 import org.spockframework.runtime.IStandardStreamsListener
 import org.spockframework.runtime.StandardStreamsCapturer
+import reactor.core.publisher.Mono
 import spock.lang.Issue
 import spock.lang.Specification
 
-import javax.inject.Inject
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 
@@ -26,7 +28,7 @@ class ClientTimeoutSpec extends Specification {
 
     @Inject
     @Client('/')
-    RxHttpClient client
+    HttpClient client
 
     def 'test that UndeliverableException is not output to console'() {
         setup:
@@ -40,7 +42,7 @@ class ClientTimeoutSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == 'Internal Server Error: The source did not signal an event for 1 seconds and has been terminated.'
+        ex.response.getBody(Map).get()._embedded.errors[0].message.contains('Internal Server Error: Did not observe any item or terminal signal within 1000ms')
 
         and: 'wait for System.err messages to come in'
         Thread.sleep(2000)
@@ -71,9 +73,10 @@ class TimeoutController {
     TimeoutClient client
 
     @Get
-    Single<String> get() {
+    @SingleResult
+    Publisher<String> get() {
         // Client will timeout in 2s (see TimeoutClientConfiguration below); we timeout the stream in 1s.
-        client.get().timeout(1, TimeUnit.SECONDS)
+        Mono.from(client.get()).timeout(Duration.ofSeconds(1))
     }
 }
 
@@ -82,7 +85,7 @@ class TimeoutController {
 @Client(value = 'http://www.google.com:81/', configuration = TimeoutClientConfiguration)
 interface TimeoutClient {
     @Get
-    Single<String> get();
+    Publisher<String> get();
 }
 
 @ConfigurationProperties(PREFIX)

@@ -22,6 +22,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.multipart.MultipartBody
 import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.Retry
 
 import java.security.MessageDigest
@@ -404,13 +405,13 @@ class DiskUploadSpec extends AbstractMicronautSpec {
                 .build()
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Mono<HttpResponse<String>> flowable = Mono.from(client.exchange(
                 HttpRequest.POST("/upload/receive-completed-file-upload-stream", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
+        HttpResponse<String> response = flowable.block()
         def result = response.getBody().get()
 
         then:
