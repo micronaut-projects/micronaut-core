@@ -563,6 +563,30 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         calculateMd5(file.toPath()) == originalmd5
     }
 
+    void "test reading a CompletedFileUpload input stream and closing it multiple times"() {
+        given:
+        def data = '{"title":"Test"}'
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("title", "bar")
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
+                .build()
+
+
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receive-completed-file-upload-stream", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+        def result = response.getBody().get()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        result == 'data.json: 16'
+    }
+
     @Override
     Map<String, Object> getConfiguration() {
         super.getConfiguration() << [
