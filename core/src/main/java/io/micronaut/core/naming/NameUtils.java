@@ -337,24 +337,31 @@ public class NameUtils {
         if (name == null) {
             return null;
         }
-
-        // The rule for decapitalize is that:
-        // If the first letter of the string is Upper Case, make it lower case
-        // UNLESS the second letter of the string is also Upper Case, in which case no
-        // changes are made.
-        switch (name.length()) {
-            case 0:
-                return name;
-            case 1:
-                return Character.isUpperCase(name.charAt(0)) ? Character.toString(Character.toLowerCase(name.charAt(0))) : name;
-            default:
-                if (!Character.isUpperCase(name.charAt(0)) || Character.isUpperCase(name.charAt(1))) {
-                    return name;
-                }
-                char[] chars = name.toCharArray();
-                chars[0] = Character.toLowerCase(chars[0]);
-                return new String(chars);
+        int length = name.length();
+        if (length == 0) {
+            return name;
         }
+        // Decapitalizes the first character if a lower case
+        // letter is found within 2 characters after the first
+        // Abc -> abc
+        // AB  -> AB
+        // ABC -> ABC
+        // ABc -> aBc
+        boolean firstUpper = Character.isUpperCase(name.charAt(0));
+        if (firstUpper) {
+            if (length == 1) {
+                return Character.toString(Character.toLowerCase(name.charAt(0)));
+            }
+            for (int i = 1; i < Math.min(length, 3); i++) {
+                if (Character.isLowerCase(name.charAt(i))) {
+                    char[] chars = name.toCharArray();
+                    chars[0] = Character.toLowerCase(chars[0]);
+                    return new String(chars);
+                }
+            }
+        }
+
+        return name;
     }
 
     private static String separateCamelCase(String name, boolean lowerCase, char separatorChar) {

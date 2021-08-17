@@ -22,10 +22,10 @@ import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.util.Attribute;
-import io.reactivex.BackpressureStrategy;
-import io.reactivex.Flowable;
-
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
 import java.util.function.Predicate;
 
 /**
@@ -57,8 +57,8 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
         WebSocketFrame frame = webSocketMessageEncoder.encodeMessage(message, mediaType);
         try {
             webSocketSessionRepository.getChannelGroup().writeAndFlush(frame, ch -> {
-                Attribute<NettyRxWebSocketSession> attr = ch.attr(NettyRxWebSocketSession.WEB_SOCKET_SESSION_KEY);
-                NettyRxWebSocketSession s = attr.get();
+                Attribute<NettyWebSocketSession> attr = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY);
+                NettyWebSocketSession s = attr.get();
                 return s != null && s.isOpen() && filter.test(s);
             }).sync();
         } catch (InterruptedException e) {
@@ -67,26 +67,26 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
     }
 
     @Override
-    public <T> Flowable<T> broadcast(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
-        return Flowable.create(emitter -> {
+    public <T> Publisher<T> broadcast(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
+        return Flux.create(emitter -> {
             try {
                 WebSocketFrame frame = webSocketMessageEncoder.encodeMessage(message, mediaType);
                 webSocketSessionRepository.getChannelGroup().writeAndFlush(frame, ch -> {
-                    Attribute<NettyRxWebSocketSession> attr = ch.attr(NettyRxWebSocketSession.WEB_SOCKET_SESSION_KEY);
-                    NettyRxWebSocketSession s = attr.get();
+                    Attribute<NettyWebSocketSession> attr = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY);
+                    NettyWebSocketSession s = attr.get();
                     return s != null && s.isOpen() && filter.test(s);
                 }).addListener(future -> {
                     if (future.isSuccess()) {
-                        emitter.onNext(message);
-                        emitter.onComplete();
+                        emitter.next(message);
+                        emitter.complete();
                     } else {
                         Throwable cause = future.cause();
-                        emitter.onError(new WebSocketSessionException("Broadcast Failure: " + cause.getMessage(), cause));
+                        emitter.error(new WebSocketSessionException("Broadcast Failure: " + cause.getMessage(), cause));
                     }
                 });
             } catch (Throwable e) {
-                emitter.onError(new WebSocketSessionException("Broadcast Failure: " + e.getMessage(), e));
+                emitter.error(new WebSocketSessionException("Broadcast Failure: " + e.getMessage(), e));
             }
-        }, BackpressureStrategy.BUFFER);
+        }, FluxSink.OverflowStrategy.BUFFER);
     }
 }

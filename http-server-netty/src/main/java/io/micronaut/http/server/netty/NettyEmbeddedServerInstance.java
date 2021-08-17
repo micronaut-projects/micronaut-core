@@ -22,11 +22,11 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.discovery.EmbeddedServerInstance;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadata;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadataResolver;
 import io.micronaut.discovery.metadata.ServiceInstanceMetadataContributor;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.micronaut.discovery.EmbeddedServerInstance;
 
 import java.net.URI;
 import java.util.HashMap;

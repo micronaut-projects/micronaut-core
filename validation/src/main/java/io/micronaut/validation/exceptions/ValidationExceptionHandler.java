@@ -19,17 +19,17 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.JsonError;
+import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.exceptions.response.Error;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
+import jakarta.inject.Singleton;
 import org.grails.datastore.mapping.validation.ValidationException;
 import org.springframework.validation.Errors;
 import org.springframework.validation.FieldError;
 
-import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
@@ -43,15 +43,6 @@ import java.util.Optional;
 public class ValidationExceptionHandler implements ExceptionHandler<ValidationException, HttpResponse<?>> {
 
     private final ErrorResponseProcessor<?> responseProcessor;
-
-    /**
-     * Constructor.
-     * @deprecated Use {@link ValidationExceptionHandler(ErrorResponseProcessor)} instead.
-     */
-    @Deprecated
-    public ValidationExceptionHandler() {
-        this.responseProcessor = null;
-    }
 
     /**
      * Constructor.

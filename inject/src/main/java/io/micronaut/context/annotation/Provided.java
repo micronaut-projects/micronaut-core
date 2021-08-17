@@ -15,9 +15,10 @@
  */
 package io.micronaut.context.annotation;
 
+import jakarta.inject.Scope;
+
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import javax.inject.Scope;
 import java.lang.annotation.Retention;
 
 /**
@@ -29,8 +30,10 @@ import java.lang.annotation.Retention;
  * @see Bean
  * @see Factory
  * @since 1.0
+ * @deprecated Use the typed member of the {@link Bean} annotation instead
  */
 @Scope
 @Retention(RUNTIME)
+@Deprecated
 public @interface Provided {
 }

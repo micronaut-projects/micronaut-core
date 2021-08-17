@@ -20,8 +20,8 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.convert.format.MapFormat;
 
 import io.micronaut.core.annotation.Nullable;
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import java.util.Map;
 
 @Requires(property = "spec.name", value = "PropertyAnnotationSpec")

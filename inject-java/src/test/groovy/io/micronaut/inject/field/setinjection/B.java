@@ -15,7 +15,8 @@
  */
 package io.micronaut.inject.field.setinjection;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
+
 import java.util.Set;
 
 public class B {

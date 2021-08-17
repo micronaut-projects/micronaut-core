@@ -53,11 +53,17 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private String[] overrideConfigLocations;
     private boolean banner = true;
     private ClassPathResourceLoader classPathResourceLoader;
+    private boolean allowEmptyProviders = false;
 
     /**
      * Default constructor.
      */
     protected DefaultApplicationContextBuilder() {
+    }
+
+    @Override
+    public boolean isAllowEmptyProviders() {
+        return allowEmptyProviders;
     }
 
     @NonNull
@@ -327,6 +333,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public @NonNull ApplicationContextBuilder banner(boolean isEnabled) {
         this.banner = isEnabled;
+        return this;
+    }
+
+    @Override
+    public ApplicationContextBuilder allowEmptyProviders(boolean shouldAllow) {
+        this.allowEmptyProviders = shouldAllow;
         return this;
     }
 }

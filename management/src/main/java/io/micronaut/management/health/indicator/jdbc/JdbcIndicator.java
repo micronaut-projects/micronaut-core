@@ -26,11 +26,11 @@ import io.micronaut.management.health.aggregator.HealthAggregator;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
 import io.micronaut.scheduling.TaskExecutors;
-import io.reactivex.Flowable;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
-import javax.inject.Named;
-import javax.inject.Singleton;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -122,9 +122,9 @@ public class JdbcIndicator implements HealthIndicator {
     @Override
     public Publisher<HealthResult> getResult() {
         if (dataSources.length == 0) {
-            return Flowable.empty();
+            return Flux.empty();
         }
-        return healthAggregator.aggregate(NAME, Flowable.merge(
+        return healthAggregator.aggregate(NAME, Flux.merge(
             Arrays.stream(dataSources)
                     .map(dataSourceResolver::resolve)
                     .map(this::getResult).collect(Collectors.toList())

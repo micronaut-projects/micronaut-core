@@ -15,8 +15,8 @@
  */
 package io.micronaut.tracing.instrument.http;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
@@ -31,7 +31,6 @@ import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.noop.NoopTracer;
 import io.opentracing.propagation.Format;
-import org.jetbrains.annotations.NotNull;
 import org.reactivestreams.Publisher;
 
 /**
@@ -89,7 +88,7 @@ public class OpenTracingServerFilter extends AbstractOpenTracingFilter implement
             }
 
             @Override
-            protected void doOnError(@NotNull Throwable throwable, @NotNull Span span) {
+            protected void doOnError(@NonNull Throwable throwable, @NonNull Span span) {
                 request.setAttribute(CONTINUE, true);
                 setErrorTags(span, throwable);
             }
@@ -111,7 +110,7 @@ public class OpenTracingServerFilter extends AbstractOpenTracingFilter implement
         return ServerFilterPhase.TRACING.order();
     }
 
-    private @NotNull SpanContext initSpanContext(@NotNull HttpRequest<?> request) {
+    private @NonNull SpanContext initSpanContext(@NonNull HttpRequest<?> request) {
         request.setAttribute(APPLIED, true);
         SpanContext spanContext = tracer.extract(
                 Format.Builtin.HTTP_HEADERS,

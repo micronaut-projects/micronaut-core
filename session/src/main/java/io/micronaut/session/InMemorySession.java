@@ -15,10 +15,10 @@
  */
 package io.micronaut.session;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 
-import io.micronaut.core.annotation.NonNull;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;

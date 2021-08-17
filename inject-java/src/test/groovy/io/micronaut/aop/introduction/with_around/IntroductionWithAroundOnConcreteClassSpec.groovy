@@ -1,19 +1,37 @@
 package io.micronaut.aop.introduction.with_around
 
-
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.beans.BeanIntrospection
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
-class IntroductionWithAroundOnConcreteClassSpec extends Specification {
+class IntroductionWithAroundOnConcreteClassSpec extends AbstractTypeElementSpec {
 
     @Shared
     @AutoCleanup
     ApplicationContext applicationContext = ApplicationContext.run()
+
+    void "test introduction with around compile"() {
+        given:
+        def context = buildContext('aroundwithintro.Test', '''
+package aroundwithintro;
+
+import io.micronaut.aop.introduction.with_around.ProxyIntroductionAndAroundOneAnnotation;
+
+@ProxyIntroductionAndAroundOneAnnotation
+class Test{}
+''', true)
+        expect:
+        getBean(context, 'aroundwithintro.Test')
+
+        cleanup:
+        context.close()
+    }
 
     @Unroll
     void "test introduction with around for #clazz"(Class clazz) {
@@ -67,12 +85,19 @@ class IntroductionWithAroundOnConcreteClassSpec extends Specification {
 
     void "test executable methods count for around with executable"() {
         when:
-            def clazz = MyBean8.class
-            def proxyTargetBeanDefinition = applicationContext.getProxyTargetBeanDefinition(clazz, null)
-            def beanDefinition = applicationContext.getBeanDefinition(clazz, null)
+        def clazz = MyBean8.class
+        def proxyTargetBeanDefinition = applicationContext.getProxyTargetBeanDefinition(clazz, null)
+        def beanDefinition = applicationContext.getBeanDefinition(clazz, null)
+
         then:
-            proxyTargetBeanDefinition.getExecutableMethods().size() == 4
-            beanDefinition.getExecutableMethods().size() == 4
+        proxyTargetBeanDefinition.getExecutableMethods().size() == 4
+        beanDefinition.getExecutableMethods().size() == 4
+
+        when:
+        MyBean8 myBean8 = applicationContext.getBean(clazz)
+
+        then:
+        myBean8.getId() == 1L
     }
 
     void "test a multidimensional array property"() {

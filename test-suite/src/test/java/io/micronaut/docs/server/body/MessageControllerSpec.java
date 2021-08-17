@@ -63,7 +63,7 @@ public class MessageControllerSpec {
     public void testEchoReactiveResponse() {
         String body = "My Text";
         String response = client.toBlocking().retrieve(
-                HttpRequest.POST("/receive/echo-flow", body)
+                HttpRequest.POST("/receive/echo-publisher", body)
                         .contentType(MediaType.TEXT_PLAIN_TYPE), String.class);
 
         assertEquals(body, response);

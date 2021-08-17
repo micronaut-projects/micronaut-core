@@ -1,10 +1,14 @@
-The previous section introduced the notion of Reactive programming using RxJava 2.x and Micronaut.
+The previous section introduced the notion of Reactive programming using https://projectreactor.io[Project Reactor] and Micronaut.
 
-Micronaut supports returning common reactive types such as rx:Single[] or rx:Observable[] (or the `Mono` type from Reactor 3.x), an instance of rs:Publisher[] or jdk:java.util.concurrent.CompletableFuture[] from any controller method.
+Micronaut supports returning common reactive types such as reactor:Mono[] (or rx:Single[] rx:Maybe[] rx:Observable[] types from RxJava), an instance of rs:Publisher[] or jdk:java.util.concurrent.CompletableFuture[] from any controller method.
+
+NOTE: To use https://projectreactor.io[Project Reactor]'s `Flux` or `Mono` you need to add the Micronaut Reactor dependency to your project to include the necessary converters.
+
+NOTE: To use https://github.com/ReactiveX/RxJava[RxJava]'s `Flowable`, `Single` or `Maybe` you need to add the Micronaut RxJava dependency to your project to include the necessary converters.
 
 The argument designated as the body of the request using the api:http.annotation.Body[] annotation can also be a reactive type or a jdk:java.util.concurrent.CompletableFuture[].
 
-When returning a reactive type, Micronaut subscribes to the returned reactive type on the same thread as the request (a Netty Event Loop thread). It is therefore important that if you perform any blocking operations, you offload those operations to an appropriately configured thread pool, for example using the RxJava `subscribeOn(..)` facility or ann:scheduling.annotation.ExecuteOn[].
+When returning a reactive type, Micronaut subscribes to the returned reactive type on the same thread as the request (a Netty Event Loop thread). It is therefore important that if you perform any blocking operations, you offload those operations to an appropriately configured thread pool, for example using the https://projectreactor.io[Project Reactor] or https://github.com/ReactiveX/RxJava[RxJava] `subscribeOn(..)` facility or ann:scheduling.annotation.ExecuteOn[].
 
 TIP: See the section on <<threadPools, Configuring Thread Pools>> for information on the thread pools that Micronaut sets up and how to configure them.
 
@@ -16,7 +20,7 @@ To summarize, the following table illustrates some common response types and the
 
 |rs:Publisher[]
 |Any type that implements the rs:Publisher[] interface
-|`Flowable<String> hello()`
+|`Publisher<String> hello()`
 
 |jdk:java.util.concurrent.CompletableFuture[]
 |A Java `CompletableFuture` instance
@@ -24,7 +28,7 @@ To summarize, the following table illustrates some common response types and the
 
 |api:http.HttpResponse[]
 |An api:http.HttpResponse[] and optional response body
-|`HttpResponse<Flowable<String>> hello()`
+|`HttpResponse<Publisher<String>> hello()`
 
 |jdk:java.lang.CharSequence[]
 |Any implementation of `CharSequence`
@@ -35,4 +39,4 @@ To summarize, the following table illustrates some common response types and the
 |`Book show()`
 |===
 
-NOTE: When returning a Reactive type, its type affects the returned response. For example, when returning a rx:Flowable[], Micronaut cannot know the size of the response, so `Transfer-Encoding` type of `Chunked` is used. Whilst for types that emit a single result such as `rx:Single[]` the `Content-Length` header is populated.
+NOTE: When returning a Reactive type, its type affects the returned response. For example, when returning a reactor:Flux[], Micronaut cannot know the size of the response, so `Transfer-Encoding` type of `Chunked` is used. Whilst for types that emit a single result such as `reactor:Mono[]` the `Content-Length` header is populated.

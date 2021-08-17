@@ -19,10 +19,18 @@ import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.AstMessageUtils
+import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
+import io.micronaut.ast.groovy.utils.InMemoryClassWriterOutputVisitor
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.order.OrderUtil
+import io.micronaut.core.util.CollectionUtils
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
+import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder
+import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
+import io.micronaut.inject.writer.BeanDefinitionWriter
+import io.micronaut.inject.writer.ClassWriterOutputVisitor
+import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
@@ -61,7 +69,32 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
             }
         }
 
+        final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = TypeElementVisitorTransform.beanDefinitionBuilders
+        if (beanDefinitionBuilders) {
+            File classesDir = compilationUnit.configuration.targetDirectory
+            ClassWriterOutputVisitor classWriterOutputVisitor
+            if (source.classLoader instanceof InMemoryByteCodeGroovyClassLoader) {
+                classWriterOutputVisitor = new InMemoryClassWriterOutputVisitor(source.classLoader as InMemoryByteCodeGroovyClassLoader)
+            } else {
+                classWriterOutputVisitor = new DirectoryClassWriterOutputVisitor(classesDir)
+            }
+            try {
+                AbstractBeanDefinitionBuilder.writeBeanDefinitionBuilders(
+                        classWriterOutputVisitor,
+                        beanDefinitionBuilders
+                )
+            } catch (IOException e) {
+                // raise a compile error
+                AstMessageUtils.error(
+                        source,
+                        source.getAST(),
+                        "Error writing bean definitions: $e.message")
+            }
+            classWriterOutputVisitor.finish()
+        }
+
         TypeElementVisitorTransform.loadedVisitors = null
+        TypeElementVisitorTransform.beanDefinitionBuilders.clear()
         AstAnnotationUtils.invalidateCache()
         AbstractAnnotationMetadataBuilder.clearMutated()
     }

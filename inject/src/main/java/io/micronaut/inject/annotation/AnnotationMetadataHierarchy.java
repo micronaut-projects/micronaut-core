@@ -16,6 +16,7 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -23,8 +24,10 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.value.OptionalValues;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 /**
  * Used to represent an annotation metadata hierarchy. The first {@link AnnotationMetadata} instance passed
@@ -103,6 +106,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
      * @return The metadata that is actually declared in the element
      */
     @NonNull
+    @Override
     public AnnotationMetadata getDeclaredMetadata() {
         return hierarchy[0];
     }
@@ -127,6 +131,59 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         } else {
             return child;
         }
+    }
+
+    @Nullable
+    @Override
+    public <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+        for (AnnotationMetadata annotationMetadata : hierarchy) {
+            final T a = annotationMetadata.synthesize(annotationClass, sourceAnnotation);
+            if (a != null) {
+                return a;
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public Annotation[] synthesizeAll() {
+        return Stream.of(hierarchy).flatMap(am -> Arrays.stream(am.synthesizeAll())).toArray(Annotation[]::new);
+    }
+
+    @Override
+    public Annotation[] synthesizeDeclared() {
+        return Stream.of(hierarchy).flatMap(am -> Arrays.stream(am.synthesizeDeclared())).toArray(Annotation[]::new);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T extends Annotation> T[] synthesizeAnnotationsByType(Class<T> annotationClass) {
+        if (annotationClass == null) {
+            return (T[]) AnnotationUtil.ZERO_ANNOTATIONS;
+        }
+        return Stream.of(hierarchy)
+                .flatMap(am -> am.getAnnotationValuesByType(annotationClass).stream())
+                .distinct()
+                .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, entries))
+                        .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(Class<T> annotationClass) {
+        if (annotationClass == null) {
+            return (T[]) AnnotationUtil.ZERO_ANNOTATIONS;
+        }
+        return Stream.of(hierarchy)
+                .flatMap(am -> am.getAnnotationValuesByType(annotationClass).stream())
+                .distinct()
+                .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, entries))
+                .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
+    }
+
+    @Nullable
+    @Override
+    public <T extends Annotation> T synthesizeDeclared(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+        return hierarchy[0].synthesize(annotationClass, sourceAnnotation);
     }
 
     @Nullable
@@ -192,6 +249,12 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @NonNull
     @Override
     public String[] stringValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
+        return stringValues(annotation.getName(), member);
+    }
+
+    @NonNull
+    @Override
+    public String[] stringValues(@NonNull String annotation, @NonNull String member) {
         String[] values = hierarchy[0].stringValues(annotation, member);
         for (int i = 1; i < hierarchy.length; i++) {
             AnnotationMetadata annotationMetadata = hierarchy[i];
@@ -704,6 +767,19 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         return ArrayUtils.toArray(strings, String[]::new);
     }
 
+    @Override
+    public String[] stringValues(String annotation, String member, Function<Object, Object> valueMapper) {
+        List<String> strings = new ArrayList<>();
+        for (AnnotationMetadata am : hierarchy) {
+            if (am instanceof EnvironmentAnnotationMetadata) {
+                strings.addAll(Arrays.asList(((EnvironmentAnnotationMetadata) am).stringValues(annotation, member, valueMapper)));
+            } else {
+                strings.addAll(Arrays.asList(am.stringValues(annotation, member)));
+            }
+        }
+        return ArrayUtils.toArray(strings, String[]::new);
+    }
+
     @NonNull
     @Override
     public Optional<String> stringValue(@NonNull String annotation, @NonNull String member, @Nullable Function<Object, Object> valueMapper) {
@@ -795,5 +871,15 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
             }
         }
         return Optional.empty();
+    }
+
+    @Override
+    public boolean isEmpty() {
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (!metadata.isEmpty()) {
+                return false;
+            }
+        }
+        return true;
     }
 }

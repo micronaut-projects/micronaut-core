@@ -13,6 +13,7 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.NamedAnnotationMapper
 import io.micronaut.inject.visitor.VisitorContext
+import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Issue
 
 import java.lang.annotation.Annotation
@@ -26,7 +27,7 @@ package mapperbinding;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 @Singleton
@@ -73,7 +74,7 @@ package annbinding2;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import io.micronaut.aop.simple.*;
 
@@ -152,7 +153,7 @@ package annbinding1;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 @Singleton
@@ -164,11 +165,12 @@ class MyBean {
 
 @Retention(RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE})
-@Around
+@InterceptorBinding
 @interface TestAnn {
 }
 
-@InterceptorBean(TestAnn.class)
+@Singleton
+@InterceptorBinding(TestAnn.class)
 class TestInterceptor implements Interceptor {
     boolean invoked = false;
     @Override
@@ -209,7 +211,7 @@ package justaround;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 @Singleton
@@ -267,7 +269,7 @@ package around.priv.method;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 @Singleton
@@ -296,7 +298,7 @@ package test;
 
 import io.micronaut.aop.proxytarget.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Mutating("someVal")
 class MyBean {
     byte[] test(byte[] someVal) {
@@ -319,7 +321,7 @@ package test;
 
 import io.micronaut.aop.simple.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Mutating("someVal")
 @TestBinding
 class MyBean {
@@ -332,7 +334,7 @@ package test;
 
 import io.micronaut.aop.simple.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Mutating("someVal")
 @TestBinding
 class MyBean {
@@ -365,7 +367,7 @@ package annbinding2;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import io.micronaut.aop.simple.*;
 
@@ -434,7 +436,7 @@ package annbinding2;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import io.micronaut.aop.simple.*;
 
@@ -492,7 +494,7 @@ package annbinding2;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import io.micronaut.aop.simple.*;
 
@@ -555,7 +557,7 @@ class TestInterceptor implements Interceptor {
 
     void "test validated on class with generics"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.$BaseEntityServiceDefinition$Intercepted', """
+        BeanDefinition beanDefinition = buildBeanDefinition('test.$BaseEntityService' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, """
 package test;
 
 @io.micronaut.validation.Validated

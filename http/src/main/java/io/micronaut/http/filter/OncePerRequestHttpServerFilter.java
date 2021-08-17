@@ -24,29 +24,31 @@ import org.reactivestreams.Publisher;
  * A filter that is only executed once per request. A filter may be executed more
  * than once per request if the original route throws an exception.
  *
+ * @deprecated All filters are executed once per request starting in Micronaut 3.0. Directly mplement
+ * {@link HttpServerFilter} instead of extending this class and replace any usages of `micronaut.once`
+ * attributes with a custom attribute name.
  * @author Graeme Rocher
  * @since 1.0
  */
+@Deprecated
 public abstract class OncePerRequestHttpServerFilter implements HttpServerFilter {
 
     @Override
     public final Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
         String attributeKey = getKey(getClass());
         MutableConvertibleValues<Object> attrs = request.getAttributes();
-        if (attrs.contains(attributeKey)) {
-            return chain.proceed(request);
-        } else {
-            attrs.put(attributeKey, true);
-            return doFilterOnce(request, chain);
-        }
+        attrs.put(attributeKey, true);
+        return doFilterOnce(request, chain);
     }
 
     /**
      * Obtain the key used to store the attribute within a request.
      *
+     * @deprecated Implement custom keys for request attributes based on the need of the filter.
      * @param filterClass the filter class
      * @return The key
      */
+    @Deprecated
     public static String getKey(Class<? extends OncePerRequestHttpServerFilter> filterClass) {
         return "micronaut.once." + filterClass.getSimpleName();
     }

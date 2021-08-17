@@ -18,6 +18,7 @@ package io.micronaut.annotation.processing.test
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.Qualifier
+import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.core.naming.NameUtils
@@ -25,7 +26,9 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import org.intellij.lang.annotations.Language
 import spock.lang.Specification
-
+import io.micronaut.inject.provider.BeanProviderDefinition
+import io.micronaut.inject.provider.JakartaProviderBeanDefinition
+import io.micronaut.aop.internal.InterceptorRegistryBean
 import java.util.function.Predicate
 import java.util.stream.Collectors
 
@@ -54,7 +57,7 @@ class AbstractKotlinCompilerSpec extends Specification {
      *
      * @return the introspection if it is correct
      */
-    protected ApplicationContext buildContext(String className, @Language("kotlin") String cls) {
+    protected ApplicationContext buildContext(String className, @Language("kotlin") String cls, boolean includeAllBeans = false) {
         def result = KotlinCompileHelper.INSTANCE.run(className, cls)
         ClassLoader classLoader = result.classLoader
 
@@ -63,10 +66,15 @@ class AbstractKotlinCompilerSpec extends Specification {
             protected List<BeanDefinitionReference> resolveBeanDefinitionReferences(Predicate<BeanDefinitionReference> predicate) {
                 // we want only the definitions we just compiled
                 def stream = result.fileNames.stream()
-                        .filter(s -> s.endsWith("DefinitionClass.class"))
+                        .filter(s -> s.endsWith('$Definition$Reference.class'))
                         .map(n -> classLoader.loadClass(n.substring(0, n.size() - 6).replace('/', '.')).newInstance())
                 if (predicate != null) stream = stream.filter(predicate)
-                return stream.collect(Collectors.toList())
+                return stream.collect(Collectors.toList()) + (includeAllBeans ? super.resolveBeanDefinitionReferences(predicate) : [
+                        new InterceptorRegistryBean(),
+                        new BeanProviderDefinition(),
+                        new JakartaProviderBeanDefinition(),
+                        new ApplicationEventPublisherFactory<>()
+                ])
             }
         }.start()
     }
@@ -76,7 +84,7 @@ class AbstractKotlinCompilerSpec extends Specification {
     }
 
     protected BeanDefinition buildBeanDefinition(String className, @Language("kotlin") String cls) {
-        def beanDefName= '$' + NameUtils.getSimpleName(className) + 'Definition'
+        def beanDefName= '$' + NameUtils.getSimpleName(className) + '$Definition'
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 

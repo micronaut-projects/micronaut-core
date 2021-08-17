@@ -16,33 +16,33 @@
 package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Body
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Header
-import io.micronaut.http.annotation.Post
-import io.micronaut.http.annotation.QueryValue
+import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.http.client.exceptions.HttpClientException
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.multipart.CompletedFileUpload
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
-import io.reactivex.Flowable
+import jakarta.inject.Inject
+import reactor.core.publisher.Flux
 import spock.lang.Specification
-
-import javax.inject.Inject
 import java.nio.charset.StandardCharsets
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
+@Property(name = 'spec.name', value = 'HttpPostSpec')
 @MicronautTest
 class HttpPostSpec extends Specification {
+
     @Inject
     @Client("/")
     HttpClient client
@@ -55,18 +55,19 @@ class HttpPostSpec extends Specification {
         def book = new Book(title: "The Stand", pages: 1000)
 
         when:
-        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<Book>> flowable = Flux.from(client.exchange(
                 HttpRequest.PATCH("/post/simple", book)
                         .accept(MediaType.APPLICATION_JSON_TYPE)
                         .header("X-My-Header", "Foo"),
 
-                Book
+                Argument.of(Book),
+                Argument.of(Map)
         ))
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
-        def e = thrown(HttpClientException)
-        e.message == "Method [PATCH] not allowed for URI [/post/simple]. Allowed methods: [POST]"
+        def e = thrown(HttpClientResponseException)
+        e.response.getBody(Map).get()."_embedded".errors[0].message == "Method [PATCH] not allowed for URI [/post/simple]. Allowed methods: [POST]"
     }
 
     void "test simple post request with JSON"() {
@@ -74,14 +75,14 @@ class HttpPostSpec extends Specification {
         def book = new Book(title: "The Stand", pages: 1000)
 
         when:
-        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<Book>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/post/simple", book)
                         .accept(MediaType.APPLICATION_JSON_TYPE)
                         .header("X-My-Header", "Foo"),
 
                 Book
         ))
-        HttpResponse<Book> response = flowable.blockingFirst()
+        HttpResponse<Book> response = flowable.blockFirst()
         Optional<Book> body = response.getBody()
 
         then:
@@ -93,20 +94,19 @@ class HttpPostSpec extends Specification {
         body.get() == book
     }
 
-
-
     void "test simple post request with URI template and JSON"() {
         given:
         def book = new Book(title: "The Stand",pages: 1000)
+
         when:
-        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<Book>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/post/title/{title}", book)
                         .accept(MediaType.APPLICATION_JSON_TYPE)
                         .header("X-My-Header", "Foo"),
 
                 Book
         ))
-        HttpResponse<Book> response = flowable.blockingFirst()
+        HttpResponse<Book> response = flowable.blockFirst()
         Optional<Book> body = response.getBody()
 
         then:
@@ -121,15 +121,16 @@ class HttpPostSpec extends Specification {
     void "test simple post request with URI template and JSON Map"() {
         given:
         def book = [title: "The Stand",pages: 1000]
+
         when:
-        Flowable<HttpResponse<Map>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<Map>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/post/title/{title}", book)
                         .accept(MediaType.APPLICATION_JSON_TYPE)
                         .header("X-My-Header", "Foo"),
 
                 Map
         ))
-        HttpResponse<Map> response = flowable.blockingFirst()
+        HttpResponse<Map> response = flowable.blockFirst()
         Optional<Map> body = response.getBody()
 
         then:
@@ -145,7 +146,7 @@ class HttpPostSpec extends Specification {
         given:
         def book = new Book(title: "The Stand", pages: 1000)
         when:
-        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<Book>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/post/form", book)
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE)
                         .accept(MediaType.APPLICATION_JSON_TYPE)
@@ -153,7 +154,7 @@ class HttpPostSpec extends Specification {
 
                 Book
         ))
-        HttpResponse<Book> response = flowable.blockingFirst()
+        HttpResponse<Book> response = flowable.blockFirst()
         Optional<Book> body = response.getBody()
 
         then:
@@ -371,12 +372,13 @@ class HttpPostSpec extends Specification {
 
     void "test http post with empty body"() {
         when:
-        def res = Flowable.fromPublisher(client.exchange(HttpRequest.POST('/post/emptyBody', null))).blockingFirst();
+        def res = client.toBlocking().exchange(HttpRequest.POST('/post/emptyBody', null));
 
         then:
         res.status == HttpStatus.NO_CONTENT
     }
 
+    @Requires(property = 'spec.name', value = 'HttpPostSpec')
     @Controller('/post')
     static class PostController {
 
@@ -483,6 +485,7 @@ class HttpPostSpec extends Specification {
     }
 
     @EqualsAndHashCode
+    @Introspected
     static class Book {
         String title
         Integer pages
@@ -492,6 +495,7 @@ class HttpPostSpec extends Specification {
         List<String> param
     }
 
+    @Requires(property = 'spec.name', value = 'HttpPostSpec')
     @Client("/post")
     static interface PostClient {
 

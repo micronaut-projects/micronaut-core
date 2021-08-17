@@ -39,6 +39,7 @@ public abstract class Engine {
 
     public boolean overriddenPackagePrivateMethodInjectedTwice;
     public boolean qualifiersInheritedFromOverriddenMethod;
+    public boolean overriddenMethodInjected;
 
     @Inject void injectPackagePrivateMethod() {
         superPackagePrivateMethodInjected = true;
@@ -50,6 +51,7 @@ public abstract class Engine {
 
     @Inject public void injectQualifiers(@Drivers Seat seatA, Seat seatB,
             @Named("spare") Tire tireA, Tire tireB) {
+        overriddenMethodInjected = true;
         if (!(seatA instanceof DriversSeat)
                 || (seatB instanceof DriversSeat)
                 || !(tireA instanceof SpareTire)

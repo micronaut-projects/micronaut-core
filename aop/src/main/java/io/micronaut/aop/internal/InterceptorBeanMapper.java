@@ -32,6 +32,11 @@ import java.util.List;
 public class InterceptorBeanMapper implements TypedAnnotationMapper<InterceptorBean> {
 
     @Override
+    public Class<InterceptorBean> annotationType() {
+        return InterceptorBean.class;
+    }
+
+    @Override
     public List<AnnotationValue<?>> map(AnnotationValue<InterceptorBean> annotation, VisitorContext visitorContext) {
         final AnnotationValueBuilder<Annotation> builder = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
         final AnnotationClassValue<?>[] values = annotation.annotationClassValues("value");
@@ -40,10 +45,5 @@ public class InterceptorBeanMapper implements TypedAnnotationMapper<InterceptorB
             bindings[i] = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDING).value(values[i].getName()).build();
         }
         return Collections.singletonList(builder.values(bindings).build());
-    }
-
-    @Override
-    public Class<InterceptorBean> annotationType() {
-        return InterceptorBean.class;
     }
 }

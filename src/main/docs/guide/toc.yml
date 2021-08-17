@@ -1,7 +1,7 @@
 introduction:
   title: Introduction
   whatsNew: What's New?
-  upgrading: Upgrading to Micronaut 2.x
+  upgrading: Upgrading to Micronaut 3.x
 quickStart:
   title: Quick Start
   buildCLI: Build/Install the CLI
@@ -20,6 +20,7 @@ ioc:
   beanContext: The BeanContext
   types: Injectable Container Types
   qualifiers: Bean Qualifiers
+  typed: Limiting Injectable Types
   scopes:
     title: Scopes
     builtInScopes:
@@ -37,6 +38,7 @@ ioc:
   introspection: Bean Introspection
   beanValidation: Bean Validation
   annotationMetadata: Bean Annotation Metadata
+  beanImport: Importing Beans from Libraries
   springBeans: Micronaut Beans And Spring
   android: Android Support
 config:
@@ -57,6 +59,7 @@ aop:
   aroundAdvice: Around Advice
   introductionAdvice: Introduction Advice
   adapterAdvice: Method Adapter Advice
+  lifecycleAdvice: Bean Life Cycle Advice
   validation:
     title: Validation Advice
   caching:
@@ -191,8 +194,9 @@ configurations:
   title: Configurations
   reactiveConfigs:
     title: Configurations for Reactive Programming
-    rxjava3: RxJava 3 Support
     reactor: Reactor Support
+    rxjava3: RxJava 3 Support
+    rxjava2: RxJava 2 Support
     rxjava1: RxJava 1 Support
   dataAccess:
     title: Configurations for Data Access

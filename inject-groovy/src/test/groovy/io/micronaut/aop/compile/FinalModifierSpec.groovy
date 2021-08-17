@@ -16,18 +16,19 @@
 package io.micronaut.aop.compile
 
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
+import io.micronaut.inject.writer.BeanDefinitionWriter
 
 class FinalModifierSpec extends AbstractBeanDefinitionSpec {
     void "test final modifier with AOP advice doesn't compile"() {
         when:
-        buildBeanDefinition('test.$FinalModifierMyBean1Definition$Intercepted', '''
+        buildBeanDefinition('test.$FinalModifierMyBean1' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.proxytarget.*;
 import io.micronaut.context.annotation.*;
 
 @Mutating("someVal")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 final class FinalModifierMyBean1 {
 
     private String myValue;
@@ -49,14 +50,14 @@ final class FinalModifierMyBean1 {
 
     void "test final modifier on method with AOP advice doesn't compile"() {
         when:
-        buildBeanDefinition('test.$FinalModifierMyBean2Definition$Intercepted', '''
+        buildBeanDefinition('test.$FinalModifierMyBean2' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.proxytarget.*;
 import io.micronaut.context.annotation.*;
 
 @Mutating("someVal")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class FinalModifierMyBean2 {
 
     private String myValue;
@@ -78,13 +79,13 @@ class FinalModifierMyBean2 {
 
     void "test final modifier on method with explicit AOP advice doesn't compile"() {
         when:
-        buildBeanDefinition('test.$FinalModifierMyBean2Definition$Intercepted', '''
+        buildBeanDefinition('test.$FinalModifierMyBean2' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.proxytarget.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class FinalModifierMyBean2 {
 
     private String myValue;

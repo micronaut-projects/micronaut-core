@@ -30,6 +30,19 @@ snippet::io.micronaut.docs.ioc.beans.IntrospectionSpec[tags="usage", indent=0]
 <4> Use the `set` method to set the property value
 <5> Use the `get` method to retrieve the property value
 
+==== Bean Fields
+
+By default Java introspections treat only JavaBean getters/setters or Java 16 record components as bean properties. You can however define classes with public or package protected fields in Java using the `accessKind` member of the ann:core.annotation.Introspected[] annotation:
+
+snippet::io.micronaut.docs.ioc.beans.User[tags="class", indent=0]
+
+<1> Final fields are treated like read-only properties
+<2> Mutable fields are treated like read-write properties
+
+NOTE: The `accessKind` accepts an array so it is possible to allow for both types of accessors but prefer one or the other depending on the order they appear in the annotation. The first one in the list has priority.
+
+IMPORTANT: Introspections on fields are not possible in Kotlin because it is not possible to declare fields directly.
+
 ==== Constructor Methods
 
 For classes with multiple constructors, apply the ann:core.annotation.Creator[] annotation to the constructor to use.

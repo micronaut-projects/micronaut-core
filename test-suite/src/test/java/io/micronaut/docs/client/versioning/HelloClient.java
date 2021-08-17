@@ -19,7 +19,8 @@ package io.micronaut.docs.client.versioning;
 import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.client.annotation.Client;
-import io.reactivex.Single;
+import org.reactivestreams.Publisher;
+import io.micronaut.core.async.annotation.SingleResult;
 // end::imports[]
 
 // tag::clazz[]
@@ -32,6 +33,7 @@ public interface HelloClient {
 
     @Version("2")
     @Get("/greeting/{name}")
-    Single<String> sayHelloTwo(String name); // <2>
+    @SingleResult
+    Publisher<String> sayHelloTwo(String name); // <2>
 }
 // end::clazz[]

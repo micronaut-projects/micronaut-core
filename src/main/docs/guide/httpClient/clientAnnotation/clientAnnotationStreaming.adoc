@@ -2,20 +2,20 @@ The ann:http.client.annotation.Client[] annotation can also handle streaming HTT
 
 === Streaming JSON with @Client
 
-For example, to write a client that streams data from the controller defined in the <<clientStreaming, JSON Streaming>> section of the documentation, you can define a client that returns an unbound rs:Publisher[] such as a RxJava rx:Flowable[] or Reactor `Flux`:
+For example, to write a client that streams data from the controller defined in the <<clientStreaming, JSON Streaming>> section of the documentation, you can define a client that returns an unbound rs:Publisher[] such as Reactor's reactor:Flux[] or a RxJava's rx:Flowable[]:
 
 snippet::io.micronaut.docs.streaming.HeadlineClient[tags="imports, class, endclass", indent=0, title="HeadlineClient.java"]
 
 <1> The `@Get` method processes responses of type `APPLICATION_JSON_STREAM`
-<2> The return type is rx:Flowable[]
+<2> The return type is `Publisher`
 
 The following example shows how the previously defined `HeadlineClient` can be invoked from a test:
 
 snippet::io.micronaut.docs.streaming.HeadlineControllerSpec[tags="streamingClient", indent=0, title="Streaming HeadlineClient"]
 
 <1> The client is retrieved from the api:context.ApplicationContext[]
-<2> The `firstElement` method returns the first emitted item from the rx:Flowable[] as a rx:Maybe[].
-<3> The `blockingGet()` method retrieves the result in the test.
+<2> The `next` method emits the first element emmited by the reactor:Flux[] into a reactor:Mono[].
+<3> The `block()` method retrieves the result in the test.
 
 === Streaming Clients and Response Types
 
@@ -41,7 +41,7 @@ The reason for this is simple; a sequence of JSON object is not, in fact, valid 
 
 Micronaut's client does however support streaming of both individual JSON objects via `application/x-json-stream` and also JSON arrays defined with `application/json`.
 
-If the server returns `application/json` and a non-single rs:Publisher[] is returned (such as a rx:Flowable[] or a Reactor `Flux`), the client streams the array elements as they become available.
+If the server returns `application/json` and a non-single rs:Publisher[] is returned (such as a Reactor's reactor:Flux[] or a RxJava's rx:Flowable[]), the client streams the array elements as they become available.
 
 === Streaming Clients and Read Timeout
 
@@ -85,4 +85,4 @@ To define a client that consumes the events, define a method that processes `Med
 
 snippet::io.micronaut.docs.sse.HeadlineClient[tags="class", indent=0, title="SSE Client"]
 
-The generic type of the `Flux` or `Flowable` can be either an api:http.sse.Event[], in which case you will receive the full event object, or a POJO, in which case you will receive only the data contained within the event converted from JSON.
+The generic type of the `Flux` can be either an api:http.sse.Event[], in which case you will receive the full event object, or a POJO, in which case you will receive only the data contained within the event converted from JSON.

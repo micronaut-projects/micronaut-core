@@ -32,7 +32,7 @@ package test;
 
 import io.micronaut.aop.introduction.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 @Stub
 @Singleton
 abstract class AbstractBean {

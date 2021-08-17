@@ -6,6 +6,8 @@ dependencies {
     api project(":http-client")
     implementation project(":core")
 
+    implementation dependencyVersion("reactor")
+
     // the following are Tracing implementations and instrumentations which
     // are optionally loaded and not required
     compileOnly "com.netflix.hystrix:hystrix-core:$hystrixVersion"

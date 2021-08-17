@@ -8,22 +8,23 @@ import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.filter.FilterChain;
 import io.micronaut.http.filter.HttpFilter;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+
 import org.reactivestreams.Publisher;
 
-@Filter("/context/chat/**")
+@Filter({"/chat/**", "/abc/**"})
 public class WebSocketContextValidationFilter implements HttpFilter {
+
+    AtomicInteger executeCount = new AtomicInteger();
 
     @Override
     public Publisher<? extends HttpResponse<?>> doFilter(HttpRequest<?> request, FilterChain chain) {
-        if (!request.getAttribute(MARKER).isPresent()) {
-            request.setAttribute(MARKER, true);
-            HttpRequest<Object> currentRequest = ServerRequestContext.currentRequest().orElse(null);
-            if (!Objects.equals(currentRequest, request)) {
-                return Publishers.just(new IllegalStateException("Current request is not set properly: " + currentRequest));
-            }
+        executeCount.incrementAndGet();
+        HttpRequest<Object> currentRequest = ServerRequestContext.currentRequest().orElse(null);
+        if (!Objects.equals(currentRequest, request)) {
+            return Publishers.just(new IllegalStateException("Current request is not set properly: " + currentRequest));
         }
         return chain.proceed(request);
     }
-
-    private static final String MARKER = WebSocketContextValidationFilter.class.getName();
 }

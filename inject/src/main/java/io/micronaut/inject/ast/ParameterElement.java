@@ -16,8 +16,6 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.NonNull;
-import org.jetbrains.annotations.NotNull;
-
 import java.util.Objects;
 
 /**
@@ -31,10 +29,19 @@ public interface ParameterElement extends TypedElement {
     /**
      * @return The type of the parameter
      */
-    @NotNull
     @Override
     @NonNull
     ClassElement getType();
+
+    @NonNull
+    @Override
+    default String getDescription(boolean simple) {
+        if (simple) {
+            return getType().getSimpleName() + " " + getName();
+        } else {
+            return getType().getName() + " " + getName();
+        }
+    }
 
     /**
      * Creates a parameter element for a simple type and name.

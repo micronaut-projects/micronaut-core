@@ -221,6 +221,37 @@ public class InstantiationUtils {
     /**
      * Instantiate the given class rethrowing any exceptions as {@link InstantiationException}.
      *
+     * @param type     The type
+     * @param argTypes The argument types
+     * @param args     The values of arguments
+     * @param <T>      The generic type
+     * @return The instantiated instance
+     * @throws InstantiationException When an error occurs
+     * @since 3.0.0
+     */
+    public static <T> T instantiate(Class<T> type, Class<?>[] argTypes, Object...args) {
+        try {
+            return BeanIntrospector.SHARED.findIntrospection(type).map(bi -> bi.instantiate(args)).orElseGet(() -> {
+                try {
+                    Logger log = ClassUtils.REFLECTION_LOGGER;
+                    if (log.isDebugEnabled()) {
+                        log.debug("Reflectively instantiating type: " + type);
+                    }
+                    final Constructor<T> declaredConstructor = type.getDeclaredConstructor(argTypes);
+                    declaredConstructor.setAccessible(true);
+                    return declaredConstructor.newInstance(args);
+                } catch (Throwable e) {
+                    throw new InstantiationException("Could not instantiate type [" + type.getName() + "]: " + e.getMessage(), e);
+                }
+            });
+        } catch (Throwable e) {
+            throw new InstantiationException("Could not instantiate type [" + type.getName() + "]: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Instantiate the given class rethrowing any exceptions as {@link InstantiationException}.
+     *
      * @param type        The type
      * @param classLoader The classloader
      * @return The instantiated instance

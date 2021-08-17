@@ -24,11 +24,11 @@ import com.netflix.hystrix.strategy.concurrency.HystrixRequestVariableLifecycle;
 import com.netflix.hystrix.strategy.properties.HystrixProperty;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.tracing.instrument.util.TracingInvocationInstrumenterFactory;
+import jakarta.inject.Singleton;
 
-import io.micronaut.core.annotation.Nullable;
-import javax.inject.Singleton;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ThreadPoolExecutor;

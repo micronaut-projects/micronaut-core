@@ -20,6 +20,7 @@ import io.micronaut.docs.annotation.Pet;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.Assert;
 import org.junit.Test;
+import reactor.core.publisher.Mono;
 
 import java.util.Collections;
 import java.util.Map;
@@ -36,7 +37,7 @@ public class HeaderSpec {
         try(EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class, config)) {
             PetClient client = embeddedServer.getApplicationContext().getBean(PetClient.class);
 
-            Pet pet = client.get("Fred").blockingGet();
+            Pet pet = Mono.from(client.get("Fred")).block();
 
             Assert.assertNotNull(pet);
 

@@ -66,6 +66,11 @@ ext {
                     name: 'micronaut-aws-bom',
                     version: micronautAwsVersion
             ],
+            'micronaut.sql': [
+                    group: 'io.micronaut.sql',
+                    name: 'micronaut-sql-bom',
+                    version: micronautSqlVersion
+            ],
             //Third-party
             'netty': [
                     group: 'io.netty',
@@ -199,12 +204,6 @@ ext {
                     group:'io.micronaut.cassandra',
                     name:'micronaut-cassandra'
             ],
-            // TODO Deprecated: Remove in the next major version
-            'micronaut.discovery.old': [
-                    version:micronautOldDiscoveryClientVersion,
-                    group:'io.micronaut',
-                    name:'micronaut-discovery-client'
-            ],
             'micronaut.discovery': [
                     version:micronautDiscoveryClientVersion,
                     group:'io.micronaut.discovery',
@@ -278,12 +277,6 @@ ext {
                     group:'io.micronaut.liquibase',
                     name:'micronaut-liquibase'
             ],
-            // TODO Deprecated: Remove in the next major version
-            'micronaut.multitenancy.old': [
-                    version:micronautOldMultitenancyVersion,
-                    group:'io.micronaut',
-                    name:'micronaut-multitenancy'
-            ],
             'micronaut.multitenancy': [
                     version:micronautMultitenancyVersion,
                     group:'io.micronaut.multitenancy',
@@ -299,12 +292,6 @@ ext {
                     version:micronautOpenApiVersion,
                     group:'io.micronaut.openapi',
                     name:'micronaut-openapi'
-            ],
-            // TODO Deprecated: Remove in the next major version
-            'micronaut.openapi.old': [
-                    version: micronautOldOpenApiVersion,
-                    group: 'io.micronaut.configuration',
-                    name: 'micronaut-openapi'
             ],
             kafka                      : [
                     version: kafkaVersion,
@@ -355,12 +342,6 @@ ext {
                     name:'micronaut-spring-annotation',
                     modules:['micronaut-spring', 'micronaut-spring-boot', 'micronaut-spring-boot-annotation', 'micronaut-spring-context', 'micronaut-spring-web', 'micronaut-spring-web-annotation']
             ],
-            'micronaut.sql': [
-                version:micronautSqlVersion,
-                group:'io.micronaut.sql',
-                name:'micronaut-hibernate-jpa',
-                modules:['micronaut-jdbc', 'micronaut-jdbc-tomcat', 'micronaut-jdbc-hikari', 'micronaut-jdbc-ucp', 'micronaut-jdbc-dbcp', 'micronaut-jasync-sql', 'micronaut-jooq', 'micronaut-jdbi', 'micronaut-hibernate-jpa-spring', 'micronaut-vertx-mysql-client', 'micronaut-vertx-pg-client']
-            ],
             'micronaut.mongo': [
                     version:micronautMongoVersion,
                     group:'io.micronaut.mongodb',
@@ -396,18 +377,6 @@ ext {
                     version: neo4jDriverVersion,
                     group:'org.neo4j.driver',
                     name:'neo4j-java-driver'
-            ],
-            oracle                      : [
-                    version: ojdbcVersion,
-                    group  : 'com.oracle.database.jdbc',
-                    name   : 'ojdbc8',
-                    modules: ['ucp']
-            ],
-            // TODO Deprecated: Remove in the next major version
-            oldOracle                  : [
-                    version: oldOracleDriverVersion,
-                    group  : 'com.oracle.ojdbc',
-                    name   : 'ojdbc8'
             ],
             'jcache'                   : [
                     version: jcacheVersion,
@@ -509,7 +478,12 @@ ext {
                     group  : 'io.micronaut.rxjava3',
                     modules : ['micronaut-rxjava3', 'micronaut-rxjava3-http-client']
             ],
-
+            'micronaut.rxjava2'        : [
+                    version: micronautRxJava2Version,
+                    group  : 'io.micronaut.rxjava2',
+                    name   : 'micronaut-rxjava2',
+                    modules: ['micronaut-rxjava2-http-client', 'micronaut-rxjava2-http-server-netty']
+            ],
             'micronaut.rxjava1'        : [
                     version: micronautRxJava1Version,
                     group  : 'io.micronaut.rxjava1',
@@ -535,11 +509,6 @@ ext {
                     group  : 'javax.validation',
                     name   : 'validation-api'
             ],
-            hikari                    : [
-                    version: hikariVersion,
-                    group  : 'com.zaxxer',
-                    name   : 'HikariCP'
-            ],
             hystrix                    : [
                     version: hystrixVersion,
                     group  : 'com.netflix.hystrix',
@@ -561,31 +530,6 @@ ext {
                     group  : 'com.h2database',
                     name   : 'h2'
             ],
-            postgres                   : [
-                    version: postgresDriverVersion,
-                    group  : 'org.postgresql',
-                    name   : 'postgresql'
-            ],
-            mysql                   : [
-                    version: mysqlDriverVersion,
-                    group  : 'mysql',
-                    name   : 'mysql-connector-java'
-            ],
-            mariadb                   : [
-                    version: mariadbDriverVersion,
-                    group  : 'org.mariadb.jdbc',
-                    name   : 'mariadb-java-client'
-            ],
-            mssql                   : [
-                    version: mssqlDriverVersion,
-                    group  : 'com.microsoft.sqlserver',
-                    name   : 'mssql-jdbc'
-            ],
-            tomcatJdbc                 : [
-                    version: tomcatJdbcVersion,
-                    group  : 'org.apache.tomcat',
-                    name   : 'tomcat-jdbc'
-            ],
             liquibase                  : [
                     version: liquibaseVersion,
                     group  : 'org.liquibase',
@@ -600,12 +544,6 @@ ext {
                     version: jnaVersion,
                     group  : 'net.java.dev.jna',
                     name   : 'jna'
-            ],
-            hibernate                  : [
-                    version: hibernateVersion,
-                    group  : 'org.hibernate',
-                    name   : 'hibernate-core',
-                    modules: ['hibernate-jcache', 'hibernate-ehcache']
             ],
             elasticsearch              : [
                     version: elasticsearchVersion,
@@ -848,6 +786,7 @@ subprojects { Project subproject ->
             }
         }
         compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
+        testAnnotationProcessor project(":http-validation")
         testImplementation "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
         testImplementation dependencyModuleVersion("groovy", "groovy")
         testImplementation(dependencyVersion("spock")) {

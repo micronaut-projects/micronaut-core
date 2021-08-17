@@ -18,7 +18,7 @@ package io.micronaut.inject.value.singletonwithvalue;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Requires(property = "spec.name", value = "ValueSpec")
 @Singleton

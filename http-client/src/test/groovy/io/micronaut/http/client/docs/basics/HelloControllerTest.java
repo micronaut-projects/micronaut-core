@@ -20,11 +20,11 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.reactivex.Flowable;
 import org.junit.Test;
+import reactor.core.publisher.Flux;
 
 import java.util.Collections;
 import java.util.Map;
@@ -44,7 +44,7 @@ public class HelloControllerTest {
     @Test
     public void testSimpleRetrieve() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
+        HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL());
 
         // tag::simple[]
         String uri = UriBuilder.of("/hello/{name}")
@@ -67,18 +67,18 @@ public class HelloControllerTest {
     @Test
     public void testRetrieveWithHeaders() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
+        HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL());
 
         // tag::headers[]
-        Flowable<String> response = client.retrieve(
+        Flux<String> response = Flux.from(client.retrieve(
                 GET("/hello/John")
                 .header("X-My-Header", "SomeValue")
-        );
+        ));
         // end::headers[]
 
         assertEquals(
                 "Hello John",
-                response.blockingFirst()
+                response.blockFirst()
         );
 
         embeddedServer.stop();
@@ -88,29 +88,29 @@ public class HelloControllerTest {
     @Test
     public void testRetrieveWithJSON() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
+        HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL());
 
         // tag::jsonmap[]
-        Flowable<Map> response = client.retrieve(
+        Flux<Map> response = Flux.from(client.retrieve(
                 GET("/greet/John"), Map.class
-        );
+        ));
         // end::jsonmap[]
 
         assertEquals(
                 "Hello John",
-                response.blockingFirst().get("text")
+                response.blockFirst().get("text")
         );
 
         // tag::jsonmaptypes[]
-        response = client.retrieve(
+        response = Flux.from(client.retrieve(
                 GET("/greet/John"),
                 Argument.of(Map.class, String.class, String.class) // <1>
-        );
+        ));
         // end::jsonmaptypes[]
 
         assertEquals(
                 "Hello John",
-                response.blockingFirst().get("text")
+                response.blockFirst().get("text")
         );
         embeddedServer.stop();
         client.stop();
@@ -119,16 +119,16 @@ public class HelloControllerTest {
     @Test
     public void testRetrieveWithPOJO() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
+        HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL());
 
         // tag::jsonpojo[]
-        Flowable<Message> response = client.retrieve(
+        Flux<Message> response = Flux.from(client.retrieve(
                 GET("/greet/John"), Message.class
-        );
+        ));
 
         assertEquals(
                 "Hello John",
-                response.blockingFirst().getText()
+                response.blockFirst().getText()
         );
         // end::jsonpojo[]
 
@@ -139,14 +139,14 @@ public class HelloControllerTest {
     @Test
     public void testRetrieveWithPOJOResponse() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
+        HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL());
 
         // tag::pojoresponse[]
-        Flowable<HttpResponse<Message>> call = client.exchange(
+        Flux<HttpResponse<Message>> call = Flux.from(client.exchange(
                 GET("/greet/John"), Message.class // <1>
-        );
+        ));
 
-        HttpResponse<Message> response = call.blockingFirst();
+        HttpResponse<Message> response = call.blockFirst();
         Optional<Message> message = response.getBody(Message.class); // <2>
         // check the status
         assertEquals(
@@ -168,18 +168,18 @@ public class HelloControllerTest {
     @Test
     public void testPostRequestWithString() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
+        HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL());
 
         // tag::poststring[]
-        Flowable<HttpResponse<String>> call = client.exchange(
+        Flux<HttpResponse<String>> call = Flux.from(client.exchange(
                 POST("/hello", "Hello John") // <1>
                     .contentType(MediaType.TEXT_PLAIN_TYPE)
                     .accept(MediaType.TEXT_PLAIN_TYPE), // <2>
                 String.class // <3>
-        );
+        ));
         // end::poststring[]
 
-        HttpResponse<String> response = call.blockingFirst();
+        HttpResponse<String> response = call.blockFirst();
         Optional<String> message = response.getBody(String.class); // <2>
         // check the status
         assertEquals(
@@ -200,16 +200,16 @@ public class HelloControllerTest {
     @Test
     public void testPostRequestWithPOJO() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
+        HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL());
 
         // tag::postpojo[]
-        Flowable<HttpResponse<Message>> call = client.exchange(
+        Flux<HttpResponse<Message>> call = Flux.from(client.exchange(
                 POST("/greet", new Message("Hello John")), // <1>
                 Message.class // <2>
-        );
+        ));
         // end::postpojo[]
 
-        HttpResponse<Message> response = call.blockingFirst();
+        HttpResponse<Message> response = call.blockFirst();
         Optional<Message> message = response.getBody(Message.class); // <2>
         // check the status
         assertEquals(

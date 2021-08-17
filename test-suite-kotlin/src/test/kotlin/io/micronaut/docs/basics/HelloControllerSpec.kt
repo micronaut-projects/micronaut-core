@@ -1,17 +1,17 @@
 package io.micronaut.docs.basics
 
-import io.kotlintest.shouldBe
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest.GET
 import io.micronaut.http.HttpRequest.POST
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.uri.UriBuilder
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
+import reactor.core.publisher.Flux
 import java.util.Collections
 
 class HelloControllerSpec: StringSpec() {
@@ -21,7 +21,7 @@ class HelloControllerSpec: StringSpec() {
     )
 
     val client = autoClose(
-        embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
+        embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
     )
 
     init {
@@ -46,35 +46,35 @@ class HelloControllerSpec: StringSpec() {
             )
             // end::headers[]
 
-            response.blockingFirst() shouldBe "Hello John"
+            Flux.from(response).blockFirst() shouldBe "Hello John"
         }
 
         "test retrieve with JSON" {
             // tag::jsonmap[]
-            var response: Flowable<Map<*, *>> = client.retrieve(
+            var response: Flux<Map<*, *>> = Flux.from(client.retrieve(
                     GET<Any>("/greet/John"), Map::class.java
-            )
+            ))
             // end::jsonmap[]
 
-            response.blockingFirst()["text"] shouldBe "Hello John"
+            response.blockFirst()["text"] shouldBe "Hello John"
 
             // tag::jsonmaptypes[]
-            response = client.retrieve(
+            response = Flux.from(client.retrieve(
                     GET<Any>("/greet/John"),
                     Argument.of(Map::class.java, String::class.java, String::class.java) // <1>
-            )
+            ))
             // end::jsonmaptypes[]
 
-            response.blockingFirst()["text"] shouldBe "Hello John"
+            response.blockFirst()["text"] shouldBe "Hello John"
         }
 
         "test retrieve with POJO" {
             // tag::jsonpojo[]
-            val response = client.retrieve(
+            val response = Flux.from(client.retrieve(
                     GET<Any>("/greet/John"), Message::class.java
-            )
+            ))
 
-            response.blockingFirst().text shouldBe "Hello John"
+            response.blockFirst().text shouldBe "Hello John"
             // end::jsonpojo[]
         }
 
@@ -84,7 +84,7 @@ class HelloControllerSpec: StringSpec() {
                     GET<Any>("/greet/John"), Message::class.java // <1>
             )
 
-            val response = call.blockingFirst()
+            val response = Flux.from(call).blockFirst()
             val message = response.getBody(Message::class.java) // <2>
             // check the status
             response.status shouldBe HttpStatus.OK // <3>
@@ -103,7 +103,7 @@ class HelloControllerSpec: StringSpec() {
             )
             // end::poststring[]
 
-            val response = call.blockingFirst()
+            val response = Flux.from(call).blockFirst()
             val message = response.getBody(String::class.java) // <2>
             // check the status
             response.status shouldBe HttpStatus.CREATED // <3>
@@ -119,7 +119,7 @@ class HelloControllerSpec: StringSpec() {
             )
             // end::postpojo[]
 
-            val response = call.blockingFirst()
+            val response = Flux.from(call).blockFirst()
             val message = response.getBody(Message::class.java) // <2>
             // check the status
             response.status shouldBe HttpStatus.CREATED // <3>

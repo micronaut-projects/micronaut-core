@@ -19,26 +19,23 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Consumes
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Produces
+import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.http.annotation.Error
 import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.http.server.exceptions.ExceptionHandler
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.TaskExecutors
-import io.reactivex.Single
-import io.reactivex.schedulers.Schedulers
+import jakarta.inject.Inject
+import jakarta.inject.Named
+import jakarta.inject.Singleton
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import javax.inject.Inject
-import javax.inject.Named
-import javax.inject.Singleton
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutorService
 
@@ -64,10 +61,19 @@ class ServerRequestContextSpec extends Specification {
         where:
         method          | uri
         "method"        | '/test-context/method'
-        "rxjava"        | '/test-context/rxjava'
+        "reactor"       | '/test-context/reactor'
         "thread"        | '/test-context/thread'
         "error"         | '/test-context/error'
         "handlerError"  | '/test-context/handler-error'
+    }
+
+    void "test the request is part of the reactor context"() {
+        given:
+        TestClient testClient = embeddedServer.getApplicationContext().getBean(TestClient)
+
+        expect:
+        testClient.reactorContext() == '/test-context/reactor-context'
+        testClient.reactorContextStream() == '/test-context/reactor-context-stream'
     }
 
     @Client('/test-context')
@@ -77,8 +83,14 @@ class ServerRequestContextSpec extends Specification {
         @Get("/method")
         String method()
 
-        @Get("/rxjava")
-        String rxjava()
+        @Get("/reactor")
+        String reactor()
+
+        @Get("/reactor-context")
+        String reactorContext()
+
+        @Get("/reactor-context-stream")
+        String reactorContextStream()
 
         @Get("/thread")
         String thread()
@@ -104,13 +116,30 @@ class ServerRequestContextSpec extends Specification {
             request.uri
         }
 
-        @Get("/rxjava")
-        Single<String> rxjava() {
-            Single.fromCallable({ ->
+        @Get("/reactor")
+        Mono<String> reactor() {
+            Mono.fromCallable({ ->
                 def request = ServerRequestContext.currentRequest().orElseThrow { -> new RuntimeException("no request") }
                 request.uri
-            }).subscribeOn(Schedulers.computation())
+            }).subscribeOn(Schedulers.boundedElastic())
         }
+
+        @Get("/reactor-context")
+        Mono<String> reactorContext() {
+            Mono.deferContextual({ ctx ->
+                def request = (HttpRequest) ctx.get(ServerRequestContext.KEY)
+                return Mono.just(request.uri)
+            })
+        }
+
+        @Get("/reactor-context-stream")
+        Flux<String> reactorContextStream() {
+            Flux.deferContextual({ ctx ->
+                def request = (HttpRequest) ctx.get(ServerRequestContext.KEY)
+                return Mono.just(request.uri)
+            })
+        }
+
 
         @Get("/thread")
         String thread() {

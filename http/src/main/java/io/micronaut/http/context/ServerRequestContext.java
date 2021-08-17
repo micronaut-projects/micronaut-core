@@ -21,7 +21,6 @@ import java.util.function.Supplier;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-
 import io.micronaut.http.HttpRequest;
 
 /**
@@ -33,6 +32,7 @@ import io.micronaut.http.HttpRequest;
  */
 public final class ServerRequestContext {
 
+    public static final String KEY = "micronaut.http.server.request";
     private static final ThreadLocal<HttpRequest> REQUEST = new ThreadLocal<>();
 
     private ServerRequestContext() {

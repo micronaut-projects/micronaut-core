@@ -16,9 +16,9 @@
 package io.micronaut.http.server.netty.types;
 
 import io.micronaut.core.util.CollectionUtils;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;

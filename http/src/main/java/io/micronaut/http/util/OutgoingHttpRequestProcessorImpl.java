@@ -17,8 +17,8 @@ package io.micronaut.http.util;
 
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.Optional;
 
 /**

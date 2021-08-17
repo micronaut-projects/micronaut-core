@@ -15,11 +15,11 @@
  */
 package io.micronaut.docs.factories
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 // tag::class[]
 @Singleton
-internal class Vehicle(val engine: Engine) {
+class Vehicle(val engine: Engine) {
 
     fun start(): String {
         return engine.start()

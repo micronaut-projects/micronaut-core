@@ -3,6 +3,7 @@ package io.micronaut.aop.introduction.with_around
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
 import io.micronaut.context.BeanContext
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.inject.ExecutableMethod
 
 import javax.inject.Singleton
@@ -16,6 +17,7 @@ class ProxyAdviceInterceptor implements MethodInterceptor<Object, Object> {
         this.beanContext = beanContext
     }
 
+    @Nullable
     @Override
     Object intercept(MethodInvocationContext<Object, Object> context) {
         if (context.getMethodName().equalsIgnoreCase("getId")) {

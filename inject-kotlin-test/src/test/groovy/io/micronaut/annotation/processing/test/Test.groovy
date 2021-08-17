@@ -33,8 +33,8 @@ class Test {
         def context = buildContext('example.Foo', '''
 package example
 
-import javax.inject.Inject
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 
 @Singleton
 class Foo {
@@ -56,7 +56,7 @@ class Bar {
         given:
         def definition = buildBeanDefinition('test.Test', '''
 package test;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 class Test {

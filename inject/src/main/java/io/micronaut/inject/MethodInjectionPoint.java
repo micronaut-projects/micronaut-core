@@ -61,4 +61,9 @@ public interface MethodInjectionPoint<B, T> extends CallableInjectionPoint<B>, E
      */
     @Override
     T invoke(B instance, Object... args);
+
+    @Override
+    default Class<B> getDeclaringType() {
+        return getDeclaringBean().getBeanType();
+    }
 }

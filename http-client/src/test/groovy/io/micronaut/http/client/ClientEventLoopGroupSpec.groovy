@@ -2,11 +2,9 @@ package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.BeanInstantiationException
-import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.netty.channel.EventLoopGroup
 import spock.lang.Specification
-
 
 class ClientEventLoopGroupSpec extends Specification {
 
@@ -17,7 +15,7 @@ class ClientEventLoopGroupSpec extends Specification {
                 'micronaut.http.client.event-loop-group': 'invalid'
         )
 
-        context.getBean(RxHttpClient)
+        context.getBean(HttpClient)
 
         then:
         def e = thrown(BeanInstantiationException)
@@ -33,8 +31,7 @@ class ClientEventLoopGroupSpec extends Specification {
                 'micronaut.netty.event-loops.other.num-threads': 0,
                 'micronaut.http.client.event-loop-group': 'other'
         )
-
-        RxHttpClient client = context.getBean(RxHttpClient)
+        HttpClient client = context.getBean(HttpClient)
 
         then:
         client.group == context.getBean(EventLoopGroup, Qualifiers.byName("other"))

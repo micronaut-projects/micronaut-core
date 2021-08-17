@@ -18,16 +18,16 @@ package io.micronaut.management.endpoint.loggers.impl;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.management.endpoint.loggers.LoggerConfiguration;
 import io.micronaut.management.endpoint.loggers.LoggersEndpoint;
 import io.micronaut.management.endpoint.loggers.ManagedLoggingSystem;
+import jakarta.inject.Singleton;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.stream.Collectors;
 

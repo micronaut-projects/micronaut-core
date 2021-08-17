@@ -180,28 +180,23 @@ public class DefaultConversionService implements ConversionService<DefaultConver
      */
     @SuppressWarnings({"OptionalIsPresent", "unchecked"})
     protected void registerDefaultConverters() {
-
+        // primitive array to wrapper array
+        @SuppressWarnings("rawtypes")
+        Function primitiveArrayToWrapperArray = ArrayUtils::toWrapperArray;
+        addConverter(double[].class, Double[].class, primitiveArrayToWrapperArray);
+        addConverter(byte[].class, Byte[].class, primitiveArrayToWrapperArray);
+        addConverter(short[].class, Short[].class, primitiveArrayToWrapperArray);
+        addConverter(boolean[].class, Boolean[].class, primitiveArrayToWrapperArray);
+        addConverter(int[].class, Integer[].class, primitiveArrayToWrapperArray);
+        addConverter(float[].class, Float[].class, primitiveArrayToWrapperArray);
+        addConverter(double[].class, Double[].class, primitiveArrayToWrapperArray);
+        addConverter(char[].class, Character[].class, primitiveArrayToWrapperArray);
         // wrapper to primitive array converters
-        addConverter(Double[].class, double[].class, (object, targetType, context) -> {
-            double[] doubles = new double[object.length];
-            for (int i = 0; i < object.length; i++) {
-                Double aDouble = object[i];
-                if (aDouble != null) {
-                    doubles[i] = aDouble;
-                }
-            }
-            return Optional.of(doubles);
-        });
-        addConverter(Integer[].class, int[].class, (object, targetType, context) -> {
-            int[] integers = new int[object.length];
-            for (int i = 0; i < object.length; i++) {
-                Integer o = object[i];
-                if (o != null) {
-                    integers[i] = o;
-                }
-            }
-            return Optional.of(integers);
-        });
+        Function<Object[], Object> wrapperArrayToPrimitiveArray = ArrayUtils::toPrimitiveArray;
+        //noinspection rawtypes
+        addConverter(Double[].class, double[].class, (Function) wrapperArrayToPrimitiveArray);
+        //noinspection rawtypes
+        addConverter(Integer[].class, int[].class, (Function) wrapperArrayToPrimitiveArray);
 
         // Object -> List
         addConverter(Object.class, List.class, (object, targetType, context) -> {

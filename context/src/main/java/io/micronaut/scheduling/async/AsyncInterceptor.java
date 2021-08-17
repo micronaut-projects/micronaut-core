@@ -22,16 +22,17 @@ import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.Async;
 import io.micronaut.scheduling.exceptions.TaskExecutionException;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Named;
-import javax.inject.Singleton;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -70,6 +71,7 @@ public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
         return InterceptPhase.ASYNC.getPosition();
     }
 
+    @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         String executorServiceName = context.stringValue(Async.class).orElse(TaskExecutors.SCHEDULED);

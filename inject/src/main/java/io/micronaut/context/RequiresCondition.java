@@ -34,6 +34,7 @@ import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
@@ -580,9 +581,9 @@ public class RequiresCondition implements Condition {
                     // remove self by passing definition as filter
                     final Collection<? extends BeanDefinition<?>> beanDefinitions = beanContext.findBeanCandidates(
                             context.getBeanResolutionContext(),
-                            type,
-                            true,
-                            candidate -> !bd.equals(candidate)
+                            Argument.of(type),
+                            bd,
+                            true
                     );
                     for (BeanDefinition<?> beanDefinition : beanDefinitions) {
                         if (!beanDefinition.isAbstract()) {

@@ -15,6 +15,7 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.annotation.processing.AnnotationUtils;
 import io.micronaut.annotation.processing.ModelUtils;
@@ -26,6 +27,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.*;
+import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.lang.model.element.Element;
@@ -52,6 +54,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     protected final TypeElement classElement;
     protected final JavaVisitorContext visitorContext;
     private final int arrayDimensions;
+    private final boolean isTypeVariable;
     private List<PropertyElement> beanProperties;
     private Map<String, Map<String, TypeMirror>> genericTypeInfo;
     private List<? extends Element> enclosedElements;
@@ -66,7 +69,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
      */
     @Internal
     public JavaClassElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
-        this(classElement, annotationMetadata, visitorContext, null, 0);
+        this(classElement, annotationMetadata, visitorContext, null, 0, false);
     }
 
     /**
@@ -80,7 +83,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             AnnotationMetadata annotationMetadata,
             JavaVisitorContext visitorContext,
             Map<String, Map<String, TypeMirror>> genericsInfo) {
-        this(classElement, annotationMetadata, visitorContext, genericsInfo, 0);
+        this(classElement, annotationMetadata, visitorContext, genericsInfo, 0, false);
     }
 
     /**
@@ -96,11 +99,56 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             JavaVisitorContext visitorContext,
             Map<String, Map<String, TypeMirror>> genericsInfo,
             int arrayDimensions) {
+        this(classElement, annotationMetadata, visitorContext, genericsInfo, arrayDimensions, false);
+    }
+
+    /**
+     * @param classElement       The {@link TypeElement}
+     * @param annotationMetadata The annotation metadata
+     * @param visitorContext     The visitor context
+     * @param genericsInfo       The generic type info
+     * @param isTypeVariable     Is the class element a type variable
+     */
+    JavaClassElement(
+            TypeElement classElement,
+            AnnotationMetadata annotationMetadata,
+            JavaVisitorContext visitorContext,
+            Map<String, Map<String, TypeMirror>> genericsInfo,
+            boolean isTypeVariable) {
+        this(classElement, annotationMetadata, visitorContext, genericsInfo, 0, isTypeVariable);
+    }
+
+    /**
+     * @param classElement       The {@link TypeElement}
+     * @param annotationMetadata The annotation metadata
+     * @param visitorContext     The visitor context
+     * @param genericsInfo       The generic type info
+     * @param arrayDimensions    The number of array dimensions
+     * @param isTypeVariable     Is the type a type variable
+     */
+    JavaClassElement(
+            TypeElement classElement,
+            AnnotationMetadata annotationMetadata,
+            JavaVisitorContext visitorContext,
+            Map<String, Map<String, TypeMirror>> genericsInfo,
+            int arrayDimensions,
+            boolean isTypeVariable) {
         super(classElement, annotationMetadata, visitorContext);
         this.classElement = classElement;
         this.visitorContext = visitorContext;
         this.genericTypeInfo = genericsInfo;
         this.arrayDimensions = arrayDimensions;
+        this.isTypeVariable = isTypeVariable;
+    }
+
+    @Override
+    public boolean isTypeVariable() {
+        return isTypeVariable;
+    }
+
+    @Override
+    public String toString() {
+        return getName();
     }
 
     @Override
@@ -117,7 +165,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @Override
     public Map<String, ClassElement> getTypeArguments(@NonNull String type) {
         if (StringUtils.isNotEmpty(type)) {
-            Map<String, Map<String, TypeMirror>> data = visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement);
+            Map<String, Map<String, TypeMirror>> data = visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement, null, getBoundTypeMirrors());
             Map<String, TypeMirror> forType = data.get(type);
             if (forType != null) {
                 Map<String, ClassElement> typeArgs = new LinkedHashMap<>(forType.size());
@@ -142,6 +190,17 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     }
 
     @Override
+    public Collection<ClassElement> getInterfaces() {
+        final List<? extends TypeMirror> interfaces = classElement.getInterfaces();
+        if (!interfaces.isEmpty()) {
+            return Collections.unmodifiableList(interfaces.stream().map((mirror) ->
+                mirrorToClassElement(mirror, visitorContext, genericTypeInfo)).collect(Collectors.toList())
+            );
+        }
+        return Collections.emptyList();
+    }
+
+    @Override
     public Optional<ClassElement> getSuperType() {
         final TypeMirror superclass = classElement.getSuperclass();
         if (superclass != null) {
@@ -156,7 +215,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                                 parameterizedClassElement(
                                     superclass,
                                     visitorContext,
-                                    visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement)));
+                                    visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement, null, getBoundTypeMirrors())));
                     }
                     return Optional.of(
                             new JavaClassElement(
@@ -421,7 +480,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         boolean onlyDeclared = result.isOnlyDeclared();
         boolean onlyAbstract = result.isOnlyAbstract();
         boolean onlyConcrete = result.isOnlyConcrete();
-
+        boolean onlyInstance = result.isOnlyInstance();
 
         if (!onlyDeclared) {
             Elements elements = visitorContext.getElements();
@@ -445,14 +504,56 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         for (Element enclosedElement : enclosedElements) {
                             if (elements.hides(enclosedElement, superElement)) {
                                 continue superElements;
-                            } else if (enclosedElement.getKind() == ElementKind.METHOD && superElement.getKind() == ElementKind.METHOD &&
-                                    elements.overrides((ExecutableElement) enclosedElement, (ExecutableElement) superElement, this.classElement)) {
-                                continue superElements;
+                            } else if (enclosedElement.getKind() == ElementKind.METHOD && superElement.getKind() == ElementKind.METHOD) {
+                                final ExecutableElement methodCandidate = (ExecutableElement) superElement;
+                                if (elements.overrides((ExecutableElement) enclosedElement, methodCandidate, this.classElement)) {
+                                    continue superElements;
+                                }
                             }
                         }
+                        // dependency injection method resolution requires extended overrides checks
+                        if (result.isOnlyInjected() && superElement.getKind() == ElementKind.METHOD) {
+                            final ExecutableElement methodCandidate = (ExecutableElement) superElement;
+                            // check for extended override
+                            final String thisClassName = this.classElement.getQualifiedName().toString();
+                            final String declaringClassName = element.getQualifiedName().toString();
+                            boolean isParent = !declaringClassName.equals(thisClassName);
+                            final ModelUtils javaModelUtils = visitorContext.getModelUtils();
+                            final ExecutableElement overridingMethod = javaModelUtils
+                                    .overridingOrHidingMethod(methodCandidate, this.classElement, false)
+                                    .orElse(methodCandidate);
+                            TypeElement overridingClass = javaModelUtils.classElementFor(overridingMethod);
+                            boolean overridden = isParent && overridingClass != null &&
+                                    !overridingClass.getQualifiedName().toString().equals(declaringClassName);
+
+                            boolean isPackagePrivate = javaModelUtils.isPackagePrivate(methodCandidate);
+                            boolean isPrivate = methodCandidate.getModifiers().contains(Modifier.PRIVATE);
+                            if (overridden && !(isPrivate || isPackagePrivate)) {
+                                // bail out if the method has been overridden, since it will have already been handled
+                                continue;
+                            }
+                            if (isParent && overridden) {
+
+                                boolean overriddenInjected = overridden && visitorContext.getAnnotationUtils()
+                                        .getAnnotationMetadata(overridingMethod).hasDeclaredAnnotation(
+                                                AnnotationUtil.INJECT);
+                                String packageOfOverridingClass = visitorContext.getElements().getPackageOf(overridingMethod).getQualifiedName().toString();
+                                String packageOfDeclaringClass = visitorContext.getElements().getPackageOf(element).getQualifiedName().toString();
+                                boolean isPackagePrivateAndPackagesDiffer = overridden && isPackagePrivate &&
+                                        !packageOfOverridingClass.equals(packageOfDeclaringClass);
+                                if (!overriddenInjected && !isPackagePrivateAndPackagesDiffer && !isPrivate) {
+                                    // bail out if the overridden method is package private and in the same package
+                                    // and is not annotated with @Inject
+                                    continue;
+                                }
+                            }
+                        }
+
                         if (onlyAbstract && !superElement.getModifiers().contains(Modifier.ABSTRACT)) {
                             continue;
                         } else if (onlyConcrete && superElement.getModifiers().contains(Modifier.ABSTRACT)) {
+                            continue;
+                        } else if (onlyInstance && superElement.getModifiers().contains(Modifier.STATIC)) {
                             continue;
                         }
                         elementsToAdd.add(superElement);
@@ -509,12 +610,18 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 }
             }
         }
+        if (onlyInstance) {
+            enclosedElements.removeIf((e) -> e.getModifiers().contains(Modifier.STATIC));
+        }
         List<Predicate<Set<ElementModifier>>> modifierPredicates = result.getModifierPredicates();
         List<Predicate<String>> namePredicates = result.getNamePredicates();
         List<Predicate<AnnotationMetadata>> annotationPredicates = result.getAnnotationPredicates();
+        final List<Predicate<ClassElement>> typePredicates = result.getTypePredicates();
         boolean hasNamePredicates = !namePredicates.isEmpty();
         boolean hasModifierPredicates = !modifierPredicates.isEmpty();
         boolean hasAnnotationPredicates = !annotationPredicates.isEmpty();
+        boolean hasTypePredicates = !typePredicates.isEmpty();
+        final JavaElementFactory elementFactory = visitorContext.getElementFactory();
 
         elementLoop:
         for (Element enclosedElement : enclosedElements) {
@@ -530,13 +637,15 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         continue;
                     } else {
                         Element enclosingElement = enclosedElement.getEnclosingElement();
+                        final ClassElement onlyAccessibleFrom = result.getOnlyAccessibleFromType().orElse(this);
+                        Object accessibleFrom = onlyAccessibleFrom.getNativeType();
                         // if the outer element of the enclosed element is not the current class
                         // we need to check if it package private and within a different package so it can be excluded
-                        if (enclosingElement != this.classElement && visitorContext.getModelUtils().isPackagePrivate(enclosedElement)) {
+                        if (enclosingElement != accessibleFrom && visitorContext.getModelUtils().isPackagePrivate(enclosedElement)) {
                             if (enclosingElement instanceof TypeElement) {
                                 Name qualifiedName = ((TypeElement) enclosingElement).getQualifiedName();
                                 String packageName = NameUtils.getPackageName(qualifiedName.toString());
-                                if (!packageName.equals(getPackageName())) {
+                                if (!packageName.equals(onlyAccessibleFrom.getPackageName())) {
                                     continue;
                                 }
                             }
@@ -570,20 +679,24 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         }
                     }
                 }
+
                 T element;
+
                 switch (enclosedElementKind) {
                     case METHOD:
+
+                        final ExecutableElement executableElement = (ExecutableElement) enclosedElement;
                         //noinspection unchecked
-                        element = (T) visitorContext.getElementFactory().newMethodElement(
+                        element = (T) elementFactory.newMethodElement(
                                 this,
-                                (ExecutableElement) enclosedElement,
+                                executableElement,
                                 metadata,
                                 genericTypeInfo
                         );
                     break;
                     case FIELD:
                         //noinspection unchecked
-                        element = (T) visitorContext.getElementFactory().newFieldElement(
+                        element = (T) elementFactory.newFieldElement(
                                 this,
                                 (VariableElement) enclosedElement,
                                 metadata
@@ -591,15 +704,16 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                     break;
                     case CONSTRUCTOR:
                         //noinspection unchecked
-                        element = (T) visitorContext.getElementFactory().newConstructorElement(
+                        element = (T) elementFactory.newConstructorElement(
                                 this,
                                 (ExecutableElement) enclosedElement,
                                 metadata
                         );
+                    break;
                     case CLASS:
                     case ENUM:
                         //noinspection unchecked
-                        element = (T) visitorContext.getElementFactory().newClassElement(
+                        element = (T) elementFactory.newClassElement(
                                 (TypeElement) enclosedElement,
                                 metadata
                         );
@@ -609,6 +723,23 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 }
 
                 if (element != null) {
+                    if (hasTypePredicates) {
+                        for (Predicate<ClassElement> typePredicate : typePredicates) {
+                            ClassElement classElement;
+                            if (element instanceof ConstructorElement) {
+                                classElement = this;
+                            } else if (element instanceof MethodElement) {
+                                classElement = ((MethodElement) element).getGenericReturnType();
+                            } else if (element instanceof ClassElement) {
+                                classElement = (ClassElement) element;
+                            } else {
+                                classElement = ((FieldElement) element).getGenericField();
+                            }
+                            if (!typePredicate.test(classElement)) {
+                                continue elementLoop;
+                            }
+                        }
+                    }
                     List<Predicate<T>> elementPredicates = result.getElementPredicates();
                     if (!elementPredicates.isEmpty()) {
                         for (Predicate<T> elementPredicate : elementPredicates) {
@@ -656,7 +787,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new JavaClassElement(classElement, getAnnotationMetadata(), visitorContext, getGenericTypeInfo(), arrayDimensions);
+        return new JavaClassElement(classElement, getAnnotationMetadata(), visitorContext, getGenericTypeInfo(), arrayDimensions, false);
     }
 
     @Override
@@ -681,6 +812,24 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             packageName = JavaModelUtils.getPackageName(classElement);
         }
         return packageName;
+    }
+
+    @Override
+    public PackageElement getPackage() {
+        Element enclosingElement = classElement.getEnclosingElement();
+        while (enclosingElement != null && enclosingElement.getKind() != ElementKind.PACKAGE) {
+            enclosingElement = enclosingElement.getEnclosingElement();
+        }
+        if (enclosingElement instanceof javax.lang.model.element.PackageElement) {
+            return new JavaPackageElement(
+                    ((javax.lang.model.element.PackageElement) enclosingElement),
+                    visitorContext.getAnnotationUtils().getAnnotationMetadata(enclosingElement),
+                    visitorContext
+            );
+        } else {
+            return PackageElement.DEFAULT_PACKAGE;
+        }
+
     }
 
     @Override
@@ -743,6 +892,20 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         return createMethodElement(annotationUtils, method);
     }
 
+    @Override
+    public Optional<ClassElement> getEnclosingType() {
+        if (isInner()) {
+            Element enclosingElement = this.classElement.getEnclosingElement();
+            if (enclosingElement instanceof TypeElement) {
+                return Optional.of(visitorContext.getElementFactory().newClassElement(
+                        ((TypeElement) enclosingElement),
+                        visitorContext.getAnnotationUtils().getAnnotationMetadata(enclosingElement)
+                ));
+            }
+        }
+        return Optional.empty();
+    }
+
     private Optional<MethodElement> createMethodElement(AnnotationUtils annotationUtils, ExecutableElement method) {
         return Optional.ofNullable(method).map(executableElement -> {
             final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(executableElement);
@@ -770,22 +933,56 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         return Collections.unmodifiableMap(map);
     }
 
+    private Map<String, TypeMirror> getBoundTypeMirrors() {
+        List<? extends TypeParameterElement> typeParameters = classElement.getTypeParameters();
+        Iterator<? extends TypeParameterElement> tpi = typeParameters.iterator();
+
+        Map<String, TypeMirror> map = new LinkedHashMap<>();
+        while (tpi.hasNext()) {
+            TypeParameterElement tpe = tpi.next();
+            TypeMirror t = tpe.asType();
+            map.put(tpe.toString(), t);
+        }
+
+        return Collections.unmodifiableMap(map);
+    }
+
     @NonNull
     @Override
     public Map<String, Map<String, ClassElement>> getAllTypeArguments() {
-        Map<String, Map<String, TypeMirror>> info = visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement);
+        Map<String, TypeMirror> typeArguments = getBoundTypeMirrors();
+        Map<String, Map<String, TypeMirror>> info = visitorContext.getGenericUtils()
+                .buildGenericTypeArgumentElementInfo(
+                        classElement,
+                        null,
+                        typeArguments
+                );
         Map<String, Map<String, ClassElement>> result = new LinkedHashMap<>(info.size());
         info.forEach((name, generics) -> {
             Map<String, ClassElement> resolved = new LinkedHashMap<>(generics.size());
             generics.forEach((variable, mirror) -> {
-                ClassElement classElement = mirrorToClassElement(mirror, visitorContext, info, visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments());
+                final Map<String, TypeMirror> typeInfo = this.genericTypeInfo != null ? this.genericTypeInfo.get(getName()) : null;
+                TypeMirror resolvedType = mirror;
+                if (mirror instanceof TypeVariable && typeInfo != null) {
+                    final TypeMirror tm = typeInfo.get(mirror.toString());
+                    if (tm != null) {
+                        resolvedType = tm;
+                    }
+                }
+                ClassElement classElement = mirrorToClassElement(
+                        resolvedType,
+                        visitorContext,
+                        info,
+                        visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments(),
+                        mirror instanceof TypeVariable
+                );
                 resolved.put(variable, classElement);
             });
             result.put(name, resolved);
         });
-        Map<String, ClassElement> typeArguments = getTypeArguments();
+
         if (!typeArguments.isEmpty()) {
-            result.put(getName(), typeArguments);
+            result.put(JavaModelUtils.getClassName(this.classElement), getTypeArguments());
         }
         return result;
     }
@@ -795,7 +992,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
      */
     Map<String, Map<String, TypeMirror>> getGenericTypeInfo() {
         if (genericTypeInfo == null) {
-            genericTypeInfo = visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement);
+            genericTypeInfo = visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement, null, getBoundTypeMirrors());
         }
         return genericTypeInfo;
     }

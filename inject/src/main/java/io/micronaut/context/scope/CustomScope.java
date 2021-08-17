@@ -16,12 +16,9 @@
 package io.micronaut.context.scope;
 
 import io.micronaut.context.BeanRegistration;
-import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Indexed;
-import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 
-import javax.inject.Provider;
 import java.lang.annotation.Annotation;
 import java.util.Optional;
 
@@ -45,30 +42,22 @@ public interface CustomScope<A extends Annotation> {
      * Resolve an object from the given scope.
      *
      * @param <T>               The bean generic type
-     * @param resolutionContext The bean resolution context
-     * @param beanDefinition    The bean definition
-     * @param identifier        The {@link BeanIdentifier}
-     * @param provider          The provider that will build the bean definition
+     * @param creationContext   The creation context
      * @return The bean instance
      */
-    <T> T get(
-        BeanResolutionContext resolutionContext,
-        BeanDefinition<T> beanDefinition,
-        BeanIdentifier identifier,
-        Provider<T> provider
-    );
+    <T> T getOrCreate(BeanCreationContext<T> creationContext);
 
     /**
      * Remove a bean definition from the scope.
      *
      * @param identifier The {@link BeanIdentifier}
      * @param <T>        The generic type
-     * @return An {@link Optional} of the instance if it exists
+     * @return An {@link Optional} of the instance that was destroyed if it exists
      */
     <T> Optional<T> remove(BeanIdentifier identifier);
 
     /**
-     * Get the {@link BeanDefinition} for the given bean.
+     * Get the {@link io.micronaut.inject.BeanDefinition} for the given bean.
      *
      * @param bean The bean
      * @param <T> The bean generic type

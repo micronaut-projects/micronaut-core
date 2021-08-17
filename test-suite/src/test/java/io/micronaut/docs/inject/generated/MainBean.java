@@ -16,7 +16,7 @@
 package io.micronaut.docs.inject.generated;
 
 import io.micronaut.test.generated.Example;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class MainBean {

@@ -4,10 +4,11 @@ import groovy.json.JsonSlurper
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
-import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.http.server.netty.AbstractMicronautSpec
+import reactor.core.publisher.Flux
 
 class DefaultJsonErrorHandlingSpec extends AbstractMicronautSpec {
 
@@ -15,24 +16,23 @@ class DefaultJsonErrorHandlingSpec extends AbstractMicronautSpec {
 
         when:
         def json = '{"title":"The Stand"'
-        rxClient.exchange(
+        Flux.from(rxClient.exchange(
                 HttpRequest.POST('/errors/map', json), String
-        ).blockingFirst()
-
+        )).blockFirst()
 
         then:
-        def e = thrown(HttpClientResponseException)
-        e.message == """Invalid JSON: Unexpected end-of-input
+        HttpClientResponseException e = thrown()
+        e.response.getBody(Map).get()._embedded.errors[0].message == """Invalid JSON: Unexpected end-of-input
  at [Source: UNKNOWN; line: 1, column: 21]"""
         e.response.status == HttpStatus.BAD_REQUEST
 
         when:
-        def body = e.response.getBody(String).orElse(null)
+        String body = e.response.getBody(String).orElse(null)
         def result = new JsonSlurper().parseText(body)
 
         then:
         result['_links'].self.href == '/errors/map'
-        result.message.startsWith('Invalid JSON')
+        result['_embedded'].errors[0].message.startsWith('Invalid JSON')
     }
 
     @Controller("/errors")

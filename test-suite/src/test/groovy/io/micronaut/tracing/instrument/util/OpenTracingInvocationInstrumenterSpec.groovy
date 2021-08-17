@@ -17,8 +17,8 @@ package io.micronaut.tracing.instrument.util
 
 import io.micronaut.context.ApplicationContext
 import io.opentracing.Tracer
-import io.reactivex.Flowable
-import io.reactivex.Single
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.Specification
 
 /**
@@ -43,11 +43,10 @@ class OpenTracingInvocationInstrumenterSpec extends Specification {
         when: 'reactive operations are executed inside a span'
         def rootSpan = tracer.buildSpan('root').start()
         def scope = tracer.activateSpan(rootSpan)
-        def combined = Flowable
-            .merge(words.collect { Single.just(it).toFlowable() })
+        def combined = Flux
+            .merge(words.collect { Mono.just(it).flux() })
             .reduce { a, b -> "$a, $b" }
-            .toSingle()
-            .blockingGet()
+            .block()
         scope.close()
         rootSpan.finish()
 

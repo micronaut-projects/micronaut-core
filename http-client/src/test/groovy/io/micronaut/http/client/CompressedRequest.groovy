@@ -15,7 +15,9 @@
  */
 package io.micronaut.http.client
 
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
@@ -24,25 +26,34 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Single
+import io.netty.handler.codec.http.HttpHeaderValues
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+
 import java.util.zip.GZIPOutputStream
 
 class CompressedRequest extends Specification {
-    
+
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer)
+            ApplicationContext.run(EmbeddedServer, [
+                    'spec.name': 'CompressedRequest'
+            ])
 
     void "test gzipped body in post request"() {
         given:
-        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
+        HttpClient client = HttpClient.create(embeddedServer.getURL())
         byte[] body = gzip("[0, 1, 2, 3, 4]")
 
         when:
         int i = 0
-        HttpResponse<List> result = client.exchange(HttpRequest.POST('/gzip/request/numbers', body).contentEncoding(io.netty.handler.codec.http.HttpHeaderValues.GZIP).contentType(MediaType.APPLICATION_JSON_TYPE), List).blockingFirst()
+        HttpResponse<List> result = client.toBlocking().exchange(
+                HttpRequest.POST('/gzip/request/numbers', body)
+                        .contentEncoding(HttpHeaderValues.GZIP)
+                        .contentType(MediaType.APPLICATION_JSON_TYPE), List)
 
         then:
         result.body().size() == 5
@@ -53,11 +64,13 @@ class CompressedRequest extends Specification {
         client.close()
     }
 
+    @Requires(property = 'spec.name', value = 'CompressedRequest')
     @Controller('/gzip/request')
     static class StreamController {
 
         @Post("/numbers")
-        Single<List<Long>> numbers(@Header MediaType contentType, @Body Single<List<Long>> numbers) {
+        @SingleResult
+        Publisher<List<Long>> numbers(@Header MediaType contentType, @Body Publisher<List<Long>> numbers) {
             assert contentType == MediaType.APPLICATION_JSON_TYPE
             numbers
         }
@@ -72,5 +85,4 @@ class CompressedRequest extends Specification {
         targetStream.close()
         zippedBytes
     }
-
 }

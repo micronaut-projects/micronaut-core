@@ -17,11 +17,11 @@ package io.micronaut.context;
 
 import io.micronaut.context.exceptions.NoSuchMessageException;
 import io.micronaut.core.annotation.Indexed;
-import io.micronaut.core.util.ArgumentUtils;
-
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import javax.inject.Singleton;
+import io.micronaut.core.util.ArgumentUtils;
+import jakarta.inject.Singleton;
+
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;

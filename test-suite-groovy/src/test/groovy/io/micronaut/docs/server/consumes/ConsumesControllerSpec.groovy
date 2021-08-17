@@ -17,9 +17,10 @@ package io.micronaut.docs.server.consumes
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
@@ -36,7 +37,7 @@ class ConsumesControllerSpec extends Specification {
 
     @AutoCleanup
     @Shared
-    RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+    HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
     def "@Consumes allow you to control which media type is accepted"() {
         given:
@@ -78,6 +79,7 @@ class ConsumesControllerSpec extends Specification {
         noExceptionThrown()
     }
 
+    @Introspected
     static class Book {
         String title
         Integer pages

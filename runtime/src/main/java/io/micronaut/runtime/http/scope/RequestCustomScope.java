@@ -15,127 +15,82 @@
  */
 package io.micronaut.runtime.http.scope;
 
-import io.micronaut.core.annotation.Nullable;
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.LifeCycle;
 import io.micronaut.context.event.ApplicationEventListener;
-import io.micronaut.context.exceptions.NoSuchBeanException;
-import io.micronaut.context.scope.CustomScope;
+import io.micronaut.context.scope.AbstractConcurrentCustomScope;
+import io.micronaut.context.scope.BeanCreationContext;
+import io.micronaut.context.scope.CreatedBean;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
-import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
-import io.micronaut.inject.DisposableBeanDefinition;
-import io.micronaut.inject.qualifiers.Qualifiers;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jakarta.inject.Singleton;
 
-import io.micronaut.core.annotation.NonNull;
-import javax.inject.Provider;
-import javax.inject.Singleton;
-import java.util.Optional;
+import java.util.Collections;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * A {@link CustomScope} that creates a new bean for every HTTP request.
+ * A {@link io.micronaut.context.scope.CustomScope} that creates a new bean for every HTTP request.
  *
  * @author James Kleeh
  * @author Marcel Overdijk
  * @since 1.2.0
  */
 @Singleton
-class RequestCustomScope implements CustomScope<RequestScope>, LifeCycle<RequestCustomScope>, ApplicationEventListener<HttpRequestTerminatedEvent> {
+class RequestCustomScope extends AbstractConcurrentCustomScope<RequestScope> implements ApplicationEventListener<HttpRequestTerminatedEvent> {
     /**
      * The request attribute to store scoped beans in.
      */
     public static final String SCOPED_BEANS_ATTRIBUTE = "io.micronaut.http.SCOPED_BEANS";
-    public static final String SCOPED_BEAN_DEFINITIONS_ATTRIBUTE = "io.micronaut.http.SCOPED_BEAN_DEFINITIONS";
-
-    private static final Logger LOG = LoggerFactory.getLogger(RequestCustomScope.class);
-
-    private final BeanContext beanContext;
 
     /**
      * Creates the request scope for the given context.
      *
-     * @param beanContext The context
      */
-    public RequestCustomScope(BeanContext beanContext) {
-        this.beanContext = beanContext;
+    public RequestCustomScope() {
+        super(RequestScope.class);
     }
 
     @Override
-    public Class<RequestScope> annotationType() {
-        return RequestScope.class;
-    }
-
-    @Override
-    public <T> T get(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition,
-                     BeanIdentifier identifier, Provider<T> provider) {
-        Optional<HttpRequest<T>> currentRequest = ServerRequestContext.currentRequest();
-        if (!currentRequest.isPresent()) {
-            throw new NoSuchBeanException(beanDefinition.getBeanType(), Qualifiers.byStereotype(RequestScope.class));
-        }
-        HttpRequest<T> httpRequest = currentRequest.get();
-        synchronized (httpRequest) {
-            return (T) getRequestScopedBeans(httpRequest, true).computeIfAbsent(identifier, i -> {
-                Object bean = provider.get();
-                if (bean instanceof RequestAware) {
-                    ((RequestAware) bean).setRequest(httpRequest);
-                }
-                getRequestScopedBeanDefinitions(httpRequest, true)
-                        .put(identifier, beanDefinition);
-                return bean;
-            });
-        }
-    }
-
-    @Override
-    public <T> Optional<T> remove(BeanIdentifier identifier) {
-        Optional<HttpRequest<Object>> request = ServerRequestContext.currentRequest();
-        if (request.isPresent()) {
-            T bean = (T) getRequestScopedBeans(request.get(), true).remove(identifier);
-            BeanDefinition<T> beanDefinition = (BeanDefinition<T>) getRequestScopedBeanDefinitions(request.get(), true).remove(identifier);
-            destroyRequestScopedBean(bean, beanDefinition);
-            return Optional.ofNullable(bean);
-        } else {
-            return Optional.empty();
-        }
-    }
-
-    private <T> void destroyRequestScopedBean(@Nullable T bean, @Nullable BeanDefinition<T> beanDefinition) {
-        if (bean != null && beanDefinition instanceof DisposableBeanDefinition) {
-            try {
-                ((DisposableBeanDefinition<T>) beanDefinition).dispose(
-                        beanContext, bean
-                );
-            } catch (Exception e) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Error disposing of request scoped bean: " + bean, e);
-                }
-            }
-        }
-    }
-
-    @NonNull
-    @Override
-    public RequestCustomScope stop() {
+    public void close() {
         ServerRequestContext.currentRequest().ifPresent(this::destroyBeans);
-        return this;
     }
 
     @Override
     public boolean isRunning() {
-        return true;
+        return ServerRequestContext.currentRequest().isPresent();
     }
 
     @Override
     public void onApplicationEvent(HttpRequestTerminatedEvent event) {
         destroyBeans(event.getSource());
+    }
+
+    @NonNull
+    @Override
+    protected Map<BeanIdentifier, CreatedBean<?>> getScopeMap(boolean forCreation) {
+        final HttpRequest<Object> request = ServerRequestContext.currentRequest().orElse(null);
+        if (request != null) {
+            //noinspection ConstantConditions
+            return getRequestAttributeMap(request, forCreation);
+        } else {
+            return Collections.emptyMap();
+        }
+    }
+
+    @NonNull
+    @Override
+    protected <T> CreatedBean<T> doCreate(@NonNull BeanCreationContext<T> creationContext) {
+        final HttpRequest<Object> request = ServerRequestContext.currentRequest().orElse(null);
+        final CreatedBean<T> createdBean = super.doCreate(creationContext);
+        final T bean = createdBean.bean();
+        if (bean instanceof RequestAware) {
+            ((RequestAware) bean).setRequest(request);
+        }
+        return createdBean;
     }
 
     /**
@@ -144,37 +99,22 @@ class RequestCustomScope implements CustomScope<RequestScope>, LifeCycle<Request
      */
     private void destroyBeans(HttpRequest<?> request) {
         ArgumentUtils.requireNonNull("request", request);
-        ConcurrentHashMap<BeanIdentifier, Object> requestScopedBeans = getRequestScopedBeans(request, false);
+        ConcurrentHashMap<BeanIdentifier, CreatedBean<?>> requestScopedBeans =
+                getRequestAttributeMap(request, false);
         if (requestScopedBeans != null) {
-            requestScopedBeans
-                    .forEach((beanIdentifier, instance) -> {
-                        BeanDefinition beanDefinition = getRequestScopedBeanDefinitions(request, false).get(beanIdentifier);
-                        destroyRequestScopedBean(instance, beanDefinition);
-                    });
+            destroyScope(requestScopedBeans);
         }
     }
 
-    private <T> ConcurrentHashMap<BeanIdentifier, Object> getRequestScopedBeans(HttpRequest<T> httpRequest, boolean create) {
-        synchronized (httpRequest) {
-            return getRequestAttributeMap(httpRequest, SCOPED_BEANS_ATTRIBUTE, create);
-        }
-    }
-
-    private <T> ConcurrentHashMap<BeanIdentifier, BeanDefinition> getRequestScopedBeanDefinitions(HttpRequest<T> httpRequest, boolean create) {
-        synchronized (httpRequest) {
-            return getRequestAttributeMap(httpRequest, SCOPED_BEAN_DEFINITIONS_ATTRIBUTE, create);
-        }
-    }
-
-    private <T> ConcurrentHashMap getRequestAttributeMap(HttpRequest<T> httpRequest, String attribute, boolean create) {
+    private <T> ConcurrentHashMap<BeanIdentifier, CreatedBean<?>> getRequestAttributeMap(HttpRequest<T> httpRequest, boolean create) {
         MutableConvertibleValues<Object> attrs = httpRequest.getAttributes();
-        Object o = attrs.getValue(attribute);
+        Object o = attrs.getValue(SCOPED_BEANS_ATTRIBUTE);
         if (o instanceof ConcurrentHashMap) {
-            return (ConcurrentHashMap) o;
+            return (ConcurrentHashMap<BeanIdentifier, CreatedBean<?>>) o;
         }
         if (create) {
-            ConcurrentHashMap scopedBeans = new ConcurrentHashMap(5);
-            attrs.put(attribute, scopedBeans);
+            ConcurrentHashMap<BeanIdentifier, CreatedBean<?>> scopedBeans = new ConcurrentHashMap<>(5);
+            attrs.put(SCOPED_BEANS_ATTRIBUTE, scopedBeans);
             return scopedBeans;
         }
         return null;

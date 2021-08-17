@@ -24,15 +24,15 @@ import io.micronaut.management.health.indicator.HealthResult;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.scheduling.annotation.Scheduled;
-import io.reactivex.Flowable;
-import io.reactivex.MaybeObserver;
-import io.reactivex.disposables.Disposable;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -87,7 +87,7 @@ public class HealthMonitorTask {
             .map(HealthIndicator::getResult)
             .collect(Collectors.toList());
 
-        Flowable<HealthResult> resultFlowable = Flowable
+        Flux<HealthResult> reactiveSequence = Flux
             .merge(healthResults)
             .filter(healthResult -> {
                     HealthStatus status = healthResult.getStatus();
@@ -95,14 +95,14 @@ public class HealthMonitorTask {
                 }
             );
 
-        resultFlowable.firstElement().subscribe(new MaybeObserver<HealthResult>() {
+        reactiveSequence.next().subscribe(new Subscriber<HealthResult>() {
             @Override
-            public void onSubscribe(Disposable d) {
+            public void onSubscribe(Subscription s) {
 
             }
 
             @Override
-            public void onSuccess(HealthResult healthResult) {
+            public void onNext(HealthResult healthResult) {
                 HealthStatus status = healthResult.getStatus();
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Health monitor check failed with status {}", status);

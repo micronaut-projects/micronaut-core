@@ -15,17 +15,6 @@
  */
 package io.micronaut.http.server.cors;
 
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_MAX_AGE;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD;
-import static io.micronaut.http.HttpHeaders.ORIGIN;
-import static io.micronaut.http.HttpHeaders.VARY;
-
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -49,6 +38,8 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import static io.micronaut.http.HttpHeaders.*;
 
 /**
  * Responsible for handling CORS requests and responses.
@@ -79,9 +70,8 @@ public class CorsFilter implements HttpServerFilter {
             if (response != null) {
                 return Publishers.just(response);
             } else {
-                return Publishers.map(chain.proceed(request), mutableHttpResponse -> {
+                return Publishers.then(chain.proceed(request), mutableHttpResponse -> {
                     handleResponse(request, mutableHttpResponse);
-                    return mutableHttpResponse;
                 });
             }
         } else {

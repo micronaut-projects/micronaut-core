@@ -1,23 +1,15 @@
 package io.micronaut.docs.server.exception
 
-import io.kotlintest.shouldBe
-import io.kotlintest.shouldThrow
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.HttpClient
-import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
-import org.junit.AfterClass
-import org.junit.BeforeClass
-import org.junit.Test
-
-import java.util.Collections
-
-import org.junit.Assert.assertEquals
 
 class ExceptionHandlerSpec: StringSpec() {
 
@@ -26,7 +18,7 @@ class ExceptionHandlerSpec: StringSpec() {
     )
 
     val client = autoClose(
-            embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.getURL())
+            embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.getURL())
     )
 
     init {
@@ -41,10 +33,11 @@ class ExceptionHandlerSpec: StringSpec() {
             }
 
             val response = ex.response
-            val body = response.getBody(errorType).get() as Map<String, Any>
+            val embedded: Map<*, *> = response.getBody(Map::class.java).get().get("_embedded") as Map<*, *>
+            val message = ((embedded.get("errors") as java.util.List<*>).get(0) as Map<*, *>).get("message")
 
             response.status().shouldBe(HttpStatus.BAD_REQUEST)
-            body["message"].shouldBe("No stock available")
+            message shouldBe("No stock available")
         }
     }
 }

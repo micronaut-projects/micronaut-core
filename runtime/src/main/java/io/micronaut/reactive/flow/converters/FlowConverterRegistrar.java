@@ -18,27 +18,26 @@ package io.micronaut.reactive.flow.converters;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
-import io.reactivex.Flowable;
+import jakarta.inject.Singleton;
 import kotlinx.coroutines.flow.Flow;
 import kotlinx.coroutines.reactive.ReactiveFlowKt;
 import org.reactivestreams.Publisher;
-
-import javax.inject.Singleton;
+import reactor.core.publisher.Flux;
 
 /**
- * Converts between a {@link Flow} and a {@link Publisher}.
+ * Converts between a {@link Flux} and a {@link Publisher}.
  *
  * @author Konrad Kamiński
  * @since 1.3
  */
 @Singleton
-@Requires(classes = {Flow.class, ReactiveFlowKt.class})
+@Requires(classes = {Flux.class, ReactiveFlowKt.class})
 public class FlowConverterRegistrar implements TypeConverterRegistrar {
     @Override
     public void register(ConversionService<?> conversionService) {
         // Flow
-        conversionService.addConverter(Flow.class, Flowable.class, flow ->
-                Flowable.fromPublisher(ReactiveFlowKt.asPublisher(flow))
+        conversionService.addConverter(Flow.class, Flux.class, flow ->
+                Flux.from(ReactiveFlowKt.asPublisher(flow))
         );
         conversionService.addConverter(Flow.class, Publisher.class, ReactiveFlowKt::asPublisher);
         conversionService.addConverter(Publisher.class, Flow.class, ReactiveFlowKt::asFlow);

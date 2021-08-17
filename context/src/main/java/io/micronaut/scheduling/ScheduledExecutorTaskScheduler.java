@@ -20,9 +20,9 @@ import static io.micronaut.core.util.ArgumentUtils.check;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.cron.CronExpression;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 
-import javax.inject.Named;
-import javax.inject.Singleton;
 import java.time.Duration;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;

@@ -23,20 +23,13 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.EnvironmentConfigurable;
 import io.micronaut.context.annotation.Type;
-import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.lang.annotation.Annotation;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 /**
  *
@@ -50,18 +43,10 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @Internal
-public class InterceptorChain<B, R> implements InvocationContext<B, R> {
-    protected static final Logger LOG = LoggerFactory.getLogger(InterceptorChain.class);
-    private static final Interceptor[] ZERO_INTERCEPTORS = new Interceptor[0];
+public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> implements InvocationContext<B, R> {
 
-    protected final Interceptor<B, R>[] interceptors;
     protected final B target;
     protected final ExecutableMethod<B, R> executionHandle;
-    protected final Object[] originalParameters;
-    protected MutableConvertibleValues<Object> attributes;
-    protected Map<String, MutableArgumentValue<?>> parameters;
-    protected final int interceptorCount;
-    protected int index = 0;
 
     /**
      * Constructor.
@@ -75,19 +60,12 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
                             B target,
                             ExecutableMethod<B, R> method,
                             Object... originalParameters) {
+        super(interceptors, originalParameters);
         if (LOG.isTraceEnabled()) {
             LOG.trace("Intercepted method [{}] invocation on target: {}", method, target);
         }
         this.target = target;
-        this.originalParameters = originalParameters;
         this.executionHandle = method;
-        this.interceptors = interceptors;
-        this.interceptorCount = interceptors.length;
-    }
-
-    @Override
-    public Object[] getParameterValues() {
-        return originalParameters;
     }
 
     @Override
@@ -96,97 +74,8 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
     }
 
     @Override
-    public MutableConvertibleValues<Object> getAttributes() {
-        MutableConvertibleValues<Object> attributes = this.attributes;
-        if (attributes == null) {
-            synchronized (this) { // double check
-                attributes = this.attributes;
-                if (attributes == null) {
-                    attributes = MutableConvertibleValues.of(new ConcurrentHashMap<>(5));
-                    this.attributes = attributes;
-                }
-            }
-        }
-        return attributes;
-    }
-
-    @Override
     public Argument[] getArguments() {
         return executionHandle.getArguments();
-    }
-
-    @Override
-    public Map<String, MutableArgumentValue<?>> getParameters() {
-        Map<String, MutableArgumentValue<?>>  parameters = this.parameters;
-        if (parameters == null) {
-            synchronized (this) { // double check
-                parameters = this.parameters;
-                if (parameters == null) {
-                    Argument[] arguments = executionHandle.getArguments();
-                    parameters = new LinkedHashMap<>(arguments.length);
-                    for (int i = 0; i < arguments.length; i++) {
-                        Argument argument = executionHandle.getArguments()[i];
-                        int finalIndex = i;
-                        parameters.put(argument.getName(), new MutableArgumentValue<Object>() {
-                            @Override
-                            public AnnotationMetadata getAnnotationMetadata() {
-                                return argument.getAnnotationMetadata();
-                            }
-
-                            @Override
-                            public Optional<Argument<?>> getFirstTypeVariable() {
-                                return argument.getFirstTypeVariable();
-                            }
-
-                            @Override
-                            public Argument[] getTypeParameters() {
-                                return argument.getTypeParameters();
-                            }
-
-                            @Override
-                            public Map<String, Argument<?>> getTypeVariables() {
-                                return argument.getTypeVariables();
-                            }
-
-                            @NonNull
-                            @Override
-                            public String getName() {
-                                return argument.getName();
-                            }
-
-                            @NonNull
-                            @Override
-                            public Class<Object> getType() {
-                                return argument.getType();
-                            }
-
-                            @Override
-                            public boolean equalsType(Argument<?> other) {
-                                return argument.equalsType(other);
-                            }
-
-                            @Override
-                            public int typeHashCode() {
-                                return argument.typeHashCode();
-                            }
-
-                            @Override
-                            public Object getValue() {
-                                return originalParameters[finalIndex];
-                            }
-
-                            @Override
-                            public void setValue(Object value) {
-                                originalParameters[finalIndex] = value;
-                            }
-                        });
-                    }
-                    parameters = Collections.unmodifiableMap(parameters);
-                    this.parameters = parameters;
-                }
-            }
-        }
-        return parameters;
     }
 
     @Override
@@ -216,19 +105,6 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
 
             return interceptor.intercept(this);
         }
-    }
-
-    @Override
-    public R proceed(Interceptor from) throws RuntimeException {
-        for (int i = 0; i < interceptors.length; i++) {
-            Interceptor<B, R> interceptor = interceptors[i];
-            if (interceptor == from) {
-                index = i + 1;
-                return proceed();
-
-            }
-        }
-        throw new IllegalArgumentException("Argument [" + from + "] is not within the interceptor chain");
     }
 
     /**
@@ -280,7 +156,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
      * @deprecated Replaced by {@link #resolveAroundInterceptors(BeanContext, ExecutableMethod, List)}
      */
     // IMPLEMENTATION NOTE: This method is deprecated but should not be removed as it would break binary compatibility
-    @SuppressWarnings("WeakerAccess")
+    @SuppressWarnings({"WeakerAccess", "rawtypes"})
     @Internal
     @UsedByGeneratedCode
     @Deprecated
@@ -319,60 +195,19 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
         return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
     }
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
     @NonNull
     private static Interceptor[] resolveInterceptors(
             BeanContext beanContext,
             ExecutableMethod<?, ?> method,
             List<BeanRegistration<Interceptor<?, ?>>> interceptors,
             InterceptorKind interceptorKind) {
-        if (interceptors.isEmpty()) {
-            if (interceptorKind == InterceptorKind.INTRODUCTION) {
-                if (method.hasStereotype(Adapter.class)) {
-                    return new Interceptor[] { new AdapterIntroduction(beanContext, method) };
-                } else {
-                    throw new IllegalStateException("At least one @Introduction method interceptor required, but missing. Check if your @Introduction stereotype annotation is marked with @Retention(RUNTIME) and @Type(..) with the interceptor type. Otherwise do not load @Introduction beans if their interceptor definitions are missing!");
-
-                }
-            } else {
-                return ZERO_INTERCEPTORS;
-            }
-        } else {
-            instrumentAnnotationMetadata(beanContext, method);
-            final List<AnnotationValue<InterceptorBinding>> applicableBindings
-                    = method.getAnnotationValuesByType(InterceptorBinding.class)
-                    .stream()
-                    .filter(ann ->
-                            ann.enumValue("kind", InterceptorKind.class)
-                                    .orElse(InterceptorKind.AROUND) == interceptorKind)
-                    .collect(Collectors.toList());
-            final Interceptor[] resolvedInterceptors = interceptors.stream()
-                    .filter(beanRegistration -> applicableBindings.stream().anyMatch(annotationValue -> {
-                        // does the annotation metadata contain @InterceptorBinding(interceptorType=SomeInterceptor.class)
-                        // that matches the list of interceptors ?
-                        final boolean isApplicableByType = annotationValue.classValue("interceptorType")
-                                .map(t -> t.isInstance(beanRegistration.getBean())).orElse(false);
-
-                        // does the annotation metadata of the interceptor definition contain
-                        // @InterceptorBinding(SomeAnnotation.class) ?
-                        final boolean isApplicationByBinding = annotationValue.stringValue()
-                                .map(annotationName -> InterceptorBindingQualifier.resolveInterceptorValues(beanRegistration
-                                        .getBeanDefinition()
-                                        .getAnnotationMetadata())
-                                        .contains(annotationName))
-                                .orElse(false);
-                        return isApplicableByType || isApplicationByBinding;
-                    })).sorted(OrderUtil.COMPARATOR)
-                    .map(BeanRegistration::getBean)
-                    .toArray(Interceptor[]::new);
-            if (LOG.isTraceEnabled()) {
-                LOG.trace("Resolved {} {} interceptors out of a possible {} for method: {} - {}", resolvedInterceptors.length, interceptorKind, interceptors.size(), method.getDeclaringType(), method.getDescription(true));
-                for (int i = 0; i < resolvedInterceptors.length; i++) {
-                    Interceptor resolvedInterceptor = resolvedInterceptors[i];
-                    LOG.trace("Interceptor {} - {}", i, resolvedInterceptor);
-                }
-            }
-            return resolvedInterceptors;
-        }
+        return beanContext.getBean(InterceptorRegistry.class)
+                    .resolveInterceptors(
+                            (ExecutableMethod) method,
+                            (List) interceptors,
+                            interceptorKind
+                    );
     }
 
     private static void instrumentAnnotationMetadata(BeanContext beanContext, ExecutableMethod<?, ?> method) {

@@ -20,32 +20,34 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.reactivex.Flowable;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
+import reactor.core.publisher.Flux;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 
 public class UploadControllerSpec {
 
     private static EmbeddedServer server;
-    private static RxHttpClient client;
+    private static HttpClient client;
 
     @BeforeClass
     public static void setupServer() {
         server = ApplicationContext.run(EmbeddedServer.class);
         client = server
                 .getApplicationContext()
-                .createBean(RxHttpClient.class, server.getURL());
+                .createBean(HttpClient.class, server.getURL());
     }
 
     @AfterClass
@@ -68,13 +70,13 @@ public class UploadControllerSpec {
                 .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".getBytes())
                 .build();
 
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload", body)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String.class
         ));
-        HttpResponse<String> response = flowable.blockingFirst();
+        HttpResponse<String> response = flowable.blockFirst();
 
         assertEquals(HttpStatus.OK.getCode(), response.code());
         assertEquals("Uploaded", response.getBody().get());
@@ -86,13 +88,13 @@ public class UploadControllerSpec {
                 .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".getBytes())
                 .build();
 
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/completed", body)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String.class
         ));
-        HttpResponse<String> response = flowable.blockingFirst();
+        HttpResponse<String> response = flowable.blockFirst();
 
         assertEquals(HttpStatus.OK.getCode(), response.code());
         assertEquals("Uploaded", response.getBody().get());
@@ -104,13 +106,13 @@ public class UploadControllerSpec {
                 .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, new byte[0])
                 .build();
 
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/completed", body)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String.class
         ));
-        HttpResponse<String> response = flowable.blockingFirst();
+        HttpResponse<String> response = flowable.blockFirst();
 
         assertEquals(HttpStatus.OK.getCode(), response.code());
         assertEquals("Uploaded", response.getBody().get());
@@ -122,16 +124,18 @@ public class UploadControllerSpec {
                 .addPart("file", "", MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".getBytes())
                 .build();
 
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/completed", body)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String.class
         ));
 
-        HttpClientResponseException ex = Assertions.assertThrows(HttpClientResponseException.class, () -> flowable.blockingFirst());
+        HttpClientResponseException ex = Assertions.assertThrows(HttpClientResponseException.class, () -> flowable.blockFirst());
+        Map<String, Object> embedded = (Map<String, Object>) ex.getResponse().getBody(Map.class).get().get("_embedded");
+        Object message = ((Map<String, Object>) ((List) embedded.get("errors")).get(0)).get("message");
 
-        assertEquals("Required argument [CompletedFileUpload file] not specified", ex.getMessage());
+        assertEquals("Required argument [CompletedFileUpload file] not specified", message);
     }
 
     @Test
@@ -140,16 +144,18 @@ public class UploadControllerSpec {
                 .addPart("file", "", MediaType.APPLICATION_JSON_TYPE, new byte[0])
                 .build();
 
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/completed", body)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String.class
         ));
 
-        HttpClientResponseException ex = Assertions.assertThrows(HttpClientResponseException.class, () -> flowable.blockingFirst());
+        HttpClientResponseException ex = Assertions.assertThrows(HttpClientResponseException.class, () -> flowable.blockFirst());
+        Map<String, Object> embedded = (Map<String, Object>) ex.getResponse().getBody(Map.class).get().get("_embedded");
+        Object message = ((Map<String, Object>) ((List) embedded.get("errors")).get(0)).get("message");
 
-        assertEquals("Required argument [CompletedFileUpload file] not specified", ex.getMessage());
+        assertEquals("Required argument [CompletedFileUpload file] not specified", message);
     }
 
     @Test
@@ -158,16 +164,18 @@ public class UploadControllerSpec {
                 .addPart("filex", "", MediaType.APPLICATION_JSON_TYPE, new byte[0])
                 .build();
 
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/completed", body)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String.class
         ));
 
-        HttpClientResponseException ex = Assertions.assertThrows(HttpClientResponseException.class, () -> flowable.blockingFirst());
+        HttpClientResponseException ex = Assertions.assertThrows(HttpClientResponseException.class, () -> flowable.blockFirst());
+        Map<String, Object> embedded = (Map<String, Object>) ex.getResponse().getBody(Map.class).get().get("_embedded");
+        Object message = ((Map<String, Object>) ((List) embedded.get("errors")).get(0)).get("message");
 
-        assertEquals("Required argument [CompletedFileUpload file] not specified", ex.getMessage());
+        assertEquals("Required argument [CompletedFileUpload file] not specified", message);
     }
 
     @Test
@@ -177,13 +185,13 @@ public class UploadControllerSpec {
                 .addPart("fileName", "bar")
                 .build();
 
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/bytes", body)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String.class
         ));
-        HttpResponse<String> response = flowable.blockingFirst();
+        HttpResponse<String> response = flowable.blockFirst();
 
         assertEquals(HttpStatus.OK.getCode(), response.code());
         assertEquals("Uploaded", response.getBody().get());

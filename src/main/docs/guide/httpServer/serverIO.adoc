@@ -7,15 +7,19 @@ The following table summarizes example return type signatures and the behaviour 
 |===
 |Return Type | Description
 
-|`Flowable<byte[]>`
-|A rx:Flowable[] that emits each chunk of content as a `byte[]` without blocking
-
-|`Flux<ByteBuf>`
-|A Reactor `Flux` that emits each chunk as a Netty `ByteBuf`
-
 |`Publisher<String>`
 |A rs:Publisher[] that emits each chunk of content as a String
+|`Flux<byte[]>`
+|A reactor:Flux[] that emits each chunk of content as a `byte[]` without blocking
+|`Flux<ByteBuf>`
+|A Reactor `Flux` that emits each chunk as a Netty `ByteBuf`
+|`Flux<Book>`
+|When emitting a POJO, each emitted object is encoded as JSON by default without blocking
 
+|`Flowable<byte[]>`
+|A reactor:Flux[] that emits each chunk of content as a `byte[]` without blocking
+|`Flowable<ByteBuf>`
+|A Reactor `Flux` that emits each chunk as a Netty `ByteBuf`
 |`Flowable<Book>`
 |When emitting a POJO, each emitted object is encoded as JSON by default without blocking
 
@@ -26,6 +30,10 @@ When returning a reactive type, the server uses a `Transfer-Encoding` of `chunke
 The server requests a single item from the rs:Publisher[], writes it, and requests the next, controlling back pressure.
 
 NOTE: It is up to the implementation of the rs:Publisher[] to schedule any blocking I/O work that may be done as a result of subscribing to the publisher.
+
+NOTE: To use https://projectreactor.io[Project Reactor]'s `Flux` or `Mono` you need to add the Micronaut Reactor dependency to your project to include the necessary converters.
+
+NOTE: To use https://github.com/ReactiveX/RxJava[RxJava]'s `Flowable`, `Single` or `Maybe` you need to add the Micronaut RxJava dependency to your project to include the necessary converters.
 
 === Performing Blocking I/O
 
@@ -66,6 +74,6 @@ See the following example:
 snippet::io.micronaut.docs.respondingnotfound.BooksController[tags="clazz", indent=0]
 
 <1> Returning `null` triggers a 404 (Not Found) response.
-<2> Returning an empty `Maybe` triggers a 404 (Not Found) response.
+<2> Returning an empty `Mono` triggers a 404 (Not Found) response.
 
-NOTE: Responding with an empty `Publisher` or `Flowable` results in an empty array being returned if the content type is JSON.
+NOTE: Responding with an empty `Publisher` or `Flux` results in an empty array being returned if the content type is JSON.

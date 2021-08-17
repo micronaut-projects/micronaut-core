@@ -19,8 +19,6 @@ import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.reflect.ClassUtils;
-import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
@@ -30,9 +28,9 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.http.bind.binders.*;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.*;
 
@@ -123,19 +121,6 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                 if (CollectionUtils.isNotEmpty(superTypes)) {
                     for (Class<?> superType : superTypes) {
                         byTypeAndAnnotation.put(new TypeAndAnnotation(Argument.of(superType), annotationType), (RequestArgumentBinder) binder);
-                    }
-                } else if (typedRequestArgumentBinder.supportsSuperTypes()) {
-                    Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(argumentType.getType());
-                    if (ClassUtils.REFLECTION_LOGGER.isWarnEnabled()) {
-                        ClassUtils.REFLECTION_LOGGER.warn(
-                                "Request argument binder [{}] triggered the use of reflection for types {}",
-                                typedRequestArgumentBinder,
-                                allInterfaces
-                        );
-                    }
-
-                    for (Class<?> itfce : allInterfaces) {
-                        byTypeAndAnnotation.put(new TypeAndAnnotation(Argument.of(itfce), annotationType), (RequestArgumentBinder) binder);
                     }
                 }
             } else {

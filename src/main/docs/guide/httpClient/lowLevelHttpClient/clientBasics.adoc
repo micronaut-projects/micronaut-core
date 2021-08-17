@@ -5,14 +5,14 @@ There are a few ways to obtain a reference to an api:http.client.HttpClient[]. T
 .Injecting an HTTP client
 [source,java]
 ----
-@Client("https://api.twitter.com/1.1") @Inject RxHttpClient httpClient;
+@Client("https://api.twitter.com/1.1") @Inject HttpClient httpClient;
 ----
 
 The above example injects a client that targets the Twitter API.
 
 [source,kotlin]
 ----
-@field:Client("\${myapp.api.twitter.url}") @Inject lateinit var httpClient: RxHttpClient
+@field:Client("\${myapp.api.twitter.url}") @Inject lateinit var httpClient: HttpClient
 ----
 
 The above Kotlin example injects a client that targets the Twitter API using a configuration path. Note the required escaping (backslash) on `"\${path.to.config}"` which is necessary due to Kotlin string interpolation.
@@ -25,11 +25,11 @@ The value you pass to the api:http.client.annotation.Client[] annotation can be 
 * A relative URI, in which case the targeted server will be the current server (useful for testing)
 * A service identifier. See the section on <<serviceDiscovery, Service Discovery>> for more information on this topic.
 
-Another way to create an `HttpClient` is with the static `create` method of api:http.client.RxHttpClient[], however this approach is not recommended as you must ensure you manually shutdown the client, and of course no dependency injection will occur for the created client.
+Another way to create an `HttpClient` is with the static `create` method of api:http.client.HttpClient[], however this approach is not recommended as you must ensure you manually shutdown the client, and of course no dependency injection will occur for the created client.
 
 ==== Performing an HTTP GET
 
-Generally there are two methods of interest when working with the `HttpClient`. The first is `retrieve`, which executes an HTTP request and returns the body in whichever type you request (by default a `String`) as an RxJava rx:Flowable[].
+Generally there are two methods of interest when working with the `HttpClient`. The first is `retrieve`, which executes an HTTP request and returns the body in whichever type you request (by default a `String`) as `Publisher`.
 
 The `retrieve` method accepts an api:http.HttpRequest[] or a `String` URI to the endpoint you wish to request.
 
@@ -43,10 +43,10 @@ For example the following `@Controller` method calls another endpoint in a non-b
 
 snippet::io.micronaut.docs.basics.HelloController[tags="imports, nonblocking", indent=0, title="Using the HTTP client without blocking"]
 
-<1> The `hello` method returns a rx:Maybe[] which may or may not emit an item. If an item is not emitted, a 404 is returned.
-<2> The `retrieve` method is called which returns a rx:Flowable[]. This has a `firstElement` method that returns the first emitted item or nothing
+<1> The `hello` method returns a reactor:Mono[] which may or may not emit an item. If an item is not emitted, a 404 is returned.
+<2> The `retrieve` method is called which returns a reactor:Flux[]. This has a `firstElement` method that returns the first emitted item or nothing
 
-TIP: Using RxJava (or Reactor if you prefer) you can easily and efficiently compose multiple HTTP client calls without blocking (which limits the throughput and scalability of your application).
+TIP: Using Reactor (or RxJava if you prefer) you can easily and efficiently compose multiple HTTP client calls without blocking (which limits the throughput and scalability of your application).
 
 ==== Debugging / Tracing the HTTP Client
 

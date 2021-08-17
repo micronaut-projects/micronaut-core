@@ -1,15 +1,209 @@
 package io.micronaut.inject.beans
 
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Order
 import io.micronaut.core.order.Ordered
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Issue
 
-import javax.inject.Named
-import javax.inject.Qualifier
+import jakarta.inject.Named
+import jakarta.inject.Qualifier
 
-class BeanDefinitionSpec extends AbstractTypeElementSpec{
+class BeanDefinitionSpec extends AbstractTypeElementSpec {
+
+    void 'test dynamic instantiate with constructor'() {
+        given:
+        def definition = buildBeanDefinition('genctor.Test', '''
+package genctor;
+
+import jakarta.inject.*;
+
+@Singleton
+class Test {
+    Test(Runnable foo) {}
+}
+
+''')
+        when:
+        def instance = definition.constructor.instantiate({} as Runnable)
+
+        then:
+        instance != null
+    }
+
+    void "test limit the exposed bean types"() {
+        given:
+        def definition = buildBeanDefinition('limittypes.Test', '''
+package limittypes;
+
+import io.micronaut.context.annotation.*;
+import jakarta.inject.*;
+
+@Singleton
+@Bean(typed = Runnable.class)
+class Test implements Runnable {
+    public void run() {}
+}
+
+''')
+        expect:
+        definition.exposedTypes == [Runnable] as Set
+    }
+
+    void "test limit the exposed bean types - reference"() {
+        given:
+        def reference = buildBeanDefinitionReference('limittypes.Test', '''
+package limittypes;
+
+import io.micronaut.context.annotation.*;
+import jakarta.inject.*;
+
+@Singleton
+@Bean(typed = Runnable.class)
+class Test implements Runnable {
+    public void run() {}
+}
+
+''')
+        expect:
+        reference.exposedTypes == [Runnable] as Set
+    }
+
+    void "test fail compilation on invalid exposed bean type"() {
+        when:
+        buildBeanDefinition('limittypes.Test', '''
+package limittypes;
+
+import io.micronaut.context.annotation.*;
+import jakarta.inject.*;
+
+@Singleton
+@Bean(typed = Runnable.class)
+class Test {
+
+}
+
+''')
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Bean defines an exposed type [java.lang.Runnable] that is not implemented by the bean type")
+    }
+
+    void "test exposed types on factory with AOP"() {
+        when:
+        buildBeanDefinition('limittypes.Test$Method0', '''
+package limittypes;
+
+import io.micronaut.aop.Logged;
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Singleton;
+
+@Factory
+class Test {
+
+    @Singleton
+    @Bean(typed = {X.class})
+    @Logged
+    Y method() {
+        return new Y();
+    }
+}
+
+interface X {
+    
+}
+class Y implements X {
+    
+}
+
+''')
+
+        then:
+        noExceptionThrown()
+    }
+
+    void "test fail compilation on exposed subclass of bean type"() {
+        when:
+        buildBeanDefinition('limittypes.Test', '''
+package limittypes;
+
+import io.micronaut.context.annotation.*;
+import jakarta.inject.*;
+
+@Singleton
+@Bean(typed = X.class)
+class Test {
+
+}
+
+class X extends Test {}
+
+''')
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Bean defines an exposed type [limittypes.X] that is not implemented by the bean type")
+    }
+
+    void "test fail compilation on exposed subclass of bean type with factory"() {
+        when:
+        buildBeanDefinition('limittypes.Test$Method0', '''
+package limittypes;
+
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Singleton;
+
+@Factory
+class Test {
+
+    @Singleton
+    @Bean(typed = {X.class, Y.class})
+    X method() {
+        return new Y();
+    }
+}
+
+interface X {
+    
+}
+class Y implements X {
+    
+}
+
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Bean defines an exposed type [limittypes.Y] that is not implemented by the bean type")
+    }
+
+    void "test exposed bean types with factory invalid type"() {
+        when:
+        buildBeanDefinition('limittypes.Test$Method0', '''
+package limittypes;
+
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Singleton;
+
+@Factory
+class Test {
+
+    @Singleton
+    @Bean(typed = {Z.class})
+    X method() {
+        return new Y();
+    }
+}
+
+interface Z { }
+interface X { }
+class Y implements X { }
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Bean defines an exposed type [limittypes.Z] that is not implemented by the bean type")
+    }
 
     void 'test order annotation'() {
         given:
@@ -18,7 +212,7 @@ package test;
 
 import io.micronaut.core.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Requires(property = "spec.name", value = "BeanDefinitionDelegateSpec")
 @Singleton
@@ -37,7 +231,7 @@ class TestOrder {
         def definition = buildBeanDefinition('test.Test', '''
 package test;
 
-@javax.inject.Named("foo")
+@jakarta.inject.Named("foo")
 class Test {
 
 }
@@ -51,7 +245,7 @@ class Test {
         def definition = buildBeanDefinition('test.Test', '''
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
@@ -76,13 +270,13 @@ class Test {
 @interface MockBean {
 
     @AliasFor(annotation = Replaces.class, member = "named")
-    @AliasFor(annotation = javax.inject.Named.class, member = "value")
+    @AliasFor(annotation = jakarta.inject.Named.class, member = "value")
     String named() default "";
 }
 ''')
         expect:
         definition.getDeclaredQualifier() == Qualifiers.byName("foo")
-        definition.getAnnotationNameByStereotype(Qualifier).get() == Named.name
+        definition.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).get() == AnnotationUtil.NAMED
     }
 
     void 'test qualifier annotation'() {
@@ -97,17 +291,17 @@ class Test {
 
 }
 
-@javax.inject.Qualifier
+@jakarta.inject.Qualifier
 @interface MyQualifier {
 
     @AliasFor(annotation = Replaces.class, member = "named")
-    @AliasFor(annotation = javax.inject.Named.class, member = "value")
+    @AliasFor(annotation = jakarta.inject.Named.class, member = "value")
     String named() default "";
 }
 ''')
         expect:
         definition.getDeclaredQualifier() == Qualifiers.byAnnotation(definition.getAnnotationMetadata(), "test.MyQualifier")
-        definition.getAnnotationNameByStereotype(Qualifier).get() == "test.MyQualifier"
+        definition.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).get() == "test.MyQualifier"
     }
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/5001")
@@ -116,7 +310,7 @@ class Test {
         def definition = buildBeanDefinition('test.NumberThingManager', '''
 package test;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 interface Thing<T> {}
 
@@ -139,7 +333,7 @@ public class NumberThingManager extends AbstractThingManager<NumberThing<?>> {}
         def definition = buildBeanDefinition('test.A', 'TestBean', '''
 package test.A;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class TestBean {
 
 }

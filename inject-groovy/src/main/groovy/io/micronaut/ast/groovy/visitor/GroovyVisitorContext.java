@@ -15,6 +15,7 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import groovy.lang.GroovyClassLoader;
@@ -24,7 +25,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.core.io.scan.ClassPathAnnotationScanner;
+import io.micronaut.ast.groovy.scan.ClassPathAnnotationScanner;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -32,6 +33,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.util.VisitorContextUtils;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 import org.codehaus.groovy.ast.ASTNode;
@@ -68,6 +70,7 @@ public class GroovyVisitorContext implements VisitorContext {
     private final MutableConvertibleValues<Object> attributes;
     private final List<String> generatedResources = new ArrayList<>();
     private final GroovyElementFactory groovyElementFactory;
+    private final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = new ArrayList<>();
 
     /**
      * @param sourceUnit      The source unit
@@ -75,7 +78,7 @@ public class GroovyVisitorContext implements VisitorContext {
      */
     public GroovyVisitorContext(SourceUnit sourceUnit, @Nullable CompilationUnit compilationUnit) {
         this.sourceUnit = sourceUnit;
-        this.errorCollector = sourceUnit.getErrorCollector();
+        this.errorCollector = sourceUnit != null ? sourceUnit.getErrorCollector() : null;
         this.compilationUnit = compilationUnit;
         this.attributes = VISITOR_ATTRIBUTES;
         this.groovyElementFactory = new GroovyElementFactory(this);
@@ -159,7 +162,7 @@ public class GroovyVisitorContext implements VisitorContext {
             final String sample = sourceUnit.getSample(expr.getLineNumber(), expr.getColumnNumber(), new Janitor());
             msg.append("\n\n").append(sample);
         }
-        System.out.println(msg.toString());
+        System.out.println(msg);
     }
 
     @Override
@@ -170,12 +173,14 @@ public class GroovyVisitorContext implements VisitorContext {
     @Override
     public void fail(String message, @Nullable Element element) {
         Message msg;
-        if (element != null) {
+        if (element instanceof AbstractGroovyElement) {
             msg = buildErrorMessage(message, element);
         } else {
             msg = new SimpleMessage(message, sourceUnit);
         }
-        errorCollector.addError(msg);
+        if (errorCollector != null) {
+            errorCollector.addError(msg);
+        }
     }
 
     @Override
@@ -186,7 +191,7 @@ public class GroovyVisitorContext implements VisitorContext {
             final String sample = sourceUnit.getSample(expr.getLineNumber(), expr.getColumnNumber(), new Janitor());
             msg.append("\n\n").append(sample);
         }
-        System.out.println(msg.toString());
+        System.out.println(msg);
 
     }
 
@@ -244,7 +249,7 @@ public class GroovyVisitorContext implements VisitorContext {
             DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
                     classesDir
             );
-            return outputVisitor.visitMetaInfFile(path);
+            return outputVisitor.visitMetaInfFile(path, originatingElements);
         }
 
         return Optional.empty();
@@ -338,5 +343,24 @@ public class GroovyVisitorContext implements VisitorContext {
     @Override
     public void addGeneratedResource(@NonNull String resource) {
         generatedResources.add(resource);
+    }
+
+    /**
+     * @return Gets the produced bean definition builders.
+     */
+    @Internal
+    public List<AbstractBeanDefinitionBuilder> getBeanElementBuilders() {
+        final ArrayList<AbstractBeanDefinitionBuilder> current = new ArrayList<>(beanDefinitionBuilders);
+        beanDefinitionBuilders.clear();
+        return current;
+    }
+
+    /**
+     * Adds a java bean definition builder.
+     * @param groovyBeanDefinitionBuilder The groovy bean definition builder
+     */
+    @Internal
+    void addBeanDefinitionBuilder(GroovyBeanDefinitionBuilder groovyBeanDefinitionBuilder) {
+        this.beanDefinitionBuilders.add(groovyBeanDefinitionBuilder);
     }
 }

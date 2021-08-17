@@ -39,7 +39,7 @@ Then, inject the named client configuration:
 .Injecting an HTTP client
 [source,java]
 ----
-@Client("foo") @Inject RxHttpClient httpClient;
+@Client("foo") @Inject ReactorHttpClient httpClient;
 ----
 
 You can also define a bean that extends from api:http.client.HttpClientConfiguration[] and ensure that the `javax.inject.Named` annotation names it appropriately:
@@ -61,7 +61,7 @@ This configuration will be picked up if you inject a service named `twitter` wit
 .Injecting an HTTP client
 [source,java]
 ----
-@Client("twitter") @Inject RxHttpClient httpClient;
+@Client("twitter") @Inject ReactorHttpClient httpClient;
 ----
 
 Alternatively, if you don't use service discovery you can use the `configuration` member of `@Client` to refer to a specific type:
@@ -72,7 +72,7 @@ Alternatively, if you don't use service discovery you can use the `configuration
 @Client(value = "https://api.twitter.com/1.1",
         configuration = TwitterHttpClientConfiguration.class)
 @Inject
-RxHttpClient httpClient;
+ReactorHttpClient httpClient;
 ----
 
 === Using HTTP Client Connection Pooling

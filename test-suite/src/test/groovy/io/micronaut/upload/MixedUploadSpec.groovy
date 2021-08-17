@@ -21,7 +21,7 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.multipart.MultipartBody
-import io.reactivex.Flowable
+import reactor.core.publisher.Flux
 import spock.lang.Retry
 
 import java.nio.file.Files
@@ -44,12 +44,12 @@ class MixedUploadSpec extends AbstractMicronautSpec {
                 .build()
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/receive-file-upload", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE), String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
+        HttpResponse<String> response = flowable.blockFirst()
         def result = response.getBody().get()
         File file = new File(uploadDir, "bar-mixed.json")
         file.deleteOnExit()
@@ -74,13 +74,13 @@ class MixedUploadSpec extends AbstractMicronautSpec {
 
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/receive-file-upload", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
+        HttpResponse<String> response = flowable.blockFirst()
 
         def result = response.getBody().get()
 
@@ -103,14 +103,14 @@ class MixedUploadSpec extends AbstractMicronautSpec {
 
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/receive-publisher", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
 
-        HttpResponse<String> response = flowable.blockingFirst()
+        HttpResponse<String> response = flowable.blockFirst()
         def result = response.getBody().get()
 
         then:
@@ -131,14 +131,14 @@ class MixedUploadSpec extends AbstractMicronautSpec {
 
 
         when:
-        Flowable<HttpResponse<Long>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<Long>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/receive-partdata", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 Long
         ))
 
-        HttpResponse<Long> response = flowable.blockingFirst()
+        HttpResponse<Long> response = flowable.blockFirst()
         def result = response.getBody().get()
 
         then:
@@ -156,14 +156,14 @@ class MixedUploadSpec extends AbstractMicronautSpec {
 
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/receive-two-flow-parts", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
 
-        HttpResponse<String> response = flowable.blockingFirst()
+        HttpResponse<String> response = flowable.blockFirst()
         def result = response.getBody().get()
 
         then:
@@ -183,13 +183,13 @@ class MixedUploadSpec extends AbstractMicronautSpec {
 
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/receive-flow-data", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN),
                 String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
+        HttpResponse<String> response = flowable.blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -202,13 +202,13 @@ class MixedUploadSpec extends AbstractMicronautSpec {
                 .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE,data.bytes)
                 .addPart("title", "bar")
                 .build()
-        flowable = Flowable.fromPublisher(client.exchange(
+        flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/receive-flow-data", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.APPLICATION_JSON_TYPE.TEXT_PLAIN_TYPE),
                 String
         ))
-        response = flowable.blockingFirst()
+        response = flowable.blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -226,13 +226,13 @@ class MixedUploadSpec extends AbstractMicronautSpec {
                 .build()
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/receive-multiple-flow-data", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN),
                 String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
+        HttpResponse<String> response = flowable.blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -247,13 +247,13 @@ class MixedUploadSpec extends AbstractMicronautSpec {
                 .addPart("data", "data2.json", MediaType.APPLICATION_JSON_TYPE,data2.bytes)
                 .addPart("title", "bar")
                 .build()
-        flowable = Flowable.fromPublisher(client.exchange(
+        flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/receive-multiple-flow-data", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.APPLICATION_JSON_TYPE.TEXT_PLAIN_TYPE),
                 String
         ))
-        response = flowable.blockingFirst()
+        response = flowable.blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -269,13 +269,13 @@ class MixedUploadSpec extends AbstractMicronautSpec {
                 .build()
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/receive-multiple-completed", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.APPLICATION_JSON_TYPE),
                 String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
+        HttpResponse<String> response = flowable.blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -291,13 +291,13 @@ class MixedUploadSpec extends AbstractMicronautSpec {
                 .build()
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/receive-multiple-streaming", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
+        HttpResponse<String> response = flowable.blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -313,13 +313,13 @@ class MixedUploadSpec extends AbstractMicronautSpec {
                 .build()
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/receive-multiple-publishers", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
+        HttpResponse<String> response = flowable.blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -335,13 +335,13 @@ class MixedUploadSpec extends AbstractMicronautSpec {
                 .build()
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/receive-flow-control", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
+        HttpResponse<String> response = flowable.blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -355,13 +355,13 @@ class MixedUploadSpec extends AbstractMicronautSpec {
                 .build()
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/receive-big-attribute", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
+        HttpResponse<String> response = flowable.blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -391,12 +391,12 @@ class MixedUploadSpec extends AbstractMicronautSpec {
                 .build()
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/upload/receive-file-upload", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE), String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
+        HttpResponse<String> response = flowable.blockFirst()
         File file = new File(uploadDir, "bar-stream.json")
         file.deleteOnExit()
 

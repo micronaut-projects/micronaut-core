@@ -18,8 +18,8 @@ package io.micronaut.validation.validator.resolver;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import javax.validation.Path;
 import javax.validation.TraversableResolver;
 import java.lang.annotation.ElementType;

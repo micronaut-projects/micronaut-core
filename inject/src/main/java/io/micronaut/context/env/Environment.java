@@ -18,7 +18,7 @@ package io.micronaut.context.env;
 import io.micronaut.context.LifeCycle;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.ResourceLoader;
-import io.micronaut.core.io.scan.ClassPathAnnotationScanner;
+import io.micronaut.core.io.scan.BeanIntrospectionScanner;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -300,8 +300,8 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      * @param annotation The annotation to scan
      * @return The classes
      */
-    default Stream<Class> scan(Class<? extends Annotation> annotation) {
-        ClassPathAnnotationScanner scanner = new ClassPathAnnotationScanner(getClassLoader());
+    default Stream<Class<?>> scan(Class<? extends Annotation> annotation) {
+        BeanIntrospectionScanner scanner = new BeanIntrospectionScanner();
         return scanner.scan(annotation, getPackages());
     }
 
@@ -313,8 +313,8 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      * @param packages   The packages to scan
      * @return The classes
      */
-    default Stream<Class> scan(Class<? extends Annotation> annotation, String... packages) {
-        ClassPathAnnotationScanner scanner = new ClassPathAnnotationScanner(getClassLoader());
+    default Stream<Class<?>> scan(Class<? extends Annotation> annotation, String... packages) {
+        BeanIntrospectionScanner scanner = new BeanIntrospectionScanner();
         return scanner.scan(annotation, Arrays.asList(packages));
     }
 

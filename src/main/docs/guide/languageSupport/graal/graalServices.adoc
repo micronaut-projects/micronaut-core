@@ -35,8 +35,8 @@ To build your native image without using Docker, install the GraalVM SDK via the
 .Installing GraalVM {graalVersion} with SDKman
 [source,bash,subs="attributes+"]
 ----
-$ sdk install java {graalVersion}.r8-grl # or {graalVersion}.r11-grl to use JDK 11
-$ sdk use java {graalVersion}.r8-grl
+$ sdk install java {graalVersion}.r11-grl
+$ sdk use java {graalVersion}.r11-grl
 ----
 
 The `native-image` tool was extracted from the base GraalVM distribution and is available as a plugin. To install it, run:
@@ -79,15 +79,13 @@ $ ./hello-world
 
 Micronaut itself does not rely on reflection or dynamic classloading, so it works automatically with GraalVM native, however certain third-party libraries used by Micronaut may require additional input about uses of reflection.
 
-Micronaut includes an annotation processor that helps to generate the `reflect-config.json` and `resource-config.json` metadata files that are automatically picked up by the `native-image` tool:
+Micronaut includes an annotation processor that helps to generate the `reflect-config.json` metadata files that are automatically picked up by the `native-image` tool:
 
 dependency:micronaut-graal[scope="annotationProcessor"]
 
 This processor generates:
 
 - A `reflect-config.json` file in the `META-INF/native-image` directory in your build classes directory (`target/classes` with Maven and typically `build/classes/java/main` with Gradle).
-- A `native-image.properties` file to read this configuration for all classes annotated with either ann:core.annotation.Introspected[] or ann:core.annotation.TypeHint[].
-- A `resource-config.json` file also in the `META-INF/native-image` directory in your build classes directory containing information about the files in the `src/main/resources` directory.
 
 For example the following class:
 
@@ -95,27 +93,25 @@ For example the following class:
 ----
 package example;
 
-import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 
-@Introspected
+@ReflectiveAccess
 class Test {
     ...
 }
 ----
 
-The above example results in the public methods and declared constructors of `example.Test` being included in `reflect-config.json`.
+The above example results in the public methods, declared fields and declared constructors of `example.Test` being included in `reflect-config.json`.
 
-If you have more advanced requirements and only wish to include certain fields or methods, use ann:core.annotation.ReflectiveAccess[] instead which can be present on any constructor, field or method to include only the specific field, constructor or method.
+If you have more advanced requirements and only wish to include certain fields or methods, use the annotation on any constructor, field or method to include only the specific field, constructor or method.
 
 TIP: To provide your own `reflect.json`, add one to `src/main/graal/reflect.json` and it will be automatically picked up.
 
-Stating with Micronaut 2.0, as the framework automatically generates the `resource-config.json` file, to include your own additional resources, provide them in `src/main/graal/resource-config.json` and they will automatically be added to the generated file.
-
 === Adding Additional Classes for Reflective Access
 
-To inform Micronaut of additional classes to be included in the generated `reflect.json` file at compile time, either annotate a class with ann:core.annotation.Introspected[] or ann:core.annotation.TypeHint[].
+To inform Micronaut of additional classes to be included in the generated `reflect.json` file at compile time, either annotate a class with ann:core.annotation.ReflectiveAccess[] or ann:core.annotation.TypeHint[].
 
-The former generates a compile-time introspection as well as allowing reflective access, and the latter only allows reflective access, and is typically used on a module or `Application` class to include classes that are needed reflectively. For example, the following is from Micronaut's Jackson module:
+Both allows for reflective access, and the latter is typically used on a module or `Application` class to include classes that are needed reflectively. For example, the following is from Micronaut's Jackson module:
 
 [source,java]
 ----
@@ -154,3 +150,7 @@ $ ./hello-world
 ----
 
 As you can see, the native image startup completes in milliseconds, and memory consumption does not include the overhead of the JVM (a native Micronaut application runs with just 20mb of memory).
+
+=== Resource file generation
+
+Starting in Micronaut 3.0 the automatic generation of the `resource-config.json` file is now part of the https://github.com/micronaut-projects/micronaut-gradle-plugin[Gradle] and https://github.com/micronaut-projects/micronaut-maven-plugin[Maven] plugins.

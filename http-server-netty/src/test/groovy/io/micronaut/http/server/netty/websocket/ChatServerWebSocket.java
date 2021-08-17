@@ -19,7 +19,11 @@ package io.micronaut.http.server.netty.websocket;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.websocket.WebSocketBroadcaster;
 import io.micronaut.websocket.WebSocketSession;
-import io.micronaut.websocket.annotation.*;
+import io.micronaut.websocket.annotation.OnClose;
+import io.micronaut.websocket.annotation.OnMessage;
+import io.micronaut.websocket.annotation.OnOpen;
+import io.micronaut.websocket.annotation.ServerWebSocket;
+
 import java.util.function.Predicate;
 
 @ServerWebSocket("/chat/{topic}/{username}") // <1>

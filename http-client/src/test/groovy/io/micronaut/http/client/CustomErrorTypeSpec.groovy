@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.client
 
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -23,10 +25,10 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import jakarta.inject.Inject
 import spock.lang.Specification
 
-import javax.inject.Inject
-
+@Property(name = 'spec.name', value = 'CustomErrorTypeSpec')
 @MicronautTest
 class CustomErrorTypeSpec extends Specification {
 
@@ -35,7 +37,7 @@ class CustomErrorTypeSpec extends Specification {
 
     @Inject
     @Client("/")
-    RxHttpClient client
+    HttpClient client
 
     void "test custom error type"() {
 
@@ -60,6 +62,7 @@ class CustomErrorTypeSpec extends Specification {
         ex.response.getBody(errorType).get().reason == 'bad things'
     }
 
+    @Requires(property = 'spec.name', value = 'CustomErrorTypeSpec')
     @Controller('/test/custom-errors')
     static class CustomErrorController {
 
@@ -74,6 +77,7 @@ class CustomErrorTypeSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'CustomErrorTypeSpec')
     @Client(value = '/test/custom-errors', errorType = MyError)
     static interface CustomErrorClient {
         @Get("/")

@@ -16,6 +16,7 @@
 package io.micronaut.retry.intercept;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.retry.CircuitState;
 import io.micronaut.retry.RetryStateBuilder;
@@ -26,7 +27,6 @@ import io.micronaut.retry.exception.CircuitOpenException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.micronaut.core.annotation.Nullable;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.OptionalDouble;

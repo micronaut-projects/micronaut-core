@@ -6,7 +6,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.security.Principal;
 import java.util.Optional;
 

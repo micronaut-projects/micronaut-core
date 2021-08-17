@@ -16,10 +16,9 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.context.annotation.DefaultImplementation;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.web.router.RouteMatch;
-
-import io.micronaut.core.annotation.NonNull;
 
 /**
  * Responsible for determining which {@link HttpContentProcessor} to use to process

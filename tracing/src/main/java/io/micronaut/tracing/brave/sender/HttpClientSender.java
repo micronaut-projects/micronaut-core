@@ -22,22 +22,26 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.client.*;
+import io.micronaut.http.client.BlockingHttpClient;
+import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.LoadBalancer;
+import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.http.client.netty.DefaultHttpClient;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.tracing.brave.ZipkinServiceInstanceList;
-import io.reactivex.BackpressureStrategy;
-import io.reactivex.Flowable;
+import jakarta.inject.Provider;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
 import zipkin2.Call;
 import zipkin2.Callback;
 import zipkin2.CheckResult;
 import zipkin2.codec.Encoding;
 import zipkin2.reporter.Sender;
 
-import javax.inject.Provider;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Collections;
@@ -228,17 +232,17 @@ public final class HttpClientSender extends Sender {
             return new HttpCall(httpClient, endpoint, compressionEnabled, encodedSpans);
         }
 
-        protected MutableHttpRequest<Flowable<Object>> prepareRequest() {
-            return HttpRequest.POST(endpoint, spanFlowable());
+        protected MutableHttpRequest<Flux<Object>> prepareRequest() {
+            return HttpRequest.POST(endpoint, spanReactiveSequence());
         }
 
-        private Flowable<Object> spanFlowable() {
-            return Flowable.create(emitter -> {
+        private Flux<Object> spanReactiveSequence() {
+            return Flux.create(emitter -> {
                 for (byte[] encodedSpan : encodedSpans) {
-                    emitter.onNext(encodedSpan);
+                    emitter.next(encodedSpan);
                 }
-                emitter.onComplete();
-            }, BackpressureStrategy.BUFFER);
+                emitter.complete();
+            }, FluxSink.OverflowStrategy.BUFFER);
         }
     }
 

@@ -2,17 +2,14 @@ package io.micronaut.inject.field
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Value
-import io.micronaut.context.event.BeanContextEvent
 import io.micronaut.context.exceptions.BeanContextException
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 import spock.lang.Specification
 
 import javax.annotation.Nullable
-import javax.inject.Inject
-import javax.inject.Singleton
 
 class FieldInjectionSpec extends Specification {
 
@@ -66,8 +63,8 @@ class FieldInjectionSpec extends Specification {
 
         then:
         e.d == null
-        e.value == "Default greeting"
-        e.property == "Default greeting"
+        e.value == null
+        e.property == null
 
         when:
         context.getBean(C2)
@@ -86,6 +83,21 @@ class FieldInjectionSpec extends Specification {
 
         then:
         thrown(BeanContextException)
+
+        cleanup:
+        context.close()
+    }
+
+    void "test injection with no bean/property found and not nullable and protected fields"() {
+        BeanContext context = ApplicationContext.run()
+
+        when:
+        F e = context.getBean(F)
+
+        then:
+        e.d == null
+        e.value == null
+        e.property == null
 
         cleanup:
         context.close()
@@ -148,6 +160,32 @@ class FieldInjectionSpec extends Specification {
         @Nullable
         @Value('${greeting}')
         private String value = "Default greeting"
+
+        @Nullable
+        @Property(name = 'greeting')
+        private String property = "Default greeting"
+
+        D getD() {
+            return d
+        }
+
+        String getValue() {
+            return value
+        }
+
+        String getProperty() {
+            return property
+        }
+    }
+
+    static class F {
+        @Inject
+        @Nullable
+        protected D d
+
+        @Nullable
+        @Value('${greeting}')
+        protected String value = "Default greeting"
 
         @Nullable
         @Property(name = 'greeting')

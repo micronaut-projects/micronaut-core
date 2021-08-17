@@ -15,13 +15,13 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
-import java.util.List;
-import java.util.StringJoiner;
-
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.cookie.Cookie;
 import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
+
+import java.util.List;
+import java.util.StringJoiner;
 
 /**
  * CookiesElement LogElement. All cookies.

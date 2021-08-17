@@ -15,9 +15,9 @@
  */
 package io.micronaut.http.server.cors;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpMethod;
 
-import io.micronaut.core.annotation.Nullable;
 import java.util.Collections;
 import java.util.List;
 

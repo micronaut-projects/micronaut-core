@@ -25,6 +25,7 @@ dependencies {
     testImplementation project(":function-web")
     testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.920'
 
+    testImplementation dependencyVersion("reactor")
 }
 
 //tasks.withType(Test) {

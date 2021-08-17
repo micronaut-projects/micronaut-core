@@ -19,8 +19,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.text.SimpleDateFormat
 import java.util.*
-import javax.annotation.PostConstruct
-import javax.inject.Inject
+import jakarta.annotation.PostConstruct
+import jakarta.inject.Inject
 
 class RefreshEventSpec {
 

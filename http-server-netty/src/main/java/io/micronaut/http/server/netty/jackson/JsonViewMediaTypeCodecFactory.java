@@ -18,17 +18,16 @@ package io.micronaut.http.server.netty.jackson;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
-import javax.inject.Named;
-import javax.inject.Singleton;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -45,9 +44,8 @@ import static io.micronaut.jackson.codec.JsonMediaTypeCodec.CONFIGURATION_QUALIF
 @Requires(beans = JacksonConfiguration.class)
 @Requires(property = JsonViewServerFilter.PROPERTY_JSON_VIEW_ENABLED)
 @Singleton
-@Internal
 @Primary
-public class JsonViewMediaTypeCodecFactory implements JsonViewCodecResolver {
+class JsonViewMediaTypeCodecFactory implements JsonViewCodecResolver {
 
     private final ObjectMapper objectMapper;
     private final ApplicationConfiguration applicationConfiguration;
@@ -59,7 +57,7 @@ public class JsonViewMediaTypeCodecFactory implements JsonViewCodecResolver {
      * @param applicationConfiguration The common application configurations
      * @param codecConfiguration       The configuration for the codec
      */
-    protected JsonViewMediaTypeCodecFactory(ObjectMapper objectMapper,
+    JsonViewMediaTypeCodecFactory(ObjectMapper objectMapper,
                           ApplicationConfiguration applicationConfiguration,
                           @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
         this.objectMapper = objectMapper;

@@ -15,11 +15,11 @@
  */
 package io.micronaut.http.netty.channel;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.kqueue.KQueue;
 import io.netty.channel.kqueue.KQueueEventLoopGroup;
@@ -27,9 +27,8 @@ import io.netty.channel.kqueue.KQueueServerSocketChannel;
 import io.netty.channel.kqueue.KQueueSocketChannel;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
-
-import javax.inject.Named;
-import javax.inject.Singleton;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
@@ -45,19 +44,6 @@ import java.util.concurrent.ThreadFactory;
 @Named(EventLoopGroupFactory.NATIVE)
 @BootstrapContextCompatible
 public class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
-
-
-    /**
-     * Creates a KQueueEventLoopGroup.
-     *
-     * @param threads The number of threads to use.
-     * @param ioRatio The io ratio.
-     * @return A KQueueEventLoopGroup.
-     */
-    @Override
-    public EventLoopGroup createEventLoopGroup(int threads, @Nullable Integer ioRatio) {
-        return withIoRatio(new KQueueEventLoopGroup(threads), ioRatio);
-    }
 
     /**
      * Creates a KQueueEventLoopGroup.
@@ -83,17 +69,6 @@ public class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
     @Override
     public EventLoopGroup createEventLoopGroup(int threads, Executor executor, @Nullable Integer ioRatio) {
         return withIoRatio(new KQueueEventLoopGroup(threads, executor), ioRatio);
-    }
-
-    /**
-     * Creates a default KQueueEventLoopGroup.
-     *
-     * @param ioRatio The io ratio.
-     * @return A KQueueEventLoopGroup.
-     */
-    @Override
-    public EventLoopGroup createEventLoopGroup(@Nullable Integer ioRatio) {
-        return withIoRatio(new KQueueEventLoopGroup(), ioRatio);
     }
 
     @Override

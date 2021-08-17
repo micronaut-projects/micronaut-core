@@ -18,8 +18,8 @@ package io.micronaut.inject.factory.beanwithfactory;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Prototype;
 
-import javax.annotation.PostConstruct;
-import javax.inject.Inject;
+import jakarta.annotation.PostConstruct;
+import jakarta.inject.Inject;
 
 @Factory
 public class BFactory  {

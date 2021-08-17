@@ -23,16 +23,18 @@ import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
-import io.reactivex.Flowable;
-import io.reactivex.Single;
-import io.reactivex.schedulers.Schedulers;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -50,7 +52,7 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
     private io.netty.handler.codec.http.multipart.FileUpload fileUpload;
     private final ExecutorService ioExecutor;
     private final HttpServerConfiguration.MultipartConfiguration configuration;
-    private final Flowable<PartData> subject;
+    private final Flux<PartData> subject;
 
     /**
      * @param httpData               The file upload (the data)
@@ -62,7 +64,7 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
         io.netty.handler.codec.http.multipart.FileUpload httpData,
         HttpServerConfiguration.MultipartConfiguration multipartConfiguration,
         ExecutorService ioExecutor,
-        Flowable<PartData> subject) {
+        Flux<PartData> subject) {
 
         this.configuration = multipartConfiguration;
         this.fileUpload = httpData;
@@ -113,9 +115,9 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
 
     @Override
     public Publisher<Boolean> transferTo(File destination) {
-        return Single.<Boolean>create(emitter ->
+        return Mono.<Boolean>create(emitter ->
 
-            subject.subscribeOn(Schedulers.from(ioExecutor))
+            subject.subscribeOn(Schedulers.fromExecutorService(ioExecutor))
                 .subscribe(new Subscriber<PartData>() {
                     Subscription subscription;
                     OutputStream outputStream;
@@ -142,7 +144,7 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
 
                     @Override
                     public void onError(Throwable t) {
-                        emitter.onError(t);
+                        emitter.error(t);
                         try {
                             if (outputStream != null) {
                                 outputStream.close();
@@ -158,12 +160,12 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
                     public void onComplete() {
                         try {
                             outputStream.close();
-                            emitter.onSuccess(true);
+                            emitter.success(true);
                         } catch (IOException e) {
                             if (LOG.isWarnEnabled()) {
                                 LOG.warn("Failed to close file stream : " + fileUpload.getName());
                             }
-                            emitter.onSuccess(false);
+                            emitter.success(false);
                         }
                     }
 
@@ -172,7 +174,7 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
                         onError(new MultipartException("Error transferring file: " + fileUpload.getName(), t));
                     }
                 })
-        ).toFlowable();
+        ).flux();
 
     }
 

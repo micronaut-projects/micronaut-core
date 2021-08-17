@@ -22,18 +22,19 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Single
-import io.reactivex.schedulers.Schedulers
+import jakarta.inject.Inject
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 import spock.lang.Specification
 import zipkin2.Span
 import zipkin2.Span.Kind
-
-import javax.inject.Inject
+import io.micronaut.core.async.annotation.SingleResult
 
 /**
  * @author graemerocher
@@ -86,7 +87,7 @@ class HttpTracingSpec extends Specification {
         reporter.spans[1].kind() == Span.Kind.CLIENT
 
 
-        when:"An observeOn call is used"
+        when:"An publishOn call is used"
         response = client.toBlocking().exchange('/traced/rxjava/observe', String)
 
         then:"The response is correct"
@@ -110,7 +111,7 @@ class HttpTracingSpec extends Specification {
         def e = thrown(HttpClientResponseException)
         def response = e.response
         response
-        reporter.spans.size() == 3
+        reporter.spans.size() == 2
         reporter.spans[0].tags().get('http.path') == '/traced/error/John'
         reporter.spans[0].tags().get('http.status_code') == '500'
         reporter.spans[0].tags().get('http.method') == 'GET'
@@ -119,8 +120,8 @@ class HttpTracingSpec extends Specification {
         reporter.spans[1].tags().get('http.path') == '/traced/error/John'
         reporter.spans[1].tags().get('http.status_code') == '500'
         reporter.spans[1].tags().get('http.method') == 'GET'
-        reporter.spans[1].tags().get('error') == '500'
-        reporter.spans[1].name() == 'get /traced/error/{name}'
+        reporter.spans[1].tags().get('error') == 'Internal Server Error'
+        reporter.spans[1].name() == 'get'
 
         cleanup:
         context.close()
@@ -214,7 +215,7 @@ class HttpTracingSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        reporter.spans.size() == 6
+        reporter.spans.size() == 4
         assertSpan(reporter.spans[0],
                 "get /traced/error/{name}",
                 "bad",
@@ -222,27 +223,17 @@ class HttpTracingSpec extends Specification {
                 Span.Kind.SERVER)
         assertSpan(reporter.spans[1],
                 "get /traced/error/{name}",
-                "500",
-                "/traced/error/John",
-                Span.Kind.SERVER)
-        assertSpan(reporter.spans[2],
-                "get /traced/error/{name}",
-                "Internal Server Error: bad",
+                "Internal Server Error",
                 "/traced/error/John",
                 Span.Kind.CLIENT)
+        assertSpan(reporter.spans[2],
+                "get /traced/nestederror/{name}",
+                "Internal Server Error",
+                "/traced/nestedError/John",
+                Span.Kind.SERVER)
         assertSpan(reporter.spans[3],
-                "get /traced/nestederror/{name}",
-                "Internal Server Error: bad",
-                "/traced/nestedError/John",
-                Span.Kind.SERVER)
-        assertSpan(reporter.spans[4],
-                "get /traced/nestederror/{name}",
-                "500",
-                "/traced/nestedError/John",
-                Span.Kind.SERVER)
-        assertSpan(reporter.spans[5],
                 "get",
-                "Internal Server Error: Internal Server Error: bad",
+                "Internal Server Error",
                 "/traced/nestedError/John",
                 Span.Kind.CLIENT)
 
@@ -281,8 +272,9 @@ class HttpTracingSpec extends Specification {
         }
 
         @Get(value = "/rxjava/observe", produces = MediaType.TEXT_PLAIN)
-        Single<String> index() {
-            return Single.just("hello").observeOn(Schedulers.computation()).map( { r ->
+        @SingleResult
+        Publisher<String> index() {
+            return Mono.just("hello").publishOn(Schedulers.boundedElastic()).map( { r ->
                 if (ServerRequestContext.currentRequest().isPresent()) {
                     return r;
                 } else {
@@ -292,11 +284,12 @@ class HttpTracingSpec extends Specification {
         }
 
         @Get("/rxjava/{name}")
-        Single<String> rxjava(String name) {
-            Single.fromCallable({->
+        @SingleResult
+        Publisher<String> rxjava(String name) {
+            Mono.fromCallable({->
                 spanCustomizer.tag("foo", "bar")
                 return name
-            }).subscribeOn(Schedulers.io())
+            }).subscribeOn(Schedulers.boundedElastic())
         }
 
         @Get("/error/{name}")

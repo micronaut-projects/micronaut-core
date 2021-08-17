@@ -17,7 +17,7 @@ package io.micronaut.docs.aop.retry
 
 import io.micronaut.retry.annotation.CircuitBreaker
 import io.micronaut.retry.annotation.Retryable
-import io.reactivex.Flowable
+import reactor.core.publisher.Flux
 
 class BookService {
 
@@ -57,9 +57,9 @@ class BookService {
 
     // tag::reactive[]
     @Retryable
-    Flowable<Book> streamBooks() {
+    Flux<Book> streamBooks() {
         // ...
     // end::reactive[]
-        Flowable.just(new Book("The Stand"))
+        Flux.just(new Book("The Stand"))
     }
 }

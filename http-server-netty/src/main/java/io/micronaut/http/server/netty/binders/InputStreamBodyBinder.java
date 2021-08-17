@@ -62,12 +62,6 @@ public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<Inpu
     }
 
     @Override
-    @Deprecated
-    public boolean supportsSuperTypes() {
-        return false;
-    }
-
-    @Override
     public Argument<InputStream> argumentType() {
         return TYPE;
     }

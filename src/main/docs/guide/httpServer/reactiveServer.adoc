@@ -24,10 +24,10 @@ The value of the ann:scheduling.annotation.ExecuteOn[] annotation can be any nam
 
 TIP: Generally speaking for database operations you want a thread pool configured that matches the maximum number of connections specified in the database connection pool.
 
-An alternative to the ann:scheduling.annotation.ExecuteOn[] annotation is to use the facility provided by the reactive library you have chosen. RxJava for example features a `subscribeOn` method which lets you alter which thread executes user code. For example:
+An alternative to the ann:scheduling.annotation.ExecuteOn[] annotation is to use the facility provided by the reactive library you have chosen. Reactive implementations such as https://projectreactor.io[Project Reactor] or https://github.com/ReactiveX/RxJava[RxJava] feature a `subscribeOn` method which lets you alter which thread executes user code. For example:
 
-snippet::io.micronaut.docs.http.server.reactive.PersonController[tags="imports,class", indent=0,title="RxJava subscribeOn Example"]
+snippet::io.micronaut.docs.http.server.reactive.PersonController[tags="imports,class", indent=0,title="Reactive subscribeOn Example"]
 
 <1> The configured I/O executor service is injected
-<2> The RxJava `fromCallable` method wraps the blocking operation
-<3> The RxJava `subscribeOn` method schedules the operation on the I/O thread pool
+<2> The `Mono::fromCallable` method wraps the blocking operation
+<3> The https://projectreactor.io[Project Reactor] `subscribeOn` method schedules the operation on the I/O thread pool

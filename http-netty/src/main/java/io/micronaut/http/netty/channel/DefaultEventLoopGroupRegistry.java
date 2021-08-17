@@ -15,22 +15,27 @@
  */
 package io.micronaut.http.netty.channel;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.BeanLocator;
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
+import io.micronaut.context.annotation.EachBean;
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.concurrent.DefaultThreadFactory;
+import jakarta.annotation.PreDestroy;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.PreDestroy;
-import javax.inject.Named;
-import javax.inject.Singleton;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -122,8 +127,8 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
     @Singleton
     @Requires(missingProperty = EventLoopGroupConfiguration.DEFAULT_LOOP)
     @Primary
-    @Bean
     @BootstrapContextCompatible
+    @Bean(typed = { EventLoopGroup.class })
     protected EventLoopGroup defaultEventLoopGroup(@Named(NettyThreadFactory.NAME) ThreadFactory threadFactory) {
         EventLoopGroupConfiguration configuration = new DefaultEventLoopGroupConfiguration();
         EventLoopGroup eventLoopGroup = eventLoopGroupFactory.createEventLoopGroup(configuration, threadFactory);

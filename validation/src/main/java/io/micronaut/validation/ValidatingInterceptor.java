@@ -15,17 +15,17 @@
  */
 package io.micronaut.validation;
 
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.aop.InterceptPhase;
 import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.validation.validator.ExecutableMethodValidator;
 import io.micronaut.validation.validator.ReactiveValidator;
 import io.micronaut.validation.validator.Validator;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
 import javax.validation.ValidatorFactory;
@@ -82,6 +82,7 @@ public class ValidatingInterceptor implements MethodInterceptor<Object, Object> 
         return POSITION;
     }
 
+    @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         if (executableValidator != null) {

@@ -22,6 +22,7 @@ import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.EnumElement
 import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.ast.PackageElement
 import spock.util.environment.RestoreSystemProperties
 
 import java.util.function.Supplier
@@ -35,6 +36,46 @@ class ClassElementSpec extends AbstractBeanDefinitionSpec {
 
     def cleanup() {
         AllElementsVisitor.clearVisited()
+    }
+
+    void "test modifiers #modifiers"() {
+        given:
+        def element = buildClassElement("""
+package modtest;
+
+class Test {
+    ${modifiers*.toString().join(' ')} String test = "test";
+
+    ${modifiers*.toString().join(' ')} void test() {};
+}
+""")
+
+        expect:
+        element.getEnclosedElement(ElementQuery.ALL_FIELDS).get().modifiers == modifiers
+        element.getEnclosedElement(ElementQuery.ALL_METHODS).get().modifiers == modifiers
+
+        where:
+        modifiers << [
+                [ElementModifier.PUBLIC] as Set,
+                [ElementModifier.PUBLIC, ElementModifier.STATIC] as Set,
+                [ElementModifier.PUBLIC, ElementModifier.STATIC, ElementModifier.FINAL] as Set,
+        ]
+    }
+
+    void "test get package element"() {
+        given:
+        def element = buildClassElement('''
+package pkgeltest;
+
+class PckElementTest {
+
+}
+''')
+        PackageElement pe = element.getPackage()
+
+        expect:
+        pe.name == 'pkgeltest'
+        pe.getClass().name.contains("GroovyPackageElement")
     }
 
     void 'test find matching methods on abstract class'() {
@@ -220,8 +261,8 @@ interface AnotherInterface {
     }
 
     void "test resolve generic type using getTypeArguments"() {
-        buildBeanDefinition('test.TestController', '''
-package test;
+        buildBeanDefinition('clselem1.TestController', '''
+package clselem1;
 
 import io.micronaut.http.annotation.*;
 import javax.inject.Inject;
@@ -245,8 +286,8 @@ public class TestController implements java.util.function.Supplier<String> {
     }
 
     void "test class is visited by custom visitor"() {
-        buildBeanDefinition('test.TestController', '''
-package test;
+        buildBeanDefinition('clselem2.TestController', '''
+package clselem2;
 
 import io.micronaut.http.annotation.*;
 import javax.inject.Inject;
@@ -272,8 +313,8 @@ public class TestController {
 
 
     void "test visit methods that take and return enums"() {
-        buildBeanDefinition('test.TestController', '''
-package test;
+        buildBeanDefinition('clselem3.TestController', '''
+package clselem3;
 
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.*;
@@ -301,8 +342,8 @@ public class TestController {
     }
 
     void "test primitive types"() {
-        buildBeanDefinition('test.TestController', '''
-package test;
+        buildBeanDefinition('clselem4.TestController', '''
+package clselem4;
 
 import io.micronaut.http.annotation.*;
 import javax.inject.Inject;
@@ -327,8 +368,8 @@ public class TestController {
     }
 
     void "test generic types at type level"() {
-        buildBeanDefinition('test.TestController', '''
-package test;
+        buildBeanDefinition('clselem5.TestController', '''
+package clselem5;
 
 import io.micronaut.http.annotation.*;
 import javax.inject.Inject;
@@ -349,14 +390,14 @@ class Foo {}
         expect:
         AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
         AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 1
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.name == 'test.Foo'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.name == 'clselem5.Foo'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters.size() == 1
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.name == 'test.Foo'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.name == 'clselem5.Foo'
     }
 
     void "test array generic types at type level"() {
-        buildBeanDefinition('test.TestController', '''
-package test;
+        buildBeanDefinition('clselem6.TestController', '''
+package clselem6;
 
 import io.micronaut.http.annotation.*;
 import javax.inject.Inject;
@@ -377,16 +418,16 @@ class Foo {}
         expect:
         AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
         AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 1
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.name == 'test.Foo'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.name == 'clselem6.Foo'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.isArray()
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters.size() == 1
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.name == 'test.Foo'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.name == 'clselem6.Foo'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.isArray()
     }
 
     void "test generic types at method level"() {
-        buildBeanDefinition('test.TestController', '''
-package test;
+        buildBeanDefinition('clselem7.TestController', '''
+package clselem7;
 
 import io.micronaut.http.annotation.*;
 import javax.inject.Inject;
@@ -407,14 +448,14 @@ class Foo {}
         expect:
         AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
         AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 1
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.name == 'test.Foo'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.name == 'clselem7.Foo'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters.size() == 1
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.name == 'test.Foo'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.name == 'clselem7.Foo'
     }
 
     void "test generic types at type level used as type arguments"() {
-        buildBeanDefinition('test.TestController', '''
-package test;
+        buildBeanDefinition('clselem8.TestController', '''
+package clselem8;
 
 import io.micronaut.http.annotation.*;
 import javax.inject.Inject;
@@ -437,9 +478,9 @@ class Foo {}
         AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 1
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.name == 'java.util.List'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.typeArguments.size() == 1
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.typeArguments.get("E").name == 'test.Foo'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.typeArguments.get("E").name == 'clselem8.Foo'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters.size() == 1
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.name == 'java.util.Set'
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.typeArguments.get("E").name == 'test.Foo'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.typeArguments.get("E").name == 'clselem8.Foo'
     }
 }

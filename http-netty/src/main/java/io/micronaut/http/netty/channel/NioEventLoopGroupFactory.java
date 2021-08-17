@@ -15,18 +15,18 @@
  */
 package io.micronaut.http.netty.channel;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
@@ -39,18 +39,6 @@ import java.util.concurrent.ThreadFactory;
 @Singleton
 @BootstrapContextCompatible
 public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
-
-    /**
-     * Creates a NioEventLoopGroup.
-     *
-     * @param threads The number of threads to use.
-     * @param ioRatio The io ratio.
-     * @return A NioEventLoopGroup.
-     */
-    @Override
-    public EventLoopGroup createEventLoopGroup(int threads, @Nullable Integer ioRatio) {
-        return withIoRatio(new NioEventLoopGroup(threads), ioRatio);
-    }
 
     /**
      * Creates a NioEventLoopGroup.
@@ -76,17 +64,6 @@ public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
     @Override
     public EventLoopGroup createEventLoopGroup(int threads, Executor executor, @Nullable Integer ioRatio) {
         return withIoRatio(new NioEventLoopGroup(threads, executor), ioRatio);
-    }
-
-    /**
-     * Creates a default NioEventLoopGroup.
-     *
-     * @param ioRatio The io ratio.
-     * @return A NioEventLoopGroup.
-     */
-    @Override
-    public EventLoopGroup createEventLoopGroup(@Nullable Integer ioRatio) {
-        return withIoRatio(new NioEventLoopGroup(), ioRatio);
     }
 
     /**

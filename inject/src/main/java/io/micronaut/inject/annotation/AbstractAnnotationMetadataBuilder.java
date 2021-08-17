@@ -27,12 +27,14 @@ import io.micronaut.inject.visitor.VisitorContext;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import jakarta.inject.Qualifier;
 
-import javax.inject.Scope;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.*;
 import java.util.function.BiConsumer;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * An abstract implementation that builds {@link AnnotationMetadata}.
@@ -48,11 +50,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * Names of annotations that should produce deprecation warnings.
      * The key in the map is the deprecated annotation the value the replacement.
      */
-    @SuppressWarnings("unchecked")
-    private static final Map<String, String> DEPRECATED_ANNOTATION_NAMES = CollectionUtils.mapOf(
-            AnnotationUtil.NULLABLE, Nullable.class.getName(),
-            AnnotationUtil.NON_NULL, NonNull.class.getName()
-    );
+    private static final Map<String, String> DEPRECATED_ANNOTATION_NAMES = Collections.emptyMap();
     private static final Map<String, List<AnnotationMapper<?>>> ANNOTATION_MAPPERS = new HashMap<>(10);
     private static final Map<String, List<AnnotationTransformer<Annotation>>> ANNOTATION_TRANSFORMERS = new HashMap<>(5);
     private static final Map<String, List<AnnotationRemapper>> ANNOTATION_REMAPPERS = new HashMap<>(5);
@@ -171,7 +169,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
 
         try {
-            includeAnnotations(annotationMetadata, element, true, annotations, true);
+            includeAnnotations(annotationMetadata, element, null, true, annotations, true);
             if (annotationMetadata.isEmpty()) {
                 return AnnotationMetadata.EMPTY_METADATA;
             }
@@ -351,7 +349,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             // ugly, but will have to do
             annotationMetadata = ((DefaultAnnotationMetadata) existing).clone();
         } else if (existing instanceof AnnotationMetadataHierarchy) {
-            final AnnotationMetadata declaredMetadata = ((AnnotationMetadataHierarchy) existing).getDeclaredMetadata();
+            final AnnotationMetadata declaredMetadata = existing.getDeclaredMetadata();
             if (declaredMetadata instanceof DefaultAnnotationMetadata) {
                 annotationMetadata = ((DefaultAnnotationMetadata) declaredMetadata).clone();
             } else {
@@ -379,6 +377,23 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return True if the annotation is present
      */
     protected abstract boolean hasAnnotation(T element, Class<? extends Annotation> annotation);
+
+    /**
+     * Checks whether an annotation is present.
+     *
+     * @param element    The element
+     * @param annotation The annotation type name
+     * @return True if the annotation is present
+     */
+    protected abstract boolean hasAnnotation(T element, String annotation);
+
+    /**
+     * Checks whether any annotations are present on the given element.
+     *
+     * @param element    The element
+     * @return True if the annotation is present
+     */
+    protected abstract boolean hasAnnotations(T element);
 
     /**
      * Get the given type of the annotation.
@@ -641,6 +656,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * Populate the annotation data for the given annotation.
      *
      * @param originatingElement The element the annotation data originates from
+     * @param parent  The parent element
      * @param annotationMirror   The annotation
      * @param metadata           the metadata
      * @param isDeclared         Is the annotation a declared annotation
@@ -650,6 +666,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     protected Map<CharSequence, Object> populateAnnotationData(
             T originatingElement,
+            @Nullable T parent,
             A annotationMirror,
             DefaultAnnotationMetadata metadata,
             boolean isDeclared,
@@ -669,6 +686,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             annotationValues = new LinkedHashMap<>(3);
         } else {
             annotationValues = new LinkedHashMap<>(5);
+            Set<String> nonBindingMembers = new HashSet<>(2);
             for (Map.Entry<? extends T, ?> entry : elementValues.entrySet()) {
                 T member = entry.getKey();
 
@@ -676,14 +694,27 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     continue;
                 }
 
-                boolean isInstantiatedMember = hasAnnotation(member, InstantiatedMember.class);
                 Object annotationValue = entry.getValue();
-                if (isInstantiatedMember) {
-                    final String memberName = getAnnotationMemberName(member);
-                    final Object rawValue = readAnnotationValue(originatingElement, member, memberName, annotationValue);
-                    if (rawValue instanceof AnnotationClassValue) {
-                        AnnotationClassValue acv = (AnnotationClassValue) rawValue;
-                        annotationValues.put(memberName, new AnnotationClassValue(acv.getName(), true));
+                if (hasAnnotations(member)) {
+                    final DefaultAnnotationMetadata memberMetadata = new DefaultAnnotationMetadata();
+                    final List<? extends A> annotationsForMember = getAnnotationsForType(member)
+                            .stream().filter((a) -> !getAnnotationTypeName(a).equals(annotationName))
+                            .collect(Collectors.toList());
+                    includeAnnotations(memberMetadata, member, null, true, annotationsForMember, false);
+
+                    boolean isInstantiatedMember = memberMetadata.hasAnnotation(InstantiatedMember.class);
+
+                    if (memberMetadata.hasAnnotation(NonBinding.class)) {
+                        final String memberName = getElementName(member);
+                        nonBindingMembers.add(memberName);
+                    }
+                    if (isInstantiatedMember) {
+                        final String memberName = getAnnotationMemberName(member);
+                        final Object rawValue = readAnnotationValue(originatingElement, member, memberName, annotationValue);
+                        if (rawValue instanceof AnnotationClassValue) {
+                            AnnotationClassValue acv = (AnnotationClassValue) rawValue;
+                            annotationValues.put(memberName, new AnnotationClassValue(acv.getName(), true));
+                        }
                     }
                 }
 
@@ -699,7 +730,20 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                             annotationValue
                     );
                 }
+            }
 
+            if (!nonBindingMembers.isEmpty()) {
+                T annotationType = getTypeForAnnotation(annotationMirror);
+                if (!hasAnnotation(annotationType, AnnotationUtil.QUALIFIER) &&
+                        !hasAnnotation(annotationType, Qualifier.class)) {
+                    addError(originatingElement, "@NonBinding annotation is only applicable to annotations that are annotated with @Qualifier");
+                } else {
+                    metadata.addDeclaredStereotype(
+                            Collections.singletonList(getAnnotationTypeName(annotationMirror)),
+                            AnnotationUtil.QUALIFIER,
+                            Collections.singletonMap("nonBinding", nonBindingMembers)
+                    );
+                }
             }
         }
         List<AnnotationMapper<?>> mappers = getAnnotationMappers(annotationName);
@@ -779,7 +823,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                         annMirror,
                                         mappedAnnotationName,
                                         metadata,
-                                        isDeclared);
+                                        isDeclared,
+                                        isInheritedAnnotationType(annMirror) || originatingElement == parent);
 
                             });
                         }
@@ -983,12 +1028,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         }
 
                         if (annotationMirror.isPresent()) {
+                            final T am = annotationMirror.get();
                             processAnnotationStereotype(
                                     Collections.singletonList(aliasedAnnotationName),
-                                    annotationMirror.get(),
+                                    am,
                                     aliasedAnnotationName,
                                     metadata,
-                                    isDeclared);
+                                    isDeclared,
+                                    isInheritedAnnotationType(am)
+                            );
                         } else {
                             processAnnotationStereotype(
                                     Collections.singletonList(aliasedAnnotationName),
@@ -1049,13 +1097,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             includeAnnotations(
                     annotationMetadata,
                     currentElement,
+                    parent,
                     isDeclared,
                     annotationHierarchy,
                     allowAliases
             );
 
         }
-        if (!annotationMetadata.hasDeclaredStereotype(Scope.class) && annotationMetadata.hasDeclaredStereotype(DefaultScope.class)) {
+        if (!annotationMetadata.hasDeclaredStereotype(AnnotationUtil.SCOPE) && annotationMetadata.hasDeclaredStereotype(DefaultScope.class)) {
             Optional<String> value = annotationMetadata.stringValue(DefaultScope.class);
             value.ifPresent(name -> annotationMetadata.addDeclaredAnnotation(name, Collections.emptyMap()));
         }
@@ -1064,6 +1113,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     private void includeAnnotations(DefaultAnnotationMetadata annotationMetadata,
                                     T element,
+                                    @Nullable T parent,
                                     boolean isDeclared,
                                     List<? extends A> annotationHierarchy,
                                     boolean allowAliases) {
@@ -1083,6 +1133,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             RetentionPolicy retentionPolicy = getRetentionPolicy(annotationType);
             Map<CharSequence, Object> annotationValues = populateAnnotationData(
                     element,
+                    parent,
                     annotationMirror,
                     annotationMetadata,
                     isDeclared,
@@ -1094,29 +1145,261 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 applyTransformations(
                         listIterator,
                         annotationMetadata,
-                        isDeclared,
-                        annotationMirror,
+                        true,
+                        annotationType,
                         annotationValues,
                         Collections.emptyList(),
+                        null,
                         annotationMetadata::addDeclaredRepeatable,
                         annotationMetadata::addDeclaredAnnotation);
             } else {
-                applyTransformations(
-                        listIterator,
-                        annotationMetadata,
-                        isDeclared,
-                        annotationMirror,
-                        annotationValues,
-                        Collections.emptyList(),
-                        annotationMetadata::addRepeatable,
-                        annotationMetadata::addAnnotation);
+                if (isInheritedAnnotation(annotationMirror) || element == parent) {
+                    applyTransformations(
+                            listIterator,
+                            annotationMetadata,
+                            false,
+                            annotationType,
+                            annotationValues,
+                            Collections.emptyList(),
+                            null,
+                            annotationMetadata::addRepeatable,
+                            annotationMetadata::addAnnotation);
+                } else {
+                    listIterator.remove();
+                }
             }
         }
         for (A annotationMirror : hierarchyCopy) {
             String annotationTypeName = getAnnotationTypeName(annotationMirror);
             String packageName = NameUtils.getPackageName(annotationTypeName);
             if (!AnnotationUtil.STEREOTYPE_EXCLUDES.contains(packageName)) {
-                processAnnotationStereotype(annotationMirror, annotationMetadata, isDeclared);
+                processAnnotationStereotype(element, parent, annotationMirror, annotationMetadata, isDeclared);
+            }
+        }
+    }
+
+    /**
+     * Test whether the annotation mirror is inherited.
+     * @param annotationMirror The mirror
+     * @return True if it is
+     */
+    protected abstract boolean isInheritedAnnotation(@NonNull A annotationMirror);
+
+    /**
+     * Test whether the annotation mirror is inherited.
+     * @param annotationType The mirror
+     * @return True if it is
+     */
+    protected abstract boolean isInheritedAnnotationType(@NonNull T annotationType);
+
+    private void buildStereotypeHierarchy(
+            List<String> parents,
+            T element,
+            DefaultAnnotationMetadata metadata,
+            boolean isDeclared,
+            boolean isInherited,
+            boolean allowAliases,
+            List<String> excludes) {
+        List<? extends A> annotationMirrors = getAnnotationsForType(element);
+
+        LinkedList<AnnotationValueBuilder<?>> interceptorBindings = new LinkedList<>();
+        final String lastParent = CollectionUtils.last(parents);
+        if (!annotationMirrors.isEmpty()) {
+
+            // first add the top level annotations
+            List<A> topLevel = new ArrayList<>();
+            final ListIterator<? extends A> listIterator = annotationMirrors.listIterator();
+            while (listIterator.hasNext()) {
+                A annotationMirror = listIterator.next();
+                String annotationName = getAnnotationTypeName(annotationMirror);
+                if (annotationName.equals(getElementName(element))) {
+                    continue;
+                }
+
+                if (!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName) && !excludes.contains(annotationName)) {
+                    if (AnnotationUtil.ADVICE_STEREOTYPES.contains(lastParent)) {
+                        if (AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(annotationName)) {
+                            // skip @InterceptorBinding stereotype handled in last round
+                            continue;
+                        }
+                    }
+                    topLevel.add(annotationMirror);
+                    final T annotationTypeMirror = getTypeForAnnotation(annotationMirror);
+                    final RetentionPolicy retentionPolicy = getRetentionPolicy(annotationTypeMirror);
+                    Map<CharSequence, Object> data = populateAnnotationData(
+                            element,
+                            null,
+                            annotationMirror,
+                            metadata,
+                            isDeclared,
+                            retentionPolicy,
+                            allowAliases
+                    );
+
+                    handleAnnotationStereotype(
+                            parents,
+                            metadata,
+                            isDeclared,
+                            isInherited,
+                            interceptorBindings,
+                            lastParent,
+                            listIterator,
+                            annotationTypeMirror,
+                            annotationName,
+                            data
+                    );
+                }
+            }
+            // remove any annotations stripped out by transformations
+            topLevel.removeIf((a) -> !annotationMirrors.contains(a));
+            // now add meta annotations
+            for (A annotationMirror : topLevel) {
+                processAnnotationStereotype(
+                        parents,
+                        annotationMirror,
+                        metadata,
+                        isDeclared,
+                        isInherited
+                );
+            }
+        }
+
+        if (lastParent != null) {
+            AnnotationMetadata modifiedStereotypes = MUTATED_ANNOTATION_METADATA.get(new MetadataKey(lastParent, element));
+            if (modifiedStereotypes != null) {
+                Set<String> annotationNames = modifiedStereotypes.getAnnotationNames();
+                for (String annotationName : annotationNames) {
+                    AnnotationValue<Annotation> a = modifiedStereotypes.getAnnotation(annotationName);
+                    if (a != null) {
+                        String stereotypeName = a.getAnnotationName();
+                        if (!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(stereotypeName) && !excludes.contains(stereotypeName)) {
+                            final T annotationType = getAnnotationMirror(stereotypeName).orElse(null);
+                            if (annotationType != null) {
+                                Map<CharSequence, Object> values = a.getValues();
+                                handleAnnotationStereotype(
+                                        parents,
+                                        metadata,
+                                        isDeclared,
+                                        isInherited,
+                                        interceptorBindings,
+                                        lastParent,
+                                        null,
+                                        annotationType,
+                                        annotationName,
+                                        values
+                                );
+                            } else {
+                                // a meta annotation not actually on the classpath
+                                if (isDeclared) {
+                                    metadata.addDeclaredStereotype(
+                                            parents,
+                                            stereotypeName,
+                                            a.getValues(),
+                                            a.getRetentionPolicy()
+                                    );
+                                } else {
+                                    metadata.addStereotype(
+                                            parents,
+                                            stereotypeName,
+                                            a.getValues(),
+                                            a.getRetentionPolicy()
+                                    );
+                                }
+                            }
+
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!interceptorBindings.isEmpty()) {
+            for (AnnotationValueBuilder<?> interceptorBinding : interceptorBindings) {
+
+                if (isDeclared) {
+                    metadata.addDeclaredRepeatable(
+                            AnnotationUtil.ANN_INTERCEPTOR_BINDINGS,
+                            interceptorBinding.build()
+                    );
+                } else {
+                    metadata.addRepeatable(
+                            AnnotationUtil.ANN_INTERCEPTOR_BINDINGS,
+                            interceptorBinding.build()
+                    );
+                }
+            }
+        }
+    }
+
+    private void handleAnnotationStereotype(
+            List<String> parents,
+            DefaultAnnotationMetadata metadata,
+            boolean isDeclared,
+            boolean isInherited,
+            LinkedList<AnnotationValueBuilder<?>> interceptorBindings,
+            String lastParent,
+            @Nullable ListIterator<? extends A> listIterator,
+            T annotationType,
+            String annotationName,
+            Map<CharSequence, Object> data) {
+        addToInterceptorBindingsIfNecessary(interceptorBindings, lastParent, annotationName);
+
+        final boolean hasInterceptorBinding = !interceptorBindings.isEmpty();
+        if (hasInterceptorBinding && AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(annotationName)) {
+            interceptorBindings.getLast().members(data);
+            return;
+        }
+        if (hasInterceptorBinding && Type.class.getName().equals(annotationName)) {
+            final Object o = data.get(AnnotationMetadata.VALUE_MEMBER);
+            AnnotationClassValue<?> interceptorType = null;
+            if (o instanceof AnnotationClassValue) {
+                interceptorType = (AnnotationClassValue<?>) o;
+            } else if (o instanceof AnnotationClassValue[]) {
+                final AnnotationClassValue[] values = (AnnotationClassValue[]) o;
+                if (values.length > 0) {
+                    interceptorType = values[0];
+                }
+            }
+            if (interceptorType != null) {
+                for (AnnotationValueBuilder<?> interceptorBinding : interceptorBindings) {
+                    interceptorBinding.member("interceptorType", interceptorType);
+                }
+            }
+        }
+
+        if (isDeclared) {
+            applyTransformations(listIterator, metadata, true, annotationType, data, parents, interceptorBindings,
+                    (string, av) -> metadata.addDeclaredRepeatableStereotype(parents, string, av),
+                    (string, values, rp) -> metadata.addDeclaredStereotype(parents, string, values, rp));
+        } else if (isInherited) {
+            applyTransformations(listIterator, metadata, false, annotationType, data, parents, interceptorBindings,
+                    (string, av) -> metadata.addRepeatableStereotype(parents, string, av),
+                    (string, values, rp) -> metadata.addStereotype(parents, string, values, rp));
+        } else {
+            if (listIterator != null) {
+                listIterator.remove();
+            }
+        }
+    }
+
+    private void addToInterceptorBindingsIfNecessary(LinkedList<AnnotationValueBuilder<?>> interceptorBindings, String lastParent, String annotationName) {
+        if (lastParent != null) {
+            AnnotationValueBuilder<?> interceptorBinding = null;
+            if (AnnotationUtil.ANN_AROUND.equals(annotationName) || AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(annotationName)) {
+                interceptorBinding = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDING)
+                        .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(lastParent))
+                        .member("kind", "AROUND");
+            } else if (AnnotationUtil.ANN_INTRODUCTION.equals(annotationName)) {
+                interceptorBinding = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDING)
+                        .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(lastParent))
+                        .member("kind", "INTRODUCTION");
+            } else if (AnnotationUtil.ANN_AROUND_CONSTRUCT.equals(annotationName)) {
+                interceptorBinding = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDING)
+                        .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(lastParent))
+                        .member("kind", "AROUND_CONSTRUCT");
+            }
+            if (interceptorBinding != null) {
+                interceptorBindings.add(interceptorBinding);
             }
         }
     }
@@ -1145,27 +1428,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
 
                 if (!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName) && !excludes.contains(annotationName)) {
-                    if (AnnotationUtil.ANN_AROUND.equals(lastParent) || AnnotationUtil.ANN_INTRODUCTION.equals(lastParent)) {
+                    if (AnnotationUtil.ADVICE_STEREOTYPES.contains(lastParent)) {
                         if (AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(annotationName)) {
                             // skip @InterceptorBinding stereotype handled in last round
                             continue;
                         }
                     }
-                    if (lastParent != null) {
-                        AnnotationValueBuilder<?> interceptorBinding = null;
-                        if (AnnotationUtil.ANN_AROUND.equals(annotationName) || AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(annotationName)) {
-                            interceptorBinding = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDING)
-                                    .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(lastParent))
-                                    .member("kind", "AROUND");
-                        } else if (AnnotationUtil.ANN_INTRODUCTION.equals(annotationName)) {
-                            interceptorBinding = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDING)
-                                    .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(lastParent))
-                                    .member("kind", "INTRODUCTION");
-                        }
-                        if (interceptorBinding != null) {
-                            interceptorBindings.add(interceptorBinding);
-                        }
-                    }
+                    addToInterceptorBindingsIfNecessary(interceptorBindings, lastParent, annotationName);
 
                     final RetentionPolicy retentionPolicy = annotationMirror.getRetentionPolicy();
 
@@ -1227,119 +1496,33 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
     }
 
-
-    private void buildStereotypeHierarchy(
-            List<String> parents,
+    private void processAnnotationStereotype(
             T element,
-            DefaultAnnotationMetadata metadata,
-            boolean isDeclared,
-            boolean allowAliases,
-            List<String> excludes) {
-        List<? extends A> annotationMirrors = getAnnotationsForType(element);
-
-        AnnotationValueBuilder<?> interceptorBinding = null;
-        AnnotationClassValue<?> interceptorType = null;
-        final String lastParent = CollectionUtils.last(parents);
-        if (!annotationMirrors.isEmpty()) {
-
-            // first add the top level annotations
-            List<A> topLevel = new ArrayList<>();
-            final ListIterator<? extends A> listIterator = annotationMirrors.listIterator();
-            while (listIterator.hasNext()) {
-                A annotationMirror = listIterator.next();
-
-                String annotationName = getAnnotationTypeName(annotationMirror);
-                if (annotationName.equals(getElementName(element))) {
-                    continue;
-                }
-
-                if (!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName) && !excludes.contains(annotationName)) {
-                    if (AnnotationUtil.ANN_AROUND.equals(lastParent) || AnnotationUtil.ANN_INTRODUCTION.equals(lastParent)) {
-                        if (AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(annotationName)) {
-                            // skip @InterceptorBinding stereotype handled in last round
-                            continue;
-                        }
-                    }
-                    if (lastParent != null && interceptorBinding == null) {
-                        if (AnnotationUtil.ANN_AROUND.equals(annotationName) || AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(annotationName)) {
-                            interceptorBinding = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDING)
-                                    .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(lastParent))
-                                    .member("kind", "AROUND");
-                        } else if (AnnotationUtil.ANN_INTRODUCTION.equals(annotationName)) {
-                            interceptorBinding = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDING)
-                                    .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(lastParent))
-                                    .member("kind", "INTRODUCTION");
-                        }
-                    }
-
-                    final T annotationTypeMirror = getTypeForAnnotation(annotationMirror);
-                    final RetentionPolicy retentionPolicy = getRetentionPolicy(annotationTypeMirror);
-
-                    topLevel.add(annotationMirror);
-
-                    Map<CharSequence, Object> data = populateAnnotationData(element, annotationMirror, metadata, isDeclared, retentionPolicy, allowAliases);
-                    if (interceptorBinding != null && AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(annotationName)) {
-                        interceptorBinding.members(data);
-                        continue;
-                    }
-                    if (Type.class.getName().equals(annotationName)) {
-                        final Object o = data.get(AnnotationMetadata.VALUE_MEMBER);
-                        if (o instanceof AnnotationClassValue) {
-                            interceptorType = (AnnotationClassValue<?>) o;
-                        } else if (o instanceof AnnotationClassValue[]) {
-                            final AnnotationClassValue[] values = (AnnotationClassValue[]) o;
-                            if (values.length > 0) {
-                                interceptorType = values[0];
-                            }
-                        }
-                    }
-
-                    if (isDeclared) {
-                        applyTransformations(listIterator, metadata, isDeclared, annotationMirror, data, parents,
-                                (string, av) -> metadata.addDeclaredRepeatableStereotype(parents, string, av),
-                                (string, values, rp) -> metadata.addDeclaredStereotype(parents, string, values, rp));
-                    } else {
-                        applyTransformations(listIterator, metadata, isDeclared, annotationMirror, data, parents,
-                                (string, av) -> metadata.addRepeatableStereotype(parents, string, av),
-                                (string, values, rp) -> metadata.addStereotype(parents, string, values, rp));
-                    }
-                }
-            }
-            // remove any annotations stripped out by transformations
-            topLevel.removeIf((a) -> !annotationMirrors.contains(a));
-            // now add meta annotations
-            for (A annotationMirror : topLevel) {
-                processAnnotationStereotype(parents, annotationMirror, metadata, isDeclared);
-            }
-        }
-
-        if (interceptorBinding != null) {
-            if (interceptorType != null) {
-                interceptorBinding.member("interceptorType", interceptorType);
-            }
-            if (isDeclared) {
-                metadata.addDeclaredRepeatable(
-                        AnnotationUtil.ANN_INTERCEPTOR_BINDINGS,
-                        interceptorBinding.build()
-                );
-            } else {
-                metadata.addRepeatable(
-                        AnnotationUtil.ANN_INTERCEPTOR_BINDINGS,
-                        interceptorBinding.build()
-                );
-            }
-        }
-    }
-
-    private void processAnnotationStereotype(A annotationMirror, DefaultAnnotationMetadata annotationMetadata, boolean isDeclared) {
+            T parent,
+            A annotationMirror,
+            DefaultAnnotationMetadata annotationMetadata,
+            boolean isDeclared) {
         T annotationType = getTypeForAnnotation(annotationMirror);
         String parentAnnotationName = getAnnotationTypeName(annotationMirror);
         if (!parentAnnotationName.endsWith(".Nullable")) {
-            processAnnotationStereotypes(annotationMetadata, isDeclared, annotationType, parentAnnotationName, Collections.emptyList());
+            processAnnotationStereotypes(
+                    annotationMetadata,
+                    isDeclared,
+                    isInheritedAnnotation(annotationMirror) || element == parent,
+                    annotationType,
+                    parentAnnotationName,
+                    Collections.emptyList()
+            );
         }
     }
 
-    private void processAnnotationStereotypes(DefaultAnnotationMetadata annotationMetadata, boolean isDeclared, T annotationType, String annotationName, List<String> excludes) {
+    private void processAnnotationStereotypes(
+            DefaultAnnotationMetadata annotationMetadata,
+            boolean isDeclared,
+            boolean isInherited,
+            T annotationType,
+            String annotationName,
+            List<String> excludes) {
         List<String> parentAnnotations = new ArrayList<>();
         parentAnnotations.add(annotationName);
         buildStereotypeHierarchy(
@@ -1347,6 +1530,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 annotationType,
                 annotationMetadata,
                 isDeclared,
+                isInherited,
                 true,
                 excludes
         );
@@ -1367,36 +1551,75 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         );
     }
 
-    private void processAnnotationStereotype(List<String> parents, A annotationMirror, DefaultAnnotationMetadata metadata, boolean isDeclared) {
+    private void processAnnotationStereotype(
+            List<String> parents,
+            A annotationMirror,
+            DefaultAnnotationMetadata metadata,
+            boolean isDeclared,
+            boolean isInherited) {
         T typeForAnnotation = getTypeForAnnotation(annotationMirror);
         String annotationTypeName = getAnnotationTypeName(annotationMirror);
-        processAnnotationStereotype(parents, typeForAnnotation, annotationTypeName, metadata, isDeclared);
+        processAnnotationStereotype(parents, typeForAnnotation, annotationTypeName, metadata, isDeclared, isInherited);
     }
 
-    private void processAnnotationStereotype(List<String> parents, T annotationType, String annotationTypeName, DefaultAnnotationMetadata metadata, boolean isDeclared) {
+    private void processAnnotationStereotype(
+            List<String> parents,
+            T annotationType,
+            String annotationTypeName,
+            DefaultAnnotationMetadata metadata,
+            boolean isDeclared,
+            boolean isInherited) {
         List<String> stereoTypeParents = new ArrayList<>(parents);
         stereoTypeParents.add(annotationTypeName);
-        buildStereotypeHierarchy(stereoTypeParents, annotationType, metadata, isDeclared, true, Collections.emptyList());
+        buildStereotypeHierarchy(stereoTypeParents, annotationType, metadata, isDeclared, isInherited, true, Collections.emptyList());
     }
 
-    private void processAnnotationStereotype(List<String> parents, AnnotationValue<?> annotationType, DefaultAnnotationMetadata metadata, boolean isDeclared) {
+    private void processAnnotationStereotype(
+            List<String> parents,
+            AnnotationValue<?> annotationType,
+            DefaultAnnotationMetadata metadata,
+            boolean isDeclared) {
         List<String> stereoTypeParents = new ArrayList<>(parents);
         stereoTypeParents.add(annotationType.getAnnotationName());
         buildStereotypeHierarchy(stereoTypeParents, annotationType, metadata, isDeclared, Collections.emptyList());
     }
 
-    private void applyTransformations(ListIterator<? extends A> hierarchyIterator,
+    private void applyTransformations(@Nullable ListIterator<? extends A> hierarchyIterator,
                                       DefaultAnnotationMetadata annotationMetadata,
                                       boolean isDeclared,
-                                      A annotationMirror,
+                                      @NonNull T annotationType,
                                       Map<CharSequence, Object> data,
                                       List<String> parents,
+                                      @Nullable LinkedList<AnnotationValueBuilder<?>> interceptorBindings,
                                       BiConsumer<String, AnnotationValue> addRepeatableAnnotation,
                                       TriConsumer<String, Map<CharSequence, Object>, RetentionPolicy> addAnnotation) {
-        String annotationName = getAnnotationTypeName(annotationMirror);
-        String repeatableName = getRepeatableName(annotationMirror);
+        applyTransformationsForAnnotationType(
+                hierarchyIterator,
+                annotationMetadata,
+                isDeclared,
+                annotationType,
+                data,
+                parents,
+                interceptorBindings,
+                addRepeatableAnnotation,
+                addAnnotation
+        );
+    }
+
+    private void applyTransformationsForAnnotationType(
+                                      @Nullable ListIterator<? extends A> hierarchyIterator,
+                                      DefaultAnnotationMetadata annotationMetadata,
+                                      boolean isDeclared,
+                                      @NonNull T annotationType,
+                                      Map<CharSequence, Object> data,
+                                      List<String> parents,
+                                      @Nullable LinkedList<AnnotationValueBuilder<?>> interceptorBindings,
+                                      BiConsumer<String, AnnotationValue> addRepeatableAnnotation,
+                                      TriConsumer<String, Map<CharSequence, Object>, RetentionPolicy> addAnnotation) {
+        String annotationName = getElementName(annotationType);
         String packageName = NameUtils.getPackageName(annotationName);
-        final T annotationType = getTypeForAnnotation(annotationMirror);
+        String repeatableName = getRepeatableNameForType(annotationType);
+
         RetentionPolicy retentionPolicy = getRetentionPolicy(annotationType);
         List<AnnotationRemapper> annotationRemappers = ANNOTATION_REMAPPERS.get(packageName);
         List<AnnotationTransformer<Annotation>> annotationTransformers = getAnnotationTransformers(annotationName);
@@ -1434,7 +1657,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         }
                     }
                 }
-                if (wasRemapped) {
+                if (wasRemapped && hierarchyIterator != null) {
                     hierarchyIterator.remove();
                 }
             } else {
@@ -1443,7 +1666,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         new io.micronaut.core.annotation.AnnotationValue<>(annotationName, data);
                 AnnotationValue<Annotation> repeatableAnn = AnnotationValue.builder(repeatableName).values(av).build();
                 final List<AnnotationTransformer<Annotation>> repeatableTransformers = getAnnotationTransformers(repeatableName);
-                hierarchyIterator.remove();
+                if (hierarchyIterator != null) {
+                    hierarchyIterator.remove();
+                }
                 if (CollectionUtils.isNotEmpty(repeatableTransformers)) {
                     for (AnnotationTransformer<Annotation> repeatableTransformer : repeatableTransformers) {
                         final List<AnnotationValue<?>> transformedRepeatable = repeatableTransformer.transform(repeatableAnn, visitorContext);
@@ -1494,8 +1719,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                 break;
                             } else {
                                 wasRemapped = true;
-                                final String transformedAnnotationName = annotationValue.getAnnotationName();
-                                addAnnotation.accept(transformedAnnotationName, annotationValue.getValues(), annotationValue.getRetentionPolicy());
+                                final String transformedAnnotationName = handleTransformedAnnotationValue(parents,
+                                                                                                          interceptorBindings,
+                                                                                                          addRepeatableAnnotation,
+                                                                                                          addAnnotation,
+                                                                                                          annotationValue
+                                );
                                 if (CollectionUtils.isNotEmpty(annotationValue.getStereotypes())) {
                                     addTransformedStereotypes(annotationMetadata, isDeclared, annotationValue, parents);
                                 } else {
@@ -1505,46 +1734,89 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         }
                     }
                 }
-                if (wasRemapped) {
+                if (wasRemapped && hierarchyIterator != null) {
                     hierarchyIterator.remove();
                 }
             } else {
                 io.micronaut.core.annotation.AnnotationValue<Annotation> av =
                         new io.micronaut.core.annotation.AnnotationValue<>(annotationName, data);
                 VisitorContext visitorContext = createVisitorContext();
-                hierarchyIterator.remove();
+                if (hierarchyIterator != null) {
+                    hierarchyIterator.remove();
+                }
                 for (AnnotationTransformer<Annotation> annotationTransformer : annotationTransformers) {
                     final List<AnnotationValue<?>> transformedValues = annotationTransformer.transform(av, visitorContext);
                     for (AnnotationValue<?> transformedValue : transformedValues) {
-                        final String transformedAnnotationName = transformedValue.getAnnotationName();
-                        final String transformedRepeatableName;
+                        final String transformedAnnotationName = handleTransformedAnnotationValue(parents,
+                                                                                                  interceptorBindings,
+                                                                                                  addRepeatableAnnotation,
+                                                                                                  addAnnotation,
+                                                                                                  transformedValue
 
-                        if (isRepeatableCandidate(transformedAnnotationName)) {
-                            String resolvedName = null;
-                            // wrap with exception handling just in case there is any problems loading the type
-                            try {
-                                resolvedName = getAnnotationMirror(transformedAnnotationName)
-                                        .map(this::getRepeatableNameForType)
-                                        .orElse(null);
-                            } catch (Exception e) {
-                                // ignore
-                            }
-                            transformedRepeatableName = resolvedName;
+                        );
+                        if (CollectionUtils.isNotEmpty(transformedValue.getStereotypes())) {
+                            addTransformedStereotypes(annotationMetadata, isDeclared, transformedValue, parents);
                         } else {
-                            transformedRepeatableName = null;
+                            addTransformedStereotypes(annotationMetadata, isDeclared, transformedAnnotationName, parents);
                         }
-
-                        if (transformedRepeatableName != null) {
-                            addRepeatableAnnotation.accept(transformedRepeatableName, transformedValue);
-                        } else {
-                            addAnnotation.accept(transformedAnnotationName,
-                                    transformedValue.getValues(),
-                                    transformedValue.getRetentionPolicy());
-                        }
-                        addTransformedStereotypes(annotationMetadata, isDeclared, transformedAnnotationName, parents);
                     }
                 }
             }
+        }
+    }
+
+    private String handleTransformedAnnotationValue(List<String> parents,
+                             LinkedList<AnnotationValueBuilder<?>> interceptorBindings,
+                             BiConsumer<String, AnnotationValue> addRepeatableAnnotation,
+                             TriConsumer<String, Map<CharSequence, Object>, RetentionPolicy> addAnnotation,
+                             AnnotationValue<?> transformedValue) {
+        final String transformedAnnotationName = transformedValue.getAnnotationName();
+        addTransformedInterceptorBindingsIfNecessary(
+                parents,
+                interceptorBindings,
+                transformedValue,
+                transformedAnnotationName
+        );
+        final String transformedRepeatableName;
+
+        if (isRepeatableCandidate(transformedAnnotationName)) {
+            String resolvedName = null;
+            // wrap with exception handling just in case there is any problems loading the type
+            try {
+                resolvedName = getAnnotationMirror(transformedAnnotationName)
+                        .map(this::getRepeatableNameForType)
+                        .orElse(null);
+            } catch (Exception e) {
+                // ignore
+            }
+            transformedRepeatableName = resolvedName;
+        } else {
+            transformedRepeatableName = null;
+        }
+
+        if (transformedRepeatableName != null) {
+            addRepeatableAnnotation.accept(transformedRepeatableName, transformedValue);
+        } else {
+            addAnnotation.accept(transformedAnnotationName,
+                                 transformedValue.getValues(),
+                                 transformedValue.getRetentionPolicy());
+        }
+        return transformedAnnotationName;
+    }
+
+    private void addTransformedInterceptorBindingsIfNecessary(List<String> parents,
+                                                              LinkedList<AnnotationValueBuilder<?>> interceptorBindings,
+                                                              AnnotationValue<?> transformedValue,
+                                                              String transformedAnnotationName) {
+        if (interceptorBindings != null && !parents.isEmpty() && AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(
+                transformedAnnotationName)) {
+            final AnnotationValueBuilder<Annotation> newBuilder = AnnotationValue
+                    .builder(transformedAnnotationName, transformedValue.getRetentionPolicy())
+                    .members(transformedValue.getValues());
+            if (!transformedValue.contains(AnnotationMetadata.VALUE_MEMBER)) {
+                newBuilder.value(parents.get(parents.size() - 1));
+            }
+            interceptorBindings.add(newBuilder);
         }
     }
 
@@ -1592,6 +1864,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 getAnnotationMirror(transformedAnnotationName).ifPresent(a -> processAnnotationStereotypes(
                         annotationMetadata,
                         isDeclared,
+                        false,
                         a,
                         transformedAnnotationName,
                         parents
@@ -1698,33 +1971,23 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             AnnotationMetadata annotationMetadata,
             AnnotationValue<A2> annotationValue) {
         String annotationName = annotationValue.getAnnotationName();
-        if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+        final boolean isReference = annotationMetadata instanceof AnnotationMetadataReference;
+        boolean isReferenceOrEmpty = annotationMetadata == AnnotationMetadata.EMPTY_METADATA || isReference;
+        if (annotationMetadata instanceof DefaultAnnotationMetadata || isReferenceOrEmpty) {
+            final DefaultAnnotationMetadata defaultMetadata = isReferenceOrEmpty ? new MutableAnnotationMetadata() : (DefaultAnnotationMetadata) annotationMetadata;
             T annotationMirror = getAnnotationMirror(annotationName).orElse(null);
-            final DefaultAnnotationMetadata defaultMetadata = (DefaultAnnotationMetadata) annotationMetadata;
             if (annotationMirror != null) {
-                String repeatableName = getRepeatableNameForType(annotationMirror);
-                RetentionPolicy retentionPolicy = getRetentionPolicy(annotationMirror);
-                if (repeatableName != null) {
-                    defaultMetadata.addDeclaredRepeatable(
-                            repeatableName,
-                            annotationValue,
-                            retentionPolicy
-                    );
-                } else {
-                    defaultMetadata.addDeclaredAnnotation(
-                            annotationName,
-                            annotationValue.getValues(),
-                            retentionPolicy
-                    );
-                }
-            } else {
-                defaultMetadata.addDeclaredAnnotation(
-                        annotationName,
-                        annotationValue.getValues()
+                applyTransformationsForAnnotationType(
+                        null,
+                        defaultMetadata,
+                        true,
+                        annotationMirror,
+                        annotationValue.getValues(),
+                        Collections.emptyList(),
+                        new LinkedList<>(),
+                        defaultMetadata::addDeclaredRepeatable,
+                        defaultMetadata::addDeclaredAnnotation
                 );
-            }
-
-            if (annotationMirror != null) {
                 final Map<? extends T, ?> defaultValues = readAnnotationDefaultValues(annotationName, annotationMirror);
                 processAnnotationDefaults(
                         annotationMirror,
@@ -1735,10 +1998,23 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 processAnnotationStereotypes(
                         defaultMetadata,
                         true,
+                        isInheritedAnnotationType(annotationMirror),
                         annotationMirror,
                         annotationName,
                         DEFAULT_ANNOTATE_EXCLUDES
                 );
+            } else {
+                defaultMetadata.addDeclaredAnnotation(
+                        annotationName,
+                        annotationValue.getValues()
+                );
+            }
+
+            if (isReference) {
+                AnnotationMetadataReference ref = (AnnotationMetadataReference) annotationMetadata;
+                return new AnnotationMetadataHierarchy(ref, defaultMetadata);
+            } else {
+                return defaultMetadata;
             }
         } else if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
             AnnotationMetadataHierarchy hierarchy = (AnnotationMetadataHierarchy) annotationMetadata;
@@ -1746,47 +2022,121 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             return hierarchy.createSibling(
                     declaredMetadata
             );
-        } else if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA || annotationMetadata instanceof AnnotationMetadataReference) {
-            T annotationMirror = getAnnotationMirror(annotationName).orElse(null);
-            final DefaultAnnotationMetadata newMetadata = new MutableAnnotationMetadata();
-            if (annotationMirror != null) {
+        }
+        return annotationMetadata;
+    }
 
+    /**
+     * Removes an annotation from the given annotation metadata.
+     * @param annotationMetadata The annotation metadata
+     * @param annotationType The annotation type
+     * @return The updated metadata
+     * @since 3.0.0
+     */
+    public AnnotationMetadata removeAnnotation(AnnotationMetadata annotationMetadata, String annotationType) {
+        // we only care if the metadata is an hierarchy or default mutable
+        final boolean isHierarchy = annotationMetadata instanceof AnnotationMetadataHierarchy;
+        AnnotationMetadata declaredMetadata = annotationMetadata;
+        if (isHierarchy) {
+            declaredMetadata = annotationMetadata.getDeclaredMetadata();
+        }
+        // if it is anything else other than DefaultAnnotationMetadata here it is probably empty
+        // in which case nothing needs to be done
+        if (declaredMetadata instanceof DefaultAnnotationMetadata) {
+            final DefaultAnnotationMetadata defaultMetadata = (DefaultAnnotationMetadata) declaredMetadata;
+            T annotationMirror = getAnnotationMirror(annotationType).orElse(null);
+            if (annotationMirror != null) {
                 String repeatableName = getRepeatableNameForType(annotationMirror);
-                RetentionPolicy retentionPolicy = getRetentionPolicy(annotationMirror);
                 if (repeatableName != null) {
-                    newMetadata.addDeclaredRepeatable(
-                            repeatableName,
-                            annotationValue,
-                            retentionPolicy
-                    );
+                    defaultMetadata.removeAnnotation(repeatableName);
                 } else {
-                    newMetadata.addDeclaredAnnotation(
-                            annotationName,
-                            annotationValue.getValues(),
-                            retentionPolicy
-                    );
+                    defaultMetadata.removeAnnotation(annotationType);
                 }
             } else {
-                newMetadata.addDeclaredAnnotation(
-                        annotationName,
-                        annotationValue.getValues()
-                );
+                defaultMetadata.removeAnnotation(annotationType);
             }
 
-            if (annotationMirror != null) {
-                processAnnotationStereotypes(
-                        newMetadata,
-                        true,
-                        annotationMirror,
-                        annotationName,
-                        DEFAULT_ANNOTATE_EXCLUDES
+            if (isHierarchy) {
+                return ((AnnotationMetadataHierarchy) annotationMetadata).createSibling(
+                        declaredMetadata
                 );
-            }
-            if (annotationMetadata instanceof AnnotationMetadataReference) {
-                AnnotationMetadataReference ref = (AnnotationMetadataReference) annotationMetadata;
-                return new AnnotationMetadataHierarchy(ref, newMetadata);
             } else {
-                return newMetadata;
+                return declaredMetadata;
+            }
+        }
+        return annotationMetadata;
+    }
+
+    /**
+     * Removes an annotation from the given annotation metadata.
+     * @param annotationMetadata The annotation metadata
+     * @param annotationType The annotation type
+     * @return The updated metadata
+     * @since 3.0.0
+     */
+    public AnnotationMetadata removeStereotype(AnnotationMetadata annotationMetadata, String annotationType) {
+        // we only care if the metadata is an hierarchy or default mutable
+        final boolean isHierarchy = annotationMetadata instanceof AnnotationMetadataHierarchy;
+        AnnotationMetadata declaredMetadata = annotationMetadata;
+        if (isHierarchy) {
+            declaredMetadata = annotationMetadata.getDeclaredMetadata();
+        }
+        // if it is anything else other than DefaultAnnotationMetadata here it is probably empty
+        // in which case nothing needs to be done
+        if (declaredMetadata instanceof DefaultAnnotationMetadata) {
+            final DefaultAnnotationMetadata defaultMetadata = (DefaultAnnotationMetadata) declaredMetadata;
+            T annotationMirror = getAnnotationMirror(annotationType).orElse(null);
+            if (annotationMirror != null) {
+                String repeatableName = getRepeatableNameForType(annotationMirror);
+                if (repeatableName != null) {
+                    defaultMetadata.removeStereotype(repeatableName);
+                } else {
+                    defaultMetadata.removeStereotype(annotationType);
+                }
+            } else {
+                defaultMetadata.removeStereotype(annotationType);
+            }
+
+            if (isHierarchy) {
+                return ((AnnotationMetadataHierarchy) annotationMetadata).createSibling(
+                        declaredMetadata
+                );
+            } else {
+                return declaredMetadata;
+            }
+        }
+        return annotationMetadata;
+    }
+
+    /**
+     * Removes an annotation from the metadata for the given predicate.
+     * @param annotationMetadata The annotation metadata
+     * @param predicate The predicate
+     * @param <T1> The annotation type
+     * @return The potentially modified metadata
+     */
+    public @NonNull <T1 extends Annotation> AnnotationMetadata removeAnnotationIf(
+            @NonNull AnnotationMetadata annotationMetadata,
+            @NonNull Predicate<AnnotationValue<T1>> predicate) {
+        // we only care if the metadata is an hierarchy or default mutable
+        final boolean isHierarchy = annotationMetadata instanceof AnnotationMetadataHierarchy;
+        AnnotationMetadata declaredMetadata = annotationMetadata;
+        if (isHierarchy) {
+            declaredMetadata = annotationMetadata.getDeclaredMetadata();
+        }
+        // if it is anything else other than DefaultAnnotationMetadata here it is probably empty
+        // in which case nothing needs to be done
+        if (declaredMetadata instanceof DefaultAnnotationMetadata) {
+            final DefaultAnnotationMetadata defaultMetadata = (DefaultAnnotationMetadata) declaredMetadata;
+
+            defaultMetadata.removeAnnotationIf(predicate);
+
+            if (isHierarchy) {
+                return ((AnnotationMetadataHierarchy) annotationMetadata).createSibling(
+                        declaredMetadata
+                );
+            } else {
+                return declaredMetadata;
             }
         }
         return annotationMetadata;

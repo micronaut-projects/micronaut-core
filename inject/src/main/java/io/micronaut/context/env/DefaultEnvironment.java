@@ -25,9 +25,8 @@ import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.io.file.DefaultFileSystemResourceLoader;
 import io.micronaut.core.io.file.FileSystemResourceLoader;
-import io.micronaut.core.io.scan.CachingClassPathAnnotationScanner;
-import io.micronaut.core.io.scan.ClassPathAnnotationScanner;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.io.scan.BeanIntrospectionScanner;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.order.OrderUtil;
@@ -90,7 +89,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private final Set<String> names;
     private final ClassLoader classLoader;
     private final Collection<String> packages = new ConcurrentLinkedQueue<>();
-    private final ClassPathAnnotationScanner annotationScanner;
+    private final BeanIntrospectionScanner annotationScanner;
     private Collection<String> configurationIncludes = new HashSet<>(3);
     private Collection<String> configurationExcludes = new HashSet<>(3);
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -135,13 +134,12 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
         environments.removeAll(specifiedNames);
         environments.addAll(specifiedNames);
-
         this.classLoader = configuration.getClassLoader();
+        this.annotationScanner = createAnnotationScanner(classLoader);
         this.names = environments;
         if (LOG.isInfoEnabled() && !environments.isEmpty()) {
             LOG.info("Established active environments: {}", environments);
         }
-        this.annotationScanner = createAnnotationScanner(classLoader);
         List<String> configLocations = configuration.getOverrideConfigLocations() == null ?
                 new ArrayList<>(DEFAULT_CONFIG_LOCATIONS) : configuration.getOverrideConfigLocations();
         // Search config locations in reverse order
@@ -160,12 +158,12 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     @Override
-    public Stream<Class> scan(Class<? extends Annotation> annotation) {
+    public Stream<Class<?>> scan(Class<? extends Annotation> annotation) {
         return annotationScanner.scan(annotation, getPackages());
     }
 
     @Override
-    public Stream<Class> scan(Class<? extends Annotation> annotation, String... packages) {
+    public Stream<Class<?>> scan(Class<? extends Annotation> annotation, String... packages) {
         return annotationScanner.scan(annotation, packages);
     }
 
@@ -373,8 +371,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @param classLoader The class loader
      * @return The scanner
      */
-    protected ClassPathAnnotationScanner createAnnotationScanner(ClassLoader classLoader) {
-        return new CachingClassPathAnnotationScanner(classLoader);
+    protected BeanIntrospectionScanner createAnnotationScanner(ClassLoader classLoader) {
+        return new BeanIntrospectionScanner();
     }
 
     /**

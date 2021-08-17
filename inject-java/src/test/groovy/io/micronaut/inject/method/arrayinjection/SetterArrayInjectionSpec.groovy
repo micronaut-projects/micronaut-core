@@ -33,12 +33,12 @@ import io.micronaut.context.annotation.*;
 @Executable
 class MyBean {
     
-    @javax.inject.Inject
+    @jakarta.inject.Inject
     public void setFoo(Foo foo) {}
 }
 
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Foo {}
 
 ''')

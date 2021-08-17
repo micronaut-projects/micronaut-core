@@ -16,7 +16,6 @@
 package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-
 import io.micronaut.core.annotation.NonNull;
 
 /**

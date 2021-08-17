@@ -16,6 +16,7 @@
 package io.micronaut.inject;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.naming.Described;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 
@@ -31,7 +32,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ExecutableMethod<T, R> extends Executable<T, R>, MethodReference<T, R> {
+public interface ExecutableMethod<T, R> extends Executable<T, R>, MethodReference<T, R>, Described {
     /**
      * Defines whether the method is abstract.
      *
@@ -63,5 +64,10 @@ public interface ExecutableMethod<T, R> extends Executable<T, R>, MethodReferenc
         String typeString = argument.getTypeString(simple);
         String args = Arrays.stream(getArguments()).map(arg -> arg.getTypeString(simple) + " " + arg.getName()).collect(Collectors.joining(","));
         return typeString + " " + getName() + "(" + args + ")";
+    }
+
+    @Override
+    default String getDescription() {
+        return getDescription(true);
     }
 }

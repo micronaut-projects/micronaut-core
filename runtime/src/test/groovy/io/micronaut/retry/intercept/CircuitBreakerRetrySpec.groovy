@@ -19,11 +19,12 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.retry.CircuitState
 import io.micronaut.retry.annotation.CircuitBreaker
 import io.micronaut.retry.annotation.RetryPredicate
-import io.reactivex.Single
+import jakarta.inject.Singleton
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Mono
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
-
-import javax.inject.Singleton
+import io.micronaut.core.async.annotation.SingleResult
 import java.time.Duration
 
 /**
@@ -236,7 +237,7 @@ class CircuitBreakerRetrySpec extends Specification {
         CounterService counterService = context.getBean(CounterService)
 
         when:
-        counterService.getCount().onErrorReturnItem(1).blockingGet() //to trigger the state
+        Mono.from(counterService.getCount()).onErrorReturn(1).block() //to trigger the state
         counterService.getCount()
 
         then:
@@ -329,8 +330,9 @@ class CircuitBreakerRetrySpec extends Specification {
         }
 
         @CircuitBreaker(attempts = '1', delay = '0ms')
-        Single<Integer> getCount() {
-            Single.error(new IllegalStateException("Bad count"))
+        @SingleResult
+        Publisher<Integer> getCount() {
+            Mono.error(new IllegalStateException("Bad count"))
         }
 
         @CircuitBreaker(attempts = '5', delay = '5ms', predicate = MyRetryPredicate.class)

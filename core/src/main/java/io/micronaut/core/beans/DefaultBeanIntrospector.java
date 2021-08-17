@@ -47,7 +47,7 @@ class DefaultBeanIntrospector implements BeanIntrospector {
 
     @NonNull
     @Override
-    public Collection<BeanIntrospection<Object>> findIntrospections(@NonNull Predicate<? super BeanIntrospectionReference> filter) {
+    public Collection<BeanIntrospection<Object>> findIntrospections(@NonNull Predicate<? super BeanIntrospectionReference<?>> filter) {
         ArgumentUtils.requireNonNull("filter", filter);
         return getIntrospections()
                 .values()
@@ -55,6 +55,18 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                 .filter(filter)
                 .map(BeanIntrospectionReference::load)
                 .collect(Collectors.toList());
+    }
+
+    @NonNull
+    @Override
+    public Collection<Class<?>> findIntrospectedTypes(@NonNull Predicate<? super BeanIntrospectionReference<?>> filter) {
+        ArgumentUtils.requireNonNull("filter", filter);
+        return getIntrospections()
+                .values()
+                .stream()
+                .filter(filter)
+                .map(BeanIntrospectionReference::getBeanType)
+                .collect(Collectors.toSet());
     }
 
     @NonNull

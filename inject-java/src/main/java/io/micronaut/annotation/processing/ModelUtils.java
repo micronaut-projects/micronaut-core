@@ -15,6 +15,7 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Creator;
@@ -23,7 +24,6 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.JavaModelUtils;
 
-import javax.inject.Inject;
 import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
@@ -232,7 +232,7 @@ public class ModelUtils {
     private Optional<ExecutableElement> findAnnotatedConstructor(AnnotationUtils annotationUtils, List<ExecutableElement> constructors) {
         return constructors.stream().filter(ctor -> {
                     final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(ctor);
-                    return annotationMetadata.hasStereotype(Inject.class) || annotationMetadata.hasStereotype(Creator.class);
+                    return annotationMetadata.hasStereotype(AnnotationUtil.INJECT) || annotationMetadata.hasStereotype(Creator.class);
                 }
         ).findFirst();
     }
@@ -309,6 +309,16 @@ public class ModelUtils {
     }
 
     /**
+     * Return whether the given element is the java.lang.Object class.
+     *
+     * @param element The element
+     * @return True if it is java.lang.Object
+     */
+    public boolean isObjectClass(TypeElement element) {
+        return element.getSuperclass().getKind() == NONE;
+    }
+
+    /**
      * @param classElement The {@link TypeElement}
      * @return A list of {@link ExecutableElement}
      */
@@ -365,19 +375,6 @@ public class ModelUtils {
     }
 
     /**
-     * Finds a no argument method of the given name.
-     *
-     * @param classElement The class element
-     * @param methodName The method name
-     * @return The executable element
-     */
-    Optional<ExecutableElement> findAccessibleNoArgumentInstanceMethod(TypeElement classElement, String methodName) {
-        return ElementFilter.methodsIn(elementUtils.getAllMembers(classElement))
-                .stream().filter(m -> m.getSimpleName().toString().equals(methodName) && !isPrivate(m) && !isStatic(m))
-                .findFirst();
-    }
-
-    /**
      * Obtains the super type element for a given type element.
      *
      * @param element The type element
@@ -390,16 +387,6 @@ public class ModelUtils {
         }
         DeclaredType kind = (DeclaredType) superclass;
         return (TypeElement) kind.asElement();
-    }
-
-    /**
-     * Return whether the given element is the java.lang.Object class.
-     *
-     * @param element The element
-     * @return True if it is java.lang.Object
-     */
-    boolean isObjectClass(TypeElement element) {
-        return element.getSuperclass().getKind() == NONE;
     }
 
     /**
@@ -562,7 +549,7 @@ public class ModelUtils {
      * @param strict       Whether to use strict checks for overriding and not include logic to handle method overloading
      * @return the overriding method
      */
-    Optional<ExecutableElement> overridingOrHidingMethod(ExecutableElement overridden, TypeElement classElement, boolean strict) {
+    public Optional<ExecutableElement> overridingOrHidingMethod(ExecutableElement overridden, TypeElement classElement, boolean strict) {
         List<ExecutableElement> methods = ElementFilter.methodsIn(elementUtils.getAllMembers(classElement));
         for (ExecutableElement method : methods) {
             if (strict) {

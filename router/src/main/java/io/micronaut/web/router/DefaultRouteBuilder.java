@@ -27,18 +27,14 @@ import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
-import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.Consumes;
-import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.filter.HttpFilter;
-import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.BeanDefinition;
@@ -428,6 +424,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         protected String bodyArgumentName;
         protected Argument<?> bodyArgument;
         protected final Map<String, Argument> requiredInputs;
+        protected final Class<?> declaringType;
         protected boolean consumesMediaTypesContainsAll;
         protected boolean producesMediaTypesContainsAll;
         protected final HttpStatus definedStatus;
@@ -449,22 +446,9 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             this.targetMethod = targetMethod;
             this.conversionService = conversionService;
             this.consumesMediaTypes = mediaTypes;
-
-            MediaType[] types = MediaType.of(targetMethod.stringValues(Produces.class));
-            Optional<Argument<?>> firstTypeVariable = targetMethod.getReturnType().getFirstTypeVariable();
-            if (firstTypeVariable.isPresent() && Event.class.isAssignableFrom(firstTypeVariable.get().getType())) {
-                producesMediaTypes = Collections.singletonList(MediaType.TEXT_EVENT_STREAM_TYPE);
-            } else if (ArrayUtils.isNotEmpty(types)) {
-                this.producesMediaTypes = Collections.unmodifiableList(Arrays.asList(types));
-            } else {
-                this.producesMediaTypes = DEFAULT_PRODUCES;
-            }
-            types = MediaType.of(targetMethod.stringValues(Consumes.class));
-            if (ArrayUtils.isNotEmpty(types)) {
-                this.consumesMediaTypes = Collections.unmodifiableList(Arrays.asList(types));
-            } else {
-                this.consumesMediaTypes = Collections.emptyList();
-            }
+            this.declaringType = targetMethod.getDeclaringType();
+            this.producesMediaTypes = RouteInfo.super.getProduces();
+            this.consumesMediaTypes = RouteInfo.super.getConsumes();
             suspended = targetMethod.getExecutableMethod().isSuspend();
             reactive = RouteInfo.super.isReactive();
             async = RouteInfo.super.isAsync();
@@ -492,6 +476,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             setProducesMediaTypesContainsAll();
             this.definedStatus = targetMethod.enumValue(Status.class, HttpStatus.class).orElse(null);
             this.isWebSocketRoute = targetMethod.hasAnnotation("io.micronaut.websocket.annotation.OnMessage");
+        }
+
+        @Override
+        public Class<?> getDeclaringType() {
+            return declaringType;
         }
 
         private void setConsumesMediaTypesContainsAll() {

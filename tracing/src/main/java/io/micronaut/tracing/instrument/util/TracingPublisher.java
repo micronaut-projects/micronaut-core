@@ -15,6 +15,7 @@
  */
 package io.micronaut.tracing.instrument.util;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.MutableHttpResponse;
 import io.opentracing.Scope;
@@ -25,8 +26,6 @@ import io.opentracing.noop.NoopScopeManager;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
-
-import io.micronaut.core.annotation.NonNull;
 
 import java.util.Optional;
 

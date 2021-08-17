@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.constructor.optionalinjection;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 import java.util.Optional;
 
 public class B {
