@@ -245,6 +245,41 @@ class ValidatedSpec extends Specification {
         server.close()
     }
 
+    def "test validated controller validates @Valid collection with standard embedded errors"() {
+        given:
+        ApplicationContext context = ApplicationContext.run([
+                'spec.name': getClass().simpleName,
+                'jackson.always-serialize-errors-as-list': true
+        ])
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange(
+                HttpRequest.POST("/validated/pojos", '[{"email":"abc"},{"email":"a@b.c","name":"Micronaut"},{"email":"a@b.c"}]')
+                        .contentType(MediaType.APPLICATION_JSON_TYPE),
+                String
+        )
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.response.code() == HttpStatus.BAD_REQUEST.code
+
+        when:
+        def result = new JsonSlurper().parseText((String) e.response.getBody().get())
+
+        then:
+        result.message == 'Bad Request'
+        result._embedded.errors.size == 3
+        result._embedded.errors.find { it.message == 'pojos[0].email: Email should be valid' }
+        result._embedded.errors.find { it.message == 'pojos[0].name: must not be blank' }
+        result._embedded.errors.find { it.message == 'pojos[2].name: must not be blank' }
+
+        cleanup:
+        server.close()
+    }
+
     def "test validated controller with multiple violations"() {
         given:
         ApplicationContext context = ApplicationContext.run([
@@ -743,5 +778,3 @@ class ValidatedSpec extends Specification {
         Integer count = 0
     }
 }
-
-
