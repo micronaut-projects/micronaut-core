@@ -2,6 +2,18 @@ Micronaut {version} includes the following changes:
 
 === Core Features
 
+==== Optimized Build-Time Metadata
+
+Micronaut 3.0 introduces a new build time metadata format that is more efficient in terms of startup and code size.
+
+The result is significant improvements to startup and native image sizes when building native images with GraalVM Native Image.
+
+It is recommended that users re-compile their applications and libraries with Micronaut 3.0 to benefit from these changes.
+
+==== Support for GraalVM 21.2
+
+Micronaut has been updated to support the latest GraalVM 21.2 release.
+
 ==== Jakarta Inject
 
 The `jakarta.inject` annotations are now the default injection annotations for Micronaut 3
