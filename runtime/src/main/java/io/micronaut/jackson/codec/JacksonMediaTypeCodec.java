@@ -15,6 +15,7 @@
  */
 package io.micronaut.jackson.codec;
 
+import com.fasterxml.jackson.core.JsonParser;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -172,7 +173,9 @@ public abstract class JacksonMediaTypeCodec implements MediaTypeCodec {
      */
     public <T> T decode(Argument<T> type, JsonNode node) throws CodecException {
         try {
-            return getObjectMapper().treeToValue(node, type.getType());
+            ObjectMapper objectMapper = getObjectMapper();
+            JsonParser jsonParser = objectMapper.treeAsTokens(node);
+            return objectMapper.readValue(jsonParser, constructJavaType(type));
         } catch (IOException e) {
             throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage(), e);
         }
