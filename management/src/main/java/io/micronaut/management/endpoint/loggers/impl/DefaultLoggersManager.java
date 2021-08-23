@@ -62,7 +62,7 @@ public class DefaultLoggersManager implements LoggersManager<Map<String, Object>
     }
 
     @Override
-    public void setLogLevel(ManagedLoggingSystem loggingSystem, @NotBlank String name, io.micronaut.logging.@NotNull LogLevel level) {
+    public void setLogLevel(ManagedLoggingSystem loggingSystem, @NotBlank String name, @NotNull io.micronaut.logging.LogLevel level) {
         loggingSystem.setLogLevel(name, level);
     }
 
