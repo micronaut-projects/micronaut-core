@@ -117,10 +117,9 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         File file = new File(tempSubDir, "nowexists.html")
         file.write("<html><head></head><body>HTML Page created after start</body></html>")
 
-        def response = rxClient.exchange(
-                HttpRequest.GET('/nowexists.html'), String
-        ).blockingFirst()
-        
+        def response = rxClient.toBlocking().exchange(
+                HttpRequest.GET('/nowexists.html'), String)
+
         then:
         file.exists()
         response.status == HttpStatus.OK
@@ -138,7 +137,6 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
                 'micronaut.router.static-resources.default.paths': ['classpath:public', 'file:' + tempFile.parent],
                 'micronaut.router.static-resources.default.mapping': '/static/**'], Environment.TEST)
         HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
-
 
         when:
         HttpResponse<String> response = Flux.from(rxClient.exchange(
