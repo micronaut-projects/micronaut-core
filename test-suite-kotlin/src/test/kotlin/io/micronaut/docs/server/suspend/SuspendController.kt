@@ -135,4 +135,9 @@ class SuspendController(
         val after = "${suspendRequestScopedService.requestId},${Thread.currentThread().id}"
         return "$before,$after"
     }
+
+    @Get("/requestContext")
+    suspend fun requestContext(): String {
+        return suspendService.requestContext()
+    }
 }
