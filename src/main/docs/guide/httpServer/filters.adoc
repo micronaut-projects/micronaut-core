@@ -52,7 +52,9 @@ The previous example demonstrates some key concepts such as executing logic in a
 
 TIP: The examples use https://projectreactor.io[Project Reactor], however you can use any reactive framework that supports the Reactive streams specifications
 
-The api:http.annotation.Filter[] annotation uses api:core.util.AntPathMatcher[] for path matching. The mapping matches URLs using the following rules:
+The api:http.annotation.Filter[] annotation can use different styles of pattern for path matching by setting the `patternStyle` member. The supported options include Ant and Regex based matching.
+
+By default, api:core.util.AntPathMatcher[] is used for path matching. When using Ant, the mapping matches URLs using the following rules:
 
 * ? matches one character
 * * matches zero or more characters
@@ -76,6 +78,10 @@ The api:http.annotation.Filter[] annotation uses api:core.util.AntPathMatcher[] 
 
 |`customer/**/*.html`
 |customer/index.html, customer/adam/profile.html, customer/adam/job/description.html
+
+The other option is regular expression based matching. To use regular expressions, set `patternStyle = FilterPatternStyle.REGEX`. The `pattern` attribute is expected to contain a regular expression which will be expected to match the provided URLs exactly (using link:{jdkapi}/java/util/regex/Matcher.html#matches--[Matcher#matches]).
+
+NOTE: Using Ant based matching is preferred because it's more performant than using regular expressions.
 
 == Error States
 
