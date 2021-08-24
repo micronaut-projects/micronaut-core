@@ -181,16 +181,16 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
 
         if (beanDefinition instanceof AdvisedBeanType) {
 
-            // intercepted bean constructors include 3 additional arguments in
+            // intercepted bean constructors include 4 additional arguments in
             // addition to the arguments declared in the bean
             // Here we subtract these from the parameters made visible to the interceptor consumer
-            if (originalParameters.length < 3) {
+            if (originalParameters.length < 4) {
                 throw new IllegalStateException("Invalid intercepted bean constructor. This should never happen. Report an issue to the project maintainers.");
             }
             return Arrays.copyOfRange(
                     originalParameters,
                     0,
-                    originalParameters.length - 3
+                    originalParameters.length - 4
             );
         }
         return originalParameters;
@@ -200,15 +200,15 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
 
         if (beanDefinition instanceof AdvisedBeanType) {
 
-            // intercepted bean constructors include 3 additional arguments in
+            // intercepted bean constructors include 4 additional arguments in
             // addition to the arguments declared in the bean
             // Here we subtract these from the parameters made visible to the interceptor consumer
-            if (originalParameters.length < 3) {
+            if (originalParameters.length < 4) {
                 throw new IllegalStateException("Invalid intercepted bean constructor. This should never happen. Report an issue to the project maintainers.");
             }
             return Arrays.copyOfRange(
                     originalParameters,
-                    originalParameters.length - 3,
+                    originalParameters.length - 4,
                     originalParameters.length
             );
         }

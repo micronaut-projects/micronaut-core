@@ -30,4 +30,16 @@ class InjectionPointSpec extends Specification {
         consumer.fromField.test() == 'two'
         consumer.fromMethod.test() == 'three'
     }
+
+    def "proxied void test that the injection point can be used to construct the object"() {
+        given:
+        def consumer = applicationContext.getBean(ProxiedSomeBeanConsumer)
+
+        expect:
+        consumer.fromConstructor.name == 'one'
+        consumer.fromField.name == 'two'
+        consumer.fromMethod.name == 'three'
+        consumer.someType.name == 'four'
+    }
+
 }
