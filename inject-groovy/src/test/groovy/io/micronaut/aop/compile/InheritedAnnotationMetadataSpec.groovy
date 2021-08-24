@@ -119,7 +119,7 @@ interface ContractService {
 abstract class BaseService {
 
     @SomeAnnot
-    public void baseServiceMethod() {}
+    void baseServiceMethod() {}
 }
 
 @SomeAnnot

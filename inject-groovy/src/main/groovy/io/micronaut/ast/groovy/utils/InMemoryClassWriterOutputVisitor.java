@@ -15,16 +15,27 @@
  */
 package io.micronaut.ast.groovy.utils;
 
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLConnection;
+import java.net.URLStreamHandler;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Utility class for testing Groovy visitors.
@@ -34,6 +45,7 @@ import java.util.Optional;
  */
 public class InMemoryClassWriterOutputVisitor implements ClassWriterOutputVisitor {
     private final Map<String, ByteArrayOutputStream> classStreams = new LinkedHashMap<>();
+    private final Map<String, Set<String>> serviceDescriptors = new LinkedHashMap<>();
     private final InMemoryByteCodeGroovyClassLoader classLoader;
 
     /**
@@ -51,8 +63,10 @@ public class InMemoryClassWriterOutputVisitor implements ClassWriterOutputVisito
     }
 
     @Override
-    public void visitServiceDescriptor(String type, String classname) {
-
+    public final void visitServiceDescriptor(String type, String classname) {
+        if (StringUtils.isNotEmpty(type) && StringUtils.isNotEmpty(classname)) {
+            serviceDescriptors.computeIfAbsent(type, s -> new LinkedHashSet<>()).add(classname);
+        }
     }
 
     @Override
@@ -71,5 +85,13 @@ public class InMemoryClassWriterOutputVisitor implements ClassWriterOutputVisito
             classLoader.addClass(name, stream.toByteArray())
         );
         classStreams.clear();
+        serviceDescriptors.forEach((name, files) -> {
+            try {
+                classLoader.addService(name, files);
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
+            }
+        });
+        serviceDescriptors.clear();
     }
 }

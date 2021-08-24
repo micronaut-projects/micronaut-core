@@ -34,6 +34,7 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.util.VisitorContextUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
+import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 import org.codehaus.groovy.ast.ASTNode;
@@ -66,6 +67,7 @@ public class GroovyVisitorContext implements VisitorContext {
     private static final MutableConvertibleValues<Object> VISITOR_ATTRIBUTES = new MutableConvertibleValuesMap<>();
     private final ErrorCollector errorCollector;
     private final CompilationUnit compilationUnit;
+    private final ClassWriterOutputVisitor outputVisitor;
     private final SourceUnit sourceUnit;
     private final MutableConvertibleValues<Object> attributes;
     private final List<String> generatedResources = new ArrayList<>();
@@ -77,9 +79,19 @@ public class GroovyVisitorContext implements VisitorContext {
      * @param compilationUnit The compilation unit
      */
     public GroovyVisitorContext(SourceUnit sourceUnit, @Nullable CompilationUnit compilationUnit) {
+        this(sourceUnit, compilationUnit, new GroovyClassWriterOutputVisitor(compilationUnit));
+    }
+
+    /**
+     * @param sourceUnit      The source unit
+     * @param compilationUnit The compilation unit
+     * @param classWriterVisitor The class writer output visitor
+     */
+    public GroovyVisitorContext(SourceUnit sourceUnit, @Nullable CompilationUnit compilationUnit, ClassWriterOutputVisitor outputVisitor) {
         this.sourceUnit = sourceUnit;
         this.errorCollector = sourceUnit != null ? sourceUnit.getErrorCollector() : null;
         this.compilationUnit = compilationUnit;
+        this.outputVisitor = outputVisitor;
         this.attributes = VISITOR_ATTRIBUTES;
         this.groovyElementFactory = new GroovyElementFactory(this);
     }
@@ -197,81 +209,32 @@ public class GroovyVisitorContext implements VisitorContext {
 
     @Override
     public OutputStream visitClass(String classname, @Nullable Element originatingElement) throws IOException {
-        return visitClass(classname, new Element[]{ originatingElement });
+        return outputVisitor.visitClass(classname, originatingElement);
     }
 
     @Override
     public OutputStream visitClass(String classname, Element... originatingElements) throws IOException {
-        File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
-        if (classesDir != null) {
-            DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
-                    classesDir
-            );
-            return outputVisitor.visitClass(classname, originatingElements);
-        } else {
-            // should only arrive here in testing scenarios
-            if (compilationUnit.getClassLoader() instanceof InMemoryByteCodeGroovyClassLoader) {
-                return new OutputStream() {
-                    @Override
-                    public void write(int b) {
-                        // no-op
-                    }
-
-                    @Override
-                    public void write(byte[] b) {
-                        ((InMemoryByteCodeGroovyClassLoader) compilationUnit.getClassLoader()).addClass(classname, b);
-                    }
-                };
-            } else {
-                return new ByteArrayOutputStream(); // in-memory, mock or unit tests situation?
-            }
-        }
+        return outputVisitor.visitClass(classname, originatingElements);
     }
 
     @Override
     public void visitServiceDescriptor(String type, String classname) {
-        File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
-        if (classesDir != null) {
-
-            DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
-                    classesDir
-            );
-            outputVisitor.visitServiceDescriptor(type, classname);
-            outputVisitor.finish();
-        }
+        outputVisitor.visitServiceDescriptor(type, classname);
     }
 
     @Override
     public Optional<GeneratedFile> visitMetaInfFile(String path, Element... originatingElements) {
-        File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
-        if (classesDir != null) {
-
-            DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
-                    classesDir
-            );
-            return outputVisitor.visitMetaInfFile(path, originatingElements);
-        }
-
-        return Optional.empty();
+        return outputVisitor.visitMetaInfFile(path, originatingElements);
     }
 
     @Override
     public Optional<GeneratedFile> visitGeneratedFile(String path) {
-        File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
-        if (classesDir != null) {
-
-            DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
-                    classesDir
-            );
-            return outputVisitor.visitGeneratedFile(path);
-        }
-
-        return Optional.empty();
+        return outputVisitor.visitGeneratedFile(path);
     }
 
     @Override
     public void finish() {
-        // no-op
+        outputVisitor.finish();
     }
 
     /**
