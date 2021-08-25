@@ -702,8 +702,6 @@ task testReportsAggregate {
 subprojects { Project subproject ->
 
     ext {
-        userOrg = "grails"
-        isGrailsPlugin = false
         isBuildSnapshot = version.toString().endsWith("-SNAPSHOT")
         shadowJarEnabled = false
     }
