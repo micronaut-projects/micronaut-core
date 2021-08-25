@@ -19,7 +19,7 @@ endpoints:
 
 The info endpoint consists of an info aggregator and any number of info sources. To add an info source, create a bean class that implements link:{api}/io/micronaut/management/endpoint/info/InfoSource.html[InfoSource]. If your info source needs to retrieve data from Java properties files, extend the link:{api}/io/micronaut/management/endpoint/info/source/PropertiesInfoSource.html[PropertiesInfoSource] interface which provides a helper method for this purpose.
 
-All info source beans are collected together with the info aggregator. To provide your own implementation of the info aggregator, create a class that implements link:{api}/io/micronaut/management/endpoint/info/InfoAggregator.html[InfoAggregator] and register it as a bean. To ensure your implementation is used instead of the default, add the link:{api}/io/micronaut/context/annotation/Replaces.html[@Replaces] annotation to your class with the value being the link:{api}/io/micronaut/management/endpoint/info/impl/RxInfoAggregator.html[default implementation].
+All info source beans are collected together with the info aggregator. To provide your own implementation of the info aggregator, create a class that implements link:{api}/io/micronaut/management/endpoint/info/InfoAggregator.html[InfoAggregator] and register it as a bean. To ensure your implementation is used instead of the default, add the link:{api}/io/micronaut/context/annotation/Replaces.html[@Replaces] annotation to your class with the value being the link:{api}/io/micronaut/management/endpoint/info/impl/ReactiveInfoAggregator.html[default implementation].
 
 The default info aggregator returns a map containing the combined properties returned by all the info sources. This map is returned as JSON from the /info endpoint.
 

@@ -19,7 +19,17 @@ class MessageControllerSpec: StringSpec() {
 
     init {
         "test message controller"() {
-            val body = client.toBlocking().retrieve("/request/hello?name=John")
+            var body = client.toBlocking().retrieve("/request/hello?name=John")
+
+            body shouldNotBe null
+            body shouldBe "Hello John!!"
+
+            body = client.toBlocking().retrieve("/request/hello-static?name=John")
+
+            body shouldNotBe null
+            body shouldBe "Hello John!!"
+
+            body = client.toBlocking().retrieve("/request/hello-reactor?name=John")
 
             body shouldNotBe null
             body shouldBe "Hello John!!"

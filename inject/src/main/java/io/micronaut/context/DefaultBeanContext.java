@@ -110,9 +110,9 @@ public class DefaultBeanContext implements BeanContext {
     final Map<BeanKey, BeanRegistration> singletonObjects = new ConcurrentHashMap<>(100);
     final Map<BeanIdentifier, Object> singlesInCreation = new ConcurrentHashMap<>(5);
     final Map<BeanKey, Provider<Object>> scopedProxies = new ConcurrentHashMap<>(20);
-
     Set<Map.Entry<Class, List<BeanInitializedEventListener>>> beanInitializedEventListeners;
-
+    
+    private final BeanContextConfiguration beanContextConfiguration;
     private final Collection<BeanDefinitionReference> beanDefinitionsClasses = new ConcurrentLinkedQueue<>();
     private final Map<String, BeanConfiguration> beanConfigurations = new HashMap<>(10);
     private final Map<BeanKey, Boolean> containsBeanCache = new ConcurrentHashMap<>(30);
@@ -209,6 +209,7 @@ public class DefaultBeanContext implements BeanContext {
         this.eagerInitStereotypes = eagerInitStereotypes.toArray(new String[0]);
         this.eagerInitStereotypesPresent = !eagerInitStereotypes.isEmpty();
         this.eagerInitSingletons = eagerInitStereotypesPresent && (eagerInitStereotypes.contains(AnnotationUtil.SINGLETON) || eagerInitStereotypes.contains(Singleton.class.getName()));
+        this.beanContextConfiguration = contextConfiguration;
     }
 
     /**
@@ -1637,6 +1638,11 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
+    @Override
+    public BeanContextConfiguration getContextConfiguration() {
+        return this.beanContextConfiguration;
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     public void publishEvent(@NonNull Object event) {
@@ -2322,14 +2328,7 @@ public class DefaultBeanContext implements BeanContext {
         if (qualifier instanceof AnyQualifier) {
             return candidates.iterator().next();
         } else {
-            final List<BeanDefinition<T>> withoutAnyBeans =
-                    candidates.stream().filter(bd -> !bd.hasDeclaredAnnotation(Any.class))
-                    .collect(Collectors.toList());
-            if (withoutAnyBeans.size() == 1) {
-                return withoutAnyBeans.iterator().next();
-            } else {
-                throw new NonUniqueBeanException(beanType, candidates.iterator());
-            }
+            throw new NonUniqueBeanException(beanType, candidates.iterator());
         }
     }
 
@@ -3667,7 +3666,6 @@ public class DefaultBeanContext implements BeanContext {
             filterReplacedBeans(null, candidates);
             Stream<BeanDefinition<T>> stream = candidates.stream();
             if (qualifier != null && !(qualifier instanceof AnyQualifier)) {
-                stream = stream.filter(bd -> !bd.hasDeclaredAnnotation(Any.class));
                 stream = qualifier.reduce(beanType.getType(), stream);
             }
             return stream.count() > 0;

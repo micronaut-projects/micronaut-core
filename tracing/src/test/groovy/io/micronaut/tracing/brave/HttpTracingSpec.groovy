@@ -120,7 +120,7 @@ class HttpTracingSpec extends Specification {
         reporter.spans[1].tags().get('http.path') == '/traced/error/John'
         reporter.spans[1].tags().get('http.status_code') == '500'
         reporter.spans[1].tags().get('http.method') == 'GET'
-        reporter.spans[1].tags().get('error') == 'Internal Server Error: bad'
+        reporter.spans[1].tags().get('error') == 'Internal Server Error'
         reporter.spans[1].name() == 'get'
 
         cleanup:
@@ -223,17 +223,17 @@ class HttpTracingSpec extends Specification {
                 Span.Kind.SERVER)
         assertSpan(reporter.spans[1],
                 "get /traced/error/{name}",
-                "Internal Server Error: bad",
+                "Internal Server Error",
                 "/traced/error/John",
                 Span.Kind.CLIENT)
         assertSpan(reporter.spans[2],
                 "get /traced/nestederror/{name}",
-                "Internal Server Error: bad",
+                "Internal Server Error",
                 "/traced/nestedError/John",
                 Span.Kind.SERVER)
         assertSpan(reporter.spans[3],
                 "get",
-                "Internal Server Error: Internal Server Error: bad",
+                "Internal Server Error",
                 "/traced/nestedError/John",
                 Span.Kind.CLIENT)
 

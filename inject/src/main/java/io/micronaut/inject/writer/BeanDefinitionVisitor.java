@@ -16,6 +16,7 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.util.Toggleable;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ast.*;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
@@ -36,7 +37,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanDefinitionVisitor extends OriginatingElements {
+public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
 
     /**
      * The suffix use for generated AOP intercepted types.
@@ -45,9 +46,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
 
     /**
      * @return The element where the bean definition originated from.
-     * @deprecated Use {@link #getOriginatingElements()} instead
      */
-    @Deprecated
     @Nullable
     Element getOriginatingElement();
 

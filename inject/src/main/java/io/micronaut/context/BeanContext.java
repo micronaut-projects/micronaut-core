@@ -50,6 +50,13 @@ public interface BeanContext extends
         MutableAttributeHolder {
 
     /**
+     * Obtains the configuration for this context.
+     * @return The {@link io.micronaut.context.BeanContextConfiguration}
+     * @since 3.0.0
+     */
+    @NonNull BeanContextConfiguration getContextConfiguration();
+
+    /**
      * Publish the given event. The event will be published synchronously and only return once all listeners have consumed the event.
      *
      * @deprecated Preferred way is to use event typed {@code ApplicationEventPublisher<MyEventType>}

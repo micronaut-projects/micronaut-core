@@ -39,6 +39,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -53,6 +54,7 @@ import io.micronaut.core.type.TypeVariableResolver;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.Toggleable;
 import io.micronaut.inject.AdvisedBeanType;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanFactory;
@@ -72,16 +74,20 @@ import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.ast.beans.BeanElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.inject.visitor.BeanElementVisitor;
+import io.micronaut.inject.visitor.BeanElementVisitorContext;
 import io.micronaut.inject.visitor.VisitorContext;
 import jakarta.inject.Singleton;
 import org.jetbrains.annotations.NotNull;
@@ -116,7 +122,10 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
+
+import static io.micronaut.inject.visitor.BeanElementVisitor.VISITORS;
 
 /**
  * <p>Responsible for building {@link BeanDefinition} instances at compile time. Uses ASM build the class definition.</p>
@@ -142,7 +151,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-public class BeanDefinitionWriter extends AbstractClassFileWriter implements BeanDefinitionVisitor {
+public class BeanDefinitionWriter extends AbstractClassFileWriter implements BeanDefinitionVisitor, BeanElement, Toggleable {
     public static final String CLASS_SUFFIX = "$Definition";
     private static final String ANN_CONSTRAINT = "javax.validation.Constraint";
 
@@ -341,6 +350,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private final ConfigurationMetadataBuilder<?> metadataBuilder;
     private final Element beanProducingElement;
     private final ClassElement beanTypeElement;
+    private final VisitorContext visitorContext;
     private GeneratorAdapter buildMethodVisitor;
     private GeneratorAdapter injectMethodVisitor;
     private Label injectEnd = null;
@@ -372,10 +382,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private final List<MethodVisitData> methodInjectionPoints = new ArrayList<>(2);
     private final List<MethodVisitData> postConstructMethodVisits = new ArrayList<>(2);
     private final List<MethodVisitData> preDestroyMethodVisits = new ArrayList<>(2);
+    private final Map<String, Boolean> isLifeCycleCache = new HashMap<>(2);
     private ExecutableMethodsDefinitionWriter executableMethodsDefinitionWriter;
 
     private Object constructor; // MethodElement or FieldElement
     private boolean constructorRequiresReflection;
+    private boolean disabled = false;
 
     /**
      * Creates a bean definition writer.
@@ -502,7 +514,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.interfaceTypes.add(BeanFactory.class);
         this.isConfigurationProperties = isConfigurationProperties(annotationMetadata);
         validateExposedTypes(annotationMetadata, visitorContext);
+        this.visitorContext = visitorContext;
+    }
 
+    @Override
+    public boolean isEnabled() {
+        return !disabled;
     }
 
     /**
@@ -529,7 +546,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void validateExposedTypes(AnnotationMetadata annotationMetadata, VisitorContext visitorContext) {
         final String[] types = annotationMetadata.stringValues(Bean.class, "typed");
-        if (ArrayUtils.isNotEmpty(types)) {
+        if (ArrayUtils.isNotEmpty(types) && !beanTypeElement.isProxy()) {
             for (String name : types) {
                 final ClassElement exposedType = visitorContext.getClassElement(name).orElse(null);
                 if (exposedType == null) {
@@ -818,6 +835,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             throw new IllegalStateException("At least one called to visitBeanDefinitionConstructor(..) is required");
         }
 
+        processAllBeanElementVisitors();
+
         if (constructor instanceof MethodElement) {
             MethodElement methodElement = (MethodElement) constructor;
             boolean isParametrized = Arrays.stream(methodElement.getParameters())
@@ -984,6 +1003,25 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.beanFinalized = true;
     }
 
+    private void processAllBeanElementVisitors() {
+        for (BeanElementVisitor<?> visitor : VISITORS) {
+            if (visitor.isEnabled() && visitor.supports(this)) {
+                try {
+                    this.disabled = visitor.visitBeanElement(this, visitorContext) == null;
+                    if (disabled) {
+                        break;
+                    }
+                } catch (Exception e) {
+                    visitorContext.fail(
+                            "Error occurred visiting BeanElementVisitor of type [" + visitor.getClass().getName() + "]: " + e.getMessage(),
+                            this
+                    );
+                    break;
+                }
+            }
+        }
+    }
+
     private void addInnerConfigurationMethod(GeneratorAdapter staticInit) {
         if (isConfigurationProperties) {
             String[] innerClasses = beanTypeElement.getEnclosedElements(ElementQuery.of(ClassElement.class))
@@ -1028,7 +1066,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void pushStoreClassesAsSet(GeneratorAdapter writer, String[] classes) {
-        if (classes.length > 3) {
+        if (classes.length > 1) {
             writer.newInstance(Type.getType(HashSet.class));
             writer.dup();
             pushArrayOfClasses(writer, classes);
@@ -1038,15 +1076,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             writer.invokeConstructor(Type.getType(HashSet.class), org.objectweb.asm.commons.Method.getMethod(
                     ReflectionUtils.findConstructor(HashSet.class, Collection.class).get()
             ));
-        } else if (classes.length == 1) {
+        } else {
             pushClass(writer, classes[0]);
             writer.invokeStatic(Type.getType(Collections.class), org.objectweb.asm.commons.Method.getMethod(
                     ReflectionUtils.getRequiredMethod(Collections.class, "singleton", Object.class)
-            ));
-        } else {
-            pushArrayOfClasses(writer, classes);
-            writer.invokeStatic(Type.getType(Arrays.class), org.objectweb.asm.commons.Method.getMethod(
-                    ReflectionUtils.getRequiredMethod(Arrays.class, "asList", Object[].class)
             ));
         }
     }
@@ -1097,6 +1130,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public void accept(ClassWriterOutputVisitor visitor) throws IOException {
+        if (disabled) {
+            return;
+        }
         try (OutputStream out = visitor.visitClass(getBeanDefinitionName(), getOriginatingElements())) {
             if (!innerClasses.isEmpty()) {
                 for (Map.Entry<String, ClassWriter> entry : innerClasses.entrySet()) {
@@ -1150,7 +1186,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
         visitPostConstructMethodDefinition(false);
         // for "super bean definitions" we just delegate to super
-        if (!superBeanDefinition) {
+        if (!superBeanDefinition || isInterceptedLifeCycleByType(this.annotationMetadata, "POST_CONSTRUCT")) {
             MethodVisitData methodVisitData = new MethodVisitData(declaringType, methodElement, requiresReflection);
             postConstructMethodVisits.add(methodVisitData);
             visitMethodInjectionPointInternal(methodVisitData, postConstructMethodVisitor, postConstructInstanceLocalVarIndex);
@@ -1163,7 +1199,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                       boolean requiresReflection,
                                       VisitorContext visitorContext) {
         // for "super bean definitions" we just delegate to super
-        if (!superBeanDefinition) {
+        if (!superBeanDefinition || isInterceptedLifeCycleByType(this.annotationMetadata, "PRE_DESTROY")) {
             visitPreDestroyMethodDefinition(false);
 
             MethodVisitData methodVisitData = new MethodVisitData(declaringType, methodElement, requiresReflection);
@@ -2017,7 +2053,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             final String lifeCycleMethodName = "initialize";
 
             //  for "super bean definition" we only add code to trigger "initialize"
-            if (!superBeanDefinition) {
+            if (!superBeanDefinition || intercepted) {
                 interfaceTypes.add(InitializingBeanDefinition.class);
 
                 GeneratorAdapter postConstructMethodVisitor = newLifeCycleMethod(lifeCycleMethodName);
@@ -2681,40 +2717,42 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private boolean isInterceptedLifeCycleByType(AnnotationMetadata annotationMetadata, String interceptType) {
-        if (this.beanTypeElement.isAssignable("io.micronaut.aop.Interceptor")) {
-            // interceptor beans cannot have lifecycle methods intercepted
-            return false;
-        }
-        final Element originatingElement = getOriginatingElements()[0];
-        final boolean isFactoryMethod = (originatingElement instanceof MethodElement && !(originatingElement instanceof ConstructorElement));
-        final boolean isProxyTarget = annotationMetadata.booleanValue(AnnotationUtil.ANN_AROUND, "proxyTarget").orElse(false) || isFactoryMethod;
-        // for beans that are @Around(proxyTarget=false) only the generated AOP impl should be intercepted
-        final boolean isAopType = StringUtils.isNotEmpty(interceptedType);
-        final boolean isConstructorInterceptionCandidate = (isProxyTarget && !isAopType) || (isAopType && !isProxyTarget);
-        final boolean hasAroundConstruct;
-        final AnnotationValue<Annotation> interceptorBindings
-                = annotationMetadata.getAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
-        final List<AnnotationValue<Annotation>> interceptorBindingAnnotations;
-        if (interceptorBindings != null) {
-            interceptorBindingAnnotations = interceptorBindings.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
-            hasAroundConstruct = interceptorBindingAnnotations
-                    .stream()
-                    .anyMatch(av -> av.stringValue("kind").map(k -> k.equals(interceptType)).orElse(false));
-        } else {
-            interceptorBindingAnnotations = Collections.emptyList();
-            hasAroundConstruct = false;
-        }
+        return isLifeCycleCache.computeIfAbsent(interceptType, s -> {
+            if (this.beanTypeElement.isAssignable("io.micronaut.aop.Interceptor")) {
+                // interceptor beans cannot have lifecycle methods intercepted
+                return false;
+            }
+            final Element originatingElement = getOriginatingElements()[0];
+            final boolean isFactoryMethod = (originatingElement instanceof MethodElement && !(originatingElement instanceof ConstructorElement));
+            final boolean isProxyTarget = annotationMetadata.booleanValue(AnnotationUtil.ANN_AROUND, "proxyTarget").orElse(false) || isFactoryMethod;
+            // for beans that are @Around(proxyTarget=false) only the generated AOP impl should be intercepted
+            final boolean isAopType = StringUtils.isNotEmpty(interceptedType);
+            final boolean isConstructorInterceptionCandidate = (isProxyTarget && !isAopType) || (isAopType && !isProxyTarget);
+            final boolean hasAroundConstruct;
+            final AnnotationValue<Annotation> interceptorBindings
+                    = annotationMetadata.getAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
+            final List<AnnotationValue<Annotation>> interceptorBindingAnnotations;
+            if (interceptorBindings != null) {
+                interceptorBindingAnnotations = interceptorBindings.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
+                hasAroundConstruct = interceptorBindingAnnotations
+                        .stream()
+                        .anyMatch(av -> av.stringValue("kind").map(k -> k.equals(interceptType)).orElse(false));
+            } else {
+                interceptorBindingAnnotations = Collections.emptyList();
+                hasAroundConstruct = false;
+            }
 
-        if (isConstructorInterceptionCandidate) {
-            return hasAroundConstruct;
-        } else if (hasAroundConstruct) {
-            // if no other AOP advice is applied
-            return interceptorBindingAnnotations
-                    .stream()
-                    .noneMatch(av -> av.stringValue("kind").map(k -> k.equals("AROUND")).orElse(false));
-        } else {
-            return false;
-        }
+            if (isConstructorInterceptionCandidate) {
+                return hasAroundConstruct;
+            } else if (hasAroundConstruct) {
+                // if no other AOP advice is applied
+                return interceptorBindingAnnotations
+                        .stream()
+                        .noneMatch(av -> av.stringValue("kind").map(k -> k.equals("AROUND")).orElse(false));
+            } else {
+                return false;
+            }
+        });
     }
 
     private void pushConstructorArguments(GeneratorAdapter buildMethodVisitor,
@@ -3289,6 +3327,162 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 int.class,
                 int.class,
                 Qualifier.class);
+    }
+
+    @Override
+    public String getName() {
+        return beanDefinitionName;
+    }
+
+    @Override
+    public boolean isProtected() {
+        return false;
+    }
+
+    @Override
+    public boolean isPublic() {
+        return true;
+    }
+
+    @Override
+    public Object getNativeType() {
+        return this;
+    }
+
+    @Override
+    public Collection<Element> getInjectionPoints() {
+        if (fieldInjectionPoints.isEmpty() && methodInjectionPoints.isEmpty()) {
+            return Collections.emptyList();
+        } else {
+            Collection<Element> injectionPoints = new ArrayList<>();
+            for (FieldVisitData fieldInjectionPoint : fieldInjectionPoints) {
+                injectionPoints.add(fieldInjectionPoint.fieldElement);
+            }
+            for (MethodVisitData methodInjectionPoint : methodInjectionPoints) {
+                injectionPoints.add(methodInjectionPoint.methodElement);
+            }
+            return Collections.unmodifiableCollection(injectionPoints);
+        }
+    }
+
+    @Override
+    public boolean isAbstract() {
+        return this.isAbstract;
+    }
+
+    @Override
+    public <T extends Annotation> Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+        this.beanProducingElement.annotate(annotationType, consumer);
+        return this;
+    }
+
+    @Override
+    public Element removeAnnotation(String annotationType) {
+        this.beanProducingElement.removeAnnotation(annotationType);
+        return this;
+    }
+
+    @Override
+    public <T extends Annotation> Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
+        this.beanProducingElement.removeAnnotationIf(predicate);
+        return this;
+    }
+
+    @Override
+    public Element removeStereotype(String annotationType) {
+        this.beanProducingElement.removeStereotype(annotationType);
+        return this;
+    }
+
+    @Override
+    public ClassElement getDeclaringClass() {
+        final Element beanProducingElement = this.beanProducingElement;
+        return getDeclaringType(beanProducingElement);
+    }
+
+    private ClassElement getDeclaringType(Element beanProducingElement) {
+        if (beanProducingElement instanceof ClassElement) {
+            return (ClassElement) beanProducingElement;
+        } else if (beanProducingElement instanceof MemberElement) {
+            return ((MemberElement) beanProducingElement).getDeclaringType();
+        } else if (beanProducingElement instanceof BeanElementBuilder) {
+            return ((BeanElementBuilder) beanProducingElement).getDeclaringElement();
+        } else {
+            return this.beanTypeElement;
+        }
+    }
+
+    @Override
+    public Element getProducingElement() {
+        return beanProducingElement;
+    }
+
+    @Override
+    public Set<ClassElement> getBeanTypes() {
+        final String[] types = this.annotationMetadata.stringValues(Bean.class, "typed");
+        if (ArrayUtils.isNotEmpty(types)) {
+            HashSet<ClassElement> classElements = new HashSet<>();
+            for (String type : types) {
+                visitorContext.getClassElement(type).ifPresent(classElements::add);
+            }
+            return Collections.unmodifiableSet(classElements);
+        } else {
+            final Optional<ClassElement> superType = beanTypeElement.getSuperType();
+            final Collection<ClassElement> interfaces = beanTypeElement.getInterfaces();
+            if (superType.isPresent() || !interfaces.isEmpty()) {
+                Set<ClassElement> beanTypes = new HashSet<>();
+                beanTypes.add(beanTypeElement);
+                populateBeanTypes(new HashSet<>(), beanTypes, superType.orElse(null), interfaces);
+                return Collections.unmodifiableSet(beanTypes);
+            } else {
+                return Collections.singleton(beanTypeElement);
+            }
+        }
+    }
+
+    private void populateBeanTypes(Set<String> processedTypes, Set<ClassElement> beanTypes, ClassElement superType, Collection<ClassElement> interfaces) {
+        for (ClassElement anInterface : interfaces) {
+            final String n = anInterface.getName();
+            if (!processedTypes.contains(n)) {
+                processedTypes.add(n);
+                beanTypes.add(anInterface);
+                populateBeanTypes(processedTypes, beanTypes, null, anInterface.getInterfaces());
+            }
+        }
+        if (superType != null) {
+            final String n = superType.getName();
+            if (!processedTypes.contains(n)) {
+                processedTypes.add(n);
+                beanTypes.add(superType);
+                final ClassElement next = superType.getSuperType().orElse(null);
+                populateBeanTypes(processedTypes, beanTypes, next, superType.getInterfaces());
+            }
+        }
+    }
+
+    @Override
+    public Optional<String> getScope() {
+        return annotationMetadata.getAnnotationNameByStereotype(AnnotationUtil.SCOPE);
+    }
+
+    @Override
+    public Collection<String> getQualifiers() {
+        return Collections.unmodifiableList(annotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER));
+    }
+
+    @Override
+    public BeanElementBuilder addAssociatedBean(ClassElement type, VisitorContext visitorContext) {
+        if (visitorContext instanceof BeanElementVisitorContext) {
+            final Element[] originatingElements = getOriginatingElements();
+            return ((BeanElementVisitorContext) visitorContext)
+                        .addAssociatedBean(originatingElements[0], type);
+        }
+        return BeanElement.super.addAssociatedBean(type, visitorContext);
+    }
+
+    @Override
+    public Element[] getOriginatingElements() {
+        return this.originatingElements.getOriginatingElements();
     }
 
     @Internal

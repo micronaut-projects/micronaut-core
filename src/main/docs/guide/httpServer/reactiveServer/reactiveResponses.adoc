@@ -2,9 +2,9 @@ The previous section introduced the notion of Reactive programming using https:/
 
 Micronaut supports returning common reactive types such as reactor:Mono[] (or rx:Single[] rx:Maybe[] rx:Observable[] types from RxJava), an instance of rs:Publisher[] or jdk:java.util.concurrent.CompletableFuture[] from any controller method.
 
-NOTE: To use https://projectreactor.io[Project Reactor]'s `Flux` or `Mono` you need to add the Micronaut's Reactor dependency to your project to include the necessary converters.
+NOTE: To use https://projectreactor.io[Project Reactor]'s `Flux` or `Mono` you need to add the Micronaut Reactor dependency to your project to include the necessary converters.
 
-NOTE: To use https://github.com/ReactiveX/RxJava[RxJava]'s `Flowable`, `Single` or `Maybe` you need to add the Micronaut's RxJava dependency to your project to include the necessary converters.
+NOTE: To use https://github.com/ReactiveX/RxJava[RxJava]'s `Flowable`, `Single` or `Maybe` you need to add the Micronaut RxJava dependency to your project to include the necessary converters.
 
 The argument designated as the body of the request using the api:http.annotation.Body[] annotation can also be a reactive type or a jdk:java.util.concurrent.CompletableFuture[].
 

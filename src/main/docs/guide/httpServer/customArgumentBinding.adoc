@@ -1,11 +1,11 @@
-Micronaut uses an api:http.bind.binders.ArgumentBinderRegistry[ArgumentBinderRegistry] to look up api:core.bind.ArgumentBinder[ArgumentBinder] beans
+Micronaut uses an api:core.bind.ArgumentBinderRegistry[ArgumentBinderRegistry] to look up api:core.bind.ArgumentBinder[ArgumentBinder] beans
 capable of binding to the arguments in controller methods. The default implementation looks for an annotation on the argument that is meta-annotated with ann:core.bind.annotation.Bindable[]. If one exists the argument binder registry searches for an argument binder that supports that annotation.
 
 If no fitting annotation is found Micronaut tries to find an argument binder that supports the argument type.
 
-An argument binder returns a api:core.bind.ArgumentBinder.BindingResult[]. The binding result gives Micronaut more information than just the value. Binding results are either satisfied or unsatisfied, and either empty or not empty. If an argument binder returns an unsatisfied result, the binder may be called again at different times in request processing. Argument binders are initially called before the body is read and before any filters are executed. If a binder relies on any of that data and it is not present, return a api:core.bind.ArgumentBinder.BindingResult#UNSATISFIED[] result. Returning an api:core.bind.ArgumentBinder.BindingResult#EMPTY[] or satisfied result will be the final result and the binder will not be called again for that request.
+An argument binder returns a link:{api}/io/micronaut/core/bind/ArgumentBinder.BindingResult.html[ArgumentBinder.BindingResult]. The binding result gives Micronaut more information than just the value. Binding results are either satisfied or unsatisfied, and either empty or not empty. If an argument binder returns an unsatisfied result, the binder may be called again at different times in request processing. Argument binders are initially called before the body is read and before any filters are executed. If a binder relies on any of that data and it is not present, return a link:{api}/io/micronaut/core/bind/ArgumentBinder.BindingResult.html#UNSATISFIED[ArgumentBinder.BindingResult#UNSATISFIED] result. Returning an link:{api}/io/micronaut/core/bind/ArgumentBinder.BindingResult.html#EMPTY[ArgumentBinder.BindingResult#EMPTY] or satisfied result will be the final result and the binder will not be called again for that request.
 
-NOTE: At the end of processing if the result is still api:core.bind.ArgumentBinder.BindingResult#UNSATISFIED[], it is considered api:core.bind.ArgumentBinder.BindingResult#EMPTY[].
+NOTE: At the end of processing if the result is still link:{api}/io/micronaut/core/bind/ArgumentBinder.BindingResult.html#UNSATISFIED[ArgumentBinder.BindingResult#UNSATISFIED], it is considered link:{api}/io/micronaut/core/bind/ArgumentBinder.BindingResult.html#EMPTY[ArgumentBinder.BindingResult#EMPTY].
 
 Key interfaces are:
 
@@ -41,7 +41,7 @@ We can define a `TypedRequestArgumentBinder` for this class, as seen below:
 snippet::io.micronaut.docs.http.server.bind.type.ShoppingCartRequestArgumentBinder[tags="class", indent=0, title="Example of typed data binding"]
 
 <1> Override the `bind` method with the data type to bind, in this example the `ShoppingCart` type
-<2> After retrieving the data (in this case, by deserializing JSON text from a cookie), return as a api:io.micronaut.core.bind.BindingResult[BindingResult]
+<2> After retrieving the data (in this case, by deserializing JSON text from a cookie), return as a link:{api}/io/micronaut/core/bind/ArgumentBinder.BindingResult.html[ArgumentBinder.BindingResult]
 <3> Also override the `argumentType` method, which is used by the ArgumentBinderRegistry.
 
 Once the binder is created, it is used for any controller argument of the associated type:

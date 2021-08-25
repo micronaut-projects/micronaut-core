@@ -22,6 +22,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.multipart.MultipartBody
 import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.Retry
 
 import java.nio.file.Files
@@ -561,6 +562,30 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         then:
         response.code() == HttpStatus.OK.code
         calculateMd5(file.toPath()) == originalmd5
+    }
+
+    void "test reading a CompletedFileUpload input stream and closing it multiple times"() {
+        given:
+        def data = '{"title":"Test"}'
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("title", "bar")
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
+                .build()
+
+
+        when:
+        Mono<HttpResponse<String>> flowable = Mono.from(client.exchange(
+                HttpRequest.POST("/upload/receive-completed-file-upload-stream", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.block()
+        def result = response.getBody().get()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        result == 'data.json: 16'
     }
 
     @Override

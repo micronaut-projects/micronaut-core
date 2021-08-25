@@ -72,6 +72,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
@@ -1485,9 +1488,13 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         String valueAnnVal = argument.getAnnotationMetadata().stringValue(Value.class).orElse(null);
         Argument<?> argumentType;
         boolean isCollection = false;
-        if (Collection.class.isAssignableFrom(argument.getType())) {
+        final boolean wrapperType = argument.isWrapperType();
+        final Class<?> argumentJavaType = argument.getType();
+        if (Collection.class.isAssignableFrom(argumentJavaType)) {
             argumentType = argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             isCollection = true;
+        } else if (wrapperType) {
+            argumentType = argument.getWrappedType();
         } else {
             argumentType = argument;
         }
@@ -1495,15 +1502,15 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
             qualifier = qualifier == null ? resolveQualifierWithInnerConfiguration(resolutionContext, argument, true) : qualifier;
             if (isCollection) {
                 Collection beans = ((DefaultBeanContext) context).getBeansOfType(resolutionContext, argumentType, qualifier);
-                return coerceCollectionToCorrectType((Class) argument.getType(), beans, resolutionContext, argument);
+                return coerceCollectionToCorrectType((Class) argumentJavaType, beans, resolutionContext, argument);
             } else {
                 return ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
             }
         } else {
             String valString = resolvePropertyValueName(resolutionContext, parentAnnotationMetadata, argument.getAnnotationMetadata(), valueAnnVal);
-            ArgumentConversionContext conversionContext = ConversionContext.of(argument);
+            ArgumentConversionContext conversionContext = wrapperType ? ConversionContext.of(argumentType) : ConversionContext.of(argument);
             Optional value = resolveValue((ApplicationContext) context, conversionContext, valueAnnVal != null, valString);
-            if (argumentType.isOptional()) {
+            if (argument.isOptional()) {
                 if (!value.isPresent()) {
                     return value;
                 } else {
@@ -1515,6 +1522,16 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
                     }
                 }
             } else {
+                if (wrapperType) {
+                    final Object v = value.orElse(null);
+                    if (OptionalInt.class == argumentJavaType) {
+                        return v instanceof Integer ? OptionalInt.of((Integer) v) : OptionalInt.empty();
+                    } else if (OptionalLong.class == argumentJavaType) {
+                        return v instanceof Long ? OptionalLong.of((Long) v) : OptionalLong.empty();
+                    } else if (OptionalDouble.class == argumentJavaType) {
+                        return v instanceof Double ? OptionalDouble.of((Double) v) : OptionalDouble.empty();
+                    }
+                }
                 if (value.isPresent()) {
                     return value.get();
                 } else {

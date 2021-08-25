@@ -23,6 +23,7 @@ import io.micronaut.ast.groovy.utils.PublicMethodVisitor;
 import io.micronaut.core.annotation.*;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.*;
 import org.apache.groovy.ast.tools.ClassNodeUtils;
@@ -214,6 +215,54 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             if (!typePredicates.isEmpty()) {
                 elements.removeIf(e -> !typePredicates.stream().allMatch(p -> p.test(((MethodElement) e).getGenericReturnType())));
             }
+        } else if (elementType == ConstructorElement.class) {
+            List<ConstructorNode> constructors = new ArrayList<>(classNode.getDeclaredConstructors());
+            if (!onlyDeclared) {
+                ClassNode superClass = classNode.getSuperClass();
+                while (superClass != null) {
+                    // don't include constructors on enum, record... – matches behavior of JavaClassElement
+                    if (superClass.getPackageName().equals("java.lang")) {
+                        break;
+                    }
+                    constructors.addAll(superClass.getDeclaredConstructors());
+                    superClass = superClass.getSuperClass();
+                }
+            }
+            for (Iterator<ConstructorNode> i = constructors.iterator(); i.hasNext(); ) {
+                ConstructorNode constructor = i.next();
+                // we don't listen to the user here, we never return static initializers. This matches behavior of JavaClassElement
+                if (constructor.isStatic()) {
+                    i.remove();
+                    continue;
+                }
+                if (onlyAccessible) {
+                    final ClassElement accessibleFromType = result.getOnlyAccessibleFromType().orElse(this);
+                    if (constructor.isPrivate()) {
+                        i.remove();
+                        continue;
+                    } else if (!constructor.getDeclaringClass().getName().equals(accessibleFromType.getName())) {
+                        // inaccessible through package scope
+                        if (constructor.isPackageScope() && !constructor.getDeclaringClass().getPackageName().equals(accessibleFromType.getPackageName())) {
+                            i.remove();
+                            continue;
+                        }
+                    }
+                }
+                if (!modifierPredicates.isEmpty()) {
+                    Set<ElementModifier> elementModifiers = resolveModifiers(constructor);
+                    if (!modifierPredicates.stream().allMatch(p -> p.test(elementModifiers))) {
+                        i.remove();
+                    }
+                }
+            }
+
+            //noinspection unchecked
+            elements = constructors.stream().map(constructorNode -> (T) new GroovyConstructorElement(
+                    this,
+                    visitorContext,
+                    constructorNode,
+                    AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, constructorNode)
+            )).collect(Collectors.toList());
         } else if (elementType == FieldElement.class) {
             List<FieldNode> fields;
             if (onlyDeclared) {
@@ -345,36 +394,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         return (fn.getModifiers() & (ACC_PUBLIC | ACC_PRIVATE | ACC_PROTECTED)) == 0;
     }
 
-    private Set<ElementModifier> resolveModifiers(MethodNode methodNode) {
-        return resolveModifiers(methodNode.getModifiers());
-    }
-
-    private Set<ElementModifier> resolveModifiers(FieldNode fieldNode) {
-        return resolveModifiers(fieldNode.getModifiers());
-    }
-
-    private Set<ElementModifier> resolveModifiers(ClassNode classNode) {
-        return resolveModifiers(classNode.getModifiers());
-    }
-
-    private Set<ElementModifier> resolveModifiers(int mod) {
-        Set<ElementModifier> modifiers = new HashSet<>(5);
-        if (Modifier.isPrivate(mod)) {
-            modifiers.add(ElementModifier.PRIVATE);
-        } else if (Modifier.isProtected(mod)) {
-            modifiers.add(ElementModifier.PROTECTED);
-        } else if (Modifier.isPublic(mod)) {
-            modifiers.add(ElementModifier.PUBLIC);
-        }
-        if (Modifier.isAbstract(mod)) {
-            modifiers.add(ElementModifier.ABSTRACT);
-        } else if (Modifier.isStatic(mod)) {
-            modifiers.add(ElementModifier.STATIC);
-        }
-        if (Modifier.isFinal(mod)) {
-            modifiers.add(ElementModifier.FINAL);
-        }
-        return modifiers;
+    @Override
+    public Set<ElementModifier> getModifiers() {
+        return resolveModifiers(this.classNode);
     }
 
     @Override
@@ -411,6 +433,18 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     @Override
     public boolean isPrimitive() {
         return classNode.isArray() && ClassUtils.getPrimitiveType(classNode.getComponentType().getName()).isPresent();
+    }
+
+    @Override
+    public Collection<ClassElement> getInterfaces() {
+        final ClassNode[] interfaces = classNode.getInterfaces();
+        if (ArrayUtils.isNotEmpty(interfaces)) {
+            return Arrays.stream(interfaces).map((cn) -> visitorContext.getElementFactory().newClassElement(
+                    cn,
+                    AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn)
+            )).collect(Collectors.toList());
+        }
+        return Collections.emptyList();
     }
 
     @Override
@@ -874,6 +908,25 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     @Override
     public String getPackageName() {
         return classNode.getPackageName();
+    }
+
+    @Override
+    public PackageElement getPackage() {
+        final PackageNode aPackage = classNode.getPackage();
+        if (aPackage != null) {
+
+            return new GroovyPackageElement(
+                    visitorContext,
+                    aPackage,
+                    AstAnnotationUtils.getAnnotationMetadata(
+                            sourceUnit,
+                            compilationUnit,
+                            aPackage
+                    )
+            );
+        } else {
+            return PackageElement.DEFAULT_PACKAGE;
+        }
     }
 
     @Override

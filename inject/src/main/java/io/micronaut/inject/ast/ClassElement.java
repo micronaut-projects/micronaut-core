@@ -26,6 +26,8 @@ import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import java.util.*;
 import java.util.function.Predicate;
 
+import static io.micronaut.inject.writer.BeanDefinitionVisitor.PROXY_SUFFIX;
+
 /**
  * Stores data about an element that references a class.
  *
@@ -116,6 +118,13 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * @return True if the class represents a proxy
+     */
+    default boolean isProxy() {
+        return getSimpleName().endsWith(PROXY_SUFFIX);
+    }
+
+    /**
      * Find and return a single primary constructor. If more than constructor candidate exists, then return empty unless a
      * constructor is found that is annotated with either {@link io.micronaut.core.annotation.Creator} or {@link javax.inject.Inject}.
      *
@@ -144,6 +153,13 @@ public interface ClassElement extends TypedElement {
         return Optional.empty();
     }
 
+    /**
+     * @return The interfaces implemented by this class element
+     */
+    default Collection<ClassElement> getInterfaces() {
+        return Collections.emptyList();
+    }
+
     @NonNull
     @Override
     default ClassElement getType() {
@@ -167,6 +183,16 @@ public interface ClassElement extends TypedElement {
      */
     default String getPackageName() {
         return NameUtils.getPackageName(getName());
+    }
+
+    /**
+     * The package name.
+     *
+     * @return The package name
+     * @since 3.0.0
+     */
+    default PackageElement getPackage() {
+        return PackageElement.of(getPackageName());
     }
 
     /**

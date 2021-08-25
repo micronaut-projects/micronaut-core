@@ -48,7 +48,7 @@ class ExceptionHandlerSpec extends Specification {
         stock != null
         stock == 0
     }
-    
+
     void "test wrapped HttpStatusException in CompletionException is unwrapped and handled by ExceptionHandler"() {
         when:
         HttpRequest request = HttpRequest.GET('/books/stock/future/1234')
@@ -59,7 +59,7 @@ class ExceptionHandlerSpec extends Specification {
         stock != null
         stock == 1234
     }
-    
+
     void "test wrapped HttpStatusException in ExecutionException is unwrapped and handled by ExceptionHandler"() {
         when:
         HttpRequest request = HttpRequest.GET('/books/stock/blocking/1234')
@@ -80,5 +80,16 @@ class ExceptionHandlerSpec extends Specification {
         noExceptionThrown()
         stock.getBody(String).get() == "NPE"
         stock.status() == HttpStatus.MULTI_STATUS
+    }
+
+    void "test exception handler returning a publisher"() {
+        when:
+        HttpRequest request = HttpRequest.GET('/books/reactive')
+        HttpResponse<String> stock = client.toBlocking().exchange(request, String)
+
+        then:
+        noExceptionThrown()
+        stock.getBody(String).get() == "[reactive handler]"
+        stock.status() == HttpStatus.OK
     }
 }

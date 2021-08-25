@@ -30,10 +30,11 @@ class ShoppingCartControllerTest: StringSpec(){
             val responseException = Assertions.assertThrows(HttpClientResponseException::class.java) {
                 client.toBlocking().retrieve(request)
             }
+            val embedded: Map<*, *> = responseException.response.getBody(Map::class.java).get().get("_embedded") as Map<*, *>
+            val message = ((embedded.get("errors") as java.util.List<*>).get(0) as Map<*, *>).get("message")
 
             responseException shouldNotBe null
-            responseException.message shouldBe "Required ShoppingCart [sessionId] not specified"
-
+            message shouldBe "Required ShoppingCart [sessionId] not specified"
         }
 
         "test annotation binding" {

@@ -49,7 +49,7 @@ dependencies {
     testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$junitVersion"
     testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.920'
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
-        testImplementation('org.bouncycastle:bcpkix-jdk15on:1.65')
+        testImplementation('org.bouncycastle:bcpkix-jdk15on:1.69')
     }
 
     testImplementation dependencyVersion("reactor")

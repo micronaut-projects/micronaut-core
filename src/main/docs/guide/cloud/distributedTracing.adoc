@@ -46,7 +46,7 @@ class HelloService {
 
 In addition to explicit tracing tags, Micronaut includes a number of instrumentations to ensure that the Span context is propagated between threads and across Microservice boundaries.
 
-These instrumentations are found in the pkg:tracing.instrument[] package and include HTTP <<clientFilter, Client Filters>> and <<filters, Server Filters>> to propagate the necessary headers via HTTP.
+These instrumentations are found in the `io.micronaut.tracing.instrument` package and include HTTP <<clientFilter, Client Filters>> and <<filters, Server Filters>> to propagate the necessary headers via HTTP.
 
 == Tracing Beans
 

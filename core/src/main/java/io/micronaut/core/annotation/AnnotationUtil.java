@@ -148,7 +148,7 @@ public class AnnotationUtil {
     public static final String ANN_INTERCEPTOR_BINDINGS = "io.micronaut.aop.InterceptorBindingDefinitions";
 
     /**
-     * The meta anontation used for inject declarations.
+     * The meta annotation used for inject declarations.
      */
     public static final String INJECT = "javax.inject.Inject";
 
@@ -163,7 +163,7 @@ public class AnnotationUtil {
     public static final String SINGLETON = "javax.inject.Singleton";
 
     /**
-     * The meta anntotion used for qualifier declarations.
+     * The meta annotation used for qualifier declarations.
      */
     public static final String QUALIFIER = "javax.inject.Qualifier";
 
@@ -173,12 +173,12 @@ public class AnnotationUtil {
     public static final String NAMED = "javax.inject.Named";
 
     /**
-     * The meta annotation used for for pre-destroy declarations.
+     * The meta annotation used for pre-destroy declarations.
      */
     public static final String PRE_DESTROY = "javax.annotation.PreDestroy";
 
     /**
-     * The meta annotation used for for post-construct declarations.
+     * The meta annotation used for post-construct declarations.
      */
     public static final String POST_CONSTRUCT = "javax.annotation.PostConstruct";
 

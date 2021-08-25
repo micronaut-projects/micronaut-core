@@ -49,7 +49,7 @@ class ProxyRequestSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message.contains("Read Timeout")
+        e.response.getBody(Map).get()._embedded.errors[0].message.contains("Read Timeout")
 
         cleanup:
         client.close()
@@ -69,7 +69,7 @@ class ProxyRequestSpec extends Specification {
         then:
         def e = thrown(HttpClientResponseException)
         e.response.header('X-My-Response-Header') == 'YYY'
-        e.message == "Internal Server Error: Bad things happened"
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad things happened"
 
         when:"A GET request with a 404"
         client.exchange("/proxy/notThere", String).blockFirst()
@@ -77,7 +77,7 @@ class ProxyRequestSpec extends Specification {
         then:
         e = thrown(HttpClientResponseException)
         e.response.header('X-My-Response-Header') == 'YYY'
-        e.message == "Page Not Found"
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Page Not Found"
     }
 
     void "test proxy POST request from filter"() {
@@ -107,7 +107,7 @@ class ProxyRequestSpec extends Specification {
         then:
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.UNSUPPORTED_MEDIA_TYPE
-        e.message == 'Content Type [text/plain] not allowed. Allowed types: [application/json]'
+        e.response.getBody(Map).get()._embedded.errors[0].message == 'Content Type [text/plain] not allowed. Allowed types: [application/json]'
     }
 
     @Controller("/real")

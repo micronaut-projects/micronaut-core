@@ -124,7 +124,7 @@ class HttpHeadSpec extends Specification {
 
         then:
         body.isPresent()
-        body.get().message == "Page Not Found"
+        body.get()._embedded.errors[0].message == "Page Not Found"
     }
 
     void "test simple blocking get request"() {
@@ -160,7 +160,6 @@ class HttpHeadSpec extends Specification {
     }
 
     void "test simple exchange request with POJO"() {
-
         when:
         Flux<HttpResponse<Book>> flowable = Flux.from(client.exchange(
                 HttpRequest.HEAD("/head/pojo"), Book

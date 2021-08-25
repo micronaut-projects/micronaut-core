@@ -1,4 +1,4 @@
-https://www.consul.io[Consul] is a popular Service Discovery and Distributed Configuration server provided by HashiCorp. Micronaut features a native api:discovery.consul.client.v1.ConsulClient[] that uses Micronaut's support for <<clientAnnotation, Declarative HTTP Clients>>.
+https://www.consul.io[Consul] is a popular Service Discovery and Distributed Configuration server provided by HashiCorp. Micronaut features a native link:{micronautdiscoveryapi}/consul/client/v1/ConsulClient.html[ConsulClient] that uses Micronaut's support for <<clientAnnotation, Declarative HTTP Clients>>.
 
 == Starting Consul
 

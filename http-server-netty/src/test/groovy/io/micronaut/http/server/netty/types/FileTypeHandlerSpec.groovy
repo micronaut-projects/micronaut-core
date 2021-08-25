@@ -53,7 +53,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test returning a file from a controller"() {
         when:
-        def response = rxClient.exchange('/test/html', String).blockFirst()
+        def response = rxClient.toBlocking().exchange('/test/html', String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -69,7 +69,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         when:
         MutableHttpRequest<?> request = HttpRequest.GET('/test/html')
         request.headers.ifModifiedSince(tempFile.lastModified())
-        def response = rxClient.exchange(request, String).blockFirst()
+        def response = rxClient.toBlocking().exchange(request, String)
 
         then:
         response.code() == HttpStatus.NOT_MODIFIED.code
@@ -79,7 +79,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
     void "test cache control can be overridden"() {
         when:
         MutableHttpRequest<?> request = HttpRequest.GET('/test/custom-cache-control')
-        def response = rxClient.exchange(request, String).blockFirst()
+        def response = rxClient.toBlocking().exchange(request, String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -89,7 +89,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test what happens when a file isn't found"() {
         when:
-        rxClient.exchange('/test/not-found', String).blockFirst()
+        rxClient.toBlocking().exchange('/test/not-found', String)
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -99,12 +99,12 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
         then:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
-        response.body() == '{"message":"Internal Server Error: Could not find file","_links":{"self":{"href":"/test/not-found","templated":false}}}'
+        response.body() == '{"message":"Internal Server Error","_links":{"self":{"href":"/test/not-found","templated":false}},"_embedded":{"errors":[{"message":"Internal Server Error: Could not find file"}]}}'
     }
 
     void "test when an attached file is returned"() {
         when:
-        def response = rxClient.exchange('/test/download', String).blockFirst()
+        def response = rxClient.toBlocking().exchange('/test/download', String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -119,7 +119,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test when a system file is returned"() {
         when:
-        def response = rxClient.exchange('/test-system/download', String).blockFirst()
+        def response = rxClient.toBlocking().exchange('/test-system/download', String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -163,7 +163,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test when an attached streamed file is returned"() {
         when:
-        def response = rxClient.exchange('/test-stream/download', String).blockFirst()
+        def response = rxClient.toBlocking().exchange('/test-stream/download', String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -177,7 +177,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test when an attached file is returned with a name"() {
         when:
-        def response = rxClient.exchange('/test/different-name', String).blockFirst()
+        def response = rxClient.toBlocking().exchange('/test/different-name', String)
 
         then: "the content type is still based on the file extension"
         response.code() == HttpStatus.OK.code
@@ -192,7 +192,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test when a system file is returned with a name"() {
         when:
-        def response = rxClient.exchange('/test-system/different-name', String).blockFirst()
+        def response = rxClient.toBlocking().exchange('/test-system/different-name', String)
 
         then: "the content type is still based on the file extension"
         response.code() == HttpStatus.OK.code
@@ -207,7 +207,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test the content type is honored when an attached file response is returned"() {
         when:
-        def response = rxClient.exchange('/test/custom-content-type', String).blockFirst()
+        def response = rxClient.toBlocking().exchange('/test/custom-content-type', String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -222,7 +222,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test the content type is honored when a system file response is returned"() {
         when:
-        def response = rxClient.exchange('/test-system/custom-content-type', String).blockFirst()
+        def response = rxClient.toBlocking().exchange('/test-system/custom-content-type', String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -237,7 +237,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test the content type is honored when a streamed file response is returned"() {
         when:
-        def response = rxClient.exchange('/test-stream/custom-content-type', String).blockFirst()
+        def response = rxClient.toBlocking().exchange('/test-stream/custom-content-type', String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -251,7 +251,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test using a piped stream"() {
         when:
-        def response = rxClient.exchange('/test-stream/piped-stream', String).blockFirst()
+        def response = rxClient.toBlocking().exchange('/test-stream/piped-stream', String)
 
         then:
         response.code() == HttpStatus.OK.code

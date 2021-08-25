@@ -24,8 +24,10 @@ import io.micronaut.core.util.ArgumentUtils;
 
 import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
+import java.util.Collections;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -74,6 +76,14 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement, D
      * @return The native type
      */
     @NonNull Object getNativeType();
+
+    /**
+     * @return The {@link ElementModifier} types for this class element
+     * @since 3.0.0
+     */
+    default Set<ElementModifier> getModifiers() {
+        return Collections.emptySet();
+    }
 
     /**
      * Annotate this element with the given annotation type. If the annotation is already present then
@@ -168,7 +178,7 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement, D
      * @param annotationType The annotation type
      * @param consumer A function that receives the {@link AnnotationValueBuilder}
      * @param <T> The annotation generic type
-     * @return The {@link AnnotationValueBuilder}
+     * @return This element
      */
     @NonNull
     default <T extends Annotation> Element annotate(@NonNull Class<T> annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
@@ -183,12 +193,26 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement, D
      *
      * @param annotationType The annotation type
      * @param <T> The annotation generic type
-     * @return The {@link AnnotationValueBuilder}
+     * @return This element
      */
     @NonNull
     default <T extends Annotation> Element annotate(@NonNull Class<T> annotationType) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
         return annotate(annotationType.getName(), annotationValueBuilder -> { });
+    }
+
+    /**
+     * Annotate this element with the given annotation type. If the annotation is already present then
+     * any values populated by the builder will be merged/overridden with the existing values.
+     *
+     * @param annotationValue The annotation type
+     * @param <T> The annotation generic type
+     * @return This element
+     * @since 3.0.0
+     */
+    @NonNull
+    default <T extends Annotation> Element annotate(@NonNull AnnotationValue<T> annotationValue) {
+        throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support adding annotations at compilation time");
     }
 
     /**

@@ -31,9 +31,9 @@ The server requests a single item from the rs:Publisher[], writes it, and reques
 
 NOTE: It is up to the implementation of the rs:Publisher[] to schedule any blocking I/O work that may be done as a result of subscribing to the publisher.
 
-NOTE: To use https://projectreactor.io[Project Reactor]'s `Flux` or `Mono` you need to add the Micronaut's Reactor dependency to your project to include the necessary converters.
+NOTE: To use https://projectreactor.io[Project Reactor]'s `Flux` or `Mono` you need to add the Micronaut Reactor dependency to your project to include the necessary converters.
 
-NOTE: To use https://github.com/ReactiveX/RxJava[RxJava]'s `Flowable`, `Single` or `Maybe` you need to add the Micronaut's RxJava dependency to your project to include the necessary converters.
+NOTE: To use https://github.com/ReactiveX/RxJava[RxJava]'s `Flowable`, `Single` or `Maybe` you need to add the Micronaut RxJava dependency to your project to include the necessary converters.
 
 === Performing Blocking I/O
 

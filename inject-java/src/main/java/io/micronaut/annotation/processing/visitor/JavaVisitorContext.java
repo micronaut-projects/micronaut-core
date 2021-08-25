@@ -15,6 +15,7 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.annotation.processing.JavaConfigurationMetadataBuilder;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.annotation.processing.AnnotationProcessingOutputVisitor;
@@ -30,7 +31,10 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.beans.BeanElement;
+import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.util.VisitorContextUtils;
+import io.micronaut.inject.visitor.BeanElementVisitorContext;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
@@ -62,7 +66,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-public class JavaVisitorContext implements VisitorContext {
+public class JavaVisitorContext implements VisitorContext, BeanElementVisitorContext {
 
     private final Messager messager;
     private final Elements elements;
@@ -212,6 +216,9 @@ public class JavaVisitorContext implements VisitorContext {
 
     private void printMessage(String message, Diagnostic.Kind kind, @Nullable io.micronaut.inject.ast.Element element) {
         if (StringUtils.isNotEmpty(message)) {
+            if (element instanceof BeanElement) {
+                element = ((BeanElement) element).getDeclaringClass();
+            }
             if (element instanceof AbstractJavaElement) {
                 Element el = (Element) element.getNativeType();
                 messager.printMessage(kind, message, el);
@@ -430,5 +437,16 @@ public class JavaVisitorContext implements VisitorContext {
     @Internal
     void addBeanDefinitionBuilder(JavaBeanDefinitionBuilder javaBeanDefinitionBuilder) {
         this.beanDefinitionBuilders.add(javaBeanDefinitionBuilder);
+    }
+
+    @Override
+    public BeanElementBuilder addAssociatedBean(io.micronaut.inject.ast.Element originatingElement, ClassElement type) {
+        JavaBeanDefinitionBuilder javaBeanDefinitionBuilder = new JavaBeanDefinitionBuilder(
+                originatingElement,
+                type,
+                new JavaConfigurationMetadataBuilder(elements, types, annotationUtils),
+                this
+        );
+        return javaBeanDefinitionBuilder;
     }
 }

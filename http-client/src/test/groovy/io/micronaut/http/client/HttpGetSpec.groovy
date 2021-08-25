@@ -18,6 +18,7 @@ package io.micronaut.http.client
 import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.core.convert.format.Format
 import io.micronaut.core.type.Argument
 import io.micronaut.http.*
@@ -92,7 +93,7 @@ class HttpGetSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Page Not Found"
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Page Not Found"
         e.status == HttpStatus.NOT_FOUND
 
     }
@@ -139,7 +140,7 @@ class HttpGetSpec extends Specification {
 
         then:
         body.isPresent()
-        body.get().message == "Page Not Found"
+        body.get()._embedded.errors[0].message == "Page Not Found"
     }
 
     void "test simple blocking get request"() {
@@ -306,7 +307,7 @@ class HttpGetSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Page Not Found"
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Page Not Found"
         e.status == HttpStatus.NOT_FOUND
     }
 
@@ -699,6 +700,11 @@ class HttpGetSpec extends Specification {
         @Get(value = "/invalidContentType", produces = "does/notexist")
         String invalidContentType() {
             return "hello"
+        }
+
+        @Get(value = "/nestedPublishers")
+        Publisher<HttpResponse<Publisher<String>>> nestedPublishers() {
+            return Publishers.just(HttpResponse.ok(Publishers.just("abc")))
         }
     }
 

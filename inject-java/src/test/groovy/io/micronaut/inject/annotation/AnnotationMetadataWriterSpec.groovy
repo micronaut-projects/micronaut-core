@@ -27,6 +27,7 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.annotation.TypeHint
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
@@ -35,6 +36,8 @@ import io.micronaut.retry.annotation.Recoverable
 import jakarta.inject.Qualifier
 import jakarta.inject.Scope
 import jakarta.inject.Singleton
+import spock.lang.Unroll
+
 import java.lang.annotation.Documented
 import java.lang.annotation.Retention
 
@@ -43,6 +46,44 @@ import java.lang.annotation.Retention
  * @since 1.0
  */
 class AnnotationMetadataWriterSpec extends AbstractTypeElementSpec {
+
+    @Unroll
+    void "test read/write annotation array type #type"() {
+        given:
+        def annotationMetadata = buildTypeAnnotationMetadata("""
+package annmetadatatest;
+
+import java.lang.annotation.Retention;
+import static java.lang.annotation.RetentionPolicy.*;
+
+@TestAnn(${code})
+class Test {
+}
+
+@interface TestAnn {
+    ${method}[] value();
+}
+""")
+        annotationMetadata = writeAndLoadMetadata('annmetadatatest.Test', annotationMetadata)
+        AnnotationValue<?> av = annotationMetadata.getAnnotation("annmetadatatest.TestAnn")
+
+        expect:
+        av != null
+        av."${method.toLowerCase()}Values"(AnnotationMetadata.VALUE_MEMBER) == val
+
+        where:
+        code                            | val                          | method    | type
+        "{true, false}"                 | [true, false] as boolean[]   | "boolean" | boolean[].class
+        "{1, 2}"                        | [1, 2] as byte[]             | "byte"    | byte[].class
+        "{'a' , 'b'}"                   | ['a', 'b'] as char[]         | "char"    | char[].class
+        "{1.1d, 2.2d}"                  | [1.1d, 2.2d] as double[]     | "double"  | double[].class
+        "{1.1f, 2.2f}"                  | [1.1f, 2.2f] as float[]      | "float"   | float[].class
+        "{10, 20}"                      | [10, 20] as int[]            | "int"     | int[].class
+        "{30, 40}"                      | [30, 40] as long[]           | "long"    | long[].class
+        "{5, 10}"                       | [5, 10] as short[]           | "short"   | short[].class
+        '{"one", "two"}'                | ["one", "two"] as String[]   | "String"  | String[].class
+        '{String.class, Integer.class}' | [String, Integer] as Class[] | "Class"   | Class[].class
+    }
 
     void "test javax nullable on field"() {
         given:
@@ -56,7 +97,6 @@ class Test {
     void testMethod() {}
 }
 ''', 'testMethod')
-
 
 
         expect:
@@ -168,7 +208,7 @@ class Test {
         then:
         metadata != null
         metadata.getValue(Timed, "percentiles", double[].class).get() == [1.1d] as double[]
-        metadata.doubleValue(Timed,"percentiles").asDouble == 1.1d
+        metadata.doubleValue(Timed, "percentiles").asDouble == 1.1d
         metadata.getValue("test.MyAnn", "doubleArray", double[].class).get() == [1.1d] as double[]
     }
 
@@ -496,7 +536,7 @@ interface ITest {
     }
 
     void "test repeatable annotations are combined"() {
-        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+        BeanDefinition definition = buildBeanDefinition('test.Test', '''\
 package test;
 
 import io.micronaut.inject.annotation.repeatable.*;

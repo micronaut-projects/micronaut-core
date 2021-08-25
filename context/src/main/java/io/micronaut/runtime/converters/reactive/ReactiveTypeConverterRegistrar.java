@@ -34,6 +34,12 @@ public class ReactiveTypeConverterRegistrar implements TypeConverterRegistrar {
 
     @Override
     public void register(ConversionService<?> conversionService) {
-        conversionService.addConverter(Object.class, Publisher.class, Publishers::just);
+        conversionService.addConverter(Object.class, Publisher.class, obj -> {
+            if (obj instanceof Publisher) {
+                return (Publisher) obj;
+            } else {
+                return Publishers.just(obj);
+            }
+        });
     }
 }

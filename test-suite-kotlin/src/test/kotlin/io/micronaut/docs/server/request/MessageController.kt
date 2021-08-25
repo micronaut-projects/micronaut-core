@@ -20,12 +20,18 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.context.ServerRequestContext
+import reactor.core.publisher.Mono
+import reactor.util.context.ContextView
+
 // end::imports[]
 
 // tag::class[]
 @Controller("/request")
 class MessageController {
+// end::class[]
 
+    // tag::request[]
     @Get("/hello") // <1>
     fun hello(request: HttpRequest<*>): HttpResponse<String> {
         val name = request.parameters
@@ -35,5 +41,35 @@ class MessageController {
         return HttpResponse.ok("Hello $name!!")
                 .header("X-My-Header", "Foo") // <3>
     }
+    // end::request[]
+
+    // tag::static-request[]
+    @Get("/hello-static") // <1>
+    fun helloStatic(): HttpResponse<String> {
+        val request: HttpRequest<*> = ServerRequestContext.currentRequest<Any>() // <1>
+            .orElseThrow { RuntimeException("No request present") }
+        val name = request.parameters
+            .getFirst("name")
+            .orElse("Nobody")
+        return HttpResponse.ok("Hello $name!!")
+            .header("X-My-Header", "Foo")
+    }
+    // end::static-request[]
+
+    // tag::request-context[]
+    @Get("/hello-reactor")
+    fun helloReactor(): Mono<HttpResponse<String>?>? {
+        return Mono.deferContextual { ctx: ContextView ->  // <1>
+            val request = ctx.get<HttpRequest<*>>(ServerRequestContext.KEY) // <2>
+            val name = request.parameters
+                .getFirst("name")
+                .orElse("Nobody")
+            Mono.just(HttpResponse.ok("Hello $name!!")
+                    .header("X-My-Header", "Foo"))
+        }
+    }
+    // end::request-context[]
+// tag::endclass[]
 }
-// end::class[]
+// end::endclass[]
+

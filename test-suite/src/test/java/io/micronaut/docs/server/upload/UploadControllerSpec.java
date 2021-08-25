@@ -32,6 +32,8 @@ import reactor.core.publisher.Flux;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 
@@ -130,8 +132,10 @@ public class UploadControllerSpec {
         ));
 
         HttpClientResponseException ex = Assertions.assertThrows(HttpClientResponseException.class, () -> flowable.blockFirst());
+        Map<String, Object> embedded = (Map<String, Object>) ex.getResponse().getBody(Map.class).get().get("_embedded");
+        Object message = ((Map<String, Object>) ((List) embedded.get("errors")).get(0)).get("message");
 
-        assertEquals("Required argument [CompletedFileUpload file] not specified", ex.getMessage());
+        assertEquals("Required argument [CompletedFileUpload file] not specified", message);
     }
 
     @Test
@@ -148,8 +152,10 @@ public class UploadControllerSpec {
         ));
 
         HttpClientResponseException ex = Assertions.assertThrows(HttpClientResponseException.class, () -> flowable.blockFirst());
+        Map<String, Object> embedded = (Map<String, Object>) ex.getResponse().getBody(Map.class).get().get("_embedded");
+        Object message = ((Map<String, Object>) ((List) embedded.get("errors")).get(0)).get("message");
 
-        assertEquals("Required argument [CompletedFileUpload file] not specified", ex.getMessage());
+        assertEquals("Required argument [CompletedFileUpload file] not specified", message);
     }
 
     @Test
@@ -166,8 +172,10 @@ public class UploadControllerSpec {
         ));
 
         HttpClientResponseException ex = Assertions.assertThrows(HttpClientResponseException.class, () -> flowable.blockFirst());
+        Map<String, Object> embedded = (Map<String, Object>) ex.getResponse().getBody(Map.class).get().get("_embedded");
+        Object message = ((Map<String, Object>) ((List) embedded.get("errors")).get(0)).get("message");
 
-        assertEquals("Required argument [CompletedFileUpload file] not specified", ex.getMessage());
+        assertEquals("Required argument [CompletedFileUpload file] not specified", message);
     }
 
     @Test

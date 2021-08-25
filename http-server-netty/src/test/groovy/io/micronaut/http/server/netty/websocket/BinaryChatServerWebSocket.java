@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.websocket;
 
+import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.annotation.OnClose;
 import io.micronaut.websocket.annotation.OnMessage;
@@ -27,6 +28,7 @@ import java.util.Set;
 public class BinaryChatServerWebSocket {
     @OnOpen
     public void onOpen(String topic, String username, WebSocketSession session) {
+        assert ServerRequestContext.currentRequest().isPresent();
         Set<? extends WebSocketSession> openSessions = session.getOpenSessions();
         System.out.println("Server session opened for username = " + username);
         System.out.println("Server openSessions = " + openSessions);
@@ -45,7 +47,7 @@ public class BinaryChatServerWebSocket {
             String username,
             byte[] message,
             WebSocketSession session) {
-
+        assert ServerRequestContext.currentRequest().isPresent();
         Set<? extends WebSocketSession> openSessions = session.getOpenSessions();
         System.out.println("Server received message = " + new String(message));
         System.out.println("Server openSessions = " + openSessions);
@@ -63,6 +65,7 @@ public class BinaryChatServerWebSocket {
             String topic,
             String username,
             WebSocketSession session) {
+        assert ServerRequestContext.currentRequest().isPresent();
         Set<? extends WebSocketSession> openSessions = session.getOpenSessions();
         System.out.println("Server session closing for username = " + username);
         for (WebSocketSession openSession : openSessions) {

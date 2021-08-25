@@ -275,7 +275,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         then:
         HttpClientResponseException ex = thrown()
         ex.response.code() == HttpStatus.BAD_REQUEST.code
-        ex.message.contains("Required argument [HttpRequest request] not specified")
+        ex.response.getBody(Map).get()._embedded.errors[0].message.contains("Required argument [HttpRequest request] not specified")
     }
 
     void "test request generic type conversion error"() {

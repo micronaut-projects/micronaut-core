@@ -56,6 +56,7 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
     private final ConversionService<?> conversionService;
     private final HttpServerConfiguration configuration;
     private final ApplicationEventPublisher<HttpRequestReceivedEvent> httpRequestReceivedEventPublisher;
+
     /**
      * @param embeddedServer    The embedded service
      * @param conversionService The conversion service

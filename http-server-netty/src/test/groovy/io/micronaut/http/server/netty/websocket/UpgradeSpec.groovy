@@ -22,7 +22,7 @@ class UpgradeSpec extends Specification {
         for (HeaderTuple header : headers) {
             nettyRequest.headers().set(header.name, header.value)
         }
-        NettyServerWebSocketUpgradeHandler handler = new NettyServerWebSocketUpgradeHandler(null, null, null, null, null, null)
+        NettyServerWebSocketUpgradeHandler handler = new NettyServerWebSocketUpgradeHandler(null, null, null, null, null, null, null)
 
         when:
         HttpRequest<?> request = new NettyHttpRequest(

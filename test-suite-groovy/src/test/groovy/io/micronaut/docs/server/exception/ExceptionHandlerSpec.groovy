@@ -51,6 +51,6 @@ class ExceptionHandlerSpec extends Specification {
         HttpResponse response = ex.getResponse()
         Map<String, Object> body = (Map<String, Object>) response.getBody(errorType).get()
         response.status() == HttpStatus.BAD_REQUEST
-        body.get("message") == "No stock available"
+        body._embedded.errors[0].message == "No stock available"
     }
 }
