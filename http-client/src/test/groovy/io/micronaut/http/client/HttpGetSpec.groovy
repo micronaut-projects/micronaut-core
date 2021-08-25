@@ -30,6 +30,7 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.reactivex.Completable
 import io.reactivex.Flowable
+import io.reactivex.Observable
 import io.reactivex.Single
 import io.reactivex.functions.Consumer
 import spock.lang.Issue
@@ -606,6 +607,16 @@ class HttpGetSpec extends Specification {
         ex.message == "Failed to decode the body for the given content type [does/notexist]"
     }
 
+    void "test deserializing map wrapped by Reactive type"() {
+        when:
+        def response = myGetClient.reactiveMap().blockingFirst()
+        def book1 = response.get("key1")
+
+        then:
+        book1 instanceof Book
+        book1.title == "title1"
+    }
+
     @Controller("/get")
     static class GetController {
 
@@ -728,6 +739,13 @@ class HttpGetSpec extends Specification {
         String invalidContentType() {
             return "hello"
         }
+
+        @Get("/reactiveMap")
+        Flowable<Map<String, Book>> reactiveMap() {
+            def map = ["key1": new Book(title: "title1"), "key2": new Book(title: "title2")]
+            return Flowable.just(map)
+        }
+
     }
 
 
@@ -903,6 +921,9 @@ class HttpGetSpec extends Specification {
 
         @Get(value = "/invalidContentType", consumes = "does/notexist")
         Single<Book> invalidContentTypeReactive()
+
+        @Get("/reactiveMap")
+        Observable<Map<String, Book>> reactiveMap();
 
     }
 
