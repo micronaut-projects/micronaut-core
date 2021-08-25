@@ -28,8 +28,10 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
@@ -215,6 +217,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             }
 
+            InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
+
             // Apply all the argument binders
             Argument[] arguments = context.getArguments();
             if (arguments.length > 0) {
@@ -226,7 +230,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                         final ClientArgumentRequestBinder<Object> binder = (ClientArgumentRequestBinder<Object>) binderRegistry
                                 .findArgumentBinder((Argument<Object>) argument)
                                 .orElse(defaultBinder);
-                        binder.bind(ConversionContext.of(argument), uriContext, definedValue, request);
+                        ArgumentConversionContext conversionContext = ConversionContext.of(argument);
+                        binder.bind(conversionContext, uriContext, definedValue, request);
+                        if (conversionContext.hasErrors()) {
+                            return interceptedMethod.handleException(new ConversionErrorException(argument, conversionContext.getLastError().get()));
+                        }
                     }
                 }
             }
@@ -316,7 +324,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             ReturnType<?> returnType = context.getReturnType();
 
-            InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
             try {
                 Argument<?> valueType = interceptedMethod.returnTypeValue();
                 Class<?> reactiveValueType = valueType.getType();

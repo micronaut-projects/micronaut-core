@@ -67,43 +67,6 @@ Instead of binding from a single section of the request, it may be desirable to 
 
 snippet::io.micronaut.docs.server.binding.BookmarkController[tags="imports,class", indent=0, title="Binding Request parameters to POJO"]
 
-== Query values formatting
-
-The link:{api}/io/micronaut/core/convert/format/Format.html[Format] annotation can be used together with `@QueryValue` annotation to format query values.
-
-The supported values are: `"CSV"`, `"SSV"`, `"PIPES"`, `"MULTI"` and `"DEEP_OBJECT"`, where the meaning is similar to https://swagger.io/docs/specification/serialization/[Open API v3] query parameter's `style` attribute.
-
-The format can only be applied to `java.lang.Iterable`, `java.util.Map` or POJO with link:{api}/io/micronaut/core/annotation/Introspected.html[Introspected] annotation. Examples of how different values will be formatted are given in the table below:
-
-|===
-| Format | Iterable example | Map or POJO example
-
-| Original value
-| `["Mike", "Adam", "Kate"]`
-| `{"name": "Mike", "age": 30"}`
-
-| `"CSV"`
-| `"param=Mike,Adam,Kate"`
-| `"param=name,Mike,age,30"`
-
-| `"SSV"`
-| `"param=Mike Adam Kate"`
-| `"param=name Mike age 30"`
-
-| `"PIPES"`
-| `"param=Mike\|Adam\|Kate"`
-| `"param=name\|Mike\|age\|30"`
-
-| `"MULTI"`
-| `"param=Mike&param=Adam&param=Kate"`
-| `"name=Mike&age=30"`
-
-| `"DEEP_OBJECT"`
-| `"param[0]=Mike&param[1]=Adam&param[2]=Kate"`
-| `"param[name]=Mike&param[age]=30"`
-
-|===
-
 == Binding from Multiple Bindable values
 
 Instead of binding just query values, it is also possible to bind any Bindable value to a POJO (e.g. to bind `HttpRequest`, `@PathVariable`, `@QueryValue` and `@Header` to a single POJO). This can be achieved with the `@RequestBean` annotation and a custom Bean class with fields with Bindable annotations, or fields that can be bound by type (e.g. `HttpRequest`, `BasicAuth`, `Authentication`, etc.).

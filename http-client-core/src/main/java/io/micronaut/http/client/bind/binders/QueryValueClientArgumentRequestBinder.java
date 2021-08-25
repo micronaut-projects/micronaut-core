@@ -76,7 +76,7 @@ public class QueryValueClientArgumentRequestBinder implements AnnotatedClientArg
             @NonNull Object value,
             @NonNull MutableHttpRequest<?> request
     ) {
-        ArgumentConversionContext<ConvertibleMultiValues> conversionContext = ConversionContext.of(
+        ArgumentConversionContext<ConvertibleMultiValues> conversionContext = context.with(
                 Argument.of(ConvertibleMultiValues.class, context.getArgument().getName(), context.getAnnotationMetadata()));
         Optional<ConvertibleMultiValues> convertedValue = conversionService.convert(value, conversionContext);
 

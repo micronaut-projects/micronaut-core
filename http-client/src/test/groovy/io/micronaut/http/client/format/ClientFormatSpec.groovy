@@ -4,6 +4,7 @@ import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.exceptions.IntrospectionException
+import io.micronaut.core.convert.exceptions.ConversionErrorException
 import io.micronaut.core.convert.format.Format
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
@@ -17,6 +18,7 @@ import spock.lang.Specification
 @Property(name = 'spec.name', value = 'ClientFormatSpec')
 @MicronautTest
 class ClientFormatSpec extends Specification {
+
     @Inject FormatClient client
 
     void "test PIPES formatted list"() {
@@ -101,7 +103,8 @@ class ClientFormatSpec extends Specification {
         client.csvFormattedObject(string)
 
         then:
-        thrown IntrospectionException
+        def ex = thrown(ConversionErrorException)
+        ex.message.startsWith("Failed to convert argument [csv] for value [hello] due to: No bean introspection available for type [class java.lang.String]")
     }
 
     void "test cannot annotate non-introspected type with format"() {
@@ -110,7 +113,8 @@ class ClientFormatSpec extends Specification {
         client.csvFormattedObject(notIntrospected)
 
         then:
-        thrown IntrospectionException
+        def ex = thrown(ConversionErrorException)
+        ex.message.startsWith("Failed to convert argument [csv] for value [NotIntrospected(property=null)] due to: No bean introspection available for type [class io.micronaut.http.client.format.ClientFormatSpec\$NotIntrospected]")
     }
 
     @Requires(property = 'spec.name', value = 'ClientFormatSpec')
@@ -172,5 +176,8 @@ class ClientFormatSpec extends Specification {
 
     static class NotIntrospected {
         public String property;
+        String toString() {
+            "NotIntrospected(property=" + property + ")"
+        }
     }
 }

@@ -76,9 +76,42 @@ The following table summarizes the parameter annotations and their purpose, and 
 
 IMPORTANT: Always use ann:http.annotation.Produces[] or ann:http.annotation.Consumes[] instead of supplying a header for `Content-Type` or `Accept`.
 
-==== Query value formatting
+== Query values formatting
 
-The link:{api}/io/micronaut/core/convert/format/Format.html[Format] annotation can be used together with `@QueryValue` annotation to format query values. More information is given in the HTTP Server section, Simple Request Binding subsection.
+The link:{api}/io/micronaut/core/convert/format/Format.html[Format] annotation can be used together with `@QueryValue` annotation to format query values.
+
+The supported values are: `"csv"`, `"ssv"`, `"pipes"`, `"multi"` and `"deep-object"`, where the meaning is similar to https://swagger.io/docs/specification/serialization/[Open API v3] query parameter's `style` attribute.
+
+The format can only be applied to `java.lang.Iterable`, `java.util.Map` or POJO with link:{api}/io/micronaut/core/annotation/Introspected.html[Introspected] annotation. Examples of how different values will be formatted are given in the table below:
+
+|===
+| Format | Iterable example | Map or POJO example
+
+| Original value
+| `["Mike", "Adam", "Kate"]`
+| `{"name": "Mike", "age": 30"}`
+
+| `"CSV"`
+| `"param=Mike,Adam,Kate"`
+| `"param=name,Mike,age,30"`
+
+| `"SSV"`
+| `"param=Mike Adam Kate"`
+| `"param=name Mike age 30"`
+
+| `"PIPES"`
+| `"param=Mike\|Adam\|Kate"`
+| `"param=name\|Mike\|age\|30"`
+
+| `"MULTI"`
+| `"param=Mike&param=Adam&param=Kate"`
+| `"name=Mike&age=30"`
+
+| `"DEEP_OBJECT"`
+| `"param[0]=Mike&param[1]=Adam&param[2]=Kate"`
+| `"param[name]=Mike&param[age]=30"`
+
+|===
 
 ==== Type-Based Binding Parameters
 

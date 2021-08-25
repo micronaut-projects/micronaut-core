@@ -16,10 +16,12 @@
 package io.micronaut.core.convert.converters;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.beans.BeanWrapper;
+import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -39,7 +41,6 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-
 
 /**
  * A factory for creation of various {@link FormattingTypeConverter}s to and from {@link ConvertibleMultiValues} type.
@@ -121,12 +122,12 @@ public class MultiValuesConverterFactory {
      * @return All the values in a Map
      */
     private static Map<String, String> getSeparatedMapParameters(
-            ConvertibleMultiValues<String> parameters, String name, Optional<String> defaultValue, Character delimiter
+            ConvertibleMultiValues<String> parameters, String name, String defaultValue, Character delimiter
     ) {
         List<String> paramValues = parameters.getAll(name);
 
-        if (paramValues.size() == 0 && defaultValue.isPresent()) {
-            paramValues.add(defaultValue.get());
+        if (paramValues.size() == 0 && defaultValue != null) {
+            paramValues.add(defaultValue);
         }
 
         Map<String, String> values = new HashMap<>();
@@ -146,9 +147,7 @@ public class MultiValuesConverterFactory {
      *
      * @return All the values in a Map
      */
-    private static Map<String, String> getMultiMapParameters(
-            ConvertibleMultiValues<String> parameters, String name, Optional<String> defaultValue
-    ) {
+    private static Map<String, String> getMultiMapParameters(ConvertibleMultiValues<String> parameters, String name) {
         // Convert to map of strings - if multiple values are present, the first one is taken
         Map values = parameters.asMap().entrySet().stream()
                 .filter(v -> !v.getValue().isEmpty())
@@ -162,9 +161,7 @@ public class MultiValuesConverterFactory {
      *
      * @return All the values in a Map
      */
-    private static Map<String, String> getDeepObjectMapParameters(
-            ConvertibleMultiValues<String> parameters, String name, Optional<String> defaultValue
-    ) {
+    private static Map<String, String> getDeepObjectMapParameters(ConvertibleMultiValues<String> parameters, String name) {
         Map<String, List<String>> paramValues = parameters.asMap();
         Map<String, String> values = new HashMap<>();
 
@@ -235,7 +232,7 @@ public class MultiValuesConverterFactory {
      * An abstract class for converters from {@link ConvertibleMultiValues}.
      * @param <T>
      */
-    public abstract static class AbstractConverterFromMultiValues<T>
+    private abstract static class AbstractConverterFromMultiValues<T>
             implements FormattingTypeConverter<ConvertibleMultiValues, T, Format> {
         protected ConversionService<?> conversionService;
 
@@ -254,14 +251,8 @@ public class MultiValuesConverterFactory {
             if (!(conversionContext instanceof ArgumentConversionContext)) {
                 return Optional.empty();
             }
-            // noinspection unchecked
-            ConvertibleMultiValues<String> parameters;
+            ConvertibleMultiValues<String> parameters = (ConvertibleMultiValues<String>) object;
             ArgumentConversionContext<T> context = (ArgumentConversionContext<T>) conversionContext;
-            try {
-                parameters = object;
-            } catch (Exception e) {
-                return Optional.empty();
-            }
 
             String format = conversionContext.getAnnotationMetadata()
                     .getValue(Format.class, String.class).orElse(null);
@@ -271,8 +262,9 @@ public class MultiValuesConverterFactory {
 
             String name = conversionContext.getAnnotationMetadata().getValue(Bindable.class, String.class)
                     .orElse(context.getArgument().getName());
-            Optional<String> defaultValue = conversionContext.getAnnotationMetadata()
-                    .getValue(Bindable.class, "defaultValue", String.class);
+            String defaultValue = conversionContext.getAnnotationMetadata()
+                    .getValue(Bindable.class, "defaultValue", String.class)
+                    .orElse(null);
 
             switch (normalizeFormatName(format)) {
                 case FORMAT_CSV:
@@ -282,9 +274,9 @@ public class MultiValuesConverterFactory {
                 case FORMAT_PIPES:
                     return retrieveSeparatedValue(context, name, parameters, defaultValue, PIPES_DELIMITER);
                 case FORMAT_MULTI:
-                    return retrieveMultiValue(context, name, parameters, defaultValue);
+                    return retrieveMultiValue(context, name, parameters);
                 case FORMAT_DEEP_OBJECT:
-                    return retrieveDeepObjectValue(context, name, parameters, defaultValue);
+                    return retrieveDeepObjectValue(context, name, parameters);
                 default:
                     return Optional.empty();
             }
@@ -302,7 +294,10 @@ public class MultiValuesConverterFactory {
          * @return the converted value if conversion was successful
          */
         protected abstract Optional<T> retrieveSeparatedValue(ArgumentConversionContext<T> conversionContext,
-            String name, ConvertibleMultiValues<String> parameters, Optional<String> defaultValue, Character delimiter);
+                                                              String name,
+                                                              ConvertibleMultiValues<String> parameters,
+                                                              @Nullable String defaultValue,
+                                                              Character delimiter);
 
         /**
          * Method to retrieve the values from a parameter in MULTI format and return in desired type.
@@ -315,7 +310,8 @@ public class MultiValuesConverterFactory {
          * @return the converted value if conversion was successful
          */
         protected abstract Optional<T> retrieveMultiValue(ArgumentConversionContext<T> conversionContext,
-            String name, ConvertibleMultiValues<String> parameters, Optional<String> defaultValue);
+                                                          String name,
+                                                          ConvertibleMultiValues<String> parameters);
 
         /**
          * Method to retrieve the values from a parameter in DEEP_OBJECT format and return in desired type.
@@ -324,10 +320,10 @@ public class MultiValuesConverterFactory {
          *                          (including type and annotations)
          * @param name the name of the parameter
          * @param parameters all the parameters from which the parameter of given name needs to be retrieved
-         * @param defaultValue default value
          * @return the converted value if conversion was successful*/
         protected abstract Optional<T> retrieveDeepObjectValue(ArgumentConversionContext<T> conversionContext,
-            String name, ConvertibleMultiValues<String> parameters, Optional<String> defaultValue);
+                                                               String name,
+                                                               ConvertibleMultiValues<String> parameters);
 
         @Override
         public Class<Format> annotationType() {
@@ -345,11 +341,11 @@ public class MultiValuesConverterFactory {
 
         @Override
         protected Optional<Iterable> retrieveSeparatedValue(ArgumentConversionContext<Iterable> conversionContext,
-            String name, ConvertibleMultiValues<String> parameters, Optional<String> defaultValue, Character delimiter
+            String name, ConvertibleMultiValues<String> parameters, String defaultValue, Character delimiter
         ) {
             List<String> values = parameters.getAll(name);
-            if (values.size() == 0 && defaultValue.isPresent()) {
-                values.add(defaultValue.get());
+            if (values.size() == 0 && defaultValue != null) {
+                values.add(defaultValue);
             }
 
             List<String> result = new ArrayList<>(values.size());
@@ -362,24 +358,25 @@ public class MultiValuesConverterFactory {
 
         @Override
         protected Optional<Iterable> retrieveMultiValue(ArgumentConversionContext<Iterable> conversionContext,
-            String name, ConvertibleMultiValues<String> parameters, Optional<String> defaultValue
-        ) {
+                                                        String name,
+                                                        ConvertibleMultiValues<String> parameters) {
             List<String> values = parameters.getAll(name);
             return convertValues(conversionContext, values);
         }
 
         @Override
         protected Optional<Iterable> retrieveDeepObjectValue(ArgumentConversionContext<Iterable> conversionContext,
-            String name, ConvertibleMultiValues<String> parameters, Optional<String> defaultValue
-        ) {
+                                                             String name,
+                                                             ConvertibleMultiValues<String> parameters) {
             List<String> values = new ArrayList<>();
 
             for (int i = 0;; ++i) {
                 String key = name + '[' + i + ']';
-                if (!parameters.contains(key)) {
+                String value = parameters.get(key);
+                if (value == null) {
                     break;
                 }
-                values.add(parameters.get(key));
+                values.add(value);
             }
 
             return convertValues(conversionContext, values);
@@ -415,7 +412,10 @@ public class MultiValuesConverterFactory {
 
         @Override
         protected Optional<Map> retrieveSeparatedValue(ArgumentConversionContext<Map> conversionContext,
-            String name, ConvertibleMultiValues<String> parameters, Optional<String> defaultValue, Character delimiter
+                                                       String name,
+                                                       ConvertibleMultiValues<String> parameters,
+                                                       String defaultValue,
+                                                       Character delimiter
         ) {
             Map<String, String> values = getSeparatedMapParameters(parameters, name, defaultValue, delimiter);
             return convertValues(conversionContext, values);
@@ -423,17 +423,19 @@ public class MultiValuesConverterFactory {
 
         @Override
         protected Optional<Map> retrieveMultiValue(ArgumentConversionContext<Map> conversionContext,
-            String name, ConvertibleMultiValues<String> parameters, Optional<String> defaultValue
+                                                   String name,
+                                                   ConvertibleMultiValues<String> parameters
         ) {
-            Map<String, String> values = getMultiMapParameters(parameters, name, defaultValue);
+            Map<String, String> values = getMultiMapParameters(parameters, name);
             return convertValues(conversionContext, values);
         }
 
         @Override
         protected Optional<Map> retrieveDeepObjectValue(ArgumentConversionContext<Map> conversionContext,
-            String name, ConvertibleMultiValues<String> parameters, Optional<String> defaultValue
+                                                        String name,
+                                                        ConvertibleMultiValues<String> parameters
         ) {
-            Map<String, String> values = getDeepObjectMapParameters(parameters, name, defaultValue);
+            Map<String, String> values = getDeepObjectMapParameters(parameters, name);
             return convertValues(conversionContext, values);
         }
 
@@ -480,13 +482,14 @@ public class MultiValuesConverterFactory {
      * A converter to convert from {@link ConvertibleMultiValues} to a POJO {@link Object}.
      */
     public static class MultiValuesToObjectConverter extends AbstractConverterFromMultiValues<Object> {
+
         public MultiValuesToObjectConverter(ConversionService<?> conversionService) {
             super(conversionService);
         }
 
         @Override
         protected Optional<Object> retrieveSeparatedValue(ArgumentConversionContext<Object> conversionContext,
-            String name, ConvertibleMultiValues<String> parameters, Optional<String> defaultValue, Character delimiter
+            String name, ConvertibleMultiValues<String> parameters, String defaultValue, Character delimiter
         ) {
             Map<String, String> values = getSeparatedMapParameters(parameters, name, defaultValue, delimiter);
             return convertValues(conversionContext, values);
@@ -494,48 +497,55 @@ public class MultiValuesConverterFactory {
 
         @Override
         protected Optional<Object> retrieveMultiValue(ArgumentConversionContext<Object> conversionContext,
-            String name, ConvertibleMultiValues<String> parameters, Optional<String> defaultValue
+                                                      String name,
+                                                      ConvertibleMultiValues<String> parameters
         ) {
-            Map<String, String> values = getMultiMapParameters(parameters, name, defaultValue);
+            Map<String, String> values = getMultiMapParameters(parameters, name);
             return convertValues(conversionContext, values);
         }
 
         @Override
         protected Optional<Object> retrieveDeepObjectValue(ArgumentConversionContext<Object> conversionContext,
-            String name, ConvertibleMultiValues<String> parameters, Optional<String> defaultValue
+                                                           String name,
+                                                           ConvertibleMultiValues<String> parameters
         ) {
-            Map<String, String> values = getDeepObjectMapParameters(parameters, name, defaultValue);
+            Map<String, String> values = getDeepObjectMapParameters(parameters, name);
             return convertValues(conversionContext, values);
         }
 
         private Optional<Object> convertValues(ArgumentConversionContext<Object> context, Map<String, String> values) {
-            BeanIntrospection introspection = BeanIntrospection.getIntrospection(context.getArgument().getType());
+            try {
+                BeanIntrospection introspection = BeanIntrospection.getIntrospection(context.getArgument().getType());
 
-            // Create with constructor
-            BeanConstructor<?> constructor = introspection.getConstructor();
-            Argument<?>[] constructorArguments = constructor.getArguments();
-            Object[] constructorParameters = new Object[constructorArguments.length];
-            for (int i = 0; i < constructorArguments.length; ++i) {
-                Argument<?> argument = constructorArguments[i];
-                String name = argument.getAnnotationMetadata().getValue(Bindable.class, String.class)
-                        .orElse(argument.getName());
-                constructorParameters[i] = conversionService.convert(values.get(name), ConversionContext.of(argument))
-                        .orElse(null);
-            }
-            Object result = constructor.instantiate(constructorParameters);
-
-            // Set the remaining properties with wrapper
-            BeanWrapper<Object> wrapper = BeanWrapper.getWrapper(result);
-            for (BeanProperty<Object, Object> property: wrapper.getBeanProperties()) {
-                String name = property.getName();
-
-                if (!property.isReadOnly() && values.containsKey(name)) {
-                    conversionService.convert(values.get(name), ConversionContext.of(property.asArgument()))
-                            .ifPresent(v -> property.set(result, v));
+                // Create with constructor
+                BeanConstructor<?> constructor = introspection.getConstructor();
+                Argument<?>[] constructorArguments = constructor.getArguments();
+                Object[] constructorParameters = new Object[constructorArguments.length];
+                for (int i = 0; i < constructorArguments.length; ++i) {
+                    Argument<?> argument = constructorArguments[i];
+                    String name = argument.getAnnotationMetadata().getValue(Bindable.class, String.class)
+                            .orElse(argument.getName());
+                    constructorParameters[i] = conversionService.convert(values.get(name), ConversionContext.of(argument))
+                            .orElse(null);
                 }
-            }
+                Object result = constructor.instantiate(constructorParameters);
 
-            return Optional.of(result);
+                // Set the remaining properties with wrapper
+                BeanWrapper<Object> wrapper = BeanWrapper.getWrapper(result);
+                for (BeanProperty<Object, Object> property : wrapper.getBeanProperties()) {
+                    String name = property.getName();
+
+                    if (!property.isReadOnly() && values.containsKey(name)) {
+                        conversionService.convert(values.get(name), ConversionContext.of(property.asArgument()))
+                                .ifPresent(v -> property.set(result, v));
+                    }
+                }
+
+                return Optional.of(result);
+            } catch (IntrospectionException e) {
+                context.reject(values, e);
+                return Optional.empty();
+            }
         }
     }
 
@@ -707,8 +717,6 @@ public class MultiValuesConverterFactory {
             ArgumentConversionContext<String> valueConversionContext = ConversionContext.STRING.with(
                     typeParameters.length > 1 ? typeParameters[1].getAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA);
 
-            // Collect all the key value pairs
-            List<String> values = new ArrayList<>();
             // noinspection unchecked
             for (Map.Entry<Object, Object> value: ((Map<Object, Object>) object).entrySet()) {
                 conversionService.convert(value.getValue(), valueConversionContext).ifPresent(v -> {
@@ -754,8 +762,16 @@ public class MultiValuesConverterFactory {
             super(conversionService);
         }
 
-        private void processValues(Object object, BiConsumer<String, String> consumer) {
-            BeanWrapper<Object> beanWrapper = BeanWrapper.getWrapper(object);
+        private void processValues(ArgumentConversionContext<Object> context,
+                                   Object object,
+                                   BiConsumer<String, String> consumer) {
+            BeanWrapper<Object> beanWrapper;
+            try {
+                beanWrapper = BeanWrapper.getWrapper(object);
+            } catch (IntrospectionException e) {
+                context.reject(object, e);
+                return;
+            }
 
             for (BeanProperty<Object, Object> property: beanWrapper.getBeanProperties()) {
                 String key = property.getValue(Bindable.class, String.class).orElse(property.getName());
@@ -768,10 +784,13 @@ public class MultiValuesConverterFactory {
         }
 
         @Override
-        protected void addSeparatedValues(ArgumentConversionContext<Object> context, String name,
-                Object object, MutableConvertibleMultiValuesMap<String> parameters, Character delimiter) {
+        protected void addSeparatedValues(ArgumentConversionContext<Object> context,
+                                          String name,
+                                          Object object,
+                                          MutableConvertibleMultiValuesMap<String> parameters,
+                                          Character delimiter) {
             List<String> values = new ArrayList<>();
-            processValues(object, (k, v) -> {
+            processValues(context, object, (k, v) -> {
                 values.add(k);
                 values.add(v);
             });
@@ -779,15 +798,19 @@ public class MultiValuesConverterFactory {
         }
 
         @Override
-        protected void addMutliValues(ArgumentConversionContext<Object> context, String name,
-                 Object object, MutableConvertibleMultiValuesMap<String> parameters) {
-            processValues(object, parameters::add);
+        protected void addMutliValues(ArgumentConversionContext<Object> context,
+                                      String name,
+                                      Object object,
+                                      MutableConvertibleMultiValuesMap<String> parameters) {
+            processValues(context, object, parameters::add);
         }
 
         @Override
-        protected void addDeepObjectValues(ArgumentConversionContext<Object> context, String name,
-                Object object, MutableConvertibleMultiValuesMap<String> parameters) {
-            processValues(object, (k, v) -> parameters.add(name + "[" + k + "]", v));
+        protected void addDeepObjectValues(ArgumentConversionContext<Object> context,
+                                           String name,
+                                           Object object,
+                                           MutableConvertibleMultiValuesMap<String> parameters) {
+            processValues(context, object, (k, v) -> parameters.add(name + "[" + k + "]", v));
         }
     }
 }
