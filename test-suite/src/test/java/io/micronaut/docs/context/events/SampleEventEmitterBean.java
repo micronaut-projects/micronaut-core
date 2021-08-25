@@ -24,7 +24,7 @@ import jakarta.inject.Singleton;
 public class SampleEventEmitterBean {
 
     @Inject
-    ApplicationEventPublisher eventPublisher;
+    ApplicationEventPublisher<SampleEvent> eventPublisher;
 
     public void publishSampleEvent() {
         eventPublisher.publishEvent(new SampleEvent());

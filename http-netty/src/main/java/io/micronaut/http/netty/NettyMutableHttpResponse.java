@@ -71,7 +71,6 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
     private final NettyHttpHeaders headers;
     private Object body;
     private Optional<Object> optionalBody;
-    private Optional<MediaType> contentType;
     private final HttpHeaders nettyHeaders;
     private final HttpHeaders trailingNettyHeaders;
     private final DecoderResult decoderResult;
@@ -147,11 +146,10 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
         this.httpResponseStatus = httpResponseStatus;
         this.nettyHeaders = nettyHeaders;
         this.trailingNettyHeaders = trailingNettyHeaders;
-        this.body = body;
-        this.optionalBody = Optional.ofNullable(body);
         this.decoderResult = decoderResult;
         this.conversionService = conversionService;
         this.headers = new NettyHttpHeaders(nettyHeaders, conversionService);
+        setBody(body);
     }
 
     /**
@@ -185,22 +183,6 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
     public String toString() {
         HttpStatus status = getStatus();
         return status.getCode() + " " + status.getReason();
-    }
-
-    @Override
-    public Optional<MediaType> getContentType() {
-        if (contentType == null) {
-            contentType = MutableHttpResponse.super.getContentType();
-            if (!contentType.isPresent()) {
-                Optional<B> body = getBody();
-                if (body.isPresent()) {
-                    contentType = MediaType.fromType(body.get().getClass());
-                } else {
-                    contentType = Optional.empty();
-                }
-            }
-        }
-        return contentType;
     }
 
     @Override
@@ -290,9 +272,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
             if (this.body instanceof ByteBuf) {
                 ((ByteBuf) this.body).release();
             }
-            this.body = body;
-            this.optionalBody = Optional.ofNullable(body);
-            this.contentType = null;
+            setBody(body);
             bodyConvertor.cleanup();
         }
         return (MutableHttpResponse<T>) this;
@@ -364,6 +344,15 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
     @Override
     public boolean isStream() {
         return false;
+    }
+
+    private void setBody(Object body) {
+        this.body = body;
+        this.optionalBody = Optional.ofNullable(body);
+        Optional<MediaType> contentType = getContentType();
+        if (!contentType.isPresent() && body != null) {
+            MediaType.fromType(body.getClass()).ifPresent(this::contentType);
+        }
     }
 
     private BodyConvertor newBodyConvertor() {

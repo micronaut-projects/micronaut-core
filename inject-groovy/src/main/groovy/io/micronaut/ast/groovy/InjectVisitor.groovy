@@ -66,7 +66,6 @@ import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.inject.configuration.ConfigurationMetadata
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder
 import io.micronaut.inject.configuration.PropertyMetadata
-import io.micronaut.inject.processing.ProcessedTypes
 import io.micronaut.inject.visitor.VisitorConfiguration
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
@@ -251,6 +250,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     node,
                     annotationMetadata
             )
+            aopProxyWriter.visitTypeArguments(groovyClassElement.getAllTypeArguments())
             populateProxyWriterConstructor(groovyClassElement, aopProxyWriter, groovyClassElement.getPrimaryConstructor().orElse(null))
             beanDefinitionWriters.put(node, aopProxyWriter)
             this.aopProxyWriter = aopProxyWriter
@@ -537,11 +537,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
                     if (isDeclaredBean && methodAnnotationMetadata.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT)) {
                         defineBeanDefinition(concreteClass)
-                        def beanWriter = getBeanWriter()
-                        if (aopProxyWriter instanceof AopProxyWriter && !((AopProxyWriter)aopProxyWriter).isProxyTarget()) {
-                            beanWriter = aopProxyWriter
-                        }
-                        beanWriter.visitPostConstructMethod(
+                        getBeanWriter().visitPostConstructMethod(
                                 declaringElement,
                                 groovyMethodElement,
                                 requiresReflection,
@@ -549,16 +545,20 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         )
                     } else if (isDeclaredBean && methodAnnotationMetadata.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)) {
                         defineBeanDefinition(concreteClass)
-                        def beanWriter = getBeanWriter()
-                        if (aopProxyWriter instanceof AopProxyWriter && !((AopProxyWriter)aopProxyWriter).isProxyTarget()) {
-                            beanWriter = aopProxyWriter
-                        }
                         beanWriter.visitPreDestroyMethod(
                                 declaringElement,
                                 groovyMethodElement,
                                 requiresReflection,
                                 groovyVisitorContext
                         )
+                        if (aopProxyWriter instanceof AopProxyWriter && !((AopProxyWriter)aopProxyWriter).isProxyTarget()) {
+                            aopProxyWriter.visitPreDestroyMethod(
+                                    declaringElement,
+                                    groovyMethodElement,
+                                    requiresReflection,
+                                    groovyVisitorContext
+                            )
+                        }
                     } else if (methodAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT)) {
                         defineBeanDefinition(concreteClass)
                         getBeanWriter().visitMethodInjectionPoint(
@@ -1091,7 +1091,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             }
             return
         }
-        boolean isInject = fieldAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT)
+        boolean isInject = isFieldInjected(fieldNode, fieldAnnotationMetadata)
         boolean isValue = isValueInjection(fieldNode, fieldAnnotationMetadata)
         FieldElement fieldElement = elementFactory.newFieldElement(fieldNode, fieldAnnotationMetadata)
 
@@ -1195,7 +1195,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             }
             return
         }
-        boolean isInject = fieldNode != null && fieldAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT)
+        boolean isInject = isFieldInjected(fieldNode, fieldAnnotationMetadata)
         boolean isValue = isValueInjection(fieldNode, fieldAnnotationMetadata)
 
         String propertyName = propertyNode.name
@@ -1328,6 +1328,10 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 visitFactoryProperty(propertyNode, fieldNode, fieldAnnotationMetadata)
             }
         }
+    }
+
+    private boolean isFieldInjected(FieldNode fieldNode, AnnotationMetadata fieldAnnotationMetadata) {
+        fieldNode != null && (fieldAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT) || (fieldAnnotationMetadata.hasDeclaredStereotype(AnnotationUtil.QUALIFIER)) && !fieldAnnotationMetadata.hasDeclaredAnnotation(Bean))
     }
 
     private void visitFactoryProperty(PropertyNode propertyNode, FieldNode fieldNode, AnnotationMetadata fieldAnnotationMetadata) {

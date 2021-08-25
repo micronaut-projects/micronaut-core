@@ -15,7 +15,7 @@ dependency:io.micronaut.netflix:micronaut-netflix-hystrix[]
 
 == Using the @HystrixCommand Annotation
 
-With the above dependency declared you can annotate any method (including methods defined on `@Client` interfaces) with the ann:configuration.hystrix.annotation.HystrixCommand[] annotation, and method's execution will be wrapped in a Hystrix command. For example:
+With the above dependency declared you can annotate any method (including methods defined on `@Client` interfaces) with the link:{micronauthystrixapi}/annotation.HystrixCommand.html[HystrixCommand] annotation, and method's execution will be wrapped in a Hystrix command. For example:
 
 .Using @HystrixCommand
 [source,groovy]
@@ -26,11 +26,11 @@ String hello(String name) {
 }
 ----
 
-NOTE: This works for reactive return types such as rx:Flowable[], and the reactive type will be wrapped in a `HystrixObservableCommand`.
+NOTE: This works for reactive return types such as reactor:Flux[], and the reactive type will be wrapped in a `HystrixObservableCommand`.
 
-The ann:configuration.hystrix.annotation.HystrixCommand[] annotation also integrates with Micronaut's support for <<retry, Retry Advice>> and <<clientFallback, Fallbacks>>
+The link:{micronauthystrixapi}/annotation.HystrixCommand.html[HystrixCommand] annotation also integrates with Micronaut's support for <<retry, Retry Advice>> and <<clientFallback, Fallbacks>>
 
-TIP: For information on how to customize the Hystrix thread pool, group, and properties, see the Javadoc for ann:configuration.hystrix.annotation.HystrixCommand[].
+TIP: For information on how to customize the Hystrix thread pool, group, and properties, see the Javadoc for link:{micronauthystrixapi}/annotation.HystrixCommand.html[HystrixCommand].
 
 == Enabling Hystrix Stream and Dashboard
 

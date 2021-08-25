@@ -1,11 +1,11 @@
 package io.micronaut.docs.server.body
 
-import io.kotlintest.shouldBe
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 
 class MessageControllerSpec: StringSpec() {
@@ -15,7 +15,7 @@ class MessageControllerSpec: StringSpec() {
     )
 
     val client = autoClose(
-            embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.getURL())
+            embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.getURL())
     )
 
     init {
@@ -31,7 +31,7 @@ class MessageControllerSpec: StringSpec() {
         "test echo reactive response"() {
             val body = "My Text"
             val response = client.toBlocking().retrieve(
-                    HttpRequest.POST("/receive/echo-flow", body)
+                    HttpRequest.POST("/receive/echo-publisher", body)
                             .contentType(MediaType.TEXT_PLAIN_TYPE), String::class.java)
 
             response shouldBe body

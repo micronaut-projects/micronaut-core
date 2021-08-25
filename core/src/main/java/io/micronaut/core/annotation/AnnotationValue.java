@@ -61,6 +61,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @param values         The values
      */
     @UsedByGeneratedCode
+    @Internal
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values) {
         this(annotationName, values, Collections.emptyMap());
     }
@@ -70,6 +71,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @param values          The values
      * @param retentionPolicy The retention policy
      */
+    @Internal
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
         this(annotationName, values, Collections.emptyMap(), retentionPolicy, null);
     }
@@ -80,6 +82,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @param retentionPolicy The retention policy
      * @param stereotypes     The stereotypes of the annotation
      */
+    @Internal
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy, List<AnnotationValue<?>> stereotypes) {
         this(annotationName, values, Collections.emptyMap(), retentionPolicy, stereotypes);
     }
@@ -91,6 +94,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @param defaultValues  The default values
      */
     @UsedByGeneratedCode
+    @Internal
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<String, Object> defaultValues) {
         this(annotationName, values, defaultValues, RetentionPolicy.RUNTIME, null);
     }
@@ -102,6 +106,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @param retentionPolicy The retention policy
      */
     @UsedByGeneratedCode
+    @Internal
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<String, Object> defaultValues, RetentionPolicy retentionPolicy) {
         this(annotationName, values, defaultValues, retentionPolicy, null);
     }
@@ -113,6 +118,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @param retentionPolicy The retention policy
      * @param stereotypes     The stereotypes of the annotation
      */
+    @Internal
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<String, Object> defaultValues, RetentionPolicy retentionPolicy, List<AnnotationValue<?>> stereotypes) {
         this.annotationName = annotationName;
         this.convertibleValues = newConvertibleValues(values);
@@ -128,6 +134,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @SuppressWarnings("unchecked")
     @UsedByGeneratedCode
+    @Internal
     public AnnotationValue(String annotationName) {
         this(annotationName, Collections.emptyMap(), Collections.emptyMap());
     }
@@ -136,6 +143,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @param annotationName    The annotation name
      * @param convertibleValues The convertible values
      */
+    @Internal
     public AnnotationValue(String annotationName, ConvertibleValues<Object> convertibleValues) {
         this.annotationName = annotationName;
         this.convertibleValues = convertibleValues;
@@ -377,6 +385,188 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         return stringValues(member, valueMapper);
     }
 
+    @Override
+    public boolean[] booleanValues(String member) {
+        Object v = values.get(member);
+        if (v != null) {
+            if (v instanceof boolean[]) {
+                return (boolean[]) v;
+            } else if (v instanceof Boolean) {
+                return new boolean[] { (Boolean) v };
+            } else {
+                String[] strings = resolveStringValues(v, this.valueMapper);
+                if (ArrayUtils.isNotEmpty(strings)) {
+                    boolean[] booleans = new boolean[strings.length];
+                    for (int i = 0; i < strings.length; i++) {
+                        String string = strings[i];
+                        booleans[i] = Boolean.parseBoolean(string);
+                    }
+                    return booleans;
+                }
+            }
+        }
+        return ArrayUtils.EMPTY_BOOLEAN_ARRAY;
+    }
+
+    @Override
+    public byte[] byteValues(String member) {
+        Object v = values.get(member);
+        if (v != null) {
+            if (v instanceof byte[]) {
+                return (byte[]) v;
+            } else if (v instanceof Number) {
+                return new byte[] { ((Number) v).byteValue() };
+            } else {
+                String[] strings = resolveStringValues(v, this.valueMapper);
+                if (ArrayUtils.isNotEmpty(strings)) {
+                    byte[] bytes = new byte[strings.length];
+                    for (int i = 0; i < strings.length; i++) {
+                        String string = strings[i];
+                        bytes[i] = Byte.parseByte(string);
+                    }
+                    return bytes;
+                }
+            }
+        }
+        return ArrayUtils.EMPTY_BYTE_ARRAY;
+    }
+
+    @Override
+    public char[] charValues(String member) {
+        Object v = values.get(member);
+        if (v != null) {
+            if (v instanceof char[]) {
+                return (char[]) v;
+            } else if (v instanceof Character[]) {
+                Character[] v2 = (Character[]) v;
+                char[] chars = new char[v2.length];
+                for (int i = 0; i < v2.length; i++) {
+                    Character character = v2[i];
+                    chars[i] = character;
+                }
+                return chars;
+            } else if (v instanceof Character) {
+                return new char[] { (Character) v };
+            }
+        }
+        return ArrayUtils.EMPTY_CHAR_ARRAY;
+    }
+
+    @Override
+    public int[] intValues(String member) {
+        Object v = values.get(member);
+        if (v != null) {
+            if (v instanceof int[]) {
+                return (int[]) v;
+            } else if (v instanceof Number) {
+                return new int[] { ((Number) v).intValue() };
+            } else {
+                String[] strings = resolveStringValues(v, this.valueMapper);
+                if (ArrayUtils.isNotEmpty(strings)) {
+                    int[] integers = new int[strings.length];
+                    for (int i = 0; i < strings.length; i++) {
+                        String string = strings[i];
+                        integers[i] = Integer.parseInt(string);
+                    }
+                    return integers;
+                }
+            }
+        }
+        return ArrayUtils.EMPTY_INT_ARRAY;
+    }
+
+    @Override
+    public double[] doubleValues(String member) {
+        Object v = values.get(member);
+        if (v != null) {
+            if (v instanceof double[]) {
+                return (double[]) v;
+            } else if (v instanceof Number) {
+                return new double[] { ((Number) v).doubleValue() };
+            } else {
+                String[] strings = resolveStringValues(v, this.valueMapper);
+                if (ArrayUtils.isNotEmpty(strings)) {
+                    double[] doubles = new double[strings.length];
+                    for (int i = 0; i < strings.length; i++) {
+                        String string = strings[i];
+                        doubles[i] = Double.parseDouble(string);
+                    }
+                    return doubles;
+                }
+            }
+        }
+        return ArrayUtils.EMPTY_DOUBLE_ARRAY;
+    }
+
+    @Override
+    public long[] longValues(String member) {
+        Object v = values.get(member);
+        if (v != null) {
+            if (v instanceof long[]) {
+                return (long[]) v;
+            } else if (v instanceof Number) {
+                return new long[] { ((Number) v).longValue() };
+            } else {
+                String[] strings = resolveStringValues(v, this.valueMapper);
+                if (ArrayUtils.isNotEmpty(strings)) {
+                    long[] longs = new long[strings.length];
+                    for (int i = 0; i < strings.length; i++) {
+                        String string = strings[i];
+                        longs[i] = Long.parseLong(string);
+                    }
+                    return longs;
+                }
+            }
+        }
+        return ArrayUtils.EMPTY_LONG_ARRAY;
+    }
+
+    @Override
+    public float[] floatValues(String member) {
+        Object v = values.get(member);
+        if (v != null) {
+            if (v instanceof float[]) {
+                return (float[]) v;
+            } else if (v instanceof Number) {
+                return new float[] { ((Number) v).floatValue() };
+            } else {
+                String[] strings = resolveStringValues(v, this.valueMapper);
+                if (ArrayUtils.isNotEmpty(strings)) {
+                    float[] floats = new float[strings.length];
+                    for (int i = 0; i < strings.length; i++) {
+                        String string = strings[i];
+                        floats[i] = Float.parseFloat(string);
+                    }
+                    return floats;
+                }
+            }
+        }
+        return ArrayUtils.EMPTY_FLOAT_ARRAY;
+    }
+
+    @Override
+    public short[] shortValues(String member) {
+        Object v = values.get(member);
+        if (v != null) {
+            if (v instanceof short[]) {
+                return (short[]) v;
+            } else if (v instanceof Number) {
+                return new short[] { ((Number) v).shortValue() };
+            } else {
+                String[] strings = resolveStringValues(v, this.valueMapper);
+                if (ArrayUtils.isNotEmpty(strings)) {
+                    short[] shorts = new short[strings.length];
+                    for (int i = 0; i < strings.length; i++) {
+                        String string = strings[i];
+                        shorts[i] = Short.parseShort(string);
+                    }
+                    return shorts;
+                }
+            }
+        }
+        return ArrayUtils.EMPTY_SHORT_ARRAY;
+    }
+
     /**
      * The string values for the given member and mapper.
      *
@@ -472,6 +662,34 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         return OptionalInt.empty();
     }
 
+    @Override
+    public Optional<Byte> byteValue(String member) {
+        if (StringUtils.isNotEmpty(member)) {
+            Object o = getRawSingleValue(member, valueMapper);
+            if (o instanceof Number) {
+                return Optional.of(((Number) o).byteValue());
+            } else if (o instanceof CharSequence) {
+                try {
+                    return Optional.of(Byte.parseByte(o.toString()));
+                } catch (NumberFormatException e) {
+                    return Optional.empty();
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<Character> charValue(String member) {
+        if (StringUtils.isNotEmpty(member)) {
+            Object o = getRawSingleValue(member, valueMapper);
+            if (o instanceof Character) {
+                return Optional.of(((Character) o));
+            }
+        }
+        return Optional.empty();
+    }
+
     /**
      * The integer value of the given member.
      *
@@ -488,11 +706,11 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     }
 
     /**
-     * The integer value of the given member.
+     * The long value of the given member.
      *
      * @param member      The annotation member
      * @param valueMapper The value mapper
-     * @return An {@link OptionalInt}
+     * @return An {@link OptionalLong}
      */
     public OptionalLong longValue(@NonNull String member, @Nullable Function<Object, Object> valueMapper) {
         if (StringUtils.isNotEmpty(member)) {
@@ -508,6 +726,34 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             }
         }
         return OptionalLong.empty();
+    }
+
+    @Override
+    public Optional<Short> shortValue(@NonNull String member) {
+        return shortValue(member, null);
+    }
+
+    /**
+     * The short value of the given member.
+     *
+     * @param member      The annotation member
+     * @param valueMapper The value mapper
+     * @return An {@link Optional} of {@link Short}
+     */
+    public Optional<Short> shortValue(@NonNull String member, @Nullable Function<Object, Object> valueMapper) {
+        if (StringUtils.isNotEmpty(member)) {
+            Object o = getRawSingleValue(member, valueMapper);
+            if (o instanceof Number) {
+                return Optional.of((((Number) o).shortValue()));
+            } else if (o instanceof CharSequence) {
+                try {
+                    return Optional.of(Short.parseShort(o.toString()));
+                } catch (NumberFormatException e) {
+                    return Optional.empty();
+                }
+            }
+        }
+        return Optional.empty();
     }
 
     /**
@@ -561,6 +807,34 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             }
         }
         return OptionalDouble.empty();
+    }
+
+    @Override
+    public Optional<Float> floatValue(String member) {
+        return floatValue(member, valueMapper);
+    }
+
+    /**
+     * The double value of the given member.
+     *
+     * @param member      The annotation member
+     * @param valueMapper The value mapper
+     * @return An {@link OptionalDouble}
+     */
+    public Optional<Float> floatValue(@NonNull String member, @Nullable Function<Object, Object> valueMapper) {
+        if (StringUtils.isNotEmpty(member)) {
+            Object o = getRawSingleValue(member, valueMapper);
+            if (o instanceof Number) {
+                return Optional.of(((Number) o).floatValue());
+            } else if (o instanceof CharSequence) {
+                try {
+                    return Optional.of(Float.parseFloat(o.toString()));
+                } catch (NumberFormatException e) {
+                    return Optional.empty();
+                }
+            }
+        }
+        return Optional.empty();
     }
 
     /**

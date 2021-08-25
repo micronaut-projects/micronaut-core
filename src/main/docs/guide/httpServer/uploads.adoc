@@ -29,7 +29,7 @@ snippet::io.micronaut.docs.server.upload.UploadController[tags="class", indent=0
 <1> The method consumes api:http.MediaType#MULTIPART_FORM_DATA[]
 <2> The method parameters match form attribute names. In this case `file` will match for example an `<input type="file" name="file">`
 <3> The api:http.multipart.StreamingFileUpload.transferTo(java.lang.String)[] method transfers the file to the server. The method returns a rs:Publisher[]
-<4> The returned rx:Single[] subscribes to the rs:Publisher[] and outputs a response once the upload is complete, without blocking.
+<4> The returned reactor:Mono[] subscribes to the rs:Publisher[] and outputs a response once the upload is complete, without blocking.
 
 === Whole Data Types
 

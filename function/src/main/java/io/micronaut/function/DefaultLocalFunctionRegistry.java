@@ -16,6 +16,7 @@
 package io.micronaut.function;
 
 import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MediaType;
@@ -177,12 +178,12 @@ public class DefaultLocalFunctionRegistry implements ExecutableMethodProcessor<F
     }
 
     @Override
-    public Optional<MediaTypeCodec> findCodec(MediaType mediaType) {
+    public Optional<MediaTypeCodec> findCodec(@Nullable MediaType mediaType) {
         return decoderRegistry.findCodec(mediaType);
     }
 
     @Override
-    public Optional<MediaTypeCodec> findCodec(MediaType mediaType, Class<?> type) {
+    public Optional<MediaTypeCodec> findCodec(@Nullable MediaType mediaType, Class<?> type) {
         return decoderRegistry.findCodec(mediaType, type);
     }
 

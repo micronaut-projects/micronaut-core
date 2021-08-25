@@ -66,6 +66,11 @@ ext {
                     name: 'micronaut-aws-bom',
                     version: micronautAwsVersion
             ],
+            'micronaut.sql': [
+                    group: 'io.micronaut.sql',
+                    name: 'micronaut-sql-bom',
+                    version: micronautSqlVersion
+            ],
             //Third-party
             'netty': [
                     group: 'io.netty',
@@ -324,6 +329,7 @@ ext {
                             'micronaut-micrometer-registry-jmx',
                             'micronaut-micrometer-registry-kairos',
                             'micronaut-micrometer-registry-new-relic',
+                            'micronaut-micrometer-registry-new-relic-telemetry',
                             'micronaut-micrometer-registry-prometheus',
                             'micronaut-micrometer-registry-signalfx',
                             'micronaut-micrometer-registry-stackdriver',
@@ -335,12 +341,6 @@ ext {
                     group:'io.micronaut.spring',
                     name:'micronaut-spring-annotation',
                     modules:['micronaut-spring', 'micronaut-spring-boot', 'micronaut-spring-boot-annotation', 'micronaut-spring-context', 'micronaut-spring-web', 'micronaut-spring-web-annotation']
-            ],
-            'micronaut.sql': [
-                version:micronautSqlVersion,
-                group:'io.micronaut.sql',
-                name:'micronaut-hibernate-jpa',
-                modules:['micronaut-jdbc', 'micronaut-jdbc-tomcat', 'micronaut-jdbc-hikari', 'micronaut-jdbc-ucp', 'micronaut-jdbc-dbcp', 'micronaut-jasync-sql', 'micronaut-jooq', 'micronaut-jdbi', 'micronaut-hibernate-jpa-spring', 'micronaut-vertx-mysql-client', 'micronaut-vertx-pg-client']
             ],
             'micronaut.mongo': [
                     version:micronautMongoVersion,
@@ -377,12 +377,6 @@ ext {
                     version: neo4jDriverVersion,
                     group:'org.neo4j.driver',
                     name:'neo4j-java-driver'
-            ],
-            oracle                      : [
-                    version: ojdbcVersion,
-                    group  : 'com.oracle.database.jdbc',
-                    name   : 'ojdbc8',
-                    modules: ['ucp']
             ],
             'jcache'                   : [
                     version: jcacheVersion,
@@ -482,17 +476,23 @@ ext {
             'micronaut.rxjava3'        : [
                     version: micronautRxJava3Version,
                     group  : 'io.micronaut.rxjava3',
-                    name   : 'micronaut-rxjava3'
+                    modules : ['micronaut-rxjava3', 'micronaut-rxjava3-http-client']
+            ],
+            'micronaut.rxjava2'        : [
+                    version: micronautRxJava2Version,
+                    group  : 'io.micronaut.rxjava2',
+                    name   : 'micronaut-rxjava2',
+                    modules: ['micronaut-rxjava2-http-client', 'micronaut-rxjava2-http-server-netty']
             ],
             'micronaut.rxjava1'        : [
                     version: micronautRxJava1Version,
                     group  : 'io.micronaut.rxjava1',
                     name   : 'micronaut-rxjava1'
             ],
-            'micronaut.reactor'        : [
+            'micronaut.reactor': [
                     version: micronautReactorVersion,
-                    group  : 'io.micronaut.reactor',
-                    name   : 'micronaut-reactor'
+                    group:'io.micronaut.reactor',
+                    modules : ['micronaut-reactor', 'micronaut-reactor-http-client']
             ],
             'micronaut.problem': [
                     version: micronautProblemJsonVersion,
@@ -508,11 +508,6 @@ ext {
                     version: validationVersion,
                     group  : 'javax.validation',
                     name   : 'validation-api'
-            ],
-            hikari                    : [
-                    version: hikariVersion,
-                    group  : 'com.zaxxer',
-                    name   : 'HikariCP'
             ],
             hystrix                    : [
                     version: hystrixVersion,
@@ -535,31 +530,6 @@ ext {
                     group  : 'com.h2database',
                     name   : 'h2'
             ],
-            postgres                   : [
-                    version: postgresDriverVersion,
-                    group  : 'org.postgresql',
-                    name   : 'postgresql'
-            ],
-            mysql                   : [
-                    version: mysqlDriverVersion,
-                    group  : 'mysql',
-                    name   : 'mysql-connector-java'
-            ],
-            mariadb                   : [
-                    version: mariadbDriverVersion,
-                    group  : 'org.mariadb.jdbc',
-                    name   : 'mariadb-java-client'
-            ],
-            mssql                   : [
-                    version: mssqlDriverVersion,
-                    group  : 'com.microsoft.sqlserver',
-                    name   : 'mssql-jdbc'
-            ],
-            tomcatJdbc                 : [
-                    version: tomcatJdbcVersion,
-                    group  : 'org.apache.tomcat',
-                    name   : 'tomcat-jdbc'
-            ],
             liquibase                  : [
                     version: liquibaseVersion,
                     group  : 'org.liquibase',
@@ -574,12 +544,6 @@ ext {
                     version: jnaVersion,
                     group  : 'net.java.dev.jna',
                     name   : 'jna'
-            ],
-            hibernate                  : [
-                    version: hibernateVersion,
-                    group  : 'org.hibernate',
-                    name   : 'hibernate-core',
-                    modules: ['hibernate-jcache', 'hibernate-ehcache']
             ],
             elasticsearch              : [
                     version: elasticsearchVersion,
@@ -599,7 +563,7 @@ ext {
             'micronaut.rss': [
                     version:micronautRssVersion,
                     group:'io.micronaut.rss',
-                    modules : ['micronaut-rss', 'micronaut-itunespodcast']
+                    modules : ['micronaut-rss', 'micronaut-rss-core', 'micronaut-rss-language', 'micronaut-itunespodcast', 'micronaut-jsonfeed-core', 'micronaut-jsonfeed']
 
             ],
             'micronaut.kubernetes': [

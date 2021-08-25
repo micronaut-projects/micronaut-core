@@ -8,18 +8,21 @@ import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
 import org.reactivestreams.Publisher
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
+import reactor.core.publisher.Flux
+import reactor.core.publisher.SignalType
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+
+import java.util.function.Consumer
 
 class MDCSpec extends Specification {
 
@@ -31,7 +34,7 @@ class MDCSpec extends Specification {
     ])
 
     @Shared @AutoCleanup
-    RxHttpClient client = RxHttpClient.create(embeddedServer.URL)
+    HttpClient client = HttpClient.create(embeddedServer.URL)
 
     void "test MDC doesn't leak"() {
         given:
@@ -80,12 +83,15 @@ class MDCSpec extends Specification {
             MDC.put(TRACE_ID_MDC_KEY, traceIdHeader)
             LOG.info('MDC updated')
 
-            return Flowable
-                    .fromPublisher(chain.proceed(request))
-                    .doFinally{->
-                        LOG.info('Removing traceId id from MDC')
-                        MDC.clear()
-                    }
+            return Flux
+                    .from(chain.proceed(request))
+                    .doFinally(new Consumer<SignalType>() {
+                        @Override
+                        void accept(SignalType signalType) {
+                            LOG.info('Removing traceId id from MDC')
+                            MDC.clear()
+                        }
+                    })
         }
 
         @Override

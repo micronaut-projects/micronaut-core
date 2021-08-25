@@ -15,7 +15,6 @@
  */
 package io.micronaut.inject;
 
-import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.Provided;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -94,54 +93,53 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
 
     @Override
     default boolean isCandidateBean(@Nullable Argument<?> beanType) {
+        if (beanType == null) {
+            return false;
+        }
         if (BeanType.super.isCandidateBean(beanType)) {
-            if (hasStereotype(Any.class)) {
-                return true;
-            } else {
-                final Argument<?>[] typeArguments = beanType.getTypeParameters();
-                final int len = typeArguments.length;
-                if (len == 0) {
-                    if (isContainerType()) {
-                        final Optional<Argument<?>> containerElement = getContainerElement();
-                        if (containerElement.isPresent()) {
-                            final Class<?> t = containerElement.get().getType();
-                            return beanType.isAssignableFrom(t) || beanType.getType() == t;
-                        } else {
-                            return false;
-                        }
+            final Argument<?>[] typeArguments = beanType.getTypeParameters();
+            final int len = typeArguments.length;
+            Class<?> beanClass = beanType.getType();
+            if (len == 0) {
+                if (isContainerType()) {
+                    final Optional<Argument<?>> containerElement = getContainerElement();
+                    if (containerElement.isPresent()) {
+                        final Class<?> t = containerElement.get().getType();
+                        return beanType.isAssignableFrom(t) || beanClass == t;
                     } else {
-                        return true;
-                    }
-                } else {
-                    final Class<?>[] beanTypeParameters;
-                    if (!Iterable.class.isAssignableFrom(beanType.getType())) {
-                        final Optional<Argument<?>> containerElement = getContainerElement();
-                        //noinspection OptionalIsPresent
-                        if (containerElement.isPresent()) {
-                            beanTypeParameters = Argument.toClassArray(containerElement.get().getTypeParameters());
-                        } else {
-                            beanTypeParameters = getTypeParameters(beanType.getType());
-                        }
-                    } else {
-                        beanTypeParameters = getTypeParameters(beanType.getType());
-                    }
-                    if (len != beanTypeParameters.length) {
                         return false;
                     }
-
-                    for (int i = 0; i < beanTypeParameters.length; i++) {
-                        Class<?> candidateParameter = beanTypeParameters[i];
-                        final Argument<?> requestedParameter = typeArguments[i];
-
-                        if (!requestedParameter.isAssignableFrom(candidateParameter)) {
-                            return false;
-                        }
-
-                    }
+                } else {
                     return true;
                 }
-            }
+            } else {
+                final Argument<?>[] beanTypeParameters;
+                if (!Iterable.class.isAssignableFrom(beanClass)) {
+                    final Optional<Argument<?>> containerElement = getContainerElement();
+                    //noinspection OptionalIsPresent
+                    if (containerElement.isPresent()) {
+                        beanTypeParameters = containerElement.get().getTypeParameters();
+                    } else {
+                        beanTypeParameters = getTypeArguments(beanClass).toArray(Argument.ZERO_ARGUMENTS);
+                    }
+                } else {
+                    beanTypeParameters = getTypeArguments(beanClass).toArray(Argument.ZERO_ARGUMENTS);
+                }
+                if (len != beanTypeParameters.length) {
+                    return false;
+                }
 
+                for (int i = 0; i < beanTypeParameters.length; i++) {
+                    Argument<?> candidateParameter = beanTypeParameters[i];
+                    final Argument<?> requestedParameter = typeArguments[i];
+                    if (!requestedParameter.isAssignableFrom(candidateParameter.getType())) {
+                        if (!(candidateParameter.isTypeVariable() && candidateParameter.isAssignableFrom(requestedParameter.getType()))) {
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            }
         }
         return false;
     }
@@ -362,7 +360,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
             return ReflectionUtils.EMPTY_CLASS_ARRAY;
         } else {
             final List<Argument<?>> typeArguments = getTypeArguments(type);
-            if (typeArguments.size() == 0) {
+            if (typeArguments.isEmpty()) {
                 return ReflectionUtils.EMPTY_CLASS_ARRAY;
             }
             Class[] params = new Class[typeArguments.size()];

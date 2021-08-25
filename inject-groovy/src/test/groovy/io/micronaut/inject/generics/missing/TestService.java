@@ -15,13 +15,11 @@
  */
 package io.micronaut.inject.generics.missing;
 
-
-import io.reactivex.Flowable;
-
+import reactor.core.publisher.Flux;
 import java.util.List;
 
 public interface TestService {
 
-    <T extends ListArguments> Flowable<List<String>> findAll(T args);
+    <T extends ListArguments> Flux<List<String>> findAll(T args);
 
 }

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.http.server.netty.websocket;
-
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.annotation.OnMessage;
@@ -22,7 +22,8 @@ import io.micronaut.websocket.annotation.OnOpen;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.websocketx.ContinuationWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
-import io.reactivex.Single;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
 
 import java.nio.ByteBuffer;
 import java.util.Collection;
@@ -72,7 +73,8 @@ public abstract class BinaryChatClientWebSocket implements AutoCloseable{
 
     public abstract Future<ByteBuf> sendAsync(ByteBuf message);
 
-    public abstract Single<ByteBuffer> sendRx(ByteBuffer message);
+    @SingleResult
+    public abstract Publisher<ByteBuffer> sendRx(ByteBuffer message);
 
     public void sendMultiple() {
         session.sendSync(new TextWebSocketFrame(false, 0, "hello"));

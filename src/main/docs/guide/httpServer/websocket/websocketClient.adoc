@@ -35,10 +35,10 @@ Note by returning `void` this tells Micronaut that the method is a blocking send
 .WebSocket Send Methods
 [source,java]
 ----
-public abstract io.reactivex.Single<String> send(String message);
+public abstract reactor.core.publisher.Mono<String> send(String message);
 ----
 
-The above example defines a send method that returns a rx:Single[].
+The above example defines a send method that returns a reactor:Mono[].
 
 .WebSocket Send Methods
 [source,java]
@@ -55,11 +55,11 @@ Once you have defined a client class you can connect to the client socket and st
 ----
 ChatClientWebSocket chatClient = webSocketClient
     .connect(ChatClientWebSocket.class, "/chat/football/fred")
-    .blockingFirst();
+    .blockFirst();
 chatClient.send("Hello World!");
 ----
 
-NOTE: For illustration purposes we use `blockingFirst()` to obtain the client. It is however possible to combine `connect` (which returns a rx:Flowable[]) to perform non-blocking interaction via WebSocket.
+NOTE: For illustration purposes we use `blockFirst()` to obtain the client. It is however possible to combine `connect` (which returns a reactor:Flux[]) to perform non-blocking interaction via WebSocket.
 
 [TIP]
 .Using the CLI

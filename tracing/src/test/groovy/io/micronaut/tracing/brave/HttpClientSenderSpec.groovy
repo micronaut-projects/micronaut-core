@@ -26,14 +26,16 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.runtime.server.event.ServerStartupEvent
 import io.micronaut.tracing.brave.sender.HttpClientSender
-import io.reactivex.Flowable
-import io.reactivex.Single
 import jakarta.inject.Singleton
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 import zipkin2.Span
 import zipkin2.reporter.Sender
+import io.micronaut.core.async.annotation.SingleResult
 
 /**
  * @author graemerocher
@@ -184,8 +186,11 @@ class HttpClientSenderSpec extends Specification {
     static class SpanController {
         List<Map> receivedSpans = []
         @Post('/spans')
-        Single<HttpResponse> spans(@Body Flowable<Map> spans) {
-            spans.toList().map({ List list ->
+        @SingleResult
+        Publisher<HttpResponse> spans(@Body Publisher<Map> spans) {
+            Flux.from(spans)
+                    .collectList()
+                    .map({ List list ->
                 println "SPANS $list"
                 receivedSpans.addAll(list)
                 HttpResponse.ok()
@@ -198,14 +203,14 @@ class HttpClientSenderSpec extends Specification {
     static class CustomPathSpanController {
         List<Map> receivedSpans = []
         @Post('/spans')
-        Single<HttpResponse> spans(@Body Flowable<Map> spans) {
-            spans.toList().map({ List list ->
+        @SingleResult
+        Publisher<HttpResponse> spans(@Body Publisher<Map> spans) {
+            Flux.from(spans).collectList().map({ List list ->
                 println "SPANS $list"
                 receivedSpans.addAll(list)
                 HttpResponse.ok()
             })
         }
-
     }
 
     @Singleton

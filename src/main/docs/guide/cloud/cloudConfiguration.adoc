@@ -76,7 +76,7 @@ Note that you can have multiple environments active, for example when running in
 
 In addition, using the value of the constants defined in the table above you can create environment-specific configuration files. For example if you create a `src/main/resources/application-gcp.yml` file, it is only loaded when running on Google Compute.
 
-TIP: Any configuration property in the api:context.env.Environment[] can also be set via an environment variable. For example, setting the `CONSUL_CLIENT_HOST` environment variable overrides the `host` property in api:discovery.consul.ConsulConfiguration[].
+TIP: Any configuration property in the api:context.env.Environment[] can also be set via an environment variable. For example, setting the `CONSUL_CLIENT_HOST` environment variable overrides the `host` property in link:{micronautdiscoveryapi}/consul/ConsulConfiguration.html[ConsulConfiguration].
 
 == Using Cloud Instance Metadata
 
@@ -86,7 +86,8 @@ TIP: As of Micronaut 2.1.x this logic depends on the presence of the appropriate
 
 All this data is merged together into the `metadata` property for the running api:discovery.ServiceInstance[].
 
-To access the metadata for your application instance you can use the interface api:runtime.server.EmbeddedServerInstance[], and call `getMetadata()` which returns a Map of the metadata.
+
+To access the metadata for your application instance you can use the interface api:discovery.EmbeddedServerInstance[], and call `getMetadata()` which returns a Map of the metadata.
 
 If you connect remotely via a client, the instance metadata can be referenced once you have retrieved a api:io.micronaut.discovery.ServiceInstance[] from either the api:http.client.LoadBalancer[] or api:discovery.DiscoveryClient[] APIs.
 
@@ -98,7 +99,7 @@ To obtain metadata for a service via <<serviceDiscovery,Service Discovery>> use 
 [source,java]
 ----
 LoadBalancer loadBalancer = loadBalancerResolver.resolve("some-service");
-Flowable.fromPublisher(
+Flux.from(
     loadBalancer.select()
 ).subscribe((instance) ->
     ConvertibleValues<String> metaData = instance.getMetadata();
@@ -106,7 +107,7 @@ Flowable.fromPublisher(
 );
 ----
 
-The api:runtime.server.EmbeddedServerInstance[] is available through event listeners that listen for the api:discovery.event.ServiceReadyEvent[]. The ann:runtime.event.annotation.EventListener[] annotation makes it easy to listen for the event in your beans.
+The api:discovery.EmbeddedServerInstance[] is available through event listeners that listen for the api:discovery.event.ServiceReadyEvent[]. The ann:runtime.event.annotation.EventListener[] annotation makes it easy to listen for the event in your beans.
 
 To obtain metadata for the locally running server, use an <<events,EventListener>> for the api:discovery.event.ServiceReadyEvent[]:
 

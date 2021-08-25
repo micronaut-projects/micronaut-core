@@ -76,7 +76,6 @@ public class DefaultBeanContext implements BeanContext {
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
-    private static final Logger EVENT_LOGGER = LoggerFactory.getLogger(ApplicationEventPublisher.class);
     @SuppressWarnings("rawtypes")
     private static final Qualifier PROXY_TARGET_QUALIFIER = new Qualifier<Object>() {
         @SuppressWarnings("rawtypes")
@@ -111,9 +110,9 @@ public class DefaultBeanContext implements BeanContext {
     final Map<BeanKey, BeanRegistration> singletonObjects = new ConcurrentHashMap<>(100);
     final Map<BeanIdentifier, Object> singlesInCreation = new ConcurrentHashMap<>(5);
     final Map<BeanKey, Provider<Object>> scopedProxies = new ConcurrentHashMap<>(20);
-
     Set<Map.Entry<Class, List<BeanInitializedEventListener>>> beanInitializedEventListeners;
-
+    
+    private final BeanContextConfiguration beanContextConfiguration;
     private final Collection<BeanDefinitionReference> beanDefinitionsClasses = new ConcurrentLinkedQueue<>();
     private final Map<String, BeanConfiguration> beanConfigurations = new HashMap<>(10);
     private final Map<BeanKey, Boolean> containsBeanCache = new ConcurrentHashMap<>(30);
@@ -131,7 +130,6 @@ public class DefaultBeanContext implements BeanContext {
             BeanContext.class,
             AnnotationMetadataResolver.class,
             BeanLocator.class,
-            ApplicationEventPublisher.class,
             ExecutionHandleLocator.class,
             ApplicationContext.class,
             PropertyResolver.class,
@@ -211,6 +209,7 @@ public class DefaultBeanContext implements BeanContext {
         this.eagerInitStereotypes = eagerInitStereotypes.toArray(new String[0]);
         this.eagerInitStereotypesPresent = !eagerInitStereotypes.isEmpty();
         this.eagerInitSingletons = eagerInitStereotypesPresent && (eagerInitStereotypes.contains(AnnotationUtil.SINGLETON) || eagerInitStereotypes.contains(Singleton.class.getName()));
+        this.beanContextConfiguration = contextConfiguration;
     }
 
     /**
@@ -1024,13 +1023,10 @@ public class DefaultBeanContext implements BeanContext {
             }
             Argument[] requiredArguments = ((ParametrizedBeanFactory) definition).getRequiredArguments();
             argumentValues = new LinkedHashMap<>(requiredArguments.length);
-            BeanResolutionContext.Path path = resolutionContext.getPath();
+            BeanResolutionContext.Path currentPath = resolutionContext.getPath();
             for (int i = 0; i < requiredArguments.length; i++) {
                 Argument<?> requiredArgument = requiredArguments[i];
-                try {
-                    path.pushConstructorResolve(
-                            definition, requiredArgument
-                    );
+                try (BeanResolutionContext.Path ignored = currentPath.pushConstructorResolve(definition, requiredArgument)) {
                     Class<?> argumentType = requiredArgument.getType();
                     if (args.length > i) {
                         Object val = args[i];
@@ -1058,8 +1054,6 @@ public class DefaultBeanContext implements BeanContext {
                             }
                         }
                     }
-                } finally {
-                    path.pop();
                 }
             }
         } else {
@@ -1644,47 +1638,16 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
+    @Override
+    public BeanContextConfiguration getContextConfiguration() {
+        return this.beanContextConfiguration;
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     public void publishEvent(@NonNull Object event) {
-        //noinspection ConstantConditions
         if (event != null) {
-            if (EVENT_LOGGER.isDebugEnabled()) {
-                EVENT_LOGGER.debug("Publishing event: {}", event);
-            }
-            Collection<ApplicationEventListener> eventListeners = getBeansOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(event.getClass()));
-
-            eventListeners = eventListeners.stream().sorted(OrderUtil.COMPARATOR).collect(Collectors.toList());
-
-            notifyEventListeners(event, eventListeners);
-        }
-    }
-
-    private void notifyEventListeners(@NonNull Object event, Collection<ApplicationEventListener> eventListeners) {
-        if (!eventListeners.isEmpty()) {
-            if (EVENT_LOGGER.isTraceEnabled()) {
-                EVENT_LOGGER.trace("Established event listeners {} for event: {}", eventListeners, event);
-            }
-            for (ApplicationEventListener listener : eventListeners) {
-                if (listener.supports(event)) {
-                    try {
-                        if (EVENT_LOGGER.isTraceEnabled()) {
-                            EVENT_LOGGER.trace("Invoking event listener [{}] for event: {}", listener, event);
-                        }
-                        listener.onApplicationEvent(event);
-                    } catch (ClassCastException ex) {
-                        String msg = ex.getMessage();
-                        if (msg == null || msg.startsWith(event.getClass().getName())) {
-                            if (EVENT_LOGGER.isDebugEnabled()) {
-                                EVENT_LOGGER.debug("Incompatible listener for event: " + listener, ex);
-                            }
-                        } else {
-                            throw ex;
-                        }
-                    }
-                }
-
-            }
+            getBean(Argument.of(ApplicationEventPublisher.class, event.getClass())).publishEvent(event);
         }
     }
 
@@ -1692,21 +1655,7 @@ public class DefaultBeanContext implements BeanContext {
     public @NonNull
     Future<Void> publishEventAsync(@NonNull Object event) {
         Objects.requireNonNull(event, "Event cannot be null");
-        CompletableFuture<Void> future = new CompletableFuture<>();
-        Collection<ApplicationEventListener> eventListeners = streamOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(event.getClass()))
-                .sorted(OrderUtil.COMPARATOR).collect(Collectors.toList());
-
-        Executor executor = findBean(Executor.class, Qualifiers.byName("scheduled"))
-                .orElseGet(ForkJoinPool::commonPool);
-        executor.execute(() -> {
-            try {
-                notifyEventListeners(event, eventListeners);
-                future.complete(null);
-            } catch (Exception e) {
-                future.completeExceptionally(e);
-            }
-        });
-        return future;
+        return getBean(Argument.of(ApplicationEventPublisher.class, event.getClass())).publishEventAsync(event);
     }
 
     @Override
@@ -2338,7 +2287,7 @@ public class DefaultBeanContext implements BeanContext {
 
         if (bean != null) {
             Qualifier<T> finalQualifier = qualifier != null ? qualifier : declaredQualifier;
-            if (!BeanCreatedEventListener.class.isInstance(bean) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
+            if (!(bean instanceof BeanCreatedEventListener) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
                 for (Map.Entry<Class, List<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
                     if (entry.getKey().isAssignableFrom(beanType)) {
                         BeanKey<T> beanKey = new BeanKey<>(beanDefinition, finalQualifier);
@@ -2379,14 +2328,7 @@ public class DefaultBeanContext implements BeanContext {
         if (qualifier instanceof AnyQualifier) {
             return candidates.iterator().next();
         } else {
-            final List<BeanDefinition<T>> withoutAnyBeans =
-                    candidates.stream().filter(bd -> !bd.hasDeclaredAnnotation(Any.class))
-                    .collect(Collectors.toList());
-            if (withoutAnyBeans.size() == 1) {
-                return withoutAnyBeans.iterator().next();
-            } else {
-                throw new NonUniqueBeanException(beanType, candidates.iterator());
-            }
+            throw new NonUniqueBeanException(beanType, candidates.iterator());
         }
     }
 
@@ -2638,7 +2580,7 @@ public class DefaultBeanContext implements BeanContext {
             return (T) this;
         }
 
-        if (beanClass == InjectionPoint.class) {
+        if (InjectionPoint.class.isAssignableFrom(beanClass)) {
             final BeanResolutionContext.Path path = resolutionContext != null ? resolutionContext.getPath() : null;
 
             if (CollectionUtils.isNotEmpty(path)) {
@@ -2658,16 +2600,25 @@ public class DefaultBeanContext implements BeanContext {
                             segment = i.next();
                         }
                     }
-                    return (T) segment.getInjectionPoint();
+                    T ip = (T) segment.getInjectionPoint();
+                    if (beanClass.isInstance(ip)) {
+                        return ip;
+                    } else {
+                        if (!injectionPointSegment.getArgument().isNullable()) {
+                            throw new DependencyInjectionException(resolutionContext, "Failed to obtain injection point. No valid injection path present in path: " + path);
+                        } else {
+                            return null;
+                        }
+                    }
                 } else {
                     if (!injectionPointSegment.getArgument().isNullable()) {
-                        throw new BeanContextException("Failed to obtain injection point. No valid injection path present in path: " + path);
+                        throw new DependencyInjectionException(resolutionContext, "Failed to obtain injection point. No valid injection path present in path: " + path);
                     } else {
                         return null;
                     }
                 }
             } else {
-                throw new BeanContextException("Failed to obtain injection point. No valid injection path present in path: " + path);
+                throw new DependencyInjectionException(resolutionContext, "Failed to obtain injection point. No valid injection path present in path: " + path);
             }
         }
         BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
@@ -3607,9 +3558,9 @@ public class DefaultBeanContext implements BeanContext {
     private <T> Stream<BeanDefinition<T>> applyBeanResolutionFilters(@Nullable BeanResolutionContext resolutionContext, Stream<BeanDefinition<T>> candidateStream) {
         candidateStream = candidateStream.filter(c -> !c.isAbstract());
 
-        BeanResolutionContext.Segment segment = resolutionContext != null ? resolutionContext.getPath().peek() : null;
-        if (segment instanceof AbstractBeanResolutionContext.ConstructorSegment) {
-            BeanDefinition declaringBean = segment.getDeclaringType();
+        BeanResolutionContext.Segment<?> segment = resolutionContext != null ? resolutionContext.getPath().peek() : null;
+        if (segment instanceof AbstractBeanResolutionContext.ConstructorSegment || segment instanceof AbstractBeanResolutionContext.MethodSegment) {
+            BeanDefinition<?> declaringBean = segment.getDeclaringType();
             // if the currently injected segment is a constructor argument and the type to be constructed is the
             // same as the candidate, then filter out the candidate to avoid a circular injection problem
             candidateStream = candidateStream.filter(c -> {
@@ -3715,7 +3666,6 @@ public class DefaultBeanContext implements BeanContext {
             filterReplacedBeans(null, candidates);
             Stream<BeanDefinition<T>> stream = candidates.stream();
             if (qualifier != null && !(qualifier instanceof AnyQualifier)) {
-                stream = stream.filter(bd -> !bd.hasDeclaredAnnotation(Any.class));
                 stream = qualifier.reduce(beanType.getType(), stream);
             }
             return stream.count() > 0;

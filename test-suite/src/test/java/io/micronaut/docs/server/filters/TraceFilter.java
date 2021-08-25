@@ -22,6 +22,7 @@ import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 // end::imports[]
 
 // tag::class[]
@@ -39,8 +40,8 @@ public class TraceFilter implements HttpServerFilter { // <2>
     @Override
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request,
                                                       ServerFilterChain chain) {
-        return traceService
-                .trace(request) // <1>
+        return Flux.from(traceService
+                .trace(request)) // <1>
                 .switchMap(aBoolean -> chain.proceed(request)) // <2>
                 .doOnNext(res ->
                     res.getHeaders().add("X-Trace-Enabled", "true") // <3>

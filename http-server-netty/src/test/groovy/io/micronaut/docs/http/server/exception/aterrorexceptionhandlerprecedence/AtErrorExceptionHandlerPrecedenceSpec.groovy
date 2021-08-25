@@ -18,7 +18,7 @@ package io.micronaut.docs.http.server.exception.aterrorexceptionhandlerprecedenc
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -34,7 +34,7 @@ class AtErrorExceptionHandlerPrecedenceSpec extends Specification {
 
     @AutoCleanup
     @Shared
-    RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+    HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
     void "@Error global has precedence over ExceptionHandler"() {
         when: 'Exception Handler responds 0, @Error global responds -1'

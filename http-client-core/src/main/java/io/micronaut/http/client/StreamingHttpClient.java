@@ -15,12 +15,14 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import org.reactivestreams.Publisher;
 
+import java.net.URL;
 import java.util.Map;
 
 /**
@@ -55,8 +57,8 @@ public interface StreamingHttpClient extends HttpClient {
      * <p>
      * <p>The downstream {@link org.reactivestreams.Subscriber} can regulate demand via the subscription</p>
      *
-     * @param request The {@link HttpRequest} to execute
      * @param <I>     The request body type
+     * @param request The {@link HttpRequest} to execute
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
     <I> Publisher<Map<String, Object>> jsonStream(HttpRequest<I> request);
@@ -88,5 +90,32 @@ public interface StreamingHttpClient extends HttpClient {
      */
     default <I, O> Publisher<O> jsonStream(HttpRequest<I> request, Class<O> type) {
         return jsonStream(request, Argument.of(type));
+    }
+
+    /**
+     * Create a new {@link StreamingHttpClient}.
+     * Note that this method should only be used outside of the context of a Micronaut application.
+     * The returned {@link StreamingHttpClient} is not subject to dependency injection.
+     * The creator is responsible for closing the client to avoid leaking connections.
+     * Within a Micronaut application use {@link jakarta.inject.Inject} to inject a client instead.
+     *
+     * @param url The base URL
+     * @return The client
+     */
+    static StreamingHttpClient create(@Nullable URL url) {
+        return StreamingHttpClientFactoryResolver.getFactory().createStreamingClient(url);
+    }
+
+    /**
+     * Create a new {@link StreamingHttpClient} with the specified configuration. Note that this method should only be used
+     * outside of the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @param configuration the client configuration
+     * @return The client
+     * @since 2.2.0
+     */
+    static StreamingHttpClient create(@Nullable URL url, HttpClientConfiguration configuration) {
+        return StreamingHttpClientFactoryResolver.getFactory().createStreamingClient(url, configuration);
     }
 }

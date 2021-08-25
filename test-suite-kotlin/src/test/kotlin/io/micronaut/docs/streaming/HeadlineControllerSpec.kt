@@ -1,12 +1,12 @@
 package io.micronaut.docs.streaming
 
-import io.kotlintest.matchers.string.shouldStartWith
-import io.kotlintest.shouldNotBe
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldNotBe
+import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.string.shouldStartWith
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest.GET
-import io.micronaut.http.client.RxHttpClient
-import io.micronaut.http.client.RxStreamingHttpClient
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import org.junit.Assert.fail
 import org.reactivestreams.Subscriber
@@ -21,7 +21,7 @@ class HeadlineControllerSpec: StringSpec() {
     )
 
     val client = autoClose(
-        embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
+        embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
     )
 
     init {
@@ -31,9 +31,9 @@ class HeadlineControllerSpec: StringSpec() {
                     .applicationContext
                     .getBean(HeadlineClient::class.java) // <1>
 
-            val firstHeadline = headlineClient.streamHeadlines().firstElement() // <2>
+            val firstHeadline = headlineClient.streamHeadlines().next() // <2>
 
-            val headline = firstHeadline.blockingGet() // <3>
+            val headline = firstHeadline.block() // <3>
 
             headline shouldNotBe null
             headline.text shouldStartWith "Latest Headline"
@@ -42,7 +42,7 @@ class HeadlineControllerSpec: StringSpec() {
 
         "test streaming client" {
             val client = embeddedServer.applicationContext.createBean(
-                RxStreamingHttpClient::class.java, embeddedServer.url)
+                StreamingHttpClient::class.java, embeddedServer.url)
 
             // tag::streaming[]
             val headlineStream = client.jsonStream(

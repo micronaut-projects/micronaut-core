@@ -30,7 +30,6 @@ import java.util.stream.Stream
  */
 class CustomPropertySourceLocatorSpec extends Specification {
 
-
     void "test that a PropertySource from a PropertySourceLocator overrides application config"() {
         given:
         def cl = getClass().getClassLoader()

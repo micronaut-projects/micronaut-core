@@ -23,6 +23,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.*
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import reactor.core.publisher.Flux
 
 /**
  * Test the non global attribute for @Error.
@@ -32,7 +33,7 @@ class CustomStaticMappingLocalSpec extends AbstractMicronautSpec {
 
     void "test that a bad request is handled is handled by the locally marked controller"() {
         when:
-        rxClient.exchange('/test1/bad').blockingFirst()
+        rxClient.exchange('/test1/bad').blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -40,7 +41,7 @@ class CustomStaticMappingLocalSpec extends AbstractMicronautSpec {
         e.response.reason() == "You sent me bad stuff - from Test1Controller.badHandler()"
 
         when:
-        rxClient.exchange('/test2/bad').blockingFirst()
+        rxClient.exchange('/test2/bad').blockFirst()
 
         then:
         e = thrown(HttpClientResponseException)
@@ -53,7 +54,7 @@ class CustomStaticMappingLocalSpec extends AbstractMicronautSpec {
         rxClient.exchange(
                 HttpRequest.POST('/test1/simple', [name:"Fred"])
                            .contentType(MediaType.FORM)
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -64,7 +65,7 @@ class CustomStaticMappingLocalSpec extends AbstractMicronautSpec {
         rxClient.exchange(
                 HttpRequest.POST('/test2/simple', [name:"Fred"])
                         .contentType(MediaType.FORM)
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         e = thrown(HttpClientResponseException)
@@ -74,7 +75,7 @@ class CustomStaticMappingLocalSpec extends AbstractMicronautSpec {
 
     void "test that a not found response request data can be handled by a local method"() {
         when:
-        rxClient.exchange('/test1/not-found').blockingFirst()
+        rxClient.exchange('/test1/not-found').blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -91,8 +92,8 @@ class CustomStaticMappingLocalSpec extends AbstractMicronautSpec {
                 HttpRequest.POST('/test1/simple', '<foo></foo>')
                         .contentType(MediaType.APPLICATION_XML),
                 String
-        ).onErrorReturn(t -> ((HttpClientResponseException) t).response)
-        .blockingFirst()
+        ).onErrorResume(t -> Flux.just(((HttpClientResponseException) t).response))
+        .blockFirst()
 
         then:
         response.getBody(String).get() == "You sent an unsupported media type - from Test1Controller.unsupportedMediaTypeHandler()"

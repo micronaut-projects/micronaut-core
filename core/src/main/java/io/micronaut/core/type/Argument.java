@@ -144,6 +144,15 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     int typeHashCode();
 
     /**
+     * Whether this argument is a type variable used in generics.
+     * @return True if it is a variable
+     * @since 3.0.0
+     */
+    default boolean isTypeVariable() {
+        return false;
+    }
+
+    /**
      * Whether the given argument is an instance.
      * @param o The object
      * @return True if it is an instance of this type
@@ -163,6 +172,42 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      */
     default boolean isAssignableFrom(@NonNull Class<?> candidateType) {
         return getType().isAssignableFrom(Objects.requireNonNull(candidateType, "Candidate type cannot be null"));
+    }
+
+    /**
+     * Checks if the argument can be assigned to this argument.
+     * @param candidateArgument The candidate argument
+     * @return True if it is assignable from.
+     * @since 3.0.0
+     */
+    default boolean isAssignableFrom(@NonNull Argument<?> candidateArgument) {
+        Objects.requireNonNull(candidateArgument, "Candidate type cannot be null");
+        if (!isAssignableFrom(candidateArgument.getType())) {
+            return false;
+        }
+        Argument[] typeParameters = getTypeParameters();
+        Argument[] candidateArgumentTypeParameters = candidateArgument.getTypeParameters();
+        if (typeParameters.length == 0) {
+            // Wildcard or no type parameters
+            return candidateArgumentTypeParameters.length >= 0;
+        }
+        if (candidateArgumentTypeParameters.length == 0) {
+            for (Argument typeParameter : typeParameters) {
+                if (typeParameter.getType() != Object.class) {
+                    return false;
+                }
+            }
+            // Wildcard
+            return true;
+        }
+        for (int i = 0; i < typeParameters.length; i++) {
+            Argument typeParameter = typeParameters[i];
+            Argument candidateArgumentTypeParameter = candidateArgumentTypeParameters[i];
+            if (!typeParameter.isAssignableFrom(candidateArgumentTypeParameter)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -223,7 +268,43 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
         return new DefaultArgument<>(type, name, AnnotationMetadata.EMPTY_METADATA, typeParameters);
     }
 
+    /**
+     * Creates a new argument for the given type and name that is at type variable.
+     *
+     * @param type           The type
+     * @param name           The name
+     * @param annotationMetadata The annotation metadata
+     * @param typeParameters the type parameters
+     * @param <T>            The generic type
+     * @return The argument instance
+     * @since 3.0.0
+     */
+    @UsedByGeneratedCode
+    @NonNull
+    static <T> Argument<T> ofTypeVariable(
+            @NonNull Class<T> type,
+            @Nullable String name,
+            @Nullable AnnotationMetadata annotationMetadata,
+            @Nullable Argument<?>... typeParameters) {
+        return new DefaultArgument<>(type, name, annotationMetadata, true, typeParameters);
+    }
 
+    /**
+     * Creates a new argument for the given type and name that is at type variable.
+     *
+     * @param type           The type
+     * @param name           The name
+     * @param <T>            The generic type
+     * @return The argument instance
+     * @since 3.0.0
+     */
+    @UsedByGeneratedCode
+    @NonNull
+    static <T> Argument<T> ofTypeVariable(
+            @NonNull Class<T> type,
+            @Nullable String name) {
+        return new DefaultArgument<>(type, name, AnnotationMetadata.EMPTY_METADATA, true);
+    }
 
     /**
      * Creates a new argument for the given type and name.

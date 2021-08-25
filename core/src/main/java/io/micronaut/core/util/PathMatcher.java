@@ -25,9 +25,13 @@ package io.micronaut.core.util;
  */
 public interface PathMatcher {
     /**
-     * The default Ant style patch matcher.
+     * The default Ant style path matcher.
      */
     AntPathMatcher ANT = new AntPathMatcher();
+    /**
+     * The default regex style path matcher.
+     */
+    RegexPathMatcher REGEX = new RegexPathMatcher();
 
     /**
      * Returns <code>true</code> if the given <code>source</code> matches the specified <code>pattern</code>,

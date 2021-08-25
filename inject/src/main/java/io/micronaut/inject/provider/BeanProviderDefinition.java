@@ -97,4 +97,9 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
             }
         };
     }
+
+    @Override
+    protected boolean isAllowEmptyProviders(BeanContext context) {
+        return true;
+    }
 }

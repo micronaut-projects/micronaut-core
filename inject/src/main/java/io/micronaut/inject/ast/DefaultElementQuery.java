@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.ast;
 
+import io.micronaut.context.annotation.Bean;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
@@ -171,7 +172,9 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
     @Override
     public ElementQuery<T> onlyInjected() {
         final List<Predicate<AnnotationMetadata>> annotationPredicates = this.annotationPredicates != null ? new ArrayList<>(this.annotationPredicates) : new ArrayList<>(1);
-        annotationPredicates.add((metadata) -> metadata.hasDeclaredAnnotation(AnnotationUtil.INJECT) ||
+        annotationPredicates.add((metadata) ->
+                metadata.hasDeclaredAnnotation(AnnotationUtil.INJECT) ||
+                (metadata.hasDeclaredStereotype(AnnotationUtil.QUALIFIER) && !metadata.hasDeclaredAnnotation(Bean.class)) ||
                 metadata.hasDeclaredAnnotation(PreDestroy.class) ||
                 metadata.hasDeclaredAnnotation(PostConstruct.class));
         return new DefaultElementQuery<>(

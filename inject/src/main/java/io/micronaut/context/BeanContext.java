@@ -28,6 +28,7 @@ import io.micronaut.core.annotation.Nullable;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.Future;
 
 /**
  * <p>The core BeanContext abstraction which allows for dependency injection of classes annotated with
@@ -44,9 +45,39 @@ public interface BeanContext extends
         ExecutionHandleLocator,
         BeanLocator,
         BeanDefinitionRegistry,
-        ApplicationEventPublisher,
+        ApplicationEventPublisher<Object>,
         AnnotationMetadataResolver,
         MutableAttributeHolder {
+
+    /**
+     * Obtains the configuration for this context.
+     * @return The {@link io.micronaut.context.BeanContextConfiguration}
+     * @since 3.0.0
+     */
+    @NonNull BeanContextConfiguration getContextConfiguration();
+
+    /**
+     * Publish the given event. The event will be published synchronously and only return once all listeners have consumed the event.
+     *
+     * @deprecated Preferred way is to use event typed {@code ApplicationEventPublisher<MyEventType>}
+     * @param event The event to publish
+     */
+    @Override
+    @Deprecated
+    void publishEvent(Object event);
+
+    /**
+     * Publish the given event. The event will be published asynchronously. A future is returned that can be used to check whether the event completed successfully or not.
+     *
+     * @deprecated Preferred way is to use event typed {@code ApplicationEventPublisher<MyEventType>}
+     * @param event The event to publish
+     * @return A future that completes when the event is published
+     */
+    @Override
+    @Deprecated
+    default Future<Void> publishEventAsync(Object event) {
+        return ApplicationEventPublisher.super.publishEventAsync(event);
+    }
 
     /**
      * Inject an existing instance.

@@ -19,7 +19,8 @@ package io.micronaut.docs.server.intro;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.client.annotation.Client;
-import io.reactivex.Single;
+import org.reactivestreams.Publisher;
+import io.micronaut.core.async.annotation.SingleResult;
 // end::imports[]
 
 /**
@@ -31,6 +32,7 @@ import io.reactivex.Single;
 public interface HelloClient {
 
     @Get(consumes = MediaType.TEXT_PLAIN) // <2>
-    Single<String> hello(); // <3>
+    @SingleResult
+    Publisher<String> hello(); // <3>
 }
 // end::class[]

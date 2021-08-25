@@ -1,11 +1,11 @@
-package io.micronaut.docs.http.client.bind.method;
+package io.micronaut.docs.http.client.bind.method
 
-import io.micronaut.http.annotation.Get;
-import io.micronaut.http.client.annotation.Client;
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.client.annotation.Client
 
 //tag::clazz[]
 @Client("/")
-public interface NameAuthorizedClient {
+interface NameAuthorizedClient {
 
     @Get("/client/authorized-resource")
     @NameAuthorization(name="Bob") // <1>

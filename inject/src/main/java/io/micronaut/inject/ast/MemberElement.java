@@ -15,6 +15,9 @@
  */
 package io.micronaut.inject.ast;
 
+import java.util.Collections;
+import java.util.Set;
+
 /**
  * A member element is an element that is contained within a {@link ClassElement}.
  * The {@link #getDeclaringType()} method returns the class that declares the element.
@@ -38,5 +41,13 @@ public interface MemberElement extends Element {
      */
     default ClassElement getOwningType() {
         return getDeclaringType();
+    }
+
+    /**
+     * @return The {@link ElementModifier} types for this class element
+     * @since 3.0.0
+     */
+    default Set<ElementModifier> getModifiers() {
+        return Collections.emptySet();
     }
 }

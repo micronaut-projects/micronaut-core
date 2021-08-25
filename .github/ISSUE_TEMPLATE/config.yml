@@ -1,0 +1,13 @@
+contact_links:
+  - name: Micronaut Core Discussions
+    url: https://github.com/micronaut-projects/micronaut-core/discussions
+    about: Ask questions about Micronaut on Github
+  - name: Micronaut Data Discussions
+    url: https://github.com/micronaut-projects/micronaut-data/discussions
+    about: Ask Micronaut Data related questions on Github
+  - name: Stack Overflow
+    url: https://stackoverflow.com/tags/micronaut
+    about: Ask questions on Stack Overflow
+  - name: Chat
+    url: https://gitter.im/micronautfw/
+    about: Chat with us on Gitter.

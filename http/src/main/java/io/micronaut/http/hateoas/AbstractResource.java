@@ -150,6 +150,47 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
         }
     }
 
+
+    /**
+     * Allows de-serializing of embedded with Jackson.
+     *
+     * @param embedded The links
+     */
+    @SuppressWarnings("unchecked")
+    @Internal
+    @ReflectiveAccess
+    protected final void setEmbedded(Map<String, List<Resource>> embedded) {
+        int x = 1;
+/*        for (Map.Entry<String, Object> entry : embedded.entrySet()) {
+            String name = entry.getKey();
+            Object value = entry.getValue();
+            if (value instanceof Collection) {
+                List<Resource> resources = new ArrayList<>();
+                for (Object obj: (Collection) value) {
+                    Resource resource = createResource(obj);
+                    if (resource != null) {
+                        resources.add(resource);
+                    }
+                }
+                embedded(name, resources);
+            } else {
+                Resource resource = createResource(value);
+                if (resource != null) {
+                    embedded(name, resource);
+                }
+            }
+        }*/
+    }
+
+//    private Resource createResource(Object resource) {
+//        if (resource instanceof Map) {
+//            Map<Object, Object> map = (Map<Object, Object>) resource;
+//            if (map.containsKey("message")) {
+//                JsonError jsonError = new JsonError("")
+//            }
+//        }
+//    }
+
     private void link(String name, Map<String, Object> linkMap) {
         ConvertibleValues<Object> values = ConvertibleValues.of(linkMap);
         Optional<String> uri = values.get(Link.HREF, String.class);

@@ -22,6 +22,7 @@ import io.micronaut.core.type.Argument;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -119,7 +120,7 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V> {
 
     @Override
     public Set<String> names() {
-        return values.keySet().stream().map(CharSequence::toString).collect(Collectors.toSet());
+        return values.keySet().stream().map(CharSequence::toString).collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     @Override

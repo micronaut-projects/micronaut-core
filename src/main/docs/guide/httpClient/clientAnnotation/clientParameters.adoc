@@ -34,7 +34,7 @@ For example, the following defines a URI template, and the `name` parameter is u
 [source,java]
 ----
 @Post("/{name}")
-Single<Pet> save(
+Mono<Pet> save(
     @NotBlank String name, // <1>
     @Body @Valid Pet pet) // <2>
 ----

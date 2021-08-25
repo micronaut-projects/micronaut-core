@@ -21,10 +21,11 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.Test;
+import reactor.core.publisher.Flux;
 
 import java.util.HashMap;
 import java.util.List;
@@ -40,10 +41,10 @@ public class AlertsEndpointSpec {
         Map<String, Object> map = new HashMap<>();
         map.put("spec.name", AlertsEndpointSpec.class.getSimpleName());
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map);
-        RxHttpClient rxClient = server.getApplicationContext().createBean(RxHttpClient.class, server.getURL());
+        HttpClient client = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
 
         try {
-            rxClient.exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String.class).blockingFirst();
+            client.toBlocking().exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String.class);
         } catch (HttpClientResponseException e) {
             assertEquals(401, e.getStatus().getCode());
         } catch (Exception e) {
@@ -59,17 +60,17 @@ public class AlertsEndpointSpec {
         map.put("spec.name", AlertsEndpointSpec.class.getSimpleName());
         map.put("endpoints.alerts.add.sensitive", false);
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map);
-        RxHttpClient rxClient = server.getApplicationContext().createBean(RxHttpClient.class, server.getURL());
+        HttpClient client = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
 
         try {
-            HttpResponse<?> response = rxClient.exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String.class).blockingFirst();
+            HttpResponse<?> response = client.toBlocking().exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String.class);
             assertEquals(response.status(), HttpStatus.OK);
         } catch (Exception e) {
             fail("Wrong exception thrown");
         }
 
         try {
-            HttpResponse<List<String>> response = rxClient.exchange(HttpRequest.GET("/alerts"), Argument.LIST_OF_STRING).blockingFirst();
+            HttpResponse<List<String>> response = client.toBlocking().exchange(HttpRequest.GET("/alerts"), Argument.LIST_OF_STRING);
             assertEquals(response.status(), HttpStatus.OK);
             assertEquals(response.body().get(0), "First alert");
         } catch (Exception e) {
@@ -84,10 +85,10 @@ public class AlertsEndpointSpec {
         Map<String, Object> map = new HashMap<>();
         map.put("spec.name", AlertsEndpointSpec.class.getSimpleName());
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map);
-        RxHttpClient rxClient = server.getApplicationContext().createBean(RxHttpClient.class, server.getURL());
+        HttpClient rxClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
 
         try {
-            rxClient.exchange(HttpRequest.DELETE("/alerts"), String.class).blockingFirst();
+            rxClient.toBlocking().exchange(HttpRequest.DELETE("/alerts"), String.class);
         } catch (HttpClientResponseException e) {
             assertEquals(401, e.getStatus().getCode());
         } catch (Exception e) {

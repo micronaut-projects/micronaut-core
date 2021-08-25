@@ -26,6 +26,8 @@ import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import java.util.*;
 import java.util.function.Predicate;
 
+import static io.micronaut.inject.writer.BeanDefinitionVisitor.PROXY_SUFFIX;
+
 /**
  * Stores data about an element that references a class.
  *
@@ -42,6 +44,17 @@ public interface ClassElement extends TypedElement {
      * @return {@code true} if and only if the this type is assignable to the second
      */
     boolean isAssignable(String type);
+
+    /**
+     * In this case of calling {@link #getTypeArguments()} a returned {@link ClassElement} may represent a type variable
+     * in which case this method will return {@code true}.
+     *
+     * @return Is this type a type variable.
+     * @since 3.0.0
+     */
+    default boolean isTypeVariable() {
+        return false;
+    }
 
     /**
      * Tests whether one type is assignable to another.
@@ -105,6 +118,13 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * @return True if the class represents a proxy
+     */
+    default boolean isProxy() {
+        return getSimpleName().endsWith(PROXY_SUFFIX);
+    }
+
+    /**
      * Find and return a single primary constructor. If more than constructor candidate exists, then return empty unless a
      * constructor is found that is annotated with either {@link io.micronaut.core.annotation.Creator} or {@link javax.inject.Inject}.
      *
@@ -133,6 +153,13 @@ public interface ClassElement extends TypedElement {
         return Optional.empty();
     }
 
+    /**
+     * @return The interfaces implemented by this class element
+     */
+    default Collection<ClassElement> getInterfaces() {
+        return Collections.emptyList();
+    }
+
     @NonNull
     @Override
     default ClassElement getType() {
@@ -156,6 +183,16 @@ public interface ClassElement extends TypedElement {
      */
     default String getPackageName() {
         return NameUtils.getPackageName(getName());
+    }
+
+    /**
+     * The package name.
+     *
+     * @return The package name
+     * @since 3.0.0
+     */
+    default PackageElement getPackage() {
+        return PackageElement.of(getPackageName());
     }
 
     /**
@@ -199,6 +236,16 @@ public interface ClassElement extends TypedElement {
      */
     default <T extends Element> List<T> getEnclosedElements(@NonNull ElementQuery<T> query) {
         return Collections.emptyList();
+    }
+
+    /**
+     * Returns the enclosing type if {@link #isInner()} return {@code true}.
+     *
+     * @return The enclosing type if any
+     * @since 3.0.0
+     */
+    default Optional<ClassElement> getEnclosingType() {
+        return Optional.empty();
     }
 
     /**

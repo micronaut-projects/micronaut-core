@@ -1,14 +1,14 @@
-Micronaut's HTTP client includes support for streaming data over HTTP via the api:http.client.RxStreamingHttpClient[] interface which includes methods specific to streaming including:
+Micronaut's HTTP client includes support for streaming data over HTTP via the link:{micronautreactorapi}/client/ReactorStreamingHttpClient[ReactorStreamingHttpClient] interface which includes methods specific to streaming including:
 
 .HTTP Streaming Methods
 |===
 |Method |Description
 
 | `dataStream(HttpRequest<I> request)`
-| Returns a stream of data as a rx:Flowable[] of api:core.io.buffer.ByteBuffer[]
+| Returns a stream of data as a reactor:Flux[] of api:core.io.buffer.ByteBuffer[]
 
 | `exchangeStream(HttpRequest<I> request)`
-| Returns the api:http.HttpResponse[] wrapping a rx:Flowable[] of api:core.io.buffer.ByteBuffer[]
+| Returns the api:http.HttpResponse[] wrapping a reactor:Flux[] of api:core.io.buffer.ByteBuffer[]
 
 | `jsonStream(HttpRequest<I> request)`
 | Returns a non-blocking stream of JSON objects
@@ -20,9 +20,9 @@ To use JSON streaming, declare a controller method on the server that returns a 
 snippet::io.micronaut.docs.streaming.HeadlineController[tags="imports, streaming", indent=0, title="Streaming JSON on the Server"]
 
 <1> The `streamHeadlines` method produces `application/x-json-stream`
-<2> A rx:Flowable[] is created from a `Callable` function (note no blocking occurs within the function, so this is ok, otherwise you should `subscribeOn` an I/O thread pool).
-<3> The rx:Flowable[] repeats 100 times
-<4> The rx:Flowable[] emits items with a delay of one second between each
+<2> A reactor:Flux[] is created from a `Callable` function (note no blocking occurs within the function, so this is ok, otherwise you should `subscribeOn` an I/O thread pool).
+<3> The reactor:Flux[] repeats 100 times
+<4> The reactor:Flux[] emits items with a delay of one second between each
 
 NOTE: The server does not have to be written in Micronaut, any server that supports JSON streaming will do.
 
@@ -30,7 +30,7 @@ Then on the client, subscribe to the stream using `jsonStream` and every time th
 
 snippet::io.micronaut.docs.streaming.HeadlineControllerSpec[tags="streaming", indent=0, title="Streaming JSON on the Client"]
 
-<1> The `jsonStream` method returns a rx:Flowable[]
+<1> The `jsonStream` method returns a reactor:Flux[]
 <2> A `CompletableFuture` is used to receive a value, but what you do with each emitted item is application-specific
 <3> The rs:Subscription[] requests a single item. You can use the rs:Subscription[] to regulate back pressure and demand.
 <4> The `onNext` method is called when an item is emitted

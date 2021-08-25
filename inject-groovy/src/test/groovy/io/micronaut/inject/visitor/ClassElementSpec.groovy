@@ -22,6 +22,7 @@ import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.EnumElement
 import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.ast.PackageElement
 import spock.util.environment.RestoreSystemProperties
 
 import java.util.function.Supplier
@@ -35,6 +36,46 @@ class ClassElementSpec extends AbstractBeanDefinitionSpec {
 
     def cleanup() {
         AllElementsVisitor.clearVisited()
+    }
+
+    void "test modifiers #modifiers"() {
+        given:
+        def element = buildClassElement("""
+package modtest;
+
+class Test {
+    ${modifiers*.toString().join(' ')} String test = "test";
+
+    ${modifiers*.toString().join(' ')} void test() {};
+}
+""")
+
+        expect:
+        element.getEnclosedElement(ElementQuery.ALL_FIELDS).get().modifiers == modifiers
+        element.getEnclosedElement(ElementQuery.ALL_METHODS).get().modifiers == modifiers
+
+        where:
+        modifiers << [
+                [ElementModifier.PUBLIC] as Set,
+                [ElementModifier.PUBLIC, ElementModifier.STATIC] as Set,
+                [ElementModifier.PUBLIC, ElementModifier.STATIC, ElementModifier.FINAL] as Set,
+        ]
+    }
+
+    void "test get package element"() {
+        given:
+        def element = buildClassElement('''
+package pkgeltest;
+
+class PckElementTest {
+
+}
+''')
+        PackageElement pe = element.getPackage()
+
+        expect:
+        pe.name == 'pkgeltest'
+        pe.getClass().name.contains("GroovyPackageElement")
     }
 
     void 'test find matching methods on abstract class'() {

@@ -1,4 +1,4 @@
-package io.micronaut.docs.http.client.bind.method;
+package io.micronaut.docs.http.client.bind.method
 
 import io.micronaut.aop.MethodInvocationContext
 import io.micronaut.core.annotation.NonNull
@@ -11,7 +11,7 @@ import org.jetbrains.annotations.NotNull
 import io.micronaut.http.client.bind.AnnotatedClientRequestBinder
 
 @Singleton // <1>
-public class NameAuthorizationBinder implements AnnotatedClientRequestBinder<NameAuthorization> { // <2>
+class NameAuthorizationBinder implements AnnotatedClientRequestBinder<NameAuthorization> { // <2>
     @NotNull
     @Override
     Class<NameAuthorization> getAnnotationType() {

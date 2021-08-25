@@ -16,6 +16,7 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -23,8 +24,10 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.value.OptionalValues;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 /**
  * Used to represent an annotation metadata hierarchy. The first {@link AnnotationMetadata} instance passed
@@ -140,6 +143,41 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
             }
         }
         return null;
+    }
+
+    @Override
+    public Annotation[] synthesizeAll() {
+        return Stream.of(hierarchy).flatMap(am -> Arrays.stream(am.synthesizeAll())).toArray(Annotation[]::new);
+    }
+
+    @Override
+    public Annotation[] synthesizeDeclared() {
+        return Stream.of(hierarchy).flatMap(am -> Arrays.stream(am.synthesizeDeclared())).toArray(Annotation[]::new);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T extends Annotation> T[] synthesizeAnnotationsByType(Class<T> annotationClass) {
+        if (annotationClass == null) {
+            return (T[]) AnnotationUtil.ZERO_ANNOTATIONS;
+        }
+        return Stream.of(hierarchy)
+                .flatMap(am -> am.getAnnotationValuesByType(annotationClass).stream())
+                .distinct()
+                .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, entries))
+                        .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(Class<T> annotationClass) {
+        if (annotationClass == null) {
+            return (T[]) AnnotationUtil.ZERO_ANNOTATIONS;
+        }
+        return Stream.of(hierarchy)
+                .flatMap(am -> am.getAnnotationValuesByType(annotationClass).stream())
+                .distinct()
+                .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, entries))
+                .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
     }
 
     @Nullable
@@ -833,5 +871,15 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
             }
         }
         return Optional.empty();
+    }
+
+    @Override
+    public boolean isEmpty() {
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (!metadata.isEmpty()) {
+                return false;
+            }
+        }
+        return true;
     }
 }

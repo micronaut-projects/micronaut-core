@@ -1,9 +1,8 @@
 package io.micronaut.docs.qualifiers.replaces.defaultimpl
 
-import io.kotlintest.matchers.types.shouldBeInstanceOf
-import io.kotlintest.specs.StringSpec
+import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.types.shouldBeInstanceOf
 import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 
 class DefaultImplementationSpec : StringSpec({
 

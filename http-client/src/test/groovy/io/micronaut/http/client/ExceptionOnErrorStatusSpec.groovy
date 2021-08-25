@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -33,12 +34,13 @@ import spock.lang.Specification
  * @since 1.3.0
  */
 @MicronautTest
+@Property(name = 'spec.name', value = 'ExceptionOnErrorStatusSpec')
 @Property(name = "micronaut.http.client.exceptionOnErrorStatus", value = 'false')
 class ExceptionOnErrorStatusSpec extends Specification {
 
     @Inject
     @Client("/")
-    RxHttpClient client
+    HttpClient client
 
     void "test not found"() {
         when:
@@ -58,6 +60,7 @@ class ExceptionOnErrorStatusSpec extends Specification {
         res.getBody(String).get() == "Server error"
     }
 
+    @Requires(property = 'spec.name', value = 'ExceptionOnErrorStatusSpec')
     @Controller("/return-response")
     static class GetController {
 

@@ -15,7 +15,7 @@
  */
 package org.atinject.jakartatck.auto
 
-import org.atinject.javaxtck.auto.accessories.Cupholder
+import org.atinject.jakartatck.auto.accessories.Cupholder
 
 import jakarta.inject.Inject
 import jakarta.inject.Singleton

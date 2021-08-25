@@ -6,7 +6,7 @@ import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Retry
@@ -24,8 +24,8 @@ class ControllerPortSpec extends Specification {
                 EmbeddedServer,
                 ['my.controller.port': customPort]
         )
-        def client = embeddedServer.applicationContext.createBean(RxHttpClient, new URL("http://localhost:$customPort"))
-        def client2 = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        def client = embeddedServer.applicationContext.createBean(HttpClient, new URL("http://localhost:$customPort"))
+        def client2 = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         def response = client.toBlocking().retrieve("/custom-port1")

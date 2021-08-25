@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.util.*;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.HttpFilter;
 
 import java.net.URI;
@@ -44,6 +45,7 @@ class DefaultFilterRoute implements FilterRoute {
     private final Supplier<HttpFilter> filterSupplier;
     private final AnnotationMetadataResolver annotationMetadataResolver;
     private Set<HttpMethod> httpMethods;
+    private FilterPatternStyle patternStyle;
     private HttpFilter filter;
     private AnnotationMetadata annotationMetadata;
 
@@ -112,12 +114,17 @@ class DefaultFilterRoute implements FilterRoute {
     }
 
     @Override
+    public FilterPatternStyle getPatternStyle() {
+        return patternStyle != null ? patternStyle : FilterPatternStyle.defaultStyle();
+    }
+
+    @Override
     public Optional<HttpFilter> match(HttpMethod method, URI uri) {
         if (httpMethods != null && !httpMethods.contains(method)) {
             return Optional.empty();
         }
         String uriStr = uri.getPath();
-        AntPathMatcher matcher = PathMatcher.ANT;
+        PathMatcher matcher = getPatternStyle().getPathMatcher();
         for (String pattern : patterns) {
             if (matcher.matches(pattern, uriStr)) {
                 HttpFilter filter = getFilter();
@@ -146,6 +153,12 @@ class DefaultFilterRoute implements FilterRoute {
             }
             httpMethods.addAll(Arrays.asList(methods));
         }
+        return this;
+    }
+
+    @Override
+    public FilterRoute patternStyle(FilterPatternStyle patternStyle) {
+        this.patternStyle = patternStyle;
         return this;
     }
 }
