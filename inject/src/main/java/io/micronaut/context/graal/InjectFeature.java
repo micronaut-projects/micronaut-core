@@ -18,16 +18,22 @@ package io.micronaut.context.graal;
 import com.oracle.svm.core.annotate.AutomaticFeature;
 import io.micronaut.context.annotation.Requirements;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.env.Environment;
+import io.micronaut.context.env.PropertiesLoader;
 import io.micronaut.context.env.PropertySourceLoader;
+import io.micronaut.context.env.graalvm.GraalBuildTimeEnvironment;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.graal.AutomaticFeatureUtils;
+import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinitionReference;
 import org.graalvm.nativeimage.hosted.Feature;
 import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.function.Predicate;
 
 @Internal
@@ -71,6 +77,13 @@ public class InjectFeature implements Feature {
                 .forEach(propertySourceLoader -> {
                     RuntimeClassInitialization.initializeAtBuildTime(propertySourceLoader.getClass());
                 });
+
+        GraalBuildTimeEnvironment.PRELOADED = new PropertiesLoader(
+                Environment.DEFAULT_NAME,
+                Collections.emptySet(),
+                Arrays.asList("classpath:/", "file:config/"),
+                ClassPathResourceLoader.defaultLoader(GraalBuildTimeEnvironment.class.getClassLoader()))
+        .read();
     }
 
 }

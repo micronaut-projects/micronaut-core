@@ -266,12 +266,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         running.set(false);
         reading.set(false);
         this.propertySources.values().removeAll(refreshablePropertySources);
-        synchronized (catalog) {
-            for (int i = 0; i < catalog.length; i++) {
-                catalog[i] = null;
-            }
-            resetCaches();
-        }
+        resetProperties();
         return this;
     }
 

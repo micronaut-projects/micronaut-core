@@ -105,6 +105,16 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     }
 
     /**
+     * Resets properties.
+     */
+    public void resetProperties() {
+        synchronized (catalog) {
+            Arrays.fill(catalog, null);
+            resetCaches();
+        }
+    }
+
+    /**
      * Add a {@link PropertySource} to this resolver.
      *
      * @param propertySource The {@link PropertySource} to add
@@ -505,7 +515,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
      * @param convention The property convention
      */
     @SuppressWarnings("MagicNumber")
-    protected void processPropertySource(PropertySource properties, PropertySource.PropertyConvention convention) {
+    public void processPropertySource(PropertySource properties, PropertySource.PropertyConvention convention) {
         this.propertySources.put(properties.getName(), properties);
         synchronized (catalog) {
             for (String property : properties) {
