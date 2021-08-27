@@ -3,7 +3,7 @@ dependencies {
     annotationProcessor project(":graal")
     api project(':inject')
     api project(':aop')
-    api dependencyVersion("validation")
+    api libs.managed.validation
     compileOnly project(':core-reactive')
     testCompileOnly project(":inject-groovy")
     testAnnotationProcessor project(":inject-java")

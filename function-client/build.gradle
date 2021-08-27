@@ -3,5 +3,5 @@ dependencies {
     api project(":function")
     api project(":http-client")
 
-    implementation dependencyVersion("reactor")
+    implementation libs.managed.reactor
 }
