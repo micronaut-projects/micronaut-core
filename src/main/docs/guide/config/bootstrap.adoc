@@ -1,0 +1,18 @@
+Most application configuration is stored in `application.yml`, environment-specific files like `application-{environment}.{extension}`, environment and system properties, etc.
+These configure the application context.
+But during application startup, before the application context is created, a "bootstrap" context is created as its parent context.
+
+Configuration properties that must be present before application context configuration properties are resolved, for example when using distributed configuration, are stored in a bootstrap configuration file.
+This file must be named `bootstrap.yml` or `bootstrap.properties` (JSON and Groovy files are not supported) and be in `src/main/resources`.
+
+Any properties that are normally in `application.yml` but are needed in `bootstrap.yml` (e.g. typically `micronaut.application.name` is used to resolve application-specific distributed configuration) should be moved to `bootstrap.yml`.
+
+Details about what configuration properties go in `bootstrap.yml` are implementation-specific, so refer to the documentation for the various modules that use `bootstrap.yml` configuration:
+
+- <<_enabling_distributed_configuration_with_consul, Consul Distributed Configuration>>
+- link:#distributedConfigurationVault[HashiCorp Vault]
+- link:#distributedConfigurationSpringCloud[Spring Cloud Config]
+- link:#distributedConfigurationAwsParameterStore[AWS Parameter Store]
+- https://micronaut-projects.github.io/micronaut-kubernetes/latest/guide/#config-client[Kubernetes Configuration Client^]
+- https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/guide/#vault[Oracle Cloud Vault^]
+- https://micronaut-projects.github.io/micronaut-gcp/latest/guide/#distributedConfiguration[Micronaut GCP^]
