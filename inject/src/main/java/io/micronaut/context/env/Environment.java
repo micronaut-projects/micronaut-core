@@ -16,6 +16,7 @@
 package io.micronaut.context.env;
 
 import io.micronaut.context.LifeCycle;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.BeanIntrospectionScanner;
@@ -25,7 +26,6 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.BeanConfiguration;
 
-import io.micronaut.core.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.Collection;
@@ -56,7 +56,7 @@ import java.util.stream.Stream;
 public interface Environment extends PropertyResolver, LifeCycle<Environment>, ConversionService<Environment>, ResourceLoader {
 
     /**
-     * Constant for the the name micronaut.
+     * Constant for the name micronaut.
      */
     String MICRONAUT = "micronaut";
 
@@ -91,13 +91,15 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     String FUNCTION = "function";
 
     /**
-     * The default bootstrap name.
+     * System property to override the default bootstrap name.
      */
     String BOOTSTRAP_NAME_PROPERTY = "micronaut.bootstrap.name";
+
     /**
      * Whether the bootstrap context is enabled.
      */
     String BOOTSTRAP_CONTEXT_PROPERTY = "micronaut.bootstrap.context";
+
     /**
      * The default bootstrap name.
      */
@@ -151,8 +153,8 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     /**
      * Cloud provider Digital Ocean.
      */
-
     String DIGITAL_OCEAN = "digitalocean";
+
     /**
      * Cloud or non cloud provider on bare metal (unknown).
      */
