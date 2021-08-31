@@ -6,6 +6,8 @@ Configuration properties that must be present before application context configu
 By default this file is named `bootstrap.yml` or `bootstrap.properties` (JSON and Groovy files are not supported) and be in `src/main/resources`.
 The name is configurable with the link:{api}/io/micronaut/context/env/Environment.html#BOOTSTRAP_NAME_PROPERTY[micronaut.bootstrap.name^] system property, and additionally you can have environment-specific bootstrap config files, e.g. `bootstrap-oraclecloud.yml`.
 
+Note however that `bootstrap.yml` must exist for environment-specific bootstrap config files to be loaded.
+
 Any properties that are normally in `application.yml` but are needed in `bootstrap.yml` (e.g. typically `micronaut.application.name` is used to resolve application-specific distributed configuration) should be moved to `bootstrap.yml`.
 
 Details about what configuration properties go in `bootstrap.yml` are implementation-specific, so refer to the documentation for the various modules that use `bootstrap.yml` configuration:
