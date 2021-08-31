@@ -192,8 +192,13 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
             return candidateArgumentTypeParameters.length >= 0;
         }
         if (candidateArgumentTypeParameters.length == 0) {
+            for (Argument typeParameter : typeParameters) {
+                if (typeParameter.getType() != Object.class) {
+                    return false;
+                }
+            }
             // Wildcard
-            return false;
+            return true;
         }
         for (int i = 0; i < typeParameters.length; i++) {
             Argument typeParameter = typeParameters[i];

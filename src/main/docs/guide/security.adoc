@@ -1,3 +1,3 @@
 Micronaut has a full-featured security solution for all of the common security patterns.
 
-See the documentation for link:https://micronaut-projects.github.io/micronaut-security/latest/guide[Micronaut Security] for more information on how to secure your applications.
+See the documentation for link:https://micronaut-projects.github.io/micronaut-security/{micronautSecurityVersion}/guide[Micronaut Security] for more information on how to secure your applications.

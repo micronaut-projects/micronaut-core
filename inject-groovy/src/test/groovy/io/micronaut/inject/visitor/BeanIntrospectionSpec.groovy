@@ -7,6 +7,7 @@ import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
+import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.core.beans.BeanMethod
 import io.micronaut.core.beans.BeanProperty
 import io.micronaut.core.reflect.exception.InstantiationException
@@ -1062,7 +1063,7 @@ import javax.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
-public class ValidatedConfig {
+class ValidatedConfig {
 
     private URL url
     private String name
@@ -1103,12 +1104,12 @@ import javax.validation.constraints.NotBlank
 import java.net.URL
 
 @ConfigurationProperties("foo.bar")
-public class ValidatedConfig {
+class ValidatedConfig {
 
     @NotNull
     URL url
     
-    public static class Inner {
+    static class Inner {
     
     }
     
@@ -1344,5 +1345,66 @@ class Test {
 
         then:
         property.get(instance) == threeDimensions
+    }
+
+    void "test introspection on abstract class"() {
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+abstract class Test {
+    String name
+    String author
+}
+""")
+
+        expect:
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 2
+    }
+
+    void "test targeting abstract class with @Introspected(classes = "() {
+        ClassLoader classLoader = buildClassLoader("""
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected(classes = [io.micronaut.inject.visitor.TestClass])
+class MyConfig {
+
+}
+""")
+
+        when:
+        BeanIntrospector beanIntrospector = BeanIntrospector.forClassLoader(classLoader)
+
+        then:
+        BeanIntrospection beanIntrospection = beanIntrospector.getIntrospection(TestClass)
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 2
+    }
+
+    void "test introspection on abstract class with extra getter"() {
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+abstract class Test {
+    String name
+    String author
+    
+    int getAge() {
+        0
+    }
+}
+""")
+
+        expect:
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 3
     }
 }

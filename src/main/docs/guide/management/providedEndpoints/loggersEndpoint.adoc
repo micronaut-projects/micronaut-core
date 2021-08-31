@@ -88,12 +88,10 @@ is responsible for returning a Publisher that returns data collected and transfo
 
 To override the default behavior for the loggers manager, either extend the default implementation (link:{api}/io/micronaut/management/endpoint/loggers/impl/DefaultLoggersManager.html[DefaultLoggersManager]) or implement the link:{api}/io/micronaut/management/endpoint/loggers/LoggersManager.html[LoggersManager] interface directly. To ensure your implementation is used instead of the default, add the link:{api}/io/micronaut/context/annotation/Replaces.html[@Replaces] annotation to your class with the value being the default implementation.
 
-The logging system
-(link:{api}/io/micronaut/management/endpoint/loggers/LoggingSystem.html[LoggingSystem])
-is responsible for processing requests from the loggers manager against a particular logging
+api:logging.LoggingSystem[] is responsible for processing requests from the loggers manager against a particular logging
 library (e.g. logback, log4j, etc.)
 
-The current default implementation for the logging system is link:{api}/io/micronaut/management/endpoint/loggers/impl/LogbackLoggingSystem.html[LogbackLoggingSystem], which works with the https://logback.qos.ch/[logback] logging framework. Additional logging systems will be implemented in future revisions of Micronaut. For custom logging system behavior, implement the link:{api}/io/micronaut/management/endpoint/loggers/LoggingSystem.html[LoggingSystem] interface directly. To ensure your implementation is used instead of the default, add the link:{api}/io/micronaut/context/annotation/Replaces.html[@Replaces] annotation to your class with the value being the default implementation.
+The current default implementation for the logging system is link:{api}/io/micronaut/management/endpoint/loggers/impl/LogbackLoggingSystem.html[LogbackLoggingSystem], which works with the https://logback.qos.ch/[logback] logging framework. Additional logging systems will be implemented in future revisions of Micronaut. For custom logging system behavior, implement the api:logging.LoggingSystem[] interface directly. To ensure your implementation is used instead of the default, add the link:{api}/io/micronaut/context/annotation/Replaces.html[@Replaces] annotation to your class with the value being the default implementation.
 
 [source,java]
 ----

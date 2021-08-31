@@ -22,7 +22,7 @@ class DefaultJsonErrorHandlingSpec extends AbstractMicronautSpec {
 
         then:
         HttpClientResponseException e = thrown()
-        e.message == """Invalid JSON: Unexpected end-of-input
+        e.response.getBody(Map).get()._embedded.errors[0].message == """Invalid JSON: Unexpected end-of-input
  at [Source: UNKNOWN; line: 1, column: 21]"""
         e.response.status == HttpStatus.BAD_REQUEST
 
@@ -32,7 +32,7 @@ class DefaultJsonErrorHandlingSpec extends AbstractMicronautSpec {
 
         then:
         result['_links'].self.href == '/errors/map'
-        result.message.startsWith('Invalid JSON')
+        result['_embedded'].errors[0].message.startsWith('Invalid JSON')
     }
 
     @Controller("/errors")

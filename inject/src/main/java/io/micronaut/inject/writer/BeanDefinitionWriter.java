@@ -382,6 +382,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private final List<MethodVisitData> methodInjectionPoints = new ArrayList<>(2);
     private final List<MethodVisitData> postConstructMethodVisits = new ArrayList<>(2);
     private final List<MethodVisitData> preDestroyMethodVisits = new ArrayList<>(2);
+    private final List<MethodVisitData> allMethodVisits = new ArrayList<>(2);
     private final Map<String, Boolean> isLifeCycleCache = new HashMap<>(2);
     private ExecutableMethodsDefinitionWriter executableMethodsDefinitionWriter;
 
@@ -546,7 +547,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void validateExposedTypes(AnnotationMetadata annotationMetadata, VisitorContext visitorContext) {
         final String[] types = annotationMetadata.stringValues(Bean.class, "typed");
-        if (ArrayUtils.isNotEmpty(types)) {
+        if (ArrayUtils.isNotEmpty(types) && !beanTypeElement.isProxy()) {
             for (String name : types) {
                 final ClassElement exposedType = visitorContext.getClassElement(name).orElse(null);
                 if (exposedType == null) {
@@ -869,42 +870,21 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_CONSTRUCTOR,
                 Type.getType(AbstractInitializableBeanDefinition.MethodOrFieldReference.class).getDescriptor(), null, null);
 
-        int methodsLength = methodInjectionPoints.size() + postConstructMethodVisits.size() + preDestroyMethodVisits.size();
+        int methodsLength = allMethodVisits.size();
         if (!superBeanDefinition && methodsLength > 0) {
             Type methodsFieldType = Type.getType(AbstractInitializableBeanDefinition.MethodReference[].class);
             classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_INJECTION_METHODS, methodsFieldType.getDescriptor(), null, null);
             pushNewArray(staticInit, AbstractInitializableBeanDefinition.MethodReference.class, methodsLength);
             int i = 0;
-            for (MethodVisitData methodVisitData : methodInjectionPoints) {
+            for (MethodVisitData methodVisitData : allMethodVisits) {
                 pushStoreInArray(staticInit, i++, methodsLength, () ->
                         pushNewMethodReference(
                                 staticInit,
                                 JavaModelUtils.getTypeReference(methodVisitData.beanType),
                                 methodVisitData.methodElement,
                                 methodVisitData.requiresReflection,
-                                false, false
-                        )
-                );
-            }
-            for (MethodVisitData methodVisitData : postConstructMethodVisits) {
-                pushStoreInArray(staticInit, i++, methodsLength, () ->
-                        pushNewMethodReference(
-                                staticInit,
-                                JavaModelUtils.getTypeReference(methodVisitData.beanType),
-                                methodVisitData.methodElement,
-                                methodVisitData.requiresReflection,
-                                true, false
-                        )
-                );
-            }
-            for (MethodVisitData methodVisitData : preDestroyMethodVisits) {
-                pushStoreInArray(staticInit, i++, methodsLength, () ->
-                        pushNewMethodReference(
-                                staticInit,
-                                JavaModelUtils.getTypeReference(methodVisitData.beanType),
-                                methodVisitData.methodElement,
-                                methodVisitData.requiresReflection,
-                                false, true
+                                methodVisitData.isPostConstruct(),
+                                methodVisitData.isPreDestroy()
                         )
                 );
             }
@@ -1066,7 +1046,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void pushStoreClassesAsSet(GeneratorAdapter writer, String[] classes) {
-        if (classes.length > 3) {
+        if (classes.length > 1) {
             writer.newInstance(Type.getType(HashSet.class));
             writer.dup();
             pushArrayOfClasses(writer, classes);
@@ -1076,15 +1056,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             writer.invokeConstructor(Type.getType(HashSet.class), org.objectweb.asm.commons.Method.getMethod(
                     ReflectionUtils.findConstructor(HashSet.class, Collection.class).get()
             ));
-        } else if (classes.length == 1) {
+        } else {
             pushClass(writer, classes[0]);
             writer.invokeStatic(Type.getType(Collections.class), org.objectweb.asm.commons.Method.getMethod(
                     ReflectionUtils.getRequiredMethod(Collections.class, "singleton", Object.class)
-            ));
-        } else {
-            pushArrayOfClasses(writer, classes);
-            writer.invokeStatic(Type.getType(Arrays.class), org.objectweb.asm.commons.Method.getMethod(
-                    ReflectionUtils.getRequiredMethod(Arrays.class, "asList", Object[].class)
             ));
         }
     }
@@ -1176,6 +1151,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         );
 
         methodInjectionPoints.add(methodVisitData);
+        allMethodVisits.add(methodVisitData);
 
         if (!requiresReflection) {
             resolveBeanOrValueForSetter(declaringType, methodElement, isOptional);
@@ -1192,8 +1168,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         visitPostConstructMethodDefinition(false);
         // for "super bean definitions" we just delegate to super
         if (!superBeanDefinition || isInterceptedLifeCycleByType(this.annotationMetadata, "POST_CONSTRUCT")) {
-            MethodVisitData methodVisitData = new MethodVisitData(declaringType, methodElement, requiresReflection);
+            MethodVisitData methodVisitData = new MethodVisitData(declaringType, methodElement, requiresReflection, true, false);
             postConstructMethodVisits.add(methodVisitData);
+            allMethodVisits.add(methodVisitData);
             visitMethodInjectionPointInternal(methodVisitData, postConstructMethodVisitor, postConstructInstanceLocalVarIndex);
         }
     }
@@ -1207,8 +1184,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (!superBeanDefinition || isInterceptedLifeCycleByType(this.annotationMetadata, "PRE_DESTROY")) {
             visitPreDestroyMethodDefinition(false);
 
-            MethodVisitData methodVisitData = new MethodVisitData(declaringType, methodElement, requiresReflection);
+            MethodVisitData methodVisitData = new MethodVisitData(declaringType, methodElement, requiresReflection, false, true);
             preDestroyMethodVisits.add(methodVisitData);
+            allMethodVisits.add(methodVisitData);
             visitMethodInjectionPointInternal(methodVisitData, preDestroyMethodVisitor, preDestroyInstanceLocalVarIndex);
         }
     }
@@ -1221,6 +1199,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
         MethodVisitData methodVisitData = new MethodVisitData(declaringType, methodElement, requiresReflection);
         methodInjectionPoints.add(methodVisitData);
+        allMethodVisits.add(methodVisitData);
         visitMethodInjectionPointInternal(methodVisitData, injectMethodVisitor, injectInstanceLocalVarIndex);
     }
 
@@ -3077,7 +3056,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 protectedConstructor.getStatic(getTypeReferenceForName(getBeanDefinitionReferenceClassName()), AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
             }
             // 4: `AbstractBeanDefinition2.MethodReference[].class` methodInjection
-            if (methodInjectionPoints.isEmpty() && preDestroyMethodVisits.isEmpty() && postConstructMethodVisits.isEmpty()) {
+            if (allMethodVisits.isEmpty()) {
                 protectedConstructor.push((String) null);
             } else {
                 protectedConstructor.getStatic(beanDefinitionType, FIELD_INJECTION_METHODS, Type.getType(AbstractInitializableBeanDefinition.MethodReference[].class));
@@ -3515,6 +3494,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         private final TypedElement beanType;
         private final boolean requiresReflection;
         private final MethodElement methodElement;
+        private final boolean postConstruct;
+        private final boolean preDestroy;
 
         /**
          * Default constructor.
@@ -3530,6 +3511,21 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             this.beanType = beanType;
             this.requiresReflection = requiresReflection;
             this.methodElement = methodElement;
+            this.postConstruct = false;
+            this.preDestroy = false;
+        }
+
+        MethodVisitData(
+                TypedElement beanType,
+                MethodElement methodElement,
+                boolean requiresReflection,
+                boolean postConstruct,
+                boolean preDestroy) {
+            this.beanType = beanType;
+            this.requiresReflection = requiresReflection;
+            this.methodElement = methodElement;
+            this.postConstruct = postConstruct;
+            this.preDestroy = preDestroy;
         }
 
         /**
@@ -3552,7 +3548,16 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         public boolean isRequiresReflection() {
             return requiresReflection;
         }
+
+        public boolean isPostConstruct() {
+            return postConstruct;
+        }
+
+        public boolean isPreDestroy() {
+            return preDestroy;
+        }
     }
+
 
     private class FactoryMethodDef {
         private final Type factoryType;

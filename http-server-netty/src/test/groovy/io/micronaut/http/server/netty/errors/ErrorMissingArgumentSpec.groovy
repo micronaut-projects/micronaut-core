@@ -43,7 +43,7 @@ class ErrorMissingArgumentSpec extends Specification {
         Map payload = ex.response.body()
 
         then:
-        payload.message == message
+        payload._embedded.errors[0].message == message
 
         where:
         uri                            | message

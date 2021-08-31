@@ -88,7 +88,7 @@ public class JacksonConfiguration {
     private JsonInclude.Include serializationInclusion = JsonInclude.Include.NON_EMPTY;
     private ObjectMapper.DefaultTyping defaultTyping = null;
     private PropertyNamingStrategy propertyNamingStrategy = null;
-    private boolean alwaysSerializeErrorsAsList = false;
+    private boolean alwaysSerializeErrorsAsList = true;
     private boolean trimStrings = false;
 
     /**

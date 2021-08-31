@@ -1,4 +1,4 @@
-Micronaut's HTTP client includes support for streaming data over HTTP via the api:http.client.ReactorStreamingHttpClient[] interface which includes methods specific to streaming including:
+Micronaut's HTTP client includes support for streaming data over HTTP via the link:{micronautreactorapi}/client/ReactorStreamingHttpClient[ReactorStreamingHttpClient] interface which includes methods specific to streaming including:
 
 .HTTP Streaming Methods
 |===

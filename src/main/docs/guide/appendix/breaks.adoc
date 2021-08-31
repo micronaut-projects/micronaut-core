@@ -151,6 +151,26 @@ For example the annotations defined in `javax.validation` are not inherited by d
 
 This behaviour grants more flexibility if you need to redefine the validation rules. Note that it is still possible to inherit validation rules through meta-annotations. See the section on <<annotationMetadata, Annotation Inheritance>> for more information.
 
+==== Error Response Format
+
+The default value of `jackson.always-serialize-errors-as-list` is now true. That means by default the Hateoas JSON errors will always be a list. For example:
+
+.Example error response
+----
+{
+  ...
+  "_embedded": {
+    "errors": [
+      {
+        "message": "Person.name: must not be blank"
+      }
+    ]
+  }
+}
+----
+
+To revert to the previous behavior where a singular error was populated in the message field instead of including `_embedded.errors`, set the configuration setting to false.
+
 ==== Runtime Classpath Scanning Removed
 
 It is no longer possible to scan the classpath at runtime using the `scan` method of the api:context.env.Environment[] interface.
@@ -176,9 +196,9 @@ warning: unknown enum constant When.MAYBE
   reason: class file for javax.annotation.meta.When not found
 ```
 
-This warning is harmless and can be ignored. To eliminate this warning, add the following dependency to your project's annotation processor classpath:
+This warning is harmless and can be ignored. To eliminate this warning, add the following dependency to your project's compile only classpath:
 
-dependency:com.google.code.findbugs:jsr305[gradleScope="annotationProcessor"]
+dependency:com.google.code.findbugs:jsr305[gradleScope="compileOnly"]
 
 ==== Server Filter Behavior
 
@@ -272,10 +292,11 @@ In previous versions of Micronaut it was possible to inject an link:{jdkapi}/jav
 Because the event loop should not be used for general purpose use cases, the injection will now fail by default with a non unique bean exception.
 The injection point should be qualified for which executor service is desired.
 
-==== Only the Exported Type from Factories is Injectable
+==== Subclasses Returned From Factories Not Injectable
 
-It is no longer possible to inject the internal implementation type from beans produced via factories.
-For example in the following example:
+It is no longer possible to inject the internal implementation type from beans produced via factories. The type returned from the factory or any of its super types are able to be injected.
+
+For example:
 
 [source,java]
 ----
@@ -291,22 +312,21 @@ public class ExecutorFactory {
 }
 ----
 
-In the above case, if the `ExecutorService` had been created previously a call to `context.getBean(ForkJoinPool.class)` would locate the already created bean.
+In the above case, if the `ExecutorService` had been already been retrieved from the context in previous logic, a call to `context.getBean(ForkJoinPool.class)` would locate the already created bean.
 This behaviour was inconsistent because if the bean had not yet been created then this lookup would not work.
 In Micronaut 3 for consistency this is no longer possible.
 
-You can however restore the behaviour by using the new `typed` member of the ann:context.annotation.Bean[] annotation:
+You can however restore the behaviour by changing the factory to return the implementation type:
 
 [source,java]
 ----
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ExecutorService;
 import javax.inject.Singleton;
-import io.micronaut.context.annotation.Bean;
 public class ExecutorFactory {
+
     @Singleton
-    @Bean(typed = { ExecutorService.class, ForkJoinPool.class })
-    public ExecutorService executorService() {
+    public ForkJoinPool executorService() {
         return ForkJoinPool.commonPool();
     }
 }
@@ -419,6 +439,10 @@ Two exception handlers that were in `micronaut-server-netty` have now been moved
 ==== New package for Micronaut Cassandra
 
 The classes in Micronaut Cassandra have been moved from `io.micronaut.configuration.cassandra` to `io.micronaut.cassandra` package.
+
+==== Micronaut Security
+
+Many of the APIs in the Micronaut Security module have undergone changes. Please see the link:https://micronaut-projects.github.io/micronaut-security/{micronautSecurityVersion}/guide[Micronaut Security] documentation for the details.
 
 ==== Groovy changes
 

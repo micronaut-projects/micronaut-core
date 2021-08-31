@@ -47,7 +47,7 @@ class OctetStreamSpec extends Specification {
 
         then:
         HttpClientResponseException e = thrown()
-        e.message == 'The content length [150000] exceeds the maximum allowed content length [10240]'
+        e.response.getBody(Map).get()._embedded.errors[0].message == 'The content length [150000] exceeds the maximum allowed content length [10240]'
     }
 
     void "test exchange byte[] non blocking"() {

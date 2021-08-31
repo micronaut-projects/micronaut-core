@@ -124,7 +124,7 @@ class HttpHeadSpec extends Specification {
 
         then:
         body.isPresent()
-        body.get().message == "Page Not Found"
+        body.get()._embedded.errors[0].message == "Page Not Found"
     }
 
     void "test simple blocking get request"() {

@@ -263,7 +263,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         context.getBean(context.classLoader.loadClass(className), qualifier)
     }
 
-    protected ApplicationContext buildContext(@Language("groovy") String cls, boolean includeAllBeans = true) {
+    protected ApplicationContext buildContext(@Language("groovy") String cls, boolean includeAllBeans = false) {
         InMemoryByteCodeGroovyClassLoader classLoader = buildClassLoader(cls)
 
         return new DefaultApplicationContext(

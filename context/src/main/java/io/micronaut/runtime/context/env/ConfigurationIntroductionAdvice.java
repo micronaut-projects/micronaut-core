@@ -19,6 +19,7 @@ import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.Qualifier;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.env.Environment;
@@ -42,7 +43,9 @@ import java.util.Optional;
  */
 @Prototype
 @Internal
+@BootstrapContextCompatible
 public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object, Object> {
+
     private static final String MEMBER_BEAN = "bean";
     private static final String MEMBER_NAME = "name";
     private final Environment environment;
