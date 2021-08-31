@@ -1,0 +1,14 @@
+plugins {
+    id 'java'
+    id "org.jetbrains.kotlin.jvm"
+}
+
+dependencies {
+    api project(":inject")
+    api project(':aop')
+
+    implementation("com.google.devtools.ksp:symbol-processing-api:1.5.21-1.0.0-beta07")
+    if (!JavaVersion.current().isJava9Compatible()) {
+        api files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    }
+}
