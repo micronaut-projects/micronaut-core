@@ -1,0 +1,2 @@
+io.micronaut.kotlin.processing.BeanDefinitionSymbolProcessorProvider
+io.micronaut.kotlin.processing.visitor.TypeElementSymbolProcessorProvider
