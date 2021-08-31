@@ -827,16 +827,17 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 @Override
                 protected void doOnError(Throwable t) {
                     s.cancel();
+                    subjects.values().forEach(subject -> subject.onError(t));
                     emitter.error(t);
                 }
 
                 @Override
                 protected void doOnComplete() {
-                    for (UnicastProcessor subject : subjects.values()) {
+                    subjects.values().forEach(subject -> {
                         if (!subject.hasCompleted()) {
                             subject.onComplete();
                         }
-                    }
+                    });
                     executeRoute();
                 }
 
