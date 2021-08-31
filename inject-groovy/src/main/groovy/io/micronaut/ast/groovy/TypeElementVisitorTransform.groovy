@@ -22,6 +22,7 @@ import io.micronaut.aop.Introduction
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.utils.PublicAbstractMethodVisitor
+import io.micronaut.ast.groovy.utils.PublicMethodVisitor
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.annotation.AnnotationMetadata
@@ -92,7 +93,7 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
                 def visitor = new ElementVisitor(source, compilationUnit, classNode, values, visitorContext, !isIntroduction)
                 if (isIntroduction || (annotationMetadata.hasStereotype(Introspected.class) && classNode.isAbstract())) {
                     visitor.visitClass(classNode)
-                    new PublicAbstractMethodVisitor(source, compilationUnit) {
+                    new PublicMethodVisitor(source) {
                         @Override
                         void accept(ClassNode cn, MethodNode methodNode) {
                             visitor.doVisitMethod(methodNode)
