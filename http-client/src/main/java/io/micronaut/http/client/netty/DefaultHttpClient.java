@@ -2569,6 +2569,10 @@ public class DefaultHttpClient implements
                 .orElse(MediaType.APPLICATION_JSON_TYPE);
 
         boolean permitsBody = io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod());
+
+        if (!(request instanceof MutableHttpRequest)) {
+            throw new IllegalArgumentException("A MutableHttpRequest is required");
+        }
         MutableHttpRequest clientHttpRequest = (MutableHttpRequest) request;
         NettyRequestWriter requestWriter = buildNettyRequest(
                 clientHttpRequest,
@@ -2694,7 +2698,7 @@ public class DefaultHttpClient implements
     public Publisher<MutableHttpResponse<?>> proxy(io.micronaut.http.HttpRequest<?> request) {
         return Flux.from(resolveRequestURI(request))
                 .flatMap(requestURI -> {
-                    AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request);
+                    AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request instanceof MutableHttpRequest ? request : request.mutate());
                     Flux<MutableHttpResponse<Object>> proxyResponsePublisher = Flux.create(emitter -> {
                         SslContext sslContext = buildSslContext(requestURI);
                         ChannelFuture channelFuture;
