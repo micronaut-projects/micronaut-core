@@ -30,14 +30,14 @@ dependencies {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
-    testImplementation 'io.micronaut.xml:micronaut-jackson-xml:2.3.2', {
+    testImplementation 'io.micronaut.xml:micronaut-jackson-xml:3.0.0', {
         exclude module:'micronaut-inject'
         exclude module:'micronaut-http'
     }
     testImplementation('com.fasterxml.jackson.core:jackson-databind')
 
     // following 3 dependencies needed for Http2PostTest
-    testImplementation 'io.vertx:vertx-core:3.9.4'
+    testImplementation 'io.vertx:vertx-core:4.1.3'
     testImplementation 'io.vertx:vertx-web-client:3.9.4'
     testImplementation group: 'org.eclipse.jetty', name: 'jetty-alpn-openjdk8-client', version: '9.4.38.v20210224'
 
