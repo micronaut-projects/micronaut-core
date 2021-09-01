@@ -35,6 +35,28 @@ import java.lang.annotation.Retention
  */
 class AnnotationMetadataWriterSpec extends AbstractBeanDefinitionSpec {
 
+    void "test inner annotations in metadata"() {
+        given:
+        def annotationMetadata = buildTypeAnnotationMetadata("inneranntest.Test","""
+package inneranntest;
+
+import java.lang.annotation.Retention;
+import static java.lang.annotation.RetentionPolicy.*;
+import io.micronaut.inject.annotation.Outer;
+
+@Outer.Inner
+class Test {
+    
+}
+""")
+
+        annotationMetadata = writeAndLoadMetadata('annmetadatatest.Test', annotationMetadata)
+
+        expect:
+        annotationMetadata.hasAnnotation(Outer.Inner)
+        annotationMetadata.hasDeclaredAnnotation(Outer.Inner)
+    }
+
     void "test annotation metadata with primitive arrays"() {
         given:
         AnnotationMetadata toWrite = buildTypeAnnotationMetadata('annmetawriter1.Test','''\

@@ -448,7 +448,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     @Override
     protected String getElementName(Element element) {
         if (element instanceof TypeElement) {
-            return ((TypeElement) element).getQualifiedName().toString();
+            return elementUtils.getBinaryName(((TypeElement) element)).toString();
         }
         return element.getSimpleName().toString();
     }
