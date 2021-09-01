@@ -20,9 +20,12 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextConfiguration
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.naming.NameUtils
+import io.micronaut.core.util.StringUtils
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.util.environment.RestoreSystemProperties
+
+import java.util.function.Function
 
 /**
  * Created by graemerocher on 12/06/2017.
@@ -333,6 +336,11 @@ class DefaultEnvironmentSpec extends Specification {
         ctx.close()
     }
     // end::disableEnvDeduction[]
+
+    void "test disable environment deduction via environment variable"() {
+        expect:
+        !DefaultEnvironment.shouldDeduceEnvironments(null, s -> (Environment.DEDUCE_ENVIRONMENT_ENV == s) ? StringUtils.FALSE : StringUtils.TRUE)
+    }
 
     void "test disable environment deduction via system property"() {
         when:

@@ -333,37 +333,67 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @return Whether environment names and packages should be deduced
      */
     protected boolean shouldDeduceEnvironments() {
+        return shouldDeduceEnvironments(deduceEnvironments);
+    }
+
+    /**
+     * Whether environments should be deduced.
+     * Evaluates, in order, if any of the following is present:
+     * - Value supplied via {@link io.micronaut.context.ApplicationContextBuilder#deduceEnvironment(Boolean)}
+     * - Environment variable {@link Environment#DEDUCE_ENVIRONMENT_ENV}
+     * - System property {@link Environment#DEDUCE_ENVIRONMENT_PROPERTY}
+     * if none is present the default value {@link Environment#DEDUCE_ENVIRONMENT_PROPERTY} is returned
+     * @param deduceEnvironments Property typically supplied via {@link io.micronaut.context.ApplicationContextBuilder#deduceEnvironment(Boolean)} indicating whether environments should be deduced
+     * @return Whether environments should be deduced
+     */
+    public static boolean shouldDeduceEnvironments(@Nullable Boolean deduceEnvironments) {
+        return shouldDeduceEnvironments(deduceEnvironments, System::getenv);
+    }
+
+    /**
+     * Whether environments should be deduced.
+     * Evaluates, in order, if any of the following is present:
+     * - Value supplied via {@link io.micronaut.context.ApplicationContextBuilder#deduceEnvironment(Boolean)}
+     * - Environment variable {@link Environment#DEDUCE_ENVIRONMENT_ENV}
+     * - System property {@link Environment#DEDUCE_ENVIRONMENT_PROPERTY}
+     * if none is present the default value {@link Environment#DEDUCE_ENVIRONMENT_PROPERTY} is returned
+     * @param deduceEnvironments Property typically supplied via {@link io.micronaut.context.ApplicationContextBuilder#deduceEnvironment(Boolean)} indicating whether environments should be deduced
+     * @param getEnvironmentVariable Function to retrieve environment variable. Typically {@code `System::getEnv`}.
+     * @return Whether environments should be deduced
+     */
+    static boolean shouldDeduceEnvironments(@Nullable Boolean deduceEnvironments, @NonNull Function<String, String> getEnvironmentVariable) {
         if (deduceEnvironments != null) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Environment deduction was set explicitly via builder to: " + deduceEnvironments);
             }
-
             return deduceEnvironments;
-        } else {
-            String deduceProperty = System.getProperty(Environment.DEDUCE_ENVIRONMENT_PROPERTY);
-            String deduceEnv = System.getenv(Environment.DEDUCE_ENVIRONMENT_ENV);
-
-            if (StringUtils.isNotEmpty(deduceEnv)) {
-                boolean deduce = Boolean.parseBoolean(deduceEnv);
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Environment deduction was set via environment variable to: " + deduce);
-                }
-                return deduce;
-            } else if (StringUtils.isNotEmpty(deduceProperty)) {
-                boolean deduce = Boolean.parseBoolean(deduceProperty);
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Environment deduction was set via system property to: " + deduce);
-                }
-                return deduce;
-            } else {
-                boolean deduceDefault = DEDUCE_ENVIRONMENT_DEFAULT;
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Environment deduction is using the default of: " + deduceDefault);
-                }
-                return deduceDefault;
-            }
         }
+
+        String deduceEnv = getEnvironmentVariable.apply(Environment.DEDUCE_ENVIRONMENT_ENV);
+        if (StringUtils.isNotEmpty(deduceEnv)) {
+            boolean deduce = Boolean.parseBoolean(deduceEnv);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Environment deduction was set via environment variable to: " + deduce);
+            }
+            return deduce;
+        }
+
+        String deduceProperty = System.getProperty(Environment.DEDUCE_ENVIRONMENT_PROPERTY);
+        if (StringUtils.isNotEmpty(deduceProperty)) {
+            boolean deduce = Boolean.parseBoolean(deduceProperty);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Environment deduction was set via system property to: " + deduce);
+            }
+            return deduce;
+        }
+
+        boolean deduceDefault = DEDUCE_ENVIRONMENT_DEFAULT;
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Environment deduction is using the default of: " + deduceDefault);
+        }
+        return deduceDefault;
     }
+
 
     /**
      * Creates the default annotation scanner.
