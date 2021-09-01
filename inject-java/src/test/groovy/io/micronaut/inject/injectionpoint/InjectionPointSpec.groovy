@@ -54,4 +54,15 @@ class InjectionPointSpec extends Specification {
         consumer.someType.name == 'four'
     }
 
+    def "inject point points are propagated for proxies with cacheable lazy target"() {
+        given:
+        def consumer = applicationContext.getBean(io.micronaut.inject.injectionpoint.cacheablelazytarget.ProxiedSomeBeanConsumer)
+
+        expect:
+        consumer.fromConstructor.name == 'one'
+        consumer.fromField.name == 'two'
+        consumer.fromMethod.name == 'three'
+        consumer.someType.name == 'four'
+    }
+
 }

@@ -173,6 +173,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private final Type proxyType;
     private final boolean hotswap;
     private final boolean lazy;
+    private final boolean cacheLazyTarget;
     private final boolean isInterface;
     private final BeanDefinitionWriter parentWriter;
     private final boolean isIntroduction;
@@ -219,6 +220,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.isProxyTarget = settings.get(Interceptor.PROXY_TARGET).orElse(false) || parent.isInterface();
         this.hotswap = isProxyTarget && settings.get(Interceptor.HOTSWAP).orElse(false);
         this.lazy = isProxyTarget && settings.get(Interceptor.LAZY).orElse(false);
+        this.cacheLazyTarget = lazy && settings.get(Interceptor.CACHEABLE_LAZY_TARGET).orElse(false);
         this.isInterface = parent.isInterface();
         this.packageName = parent.getPackageName();
         this.targetClassShortName = parent.getBeanSimpleName();
@@ -303,6 +305,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.isInterface = isInterface;
         this.hotswap = false;
         this.lazy = false;
+        this.cacheLazyTarget = false;
         this.targetClassShortName = className;
         this.targetClassFullName = packageName + '.' + targetClassShortName;
         this.parentWriter = null;
@@ -772,16 +775,17 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             );
 
             writeWithQualifierMethod(proxyClassWriter);
-
-            // add the $target field for the target bean
-            int modifiers = hotswap ? ACC_PRIVATE : ACC_PRIVATE | ACC_FINAL;
-            proxyClassWriter.visitField(
-                    modifiers,
-                    FIELD_TARGET,
-                    targetType.getDescriptor(),
-                    null,
-                    null
-            );
+            if (!lazy || cacheLazyTarget) {
+                // add the $target field for the target bean
+                int modifiers = hotswap ? ACC_PRIVATE : ACC_PRIVATE | ACC_FINAL;
+                proxyClassWriter.visitField(
+                        modifiers,
+                        FIELD_TARGET,
+                        targetType.getDescriptor(),
+                        null,
+                        null
+                );
+            }
             if (lazy) {
                 interceptedInterface = InterceptedProxy.class;
                 proxyClassWriter.visitField(
@@ -1384,61 +1388,66 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 Object.class.getName());
 
         if (lazy) {
-            // Object local = this.$target;
-            int targetLocal = interceptedTargetVisitor.newLocal(targetType);
-            interceptedTargetVisitor.loadThis();
-            interceptedTargetVisitor.getField(proxyType, FIELD_TARGET, targetType);
-            interceptedTargetVisitor.storeLocal(targetLocal, targetType);
-            // if (local == null) {
-            interceptedTargetVisitor.loadLocal(targetLocal, targetType);
-            Label returnLabel = new Label();
-            interceptedTargetVisitor.ifNonNull(returnLabel);
-            // synchronized (this) {
-            Label synchronizationEnd = new Label();
-            interceptedTargetVisitor.loadThis();
-            interceptedTargetVisitor.monitorEnter();
+            if (cacheLazyTarget) {
+                // Object local = this.$target;
+                int targetLocal = interceptedTargetVisitor.newLocal(targetType);
+                interceptedTargetVisitor.loadThis();
+                interceptedTargetVisitor.getField(proxyType, FIELD_TARGET, targetType);
+                interceptedTargetVisitor.storeLocal(targetLocal, targetType);
+                // if (local == null) {
+                interceptedTargetVisitor.loadLocal(targetLocal, targetType);
+                Label returnLabel = new Label();
+                interceptedTargetVisitor.ifNonNull(returnLabel);
+                // synchronized (this) {
+                Label synchronizationEnd = new Label();
+                interceptedTargetVisitor.loadThis();
+                interceptedTargetVisitor.monitorEnter();
 
-            Label tryLabel = new Label();
-            Label catchLabel = new Label();
+                Label tryLabel = new Label();
+                Label catchLabel = new Label();
 
-            interceptedTargetVisitor.visitTryCatchBlock(tryLabel, returnLabel, catchLabel, null);
+                interceptedTargetVisitor.visitTryCatchBlock(tryLabel, returnLabel, catchLabel, null);
 
-            // Try body
-            interceptedTargetVisitor.visitLabel(tryLabel);
-            // local = this.$target
-            interceptedTargetVisitor.loadThis();
-            interceptedTargetVisitor.getField(proxyType, FIELD_TARGET, targetType);
-            interceptedTargetVisitor.storeLocal(targetLocal, targetType);
-            // if (local == null) {
-            interceptedTargetVisitor.loadLocal(targetLocal, targetType);
-            interceptedTargetVisitor.ifNonNull(synchronizationEnd);
-            // this.$target =
-            interceptedTargetVisitor.loadThis();
-            pushResolveLazyProxyTargetBean(interceptedTargetVisitor, targetType);
-            interceptedTargetVisitor.putField(proxyType, FIELD_TARGET, targetType);
-            // cleanup this.$beanResolutionContext
-            interceptedTargetVisitor.loadThis();
-            interceptedTargetVisitor.push((String) null);
-            interceptedTargetVisitor.putField(proxyType, FIELD_BEAN_RESOLUTION_CONTEXT, Type.getType(BeanResolutionContext.class));
-            interceptedTargetVisitor.goTo(synchronizationEnd);
+                // Try body
+                interceptedTargetVisitor.visitLabel(tryLabel);
+                // local = this.$target
+                interceptedTargetVisitor.loadThis();
+                interceptedTargetVisitor.getField(proxyType, FIELD_TARGET, targetType);
+                interceptedTargetVisitor.storeLocal(targetLocal, targetType);
+                // if (local == null) {
+                interceptedTargetVisitor.loadLocal(targetLocal, targetType);
+                interceptedTargetVisitor.ifNonNull(synchronizationEnd);
+                // this.$target =
+                interceptedTargetVisitor.loadThis();
+                pushResolveLazyProxyTargetBean(interceptedTargetVisitor, targetType);
+                interceptedTargetVisitor.putField(proxyType, FIELD_TARGET, targetType);
+                // cleanup this.$beanResolutionContext
+                interceptedTargetVisitor.loadThis();
+                interceptedTargetVisitor.push((String) null);
+                interceptedTargetVisitor.putField(proxyType, FIELD_BEAN_RESOLUTION_CONTEXT, Type.getType(BeanResolutionContext.class));
+                interceptedTargetVisitor.goTo(synchronizationEnd);
 
-            // Catch body
-            interceptedTargetVisitor.visitLabel(catchLabel);
-            interceptedTargetVisitor.loadThis();
-            interceptedTargetVisitor.monitorExit();
-            interceptedTargetVisitor.throwException();
+                // Catch body
+                interceptedTargetVisitor.visitLabel(catchLabel);
+                interceptedTargetVisitor.loadThis();
+                interceptedTargetVisitor.monitorExit();
+                interceptedTargetVisitor.throwException();
 
-            // Synchronization end label
-            interceptedTargetVisitor.visitLabel(synchronizationEnd);
-            interceptedTargetVisitor.loadThis();
-            interceptedTargetVisitor.monitorExit();
-            interceptedTargetVisitor.goTo(returnLabel);
+                // Synchronization end label
+                interceptedTargetVisitor.visitLabel(synchronizationEnd);
+                interceptedTargetVisitor.loadThis();
+                interceptedTargetVisitor.monitorExit();
+                interceptedTargetVisitor.goTo(returnLabel);
 
-            // Return label just loads and returns value
-            interceptedTargetVisitor.visitLabel(returnLabel);
-            interceptedTargetVisitor.loadThis();
-            interceptedTargetVisitor.getField(proxyType, FIELD_TARGET, targetType);
-            interceptedTargetVisitor.returnValue();
+                // Return label just loads and returns value
+                interceptedTargetVisitor.visitLabel(returnLabel);
+                interceptedTargetVisitor.loadThis();
+                interceptedTargetVisitor.getField(proxyType, FIELD_TARGET, targetType);
+                interceptedTargetVisitor.returnValue();
+            } else {
+                pushResolveLazyProxyTargetBean(interceptedTargetVisitor, targetType);
+                interceptedTargetVisitor.returnValue();
+            }
         } else {
             int localRef = -1;
             Label l1 = null;
