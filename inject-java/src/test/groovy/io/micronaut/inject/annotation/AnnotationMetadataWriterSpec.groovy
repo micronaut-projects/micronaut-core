@@ -47,6 +47,28 @@ import java.lang.annotation.Retention
  */
 class AnnotationMetadataWriterSpec extends AbstractTypeElementSpec {
 
+    void "test inner annotations in metadata"() {
+        given:
+        def annotationMetadata = buildTypeAnnotationMetadata("""
+package inneranntest;
+
+import java.lang.annotation.Retention;
+import static java.lang.annotation.RetentionPolicy.*;
+import io.micronaut.inject.annotation.Outer;
+
+@Outer.Inner
+class Test {
+    
+}
+""")
+
+        annotationMetadata = writeAndLoadMetadata('annmetadatatest.Test', annotationMetadata)
+
+        expect:
+        annotationMetadata.hasAnnotation(Outer.Inner)
+        annotationMetadata.hasDeclaredAnnotation(Outer.Inner)
+    }
+
     @Unroll
     void "test read/write annotation array type #type"() {
         given:
