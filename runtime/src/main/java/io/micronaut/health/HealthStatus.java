@@ -17,6 +17,7 @@ package io.micronaut.health;
 
 import com.fasterxml.jackson.annotation.JsonValue;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 
 import javax.validation.constraints.NotNull;
 import java.util.Optional;
@@ -29,6 +30,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Introspected
+@ReflectiveAccess
 public class HealthStatus implements Comparable<HealthStatus> {
 
     /**

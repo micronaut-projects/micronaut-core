@@ -12,21 +12,21 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
-import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import io.micronaut.test.support.TestPropertyProvider;
 import io.vertx.core.Vertx;
-import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpClientOptions;
 import io.vertx.core.http.HttpMethod;
+import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import reactor.core.publisher.Flux;
 
-import javax.inject.Inject;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -46,25 +46,25 @@ public class Http2PostTest implements TestPropertyProvider {
 
     @Inject
     @Client(value = "/", httpVersion = HttpVersion.HTTP_2_0)
-    RxHttpClient client;
+    HttpClient client;
 
     @Inject
     ServerSslBuilder serverSslBuilder;
 
     @Test
     void testPost() {
-        HttpResponse<String> result = client.exchange(HttpRequest.POST("/vertx/demo/testPost", "Request-1")
-                .contentType(MediaType.TEXT_PLAIN), String.class)
-                .blockingFirst();
+        HttpResponse<String> result = Flux.from(client.exchange(HttpRequest.POST("/vertx/demo/testPost", "Request-1")
+                .contentType(MediaType.TEXT_PLAIN), String.class))
+                .blockFirst();
 
         Assertions.assertEquals(
                 "Test succeeded on POST. Received : Request-1",
                 result.body()
         );
 
-        result = client.exchange(HttpRequest.POST("/vertx/demo/testPost", "Request-2")
-                .contentType(MediaType.TEXT_PLAIN), String.class)
-                .blockingFirst();
+        result = Flux.from(client.exchange(HttpRequest.POST("/vertx/demo/testPost", "Request-2")
+                .contentType(MediaType.TEXT_PLAIN), String.class))
+                .blockFirst();
 
         Assertions.assertEquals(
                 "Test succeeded on POST. Received : Request-2",
@@ -84,7 +84,7 @@ public class Http2PostTest implements TestPropertyProvider {
                 .setUseAlpn(true)
                 .setDefaultHost("localhost")
                 .setDefaultPort(embeddedServer.getPort());
-        HttpClient client = vertx.createHttpClient(options);
+        io.vertx.core.http.HttpClient client = vertx.createHttpClient(options);
         CompletableFuture<String> result = new CompletableFuture<>();
         // Going to send 2 POST requests. 2nd request will not be succeessful
         client.request(HttpMethod.POST, "/vertx/demo/testPost", response -> {

@@ -19,8 +19,6 @@ import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.support.AbstractBeanDefinitionSpec
 
-import javax.inject.Scope
-
 class RefreshScopeBeanSpec extends AbstractBeanDefinitionSpec {
 
     void "test configuration properties path"() {

@@ -15,20 +15,37 @@
  */
 package io.micronaut.inject.method.setinjection;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import io.micronaut.context.BeanContext;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+
 import java.util.Set;
 
 @Singleton
 public class B {
     private Set<A> all;
+    private Set<A> allPrivate;
+    private BeanContext beanContext;
 
     @Inject
     void setA(Set<A> a) {
         this.all = a;
     }
 
+    @Inject
+    private void setPrivate(Set<A> a, BeanContext beanContext) {
+        this.all = a;
+    }
+
     Set<A> getAll() {
         return this.all;
+    }
+
+    public Set<A> getAllPrivate() {
+        return allPrivate;
+    }
+
+    public BeanContext getBeanContext() {
+        return beanContext;
     }
 }

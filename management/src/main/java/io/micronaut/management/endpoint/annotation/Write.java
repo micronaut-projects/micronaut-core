@@ -15,16 +15,17 @@
  */
 package io.micronaut.management.endpoint.annotation;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.EntryPoint;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * A method designed to annotate an {@link Endpoint} write operation.
@@ -37,6 +38,7 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 @Executable
 @EntryPoint
+@Inherited
 public @interface Write {
 
     /**

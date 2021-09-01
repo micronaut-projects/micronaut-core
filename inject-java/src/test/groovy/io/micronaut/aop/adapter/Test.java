@@ -19,7 +19,7 @@ import io.micronaut.aop.Adapter;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.StartupEvent;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     private boolean invoked = false;

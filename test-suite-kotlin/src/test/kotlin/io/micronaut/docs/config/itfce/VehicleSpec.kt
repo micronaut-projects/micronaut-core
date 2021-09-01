@@ -1,13 +1,11 @@
 package io.micronaut.docs.config.itfce
 
-import io.kotlintest.matchers.string.shouldContain
-import io.kotlintest.matchers.types.shouldNotBeNull
-import io.kotlintest.shouldBe
-import io.kotlintest.shouldThrow
-import io.kotlintest.specs.StringSpec
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.matchers.shouldBe
+import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.string.shouldContain
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.BeanInstantiationException
-import io.micronaut.context.exceptions.DependencyInjectionException
 
 class VehicleSpec: StringSpec({
 

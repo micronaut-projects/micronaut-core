@@ -24,7 +24,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
@@ -59,7 +59,7 @@ class ClientFilterSpec extends Specification{
 
     void "test a client with no service ids doesn't match a filter with a service id"() {
         given:
-        RxHttpClient client = context.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange("/filters/name", String.class)

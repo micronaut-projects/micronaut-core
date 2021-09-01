@@ -13,6 +13,8 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.NamedAnnotationMapper
 import io.micronaut.inject.visitor.VisitorContext
+import io.micronaut.inject.writer.BeanDefinitionWriter
+import spock.lang.Issue
 
 import java.lang.annotation.Annotation
 
@@ -25,7 +27,7 @@ package mapperbinding;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 @Singleton
@@ -72,7 +74,7 @@ package annbinding2;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import io.micronaut.aop.simple.*;
 
@@ -151,7 +153,7 @@ package annbinding1;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 @Singleton
@@ -208,7 +210,7 @@ package justaround;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 @Singleton
@@ -258,14 +260,64 @@ class AnotherInterceptor implements Interceptor {
         context.close()
     }
 
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/5522')
+    void 'test Around annotation on private method fails'() {
+        when:
+        buildContext('''
+package around.priv.method;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import jakarta.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Singleton
+class MyBean {
+    @TestAnn
+    private void foobar() {
+    }
+}
+
+@Retention(RUNTIME)
+@Target([ElementType.METHOD, ElementType.TYPE])
+@Around
+@interface TestAnn {
+}
+''')
+
+        then:
+        Throwable t = thrown()
+        t.message.contains 'Method annotated as executable but is declared private'
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/5522')
+    void 'based on http-client StreamSpec; allow private method with Executable stereotype as long as not declared'() {
+        when:
+        buildContext('''
+package stream.spec;
+
+import io.micronaut.http.annotation.*;
+
+    @Controller('/stream')
+    class StreamEchoController {
+        private static String helper(String s) {
+            s.toUpperCase()
+        }
+    }
+''')
+
+        then:
+        noExceptionThrown()
+    }
+
     void 'test byte[] return compile'() {
         given:
         ApplicationContext context = buildContext('''
-package test;
+package aroundctest1;
 
 import io.micronaut.aop.proxytarget.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Mutating("someVal")
 class MyBean {
     byte[] test(byte[] someVal) {
@@ -273,7 +325,7 @@ class MyBean {
     };
 }
 ''')
-        def instance = getBean(context, 'test.MyBean')
+        def instance = getBean(context, 'aroundctest1.MyBean')
         expect:
         instance != null
 
@@ -283,13 +335,13 @@ class MyBean {
 
     void 'compile simple AOP advice'() {
         given:
-        BeanDefinition beanDefinition = buildInterceptedBeanDefinition('test.MyBean', '''
-package test;
+        BeanDefinition beanDefinition = buildInterceptedBeanDefinition('aroundctest2.MyBean', '''
+package aroundctest2;
 
 import io.micronaut.aop.interceptors.*;
 import io.micronaut.aop.simple.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Mutating("someVal")
 @TestBinding
 class MyBean {
@@ -297,13 +349,13 @@ class MyBean {
 }
 ''')
 
-        BeanDefinitionReference ref = buildInterceptedBeanDefinitionReference('test.MyBean', '''
-package test;
+        BeanDefinitionReference ref = buildInterceptedBeanDefinitionReference('aroundctest3.MyBean', '''
+package aroundctest3;
 
 import io.micronaut.aop.interceptors.*;
 import io.micronaut.aop.simple.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Mutating("someVal")
 @TestBinding
 class MyBean {
@@ -324,9 +376,9 @@ class MyBean {
         values[1].enumValue("kind", InterceptorKind).get() == InterceptorKind.AROUND
         beanDefinition != null
         beanDefinition instanceof AdvisedBeanType
-        beanDefinition.interceptedType.name == 'test.MyBean'
+        beanDefinition.interceptedType.name == 'aroundctest2.MyBean'
         ref in AdvisedBeanType
-        ref.interceptedType.name == 'test.MyBean'
+        ref.interceptedType.name == 'aroundctest3.MyBean'
     }
 
     void 'test multiple annotations on a single method'() {
@@ -336,7 +388,7 @@ package annbinding2;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import io.micronaut.aop.simple.*;
 
@@ -405,7 +457,7 @@ package annbinding2;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import io.micronaut.aop.simple.*;
 
@@ -463,7 +515,7 @@ package annbinding2;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import io.micronaut.aop.simple.*;
 
@@ -526,8 +578,8 @@ class TestInterceptor implements Interceptor {
 
     void "test validated on class with generics"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.$BaseEntityServiceDefinition$Intercepted', """
-package test;
+        BeanDefinition beanDefinition = buildBeanDefinition('aroundctest4.$BaseEntityService' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, """
+package aroundctest4;
 
 @io.micronaut.validation.Validated
 class BaseEntityService<T extends BaseEntity> extends BaseService<T> {
@@ -547,7 +599,7 @@ interface IBeanValidator<T> {
         then:
         noExceptionThrown()
         beanDefinition != null
-        beanDefinition.getTypeArguments('test.BaseService')[0].type.name == 'test.BaseEntity'
+        beanDefinition.getTypeArguments('aroundctest4.BaseService')[0].type.name == 'aroundctest4.BaseEntity'
     }
 
     static class NamedTestAnnMapper implements NamedAnnotationMapper {

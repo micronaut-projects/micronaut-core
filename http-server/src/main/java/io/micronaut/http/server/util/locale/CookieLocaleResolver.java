@@ -15,12 +15,12 @@
  */
 package io.micronaut.http.server.util.locale;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.Locale;
 import java.util.Optional;
 

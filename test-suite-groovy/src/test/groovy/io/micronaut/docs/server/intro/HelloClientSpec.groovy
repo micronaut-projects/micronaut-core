@@ -18,9 +18,10 @@ package io.micronaut.docs.server.intro
 import io.micronaut.context.annotation.Property
 // tag::imports[]
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import reactor.core.publisher.Mono
 import spock.lang.Specification
 
-import javax.inject.Inject
+import jakarta.inject.Inject
 // end::imports[]
 
 /**
@@ -36,7 +37,7 @@ class HelloClientSpec extends Specification {
 
     void "test hello world response"() {
         expect:
-        client.hello().blockingGet() == "Hello World" // <3>
+        Mono.from(client.hello()).block() == "Hello World" // <3>
     }
 
 }

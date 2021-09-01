@@ -62,6 +62,15 @@ public interface AnnotationMetadata extends AnnotationSource {
     String CLASS_NAME_SUFFIX = "$$AnnotationMetadata";
 
     /**
+     * Gets the declared metadata without inherited metdata.
+     * @return The declared metadata
+     * @since 3.0.0
+     */
+    default @NonNull AnnotationMetadata getDeclaredMetadata() {
+        return this;
+    }
+
+    /**
      * Does the metadata contain any property expressions like {@code ${foo.bar}}. Note
      * this by default returns {@code true} as previous versions of Micronaut must assume metadata
      * is present. The compilation time this is computed in order to decide whether to instrument
@@ -122,6 +131,21 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default @NonNull <T> OptionalValues<T> getValues(@NonNull String annotation, @NonNull Class<T> valueType) {
         return OptionalValues.empty();
+    }
+
+    /**
+     * Get all of the values for the given annotation and type of the underlying values.
+     *
+     * @param annotation The annotation name
+     * @return An immutable map of values
+     */
+    default @NonNull Map<CharSequence, Object> getValues(@NonNull String annotation) {
+        final AnnotationValue<Annotation> ann = getAnnotation(annotation);
+        if (ann != null) {
+            return ann.getValues();
+        } else {
+            return Collections.emptyMap();
+        }
     }
 
     /**
@@ -326,6 +350,31 @@ public interface AnnotationMetadata extends AnnotationSource {
         return hasDeclaredAnnotation(annotationClass);
     }
 
+
+    /**
+     * @see AnnotationSource#isAnnotationPresent(String)
+     */
+    @Override
+    default boolean isAnnotationPresent(@NonNull String annotationName) {
+        //noinspection ConstantConditions
+        if (annotationName == null) {
+            return false;
+        }
+        return hasAnnotation(annotationName);
+    }
+
+    /**
+     * @see AnnotationSource#isAnnotationPresent(String)
+     */
+    @Override
+    default boolean isDeclaredAnnotationPresent(@NonNull String annotationName) {
+        //noinspection ConstantConditions
+        if (annotationName == null) {
+            return false;
+        }
+        return hasDeclaredAnnotation(annotationName);
+    }
+
     /**
      * Return the default value for the given annotation member.
      *
@@ -528,9 +577,19 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return A set of annotation names
      */
     default @NonNull List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull Class<? extends Annotation> stereotype) {
+        return getAnnotationTypesByStereotype(stereotype.getName());
+    }
+
+    /**
+     * Resolve all of the annotation names that feature the given stereotype.
+     *
+     * @param stereotype The annotation names
+     * @return A set of annotation names
+     */
+    default @NonNull List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull String stereotype) {
         ArgumentUtils.requireNonNull("stereotype", stereotype);
 
-        List<String> names = getAnnotationNamesByStereotype(stereotype.getName());
+        List<String> names = getAnnotationNamesByStereotype(stereotype);
         List<Class<? extends Annotation>> list = new ArrayList<>(names.size());
         for (String name : names) {
             Optional<Class<? extends Annotation>> opt = getAnnotationType(name);
@@ -1045,6 +1104,27 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return The string values if it is present
      */
     default @NonNull String[] stringValues(@NonNull Class<? extends Annotation> annotation) {
+        return stringValues(annotation, VALUE_MEMBER);
+    }
+
+    /**
+     * The values as string array for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @param member     The member
+     * @return The string values if it is present
+     */
+    default @NonNull String[] stringValues(@NonNull String annotation, @NonNull String member) {
+        return StringUtils.EMPTY_STRING_ARRAY;
+    }
+
+    /**
+     * The values as string array for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @return The string values if it is present
+     */
+    default @NonNull String[] stringValues(@NonNull String annotation) {
         return stringValues(annotation, VALUE_MEMBER);
     }
 

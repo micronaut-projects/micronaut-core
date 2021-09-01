@@ -19,6 +19,7 @@ import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.FieldElement;
 import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.control.SourceUnit;
@@ -26,6 +27,8 @@ import org.codehaus.groovy.control.SourceUnit;
 import io.micronaut.core.annotation.NonNull;
 
 import java.lang.reflect.Modifier;
+import java.util.Collections;
+import java.util.Set;
 
 /**
  * A field element returning data from a {@link Variable}. The
@@ -51,6 +54,15 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
         super(visitorContext, annotatedNode, annotationMetadata);
         this.variable = variable;
         this.sourceUnit = visitorContext.getSourceUnit();
+    }
+
+    @Override
+    public Set<ElementModifier> getModifiers() {
+        if (variable instanceof FieldNode) {
+            return super.resolveModifiers(((FieldNode) variable));
+        } else {
+            return Collections.emptySet();
+        }
     }
 
     @Override

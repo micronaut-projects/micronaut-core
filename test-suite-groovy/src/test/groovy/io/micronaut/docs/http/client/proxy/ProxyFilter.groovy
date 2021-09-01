@@ -7,6 +7,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.client.ProxyHttpClient
+import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.http.uri.UriBuilder
@@ -16,7 +17,7 @@ import org.reactivestreams.Publisher
 
 // tag::class[]
 @Filter("/proxy/**")
-class ProxyFilter extends OncePerRequestHttpServerFilter { // <1>
+class ProxyFilter implements HttpServerFilter { // <1>
 
     private final ProxyHttpClient client
     private final EmbeddedServer embeddedServer
@@ -28,8 +29,8 @@ class ProxyFilter extends OncePerRequestHttpServerFilter { // <1>
     }
 
     @Override
-    protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request,
-                                                             ServerFilterChain chain) {
+    Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request,
+                                               ServerFilterChain chain) {
         Publishers.map(client.proxy( // <3>
                 request.mutate() // <4>
                         .uri { UriBuilder b -> // <5>

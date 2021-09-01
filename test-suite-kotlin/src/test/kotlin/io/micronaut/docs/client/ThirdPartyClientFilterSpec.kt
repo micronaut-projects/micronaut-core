@@ -1,7 +1,7 @@
 package io.micronaut.docs.client
 
-import io.kotlintest.shouldBe
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.annotation.Value
@@ -12,15 +12,15 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
 import org.reactivestreams.Publisher
 import java.util.Base64
-import javax.inject.Singleton
+import jakarta.inject.Singleton
+import reactor.core.publisher.Flux
 
 class ThirdPartyClientFilterSpec: StringSpec() {
     private var result: String? = null
@@ -37,14 +37,14 @@ class ThirdPartyClientFilterSpec: StringSpec() {
     )
 
     val client = autoClose(
-        embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
+        embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
     )
 
     init {
         "a client filter is applied to the request and adds the authorization header" {
             val bintrayService = embeddedServer.applicationContext.getBean(BintrayService::class.java)
 
-            result = bintrayService.fetchRepositories().blockingFirst().body()
+            result = bintrayService.fetchRepositories().blockFirst().body()
 
             val encoded = Base64.getEncoder().encodeToString("$username:$token".toByteArray())
             val expected = "Basic $encoded"
@@ -66,15 +66,15 @@ class ThirdPartyClientFilterSpec: StringSpec() {
 //tag::bintrayService[]
 @Singleton
 internal class BintrayService(
-        @param:Client(BintrayApi.URL) val client: RxHttpClient, // <1>
-        @param:Value("\${bintray.organization}") val org: String) {
+    @param:Client(BintrayApi.URL) val client: HttpClient, // <1>
+    @param:Value("\${bintray.organization}") val org: String) {
 
-    fun fetchRepositories(): Flowable<HttpResponse<String>> {
-        return client.exchange(HttpRequest.GET<Any>("/repos/$org"), String::class.java) // <2>
+    fun fetchRepositories(): Flux<HttpResponse<String>> {
+        return Flux.from(client.exchange(HttpRequest.GET<Any>("/repos/$org"), String::class.java)) // <2>
     }
 
-    fun fetchPackages(repo: String): Flowable<HttpResponse<String>> {
-        return client.exchange(HttpRequest.GET<Any>("/repos/$org/$repo/packages"), String::class.java) // <2>
+    fun fetchPackages(repo: String): Flux<HttpResponse<String>> {
+        return Flux.from(client.exchange(HttpRequest.GET<Any>("/repos/$org/$repo/packages"), String::class.java)) // <2>
     }
 }
 //end::bintrayService[]

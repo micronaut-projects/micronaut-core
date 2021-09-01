@@ -16,8 +16,8 @@
 package io.micronaut.validation.validator.constraints;
 
 import io.micronaut.core.annotation.AnnotationValue;
-
 import io.micronaut.core.annotation.NonNull;
+
 import javax.validation.ValidationException;
 import javax.validation.constraints.Pattern;
 import java.lang.annotation.Annotation;

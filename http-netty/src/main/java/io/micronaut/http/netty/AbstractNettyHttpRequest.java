@@ -15,11 +15,15 @@
  */
 package io.micronaut.http.netty;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.http.*;
+import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpParameters;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpVersion;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
@@ -55,9 +59,9 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     protected final String httpMethodName;
 
     private NettyHttpParameters httpParameters;
-    private MediaType mediaType;
+    private Optional<MediaType> mediaType;
     private Charset charset;
-    private Locale locale;
+    private Optional<Locale> locale;
     private String path;
     private Collection<MediaType> accept;
 
@@ -159,62 +163,34 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
 
     @Override
     public Collection<MediaType> accept() {
-        Collection<MediaType> accept = this.accept;
         if (accept == null) {
-            synchronized (this) { // double check
-                accept = this.accept;
-                if (accept == null) {
-                    accept = HttpRequest.super.accept();
-                    this.accept = accept;
-                }
-            }
+            accept = HttpRequest.super.accept();
         }
         return accept;
     }
 
     @Override
     public Optional<MediaType> getContentType() {
-        MediaType contentType = this.mediaType;
-        if (contentType == null) {
-            synchronized (this) { // double check
-                contentType = this.mediaType;
-                if (contentType == null) {
-                    contentType = HttpRequest.super.getContentType().orElse(null);
-                    this.mediaType = contentType;
-                }
-            }
+        if (mediaType == null) {
+            mediaType = HttpRequest.super.getContentType();
         }
-        return Optional.ofNullable(contentType);
+        return mediaType;
     }
 
     @Override
     public Charset getCharacterEncoding() {
-        Charset charset = this.charset;
         if (charset == null) {
-            synchronized (this) { // double check
-                charset = this.charset;
-                if (charset == null) {
-                    charset = initCharset(HttpRequest.super.getCharacterEncoding());
-                    this.charset = charset;
-                }
-            }
+            charset = initCharset(HttpRequest.super.getCharacterEncoding());
         }
         return charset;
     }
 
     @Override
     public Optional<Locale> getLocale() {
-        Locale locale = this.locale;
         if (locale == null) {
-            synchronized (this) { // double check
-                locale = this.locale;
-                if (locale == null) {
-                    locale = HttpRequest.super.getLocale().orElse(null);
-                    this.locale = locale;
-                }
-            }
+            locale = HttpRequest.super.getLocale();
         }
-        return Optional.ofNullable(locale);
+        return locale;
     }
 
     @Override

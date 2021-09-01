@@ -16,14 +16,86 @@
 package io.micronaut.core.type
 
 import spock.lang.Specification
-
-import java.lang.reflect.ParameterizedType
-
+import spock.lang.Unroll
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
 class ArgumentSpec extends Specification {
+
+    private List<String> stringList
+    private List<Integer> integerList
+    private Map<String, Integer> mapStringInteger
+    private Map<String, ?> mapStringWildcardInteger
+    private Map<?, ?> wildcardMap
+    private Map<Object, Object> objectMap
+    private Map noTypeMap
+    private List noTypeList
+    private List<?> wildcardList
+    private List<Object> objectList
+    private List<Argument<?>> nestedWildcardList;
+    private List<Argument<String>> nestedStringList;
+    private List<Argument<Integer>> nestedIntegerList;
+
+    @Unroll
+    void 'test of parameterized type #field'() {
+        given:
+        def listOfString = Argument.of(getClass().getDeclaredField(field).genericType)
+
+        expect:
+        listOfString.type == type
+        listOfString.typeParameters*.type == parameters
+
+        where:
+        field                | type | parameters
+        "stringList"         | List | [String]
+        "wildcardList"       | List | []
+        "nestedWildcardList" | List | [Argument]
+        "mapStringInteger"   | Map  | [String, Integer]
+    }
+
+    @Unroll
+    void 'test #field isAssignableFrom from #candidateField should be #result'() {
+        given:
+            def argument = Argument.of(getClass().getDeclaredField(field).genericType)
+            def candidateArgument = Argument.of(getClass().getDeclaredField(candidateField).genericType)
+
+        expect:
+            argument.isAssignableFrom(candidateArgument) == result
+
+        where:
+            field                      | candidateField             | result
+            "noTypeList"               | "wildcardList"             | true
+            "wildcardList"             | "wildcardList"             | true
+            "objectList"               | "wildcardList"             | true
+            "stringList"               | "integerList"              | false
+            "wildcardList"             | "integerList"              | true
+            "wildcardList"             | "stringList"               | true
+            "objectList"               | "integerList"              | true
+            "objectList"               | "stringList"               | true
+            "wildcardList"             | "mapStringInteger"         | false
+            "stringList"               | "wildcardList"             | false
+            "integerList"              | "wildcardList"             | false
+            "integerList"              | "objectList"               | false
+            "nestedWildcardList"       | "nestedStringList"         | true
+            "nestedWildcardList"       | "nestedIntegerList"        | true
+            "nestedStringList"         | "nestedWildcardList"       | false
+            "nestedIntegerList"        | "nestedWildcardList"       | false
+            "noTypeList"               | "nestedWildcardList"       | true
+            "wildcardList"             | "nestedWildcardList"       | true
+            "wildcardList"             | "nestedWildcardList"       | true
+            "wildcardList"             | "nestedStringList"         | true
+            "wildcardList"             | "nestedIntegerList"        | true
+            "mapStringWildcardInteger" | "mapStringInteger"         | true
+            "mapStringInteger"         | "mapStringWildcardInteger" | false
+            "mapStringInteger"         | "objectMap"                | false
+            "wildcardMap"              | "mapStringInteger"         | true
+            "wildcardMap"              | "mapStringWildcardInteger" | true
+            "noTypeMap"                | "mapStringInteger"         | true
+            "noTypeMap"                | "mapStringWildcardInteger" | true
+            "objectMap"                | "mapStringInteger"         | true
+            "objectMap"                | "mapStringWildcardInteger" | true
+    }
 
     void "test as parameterized type"() {
         given:

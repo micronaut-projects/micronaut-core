@@ -15,10 +15,10 @@
  */
 package io.micronaut.http.server.netty.configuration;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
@@ -28,8 +28,8 @@ import io.micronaut.runtime.ApplicationConfiguration;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.ApplicationProtocolNames;
+import jakarta.inject.Inject;
 
-import javax.inject.Inject;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
@@ -99,6 +99,13 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_COMPRESSIONLEVEL = 6;
+
+    /**
+     * The default configuration for boolean flag indicating whether to add connection header `keep-alive` to responses with HttpStatus > 499.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR = false;
+
     private final List<ChannelPipelineListener> pipelineCustomizers;
 
     private Map<ChannelOption, Object> childOptions = Collections.emptyMap();
@@ -118,6 +125,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private String fallbackProtocol = ApplicationProtocolNames.HTTP_1_1;
     private AccessLogger accessLogger;
     private Http2Settings http2Settings = new Http2Settings();
+    private boolean keepAliveOnServerError = DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR;
 
     /**
      * Default empty constructor.
@@ -327,6 +335,13 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
+     * @return True if the connection should be kept alive on internal server errors
+     */
+    public boolean isKeepAliveOnServerError() {
+        return keepAliveOnServerError;
+    }
+
+    /**
      * Sets the Netty child worker options.
      *
      * @param childOptions The options
@@ -438,6 +453,14 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setCompressionLevel(@ReadableBytes int compressionLevel) {
         this.compressionLevel = compressionLevel;
+    }
+
+    /**
+     * Whether to send connection keep alive on internal server errors. Default value ({@value DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR}).
+     * @param keepAliveOnServerError The keep alive on server error flag
+     */
+    public void setKeepAliveOnServerError(boolean keepAliveOnServerError) {
+        this.keepAliveOnServerError = keepAliveOnServerError;
     }
 
     /**

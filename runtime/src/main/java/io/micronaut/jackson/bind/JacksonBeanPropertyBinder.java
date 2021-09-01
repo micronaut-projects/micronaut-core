@@ -35,8 +35,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.jackson.JacksonConfiguration;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +51,7 @@ import java.util.Set;
  */
 @Singleton
 @Primary
-public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
+class JacksonBeanPropertyBinder implements BeanPropertyBinder {
 
     private final ObjectMapper objectMapper;
     private final int arraySizeThreshhold;
@@ -60,7 +60,7 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
      * @param objectMapper  To read/write JSON
      * @param configuration The configuration for Jackson JSON parser
      */
-    public JacksonBeanPropertyBinder(ObjectMapper objectMapper, JacksonConfiguration configuration) {
+    JacksonBeanPropertyBinder(ObjectMapper objectMapper, JacksonConfiguration configuration) {
         this.objectMapper = objectMapper;
         this.arraySizeThreshhold = configuration.getArraySizeThreshold();
     }

@@ -16,15 +16,18 @@
 package io.micronaut.http.server.netty.websocket
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.util.StreamUtils
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.websocket.RxWebSocketClient
+import io.micronaut.websocket.WebSocketClient
+import io.micronaut.websocket.exceptions.WebSocketClientException
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
-
-import javax.inject.Inject
-import javax.inject.Singleton
 
 class SimpleTextWebSocketSpec extends Specification {
 
@@ -35,9 +38,9 @@ class SimpleTextWebSocketSpec extends Specification {
         PollingConditions conditions = new PollingConditions(timeout: 15    , delay: 0.5)
 
         when: "a websocket connection is established"
-        RxWebSocketClient wsClient = embeddedServer.applicationContext.createBean(RxWebSocketClient, embeddedServer.getURI())
-        ChatClientWebSocket fred = wsClient.connect(ChatClientWebSocket, "/chat/stuff/fred").blockingFirst()
-        ChatClientWebSocket bob = wsClient.connect(ChatClientWebSocket, [topic:"stuff",username:"bob"]).blockingFirst()
+        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
+        ChatClientWebSocket fred = Flux.from(wsClient.connect(ChatClientWebSocket, "/chat/stuff/fred")).blockFirst()
+        ChatClientWebSocket bob = Flux.from(wsClient.connect(ChatClientWebSocket, [topic:"stuff",username:"bob"])).blockFirst()
 
         then:"The connection is valid"
         fred.session != null
@@ -56,7 +59,6 @@ class SimpleTextWebSocketSpec extends Specification {
             fred.replies.contains("[bob] Joined!")
             fred.replies.size() == 1
         }
-
 
         when:"A message is sent"
         fred.send("Hello bob!")
@@ -79,7 +81,7 @@ class SimpleTextWebSocketSpec extends Specification {
             bob.replies.size() == 1
         }
         fred.sendAsync("foo").get() == 'foo'
-        fred.sendRx("bar").blockingGet() == 'bar'
+        Mono.from(fred.sendRx("bar")).block() == 'bar'
 
         when:
         bob.close()
@@ -113,14 +115,17 @@ class SimpleTextWebSocketSpec extends Specification {
         PollingConditions conditions = new PollingConditions(timeout: 15    , delay: 0.5)
 
         when: "a websocket connection is established"
-        RxWebSocketClient wsClient = embeddedServer.applicationContext.createBean(RxWebSocketClient, embeddedServer.getURI())
-        ChatClientWebSocket fred = wsClient.connect(ChatClientWebSocket, "/chat/stuff/fred").blockingFirst()
-        ChatClientWebSocket bob = wsClient.connect(ChatClientWebSocket, [topic:"stuff",username:"bob"]).blockingFirst()
+        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
+        ChatClientWebSocket fred = Flux.from(wsClient.connect(ChatClientWebSocket, "/chat/stuff/fred")).blockFirst()
+        ChatClientWebSocket bob = Flux.from(wsClient.connect(ChatClientWebSocket, [topic:"stuff",username:"bob"])).blockFirst()
+        ChatServerWebSocket server = embeddedServer.applicationContext.getBean(ChatServerWebSocket)
 
         then:"The connection is valid"
         fred.session != null
         fred.session.id != null
         fred.request != null
+        fred.subProtocol == null
+        server.subProtocol == null
 
         then:"A session is established"
         fred.session != null
@@ -134,7 +139,6 @@ class SimpleTextWebSocketSpec extends Specification {
             fred.replies.contains("[bob] Joined!")
             fred.replies.size() == 1
         }
-
 
         when:"A message is sent"
         fred.send("Hello bob!")
@@ -157,7 +161,7 @@ class SimpleTextWebSocketSpec extends Specification {
             bob.replies.size() == 1
         }
         fred.sendAsync("foo").get() == 'foo'
-        fred.sendRx("bar").blockingGet() == 'bar'
+        Mono.from(fred.sendRx("bar")).block() == 'bar'
 
         when:
         bob.close()
@@ -186,8 +190,8 @@ class SimpleTextWebSocketSpec extends Specification {
         PollingConditions conditions = new PollingConditions(timeout: 2, delay: 0.5)
 
         when: "a websocket connection is established"
-        RxWebSocketClient wsClient = embeddedServer.applicationContext.createBean(RxWebSocketClient, embeddedServer.getURI())
-        QueryParamClientWebSocket client = wsClient.connect(QueryParamClientWebSocket, "/charity?dinner=chicken%20dumplings").blockingFirst()
+        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
+        QueryParamClientWebSocket client = wsClient.connect(QueryParamClientWebSocket, "/charity?dinner=chicken%20dumplings").blockFirst()
 
         then: "The connection is valid"
         client.session.id != null
@@ -205,11 +209,39 @@ class SimpleTextWebSocketSpec extends Specification {
         embeddedServer.close()
     }
 
+    void "test a filter responding to a websocket upgrade request"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.builder(
+                'websocket-filter-respond': true
+        ).run(EmbeddedServer)
+
+        when:
+        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
+        Flux.from(wsClient.connect(ChatClientWebSocket, "/chat/stuff/fred")).blockFirst()
+
+        then:
+        def ex = thrown(WebSocketClientException)
+        ex.message.contains("Invalid handshake response getStatus: 200 OK")
+    }
+
+    void "test filters are invoked for web socket requests that don't match any routes"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.builder().run(EmbeddedServer)
+
+        when:
+        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
+        Flux.from(wsClient.connect(ChatClientWebSocket, "/abc/def/ghi")).blockFirst()
+
+        then:
+        def ex = thrown(WebSocketClientException)
+        ex.message.contains("Invalid handshake response getStatus: 404 Not Found")
+        embeddedServer.applicationContext.getBean(WebSocketContextValidationFilter).executeCount.get() == 1
+    }
 
     @Singleton
     static class MyBean {
         @Inject
         @Client("http://localhost:8080")
-        RxWebSocketClient myClient
+        WebSocketClient myClient
     }
 }

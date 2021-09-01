@@ -17,9 +17,8 @@ package io.micronaut.http.ssl;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
-
 import io.micronaut.core.annotation.Nullable;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 /**
  * The default {@link SslConfiguration} used for HTTP servers.

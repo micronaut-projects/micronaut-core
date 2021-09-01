@@ -45,3 +45,17 @@ snippet::io.micronaut.docs.injectionpoint.EngineFactory[tags="class",indent=0]
 <3> The value is used to construct an engine, throwing an exception if an engine cannot be constructed.
 
 NOTE: It is important to note that the factory is declared as ann:context.annotation.Prototype[] scope so the method is invoked for each injection point. If the `V8Engine` and `V6Engine` types are required to be singletons, the factory should use a Map to ensure the objects are only constructed once.
+
+=== Beans from Fields
+
+With Micronaut 3.0 or above it is also possible to produce beans from fields by declaring the ann:context.annotation.Bean[] annotation on a field.
+
+Whilst generally this approach should be discouraged in favour for factory methods, which provide more flexibility it does simplify testing code. For example with bean fields you can easily produce mocks in your test code:
+
+snippet::io.micronaut.docs.factories.VehicleMockSpec[tags="imports, class",indent=0]
+
+<1> A bean is defined from a field that replaces the existing `Engine`.
+<2> The `Vehicle` is injected.
+<3> The code asserts that the mock implementation is called.
+
+Note that only public or package protected fields are supported on non-primitive types. If the field is `static`, `private`, or `protected` a compilation error will occur.

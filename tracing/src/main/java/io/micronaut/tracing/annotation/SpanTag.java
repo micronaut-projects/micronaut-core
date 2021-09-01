@@ -15,7 +15,11 @@
  */
 package io.micronaut.tracing.annotation;
 
-import java.lang.annotation.*;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
  * <p>Applied to parameters of a method to indicate which parameters should be included in span tags.</p>

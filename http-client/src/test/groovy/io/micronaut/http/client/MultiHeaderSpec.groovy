@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.client
 
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
@@ -23,16 +25,16 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import jakarta.inject.Inject
 import spock.lang.Specification
 
-import javax.inject.Inject
-
+@Property(name = 'spec.name', value = 'MultiHeaderSpec')
 @MicronautTest
 class MultiHeaderSpec extends Specification {
 
     @Inject
     @Client("/")
-    RxHttpClient asyncClient
+    HttpClient asyncClient
 
     void "test multi-valued header"() {
         given:
@@ -57,6 +59,7 @@ class MultiHeaderSpec extends Specification {
         "/echo-multi-header-as-list/from-string-param" | "a"
     }
 
+    @Requires(property = 'spec.name', value = 'MultiHeaderSpec')
     @Controller("/echo-multi-header-as-list")
     static class EchoMultiHeaderController {
 

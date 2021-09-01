@@ -15,25 +15,23 @@
  */
 package io.micronaut.http.netty.channel;
 
-import java.util.concurrent.Executor;
-import java.util.concurrent.ThreadFactory;
-
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
-
-import javax.inject.Named;
-import javax.inject.Singleton;
-
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.epoll.EpollSocketChannel;
-import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.epoll.Epoll;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollServerSocketChannel;
+import io.netty.channel.epoll.EpollSocketChannel;
+import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
+
+import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * Factory for EpollEventLoopGroup.
@@ -46,18 +44,6 @@ import io.netty.channel.socket.SocketChannel;
 @Named(EventLoopGroupFactory.NATIVE)
 @BootstrapContextCompatible
 public class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
-
-    /**
-     * Creates an EpollEventLoopGroup.
-     *
-     * @param threads The number of threads to use.
-     * @param ioRatio The io ratio.
-     * @return An EpollEventLoopGroup.
-     */
-    @Override
-    public EventLoopGroup createEventLoopGroup(int threads, @Nullable Integer ioRatio) {
-        return new EpollEventLoopGroup(threads);
-    }
 
     /**
      * Creates an EpollEventLoopGroup.
@@ -83,17 +69,6 @@ public class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
     @Override
     public EventLoopGroup createEventLoopGroup(int threads, Executor executor, @Nullable Integer ioRatio) {
         return new EpollEventLoopGroup(threads, executor);
-    }
-
-    /**
-     * Creates a default EpollEventLoopGroup.
-     *
-     * @param ioRatio The io ratio.
-     * @return An EpollEventLoopGroup.
-     */
-    @Override
-    public EventLoopGroup createEventLoopGroup(@Nullable Integer ioRatio) {
-        return new EpollEventLoopGroup();
     }
 
     /**

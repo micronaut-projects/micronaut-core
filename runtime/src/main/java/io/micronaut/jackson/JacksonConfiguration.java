@@ -18,18 +18,31 @@ package io.micronaut.jackson;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.PropertyNamingStrategy;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.type.TypeFactory;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.TimeZone;
 
 /**
  * Configuration for the Jackson JSON parser.
@@ -40,7 +53,7 @@ import java.util.*;
 @ConfigurationProperties("jackson")
 @TypeHint(
         value = {
-                PropertyNamingStrategy.UpperCamelCaseStrategy.class,
+                PropertyNamingStrategies.UpperCamelCaseStrategy.class,
                 ArrayList.class,
                 LinkedHashMap.class,
                 HashSet.class
@@ -75,7 +88,7 @@ public class JacksonConfiguration {
     private JsonInclude.Include serializationInclusion = JsonInclude.Include.NON_EMPTY;
     private ObjectMapper.DefaultTyping defaultTyping = null;
     private PropertyNamingStrategy propertyNamingStrategy = null;
-    private boolean alwaysSerializeErrorsAsList = false;
+    private boolean alwaysSerializeErrorsAsList = true;
     private boolean trimStrings = false;
 
     /**

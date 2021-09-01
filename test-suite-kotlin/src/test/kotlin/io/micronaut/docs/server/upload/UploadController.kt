@@ -23,19 +23,19 @@ import io.micronaut.http.MediaType.TEXT_PLAIN
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.multipart.StreamingFileUpload
-import io.reactivex.Single
+import reactor.core.publisher.Mono
 import java.io.File
 
 @Controller("/upload")
 class UploadController {
 
     @Post(value = "/", consumes = [MULTIPART_FORM_DATA], produces = [TEXT_PLAIN]) // <1>
-    fun upload(file: StreamingFileUpload): Single<HttpResponse<String>> { // <2>
+    fun upload(file: StreamingFileUpload): Mono<HttpResponse<String>> { // <2>
 
         val tempFile = File.createTempFile(file.filename, "temp")
         val uploadPublisher = file.transferTo(tempFile) // <3>
 
-        return Single.fromPublisher(uploadPublisher)  // <4>
+        return Mono.from(uploadPublisher)  // <4>
             .map { success ->
                 if (success) {
                     HttpResponse.ok("Uploaded")

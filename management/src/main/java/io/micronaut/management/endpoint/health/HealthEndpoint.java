@@ -16,10 +16,12 @@
 package io.micronaut.management.endpoint.health;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.EndpointConfiguration;
+import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
 import io.micronaut.management.endpoint.annotation.Selector;
 import io.micronaut.management.health.aggregator.HealthAggregator;
@@ -27,10 +29,10 @@ import io.micronaut.management.health.indicator.HealthCheckType;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
 import io.micronaut.management.health.indicator.annotation.Liveness;
-import io.reactivex.Single;
+import jakarta.inject.Inject;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
 
-import io.micronaut.core.annotation.Nullable;
-import javax.inject.Inject;
 import java.security.Principal;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -95,13 +97,14 @@ public class HealthEndpoint {
      * Return all health indicators.
      *
      * @param principal Authenticated user
-     * @return The health information as a {@link Single}
+     * @return The health information as a {@link Mono}
      */
     @Read
-    public Single<HealthResult> getHealth(@Nullable Principal principal) {
+    @SingleResult
+    public Publisher<HealthResult> getHealth(@Nullable Principal principal) {
         HealthLevelOfDetail detail = levelOfDetail(principal);
 
-        return Single.fromPublisher(
+        return Mono.from(
                 healthAggregator.aggregate(healthIndicators, detail)
         );
     }
@@ -111,10 +114,11 @@ public class HealthEndpoint {
      *
      * @param principal Authenticated user
      * @param selector HealthEndpointSelector
-     * @return The health information as a {@link Single}
+     * @return The health information as a {@link Mono}
      */
     @Read
-    public Single<HealthResult> getHealth(@Nullable Principal principal, @Selector HealthCheckType selector) {
+    @SingleResult
+    public Publisher<HealthResult> getHealth(@Nullable Principal principal, @Selector HealthCheckType selector) {
         HealthLevelOfDetail detail = levelOfDetail(principal);
         HealthIndicator[] indicators;
 
@@ -128,7 +132,7 @@ public class HealthEndpoint {
                 break;
         }
 
-        return Single.fromPublisher(
+        return Mono.from(
                 healthAggregator.aggregate(indicators, detail)
         );
     }

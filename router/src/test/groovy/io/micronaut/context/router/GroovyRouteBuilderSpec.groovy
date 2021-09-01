@@ -17,6 +17,7 @@ package io.micronaut.context.router
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.context.annotation.Executable
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -27,8 +28,8 @@ import io.micronaut.web.router.Router
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import javax.inject.Inject
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 
 /**
  * @author Graeme Rocher
@@ -121,6 +122,7 @@ class GroovyRouteBuilderSpec extends Specification {
     }
 
     @Controller('/book')
+    @Executable
     static class BookController {
 
         String hello(String message) {
@@ -147,6 +149,7 @@ class GroovyRouteBuilderSpec extends Specification {
     }
 
     @Controller('/author')
+    @Executable
     static class AuthorController {
         List index() {
             ["author"]
@@ -167,6 +170,7 @@ class GroovyRouteBuilderSpec extends Specification {
     }
 
     @Controller('/error-handling')
+    @Executable
     static class ErrorHandlingController {
 
         @Get('/throws-a')

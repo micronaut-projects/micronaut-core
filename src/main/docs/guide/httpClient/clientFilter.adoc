@@ -8,7 +8,8 @@ To resolve this you can define a filter. The following is an example `BintraySer
 
 snippet::io.micronaut.docs.client.ThirdPartyClientFilterSpec[tags="bintrayApiConstants, bintrayService", indent=0]
 
-<1> An api:http.client.RxHttpClient[] is injected for the Bintray API
+
+<1> An link:{micronautreactorapi}/client/ReactorHttpClient[ReactorHttpClient] is injected for the Bintray API
 <2> The organization is configurable via configuration
 
 The Bintray API is secured. To authenticate you add an `Authorization` header for every request. You can modify `fetchRepositories` and `fetchPackages` methods to include the necessary HTTP Header for each request, but using a filter is much simpler:
@@ -23,9 +24,9 @@ Now when you invoke the `bintrayService.fetchRepositories()` method, the `Author
 
 === Injecting Another Client into a HttpClientFilter
 
-To create an api:http.client.RxHttpClient[], Micronaut needs to resolve all `HttpClientFilter` instances, which creates a circular dependency when injecting another api:http.client.RxHttpClient[] or a `@Client` bean into an instance of a `HttpClientFilter`.
+To create an link:{micronautreactorapi}/client/ReactorHttpClient[ReactorHttpClient], Micronaut needs to resolve all `HttpClientFilter` instances, which creates a circular dependency when injecting another link:{micronautreactorapi}/client.ReactorHttpClient[] or a `@Client` bean into an instance of a `HttpClientFilter`.
 
-To resolve this issue, use the api:context.BeanProvider[] interface to inject another api:http.client.RxHttpClient[] or a `@Client` bean into an instance of `HttpClientFilter`.
+To resolve this issue, use the api:context.BeanProvider[] interface to inject another link:{micronautreactorapi}/client/ReactorHttpClient[ReactorHttpClient] or a `@Client` bean into an instance of `HttpClientFilter`.
 
 The following example which implements a filter allowing https://cloud.google.com/run/docs/authenticating/service-to-service[authentication between services on Google Cloud Run] demonstrates how to use api:context.BeanProvider[] to inject another client:
 

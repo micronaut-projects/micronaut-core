@@ -21,6 +21,7 @@ import io.micronaut.context.env.DefaultEnvironment;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.convert.*;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.naming.Named;
@@ -235,13 +236,13 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(BeanResolutionContext resolutionContext, Class<T> beanType, BeanDefinition<?> filter, boolean filterProxied) {
+    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(BeanResolutionContext resolutionContext, Argument<T> beanType, BeanDefinition<?> filter, boolean filterProxied) {
         Collection<BeanDefinition<T>> candidates = super.findBeanCandidates(resolutionContext, beanType, filter, filterProxied);
         return transformIterables(resolutionContext, candidates, filterProxied);
     }
 
     @Override
-    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(BeanResolutionContext resolutionContext, Class<T> beanType, boolean filterProxied, Predicate<BeanDefinition<T>> predicate) {
+    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(BeanResolutionContext resolutionContext, Argument<T> beanType, boolean filterProxied, Predicate<BeanDefinition<T>> predicate) {
         Collection<BeanDefinition<T>> candidates = super.findBeanCandidates(resolutionContext, beanType, filterProxied, predicate);
         return transformIterables(resolutionContext, candidates, filterProxied);
     }
@@ -307,7 +308,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                         continue;
                     }
 
-                    Collection<BeanDefinition> dependentCandidates = findBeanCandidates(resolutionContext, dependentType, filterProxied, null);
+                    Collection<BeanDefinition> dependentCandidates = findBeanCandidates(resolutionContext, Argument.of(dependentType), filterProxied, null);
+
                     if (!dependentCandidates.isEmpty()) {
                         for (BeanDefinition dependentCandidate : dependentCandidates) {
 
@@ -317,7 +319,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                 BeanDefinitionDelegate<?> parentDelegate = (BeanDefinitionDelegate) dependentCandidate;
                                 optional = parentDelegate.get(Named.class.getName(), String.class).map(Qualifiers::byName);
                             } else {
-                                Optional<String> qualifierName = dependentCandidate.getAnnotationNameByStereotype(javax.inject.Qualifier.class);
+                                Optional<String> qualifierName = dependentCandidate.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER);
                                 optional = qualifierName.map(name -> Qualifiers.byAnnotation(dependentCandidate, name));
                             }
 
@@ -326,15 +328,10 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                             }
 
                             optional.ifPresent(qualifier -> {
-                                    String qualifierKey = javax.inject.Qualifier.class.getName();
+                                    String qualifierKey = AnnotationUtil.QUALIFIER;
                                     Argument<?>[] arguments = candidate.getConstructor().getArguments();
                                     for (Argument<?> argument : arguments) {
-                                        Class<?> argumentType;
-                                        if (ProviderFactory.isProvider(argument.getType())) {
-                                            argumentType = argument.getFirstTypeVariable().orElse(argument).getType();
-                                        } else {
-                                            argumentType = argument.getType();
-                                        }
+                                        Class<?> argumentType = argument.getType();
                                         if (argumentType.equals(dependentType)) {
                                             Map<? extends Argument<?>, Qualifier> qualifedArg = Collections.singletonMap(argument, qualifier);
                                             delegate.put(qualifierKey, qualifedArg);
@@ -441,7 +438,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                 return delegate;
                             }
                         } else {
-                            Optional<Qualifier> resolvedQualifier = delegate.get(javax.inject.Qualifier.class.getName(), Qualifier.class);
+                            Optional<Qualifier> resolvedQualifier = delegate.get(AnnotationUtil.QUALIFIER, Qualifier.class);
                             if (resolvedQualifier.isPresent() && resolvedQualifier.get().equals(qualifier)) {
                                 return delegate;
                             }

@@ -15,12 +15,12 @@
  */
 package io.micronaut.function.executor;
 
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import org.junit.Assert;
 import org.junit.Test;
 
-import javax.annotation.PostConstruct;
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 

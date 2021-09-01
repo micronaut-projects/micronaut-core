@@ -15,16 +15,15 @@
  */
 package io.micronaut.http.netty.channel;
 
-import java.util.concurrent.Executor;
-import java.util.concurrent.ThreadFactory;
-
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
-
-import io.micronaut.core.annotation.Nullable;
 import io.netty.channel.socket.SocketChannel;
+
+import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * Factory for EventLoopGroup.
@@ -100,18 +99,6 @@ public interface EventLoopGroupFactory {
      */
     default EventLoopGroup createEventLoopGroup(int threads, @Nullable Integer ioRatio) {
         return createEventLoopGroup(threads, (ThreadFactory) null, ioRatio);
-    }
-
-    /**
-     * Creates a default EventLoopGroup.
-     *
-     * @param ioRatio The io ratio.
-     * @return An EventLoopGroup.
-     * @deprecated Use {@link #createEventLoopGroup(EventLoopGroupConfiguration, ThreadFactory)} instead
-     */
-    @Deprecated
-    default EventLoopGroup createEventLoopGroup(@Nullable Integer ioRatio) {
-        return createEventLoopGroup(0, (ThreadFactory) null, ioRatio);
     }
 
     /**

@@ -17,9 +17,9 @@ package io.micronaut.inject.failures.postconstruct;
 
 import io.micronaut.context.annotation.Requires;
 
-import javax.annotation.PostConstruct;
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import jakarta.annotation.PostConstruct;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 @Requires(property = "spec.name", value = "PostConstructExceptionSpec")
 @Singleton

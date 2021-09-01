@@ -20,8 +20,8 @@ import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.function.client.FunctionDefinition;
 import io.micronaut.function.client.FunctionDefinitionProvider;
 import io.micronaut.runtime.server.EmbeddedServer;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.net.URI;
 import java.util.Collection;
 import java.util.Collections;

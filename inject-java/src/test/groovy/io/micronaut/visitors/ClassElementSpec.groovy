@@ -17,17 +17,102 @@ package io.micronaut.visitors
 
 import io.micronaut.annotation.processing.visitor.JavaClassElement
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ConstructorElement
 import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.EnumElement
 import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.ast.PackageElement
+import jakarta.inject.Singleton
 import spock.lang.IgnoreIf
+import spock.lang.Issue
 import spock.util.environment.Jvm
 
 import java.util.function.Supplier
 
 class ClassElementSpec extends AbstractTypeElementSpec {
+
+    void "test modifiers #modifiers"() {
+        given:
+        def element = buildClassElement("""
+package modtest;
+
+class Test {
+    ${modifiers*.toString().join(' ')} String test = "test";
+
+    ${modifiers*.toString().join(' ')} void test() {};
+}
+""")
+
+        expect:
+        element.getEnclosedElement(ElementQuery.ALL_FIELDS).get().modifiers == modifiers
+        element.getEnclosedElement(ElementQuery.ALL_METHODS).get().modifiers == modifiers
+
+        where:
+        modifiers << [
+                [ElementModifier.PUBLIC] as Set,
+                [ElementModifier.PUBLIC, ElementModifier.STATIC] as Set,
+                [ElementModifier.PUBLIC, ElementModifier.STATIC, ElementModifier.FINAL] as Set,
+        ]
+    }
+
+    void "test annotate applies transformations"() {
+        when:
+        def element = buildClassElement('''
+package anntransform;
+
+class Test {
+}
+''')
+        then:
+        !element.hasAnnotation(AnnotationUtil.SINGLETON)
+
+        when:
+        element.annotate(Singleton)
+
+        then:
+        !element.hasAnnotation(Singleton)
+        element.hasAnnotation(AnnotationUtil.SINGLETON)
+    }
+
+
+    void "test get package element"() {
+        given:
+        def element = buildClassElement('''
+package pkgeltest;
+
+class PckElementTest {
+
+}
+''')
+        PackageElement pe = element.getPackage()
+
+        expect:
+        pe.name == 'pkgeltest'
+        pe.getClass().name.contains("JavaPackageElement")
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/5611')
+    void 'test visit enum with custom annotation'() {
+        when:"An enum has an annotation that is visited by CustomAnnVisitor"
+        def context = buildContext('''
+package test;
+
+@io.micronaut.visitors.CustomAnn
+enum EnumTest {
+
+}
+''')
+
+        then:"No compilation error occurs"
+        context != null
+
+        cleanup:
+        context.close()
+    }
 
     void 'test find matching methods on abstract class'() {
         given:
@@ -210,12 +295,46 @@ interface AnotherInterface {
         accessibleFields*.name as Set == ['s1', 't1'] as Set
     }
 
+    void "test find matching constructors using ElementQuery"() {
+        given:
+        ClassElement classElement = buildClassElement('''
+package elementquery;
+
+class Test extends SuperType {
+    static {}
+    
+    Test() {}
+    
+    Test(int i) {}
+}
+
+class SuperType {
+    static {}
+    
+    SuperType() {}
+    
+    SuperType(String s) {}
+}
+''')
+        when:
+        def constructors = classElement.getEnclosedElements(ElementQuery.CONSTRUCTORS)
+
+        then:"only our own instance constructors"
+        constructors.size() == 2
+
+        when:
+        def allConstructors = classElement.getEnclosedElements(ElementQuery.of(ConstructorElement.class))
+
+        then:"superclass constructors, but not including static initializers"
+        allConstructors.size() == 4
+    }
+
     void "test visit inherited controller classes"() {
         buildBeanDefinition('test.TestController', '''
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController extends BaseTestController {
@@ -294,7 +413,7 @@ class B {
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController {
@@ -321,7 +440,7 @@ package test;
 
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController {
@@ -349,7 +468,7 @@ public class TestController {
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController {
@@ -375,7 +494,7 @@ public class TestController {
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController<T extends Foo> {
@@ -406,7 +525,7 @@ class Foo {}
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController implements java.util.function.Supplier<String> {
@@ -431,7 +550,7 @@ public class TestController implements java.util.function.Supplier<String> {
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController<T extends Foo> {
@@ -461,7 +580,7 @@ class Foo {}
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController {
@@ -489,7 +608,7 @@ class Foo {}
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController<MT extends Foo> {
@@ -637,7 +756,7 @@ class Time extends Quantity<Time, TimeUnit> {
     }
 }
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {}
 ''')
 

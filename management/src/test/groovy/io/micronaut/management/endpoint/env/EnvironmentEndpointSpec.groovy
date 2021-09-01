@@ -2,7 +2,7 @@ package io.micronaut.management.endpoint.env
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Shared
@@ -16,10 +16,10 @@ class EnvironmentEndpointSpec extends Specification {
     void "the env endpoint is sensitive by default"() {
         given:
         this.embeddedServer = ApplicationContext.run(EmbeddedServer, Environment.TEST)
-        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        client.exchange("/${EnvironmentEndpoint.NAME}").blockingFirst()
+        client.exchange("/${EnvironmentEndpoint.NAME}").blockFirst()
 
         then:
         HttpClientResponseException responseException = thrown()
@@ -31,10 +31,10 @@ class EnvironmentEndpointSpec extends Specification {
 
     void "it returns all the environment information"() {
         given:
-        RxHttpClient client = buildClient()
+        HttpClient client = buildClient()
 
         when:
-        Map result = client.exchange("/${EnvironmentEndpoint.NAME}", Map).blockingFirst().body()
+        Map result = client.exchange("/${EnvironmentEndpoint.NAME}", Map).blockFirst().body()
 
         then:
         result.activeEnvironments == ["test"]
@@ -48,10 +48,10 @@ class EnvironmentEndpointSpec extends Specification {
 
     void "it returns all the properties of a property source"() {
         given:
-        RxHttpClient client = buildClient()
+        HttpClient client = buildClient()
 
         when:
-        Map result = client.exchange("/${EnvironmentEndpoint.NAME}/context", Map).blockingFirst().body()
+        Map result = client.exchange("/${EnvironmentEndpoint.NAME}/context", Map).blockFirst().body()
 
         then:
         result.order == 0
@@ -63,10 +63,10 @@ class EnvironmentEndpointSpec extends Specification {
 
     void "it returns not found if the property source doesn't exist"() {
         given:
-        RxHttpClient client = buildClient()
+        HttpClient client = buildClient()
 
         when:
-        client.exchange("/${EnvironmentEndpoint.NAME}/blah").blockingFirst()
+        client.exchange("/${EnvironmentEndpoint.NAME}/blah").blockFirst()
 
         then:
         HttpClientResponseException responseException = thrown()
@@ -88,10 +88,10 @@ class EnvironmentEndpointSpec extends Specification {
                 'appSecret': 'app',
                 'apiToken': 'token'
         ], Environment.TEST)
-        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        Map result = client.exchange("/${EnvironmentEndpoint.NAME}/context", Map).blockingFirst().body()
+        Map result = client.exchange("/${EnvironmentEndpoint.NAME}/context", Map).blockFirst().body()
 
         then:
         result.properties['foo.bar'] == 'baz'
@@ -104,12 +104,12 @@ class EnvironmentEndpointSpec extends Specification {
 
     }
 
-    private RxHttpClient buildClient() {
+    private HttpClient buildClient() {
         this.embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.env.sensitive': false, 'foo.bar':'baz'], Environment.TEST)
-        return embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        return embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
     }
 
-    private void doCleanup(RxHttpClient client) {
+    private void doCleanup(HttpClient client) {
         client.close()
         embeddedServer.close()
         embeddedServer = null

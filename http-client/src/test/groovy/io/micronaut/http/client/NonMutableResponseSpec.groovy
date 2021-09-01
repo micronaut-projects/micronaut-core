@@ -1,25 +1,25 @@
 package io.micronaut.http.client
 
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Single
+import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-
-import javax.inject.Inject
 import java.util.concurrent.CompletableFuture
 
 class NonMutableResponseSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,['micronaut.server.max-request-size': '10KB'])
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,['micronaut.server.max-request-size': '10KB',
+                                                                                                'spec.name': 'NonMutableResponseSpec'])
     @Shared HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
-
 
     void "test returning a non mutable response from a controller"() {
         expect:
@@ -29,6 +29,7 @@ class NonMutableResponseSpec extends Specification {
         client.toBlocking().retrieve('/test/non-mutable/publisher') == 'test'
     }
 
+    @Requires(property = 'spec.name', value = 'NonMutableResponseSpec')
     @Client('/')
     static interface ResponseClient {
 
@@ -39,12 +40,14 @@ class NonMutableResponseSpec extends Specification {
         CompletableFuture<HttpResponse<String>> goCompletable()
 
         @Get('/test/non-mutable/proxy')
-        Single<HttpResponse<String>> goSingle()
+        @SingleResult
+        Publisher<HttpResponse<String>> goMono()
 
         @Get('/test/non-mutable/proxy')
         Publisher<HttpResponse<String>> goPublisher()
     }
 
+    @Requires(property = 'spec.name', value = 'NonMutableResponseSpec')
     @Controller
     static class ResponseController {
 
@@ -61,8 +64,9 @@ class NonMutableResponseSpec extends Specification {
         }
 
         @Get('/test/non-mutable/single')
-        Single<HttpResponse<String>> goSingle() {
-            responseClient.goSingle()
+        @SingleResult
+        Publisher<HttpResponse<String>> goMono() {
+            responseClient.goMono()
         }
 
         @Get('/test/non-mutable/publisher')

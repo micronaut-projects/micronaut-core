@@ -15,12 +15,14 @@
  */
 package io.micronaut.inject.lifecycle.beaninitializingeventlistener;
 
-import javax.annotation.PostConstruct;
-import javax.inject.Inject;
-import javax.inject.Provider;
-import javax.inject.Singleton;
+import io.micronaut.context.annotation.Factory;
 
-@Singleton
+import jakarta.annotation.PostConstruct;
+import jakarta.inject.Inject;
+import jakarta.inject.Provider;
+import jakarta.inject.Singleton;
+
+@Factory
 public class BFactory implements Provider<B> {
     String name = "original";
     boolean postConstructCalled = false;
@@ -99,6 +101,7 @@ public class BFactory implements Provider<B> {
     }
 
     @Override
+    @Singleton
     public B get() {
         getCalled = true;
         B b = new B();

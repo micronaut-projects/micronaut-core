@@ -15,7 +15,7 @@ To add Ribbon support to your application, add the `netflix-ribbon` configuratio
 
 dependency:io.micronaut.netflix:micronaut-netflix-ribbon[]
 
-The api:http.client.LoadBalancer[] implementations will now be api:configuration.ribbon.RibbonLoadBalancer[] instances.
+The api:http.client.LoadBalancer[] implementations will now be link:{micronautribbonapi}/RibbonLoadBalancer.html[RibbonLoadBalancer] instances.
 
 Ribbon's http://netflix.github.io/ribbon/ribbon-core-javadoc/com/netflix/client/config/CommonClientConfigKey.html[Configuration options] can be set using the `ribbon` namespace in configuration. For example in `application.yml`:
 
@@ -39,4 +39,4 @@ ribbon:
       ServerListRefreshInterval: 2000
 ----
 
-By default Micronaut registers a api:configuration.ribbon.DiscoveryClientServerList[] for each client that integrates Ribbon with Micronaut's api:discovery.DiscoveryClient[].
+By default Micronaut registers a link:{micronautribbonapi}/DiscoveryClientServerList.html[DiscoveryClientServerList] for each client that integrates Ribbon with Micronaut's api:discovery.DiscoveryClient[].

@@ -25,7 +25,6 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.client.HttpClient;
 
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.reactivex.Flowable;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -44,6 +43,7 @@ import io.micronaut.http.client.multipart.MultipartBody;
 
 // tag::controllerImports[]
 import io.micronaut.http.annotation.Controller;
+import reactor.core.publisher.Flux;
 // end::controllerImports[]
 
 // tag::class[]
@@ -92,7 +92,7 @@ public class MultipartFileUploadSpec {
 
         // end::multipartBody[]
 
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 // tag::request[]
                 HttpRequest.POST("/multipart/upload", requestBody)    // <1>
                            .contentType(MediaType.MULTIPART_FORM_DATA_TYPE) // <2>
@@ -100,7 +100,7 @@ public class MultipartFileUploadSpec {
                            .accept(MediaType.TEXT_PLAIN_TYPE),
                 String.class
         ));
-        HttpResponse<String> response = flowable.blockingFirst();
+        HttpResponse<String> response = flowable.blockFirst();
         String body = response.getBody().get();
 
         assertEquals("Uploaded 9 bytes", body);
@@ -114,13 +114,13 @@ public class MultipartFileUploadSpec {
                 .build();
         // end::multipartBodyBytes[]
 
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/multipart/upload", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String.class
         ));
-        HttpResponse<String> response = flowable.blockingFirst();
+        HttpResponse<String> response = flowable.blockFirst();
         String body = response.getBody().get();
 
         assertEquals("Uploaded 12 bytes", body);
@@ -135,13 +135,13 @@ public class MultipartFileUploadSpec {
         writer.close();
         file.createNewFile();
 
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/multipart/upload", MultipartBody.builder().addPart("data", file.getName(), file))
                         .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String.class
         ));
-        HttpResponse<String> response = flowable.blockingFirst();
+        HttpResponse<String> response = flowable.blockFirst();
         String body = response.getBody().get();
 
         assertEquals("Uploaded 9 bytes", body);

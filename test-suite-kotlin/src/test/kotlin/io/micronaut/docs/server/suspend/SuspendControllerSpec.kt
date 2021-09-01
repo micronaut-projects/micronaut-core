@@ -15,18 +15,18 @@
  */
 package io.micronaut.docs.server.suspend
 
-import io.kotlintest.should
-import io.kotlintest.shouldBe
-import io.kotlintest.shouldNotBe
-import io.kotlintest.shouldThrowExactly
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
+import io.kotest.assertions.throwables.shouldThrowExactly
+import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.should
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpHeaders.*
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest.GET
 import io.micronaut.http.HttpRequest.OPTIONS
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import kotlinx.coroutines.reactive.awaitSingle
@@ -45,12 +45,13 @@ class SuspendControllerSpec : StringSpec() {
     )
 
     val client = autoClose(
-        embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
+        embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
     )
 
     private var suspendClient = embeddedServer.applicationContext.createBean(SuspendClient::class.java, embeddedServer.url)
 
     init {
+
         "test suspend applies CORS options" {
             val origin = "foo.com"
             val headers = "$CONTENT_TYPE,$ACCEPT"
@@ -202,7 +203,7 @@ class SuspendControllerSpec : StringSpec() {
 
             ex.status shouldBe HttpStatus.BAD_REQUEST
             body shouldBe "illegal.argument"
-            filter.response shouldBe null
+            filter.response.status shouldBe HttpStatus.BAD_REQUEST
             filter.error should { t -> t is IllegalArgumentException }
         }
 
@@ -232,6 +233,13 @@ class SuspendControllerSpec : StringSpec() {
             val (beforeRequestId, beforeThreadId, afterRequestId, afterThreadId) = body.split(',')
             beforeRequestId shouldBe afterRequestId
             beforeThreadId shouldNotBe afterThreadId // it will be the default co-routine dispatcher
+            response.status shouldBe HttpStatus.OK
+        }
+
+        "test request context is available" {
+            val response = client.exchange(GET<String>("/suspend/requestContext"), String::class.java).awaitSingle()
+            val body = response.body.get()
+            body shouldBe "/suspend/requestContext"
             response.status shouldBe HttpStatus.OK
         }
     }

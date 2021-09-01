@@ -18,20 +18,20 @@ package io.micronaut.docs.server.body
 // tag::imports[]
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
-import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
-import io.micronaut.scheduling.TaskExecutors
-import io.micronaut.scheduling.annotation.ExecuteOn
-import io.reactivex.Flowable
-import io.reactivex.Single
-import java.io.InputStream
 import javax.validation.constraints.Size
 // end::imports[]
-
+// end::importsreactive[]
+import org.reactivestreams.Publisher
+import io.micronaut.core.async.annotation.SingleResult
+import reactor.core.publisher.Flux
+// end::importsreactive[]
+// tag::class[]
 @Controller("/receive")
 open class MessageController {
+// end::class[]
 
     // tag::echo[]
     @Post(value = "/echo", consumes = [MediaType.TEXT_PLAIN]) // <1>
@@ -41,12 +41,15 @@ open class MessageController {
     // end::echo[]
 
     // tag::echoReactive[]
-    @Post(value = "/echo-flow", consumes = [MediaType.TEXT_PLAIN]) // <1>
-    open fun echoFlow(@Body text: Flowable<String>): Single<MutableHttpResponse<String>> { //<2>
-        return text
+    @Post(value = "/echo-publisher", consumes = [MediaType.TEXT_PLAIN]) // <1>
+    @SingleResult
+    open fun echoFlow(@Body text: Publisher<String>): Publisher<HttpResponse<String>> { //<2>
+        return Flux.from(text)
             .collect({ StringBuffer() }, { obj, str -> obj.append(str) }) // <3>
             .map { buffer -> HttpResponse.ok(buffer.toString()) }
     }
     // end::echoReactive[]
 
+// tag::endclass[]
 }
+// end::endclass[]

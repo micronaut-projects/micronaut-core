@@ -15,6 +15,7 @@
  */
 package io.micronaut.tracing.jaeger
 
+import io.jaegertracing.internal.JaegerSpan
 import io.jaegertracing.internal.JaegerTracer
 import io.jaegertracing.internal.metrics.InMemoryMetricsFactory
 import io.jaegertracing.internal.reporters.InMemoryReporter
@@ -33,16 +34,17 @@ import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 import io.micronaut.tracing.annotation.ContinueSpan
 import io.opentracing.Tracer
-import io.reactivex.Flowable
-import io.reactivex.Single
-import io.reactivex.schedulers.Schedulers
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 import spock.lang.AutoCleanup
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
-
-import javax.inject.Inject
+import io.micronaut.core.async.annotation.SingleResult
+import jakarta.inject.Inject
 import java.time.Duration
+import java.time.temporal.ChronoUnit
 import java.util.concurrent.TimeUnit
 
 /**
@@ -72,7 +74,7 @@ class HttpTracingSpec extends Specification {
         response
         conditions.eventually {
             reporter.spans.size() == 2
-            def span = reporter.spans.find { it.operationName == 'GET /traced/hello/{name}' }
+            JaegerSpan span = reporter.spans.find { it.operationName == 'GET /traced/hello/{name}' }
             span != null
             span.tags.get("foo") == 'bar'
             span.tags.get('http.path') == '/traced/hello/John'
@@ -99,7 +101,7 @@ class HttpTracingSpec extends Specification {
         response
         conditions.eventually {
             reporter.spans.size() == 2
-            def span = reporter.spans.find { it.operationName == 'GET /traced/blocking/hello/{name}' }
+            JaegerSpan span = reporter.spans.find { it.operationName == 'GET /traced/blocking/hello/{name}' }
             span != null
             span.tags.get("foo") == 'bar'
             span.tags.get('http.path') == '/traced/blocking/hello/John'
@@ -108,7 +110,7 @@ class HttpTracingSpec extends Specification {
         }
     }
 
-    void "test basic response rx http tracing"() {
+    void "test basic response reactive http tracing"() {
 
         when:
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
@@ -119,40 +121,40 @@ class HttpTracingSpec extends Specification {
         context.containsBean(JaegerTracer)
 
         when:
-        HttpResponse<String> response = client.toBlocking().exchange('/traced/response-rx/John', String)
+        HttpResponse<String> response = client.toBlocking().exchange('/traced/response-reactive/John', String)
         PollingConditions conditions = new PollingConditions()
 
         then:
         response
         conditions.eventually {
             reporter.spans.size() == 2
-            def span = reporter.spans.find { it.operationName == 'GET /traced/response-rx/{name}' }
+            def span = reporter.spans.find { it.operationName == 'GET /traced/response-reactive/{name}' }
             span != null
             span.tags.get("foo") == 'bar'
-            span.tags.get('http.path') == '/traced/response-rx/John'
+            span.tags.get('http.path') == '/traced/response-reactive/John'
             nrOfStartedSpans > 0
             nrOfFinishedSpans == nrOfStartedSpans
         }
     }
 
-    void "test rxjava http tracing"() {
+    void "test reactive http tracing"() {
         given:
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        HttpResponse<String> response = client.toBlocking().exchange('/traced/rxjava/John', String)
+        HttpResponse<String> response = client.toBlocking().exchange('/traced/reactive/John', String)
         PollingConditions conditions = new PollingConditions()
 
         then:
         response
         conditions.eventually {
             reporter.spans.size() == 2
-            def span = reporter.spans.find { it.operationName == 'GET /traced/rxjava/{name}' }
+            JaegerSpan span = reporter.spans.find { it.operationName == 'GET /traced/reactive/{name}' }
             span != null
             span.tags.get("foo") == 'bar'
-            span.tags.get('http.path') == '/traced/rxjava/John'
+            span.tags.get('http.path') == '/traced/reactive/John'
             nrOfStartedSpans > 0
             nrOfFinishedSpans == nrOfStartedSpans
         }
@@ -178,7 +180,7 @@ class HttpTracingSpec extends Specification {
             span.tags.get('http.path') == '/traced/error/John'
             span.tags.get('http.status_code') == 500
             span.tags.get('http.method') == 'GET'
-            span.tags.get('error') == 'Internal Server Error: bad'
+            span.tags.get('error') == 'Internal Server Error'
             span.operationName == 'GET /traced/error/John'
             def serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
             serverSpan.tags.get('http.path') == '/traced/error/John'
@@ -207,13 +209,13 @@ class HttpTracingSpec extends Specification {
         response
         conditions.eventually {
             reporter.spans.size() == 2
-            def span = reporter.spans.find { it.tags.containsKey('http.client') }
+            JaegerSpan span = reporter.spans.find { it.tags.containsKey('http.client') }
             span.tags.get('http.path') == '/traced/blocking/error/John'
             span.tags.get('http.status_code') == 500
             span.tags.get('http.method') == 'GET'
-            span.tags.get('error') == 'Internal Server Error: bad'
+            span.tags.get('error') == 'Internal Server Error'
             span.operationName == 'GET /traced/blocking/error/John'
-            def serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
+            JaegerSpan serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
             serverSpan.tags.get('http.path') == '/traced/blocking/error/John'
             serverSpan.tags.get('http.status_code') == 500
             serverSpan.tags.get('http.method') == 'GET'
@@ -224,7 +226,7 @@ class HttpTracingSpec extends Specification {
         }
     }
 
-    void "test basic http trace error - rx"() {
+    void "test basic http trace error - reactive"() {
         given:
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
@@ -232,32 +234,32 @@ class HttpTracingSpec extends Specification {
         PollingConditions conditions = new PollingConditions()
 
         when:
-        client.toBlocking().exchange('/traced/rxError/John', String)
+        client.toBlocking().exchange('/traced/reactiveError/John', String)
 
         then:
-        def e = thrown(HttpClientResponseException)
-        def response = e.response
+        HttpClientResponseException e = thrown()
+        HttpResponse<?> response = e.response
         response
         conditions.eventually {
             reporter.spans.size() == 2
-            def span = reporter.spans.find { it.tags.containsKey('http.client') }
-            span.tags.get('http.path') == '/traced/rxError/John'
+            JaegerSpan span = reporter.spans.find { it.tags.containsKey('http.client') }
+            span.tags.get('http.path') == '/traced/reactiveError/John'
             span.tags.get('http.status_code') == 500
             span.tags.get('http.method') == 'GET'
-            span.tags.get('error') == 'Internal Server Error: bad'
-            span.operationName == 'GET /traced/rxError/John'
-            def serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
-            serverSpan.tags.get('http.path') == '/traced/rxError/John'
+            span.tags.get('error') == 'Internal Server Error'
+            span.operationName == 'GET /traced/reactiveError/John'
+            JaegerSpan serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
+            serverSpan.tags.get('http.path') == '/traced/reactiveError/John'
             serverSpan.tags.get('http.status_code') == 500
             serverSpan.tags.get('http.method') == 'GET'
             serverSpan.tags.get('error') == 'Internal Server Error'
-            serverSpan.operationName == 'GET /traced/rxError/{name}'
+            serverSpan.operationName == 'GET /traced/reactiveError/{name}'
             nrOfStartedSpans > 0
             nrOfFinishedSpans == nrOfStartedSpans
         }
     }
 
-    void "test basic http trace error - rx with error handler"() {
+    void "test basic http trace error - reactive with error handler"() {
         given:
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
@@ -268,18 +270,18 @@ class HttpTracingSpec extends Specification {
         client.toBlocking().exchange('/traced/quota-error', String)
 
         then:
-        def e = thrown(HttpClientResponseException)
-        def response = e.response
+        HttpClientResponseException e = thrown()
+        HttpResponse<?> response = e.response
         response
         conditions.eventually {
             reporter.spans.size() == 2
-            def span = reporter.spans.find { it.tags.containsKey('http.client') }
+            JaegerSpan span = reporter.spans.find { it.tags.containsKey('http.client') }
             span.tags.get('http.path') == '/traced/quota-error'
             span.tags.get('http.status_code') == 429
             span.tags.get('http.method') == 'GET'
             span.tags.get('error') == 'retry later'
             span.operationName == 'GET /traced/quota-error'
-            def serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
+            JaegerSpan serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
             serverSpan.tags.get('http.path') == '/traced/quota-error'
             serverSpan.tags.get('http.status_code') == 429
             serverSpan.tags.get('http.method') == 'GET'
@@ -301,18 +303,18 @@ class HttpTracingSpec extends Specification {
         client.toBlocking().exchange('/traced/delayed-error/2s', String)
 
         then:
-        def e = thrown(HttpClientResponseException)
-        def response = e.response
+        HttpClientResponseException e = thrown()
+        HttpResponse<?> response = e.response
         response
         conditions.eventually {
             reporter.spans.size() == 2
-            def span = reporter.spans.find { it.tags.containsKey('http.client') }
+            JaegerSpan span = reporter.spans.find { it.tags.containsKey('http.client') }
             span.tags.get('http.path') == '/traced/delayed-error/2s'
             span.tags.get('http.status_code') == 500
             span.tags.get('http.method') == 'GET'
-            span.tags.get('error') == 'Internal Server Error: delayed error'
+            span.tags.get('error') == 'Internal Server Error'
             span.operationName == 'GET /traced/delayed-error/2s'
-            def serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
+            JaegerSpan serverSpan = reporter.spans.find { it.tags.containsKey('http.server') }
             serverSpan.tags.get('http.path') == '/traced/delayed-error/2s'
             serverSpan.tags.get('http.status_code') == 500
             serverSpan.tags.get('http.method') == 'GET'
@@ -416,7 +418,7 @@ class HttpTracingSpec extends Specification {
         client.close()
     }
 
-    void "tested continue http tracing - rx"() {
+    void "tested continue http tracing - reactive"() {
         given:
         InMemoryReporter reporter = context.getBean(InMemoryReporter)
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
@@ -581,7 +583,7 @@ class HttpTracingSpec extends Specification {
                 it.operationName == 'GET /traced/error/{name}' &&
                         it.tags.get('http.path') == '/traced/error/John' &&
                         it.tags.get('http.status_code') == 500 &&
-                        it.tags.get('error') == 'Internal Server Error: bad' &&
+                        it.tags.get('error') == 'Internal Server Error' &&
                         it.tags.get('http.client')
             } != null
             reporter.spans.find {
@@ -614,7 +616,7 @@ class HttpTracingSpec extends Specification {
         client.toBlocking().exchange('/traced/blocking/nestedError/John', String)
 
         then:
-        def ex = thrown(HttpClientResponseException)
+        HttpClientResponseException ex = thrown()
         ex != null
         conditions.eventually {
             reporter.spans.size() == 4
@@ -630,7 +632,7 @@ class HttpTracingSpec extends Specification {
                 it.operationName == 'GET /traced/blocking/error/{name}' &&
                         it.tags.get('http.path') == '/traced/blocking/error/John' &&
                         it.tags.get('http.status_code') == 500 &&
-                        it.tags.get('error') == 'Internal Server Error: bad' &&
+                        it.tags.get('error') == 'Internal Server Error' &&
                         it.tags.get('http.client')
             } != null
             reporter.spans.find {
@@ -652,14 +654,14 @@ class HttpTracingSpec extends Specification {
         }
     }
 
-    void "tested continue nested http tracing - rx"() {
+    void "tested continue nested http tracing - reactive"() {
         given:
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
         PollingConditions conditions = new PollingConditions()
 
         when:
-        HttpResponse<String> response = client.toBlocking().exchange('/traced/nestedRx/John', String)
+        HttpResponse<String> response = client.toBlocking().exchange('/traced/nestedReactive/John', String)
 
         then:
         response.body() == "10"
@@ -758,20 +760,21 @@ class HttpTracingSpec extends Specification {
             return name
         }
 
-        @Get("/response-rx/{name}")
+        @Get("/response-reactive/{name}")
         HttpResponse<Publisher<String>> responseRx(String name) {
-            return HttpResponse.ok(Publishers.map(Flowable.fromCallable({ ->
+            return HttpResponse.ok(Publishers.map(Mono.fromCallable({ ->
                 spanCustomizer.activeSpan().setTag("foo", "bar")
                 return name
             }), { String n -> n }))
         }
 
-        @Get("/rxjava/{name}")
-        Single<String> rxjava(String name) {
-            Single.fromCallable({ ->
+        @Get("/reactive/{name}")
+        @SingleResult
+        Publisher<String> reactive(String name) {
+            Mono.fromCallable({ ->
                 spanCustomizer.activeSpan().setTag("foo", "bar")
                 return name
-            }).subscribeOn(Schedulers.io())
+            }).subscribeOn(Schedulers.boundedElastic())
         }
 
         @Get("/error/{name}")
@@ -785,9 +788,10 @@ class HttpTracingSpec extends Specification {
             throw new RuntimeException("bad")
         }
 
-        @Get("/rxError/{name}")
-        Single<String> rxError(String name) {
-            Single.defer { Single.just(error(name)) }
+        @Get("/reactiveError/{name}")
+        @SingleResult
+        Publisher<String> reactiveError(String name) {
+            Mono.defer { Mono.just(error(name)) }
         }
 
         @Get("/nested/{name}")
@@ -816,7 +820,7 @@ class HttpTracingSpec extends Specification {
 
         @ContinueSpan
         @Get("/continueRx/{name}")
-        Single<String> continuedRx(String name) {
+        Publisher<String> continuedRx(String name) {
             tracedClient.continuedRx(name)
         }
 
@@ -844,30 +848,35 @@ class HttpTracingSpec extends Specification {
             "response"
         }
 
-        @Get("/nestedRx/{name}")
-        Single<String> nestedRx(String name) {
+        @Get("/nestedReactive/{name}")
+        @SingleResult
+        Publisher<String> nestedReactive(String name) {
             spanCustomizer.activeSpan().setBaggageItem("foo", "bar")
-            tracedClient.continuedRx(name)
+            Flux.from(tracedClient.continuedRx(name))
                     .flatMap({ String res ->
                         assert spanCustomizer.activeSpan().getBaggageItem("foo") == "bar"
-                        return tracedClient.nestedRx2(res)
+                        return tracedClient.nestedReactive2(res)
                     })
         }
 
-        @Get("/nestedRx2/{name}")
-        Single<Integer> nestedRx2(String name) {
+        @Get("/nestedReactive2/{name}")
+        @SingleResult
+        Publisher<Integer> nestedReactive2(String name) {
             assert spanCustomizer.activeSpan().getBaggageItem("foo") == "bar"
-            return Single.just(10)
+            return Mono.just(10)
         }
 
         @Get("/quota-error")
-        Single<String> quotaError() {
-            Single.error(new QuotaException("retry later"))
+        @SingleResult
+        Publisher<String> quotaError() {
+            Mono.error(new QuotaException("retry later"))
         }
 
         @Get("/delayed-error/{duration}")
-        Single<Object> delayedError(Duration duration) {
-            Single.error(new RuntimeException("delayed error")).delay(duration.toMillis(), TimeUnit.MILLISECONDS, true)
+        @SingleResult
+        Publisher<Object> delayedError(Duration duration) {
+            Mono.error(new RuntimeException("delayed error"))
+                    .delaySubscription(Duration.of(duration.toMillis(), ChronoUnit.MILLIS))
         }
 
         @Error(QuotaException)
@@ -904,9 +913,11 @@ class HttpTracingSpec extends Specification {
         String blockingContinued(String name)
 
         @Get("/hello/{name}")
-        Single<String> continuedRx(String name)
+        @SingleResult
+        Publisher<String> continuedRx(String name)
 
-        @Get("/nestedRx2/{name}")
-        Single<String> nestedRx2(String name)
+        @Get("/nestedReactive2/{name}")
+        @SingleResult
+        Publisher<String> nestedReactive2(String name)
     }
 }

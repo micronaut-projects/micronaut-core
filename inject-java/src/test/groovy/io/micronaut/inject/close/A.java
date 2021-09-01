@@ -17,8 +17,8 @@ package io.micronaut.inject.close;
 
 import io.micronaut.context.annotation.Requires;
 
-import javax.annotation.PreDestroy;
-import javax.inject.Singleton;
+import jakarta.annotation.PreDestroy;
+import jakarta.inject.Singleton;
 import java.io.IOException;
 
 @Requires(property = "spec.name", value = "BeanCloseOrderSpec")

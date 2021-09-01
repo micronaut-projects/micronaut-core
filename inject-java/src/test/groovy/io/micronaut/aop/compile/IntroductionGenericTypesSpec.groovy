@@ -46,7 +46,7 @@ interface MyInterface<T extends URL> {
 
 
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Executable
 interface MyBean extends MyInterface<URL> {
 }
@@ -77,7 +77,7 @@ import java.net.*;
 
 interface MyInterface<T extends Person> {
 
-    io.reactivex.Single<java.util.List<T>> getPeopleSingle();
+    reactor.core.publisher.Mono<java.util.List<T>> getPeopleSingle();
     
     T getPerson();
     
@@ -97,7 +97,7 @@ interface MyInterface<T extends Person> {
 
 
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Executable
 interface MyBean extends MyInterface<SubPerson> {
 

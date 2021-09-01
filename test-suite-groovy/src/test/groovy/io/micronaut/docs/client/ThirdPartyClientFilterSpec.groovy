@@ -10,20 +10,20 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 @Retry
 class ThirdPartyClientFilterSpec extends Specification {
@@ -72,21 +72,21 @@ class ThirdPartyClientFilterSpec extends Specification {
 //tag::bintrayService[]
 @Singleton
 class BintrayService {
-    final RxHttpClient client
+    final HttpClient client
     final String org
 
     BintrayService(
-            @Client(BintrayApi.URL) RxHttpClient client, // <1>
+            @Client(BintrayApi.URL) HttpClient client, // <1>
             @Value('${bintray.organization}') String org ) {
         this.client = client
         this.org = org
     }
 
-    Flowable<HttpResponse<String>> fetchRepositories() {
+    Flux<HttpResponse<String>> fetchRepositories() {
         client.exchange(HttpRequest.GET("/repos/$org"), String) // <2>
     }
 
-    Flowable<HttpResponse<String>> fetchPackages(String repo) {
+    Flux<HttpResponse<String>> fetchPackages(String repo) {
         client.exchange(HttpRequest.GET("/repos/${org}/${repo}/packages"), String) // <2>
     }
 }

@@ -29,12 +29,25 @@ In addition, for full control over the emitted HTTP response you can use the sta
 
 The following example implements the previous `MessageController` example using the api:io.micronaut.http.HttpRequest[] and api:io.micronaut.http.HttpResponse[] objects:
 
-snippet::io.micronaut.docs.server.request.MessageController[tags="imports,class", indent=0, title="Request and Response Example"]
+snippet::io.micronaut.docs.server.request.MessageController[tags="imports,class,request,endclass", indent=0, title="Request and Response Example"]
 
 <1> The method is mapped to the URI `/hello` and accepts a api:io.micronaut.http.HttpRequest[]
 <2> The api:http.HttpRequest[] is used to obtain the value of a query parameter named `name`.
 <3> The api:http.HttpResponse.ok(T)[] method returns a api:http.MutableHttpResponse[] with a text body. A header named `X-My-Header` is also added to the response.
 
-api:io.micronaut.http.HttpRequest[] is also available from static context via api:io.micronaut.http.context.ServerRequestContext[].
+The api:io.micronaut.http.HttpRequest[] is also available from a static context via api:io.micronaut.http.context.ServerRequestContext[].
 
-IMPORTANT: Generally api:io.micronaut.http.context.ServerRequestContext[] is available within reactive flow, but the recommended approach is to propagate the necessary state through lambdas.
+snippet::io.micronaut.docs.server.request.MessageController[tags="imports,class,static-request,endclass", indent=0, title="Using the ServerRequestContext"]
+
+<1> The api:io.micronaut.http.context.ServerRequestContext[] is used to retrieve the request.
+
+IMPORTANT: Generally api:io.micronaut.http.context.ServerRequestContext[] is available within reactive flow, but the recommended approach is consume the request as an argument as shown in the previous example. If the request is needed in downstream methods it should be passed as an argument to those methods. There are cases where the context is not propagated because other threads are used to emit the data.
+
+An alternative for users of Project Reactor to using the ServerRequestContext is to use the contextual features of Project Reactor to retrieve the request. Because the Micronaut Framework uses Project Reactor as it's default reactive streams implementation, users of Project Reactor can benefit by being able to access the request in the context. For example:
+
+snippet::io.micronaut.docs.server.request.MessageController[tags="imports,class,request-context,endclass", indent=0, title="Using the Project Reactor context"]
+
+<1> The Mono is created with a reference to the context
+<2> The request is retrieved from the context
+
+Using the context to retrieve the request is the best approach for reactive flows because Project Reactor propagates the context and it does not rely on a thread local like api:io.micronaut.http.context.ServerRequestContext[].

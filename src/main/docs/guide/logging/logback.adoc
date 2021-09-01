@@ -1,29 +1,10 @@
-To use the logback library with link:http://logback.qos.ch/manual/configuration.html[logback.xml] placed in resources folder , you must include a dependency:
+To use the logback library, add the following dependency to your build.
 
-.Configuring logback in Gradle
-[source,groovy]
-----
-implementation "ch.qos.logback:logback-classic"
-----
+dependency:ch.qos.logback:logback-classic[gradleScope="implementation"]
 
-Or if using Maven:
+If it does not exist yet, place a link:http://logback.qos.ch/manual/configuration.html[logback.xml] file in the resources folder and modify the content for your needs. For example:
 
-.Configuring logback in Maven
-[source,xml]
-----
-<dependencies>
-  <dependency>
-    <dependency>
-      <groupId>ch.qos.logback</groupId>
-      <artifactId>logback-classic</artifactId>
-    </dependency>
-  </dependency>
-</dependencies>
-----
-
-If it does not exist yet, place a logback.xml file to resources folder and modify the content for your needs. Example:
-
-.logback.xml
+.src/main/resources/logback.xml
 [source,xml]
 ----
 <configuration>
@@ -44,7 +25,7 @@ If it does not exist yet, place a logback.xml file to resources folder and modif
 </configuration>
 ----
 
-To change the loglevel for specific classes or package names, you can add such a logger entry to the configuration section:
+To change the log level for specific classes or package names, you can add such a logger entry to the configuration section:
 
 [source,xml]
 ----

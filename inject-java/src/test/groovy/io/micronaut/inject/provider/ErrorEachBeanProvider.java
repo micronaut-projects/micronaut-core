@@ -5,7 +5,7 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Requires;
 
-import javax.inject.Provider;
+import jakarta.inject.Provider;
 
 
 @Requires(property = "spec.name", value = "ProviderNamedInjectionSpec")

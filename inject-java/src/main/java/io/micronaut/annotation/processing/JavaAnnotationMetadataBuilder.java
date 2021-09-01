@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
@@ -37,6 +38,7 @@ import javax.lang.model.util.AbstractAnnotationValueVisitor8;
 import javax.lang.model.util.Elements;
 import javax.tools.Diagnostic;
 import java.lang.annotation.Annotation;
+import java.lang.annotation.Inherited;
 import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -160,6 +162,27 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
         }
         return RetentionPolicy.RUNTIME;
+    }
+
+    @Override
+    protected boolean isInheritedAnnotation(@NonNull AnnotationMirror annotationMirror) {
+        final List<? extends AnnotationMirror> annotationMirrors = annotationMirror.getAnnotationType().asElement().getAnnotationMirrors();
+        for (AnnotationMirror mirror : annotationMirrors) {
+            if (getAnnotationTypeName(mirror).equals(Inherited.class.getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    protected boolean isInheritedAnnotationType(@NonNull Element annotationType) {
+        for (AnnotationMirror mirror : annotationType.getAnnotationMirrors()) {
+            if (getAnnotationTypeName(mirror).equals(Inherited.class.getName())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -528,13 +551,33 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      */
     @Override
     public boolean hasAnnotation(Element element, Class<? extends Annotation> ann) {
+        return hasAnnotation(element, ann.getName());
+    }
+
+    /**
+     * Checks if a method has an annotation.
+     *
+     * @param element The method
+     * @param ann    The annotation to look for
+     * @return Whether if the method has the annotation
+     */
+    @Override
+    public boolean hasAnnotation(Element element, String ann) {
         List<? extends AnnotationMirror> annotationMirrors = element.getAnnotationMirrors();
-        for (AnnotationMirror annotationMirror : annotationMirrors) {
-            if (annotationMirror.getAnnotationType().toString().equals(ann.getName())) {
-                return true;
+        if (CollectionUtils.isNotEmpty(annotationMirrors)) {
+            for (AnnotationMirror annotationMirror : annotationMirrors) {
+                final DeclaredType annotationType = annotationMirror.getAnnotationType();
+                if (annotationType.toString().equals(ann)) {
+                    return true;
+                }
             }
         }
         return false;
+    }
+
+    @Override
+    protected boolean hasAnnotations(Element element) {
+        return CollectionUtils.isNotEmpty(element.getAnnotationMirrors());
     }
 
     /**

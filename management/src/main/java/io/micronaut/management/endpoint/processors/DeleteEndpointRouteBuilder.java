@@ -19,11 +19,11 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.management.endpoint.annotation.Delete;
 import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
+import io.micronaut.management.endpoint.annotation.Delete;
 import io.micronaut.web.router.UriRoute;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 
 /**

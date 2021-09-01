@@ -15,18 +15,13 @@
  */
 package io.micronaut.inject.beans;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.annotation.*;
 import io.micronaut.core.beans.AbstractBeanMethod;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.ExecutableMethod;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-
 import java.lang.reflect.Method;
 
 /**
@@ -49,9 +44,9 @@ public abstract class AbstractExecutableBeanMethod<B, T> extends AbstractBeanMet
      * @param arguments          The argument types
      */
     protected AbstractExecutableBeanMethod(
-            @NotNull BeanIntrospection<B> introspection,
-            @NotNull Argument<T> returnType,
-            @NotNull String name,
+            @NonNull BeanIntrospection<B> introspection,
+            @NonNull Argument<T> returnType,
+            @NonNull String name,
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Argument<?>... arguments) {
         super(introspection, returnType, name, annotationMetadata, arguments);

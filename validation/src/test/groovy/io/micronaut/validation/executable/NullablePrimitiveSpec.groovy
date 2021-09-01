@@ -48,10 +48,10 @@ class NullablePrimitiveSpec extends AbstractTypeElementSpec {
 
         where:
         deprecated | annotation
-        true       | 'javax.annotation.Nullable'
+        false       | 'javax.annotation.Nullable'
         false      | 'io.micronaut.core.annotation.Nullable'
         false      | 'edu.umd.cs.findbugs.annotations.Nullable'
-        true       | 'javax.annotation.Nonnull'
+        false       | 'javax.annotation.Nonnull'
         false      | 'io.micronaut.core.annotation.NonNull'
         false      | 'edu.umd.cs.findbugs.annotations.NonNull'
     }
@@ -118,7 +118,7 @@ class NullablePrimitiveSpec extends AbstractTypeElementSpec {
         buildTypeElement("""
             package test;
 
-            @javax.inject.Singleton
+            @jakarta.inject.Singleton
             class Foo {
                 void bar(${annotation} int n) {
                 }

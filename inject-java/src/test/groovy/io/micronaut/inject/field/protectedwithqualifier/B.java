@@ -17,8 +17,8 @@ package io.micronaut.inject.field.protectedwithqualifier;
 
 import io.micronaut.inject.qualifiers.One;
 
-import javax.inject.Inject;
-import javax.inject.Named;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
 
 public  class B {
     @Inject

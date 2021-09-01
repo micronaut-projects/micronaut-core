@@ -10,7 +10,7 @@ dependency:io.micronaut.spring:micronaut-spring[gradleScope="implementation"]
 
 NOTE: If you use Micronaut's <<hibernateSupport,Hibernate support>> you already get this dependency and a `HibernateTransactionManager` is configured for you.
 
-This is done by defining a Micronaut ann:spring.tx.annotation.Transactional[] annotation that uses ann:context.annotation.AliasFor[] in a manner that every time you set a value with ann:spring.tx.annotation.Transactional[] it aliases the value to the equivalent value in Spring's version of `@Transactional`.
+This is done by defining a Micronaut link:{micronautspringapi}/tx/annotation/Transactional.html[Transactional] annotation that uses ann:context.annotation.AliasFor[] in a manner that every time you set a value with link:{micronautspringapi}/tx/annotation/Transactional.html[Transactional] it aliases the value to the equivalent value in Spring's version of `@Transactional`.
 
 The benefit here is you can use Micronaut's compile-time, reflection-free AOP to declare programmatic Spring transactions. For example:
 
@@ -26,4 +26,4 @@ public Book saveBook(String title) {
 }
 ----
 
-NOTE: Micronaut's version of ann:spring.tx.annotation.Transactional[] is meta-annotated with ann:core.annotation.Blocking[], ensuring that all methods annotated with it use the I/O thread pool when executing within the HTTP server
+NOTE: Micronaut's version of link:{micronautspringapi}/tx/annotation/Transactional.html[Transactional] is meta-annotated with ann:core.annotation.Blocking[], ensuring that all methods annotated with it use the I/O thread pool when executing within the HTTP server

@@ -5,12 +5,12 @@ import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.validation.validator.resolver.CompositeTraversableResolver
+import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
 import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 
-import javax.inject.Singleton
 import javax.validation.ElementKind
 import javax.validation.Valid
 import javax.validation.ValidatorFactory

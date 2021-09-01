@@ -18,9 +18,10 @@ package io.micronaut.docs.annotation
 // tag::imports[]
 import io.micronaut.http.annotation.Post
 import io.micronaut.validation.Validated
-import io.reactivex.Single
 import javax.validation.constraints.Min
 import javax.validation.constraints.NotBlank
+import io.micronaut.core.async.annotation.SingleResult
+import org.reactivestreams.Publisher
 // end::imports[]
 
 // tag::class[]
@@ -28,7 +29,8 @@ import javax.validation.constraints.NotBlank
 interface PetOperations {
     // tag::save[]
     @Post
-    fun save(@NotBlank name: String, @Min(1L) age: Int): Single<Pet>
+    @SingleResult
+    fun save(@NotBlank name: String, @Min(1L) age: Int): Publisher<Pet>
     // end::save[]
 }
 // end::class[]

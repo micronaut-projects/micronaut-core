@@ -16,7 +16,7 @@
 package io.micronaut.jackson
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.PropertyNamingStrategy
+import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.databind.SerializationFeature
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
@@ -119,18 +119,19 @@ class JacksonSetupSpec extends Specification {
 
         where:
         configuredJackonPropertyNamingStrategy | expectedPropertyNamingStrategy
-        'SNAKE_CASE'                           | PropertyNamingStrategy.SNAKE_CASE
-        'UPPER_CAMEL_CASE'                     | PropertyNamingStrategy.UPPER_CAMEL_CASE
-        'LOWER_CAMEL_CASE'                     | PropertyNamingStrategy.LOWER_CAMEL_CASE
-        'LOWER_CASE'                           | PropertyNamingStrategy.LOWER_CASE
-        'KEBAB_CASE'                           | PropertyNamingStrategy.KEBAB_CASE
+        'SNAKE_CASE'                           | PropertyNamingStrategies.SNAKE_CASE
+        'UPPER_CAMEL_CASE'                     | PropertyNamingStrategies.UPPER_CAMEL_CASE
+        'LOWER_CAMEL_CASE'                     | PropertyNamingStrategies.LOWER_CAMEL_CASE
+        'LOWER_DOT_CASE'                       | PropertyNamingStrategies.LOWER_DOT_CASE
+        'LOWER_CASE'                           | PropertyNamingStrategies.LOWER_CASE
+        'KEBAB_CASE'                           | PropertyNamingStrategies.KEBAB_CASE
     }
 
     void "test property naming strategy from yml"() {
         ApplicationContext applicationContext = ApplicationContext.run("jackson")
 
         expect:
-        applicationContext.getBean(JacksonConfiguration).propertyNamingStrategy == PropertyNamingStrategy.SNAKE_CASE
+        applicationContext.getBean(JacksonConfiguration).propertyNamingStrategy == PropertyNamingStrategies.SNAKE_CASE
     }
 
     void "verify trim strings with custom property enabled"() {

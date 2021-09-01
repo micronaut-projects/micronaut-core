@@ -7,7 +7,7 @@ import io.micronaut.inject.ExecutableMethod
 
 class MessagingAnnotationSpec extends AbstractTypeElementSpec {
 
-    void "test deprecated annotations"() {
+    void "test annotations"() {
         given:
         def definition = buildBeanDefinition('test.TestListener','''
 package test;
@@ -26,19 +26,19 @@ class TestListener {
 ''')
         def method = definition.getRequiredMethod("receive", String, String)
 
-        expect:"for backwards compatibility we transform the new annotation to the old"
-        def typeHeaders = definition.getAnnotationValuesByType(Header)
+        expect:
+        def typeHeaders = definition.getAnnotationValuesByType(MessageHeader)
         typeHeaders.size() == 2
-        typeHeaders[0].annotationName == Header.name
+        typeHeaders[0].annotationName == MessageHeader.name
         typeHeaders[0].stringValue().get() == "Bar"
         typeHeaders[0].stringValue("name").get() == "Foo"
-        !method.arguments[0].annotationMetadata.hasAnnotation(MessageBody)
-        method.arguments[0].annotationMetadata.hasAnnotation(Body)
-        method.arguments[0].annotationMetadata.getAnnotationNameByStereotype(Bindable).get() == Body.name
-        !method.arguments[1].annotationMetadata.hasAnnotation(MessageHeader)
-        def headers = method.arguments[1].annotationMetadata.getAnnotationValuesByType(Header)
+        method.arguments[0].annotationMetadata.hasAnnotation(MessageBody)
+        method.arguments[0].annotationMetadata.getAnnotationNameByStereotype(Bindable).get() == MessageBody.name
+        method.arguments[1].annotationMetadata.hasAnnotation(MessageHeader)
+        method.arguments[1].annotationMetadata.getAnnotationTypeByStereotype(Bindable).get() == MessageHeader
+        def headers = method.arguments[1].annotationMetadata.getAnnotationValuesByType(MessageHeader)
         headers.size() == 1
-        headers[0].annotationName == Header.name
+        headers[0].annotationName == MessageHeader.name
         headers[0].stringValue().get() == "CONTENT_TYPE"
     }
 }

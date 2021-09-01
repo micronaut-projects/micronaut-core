@@ -24,8 +24,8 @@ import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.MediaType;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.net.InetSocketAddress;
 import java.net.ProxySelector;
 import java.net.SocketAddress;

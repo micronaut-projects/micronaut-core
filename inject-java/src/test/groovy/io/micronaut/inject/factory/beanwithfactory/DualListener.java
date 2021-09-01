@@ -21,7 +21,7 @@ import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.context.event.BeanInitializedEventListener;
 import io.micronaut.context.event.BeanInitializingEvent;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class DualListener implements BeanCreatedEventListener<BFactory>, BeanInitializedEventListener<BFactory> {

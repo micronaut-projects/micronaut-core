@@ -15,21 +15,24 @@
  */
 package io.micronaut.jackson.bind
 
-
+import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.databind.PropertyNamingStrategy
+import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.convert.ConversionError
-import spock.lang.Shared
+import io.micronaut.core.convert.ConversionService
 import spock.lang.Specification
 import spock.lang.Unroll
 
 class CharSequencePropertyNamingStrategyConverterSpec extends Specification {
-    @Shared
-    CharSequencePropertyNamingStrategyConverter converter = new CharSequencePropertyNamingStrategyConverter()
 
     @Unroll
     void 'test configuring #propertyNaminStrategyString converts to correct PropertyNamingStrategy'() {
+        given:
+        def ctx = ApplicationContext.run()
+        def converter = ctx.getBean(ConversionService)
+
         when:
         Optional<PropertyNamingStrategy> actualPropertyNamingStrategy = converter.convert(
                 propertyNaminStrategyString, PropertyNamingStrategy)
@@ -38,29 +41,39 @@ class CharSequencePropertyNamingStrategyConverterSpec extends Specification {
         actualPropertyNamingStrategy.isPresent()
         actualPropertyNamingStrategy.get() == expectedPropertyNamingStrategy
 
+        cleanup:
+        ctx.close()
+
         where:
         propertyNaminStrategyString | expectedPropertyNamingStrategy
-        'SNAKE_CASE'                | PropertyNamingStrategy.SNAKE_CASE
-        'UPPER_CAMEL_CASE'          | PropertyNamingStrategy.UPPER_CAMEL_CASE
-        'LOWER_CAMEL_CASE'          | PropertyNamingStrategy.LOWER_CAMEL_CASE
-        'LOWER_CASE'                | PropertyNamingStrategy.LOWER_CASE
-        'KEBAB_CASE'                | PropertyNamingStrategy.KEBAB_CASE
+        'SNAKE_CASE'                | PropertyNamingStrategies.SNAKE_CASE
+        'UPPER_CAMEL_CASE'          | PropertyNamingStrategies.UPPER_CAMEL_CASE
+        'LOWER_CAMEL_CASE'          | PropertyNamingStrategies.LOWER_CAMEL_CASE
+        'LOWER_DOT_CASE'            | PropertyNamingStrategies.LOWER_DOT_CASE
+        'LOWER_CASE'                | PropertyNamingStrategies.LOWER_CASE
+        'KEBAB_CASE'                | PropertyNamingStrategies.KEBAB_CASE
     }
 
     @Unroll
     void 'test invalid String #invalidString throws IllegalArgumentException'() {
+        given:
+        def ctx = ApplicationContext.run()
+        def converter = ctx.getBean(ConversionService)
+
         when:
-        ConversionContext ctx = ArgumentConversionContext.of(CharSequence)
-        converter.convert(invalidString, PropertyNamingStrategy, ctx)
-        ConversionError conversionError = ctx.last()
+        ConversionContext conversionContext = ArgumentConversionContext.of(CharSequence)
+        converter.convert(invalidString, PropertyNamingStrategy, conversionContext)
+        ConversionError conversionError = conversionContext.last()
 
         then:
         conversionError.cause instanceof IllegalArgumentException
         conversionError.cause.message == "Unable to convert '$invalidString' to a com.fasterxml.jackson.databind.PropertyNamingStrategy"
 
+        cleanup:
+        ctx.close()
+
         where:
         invalidString | _
-        null          | _
         ''            | _
         'CASE'        | _
     }

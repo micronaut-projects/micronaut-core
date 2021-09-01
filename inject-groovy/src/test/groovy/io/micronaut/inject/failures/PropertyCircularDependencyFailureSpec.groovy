@@ -20,8 +20,8 @@ import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.exceptions.CircularDependencyException
 import spock.lang.Specification
 
-import javax.inject.Inject
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 
 /**
  * Created by graemerocher on 16/05/2017.
@@ -43,11 +43,11 @@ Failed to inject value for parameter [a] of method [setA] of class: io.micronaut
 
 Message: Circular dependency detected
 Path Taken: 
-B.setA([A a]) --> A.setB([B b])
-^                            |
-|                            |
-|                            |
-+----------------------------+'''
+new B() --> B.setA([A a]) --> A.setB([B b])
+^                                        |
+|                                        |
+|                                        |
++----------------------------------------+'''
     }
 
     @Singleton

@@ -16,6 +16,7 @@ dependencies {
     annotationProcessor project(":inject-java")
     api project(":inject")
 
+    testImplementation project(":context")
     testImplementation dependencyModuleVersion("netty", "netty-codec-http")
     testImplementation project(":http-server-netty")
     testImplementation project(":http-client")
@@ -54,22 +55,23 @@ dependencies {
     testAnnotationProcessor project(":inject-java")
     testAnnotationProcessor project(":test-suite")
 
-    testRuntimeOnly dependencyVersion("tomcatJdbc")
     testRuntimeOnly dependencyVersion("h2")
     testRuntimeOnly "org.junit.vintage:junit-vintage-engine:$junitVersion"
     testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
     testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.920'
 
     // needed for HTTP/2 tests
-    testImplementation 'io.netty:netty-tcnative:2.0.36.Final'
-    testImplementation 'io.netty:netty-tcnative-boringssl-static:2.0.35.Final'
-    testImplementation "io.netty:netty-tcnative-boringssl-static:2.0.35.Final:${Os.isFamily(Os.FAMILY_MAC) ? 'osx-x86_64' : 'linux-x86_64'}"
+    testImplementation 'io.netty:netty-tcnative:2.0.40.Final'
+    testImplementation 'io.netty:netty-tcnative-boringssl-static:2.0.40.Final'
+    testImplementation "io.netty:netty-tcnative-boringssl-static:2.0.40.Final:${Os.isFamily(Os.FAMILY_MAC) ? 'osx-x86_64' : 'linux-x86_64'}"
     testImplementation 'org.zalando:logbook-netty:2.4.1'
     testImplementation "ch.qos.logback:logback-classic:1.2.3"
 
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
-        testImplementation('org.bouncycastle:bcpkix-jdk15on:1.65')
+        testImplementation('org.bouncycastle:bcpkix-jdk15on:1.69')
     }
+
+    testImplementation dependencyVersion("reactor")
 }
 
 //tasks.withType(Test) {

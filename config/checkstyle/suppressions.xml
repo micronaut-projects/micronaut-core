@@ -6,15 +6,17 @@
 
 <suppressions>
     <suppress checks="FileLength"
-              files="DefaultBeanContext.java|BeanDefinitionWriter.java|DefaultHttpClient.java|BeanDefinitionInjectProcessor.java|AbstractBeanDefinition.java|DefaultValidator.java"/>
+              files="DefaultBeanContext.java|BeanDefinitionWriter.java|DefaultHttpClient.java|BeanDefinitionInjectProcessor.java|AbstractBeanDefinition.java|AbstractBeanDefinition2.java|DefaultValidator.java|RoutingInBoundHandler.java|DefaultAnnotationMetadata.java|AbstractAnnotationMetadataBuilder.java"/>
     <suppress checks="DeclarationOrder"
               files="UriTemplate.java"/>
     <suppress checks="Header"
-              files="AnnotationClassReader.java|Attribute.java|Context.java|io[\\/]micronaut[\\/]core[\\/]util[\\/]clhm|AmazonInfo.java|DataCenterInfo.java|LeaseInfo.java|QueryStringDecoder.java|CronExpression.java|AntPathMatcher.java|io[\\/]micronaut[\\/]http[\\/]netty[\\/]stream[\\/]package-info.java" />
+              files="AnnotationClassReader.java|Attribute.java|Context.java|io[\\/]micronaut[\\/]core[\\/]util[\\/]clhm|AmazonInfo.java|DataCenterInfo.java|LeaseInfo.java|QueryStringDecoder.java|CronExpression.java|AntPathMatcher.java|MicronautAstBuilder.java|io[\\/]micronaut[\\/]http[\\/]netty[\\/]stream[\\/]package-info.java" />
     <suppress checks="[a-zA-Z0-9]*"
               files="FlowControlHandler.java" />
     <suppress checks="ParameterNumber"
               files="DefaultHttpClient.java" />
+    <suppress checks="IllegalImport"
+              files="JavaxProviderBeanDefinition.java" />
     <!-- <suppress checks="FileLength" -->
     <!-- files="DefaultBeanContext.java|BeanDefinitionWriter.java|DefaultHttpClient.java"/> -->
 

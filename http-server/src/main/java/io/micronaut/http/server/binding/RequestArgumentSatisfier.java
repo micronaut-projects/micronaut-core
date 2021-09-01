@@ -30,8 +30,8 @@ import io.micronaut.http.bind.binders.RequestBeanAnnotationBinder;
 import io.micronaut.web.router.NullArgument;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UnresolvedArgument;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;

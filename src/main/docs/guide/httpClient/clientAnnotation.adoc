@@ -30,7 +30,7 @@ snippet::io.micronaut.docs.annotation.PetClient[tags="imports, class", indent=0,
 <2> The interface extends from `PetOperations`
 <3> The `save` method is overridden. See the warning below.
 
-WARNING: Notice in the above example we override the `save` method. This is necessary if you compile without the `-parameters` option since Java does not retain parameters names in bytecode otherwise. Overriding is not necessary if you compile with `-parameters`.
+WARNING: Notice in the above example we override the `save` method. This is necessary if you compile without the `-parameters` option since Java does not retain parameters names in bytecode otherwise. Overriding is not necessary if you compile with `-parameters`. In addition, when overriding methods you should ensure any validation annotations are declared again since these are not jdk:java.lang.annotation.Inherited[] annotations.
 
 Once you have defined a client you can `@Inject` it wherever you need it.
 
@@ -54,11 +54,11 @@ The following table illustrates common return types usable with ann:http.client.
 
 |rs:Publisher[]
 |Any type that implements the rs:Publisher[] interface
-|`Flowable<String> hello()`
+|`Flux<String> hello()`
 
 |api:http.HttpResponse[]
 |An api:http.HttpResponse[] and optional response body type
-|`Single<HttpResponse<String>> hello()`
+|`Mono<HttpResponse<String>> hello()`
 
 |rs:Publisher[]
 |A rs:Publisher[] implementation that emits a POJO

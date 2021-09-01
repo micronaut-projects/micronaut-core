@@ -3,12 +3,14 @@ package io.micronaut.validation.validator.reactive
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected
-import io.reactivex.Single
+import jakarta.inject.Singleton
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-
-import javax.inject.Singleton
+import io.micronaut.core.async.annotation.SingleResult
 import javax.validation.ConstraintViolationException
 import javax.validation.Valid
 import javax.validation.constraints.NotBlank
@@ -27,10 +29,10 @@ class ReactiveMethodValidationSpec extends Specification {
         BookService bookService = applicationContext.getBean(BookService)
 
         when:
-        bookService.rxReturnInvalid(Single.just(new Book(title: "It"))).blockingGet()
+        Mono.from(bookService.rxReturnInvalid(Mono.just(new Book(title: "It")))).block()
 
         then:
-        def e = thrown(ConstraintViolationException)
+        ConstraintViolationException e = thrown()
         e.message == 'title: must not be blank'
         e.getConstraintViolations().first().propertyPath.toString() == 'title'
     }
@@ -40,10 +42,10 @@ class ReactiveMethodValidationSpec extends Specification {
         BookService bookService = applicationContext.getBean(BookService)
 
         when:
-        bookService.rxValid(Single.just(new Book(title: ""))).blockingGet()
+        Mono.from(bookService.rxValid(Mono.just(new Book(title: "")))).block()
 
         then:
-        def e = thrown(ConstraintViolationException)
+        ConstraintViolationException e = thrown()
         e.message == 'rxValid.title: must not be blank'
         e.getConstraintViolations().first().propertyPath.toString() == 'rxValid.title'
     }
@@ -53,10 +55,10 @@ class ReactiveMethodValidationSpec extends Specification {
         BookService bookService = applicationContext.getBean(BookService)
 
         when:
-        bookService.rxSimple(Single.just("")).blockingGet()
+        Mono.from(bookService.rxSimple(Mono.just(""))).block()
 
         then:
-        def e = thrown(ConstraintViolationException)
+        ConstraintViolationException e = thrown()
         e.message == 'rxSimple.title: must not be blank'
         e.getConstraintViolations().first().propertyPath.toString() == 'rxSimple.title'
     }
@@ -69,7 +71,7 @@ class ReactiveMethodValidationSpec extends Specification {
         bookService.futureSimple(CompletableFuture.completedFuture("")).get()
 
         then:
-        def e = thrown(ExecutionException)
+        ExecutionException e = thrown()
 
         e.cause.message == 'futureSimple.title: must not be blank'
         e.cause.getConstraintViolations().first().propertyPath.toString() == 'futureSimple.title'
@@ -83,7 +85,7 @@ class ReactiveMethodValidationSpec extends Specification {
         bookService.futureValid(CompletableFuture.completedFuture(new Book(title: ""))).get()
 
         then:
-        def e = thrown(ExecutionException)
+        ExecutionException e = thrown()
 
         e.cause.message == 'futureValid.title: must not be blank'
         e.cause.getConstraintViolations().first().propertyPath.toString() == 'futureValid.title'
@@ -94,11 +96,10 @@ class ReactiveMethodValidationSpec extends Specification {
         BookService bookService = applicationContext.getBean(BookService)
 
         when:
-        def book = bookService.rxValid(Single.just(new Book(title: "It"))).blockingGet()
+        Book book = Mono.from(bookService.rxValid(Mono.just(new Book(title: "It")))).block()
 
         then:
         book.title == 'It'
-
     }
 }
 
@@ -118,20 +119,23 @@ class BookService {
 
     @Executable
     @Valid
-    Single<Book> rxSimple(@NotBlank Single<String> title) {
-        return title.map({ String t -> new Book(title: t)})
+    @SingleResult
+    Publisher<Book> rxSimple(@NotBlank Publisher<String> title) {
+        return Flux.from(title).map({ String t -> new Book(title: t)})
     }
 
     @Executable
     @Valid
-    Single<Book> rxValid(@Valid Single<Book> book) {
+    @SingleResult
+    Publisher<Book> rxValid(@Valid Publisher<Book> book) {
         return book
     }
 
     @Executable
     @Valid
-    Single<Book> rxReturnInvalid(@Valid Single<Book> book) {
-        return book.map({ b -> b.title =''; return b})
+    @SingleResult
+    Publisher<Book> rxReturnInvalid(@Valid Publisher<Book> book) {
+        return Flux.from(book).map({ b -> b.title =''; return b})
     }
 
 

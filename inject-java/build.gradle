@@ -5,20 +5,22 @@ dependencies {
     if (!JavaVersion.current().isJava9Compatible()) {
         compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
-    compileOnly "jakarta.inject:jakarta.inject-api:2.0.0"
     compileOnly dependencyVersion("validation")
 
+    testImplementation project(":context")
     testImplementation project(':aop')
     testAnnotationProcessor project(":inject-java")
     testImplementation project(":inject-java-test")
     testImplementation project(":inject-test-utils")
     testImplementation project(":runtime")
-    testImplementation dependencyVersion("rxjava2")
+
+    testImplementation dependencyVersion("reactor")
+
     testImplementation dependencyVersion("spotbugs")
     testImplementation "org.hibernate:hibernate-core:5.4.29.Final"
     testImplementation "junit:junit:4.13.2"
     testImplementation "com.google.testing.compile:compile-testing:0.19"
-    testImplementation 'org.mongodb:mongo-java-driver:3.12.8'
+    testImplementation 'org.mongodb:mongo-java-driver:3.12.10'
     testImplementation 'org.neo4j.driver:neo4j-java-driver:1.4.5'
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
     if (!JavaVersion.current().isJava9Compatible()) {
@@ -27,9 +29,12 @@ dependencies {
     testImplementation dependencyModuleVersion("micrometer", "micrometer-core")
     testImplementation project(":validation")
     testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
-    testImplementation "jakarta.inject:jakarta.inject-api:2.0.0"
-
-
+    testImplementation dependencyVersion("zipkin.reporter")
+    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-core"), {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-bom'
+        exclude module:'micronaut-inject'
+    }
     testRuntimeOnly 'org.glassfish.web:el-impl:2.2.1-b05'
     testRuntimeOnly 'org.glassfish:javax.el:3.0.1-b12'
 }

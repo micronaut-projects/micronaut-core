@@ -1,22 +1,171 @@
-This section covers the steps required to upgrade a Micronaut 2.0 application to Micronaut 2.1.
+This section covers the steps required to upgrade a Micronaut 2.x application to Micronaut 3.0.0.
 
-=== New Group IDs
+The sections below go into more detail, but at a high level the process generally involves:
 
-Some dependencies have new Maven Group IDs, so you may need to update them. The following table summarizes changes to group IDs:
+* updating versions
+* updating annotations
+* choosing a Reactive implementation
+* adjusting code affected by breaking changes
 
-.Updated Maven Group IDs
+Typically, upgrading should be straightforward, but it's possible to save yourself some work with https://docs.openrewrite.org/[OpenRewrite^], an automated refactoring tool that you can use to make many of the required upgrade changes.
+
+=== Automating Upgrades with OpenRewrite
+
+OpenRewrite works with Micronaut applications written in Java, but OpenRewrite doesn't currently support Kotlin or Groovy.
+Like any automated tool it does much of the work for you, but be sure to review the resulting changes and manually make any changes that aren't supported by OpenRewrite, for example converting from RxJava2 to Reactor.
+
+NOTE: If you will be using OpenRewrite, don't make any upgrade changes yet that would cause your application not to compile, for example updating the Micronaut version to 3.x.
+This would cause application classes that use `javax.inject` annotations like `@Singleton` or RxJava2 classes like `io.reactivex.Flowable` to not compile since those dependencies are no longer included by default.
+Instead, use OpenRewrite to do the initial work and just do the steps yourself that aren't possible or practical to automate.
+
+Adding OpenRewrite support to your build is easy, it just requires adding the Gradle or Maven plugin and configuring the plugin to use the Micronaut upgrade recipe.
+
+See the https://micronaut.io/launch?features=openrewrite&lang=JAVA&build=GRADLE&activity=diff[Gradle feature diff^] or the https://micronaut.io/launch?features=openrewrite&lang=JAVA&build=MAVEN&activity=diff[Maven feature diff^] to see the required build script changes.
+
+Once you've made the build script changes, you can "dry-run" the Micronaut upgrade recipe to see what changes would be made.
+
+For Gradle, run
+
+[source,bash]
+----
+$ ./gradlew rewriteDryRun
+----
+
+and view the diff report generated in `build/reports/rewrite/rewrite.patch`
+
+and for Maven, run
+
+[source,bash]
+----
+$ ./mvnw rewrite:dryRun
+----
+
+and view the diff report generated in `target/site/rewrite/rewrite.patch`.
+
+Then you can run the recipe for real, letting OpenRewrite update your code.
+
+For Gradle, run
+
+[source,bash]
+----
+$ ./gradlew rewriteRun
+----
+
+and for Maven, run
+
+[source,bash]
+----
+$ ./mvnw rewrite:run
+----
+
+Once the changes have been made, you could remove the plugin, but it's fine to leave it since OpenRewrite doesn't run automatically, only when you run one of its commands.
+And there are many more recipes available beyond the Micronaut upgrade recipe that you might want to include to automate other code changes.
+
+The plugin includes another command to list all recipes currently in the classpath (in this case the core recipes plus those added by the `rewrite-micronaut` module).
+
+For Gradle, run
+
+[source,bash]
+----
+$ ./gradlew rewriteDiscover
+----
+
+and for Maven, run
+
+[source,bash]
+----
+$ ./mvnw rewrite:discover
+----
+
+and the available recipes and styles will be output to the console. Check out the https://docs.openrewrite.org/[OpenRewrite documentation] for more information and to see the many other available recipes available.
+
+=== Version Update
+
+If you use Gradle, update the `micronautVersion` property in `gradle.properties`, e.g.
+
+.gradle.properties
+[source,properties,subs="attributes+"]
+----
+micronautVersion={version}
+----
+
+If you use Maven, update the parent POM version and `micronaut.version` property in `pom.xml`, e.g.
+
+.pom.xml
+[source,xml,subs="attributes+"]
+----
+<parent>
+  <groupId>io.micronaut</groupId>
+  <artifactId>micronaut-parent</artifactId>
+  <version>{version}</version>
+</parent>
+
+<properties>
+  ...
+  <micronaut.version>{version}</micronaut.version>
+  ...
+</properties>
+----
+
+=== Build Plugin Update
+
+If you use the Micronaut Gradle plugin, update the version to `2.0.3`
+
+`id("io.micronaut.application") version "2.0.3"`
+
+For Maven users the plugin version is updated automatically when you update the Micronaut version.
+
+=== Inject Annotations
+
+The `javax.inject` annotations are no longer a transitive dependency. Micronaut now ships with the Jakarta inject annotations. Either replace all `javax.inject` imports with `jakarta.inject`, or add a dependency on `javax-inject` to continue using the older annotations:
+
+dependency:javax.inject:javax.inject:1[]
+
+Any code that relied on the `javax.inject` annotations being present in the annotation metadata will still work as expected, however any code that interacts with them must be changed to no longer reference the annotation classes themselves. Static variables in the link:{api}/io/micronaut/core/annotation/AnnotationUtil.html[AnnotationUtil] class (e.g. `AnnotationUtil.INJECT`, `AnnotationUtil.SINGLETON`, etc.) should be used in place of the annotation classes when working with annotation metadata.
+
+=== Nullability Annotations
+
+Micronaut now only comes with its own set of annotations to declare nullability. The findbugs, javax, and jetbrains annotations are all still supported, however you must add a dependency to use them. Either switch to the Micronaut ann:core.annotation.Nullable[] / ann:core.annotation.NonNull[] annotations or add a dependency for the annotation library you wish to use.
+
+=== RxJava2
+
+Micronaut no longer ships any reactive implementation as a default in any of our modules or core libraries. Upgrading to Micronaut 3 requires choosing which reactive streams implementation to use, and then adding the relevant dependency.
+
+For those already using RxJava3 or Project Reactor, there should be no changes required to upgrade to Micronaut 3. If you use RxJava2 and wish to continue using it, you must add a dependency:
+
+dependency:io.micronaut.rxjava2:micronaut-rxjava2[gradleScope="implementation"]
+
+In addition, if any of the `Rx` HTTP client interfaces were used, a dependency must be added and the imports must be updated.
+
+dependency:io.micronaut.rxjava2:micronaut-rxjava2-http-client[gradleScope="implementation"]
+
+.RxJava2 HTTP Client Imports
 |===
-|Previous ID|New ID
+|Old |New
 
-|`io.micronaut.configuration:micronaut-openapi`
-|`io.micronaut.openapi:micronaut-openapi`
+| io.micronaut.http.client.RxHttpClient
+| io.micronaut.rxjava2.http.client.RxHttpClient
+
+| io.micronaut.http.client.RxProxyHttpClient
+| io.micronaut.rxjava2.http.client.proxy.RxProxyHttpClient
+
+| io.micronaut.http.client.RxStreamingHttpClient
+| io.micronaut.rxjava2.http.client.RxStreamingHttpClient
+
+| io.micronaut.http.client.sse.RxSseClient
+| io.micronaut.rxjava2.http.client.sse.RxSseClient
+
+| io.micronaut.websocket.RxWebSocketClient
+| io.micronaut.rxjava2.http.client.websockets.RxWebSocketClient
 
 |===
 
-=== Mandatory upgrade for Netty tcnative
+If the Netty based server implementation is being used, an additional dependency must be added:
 
-Due to a new https://github.com/netty/netty/pull/10407[SSL default value introduced in Netty 4.1.52], if you use tcnative you need to update it to at least `2.0.33.Final`.
+dependency:io.micronaut.rxjava2:micronaut-rxjava2-http-server-netty[gradleScope="implementation"]
 
-=== Other Breaking Changes
+NOTE: We recommend switching to Project Reactor as that is the implementation used internally by Micronaut. Adding a dependency to RxJava2 will result in both implementations in the runtime classpath of your application.
 
-If the above cases don't cover your use case see the section on <<breaks, Breaking Changes>> for a list of other changes that are regarded as breaking in this release.
+=== Breaking Changes
+
+Review the section on <<breaks, Breaking Changes>> and update your affected application code.

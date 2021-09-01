@@ -25,8 +25,8 @@ import org.neo4j.driver.v1.Config
 class ConfigurationPropertiesBuilderSpec extends AbstractBeanDefinitionSpec {
     void "test configuration builder on method"() {
         given:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyPropertiesAA', '''
-package test;
+        BeanDefinition beanDefinition = buildBeanDefinition('cpbtest1.MyPropertiesAA', '''
+package cpbtest1;
 
 import io.micronaut.context.annotation.*
 
@@ -85,8 +85,8 @@ class TestAA {
 
     void "test configuration builder with includes"() {
         given:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyPropertiesA', '''
-package test;
+        BeanDefinition beanDefinition = buildBeanDefinition('cpbtest2.MyPropertiesA', '''
+package cpbtest2;
 
 import io.micronaut.context.annotation.*
 
@@ -138,8 +138,8 @@ class TestA {
 
     void "test configuration builder with factory method and properties"() {
         given:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyPropertiesB', '''
-package test
+        BeanDefinition beanDefinition = buildBeanDefinition('cpbtest3.MyPropertiesB', '''
+package cpbtest3
 
 import io.micronaut.context.annotation.*
 
@@ -175,8 +175,8 @@ class TestB {
 
     void "test catch and log NoSuchMethodError for when underlying builder changes"() {
         given:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
-package test
+        BeanDefinition beanDefinition = buildBeanDefinition('cpbtest4.MyProperties', '''
+package cpbtest4
 
 import io.micronaut.context.annotation.*
 
@@ -206,8 +206,8 @@ class TestC {
 
     void "test with groovy properties"() {
         given:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
-package test
+        BeanDefinition beanDefinition = buildBeanDefinition('cpbtest5.MyProperties', '''
+package cpbtest5
 
 import io.micronaut.context.annotation.*
 
@@ -252,8 +252,8 @@ class TestD {
 
     void "test different inject types for config properties"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.Neo4jProperties', '''
-package test
+        BeanDefinition beanDefinition = buildBeanDefinition('cpbtest6.Neo4jProperties', '''
+package cpbtest6
 
 import io.micronaut.context.annotation.*
 import org.neo4j.driver.v1.*
@@ -298,8 +298,8 @@ class Neo4jProperties {
 
     void "test specifying a configuration prefix"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.Neo4jProperties', '''
-package test
+        BeanDefinition beanDefinition = buildBeanDefinition('cpbtest7.Neo4jProperties', '''
+package cpbtest7
 
 import io.micronaut.context.annotation.*
 import org.neo4j.driver.v1.*
@@ -346,8 +346,8 @@ class Neo4jProperties {
 
     void "test specifying a configuration prefix with value"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.Neo4jProperties', '''
-package test
+        BeanDefinition beanDefinition = buildBeanDefinition('cpbtest8.Neo4jProperties', '''
+package cpbtest8
 
 import io.micronaut.context.annotation.*
 import org.neo4j.driver.v1.*
@@ -394,8 +394,8 @@ class Neo4jProperties {
 
     void "test builder method long and TimeUnit arguments"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.Neo4jProperties', '''
-package test
+        BeanDefinition beanDefinition = buildBeanDefinition('cpbtest9.Neo4jProperties', '''
+package cpbtest9
 
 import io.micronaut.context.annotation.*
 import org.neo4j.driver.v1.*
@@ -436,8 +436,8 @@ class Neo4jProperties {
 
     void "test using a builder that is marked final"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.Neo4jProperties', '''
-package test
+        BeanDefinition beanDefinition = buildBeanDefinition('cpbtest10.Neo4jProperties', '''
+package cpbtest10
 
 import io.micronaut.context.annotation.*
 import org.neo4j.driver.v1.*
@@ -473,8 +473,8 @@ class Neo4jProperties {
 
     void "test configuration builder that are interfaces"() {
         given:
-        ApplicationContext ctx = buildContext("test.PoolConfig", '''
-package test
+        ApplicationContext ctx = buildContext('''
+package cpbtest11
 
 import io.micronaut.context.annotation.*
 
@@ -534,7 +534,7 @@ class DefaultConnectionPool implements ConnectionPool {
         ctx.getEnvironment().addPropertySource(PropertySource.of(["pool.max-concurrency": 123]))
 
         when:
-        Class testProps = ctx.classLoader.loadClass("test.PoolConfig")
+        Class testProps = ctx.classLoader.loadClass("cpbtest11.PoolConfig")
         def testPropBean = ctx.getBean(testProps)
 
         then:

@@ -1,12 +1,12 @@
 package io.micronaut.docs.http.server.bind
 
-import io.kotlintest.shouldBe
-import io.kotlintest.shouldNotBe
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.cookie.Cookie
 import io.micronaut.runtime.server.EmbeddedServer
@@ -19,7 +19,7 @@ class ShoppingCartControllerTest: StringSpec(){
     )
 
     val client = autoClose(
-            embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
+            embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
     )
 
     init {
@@ -30,10 +30,11 @@ class ShoppingCartControllerTest: StringSpec(){
             val responseException = Assertions.assertThrows(HttpClientResponseException::class.java) {
                 client.toBlocking().retrieve(request)
             }
+            val embedded: Map<*, *> = responseException.response.getBody(Map::class.java).get().get("_embedded") as Map<*, *>
+            val message = ((embedded.get("errors") as java.util.List<*>).get(0) as Map<*, *>).get("message")
 
             responseException shouldNotBe null
-            responseException.message shouldBe "Required ShoppingCart [sessionId] not specified"
-
+            message shouldBe "Required ShoppingCart [sessionId] not specified"
         }
 
         "test annotation binding" {

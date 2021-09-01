@@ -20,10 +20,10 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.util.ArrayUtils;
-import io.reactivex.Flowable;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
-import javax.inject.Singleton;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -58,13 +58,13 @@ public class DefaultCompositeConfigurationClient implements ConfigurationClient 
     @Override
     public Publisher<PropertySource> getPropertySources(Environment environment) {
         if (ArrayUtils.isEmpty(configurationClients)) {
-            return Flowable.empty();
+            return Flux.empty();
         }
         List<Publisher<PropertySource>> publishers = Arrays.stream(configurationClients)
             .map(configurationClient -> configurationClient.getPropertySources(environment))
             .collect(Collectors.toList());
 
-        return Flowable.merge(publishers);
+        return Flux.merge(publishers);
     }
 
     @Override

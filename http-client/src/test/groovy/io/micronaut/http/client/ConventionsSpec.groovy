@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
@@ -27,7 +28,11 @@ import spock.lang.Specification
 
 class ConventionsSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+            'spec.name': 'ConventionsSpec'
+    ])
 
     void 'test convention mappings for client'() {
         given:
@@ -39,19 +44,18 @@ class ConventionsSpec extends Specification {
 
     void 'test convention mappings'() {
         given:
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient, embeddedServer.getURL())
 
         expect:
         client.toBlocking().retrieve('/hello-convention') == 'good'
 
         cleanup:
         client.close()
-
     }
 
     void 'test convention mappings with validation'() {
         given:
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient, embeddedServer.getURL())
 
         expect:
         client.toBlocking().retrieve('/hello-validated') == 'good'
@@ -60,12 +64,14 @@ class ConventionsSpec extends Specification {
         client.close()
     }
 
+    @Requires(property = 'spec.name', value = 'ConventionsSpec')
     @Client('/hello-convention')
     static interface HelloConventionClient {
         @Get
         String fooBar()
     }
 
+    @Requires(property = 'spec.name', value = 'ConventionsSpec')
     @Controller('/hello-convention')
     static class HelloConventionController {
         @Get
@@ -74,6 +80,7 @@ class ConventionsSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'ConventionsSpec')
     @Controller('/hello-validated')
     @Validated
     static class HelloValidatedController {

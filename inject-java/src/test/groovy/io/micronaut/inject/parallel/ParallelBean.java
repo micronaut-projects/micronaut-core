@@ -18,7 +18,7 @@ package io.micronaut.inject.parallel;
 import io.micronaut.context.annotation.Parallel;
 import io.micronaut.context.annotation.Requires;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 @Parallel

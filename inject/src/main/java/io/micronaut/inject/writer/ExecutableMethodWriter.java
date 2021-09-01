@@ -50,7 +50,7 @@ import java.util.*;
 @Internal
 public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter implements Opcodes {
 
-    protected static final org.objectweb.asm.commons.Method METHOD_INVOKE_INTERNAL = org.objectweb.asm.commons.Method.getMethod(
+    public static final org.objectweb.asm.commons.Method METHOD_INVOKE_INTERNAL = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethod.class, "invokeInternal", Object.class, Object[].class));
     protected static final org.objectweb.asm.commons.Method METHOD_IS_ABSTRACT = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(ExecutableMethod.class, "isAbstract"));
@@ -252,6 +252,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
                     genericReturnType,
                     genericReturnType.getAnnotationMetadata(),
                     genericReturnType.getTypeArguments(),
+                    new HashMap<>(),
                     loadTypeMethods
             );
         }
@@ -264,6 +265,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
                     classWriter,
                     constructorWriter,
                     argumentTypes,
+                    new HashMap<>(),
                     loadTypeMethods
             );
 

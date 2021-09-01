@@ -28,6 +28,8 @@ import io.micronaut.inject.annotation.AnnotatedElementValidator;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.inject.visitor.TypeElementVisitor;
+
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -99,7 +101,11 @@ public class AnnotationUtils {
         while (i.hasNext()) {
             final ServiceDefinition<AnnotatedElementValidator> validator = i.next();
             if (validator.isPresent()) {
-                elementValidator = validator.load();
+                try {
+                    elementValidator = validator.load();
+                } catch (Throwable e) {
+                    // probably missing required dependencies to load the validator
+                }
                 break;
             }
         }
@@ -271,7 +277,8 @@ public class AnnotationUtils {
                 modelUtils,
                 genericUtils,
                 filer,
-                visitorAttributes
+                visitorAttributes,
+                TypeElementVisitor.VisitorKind.ISOLATING
         );
     }
 

@@ -1,8 +1,9 @@
 dependencies {
     annotationProcessor project(":inject-java")
-    api dependencyVersion("rxjava2")
+
+    implementation dependencyVersion("reactor")
+
     api project(":runtime")
-    api project(":websocket")
 
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
 }

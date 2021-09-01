@@ -187,7 +187,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      */
     @Experimental
     default Optional<Path> getClassesOutputPath() {
-        Optional<GeneratedFile> dummy = visitMetaInfFile("dummy");
+        Optional<GeneratedFile> dummy = visitMetaInfFile("dummy", Element.EMPTY_ELEMENT_ARRAY);
         if (dummy.isPresent()) {
             // we want the parent directory of META-INF/dummy
             Path classesOutputDir = Paths.get(dummy.get().toURI()).getParent().getParent();
@@ -262,4 +262,5 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     default void addGeneratedResource(String resource) {
         info("EXPERIMENTAL: Compile time resource contribution to the context is experimental", null);
     }
+
 }

@@ -80,11 +80,6 @@ NOTE: By default, the endpoint doesn't allow changing the log level by unauthori
 
 == Customization
 
-The loggers endpoint is composed of two customizable parts: a loggers manager and a logging system.
+The loggers endpoint is composed of two customizable parts: a api:management.endpoint.loggers.LoggersManager[] and a api:logging.LoggingSystem[]. See the <<logging, logging section of the documentation>> for information on customizing the logging system.
 
-The loggers manager
-(link:{api}/io/micronaut/management/endpoint/loggers/LoggersManager.html[LoggersManager])
-is responsible for returning a Publisher that returns data collected and transformed for the response, and it is also responsible for updating a logger with a new log level.
-
-Consult the logging chapter for details <<custloggingsystem, howto customize the logging system>>.
-
+The api:management.endpoint.loggers.LoggersManager[] is responsible for retrieving and setting log levels. If the default implementation is not sufficient for your use case, simply provide your own implementation and replace the api:management.endpoint.loggers.impl.DefaultLoggersManager[default implementation] with the ann:context.annotation.Replaces[] annotation.

@@ -4,8 +4,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.BeanInstantiationException
 import spock.lang.Specification
 
-import javax.validation.ConstraintViolationException
-
 class PojoConfigurationPropertiesSpec extends Specification {
 
     void "test @Valid on config props property"() {

@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.field.simpleinjection;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public class B {
 

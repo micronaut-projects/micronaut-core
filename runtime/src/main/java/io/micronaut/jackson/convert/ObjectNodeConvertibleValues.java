@@ -17,6 +17,7 @@ package io.micronaut.jackson.convert;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -38,6 +39,7 @@ import java.util.Set;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class ObjectNodeConvertibleValues<V> implements ConvertibleValues<V> {
 
     private final ObjectNode objectNode;

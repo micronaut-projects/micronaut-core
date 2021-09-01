@@ -22,9 +22,9 @@ import io.micronaut.core.value.OptionalMultiValues;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.jackson.JacksonConfiguration;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;

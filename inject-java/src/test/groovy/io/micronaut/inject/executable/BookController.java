@@ -17,7 +17,7 @@ package io.micronaut.inject.executable;
 
 import io.micronaut.context.annotation.Executable;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 import java.util.List;
 
 @Executable

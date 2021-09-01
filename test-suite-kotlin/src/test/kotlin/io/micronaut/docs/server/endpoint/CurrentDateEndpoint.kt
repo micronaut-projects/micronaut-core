@@ -32,7 +32,7 @@ import io.micronaut.management.endpoint.annotation.Selector
 import io.micronaut.management.endpoint.annotation.Write
 //end::writeImport[]
 
-import javax.annotation.PostConstruct
+import jakarta.annotation.PostConstruct
 import java.util.Date
 
 //tag::endpointClassBegin[]

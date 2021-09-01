@@ -1,1 +1,1 @@
-RxJava 2 is the default reactive programming library used by Micronaut, however individual modules for other reactive libraries have been added.
+https://projectreactor.io[Project Reactor] is used internally by Micronaut. However to use Reactor or other reactive libraries (e.g. RxJava) types in your controller and/or HTTP Client methods you need to include dependencies.

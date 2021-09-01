@@ -1,3 +1,5 @@
 The api:http.client.HttpClient[] interface forms the basis for the low-level API. This interfaces declares methods to help ease executing HTTP requests and receiving responses.
 
-The majority of the methods in the api:http.client.HttpClient[] interface return Reactive Streams rs:Publisher[] instances, which is not always the most useful interface to work against. A sub-interface named api:http.client.RxHttpClient[] is included that provides a variation of the api:http.client.HttpClient[] interface that returns RxJava rx:Flowable[] types.
+The majority of the methods in the api:http.client.HttpClient[] interface return Reactive Streams rs:Publisher[] instances, which is not always the most useful interface to work against.
+
+Micronaut's Reactor HTTP Client dependency ships with a sub-interface named link:{micronautreactorapi}/client/ReactorHttpClient[ReactorHttpClient]. It provides a variation of the api:http.client.HttpClient[] interface that returns https://projectreactor.io[Project Reactor] reactor:Flux[] types.

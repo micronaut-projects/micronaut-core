@@ -15,16 +15,16 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import groovy.lang.GroovyClassLoader;
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
-import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.core.io.scan.ClassPathAnnotationScanner;
+import io.micronaut.ast.groovy.scan.ClassPathAnnotationScanner;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -32,7 +32,8 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.util.VisitorContextUtils;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor;
+import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
+import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
@@ -46,8 +47,6 @@ import org.codehaus.groovy.control.messages.SimpleMessage;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URL;
@@ -64,19 +63,31 @@ public class GroovyVisitorContext implements VisitorContext {
     private static final MutableConvertibleValues<Object> VISITOR_ATTRIBUTES = new MutableConvertibleValuesMap<>();
     private final ErrorCollector errorCollector;
     private final CompilationUnit compilationUnit;
+    private final ClassWriterOutputVisitor outputVisitor;
     private final SourceUnit sourceUnit;
     private final MutableConvertibleValues<Object> attributes;
     private final List<String> generatedResources = new ArrayList<>();
     private final GroovyElementFactory groovyElementFactory;
+    private final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = new ArrayList<>();
 
     /**
      * @param sourceUnit      The source unit
      * @param compilationUnit The compilation unit
      */
     public GroovyVisitorContext(SourceUnit sourceUnit, @Nullable CompilationUnit compilationUnit) {
+        this(sourceUnit, compilationUnit, new GroovyClassWriterOutputVisitor(compilationUnit));
+    }
+
+    /**
+     * @param sourceUnit      The source unit
+     * @param compilationUnit The compilation unit
+     * @param outputVisitor   The class writer output visitor
+     */
+    public GroovyVisitorContext(SourceUnit sourceUnit, @Nullable CompilationUnit compilationUnit, ClassWriterOutputVisitor outputVisitor) {
         this.sourceUnit = sourceUnit;
-        this.errorCollector = sourceUnit.getErrorCollector();
+        this.errorCollector = sourceUnit != null ? sourceUnit.getErrorCollector() : null;
         this.compilationUnit = compilationUnit;
+        this.outputVisitor = outputVisitor;
         this.attributes = VISITOR_ATTRIBUTES;
         this.groovyElementFactory = new GroovyElementFactory(this);
     }
@@ -159,7 +170,7 @@ public class GroovyVisitorContext implements VisitorContext {
             final String sample = sourceUnit.getSample(expr.getLineNumber(), expr.getColumnNumber(), new Janitor());
             msg.append("\n\n").append(sample);
         }
-        System.out.println(msg.toString());
+        System.out.println(msg);
     }
 
     @Override
@@ -170,12 +181,14 @@ public class GroovyVisitorContext implements VisitorContext {
     @Override
     public void fail(String message, @Nullable Element element) {
         Message msg;
-        if (element != null) {
+        if (element instanceof AbstractGroovyElement) {
             msg = buildErrorMessage(message, element);
         } else {
             msg = new SimpleMessage(message, sourceUnit);
         }
-        errorCollector.addError(msg);
+        if (errorCollector != null) {
+            errorCollector.addError(msg);
+        }
     }
 
     @Override
@@ -186,87 +199,38 @@ public class GroovyVisitorContext implements VisitorContext {
             final String sample = sourceUnit.getSample(expr.getLineNumber(), expr.getColumnNumber(), new Janitor());
             msg.append("\n\n").append(sample);
         }
-        System.out.println(msg.toString());
+        System.out.println(msg);
 
     }
 
     @Override
     public OutputStream visitClass(String classname, @Nullable Element originatingElement) throws IOException {
-        return visitClass(classname, new Element[]{ originatingElement });
+        return outputVisitor.visitClass(classname, originatingElement);
     }
 
     @Override
     public OutputStream visitClass(String classname, Element... originatingElements) throws IOException {
-        File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
-        if (classesDir != null) {
-            DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
-                    classesDir
-            );
-            return outputVisitor.visitClass(classname, originatingElements);
-        } else {
-            // should only arrive here in testing scenarios
-            if (compilationUnit.getClassLoader() instanceof InMemoryByteCodeGroovyClassLoader) {
-                return new OutputStream() {
-                    @Override
-                    public void write(int b) {
-                        // no-op
-                    }
-
-                    @Override
-                    public void write(byte[] b) {
-                        ((InMemoryByteCodeGroovyClassLoader) compilationUnit.getClassLoader()).addClass(classname, b);
-                    }
-                };
-            } else {
-                return new ByteArrayOutputStream(); // in-memory, mock or unit tests situation?
-            }
-        }
+        return outputVisitor.visitClass(classname, originatingElements);
     }
 
     @Override
     public void visitServiceDescriptor(String type, String classname) {
-        File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
-        if (classesDir != null) {
-
-            DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
-                    classesDir
-            );
-            outputVisitor.visitServiceDescriptor(type, classname);
-            outputVisitor.finish();
-        }
+        outputVisitor.visitServiceDescriptor(type, classname);
     }
 
     @Override
     public Optional<GeneratedFile> visitMetaInfFile(String path, Element... originatingElements) {
-        File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
-        if (classesDir != null) {
-
-            DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
-                    classesDir
-            );
-            return outputVisitor.visitMetaInfFile(path);
-        }
-
-        return Optional.empty();
+        return outputVisitor.visitMetaInfFile(path, originatingElements);
     }
 
     @Override
     public Optional<GeneratedFile> visitGeneratedFile(String path) {
-        File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
-        if (classesDir != null) {
-
-            DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
-                    classesDir
-            );
-            return outputVisitor.visitGeneratedFile(path);
-        }
-
-        return Optional.empty();
+        return outputVisitor.visitGeneratedFile(path);
     }
 
     @Override
     public void finish() {
-        // no-op
+        outputVisitor.finish();
     }
 
     /**
@@ -338,5 +302,24 @@ public class GroovyVisitorContext implements VisitorContext {
     @Override
     public void addGeneratedResource(@NonNull String resource) {
         generatedResources.add(resource);
+    }
+
+    /**
+     * @return Gets the produced bean definition builders.
+     */
+    @Internal
+    public List<AbstractBeanDefinitionBuilder> getBeanElementBuilders() {
+        final ArrayList<AbstractBeanDefinitionBuilder> current = new ArrayList<>(beanDefinitionBuilders);
+        beanDefinitionBuilders.clear();
+        return current;
+    }
+
+    /**
+     * Adds a java bean definition builder.
+     * @param groovyBeanDefinitionBuilder The groovy bean definition builder
+     */
+    @Internal
+    void addBeanDefinitionBuilder(GroovyBeanDefinitionBuilder groovyBeanDefinitionBuilder) {
+        this.beanDefinitionBuilders.add(groovyBeanDefinitionBuilder);
     }
 }

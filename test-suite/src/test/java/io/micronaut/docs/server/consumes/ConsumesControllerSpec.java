@@ -16,6 +16,7 @@
 package io.micronaut.docs.server.consumes;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.client.HttpClient;
@@ -78,6 +79,7 @@ public class ConsumesControllerSpec {
                 .contentType(MediaType.TEXT_PLAIN)));
     }
 
+    @Introspected
     static class Book {
         public String title;
         public Integer pages;

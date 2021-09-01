@@ -3,8 +3,9 @@ ext {
 }
 dependencies {
     api dependencyVersion("javax.annotation-api")
-    api group: 'javax.inject', name: 'javax.inject', version: '1'
-    compileOnly "jakarta.inject:jakarta.inject-api:2.0.0"
+    compileOnly group: 'javax.inject', name: 'javax.inject', version: '1'
+    api "jakarta.inject:jakarta.inject-api:2.0.0"
+    api "jakarta.annotation:jakarta.annotation-api:$jakartaAnnotationApiVersion"
     api project(':core')
     api dependencyVersion("snakeyaml")
 
@@ -13,7 +14,8 @@ dependencies {
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
     compileOnly dependencyVersion("validation")
 
-    testImplementation dependencyVersion("validation")
+//    testImplementation dependencyVersion("validation")
+    testImplementation project(":context")
     testImplementation project(":inject-groovy")
     testImplementation project(":inject-test-utils")
     testImplementation "com.github.stefanbirkner:system-lambda:1.2.0"

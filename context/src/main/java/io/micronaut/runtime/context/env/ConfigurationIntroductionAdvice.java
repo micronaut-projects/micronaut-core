@@ -19,10 +19,12 @@ import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.Qualifier;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
@@ -41,7 +43,9 @@ import java.util.Optional;
  */
 @Prototype
 @Internal
+@BootstrapContextCompatible
 public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object, Object> {
+
     private static final String MEMBER_BEAN = "bean";
     private static final String MEMBER_NAME = "name";
     private final Environment environment;
@@ -61,6 +65,7 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
         this.name = qualifier instanceof Named ? ((Named) qualifier).getName() : null;
     }
 
+    @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         final ReturnType<Object> rt = context.getReturnType();

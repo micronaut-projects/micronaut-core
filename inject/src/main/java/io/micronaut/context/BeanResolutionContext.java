@@ -16,12 +16,16 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.ValueResolver;
 import io.micronaut.inject.*;
 
 import io.micronaut.core.annotation.Nullable;
+
+import java.util.Collections;
 import java.util.Deque;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -70,8 +74,9 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     /**
      * Remove the attribute for the given key.
      * @param key the key
+     * @return The previous value
      */
-    void removeAttribute(CharSequence key);
+    Object removeAttribute(CharSequence key);
 
     /**
      * Adds a bean that is created as part of the resolution. This is used to store references to instances passed to {@link BeanContext#inject(Object)}
@@ -110,9 +115,46 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     void setCurrentQualifier(@Nullable Qualifier<?> qualifier);
 
     /**
+     * Adds a dependent bean to the resolution context.
+     * @param identifier The identifier
+     * @param definition The bean definition
+     * @param bean The bean
+     * @param <T> The generic type
+     */
+    <T> void addDependentBean(BeanIdentifier identifier, BeanDefinition<T> definition, T bean);
+
+    /**
+     * @return The dependent beans that must be destroyed by an upstream bean
+     */
+    default @NonNull List<BeanRegistration<?>> getAndResetDependentBeans() {
+        return Collections.emptyList();
+    }
+
+    /**
      * Represents a path taken to resolve a bean definitions dependencies.
      */
-    interface Path extends Deque<Segment<?>> {
+    interface Path extends Deque<Segment<?>>, AutoCloseable {
+        /**
+         * Push an unresolved constructor call onto the queue.
+         *
+         * @param declaringType The type
+         * @param beanType      The bean type
+         * @return This path
+         */
+        Path pushBeanCreate(BeanDefinition<?> declaringType, Argument<?> beanType);
+
+        /**
+         * Push an unresolved constructor call onto the queue.
+         *
+         * @param declaringType        The type
+         * @param methodName           The method name
+         * @param argument             The unresolved argument
+         * @param arguments            The arguments
+         * @param requiresReflection  is requires reflection
+         * @return This path
+         */
+        Path pushConstructorResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments, boolean requiresReflection);
+
         /**
          * Push an unresolved constructor call onto the queue.
          *
@@ -133,6 +175,18 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
         Path pushMethodArgumentResolve(BeanDefinition declaringType, MethodInjectionPoint methodInjectionPoint, Argument argument);
 
         /**
+         * Push an unresolved method call onto the queue.
+         *
+         * @param declaringType        The type
+         * @param methodName           The method name
+         * @param argument             The unresolved argument
+         * @param arguments            The arguments
+         * @param requiresReflection  is requires reflection
+         * @return This path
+         */
+        Path pushMethodArgumentResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments, boolean requiresReflection);
+
+        /**
          * Push an unresolved field onto the queue.
          *
          * @param declaringType       declaring type
@@ -140,6 +194,16 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
          * @return This path
          */
         Path pushFieldResolve(BeanDefinition declaringType, FieldInjectionPoint fieldInjectionPoint);
+
+        /**
+         * Push an unresolved field onto the queue.
+         *
+         * @param declaringType       declaring type
+         * @param fieldAsArgument     The field as argument
+         * @param requiresReflection  is requires reflection
+         * @return This path
+         */
+        Path pushFieldResolve(BeanDefinition declaringType, Argument fieldAsArgument, boolean requiresReflection);
 
         /**
          * Converts the path to a circular string.
@@ -152,6 +216,11 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
          * @return The current path segment
          */
         Optional<Segment<?>> currentSegment();
+
+        @Override
+        default void close() {
+            pop();
+        }
     }
 
     /**

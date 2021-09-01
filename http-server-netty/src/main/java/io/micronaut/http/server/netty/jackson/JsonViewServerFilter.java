@@ -29,11 +29,12 @@ import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
-import io.reactivex.Flowable;
-import io.reactivex.schedulers.Schedulers;
+import jakarta.inject.Named;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
-import javax.inject.Named;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 
@@ -73,24 +74,25 @@ public class JsonViewServerFilter implements HttpServerFilter {
         Optional<Class> viewClass = request.getAttribute(HttpAttributes.ROUTE_MATCH, AnnotationMetadata.class)                                                          .flatMap(ann -> ann.classValue(JsonView.class));
         final Publisher<MutableHttpResponse<?>> responsePublisher = chain.proceed(request);
         if (viewClass.isPresent()) {
-            return Flowable.fromPublisher(responsePublisher).switchMap(response -> {
+            return Flux.from(responsePublisher).switchMap(response -> {
                 final Optional<?> optionalBody = response.getBody();
                 if (optionalBody.isPresent()) {
                     Object body = optionalBody.get();
                     MediaTypeCodec codec = codecFactory.resolveJsonViewCodec(viewClass.get());
                     if (Publishers.isConvertibleToPublisher(body)) {
-                        response.body(Publishers.convertPublisher(body, Flowable.class)
+                        Publisher<?> pub = Publishers.convertPublisher(body, Publisher.class);
+                        response.body(Flux.from(pub)
                                 .map(codec::encode)
-                                .subscribeOn(Schedulers.from(executorService)));
+                                .subscribeOn(Schedulers.fromExecutorService(executorService)));
                     } else {
-                        return Flowable.fromCallable(() -> {
+                        return Mono.fromCallable(() -> {
                             final byte[] encoded = codec.encode(body);
                             response.body(encoded);
                             return response;
-                        }).subscribeOn(Schedulers.from(executorService));
+                        }).subscribeOn(Schedulers.fromExecutorService(executorService));
                     }
                 }
-                return Flowable.just(response);
+                return Flux.just(response);
             });
         } else {
             return responsePublisher;

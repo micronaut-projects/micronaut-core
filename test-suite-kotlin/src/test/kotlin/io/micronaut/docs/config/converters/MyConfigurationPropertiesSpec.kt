@@ -1,6 +1,6 @@
 package io.micronaut.docs.config.converters
 
-import io.kotlintest.specs.AnnotationSpec
+import io.kotest.core.spec.style.AnnotationSpec
 import io.micronaut.context.ApplicationContext
 import org.junit.Assert.assertEquals
 import java.time.LocalDate

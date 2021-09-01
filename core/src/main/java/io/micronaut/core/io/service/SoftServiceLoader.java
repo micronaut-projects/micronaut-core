@@ -47,6 +47,7 @@ import java.util.function.Predicate;
  * @since 1.0
  */
 public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>> {
+
     public static final String META_INF_SERVICES = "META-INF/services";
 
     private final Class<S> serviceType;

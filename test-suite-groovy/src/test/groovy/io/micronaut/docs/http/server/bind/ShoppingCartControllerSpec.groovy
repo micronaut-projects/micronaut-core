@@ -3,7 +3,7 @@ package io.micronaut.docs.http.server.bind
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.cookie.Cookie
 import io.micronaut.runtime.server.EmbeddedServer
@@ -19,7 +19,7 @@ class ShoppingCartControllerSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+    HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
     void testBindingBadCredentials() {
         when:
@@ -28,8 +28,7 @@ class ShoppingCartControllerSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.getMessage() == "Required ShoppingCart [sessionId] not specified"
-
+        ex.response.getBody(Map).get()._embedded.errors[0].message == "Required ShoppingCart [sessionId] not specified"
     }
 
     void testAnnotationBinding() {

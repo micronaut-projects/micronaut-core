@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.codec;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.MediaType;
 
 import java.util.Arrays;
@@ -32,8 +33,8 @@ import java.util.Optional;
  */
 public class DefaultMediaTypeCodecRegistry implements MediaTypeCodecRegistry {
 
-    Map<String, MediaTypeCodec> decodersByExtension = new LinkedHashMap<>(3);
-    Map<MediaType, MediaTypeCodec> decodersByType = new LinkedHashMap<>(3);
+    Map<String, Optional<MediaTypeCodec>> decodersByExtension = new LinkedHashMap<>(3);
+    Map<MediaType, Optional<MediaTypeCodec>> decodersByType = new LinkedHashMap<>(3);
 
     private final Collection<MediaTypeCodec> codecs;
 
@@ -54,8 +55,8 @@ public class DefaultMediaTypeCodecRegistry implements MediaTypeCodecRegistry {
                 Collection<MediaType> mediaTypes = decoder.getMediaTypes();
                 for (MediaType mediaType : mediaTypes) {
                     if (mediaType != null) {
-                        decodersByExtension.put(mediaType.getExtension(), decoder);
-                        decodersByType.put(mediaType, decoder);
+                        decodersByExtension.put(mediaType.getExtension(), Optional.of(decoder));
+                        decodersByType.put(mediaType, Optional.of(decoder));
                     }
                 }
             }
@@ -65,19 +66,19 @@ public class DefaultMediaTypeCodecRegistry implements MediaTypeCodecRegistry {
     }
 
     @Override
-    public Optional<MediaTypeCodec> findCodec(MediaType mediaType) {
+    public Optional<MediaTypeCodec> findCodec(@Nullable MediaType mediaType) {
         if (mediaType == null) {
             return Optional.empty();
         }
-        MediaTypeCodec decoder = decodersByType.get(mediaType);
+        Optional<MediaTypeCodec> decoder = decodersByType.get(mediaType);
         if (decoder == null) {
             decoder = decodersByExtension.get(mediaType.getExtension());
         }
-        return Optional.ofNullable(decoder);
+        return decoder == null ? Optional.empty() : decoder;
     }
 
     @Override
-    public Optional<MediaTypeCodec> findCodec(MediaType mediaType, Class<?> type) {
+    public Optional<MediaTypeCodec> findCodec(@Nullable MediaType mediaType, Class<?> type) {
         Optional<MediaTypeCodec> codec = findCodec(mediaType);
         if (codec.isPresent()) {
             MediaTypeCodec mediaTypeCodec = codec.get();

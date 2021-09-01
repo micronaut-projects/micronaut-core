@@ -15,14 +15,6 @@
  */
 package io.micronaut.http.netty.reactive;
 
-import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.CANCELLED;
-import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.COMPLETE;
-import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.INACTIVE;
-import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.NO_CONTEXT;
-import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.NO_SUBSCRIPTION;
-import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.NO_SUBSCRIPTION_OR_CONTEXT;
-import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.RUNNING;
-
 import io.micronaut.core.annotation.Internal;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelFuture;
@@ -32,6 +24,8 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.*;
 
 /**
  * Subscriber that publishes received messages to the handler pipeline.

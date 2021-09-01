@@ -19,7 +19,9 @@ import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
-import javax.inject.Singleton;
+import io.micronaut.core.annotation.Nullable;
+import jakarta.inject.Singleton;
+
 import java.util.concurrent.locks.Lock;
 
 /**
@@ -42,6 +44,7 @@ public class RefreshInterceptor implements MethodInterceptor {
         this.refreshScope = refreshScope;
     }
 
+    @Nullable
     @Override
     public Object intercept(MethodInvocationContext context) {
         Object target = context.getTarget();

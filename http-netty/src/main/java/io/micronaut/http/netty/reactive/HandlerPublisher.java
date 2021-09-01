@@ -15,8 +15,6 @@
  */
 package io.micronaut.http.netty.reactive;
 
-import static io.micronaut.http.netty.reactive.HandlerPublisher.State.*;
-
 import io.micronaut.core.annotation.Internal;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -33,6 +31,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static io.micronaut.http.netty.reactive.HandlerPublisher.State.*;
 
 /**
  * Publisher for a Netty Handler.

@@ -34,7 +34,7 @@ For example, the following defines a URI template, and the `name` parameter is u
 [source,java]
 ----
 @Post("/{name}")
-Single<Pet> save(
+Mono<Pet> save(
     @NotBlank String name, // <1>
     @Body @Valid Pet pet) // <2>
 ----
@@ -126,3 +126,26 @@ Without any additional code, the client attempts to convert the metadata to a st
 The following binder handles arguments passed to clients of type `Metadata` and mutate the request to contain the desired headers.
 
 snippet::io.micronaut.docs.http.client.bind.type.MetadataClientArgumentBinder[tags="clazz", indent=0, title="Typed Argument Binder"]
+
+=== Binding On Method
+
+It is also possible to create a binder, that would change the request with an annotation on the method. For example:
+
+snippet::io.micronaut.docs.http.client.bind.method.NameAuthorizedClient[tags="clazz", indent=0, title="Client With Annotated Method"]
+
+<1> The `@NameAuthorization` is annotating a method
+
+The annotation is defined as:
+
+snippet::io.micronaut.docs.http.client.bind.method.NameAuthorization[tags="clazz", indent=0, title="Annotation Definition"]
+
+<1> It is defined to be used on methods
+
+The following binder specifies the behaviour:
+
+snippet::io.micronaut.docs.http.client.bind.method.NameAuthorizationBinder[tags="clazz", indent=0, title="Annotation Definition"]
+
+<1> The `@Singleton` annotation registers it in Micronaut context
+<2> It implements the `AnnotatedClientRequestBinder<NameAuthorization>`
+<3> The custom `bind` method is used to implement the behaviour of the binder
+

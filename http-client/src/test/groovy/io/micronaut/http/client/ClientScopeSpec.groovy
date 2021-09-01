@@ -29,14 +29,12 @@ import io.micronaut.http.client.exceptions.NoHostException
 import io.micronaut.http.client.netty.DefaultHttpClient
 import io.micronaut.jackson.annotation.JacksonFeatures
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
-import spock.lang.AutoCleanup
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
+import reactor.core.publisher.Flux
 import spock.lang.IgnoreIf
 import spock.lang.Retry
 import spock.lang.Specification
-
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * @author Graeme Rocher
@@ -68,7 +66,7 @@ class ClientScopeSpec extends Specification {
         then:
         myService.get() == 'success'
         myJavaService.client == myService.client
-        myJavaService.rxHttpClient == myService.rxHttpClient
+        myJavaService.reactiveHttpClient == myService.reactiveHttpClient
 
         when:"test client scope annotation field injection"
         MyServiceField myServiceField = applicationContext.getBean(MyServiceField)
@@ -77,7 +75,7 @@ class ClientScopeSpec extends Specification {
         then:
         myServiceField.get() == 'success'
         myJavaService.client == myServiceField.client
-        myJavaService.rxHttpClient == myServiceField.rxHttpClient
+        myJavaService.reactiveHttpClient == myServiceField.reactiveHttpClient
 
         when:"test client scope annotation constructor injection"
         MyServiceConstructor serviceConstructor = applicationContext.getBean(MyServiceConstructor)
@@ -86,7 +84,7 @@ class ClientScopeSpec extends Specification {
         then:
         serviceConstructor.get() == 'success'
         myJavaService.client == serviceConstructor.client
-        myJavaService.rxHttpClient == serviceConstructor.rxHttpClient
+        myJavaService.reactiveHttpClient == serviceConstructor.reactiveHttpClient
 
 
         and:"test client scope with path in annotation"
@@ -99,8 +97,8 @@ class ClientScopeSpec extends Specification {
 
         then:
         thrown(HttpClientException)
-        Flowable.fromPublisher(((DefaultHttpClient) myJavaService.client)
-                .resolveRequestURI(HttpRequest.GET("/foo"))).blockingFirst().toString() == "http://localhost:${embeddedServer.port}/foo"
+        Flux.from(((DefaultHttpClient) myJavaService.client)
+                .resolveRequestURI(HttpRequest.GET("/foo"))).blockFirst().toString() == "http://localhost:${embeddedServer.port}/foo"
 
         when:"test service definition with declarative client with jackson features"
         MyServiceJacksonFeatures jacksonFeatures = applicationContext.getBean(MyServiceJacksonFeatures)
@@ -122,7 +120,7 @@ class ClientScopeSpec extends Specification {
         ex.message == "Request URI specifies no host to connect to"
 
         when:"test no base path with client scope"
-        RxHttpClient noIdClient = myService.noIdClient
+        HttpClient noIdClient = myService.noIdClient
 
         then:
         noIdClient.toBlocking().retrieve("http://localhost:${embeddedServer.port}/scope") == "success"
@@ -175,16 +173,16 @@ class ClientScopeSpec extends Specification {
         HttpClient client
 
         @Inject @Client('${from.config}')
-        RxHttpClient rxHttpClient
+        HttpClient reactiveHttpClient
 
         @Inject @Client(id = 'myService', path = '/scope')
-        RxHttpClient pathClient
+        HttpClient pathClient
 
         @Inject @Client
-        RxHttpClient noIdClient
+        HttpClient noIdClient
 
         String get() {
-            rxHttpClient != null
+            reactiveHttpClient != null
             client.toBlocking().retrieve(
                     HttpRequest.GET('/scope'), String
             )
@@ -202,13 +200,13 @@ class ClientScopeSpec extends Specification {
         protected HttpClient client
 
         @Inject @Client('${from.config}')
-        protected RxHttpClient rxHttpClient
+        protected HttpClient reactiveHttpClient
 
         @Inject @Client(id = 'myService', path = '/scope')
-        protected RxHttpClient pathClient
+        protected HttpClient pathClient
 
         String get() {
-            rxHttpClient != null
+            reactiveHttpClient != null
             client.toBlocking().retrieve(
                     HttpRequest.GET('/scope'), String
             )
@@ -223,16 +221,16 @@ class ClientScopeSpec extends Specification {
     static class MyServiceConstructor {
 
         private final HttpClient client
-        private final RxHttpClient rxHttpClient
+        private final HttpClient reactiveHttpClient
 
         MyServiceConstructor(@Client('${from.config}')HttpClient client,
-                             @Client('${from.config}') RxHttpClient rxHttpClient) {
-            this.rxHttpClient = rxHttpClient
+                             @Client('${from.config}') HttpClient reactiveHttpClient) {
+            this.reactiveHttpClient = reactiveHttpClient
             this.client = client
         }
 
         String get() {
-            rxHttpClient != null
+            reactiveHttpClient != null
             client.toBlocking().retrieve(
                     HttpRequest.GET('/scope'), String
             )
@@ -267,7 +265,7 @@ class ClientScopeSpec extends Specification {
         protected HttpClient clientConfiguration2
 
         @Inject @Client('/')
-        protected RxHttpClient rxClient
+        protected HttpClient rxClient
     }
 
     @Singleton

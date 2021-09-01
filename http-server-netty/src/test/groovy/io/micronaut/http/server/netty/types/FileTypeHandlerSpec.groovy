@@ -27,10 +27,10 @@ import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableR
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType
 import io.micronaut.http.server.types.files.StreamedFile
 import io.micronaut.http.server.types.files.SystemFile
+import jakarta.inject.Inject
+import jakarta.inject.Named
 import spock.lang.IgnoreIf
 
-import javax.inject.Inject
-import javax.inject.Named
 import java.nio.file.Files
 import java.time.Instant
 import java.time.ZoneId
@@ -53,7 +53,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test returning a file from a controller"() {
         when:
-        def response = rxClient.exchange('/test/html', String).blockingFirst()
+        def response = rxClient.toBlocking().exchange('/test/html', String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -69,7 +69,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         when:
         MutableHttpRequest<?> request = HttpRequest.GET('/test/html')
         request.headers.ifModifiedSince(tempFile.lastModified())
-        def response = rxClient.exchange(request, String).blockingFirst()
+        def response = rxClient.toBlocking().exchange(request, String)
 
         then:
         response.code() == HttpStatus.NOT_MODIFIED.code
@@ -79,7 +79,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
     void "test cache control can be overridden"() {
         when:
         MutableHttpRequest<?> request = HttpRequest.GET('/test/custom-cache-control')
-        def response = rxClient.exchange(request, String).blockingFirst()
+        def response = rxClient.toBlocking().exchange(request, String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -89,7 +89,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test what happens when a file isn't found"() {
         when:
-        rxClient.exchange('/test/not-found', String).blockingFirst()
+        rxClient.toBlocking().exchange('/test/not-found', String)
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -99,12 +99,12 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
         then:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
-        response.body() == '{"message":"Internal Server Error: Could not find file","_links":{"self":{"href":"/test/not-found","templated":false}}}'
+        response.body() == '{"message":"Internal Server Error","_links":{"self":{"href":"/test/not-found","templated":false}},"_embedded":{"errors":[{"message":"Internal Server Error: Could not find file"}]}}'
     }
 
     void "test when an attached file is returned"() {
         when:
-        def response = rxClient.exchange('/test/download', String).blockingFirst()
+        def response = rxClient.toBlocking().exchange('/test/download', String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -119,7 +119,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test when a system file is returned"() {
         when:
-        def response = rxClient.exchange('/test-system/download', String).blockingFirst()
+        def response = rxClient.toBlocking().exchange('/test-system/download', String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -163,7 +163,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test when an attached streamed file is returned"() {
         when:
-        def response = rxClient.exchange('/test-stream/download', String).blockingFirst()
+        def response = rxClient.toBlocking().exchange('/test-stream/download', String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -177,7 +177,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test when an attached file is returned with a name"() {
         when:
-        def response = rxClient.exchange('/test/different-name', String).blockingFirst()
+        def response = rxClient.toBlocking().exchange('/test/different-name', String)
 
         then: "the content type is still based on the file extension"
         response.code() == HttpStatus.OK.code
@@ -192,7 +192,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test when a system file is returned with a name"() {
         when:
-        def response = rxClient.exchange('/test-system/different-name', String).blockingFirst()
+        def response = rxClient.toBlocking().exchange('/test-system/different-name', String)
 
         then: "the content type is still based on the file extension"
         response.code() == HttpStatus.OK.code
@@ -207,7 +207,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test the content type is honored when an attached file response is returned"() {
         when:
-        def response = rxClient.exchange('/test/custom-content-type', String).blockingFirst()
+        def response = rxClient.toBlocking().exchange('/test/custom-content-type', String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -222,7 +222,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test the content type is honored when a system file response is returned"() {
         when:
-        def response = rxClient.exchange('/test-system/custom-content-type', String).blockingFirst()
+        def response = rxClient.toBlocking().exchange('/test-system/custom-content-type', String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -237,7 +237,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test the content type is honored when a streamed file response is returned"() {
         when:
-        def response = rxClient.exchange('/test-stream/custom-content-type', String).blockingFirst()
+        def response = rxClient.toBlocking().exchange('/test-stream/custom-content-type', String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -251,7 +251,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test using a piped stream"() {
         when:
-        def response = rxClient.exchange('/test-stream/piped-stream', String).blockingFirst()
+        def response = rxClient.toBlocking().exchange('/test-stream/piped-stream', String)
 
         then:
         response.code() == HttpStatus.OK.code

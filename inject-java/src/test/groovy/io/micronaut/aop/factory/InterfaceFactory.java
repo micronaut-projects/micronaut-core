@@ -18,7 +18,7 @@ package io.micronaut.aop.factory;
 import io.micronaut.aop.simple.Mutating;
 import io.micronaut.context.annotation.*;
 
-import javax.inject.Named;
+import jakarta.inject.Named;
 
 /**
  * @author Graeme Rocher

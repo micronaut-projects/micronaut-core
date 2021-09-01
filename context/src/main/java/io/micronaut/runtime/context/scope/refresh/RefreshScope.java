@@ -18,25 +18,24 @@ package io.micronaut.runtime.context.scope.refresh;
 import io.micronaut.aop.InterceptedProxy;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
-import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.LifeCycle;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.ApplicationEventListener;
+import io.micronaut.context.scope.BeanCreationContext;
+import io.micronaut.context.scope.CreatedBean;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
-import io.micronaut.inject.DisposableBeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.context.scope.Refreshable;
 import io.micronaut.scheduling.TaskExecutors;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 
-import javax.inject.Named;
-import javax.inject.Provider;
-import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
@@ -60,13 +59,13 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 @Requires(notEnv = {Environment.FUNCTION, Environment.ANDROID})
 public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<RefreshScope>, ApplicationEventListener<RefreshEvent> {
 
-    private final Map<String, BeanRegistration> refreshableBeans = new ConcurrentHashMap<>(10);
+    private final Map<BeanIdentifier, CreatedBean<?>> refreshableBeans = new ConcurrentHashMap<>(10);
     private final ConcurrentMap<Object, ReadWriteLock> locks = new ConcurrentHashMap<>();
     private final BeanContext beanContext;
     private final Executor executorService;
 
     /**
-     * @param beanContext     The bean context to allow DI of beans annotated with {@link javax.inject.Inject}
+     * @param beanContext     The bean context to allow DI of beans annotated with @Inject
      * @param executorService The executor service
      */
     public RefreshScope(BeanContext beanContext, @Named(TaskExecutors.IO) Executor executorService) {
@@ -86,14 +85,14 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> T get(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition, BeanIdentifier identifier, Provider<T> provider) {
-        BeanRegistration beanRegistration = refreshableBeans.computeIfAbsent(identifier.toString(), key -> {
-            T bean = provider.get();
-            BeanRegistration registration = new BeanRegistration(identifier, beanDefinition, bean);
-            locks.putIfAbsent(registration.getBean(), new ReentrantReadWriteLock());
-            return registration;
+    public <T> T getOrCreate(BeanCreationContext<T> creationContext) {
+        final BeanIdentifier id = creationContext.id();
+        CreatedBean<?> created = refreshableBeans.computeIfAbsent(id, key -> {
+            CreatedBean<T> createdBean = creationContext.create();
+            locks.putIfAbsent(createdBean.bean(), new ReentrantReadWriteLock());
+            return createdBean;
         });
-        return (T) beanRegistration.getBean();
+        return (T) created.bean();
     }
 
     @Override
@@ -106,10 +105,11 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
     @SuppressWarnings("unchecked")
     @Override
     public <T> Optional<T> remove(BeanIdentifier identifier) {
-        BeanRegistration registration = refreshableBeans.get(identifier.toString());
-        if (registration != null) {
-            disposeOfBean(identifier.toString());
-            return Optional.ofNullable((T) registration.getBean());
+        CreatedBean<?> createdBean = refreshableBeans.get(identifier);
+        if (createdBean != null) {
+            createdBean.close();
+            //noinspection ConstantConditions
+            return Optional.ofNullable((T) createdBean.bean());
         }
         return Optional.empty();
     }
@@ -140,9 +140,14 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
         if (bean instanceof InterceptedProxy) {
             bean = ((InterceptedProxy<T>) bean).interceptedTarget();
         }
-        for (BeanRegistration beanRegistration : refreshableBeans.values()) {
-            if (beanRegistration.getBean() == bean) {
-                return Optional.of(beanRegistration);
+        for (CreatedBean<?> created : refreshableBeans.values()) {
+            if (created.bean() == bean) {
+                //noinspection unchecked
+                return Optional.of(new BeanRegistration<>(
+                        created.id(),
+                        (BeanDefinition<T>) created.definition(),
+                        (T) created.bean()
+                ));
             }
         }
         return Optional.empty();
@@ -184,9 +189,9 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
     }
 
     private void disposeOfBeanSubset(Collection<String> keys) {
-        for (String beanKey : refreshableBeans.keySet()) {
-            BeanRegistration beanRegistration = refreshableBeans.get(beanKey);
-            BeanDefinition definition = beanRegistration.getBeanDefinition();
+        for (BeanIdentifier beanKey : refreshableBeans.keySet()) {
+            CreatedBean<?> createdBean = refreshableBeans.get(beanKey);
+            BeanDefinition<?> definition = createdBean.definition();
             String[] strings = definition.stringValues(Refreshable.class);
             if (!ArrayUtils.isEmpty(strings)) {
                 for (String prefix : strings) {
@@ -203,24 +208,19 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
     }
 
     private void disposeOfAllBeans() {
-        for (String key : refreshableBeans.keySet()) {
+        for (BeanIdentifier key : refreshableBeans.keySet()) {
             disposeOfBean(key);
         }
     }
 
-    private void disposeOfBean(String key) {
-        BeanRegistration registration = refreshableBeans.remove(key);
-        if (registration != null) {
-
-            Object bean = registration.getBean();
-            BeanDefinition definition = registration.getBeanDefinition();
-
+    private void disposeOfBean(BeanIdentifier key) {
+        CreatedBean<?> createdBean = refreshableBeans.remove(key);
+        if (createdBean != null) {
+            Object bean = createdBean.bean();
             Lock lock = getLock(bean).writeLock();
             try {
                 lock.lock();
-                if (definition instanceof DisposableBeanDefinition) {
-                    ((DisposableBeanDefinition) definition).dispose(beanContext, bean);
-                }
+                createdBean.close();
                 locks.remove(bean);
             } finally {
                 lock.unlock();

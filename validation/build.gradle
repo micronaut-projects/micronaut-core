@@ -8,15 +8,17 @@ dependencies {
     compileOnly dependencyVersion("gorm")
     compileOnly project(":http-server")
 
+    implementation dependencyVersion("reactor")
+
     testImplementation dependencyVersion("spotbugs")
     testAnnotationProcessor project(":inject-java")
+    testCompileOnly project(":inject-groovy")
     testImplementation project(":inject")
-    testImplementation project(":http-server-netty")
-    testImplementation project(":websocket")
+
     testImplementation project(":http-client")
+    testImplementation project(":http-server-netty")
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
     testImplementation project(":inject-java-test")
-    testCompileOnly project(":inject-groovy")
 
 }
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

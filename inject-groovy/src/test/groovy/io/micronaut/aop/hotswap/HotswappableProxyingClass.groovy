@@ -18,7 +18,7 @@ package io.micronaut.aop.hotswap
 import io.micronaut.aop.Around
 import io.micronaut.aop.proxytarget.Mutating
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 /**
  * @author Graeme Rocher

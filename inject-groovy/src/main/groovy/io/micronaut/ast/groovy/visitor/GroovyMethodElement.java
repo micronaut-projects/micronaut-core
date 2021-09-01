@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import org.codehaus.groovy.ast.ClassNode;
@@ -30,10 +31,8 @@ import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.control.SourceUnit;
 
 import io.micronaut.core.annotation.NonNull;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+
+import java.util.*;
 import java.util.function.Function;
 
 /**
@@ -62,6 +61,11 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
         this.methodNode = methodNode;
         this.sourceUnit = visitorContext.getSourceUnit();
         this.declaringClass = declaringClass;
+    }
+
+    @Override
+    public Set<ElementModifier> getModifiers() {
+        return resolveModifiers(this.methodNode);
     }
 
     @Override
@@ -180,10 +184,11 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
 
     @Override
     public MethodElement withNewParameters(ParameterElement... newParameters) {
+        final ParameterElement[] existing = getParameters();
         return new GroovyMethodElement(declaringClass, visitorContext, methodNode, getAnnotationMetadata()) {
             @Override
             public ParameterElement[] getParameters() {
-                return ArrayUtils.concat(super.getParameters(), newParameters);
+                return ArrayUtils.concat(existing, newParameters);
             }
         };
     }
@@ -191,7 +196,6 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     @Override
     public ClassElement getDeclaringType() {
         if (this.declaringElement == null) {
-
             this.declaringElement = visitorContext.getElementFactory().newClassElement(
                     methodNode.getDeclaringClass(),
                     AstAnnotationUtils.getAnnotationMetadata(

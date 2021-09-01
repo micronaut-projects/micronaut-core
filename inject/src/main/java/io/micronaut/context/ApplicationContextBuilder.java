@@ -21,8 +21,8 @@ import io.micronaut.core.util.ArgumentUtils;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.Map;
 
@@ -204,6 +204,15 @@ public interface ApplicationContextBuilder {
      * @return This application
      */
     @NonNull ApplicationContextBuilder banner(boolean isEnabled);
+
+    /**
+     * Whether to error on an empty bean provider. Defaults to {@code false}.
+     *
+     * @param shouldAllow True if empty {@link jakarta.inject.Provider} instances are allowed
+     * @return This application
+     * @since 3.0.0
+     */
+    @NonNull ApplicationContextBuilder allowEmptyProviders(boolean shouldAllow);
 
     /**
      * Set the command line arguments.

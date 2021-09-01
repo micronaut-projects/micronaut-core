@@ -28,7 +28,6 @@ import junit.framework.TestCase;
 import spock.mock.DetachedMockFactory;
 
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiConsumer;
 
 public class HttpRequestTest extends TestCase {
 

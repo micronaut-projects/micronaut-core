@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.configuration;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 @StringArray("${value.list:temp}")

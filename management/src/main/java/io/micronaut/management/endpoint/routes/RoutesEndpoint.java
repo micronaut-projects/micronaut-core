@@ -15,11 +15,13 @@
  */
 package io.micronaut.management.endpoint.routes;
 
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRoute;
-import io.reactivex.Single;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
 
 import java.util.Comparator;
 import java.util.stream.Stream;
@@ -47,14 +49,15 @@ public class RoutesEndpoint {
     }
 
     /**
-     * @return The routes as a {@link Single}
+     * @return The routes as a {@link Mono}
      */
     @Read
-    public Single getRoutes() {
+    @SingleResult
+    public Publisher getRoutes() {
         Stream<UriRoute> uriRoutes = router.uriRoutes()
                 .sorted(Comparator
                         .comparing((UriRoute r) -> r.getUriMatchTemplate().toPathString())
                         .thenComparing(UriRoute::getHttpMethodName));
-        return Single.fromPublisher(routeDataCollector.getData(uriRoutes));
+        return Mono.from(routeDataCollector.getData(uriRoutes));
     }
 }

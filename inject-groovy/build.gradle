@@ -4,6 +4,8 @@ dependencies {
     api dependencyModuleVersion("groovy", "groovy")
 
 //    testImplementation 'javax.validation:validation-api:1.1.0.Final'
+    testImplementation project(":context")
+    testImplementation group: 'javax.inject', name: 'javax.inject', version: '1'
     testImplementation dependencyVersion("spotbugs")
     testImplementation "org.hibernate:hibernate-core:5.4.29.Final"
     testImplementation 'org.hibernate:hibernate-validator:6.1.6.Final'
@@ -18,6 +20,13 @@ dependencies {
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
     testImplementation "com.blazebit:blaze-persistence-core-impl:1.6.0-Alpha1"
 
+    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-core"), {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+        exclude module:'micronaut-bom'
+    }
+
+    testImplementation dependencyVersion("reactor")
 }
 
 test {

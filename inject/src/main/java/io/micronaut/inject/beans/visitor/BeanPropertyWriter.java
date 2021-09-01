@@ -52,25 +52,26 @@ import java.util.stream.Collectors;
 @Internal
 class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
 
-    private static final Type TYPE_BEAN_PROPERTY = Type.getType(AbstractBeanProperty.class);
-    private static final Method METHOD_READ_INTERNAL = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanProperty.class, "readInternal", Object.class));
-    private static final Method METHOD_WRITE_INTERNAL = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanProperty.class, "writeInternal", Object.class, Object.class));
+    static final Type TYPE_BEAN_PROPERTY = Type.getType(AbstractBeanProperty.class);
+    static final Method METHOD_READ_INTERNAL = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanProperty.class, "readInternal", Object.class));
+    static final Method METHOD_WRITE_INTERNAL = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanProperty.class, "writeInternal", Object.class, Object.class));
+    static final Method METHOD_GET_BEAN = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(BeanProperty.class, "getDeclaringBean"));
     private static final Method METHOD_WITH_VALUE_INTERNAL = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanProperty.class, "withValueInternal", Object.class, Object.class));
-    private static final Method METHOD_GET_BEAN = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(BeanProperty.class, "getDeclaringBean"));
     private static final Method METHOD_INSTANTIATE = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(BeanIntrospection.class, "instantiate", Object[].class));
-    private final Type propertyType;
+    protected final Type type;
+    protected final Type propertyType;
+    protected final Type beanType;
     private final String propertyName;
     private final AnnotationMetadata annotationMetadata;
-    private final Type type;
     private final ClassWriter classWriter;
     private final Map<String, ClassElement> typeArguments;
-    private final Type beanType;
     private final boolean readOnly;
     private final boolean isMutable;
     private final MethodElement readMethod;
     private final MethodElement writeMethod;
     private final MethodElement withMethod;
     private final HashMap<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
+    private final Map<String, Integer> defaults = new HashMap<>();
     private final TypedElement typeElement;
     private final ClassElement declaringElement;
     private final Type propertyGenericType;
@@ -390,6 +391,18 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         writeMethod.checkCast(beanType);
         writeMethod.loadArg(1);
         pushCastToType(writeMethod, propertyType);
+        writeWriteMethod(writeMethod);
+        writeMethod.visitInsn(RETURN);
+        writeMethod.visitMaxs(1, 1);
+        writeMethod.visitEnd();
+
+    }
+
+    /**
+     * Generates the write method.
+     * @param writeMethod The write method to write
+     */
+    protected void writeWriteMethod(GeneratorAdapter writeMethod) {
         final boolean hasWriteMethod = this.writeMethod != null;
         final String methodName = hasWriteMethod ? this.writeMethod.getName() : NameUtils.setterNameFor(propertyName);
         final Type returnType = hasWriteMethod ? JavaModelUtils.getTypeReference(this.writeMethod.getReturnType()) : Type.VOID_TYPE;
@@ -406,10 +419,6 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
                             getMethodDescriptor(returnType, Collections.singleton(propertyType)))
             );
         }
-        writeMethod.visitInsn(RETURN);
-        writeMethod.visitMaxs(1, 1);
-        writeMethod.visitEnd();
-
     }
 
     private void writeReadMethod() {
@@ -421,6 +430,18 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         );
         readMethod.loadArg(0);
         pushCastToType(readMethod, beanType);
+        writeReadMethod(readMethod);
+        pushBoxPrimitiveIfNecessary(propertyType, readMethod);
+        readMethod.returnValue();
+        readMethod.visitMaxs(1, 1);
+        readMethod.visitEnd();
+    }
+
+    /**
+     * Generates the read method.
+     * @param readMethod The read method to generate.
+     */
+    protected void writeReadMethod(GeneratorAdapter readMethod) {
         final boolean isBoolean = propertyType.getClassName().equals("boolean");
         final String methodName = this.readMethod != null ? this.readMethod.getName() : NameUtils.getterNameFor(propertyName, isBoolean);
         if (declaringElement.isInterface()) {
@@ -428,10 +449,6 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         } else {
             readMethod.invokeVirtual(beanType, new Method(methodName, getMethodDescriptor(propertyType, Collections.emptyList())));
         }
-        pushBoxPrimitiveIfNecessary(propertyType, readMethod);
-        readMethod.returnValue();
-        readMethod.visitMaxs(1, 1);
-        readMethod.visitEnd();
     }
 
     private void writeConstructor() {
@@ -454,7 +471,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             if (annotationMetadata.isEmpty()) {
                 constructor.visitInsn(ACONST_NULL);
             } else {
-                AnnotationMetadataWriter.instantiateNewMetadata(type, classWriter, constructor, annotationMetadata, loadTypeMethods);
+                AnnotationMetadataWriter.instantiateNewMetadata(type, classWriter, constructor, annotationMetadata, defaults, loadTypeMethods);
             }
         } else {
             constructor.visitInsn(ACONST_NULL);
@@ -468,6 +485,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
                     constructor,
                     typeElement.getName(),
                     typeArguments,
+                    new HashMap<>(),
                     loadTypeMethods
             );
         } else {

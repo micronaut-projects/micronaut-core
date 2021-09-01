@@ -6,7 +6,7 @@ The following example demonstrates rewriting requests under the URI `/proxy` to 
 
 snippet::io.micronaut.docs.http.client.proxy.ProxyFilter[tags="imports,class", indent=0, title="Customizing the Netty pipeline for Logbook"]
 
-<1> The filter extends api:http.filter.OncePerRequestHttpServerFilter[]
+<1> The filter extends api:http.filter.HttpServerFilter[]
 <2> The api:http.client.ProxyHttpClient[] is injected into the constructor.
 <3> The `proxy` method proxies the request
 <4> The request is mutated to modify the URI and include an additional header

@@ -29,6 +29,7 @@ import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
@@ -66,8 +67,10 @@ public class ExceptionHandlerSpec {
         });
         HttpResponse response = ex.getResponse();
         Map<String, Object> body = (Map<String, Object>) response.getBody(errorType).get();
+        Map<String, Object> embedded = (Map<String, Object>) body.get("_embedded");
+        Object message = ((Map<String, Object>) ((List) embedded.get("errors")).get(0)).get("message");
 
         assertEquals(response.status(), HttpStatus.BAD_REQUEST);
-        assertEquals(body.get("message"), "No stock available");
+        assertEquals(message, "No stock available");
     }
 }

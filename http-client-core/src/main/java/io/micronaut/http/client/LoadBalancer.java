@@ -15,13 +15,13 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import org.reactivestreams.Publisher;
 
-import io.micronaut.core.annotation.Nullable;
 import java.net.URL;
 import java.util.Optional;
 

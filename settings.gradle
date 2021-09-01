@@ -1,3 +1,14 @@
+pluginManagement {
+    plugins {
+//        id 'io.micronaut.application' version getProperty("micronautGradlePluginVersion")
+//        id 'io.micronaut.library' version getProperty("micronautGradlePluginVersion")
+        id "org.jetbrains.kotlin.jvm" version getProperty("kotlinVersion")
+        id "org.jetbrains.kotlin.kapt" version getProperty("kotlinVersion")
+        id "org.jetbrains.kotlin.plugin.allopen" version getProperty("kotlinVersion")
+        id "org.jetbrains.kotlin.plugin.jpa" version getProperty("kotlinVersion")
+    }
+}
+
 rootProject.name = 'micronaut'
 
 include "aop"
@@ -18,11 +29,13 @@ include "http-client"
 include "http-netty"
 include "http-server"
 include "http-server-netty"
+include "http-validation"
 include "inject"
 include "inject-groovy"
 include "inject-groovy-test"
 include "inject-java"
 include "inject-java-test"
+include 'inject-kotlin-test'
 include "inject-test-utils"
 include "management"
 include "messaging"
@@ -37,6 +50,8 @@ include "websocket"
 // test suites
 include "test-suite"
 include "test-suite-helper"
+include "test-suite-javax-inject"
+include "test-suite-jakarta-inject-bean-import"
 include "test-suite-kotlin"
 include "test-suite-groovy"
 include "test-utils"

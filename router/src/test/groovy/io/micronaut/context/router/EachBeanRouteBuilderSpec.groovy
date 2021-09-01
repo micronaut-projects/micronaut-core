@@ -13,7 +13,7 @@ import io.micronaut.web.router.RouteMatch
 import io.micronaut.web.router.Router
 import spock.lang.Specification
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 class EachBeanRouteBuilderSpec extends Specification {
 

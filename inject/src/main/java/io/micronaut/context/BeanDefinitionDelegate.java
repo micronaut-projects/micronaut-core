@@ -15,12 +15,11 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.exceptions.BeanInstantiationException;
-import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameResolver;
@@ -30,7 +29,6 @@ import io.micronaut.core.value.ValueResolver;
 import io.micronaut.inject.*;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
-import javax.inject.Provider;
 import java.util.*;
 
 /**
@@ -115,34 +113,19 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                 if (named != null) {
                     Map<String, Object> fulfilled = new LinkedHashMap<>(requiredArguments.length);
                     for (Argument argument : requiredArguments) {
-                        Class argumentType = argument.getType();
                         Optional result = ConversionService.SHARED.convert(named, argument);
                         String argumentName = argument.getName();
                         if (result.isPresent()) {
                             fulfilled.put(argumentName, result.get());
                         } else {
                             Qualifier qualifier = Qualifiers.byName(named.toString());
-                            // attempt bean lookup to full argument
-                            if (ProviderFactory.isProvider(argumentType)) {
-                                Optional<Argument<?>> genericType = argument.getFirstTypeVariable();
-                                if (genericType.isPresent()) {
-                                    Class beanType = genericType.get().getType();
-                                    try {
-                                        Provider provider = ((DefaultBeanContext) context).getBeanProvider(resolutionContext, beanType, qualifier);
-                                        if (provider != null) {
-                                            fulfilled.put(argumentName, ProviderFactory.createProvider(argumentType, provider::get).orElse(null));
-                                        } else {
-                                            fulfilled.put(argumentName, null);
-                                        }
-                                    } catch (NoSuchBeanException e) {
-                                        //If the parameter is not null it will be caught by AbstractParametrizedBeanDefinition
-                                    }
-                                }
-                            } else {
-                                Optional bean = ((DefaultBeanContext) context).findBean(resolutionContext, argumentType, qualifier);
-                                if (bean.isPresent()) {
-                                    fulfilled.put(argumentName, bean.get());
-                                }
+                            Optional bean;
+                            try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+                                    .pushConstructorResolve(definition, argument)) {
+                                bean = ((DefaultBeanContext) context).findBean(resolutionContext, argument, qualifier);
+                            }
+                            if (bean.isPresent()) {
+                                fulfilled.put(argumentName, bean.get());
                             }
                         }
                     }
@@ -238,6 +221,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     }
 
     @Override
+    @NonNull
     public String getName() {
         return definition.getName();
     }

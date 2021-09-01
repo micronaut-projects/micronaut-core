@@ -23,7 +23,6 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
-import org.jetbrains.annotations.NotNull;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -99,9 +98,8 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
         return registerSingleton(type, singleton, null, true);
     }
 
-    @NotNull
     @Override
-    default @NonNull ApplicationContext registerSingleton(@NotNull Object singleton, boolean inject) {
+    default @NonNull ApplicationContext registerSingleton(@NonNull Object singleton, boolean inject) {
         return (ApplicationContext) BeanContext.super.registerSingleton(singleton, inject);
     }
 
@@ -255,31 +253,6 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      *
      * @param environments The environments to use
      * @return The application context builder
-     * @deprecated Use {@link #builder(String...)}
-     */
-    @Deprecated
-    static @NonNull ApplicationContextBuilder build(@NonNull String... environments) {
-        return builder(environments);
-    }
-
-    /**
-     * Build a {@link ApplicationContext}.
-     *
-     * @param properties   The properties
-     * @param environments The environments to use
-     * @return The application context builder
-     * @deprecated Use {@link #builder(Map, String...)}
-     */
-    @Deprecated
-    static @NonNull ApplicationContextBuilder build(@NonNull Map<String, Object> properties, @NonNull String... environments) {
-        return builder(properties, environments);
-    }
-
-    /**
-     * Build a {@link ApplicationContext}.
-     *
-     * @param environments The environments to use
-     * @return The application context builder
      */
     static @NonNull ApplicationContextBuilder builder(@NonNull String... environments) {
         ArgumentUtils.requireNonNull("environments", environments);
@@ -306,17 +279,6 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * Build a {@link ApplicationContext}.
      *
      * @return The application context builder
-     * @deprecated Use {@link #builder()}
-     */
-    @Deprecated
-    static @NonNull ApplicationContextBuilder build() {
-        return builder();
-    }
-
-    /**
-     * Build a {@link ApplicationContext}.
-     *
-     * @return The application context builder
      */
     static @NonNull ApplicationContextBuilder builder() {
         return new DefaultApplicationContextBuilder();
@@ -333,32 +295,6 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
         ArgumentUtils.requireNonNull("environments", environments);
         ArgumentUtils.requireNonNull("classLoader", classLoader);
         return builder(classLoader, environments).start();
-    }
-
-    /**
-     * Build a {@link ApplicationContext}.
-     *
-     * @param classLoader  The classloader to use
-     * @param environments The environment to use
-     * @return The application context builder
-     * @deprecated Use {@link #builder(ClassLoader, String...)}
-     */
-    @Deprecated
-    static @NonNull ApplicationContextBuilder build(@NonNull ClassLoader classLoader, @NonNull String... environments) {
-        return builder(classLoader, environments);
-    }
-
-    /**
-     * Build a {@link ApplicationContext}.
-     *
-     * @param mainClass    The main class of the application
-     * @param environments The environment to use
-     * @return The application context builder
-     * @deprecated Use {@link #builder(Class, String...)}
-     */
-    @Deprecated
-    static @NonNull ApplicationContextBuilder build(@NonNull Class mainClass, @NonNull String... environments) {
-        return builder(mainClass, environments);
     }
 
     /**

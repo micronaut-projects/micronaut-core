@@ -20,13 +20,13 @@ import io.micronaut.http.MediaType.TEXT_EVENT_STREAM
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.sse.Event
-import io.reactivex.Flowable
+import reactor.core.publisher.Flux
 
 // tag::class[]
 @Client("/streaming/sse")
 interface HeadlineClient {
 
     @Get(value = "/headlines", processes = [TEXT_EVENT_STREAM])
-    fun streamHeadlines(): Flowable<Event<Headline>>
+    fun streamHeadlines(): Flux<Event<Headline>>
 }
 // end::class[]

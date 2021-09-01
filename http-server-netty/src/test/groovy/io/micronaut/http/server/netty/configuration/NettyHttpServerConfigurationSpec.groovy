@@ -462,6 +462,39 @@ class NettyHttpServerConfigurationSpec extends Specification {
         cleanup:
         beanContext.close()
     }
+
+    void "test default keepAlive configuration"() {
+        given:
+        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        beanContext.start()
+
+        when:
+        NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
+
+        then:
+        !config.keepAliveOnServerError
+
+        cleanup:
+        beanContext.close()
+    }
+
+    void "test keepAlive configuration set to true"() {
+        given:
+        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        beanContext.environment.addPropertySource(PropertySource.of("test",
+          ['micronaut.server.netty.keepAliveOnServerError': true]
+        ))
+        beanContext.start()
+
+        when:
+        NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
+
+        then:
+        config.keepAliveOnServerError
+
+        cleanup:
+        beanContext.close()
+    }
 }
 
 class MemoryAppender extends AppenderBase<ILoggingEvent> {

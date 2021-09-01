@@ -75,4 +75,14 @@ public class IntrospectionSpec extends TestCase {
         Business business = introspection.instantiate("Apple");
         assertEquals("Apple", business.getName());
     }
+
+    public void testUser() {
+        final BeanIntrospection<User> introspection = BeanIntrospection.getIntrospection(User.class);
+        User user = introspection.instantiate("Apple");
+        assertEquals("Apple", user.name);
+        assertEquals(18, user.age);
+        assertEquals(2, introspection.getBeanProperties().size());
+        introspection.getRequiredProperty("age", int.class).set(user, 23);
+        assertEquals(23, user.age);
+    }
 }
