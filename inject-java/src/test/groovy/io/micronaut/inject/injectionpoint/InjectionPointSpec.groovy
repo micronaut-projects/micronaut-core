@@ -1,6 +1,7 @@
 package io.micronaut.inject.injectionpoint
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.inject.injectionpoint.notlazytarget.ProxiedSomeBeanConsumer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -31,9 +32,20 @@ class InjectionPointSpec extends Specification {
         consumer.fromMethod.test() == 'three'
     }
 
-    def "proxied void test that the injection point can be used to construct the object"() {
+    def "inject point points are propagated for proxies with non-lazy target"() {
         given:
         def consumer = applicationContext.getBean(ProxiedSomeBeanConsumer)
+
+        expect:
+        consumer.fromConstructor.name == 'one'
+        consumer.fromField.name == 'two'
+        consumer.fromMethod.name == 'three'
+        consumer.someType.name == 'four'
+    }
+
+    def "inject point points are propagated for proxies with lazy target"() {
+        given:
+        def consumer = applicationContext.getBean(io.micronaut.inject.injectionpoint.lazytarget.ProxiedSomeBeanConsumer)
 
         expect:
         consumer.fromConstructor.name == 'one'

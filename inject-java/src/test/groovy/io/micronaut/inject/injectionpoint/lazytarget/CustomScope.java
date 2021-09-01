@@ -13,19 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.injectionpoint;
+package io.micronaut.inject.injectionpoint.lazytarget;
 
-public class ProxiedSomeBean {
-    private String name;
+import io.micronaut.aop.Around;
+import io.micronaut.runtime.context.scope.ScopedProxy;
+import jakarta.inject.Scope;
 
-    public ProxiedSomeBean() {
-    }
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
-    public ProxiedSomeBean(String name) {
-        this.name = name;
-    }
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-    public String getName() {
-        return name;
-    }
+@Around(lazy = true, proxyTarget = true)
+@ScopedProxy
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+@Scope
+public @interface CustomScope {
 }

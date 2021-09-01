@@ -730,23 +730,7 @@ public class DefaultBeanContext implements BeanContext {
     @NonNull
     private BeanResolutionContext newResolutionContext(BeanDefinition<?> beanDefinition, @Nullable BeanResolutionContext currentContext) {
         if (currentContext == null) {
-            return new AbstractBeanResolutionContext(this, beanDefinition) {
-                @Override
-                public <T> void addInFlightBean(BeanIdentifier beanIdentifier, T instance) {
-                    singlesInCreation.put(beanIdentifier, instance);
-                }
-
-                @Override
-                public void removeInFlightBean(BeanIdentifier beanIdentifier) {
-                    singlesInCreation.remove(beanIdentifier);
-                }
-
-                @Nullable
-                @Override
-                public <T> T getInFlightBean(BeanIdentifier beanIdentifier) {
-                    return (T) singlesInCreation.get(beanIdentifier);
-                }
-            };
+            return new DefaultBeanResolutionContext(beanDefinition);
         } else {
             return currentContext;
         }
@@ -4342,6 +4326,36 @@ public class DefaultBeanContext implements BeanContext {
                     }
                 }
             }
+        }
+    }
+
+    private class DefaultBeanResolutionContext extends AbstractBeanResolutionContext {
+
+        public DefaultBeanResolutionContext(BeanDefinition<?> beanDefinition) {
+            super(DefaultBeanContext.this, beanDefinition);
+        }
+
+        @Override
+        public BeanResolutionContext copy() {
+            DefaultBeanResolutionContext copy = new DefaultBeanResolutionContext(rootDefinition);
+            copy.copyStateFrom(this);
+            return copy;
+        }
+
+        @Override
+        public <T> void addInFlightBean(BeanIdentifier beanIdentifier, T instance) {
+            singlesInCreation.put(beanIdentifier, instance);
+        }
+
+        @Override
+        public void removeInFlightBean(BeanIdentifier beanIdentifier) {
+            singlesInCreation.remove(beanIdentifier);
+        }
+
+        @Nullable
+        @Override
+        public <T> T getInFlightBean(BeanIdentifier beanIdentifier) {
+            return (T) singlesInCreation.get(beanIdentifier);
         }
     }
 }

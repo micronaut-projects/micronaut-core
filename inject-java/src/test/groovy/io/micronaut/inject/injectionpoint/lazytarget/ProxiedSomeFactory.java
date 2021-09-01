@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.injectionpoint;
+package io.micronaut.inject.injectionpoint.lazytarget;
 
 import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.inject.InjectionPoint;
+import io.micronaut.inject.injectionpoint.SomeAnn;
 
 @Factory
 public class ProxiedSomeFactory {

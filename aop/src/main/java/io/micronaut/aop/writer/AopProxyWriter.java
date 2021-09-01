@@ -128,6 +128,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     public static final Type TYPE_INTERCEPTOR_CHAIN = Type.getType(InterceptorChain.class);
     public static final Type TYPE_METHOD_INTERCEPTOR_CHAIN = Type.getType(MethodInterceptorChain.class);
     public static final String FIELD_TARGET = "$target";
+    public static final String FIELD_BEAN_RESOLUTION_CONTEXT = "$beanResolutionContext";
     public static final String FIELD_READ_WRITE_LOCK = "$target_rwl";
     public static final Type TYPE_READ_WRITE_LOCK = Type.getType(ReentrantReadWriteLock.class);
     public static final String FIELD_READ_LOCK = "$target_rl";
@@ -774,6 +775,13 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
             if (lazy) {
                 interceptedInterface = InterceptedProxy.class;
+                proxyClassWriter.visitField(
+                        ACC_PRIVATE | ACC_FINAL,
+                        FIELD_BEAN_RESOLUTION_CONTEXT,
+                        Type.getType(BeanResolutionContext.class).getDescriptor(),
+                        null,
+                        null
+                );
             } else {
                 interceptedInterface = hotswap ? HotSwappableInterceptedProxy.class : InterceptedProxy.class;
 
@@ -848,6 +856,16 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 proxyConstructorGenerator.loadThis();
                 pushResolveProxyTargetBean(proxyConstructorGenerator, targetType);
                 proxyConstructorGenerator.putField(proxyType, FIELD_TARGET, targetType);
+            } else {
+                proxyConstructorGenerator.loadThis();
+                proxyConstructorGenerator.loadArg(beanResolutionContextArgumentIndex);
+                proxyConstructorGenerator.invokeInterface(
+                        Type.getType(BeanResolutionContext.class),
+                        Method.getMethod(
+                                ReflectionUtils.getRequiredMethod(BeanResolutionContext.class, "copy")
+                        )
+                );
+                proxyConstructorGenerator.putField(proxyType, FIELD_BEAN_RESOLUTION_CONTEXT, Type.getType(BeanResolutionContext.class));
             }
 
             // Write the Object interceptedTarget() method
@@ -1000,17 +1018,21 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         generatorAdapter.loadThis();
         // load the bean context
         generatorAdapter.getField(proxyType, FIELD_BEAN_LOCATOR, TYPE_BEAN_LOCATOR);
+        pushCastToType(generatorAdapter, TYPE_DEFAULT_BEAN_CONTEXT);
 
-        // 1st argument: the type
+        // 1st argument: the bean resolution context
+        generatorAdapter.loadThis();
+        generatorAdapter.getField(proxyType, FIELD_BEAN_RESOLUTION_CONTEXT, Type.getType(BeanResolutionContext.class));
+        // 2nd argument: the type
         buildProxyLookupArgument(generatorAdapter, targetType);
-        // 2nd argument: null qualifier
+        // 3rd argument: null qualifier
         generatorAdapter.loadThis();
         // the bean qualifier
         generatorAdapter.getField(proxyType, FIELD_BEAN_QUALIFIER, Type.getType(Qualifier.class));
 
-        generatorAdapter.invokeInterface(
-                TYPE_BEAN_LOCATOR,
-                METHOD_GET_PROXY_TARGET_BEAN
+        generatorAdapter.invokeVirtual(
+                TYPE_DEFAULT_BEAN_CONTEXT,
+                METHOD_GET_PROXY_TARGET_BEAN_WITH_CONTEXT
 
         );
         pushCastToType(generatorAdapter, getTypeReferenceForName(targetClassFullName));

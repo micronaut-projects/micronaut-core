@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.injectionpoint;
+package io.micronaut.inject.injectionpoint.lazytarget;
 
 import io.micronaut.context.scope.BeanCreationContext;
 import io.micronaut.context.scope.CustomScope;
@@ -23,10 +23,10 @@ import jakarta.inject.Singleton;
 import java.util.Optional;
 
 @Singleton
-public class CustomScopeScope implements CustomScope<io.micronaut.inject.injectionpoint.CustomScope> {
+public class CustomScopeScope implements CustomScope<io.micronaut.inject.injectionpoint.lazytarget.CustomScope> {
     @Override
-    public Class<io.micronaut.inject.injectionpoint.CustomScope> annotationType() {
-        return io.micronaut.inject.injectionpoint.CustomScope.class;
+    public Class<io.micronaut.inject.injectionpoint.lazytarget.CustomScope> annotationType() {
+        return io.micronaut.inject.injectionpoint.lazytarget.CustomScope.class;
     }
 
     @Override
