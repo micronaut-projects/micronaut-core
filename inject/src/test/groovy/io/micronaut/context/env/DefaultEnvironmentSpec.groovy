@@ -342,6 +342,7 @@ class DefaultEnvironmentSpec extends Specification {
         !DefaultEnvironment.shouldDeduceEnvironments(null, s -> (Environment.DEDUCE_ENVIRONMENT_ENV == s) ? StringUtils.FALSE : StringUtils.TRUE)
     }
 
+    @RestoreSystemProperties
     void "test disable environment deduction via system property"() {
         when:
         System.setProperty(Environment.CLOUD_PLATFORM_PROPERTY, "GOOGLE_COMPUTE")
