@@ -46,7 +46,10 @@ public class HateoasErrorResponseProcessor implements ErrorResponseProcessor<Jso
         this.alwaysSerializeErrorsAsList = jacksonConfiguration.isAlwaysSerializeErrorsAsList();
     }
 
-    @Internal
+    /**
+     * Constructor for binary compatibility. Equivalent to
+     * {@link HateoasErrorResponseProcessor#HateoasErrorResponseProcessor(JsonConfiguration)}
+     */
     public HateoasErrorResponseProcessor(JacksonConfiguration jacksonConfiguration) {
         this((JsonConfiguration) jacksonConfiguration);
     }

@@ -24,8 +24,3 @@ dependencies {
         testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
 }
-
-test {
-    // these tests don't make sense without jackson.
-    systemProperty "micronaut.databind", "jackson"
-}
