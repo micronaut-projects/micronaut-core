@@ -16,7 +16,6 @@
 package io.micronaut.http.server.exceptions.response;
 
 import io.micronaut.context.annotation.Secondary;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
@@ -49,6 +48,8 @@ public class HateoasErrorResponseProcessor implements ErrorResponseProcessor<Jso
     /**
      * Constructor for binary compatibility. Equivalent to
      * {@link HateoasErrorResponseProcessor#HateoasErrorResponseProcessor(JsonConfiguration)}
+     *
+     * @param jacksonConfiguration the configuration to use for processing.
      */
     public HateoasErrorResponseProcessor(JacksonConfiguration jacksonConfiguration) {
         this((JsonConfiguration) jacksonConfiguration);
