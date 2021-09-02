@@ -392,6 +392,7 @@ class HttpHeadSpec extends Specification {
     @Requires(property = 'spec.name', value = 'HttpHeadSpec')
     @Controller("/get")
     static class GetController {
+
         @Get("/jsonError")
         HttpResponse jsonError() {
             return HttpResponse.serverError().body([foo: "bar"])

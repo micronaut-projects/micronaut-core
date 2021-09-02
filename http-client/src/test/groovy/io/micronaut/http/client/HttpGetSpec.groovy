@@ -598,6 +598,7 @@ class HttpGetSpec extends Specification {
         book1.title == "title1"
     }
 
+    @Requires(property = 'spec.name', value = 'HttpGetSpec')
     @Controller("/get")
     static class GetController {
 
