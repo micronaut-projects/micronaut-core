@@ -1,14 +1,16 @@
+import io.micronaut.build.internal.pom.VersionCatalogConverter
+import org.gradle.api.plugins.catalog.CatalogPluginExtension
+import org.gradle.api.plugins.catalog.VersionCatalogPlugin
+
 plugins {
     id 'java-platform'
+    id 'version-catalog'
     id 'maven-publish'
     id 'io.micronaut.build.internal.publishing'
 }
 
 group projectGroupId
 version projectVersion
-
-
-boolean micronautSnapshot = rootProject.version.toString().endsWith("-SNAPSHOT")
 
 def excludedProjects = [
         "benchmarks",
@@ -20,7 +22,7 @@ def excludedProjects = [
         "test-utils"
 ]
 
-def catalog = project.extensions.findByType(VersionCatalogsExtension).named("libs")
+def libsCatalog = project.extensions.findByType(VersionCatalogsExtension).named("libs")
 
 // This map defines the names of the properties found in the POM file
 // which cannot be directly inferred from the version name in the catalog.
@@ -39,15 +41,31 @@ String toPropertyName(String alias) {
     alias.split("(?=[A-Z])").collect { it.toLowerCase(Locale.US) }.join("-").replace((char)'-', (char)'.')
 }
 
+components.javaPlatform.addVariantsFromConfiguration(
+        configurations.getByName(VersionCatalogPlugin.VERSION_CATALOG_ELEMENTS)
+) { details ->
+    details.mapToMavenScope("compile")
+    details.mapToOptional()
+}
+
+def modelConverter = new VersionCatalogConverter(
+        file("../gradle/libs.versions.toml"),
+        project.extensions.findByType(CatalogPluginExtension)
+)
+
+tasks.named("generateCatalogAsToml") {
+    modelConverter.populateModel()
+}
+
 publishing {
     publications {
         publication(MavenPublication) {
             artifactId("micronaut-bom")
             from components.javaPlatform
 
-            catalog.versionAliases.each { alias ->
+            libsCatalog.versionAliases.each { alias ->
                 if (alias.startsWith('managed.')) {
-                    catalog.findVersion(alias).ifPresent { version ->
+                    libsCatalog.findVersion(alias).ifPresent { version ->
                         alias = alias - 'managed.'
                         String baseName = legacyVersionNames[alias] ?: toPropertyName(alias)
                         String propertyName = "${baseName}.version"
@@ -64,9 +82,9 @@ javaPlatform {
 }
 
 dependencies {
-    catalog.dependencyAliases.each { alias ->
+    libsCatalog.dependencyAliases.each { alias ->
         if (alias.startsWith("boms.")) {
-            api platform(catalog.findDependency(alias).map {
+            api platform(libsCatalog.findDependency(alias).map {
                 it.get()
             }.orElseThrow { new RuntimeException("Unexpected missing alias in catalog") })
         }
@@ -84,12 +102,20 @@ dependencies {
                 continue
             }
 
-            api "$p.group:micronaut-$p.name:$p.version"
+            String moduleGroup = p.group
+            String moduleName = "micronaut-${p.name}"
+            String moduleVersion = p.version
+
+            api "$moduleGroup:$moduleName:$moduleVersion"
+
+            modelConverter.extraVersions.put(moduleName, moduleVersion)
+            modelConverter.extraLibraries.put(moduleName, VersionCatalogConverter.library(moduleGroup, moduleName, moduleName))
+
         }
 
-        catalog.dependencyAliases.each { alias ->
+        libsCatalog.dependencyAliases.each { alias ->
             if (alias.startsWith("managed.")) {
-                api catalog.findDependency(alias).map {
+                api libsCatalog.findDependency(alias).map {
                     it.get()
                 }.orElseThrow { new RuntimeException("Unexpected missing alias in catalog") }
             }

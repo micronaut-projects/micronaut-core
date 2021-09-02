@@ -9,12 +9,6 @@ pluginManagement {
     }
 }
 
-includeBuild("../micronaut-build") {
-    dependencySubstitution {
-        substitute(module("io.micronaut.build.internal:micronaut-gradle-plugins")).using(project(":"))
-    }
-}
-
 enableFeaturePreview("VERSION_CATALOGS")
 
 rootProject.name = 'micronaut'
