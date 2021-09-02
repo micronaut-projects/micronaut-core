@@ -67,7 +67,7 @@ import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriMatchTemplate;
-import io.micronaut.jackson.codec.JsonMediaTypeCodec;
+import io.micronaut.json.codec.JsonMediaTypeCodec;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;

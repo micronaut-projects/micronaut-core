@@ -1,0 +1,31 @@
+dependencies {
+    annotationProcessor project(":inject-java")
+
+    api project(":jackson-core")
+
+    api "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion"
+    api "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jacksonVersion"
+    api "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion"
+    compileOnly("com.fasterxml.jackson.module:jackson-module-kotlin:$jacksonVersion") {
+        transitive = false
+    }
+    compileOnly("com.fasterxml.jackson.module:jackson-module-afterburner:$jacksonVersion") {
+        transitive = false
+    }
+    compileOnly("com.fasterxml.jackson.module:jackson-module-parameter-names:$jacksonVersion") {
+        transitive = false
+    }
+
+    testAnnotationProcessor project(":inject-java")
+    testImplementation project(":inject-java")
+    testImplementation project(":inject-java-test")
+    testImplementation project(":inject-groovy")
+    if (!JavaVersion.current().isJava9Compatible()) {
+        testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    }
+}
+
+test {
+    // these tests don't make sense without jackson.
+    systemProperty "micronaut.databind", "jackson"
+}
