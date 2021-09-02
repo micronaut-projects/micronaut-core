@@ -17,9 +17,24 @@ package io.micronaut.json;
 
 import io.micronaut.core.annotation.Internal;
 
+/**
+ * Base interface for application-level json configuration.
+ *
+ * @author Jonas Konrad
+ * @since 3.1
+ */
 @Internal
 public interface JsonConfiguration {
+    /**
+     * Whether _embedded.errors should always be serialized as list. If set to false, _embedded.errors
+     * with 1 element will be serialized as an object.
+     *
+     * @return True if _embedded.errors should always be serialized as list.
+     */
     boolean isAlwaysSerializeErrorsAsList();
 
+    /**
+     * @return The array size threshold to use
+     */
     int getArraySizeThreshold();
 }

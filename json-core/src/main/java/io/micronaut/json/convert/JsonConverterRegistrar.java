@@ -32,6 +32,12 @@ import jakarta.inject.Singleton;
 import java.io.IOException;
 import java.util.*;
 
+/**
+ * Converter registrar for json.
+ *
+ * @author Jonas Konrad
+ * @since 3.1
+ */
 @Singleton
 public final class JsonConverterRegistrar implements TypeConverterRegistrar {
     private final BeanProvider<JsonMapper> objectCodec;

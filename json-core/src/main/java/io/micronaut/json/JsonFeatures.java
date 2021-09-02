@@ -15,8 +15,14 @@
  */
 package io.micronaut.json;
 
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Experimental;
 
-@Internal
+/**
+ * Base interface for json feature classes that can be scanned from annotations. See {@link JsonMapper#detectFeatures}.
+ *
+ * @author Jonas Konrad
+ * @since 3.1
+ */
+@Experimental
 public interface JsonFeatures {
 }
