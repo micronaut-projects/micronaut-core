@@ -33,9 +33,7 @@ import java.util.Set;
  *
  * @author Graeme Rocher
  * @since 1.0
- * @deprecated Use {@link io.micronaut.jackson.core.env.JsonPropertySourceLoader}
  */
-@Deprecated
 public class JsonPropertySourceLoader extends AbstractPropertySourceLoader {
 
     /**

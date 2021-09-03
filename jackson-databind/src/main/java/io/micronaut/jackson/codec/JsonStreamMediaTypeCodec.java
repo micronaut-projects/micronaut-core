@@ -35,11 +35,12 @@ import java.util.List;
 /**
  * A codec for {@link MediaType#APPLICATION_JSON_STREAM}.
  *
+ * Note: will be replaced by {@link io.micronaut.json.codec.JsonStreamMediaTypeCodec} in the future, but that class is
+ * currently experimental.
+ *
  * @author Graeme Rocher
  * @since 1.0
- * @deprecated Use {@link io.micronaut.json.codec.JsonStreamMediaTypeCodec}
  */
-@Deprecated
 @Secondary
 @Singleton
 @BootstrapContextCompatible

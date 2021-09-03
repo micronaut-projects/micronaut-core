@@ -31,9 +31,13 @@ import io.micronaut.runtime.ApplicationConfiguration;
 import java.io.IOException;
 
 /**
- * @deprecated Use {@link #MapperMediaTypeCodec}
+ * A {@link io.micronaut.http.codec.MediaTypeCodec} for JSON and Jackson.
+ *
+ * Note: will be replaced by {@link MapperMediaTypeCodec} in the future, but that class is currently experimental.
+ *
+ * @author Graeme Rocher
+ * @since 1.0.0
  */
-@Deprecated
 public abstract class JacksonMediaTypeCodec extends MapperMediaTypeCodec {
     public static final String REGULAR_JSON_MEDIA_TYPE_CODEC_NAME = "json";
 

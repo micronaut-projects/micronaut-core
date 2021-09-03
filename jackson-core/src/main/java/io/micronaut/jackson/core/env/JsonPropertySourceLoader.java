@@ -18,6 +18,7 @@ package io.micronaut.jackson.core.env;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import io.micronaut.context.env.AbstractPropertySourceLoader;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.jackson.core.tree.MicronautTreeCodec;
 import io.micronaut.json.tree.JsonNode;
 
@@ -36,6 +37,7 @@ import java.util.Set;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Experimental
 public class JsonPropertySourceLoader extends AbstractPropertySourceLoader {
 
     /**

@@ -17,6 +17,7 @@ package io.micronaut.json.codec;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecConfiguration;
@@ -32,6 +33,7 @@ import jakarta.inject.Singleton;
  * @author Graeme Rocher
  * @since 1.0.0
  */
+@Experimental
 @Named(MapperMediaTypeCodec.REGULAR_JSON_MEDIA_TYPE_CODEC_NAME)
 @Singleton
 @BootstrapContextCompatible

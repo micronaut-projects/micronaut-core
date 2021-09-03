@@ -16,6 +16,7 @@
 package io.micronaut.json.convert;
 
 import io.micronaut.context.BeanProvider;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.BeanPropertyBinder;
@@ -38,6 +39,7 @@ import java.util.*;
  * @author Jonas Konrad
  * @since 3.1
  */
+@Experimental
 @Singleton
 public final class JsonConverterRegistrar implements TypeConverterRegistrar {
     private final BeanProvider<JsonMapper> objectCodec;

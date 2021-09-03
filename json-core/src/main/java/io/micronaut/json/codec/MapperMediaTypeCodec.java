@@ -16,6 +16,7 @@
 package io.micronaut.json.codec;
 
 import io.micronaut.context.BeanProvider;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
@@ -44,6 +45,7 @@ import java.util.List;
  * @author svishnyakov
  * @since 1.3.0
  */
+@Experimental
 public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
     public static final String REGULAR_JSON_MEDIA_TYPE_CODEC_NAME = "json";
 

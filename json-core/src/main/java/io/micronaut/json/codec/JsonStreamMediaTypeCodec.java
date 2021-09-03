@@ -17,6 +17,7 @@ package io.micronaut.json.codec;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecConfiguration;
@@ -37,6 +38,7 @@ import java.util.List;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Experimental
 @Singleton
 @BootstrapContextCompatible
 public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {

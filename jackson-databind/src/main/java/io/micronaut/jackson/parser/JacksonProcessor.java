@@ -45,9 +45,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
  *
  * @author Graeme Rocher
  * @since 1.0
- * @deprecated Use {@link io.micronaut.json.JsonMapper#createReactiveParser}
  */
-@Deprecated
 public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], JsonNode> {
 
     private static final Logger LOG = LoggerFactory.getLogger(JacksonProcessor.class);

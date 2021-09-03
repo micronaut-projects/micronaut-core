@@ -30,15 +30,16 @@ import jakarta.inject.Singleton;
 /**
  * A {@link io.micronaut.http.codec.MediaTypeCodec} for JSON and Jackson.
  *
+ * Note: will be replaced by {@link io.micronaut.json.codec.JsonMediaTypeCodec} in the future, but that class is
+ * currently experimental.
+ *
  * @author Graeme Rocher
  * @since 1.0.0
- * @deprecated Use {@link io.micronaut.json.codec.JsonMediaTypeCodec}
  */
 @Named("json")
 @Singleton
 @Secondary
 @BootstrapContextCompatible
-@Deprecated
 public class JsonMediaTypeCodec extends JacksonMediaTypeCodec {
 
     public static final String CONFIGURATION_QUALIFIER = "json";
