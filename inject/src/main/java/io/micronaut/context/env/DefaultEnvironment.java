@@ -393,8 +393,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
         return deduceDefault;
     }
-
-
+    
     /**
      * Creates the default annotation scanner.
      *
