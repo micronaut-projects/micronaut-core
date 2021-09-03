@@ -36,6 +36,26 @@ class UploadSpec extends AbstractMicronautSpec {
         response.getBody().get() == "Uploaded"
     }
 
+    void "test file upload output stream"() {
+        given:
+        MultipartBody body = MultipartBody.builder()
+                .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, '{"title":"Foo"}'.bytes)
+                .build()
+
+        when:
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
+                HttpRequest.POST("/upload/outputStream", body)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.getBody().get() == "Uploaded"
+    }
+
     void "test completed file upload"() {
         given:
         MultipartBody body = MultipartBody.builder()
