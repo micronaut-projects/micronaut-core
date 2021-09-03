@@ -137,6 +137,57 @@ class MyBean {
     }
 
     @Unroll
+    void "test produce bean for primitive #primitiveType matrix array type from field"() {
+        given:
+        def context = buildContext("""
+package primitive.fields.factory;
+
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Factory;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
+
+@Factory
+class PrimitiveFactory {
+    @Bean
+    @Named("totals")
+    $primitiveType[][] totals = { new $primitiveType[] { 10 } };
+}
+
+@Singleton
+class MyBean {
+    public final $primitiveType[][] totals;
+
+    @Inject
+    @Named("totals")
+    public $primitiveType[][] totalsFromField;
+
+    public $primitiveType[][] totalsFromMethod;
+
+    MyBean(@Named $primitiveType[][] totals) {
+        this.totals = totals;
+    }
+    
+    @Inject
+    void setTotals(@Named $primitiveType[][] totals) {
+        this.totalsFromMethod = totals;
+    }
+}
+""")
+
+        def bean = getBean(context, 'primitive.fields.factory.MyBean')
+
+        expect:
+        bean.totals[0][0] == 10
+        bean.totalsFromField[0][0] == 10
+        bean.totalsFromMethod[0][0] == 10
+
+        where:
+        primitiveType << ['int', 'short', 'long', 'double', 'float', 'byte']
+    }
+
+    @Unroll
     void "test produce bean for primitive #primitiveType type from field"() {
         given:
         def context = buildContext("""
