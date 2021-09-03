@@ -46,6 +46,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -116,6 +117,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -335,12 +337,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private final String beanDefinitionName;
     private final String beanDefinitionInternalName;
     private final Type beanType;
-    private final Type providedType;
     private final Set<Class> interfaceTypes;
     private final Map<String, Integer> defaultsStorage = new HashMap<>();
     private final Map<String, GeneratorAdapter> loadTypeMethods = new LinkedHashMap<>();
     private final Map<String, ClassWriter> innerClasses = new LinkedHashMap<>(2);
-    private final String providedBeanClassName;
     private final String packageName;
     private final String beanSimpleClassName;
     private final Type beanDefinitionType;
@@ -351,6 +351,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private final Element beanProducingElement;
     private final ClassElement beanTypeElement;
     private final VisitorContext visitorContext;
+    private final boolean isPrimitiveBean;
     private GeneratorAdapter buildMethodVisitor;
     private GeneratorAdapter injectMethodVisitor;
     private Label injectEnd = null;
@@ -438,13 +439,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (beanProducingElement instanceof ClassElement) {
             ClassElement classElement = (ClassElement) beanProducingElement;
             autoApplyNamedToBeanProducingElement(classElement);
+            if (classElement.isPrimitive()) {
+                throw new IllegalArgumentException("Primitive beans can only be created from factories");
+            }
             this.beanTypeElement = classElement;
             this.packageName = classElement.getPackageName();
             this.isInterface = classElement.isInterface();
             this.isAbstract = classElement.isAbstract();
             this.beanFullClassName = classElement.getName();
             this.beanSimpleClassName = classElement.getSimpleName();
-            this.providedBeanClassName = beanFullClassName;
             this.beanDefinitionName = getBeanDefinitionName(packageName, beanSimpleClassName);
         } else if (beanProducingElement instanceof MethodElement) {
             autoApplyNamedToBeanProducingElement(beanProducingElement);
@@ -456,7 +459,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             this.isAbstract = false;
             this.beanFullClassName = producedElement.getName();
             this.beanSimpleClassName = producedElement.getSimpleName();
-            this.providedBeanClassName = producedElement.getName();
             String upperCaseMethodName = NameUtils.capitalize(factoryMethodElement.getName());
             if (uniqueIdentifier == null) {
                 throw new IllegalArgumentException("Factory methods require passing a unique identifier");
@@ -473,7 +475,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             this.isAbstract = false;
             this.beanFullClassName = producedElement.getName();
             this.beanSimpleClassName = producedElement.getSimpleName();
-            this.providedBeanClassName = producedElement.getName();
             String fieldName = NameUtils.capitalize(factoryMethodElement.getName());
             if (uniqueIdentifier == null) {
                 throw new IllegalArgumentException("Factory fields require passing a unique identifier");
@@ -488,7 +489,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             this.isAbstract = this.beanTypeElement.isAbstract();
             this.beanFullClassName = this.beanTypeElement.getName();
             this.beanSimpleClassName = this.beanTypeElement.getSimpleName();
-            this.providedBeanClassName = this.beanFullClassName;
             if (uniqueIdentifier == null) {
                 throw new IllegalArgumentException("Beans produced by addAssociatedBean(..) require passing a unique identifier");
             }
@@ -505,10 +505,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         } else {
             throw new IllegalArgumentException("Unsupported element type: " + beanProducingElement.getClass().getName());
         }
+        this.isPrimitiveBean = beanTypeElement.isPrimitive() && !beanTypeElement.isArray();
         this.annotationMetadata = beanProducingElement.getAnnotationMetadata();
         this.beanDefinitionType = getTypeReferenceForName(this.beanDefinitionName);
-        this.beanType = getTypeReferenceForName(beanFullClassName);
-        this.providedType = getTypeReferenceForName(providedBeanClassName);
+        this.beanType = getTypeReference(beanTypeElement);
         this.beanDefinitionInternalName = getInternalName(this.beanDefinitionName);
         this.interfaceTypes = new TreeSet<>(Comparator.comparing(Class::getName));
         this.interfaceTypes.add(BeanFactory.class);
@@ -638,7 +638,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public Type getProvidedType() {
-        return providedType;
+        return beanType;
     }
 
     @Override
@@ -852,11 +852,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         for (int i = 0; i < interfaceInternalNames.length; i++) {
             interfaceInternalNames[i] = Type.getInternalName(j.next());
         }
+
+        final String beanDefSignature = generateBeanDefSig(beanType);
         classWriter.visit(V1_8, ACC_SYNTHETIC,
-                beanDefinitionInternalName,
-                generateBeanDefSig(providedType.getInternalName()),
-                isSuperFactory ? TYPE_ABSTRACT_BEAN_DEFINITION.getInternalName() : superType.getInternalName(),
-                interfaceInternalNames);
+                          beanDefinitionInternalName,
+                          beanDefSignature,
+                          isSuperFactory ? TYPE_ABSTRACT_BEAN_DEFINITION.getInternalName() : superType.getInternalName(),
+                          interfaceInternalNames);
 
         classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
 
@@ -964,9 +966,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         staticInit.visitMaxs(DEFAULT_MAX_STACK, defaultsStorage.size() + 3);
         staticInit.visitEnd();
 
-        finalizeBuildMethod();
-
         if (buildMethodVisitor != null) {
+            if (isPrimitiveBean) {
+                pushBoxPrimitiveIfNecessary(beanType, buildMethodVisitor);
+            }
             buildMethodVisitor.returnValue();
             buildMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, 10);
         }
@@ -975,6 +978,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 injectMethodVisitor.visitLabel(injectEnd);
             }
             invokeSuperInjectMethod(injectMethodVisitor, INJECT_BEAN_METHOD);
+            if (isPrimitiveBean) {
+                pushBoxPrimitiveIfNecessary(beanType, injectMethodVisitor);
+            }
             injectMethodVisitor.returnValue();
             injectMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, 10);
         }
@@ -1431,7 +1437,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (isCollection || isArray) {
             requiresGenericType = true;
             ClassElement typeArgument = genericType.isArray() ? genericType.fromArray() : genericType.getFirstTypeArgument().orElse(null);
-            if (typeArgument != null) {
+            if (typeArgument != null && !typeArgument.isPrimitive()) {
                 if (typeArgument.isAssignable(BeanRegistration.class)) {
                     methodToInvoke = GET_BEAN_REGISTRATIONS_FOR_FIELD;
                 } else {
@@ -1679,7 +1685,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     () -> resolveFieldArgument(injectMethodVisitor, currentFieldIndex));
             // invoke getBeanForField
             pushInvokeMethodOnSuperClass(injectMethodVisitor, methodToInvoke);
-            if (isArray) {
+            if (isArray && requiresGenericType) {
                 convertToArray(fieldElement.getType().fromArray(), injectMethodVisitor);
             }
             // cast the return value to the correct type
@@ -1893,7 +1899,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             } else if (isCollection || isArray) {
                 requiresGenericType = true;
                 ClassElement typeArgument = genericType.isArray() ? genericType.fromArray() : genericType.getFirstTypeArgument().orElse(null);
-                if (typeArgument != null) {
+                if (typeArgument != null && !typeArgument.isPrimitive()) {
                     if (typeArgument.isAssignable(BeanRegistration.class)) {
                         methodToInvoke = GET_BEAN_REGISTRATIONS_FOR_METHOD_ARGUMENT;
                     } else {
@@ -1922,7 +1928,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             pushQualifier(injectMethodVisitor, entry, () -> resolveMethodArgument(injectMethodVisitor, currentMethodIndex, i));
 
             pushInvokeMethodOnSuperClass(injectMethodVisitor, methodToInvoke);
-            if (isArray) {
+            if (isArray && requiresGenericType) {
                 convertToArray(genericType.fromArray(), injectMethodVisitor);
             }
             // cast the return value to the correct type
@@ -2015,7 +2021,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @SuppressWarnings("MagicNumber")
     private void visitInjectMethodDefinition() {
-        if (!superBeanDefinition && injectMethodVisitor == null) {
+        if (!isPrimitiveBean && !superBeanDefinition && injectMethodVisitor == null) {
             String desc = getMethodDescriptor(Object.class.getName(), BeanResolutionContext.class.getName(), BeanContext.class.getName(), Object.class.getName());
             injectMethodVisitor = new GeneratorAdapter(classWriter.visitMethod(
                     ACC_PROTECTED,
@@ -2040,7 +2046,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // The object being injected is argument 3 of the inject method
             injectMethodVisitor.loadArg(2);
             // store it in a local variable
-            injectMethodVisitor.visitTypeInsn(CHECKCAST, beanType.getInternalName());
+            pushCastToType(injectMethodVisitor, beanType);
             injectInstanceLocalVarIndex = injectMethodVisitor.newLocal(beanType);
             injectMethodVisitor.storeLocal(injectInstanceLocalVarIndex);
         }
@@ -2061,7 +2067,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 // The object being injected is argument 3 of the inject method
                 postConstructMethodVisitor.loadArg(2);
                 // store it in a local variable
-                postConstructMethodVisitor.visitTypeInsn(CHECKCAST, beanType.getInternalName());
+                pushCastToType(postConstructMethodVisitor, beanType);
                 postConstructInstanceLocalVarIndex = postConstructMethodVisitor.newLocal(beanType);
                 postConstructMethodVisitor.storeLocal(postConstructInstanceLocalVarIndex);
                 invokeSuperInjectMethod(postConstructMethodVisitor, POST_CONSTRUCT_METHOD);
@@ -2259,7 +2265,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // The object being injected is argument 3 of the inject method
             preDestroyMethodVisitor.loadArg(2);
             // store it in a local variable
-            preDestroyMethodVisitor.visitTypeInsn(CHECKCAST, beanType.getInternalName());
+            pushCastToType(preDestroyMethodVisitor, beanType);
             preDestroyInstanceLocalVarIndex = preDestroyMethodVisitor.newLocal(beanType);
             preDestroyMethodVisitor.storeLocal(preDestroyInstanceLocalVarIndex);
 
@@ -2273,30 +2279,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 ACC_PUBLIC,
                 methodName,
                 desc,
-                getMethodSignature(getTypeDescriptor(providedBeanClassName), getTypeDescriptor(BeanResolutionContext.class.getName()), getTypeDescriptor(BeanContext.class.getName()), getTypeDescriptor(providedBeanClassName)),
+                getMethodSignature(getTypeDescriptor(beanFullClassName), getTypeDescriptor(BeanResolutionContext.class.getName()), getTypeDescriptor(BeanContext.class.getName()), getTypeDescriptor(beanFullClassName)),
                 null),
                 ACC_PUBLIC,
                 methodName,
                 desc
         );
-    }
-
-    private void finalizeBuildMethod() {
-        // if this is a provided bean then execute "get"
-        if (!providedBeanClassName.equals(beanFullClassName)) {
-
-            buildMethodVisitor.storeLocal(buildInstanceLocalVarIndex);
-            buildMethodVisitor.loadLocal(buildInstanceLocalVarIndex);
-            buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
-                    beanType.getInternalName(),
-                    "get",
-                    Type.getMethodDescriptor(Type.getType(Object.class)),
-                    false);
-            pushCastToType(buildMethodVisitor, providedType);
-            buildMethodVisitor.loadLocal(buildInstanceLocalVarIndex);
-            pushBeanDefinitionMethodInvocation(buildMethodVisitor, "injectAnother");
-            pushCastToType(buildMethodVisitor, providedType);
-        }
     }
 
     @SuppressWarnings("MagicNumber")
@@ -2386,9 +2374,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
             this.buildInstanceLocalVarIndex = buildMethodVisitor.newLocal(beanType);
             buildMethodVisitor.storeLocal(buildInstanceLocalVarIndex);
-            pushBeanDefinitionMethodInvocation(buildMethodVisitor, "injectBean");
-            pushCastToType(buildMethodVisitor, beanType);
-            buildMethodVisitor.storeLocal(buildInstanceLocalVarIndex);
+            if (!isPrimitiveBean) {
+                pushBeanDefinitionMethodInvocation(buildMethodVisitor, "injectBean");
+                pushCastToType(buildMethodVisitor, beanType);
+                buildMethodVisitor.storeLocal(buildInstanceLocalVarIndex);
+            }
             buildMethodVisitor.loadLocal(buildInstanceLocalVarIndex);
             initLifeCycleMethodsIfNecessary();
         }
@@ -2457,6 +2447,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             buildMethodVisitor.storeLocal(buildInstanceLocalVarIndex);
             buildMethodVisitor.loadLocal(buildInstanceLocalVarIndex);
             initLifeCycleMethodsIfNecessary();
+            pushBoxPrimitiveIfNecessary(beanType, buildMethodVisitor);
         }
     }
 
@@ -2794,7 +2785,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 if (genericType.isAssignable(Collection.class) || isArray) {
                     hasGenericType = true;
                     ClassElement typeArgument = genericType.isArray() ? genericType.fromArray() : genericType.getFirstTypeArgument().orElse(null);
-                    if (typeArgument != null) {
+                    if (typeArgument != null && !typeArgument.isPrimitive()) {
                         if (typeArgument.isAssignable(BeanRegistration.class)) {
                             methodToInvoke = GET_BEAN_REGISTRATIONS_FOR_CONSTRUCTOR_ARGUMENT;
                         } else {
@@ -2833,7 +2824,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             });
             // invoke method
             pushInvokeMethodOnSuperClass(buildMethodVisitor, methodToInvoke);
-            if (isArray) {
+            if (isArray && hasGenericType) {
                 convertToArray(argumentType.getGenericType().fromArray(), buildMethodVisitor);
             }
             pushCastToType(buildMethodVisitor, argumentType);
@@ -2898,13 +2889,23 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 // skip for arrays of BeanRegistration
                 return false;
             }
-            visitor.push(JavaModelUtils.getTypeReference(type.fromArray()));
-            visitor.push((String) null);
-            invokeInterfaceStaticMethod(
-                    visitor,
-                    Argument.class,
-                    METHOD_CREATE_ARGUMENT_SIMPLE
-            );
+            final ClassElement componentType = type.fromArray();
+            if (componentType.isPrimitive()) {
+                visitor.getStatic(
+                        TYPE_ARGUMENT,
+                        componentType.getName().toUpperCase(Locale.ENGLISH),
+                        TYPE_ARGUMENT
+                );
+            } else {
+
+                visitor.push(JavaModelUtils.getTypeReference(componentType));
+                visitor.push((String) null);
+                invokeInterfaceStaticMethod(
+                        visitor,
+                        Argument.class,
+                        METHOD_CREATE_ARGUMENT_SIMPLE
+                );
+            }
             return true;
         } else if (type.getTypeArguments().isEmpty()) {
             visitor.visitInsn(ACONST_NULL);
@@ -2955,6 +2956,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
         String methodDescriptor;
         String methodSignature;
+        final ClassElement beanDefinitionParam = ClassElement.of(BeanDefinition.class,
+                                                                 AnnotationMetadata.EMPTY_METADATA,
+                                                                 Collections.singletonMap("T", beanTypeElement));
+
         if (isParametrized) {
             methodDescriptor = getMethodDescriptor(
                     Object.class.getName(),
@@ -2964,11 +2969,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     Map.class.getName()
             );
             methodSignature = getMethodSignature(
-                    getTypeDescriptor(providedBeanClassName),
+                    getTypeDescriptor(beanTypeElement),
                     getTypeDescriptor(BeanResolutionContext.class.getName()),
                     getTypeDescriptor(BeanContext.class.getName()),
-                    getTypeDescriptor(BeanDefinition.class.getName(),
-                            providedBeanClassName),
+                    getTypeDescriptor(beanDefinitionParam),
                     getTypeDescriptor(Map.class.getName())
             );
         } else {
@@ -2979,11 +2983,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     BeanDefinition.class.getName()
             );
             methodSignature = getMethodSignature(
-                    getTypeDescriptor(providedBeanClassName),
+                    getTypeDescriptor(beanTypeElement),
                     getTypeDescriptor(BeanResolutionContext.class.getName()),
                     getTypeDescriptor(BeanContext.class.getName()),
-                    getTypeDescriptor(BeanDefinition.class.getName(),
-                            providedBeanClassName)
+                    getTypeDescriptor(beanDefinitionParam)
             );
         }
 
@@ -3001,7 +3004,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         buildMethodVisitor.loadArg(0);
         buildMethodVisitor.loadArg(1);
         buildMethodVisitor.loadLocal(buildInstanceLocalVarIndex);
-
+        pushBoxPrimitiveIfNecessary(beanType, buildMethodVisitor);
         buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
                 superBeanDefinition ? superType.getInternalName() : beanDefinitionInternalName,
                 methodName,
@@ -3244,45 +3247,78 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
     }
 
-    private String generateBeanDefSig(String typeParameter) {
-        SignatureVisitor sv = new SignatureWriter();
+    private String generateBeanDefSig(Type typeParameter) {
+        if (beanTypeElement.isPrimitive()) {
+            if (beanTypeElement.isArray()) {
+                typeParameter = JavaModelUtils.getTypeReference(beanTypeElement);
+            } else {
+                typeParameter = ClassUtils.getPrimitiveType(typeParameter.getClassName())
+                        .map(ReflectionUtils::getWrapperType)
+                        .map(Type::getType)
+                        .orElseThrow(() -> new IllegalStateException("Not a primitive type: " + beanFullClassName));
+            }
+        }
+        SignatureVisitor sv = new ArrayAwareSignatureWriter();
         visitSuperTypeParameters(sv, typeParameter);
 
-        final String beanTypeInternalName = getInternalName(typeParameter);
         // visit BeanFactory interface
         for (Class<?> interfaceType : interfaceTypes) {
-            String param;
+            Type param;
             if (ProxyBeanDefinition.class == interfaceType || AdvisedBeanType.class == interfaceType) {
-                param = getInterceptedType().map(Type::getInternalName).orElse(beanTypeInternalName);
+                param = getInterceptedType().orElse(typeParameter);
             } else {
-                param = beanTypeInternalName;
+                param = typeParameter;
             }
 
             SignatureVisitor bfi = sv.visitInterface();
             bfi.visitClassType(Type.getInternalName(interfaceType));
             SignatureVisitor iisv = bfi.visitTypeArgument('=');
-            iisv.visitClassType(param);
-            iisv.visitEnd();
+            visitTypeParameter(param, iisv);
             bfi.visitEnd();
         }
         return sv.toString();
     }
 
-    private void visitSuperTypeParameters(SignatureVisitor sv, String... typeParameters) {
+    private void visitSuperTypeParameters(SignatureVisitor sv, Type... typeParameters) {
         // visit super class
         SignatureVisitor psv = sv.visitSuperclass();
         psv.visitClassType(isSuperFactory ? TYPE_ABSTRACT_BEAN_DEFINITION.getInternalName() : superType.getInternalName());
         if (superType == TYPE_ABSTRACT_BEAN_DEFINITION || isSuperFactory) {
-            for (String typeParameter : typeParameters) {
+            for (Type typeParameter : typeParameters) {
 
-                SignatureVisitor ppsv = psv.visitTypeArgument('=');
-                String beanTypeInternalName = getInternalName(typeParameter);
-                ppsv.visitClassType(beanTypeInternalName);
-                ppsv.visitEnd();
+                ArrayAwareSignatureWriter ppsv = (ArrayAwareSignatureWriter)
+                        psv.visitTypeArgument('=');
+                visitTypeParameter(typeParameter, ppsv);
             }
         }
 
         psv.visitEnd();
+    }
+
+    private void visitTypeParameter(Type typeParameter, SignatureVisitor ppsv) {
+        final boolean isArray = typeParameter.getSort() == Type.ARRAY;
+        if (isArray) {
+            for (int i = 0; i < typeParameter.getDimensions(); i++) {
+                 ppsv.visitArrayType();
+            }
+            Type elementType = typeParameter.getElementType();
+            while (elementType.getSort() == Type.ARRAY) {
+                elementType = elementType.getElementType();
+            }
+            if (elementType.getSort() == Type.OBJECT) {
+                ppsv.visitClassType(elementType.getInternalName());
+            } else {
+                // primitive
+                ppsv.visitBaseType(elementType.getInternalName().charAt(0));
+            }
+        } else {
+            ppsv.visitClassType(typeParameter.getInternalName());
+        }
+        if (isArray) {
+            ((ArrayAwareSignatureWriter) ppsv).visitEndArray();
+        } else {
+            ppsv.visitEnd();
+        }
     }
 
     private static Method getBeanLookupMethod(String methodName, boolean requiresGenericType) {

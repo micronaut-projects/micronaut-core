@@ -319,7 +319,6 @@ public class DefaultBeanContext implements BeanContext {
                     null,
                     Argument.of(type),
                     null,
-                    false,
                     false
             );
             return candidate.map(AnnotationMetadataProvider::getAnnotationMetadata).orElse(AnnotationMetadata.EMPTY_METADATA);
@@ -594,8 +593,8 @@ public class DefaultBeanContext implements BeanContext {
                     null,
                     beanKey.beanType,
                     qualifier,
-                    false,
-                    false).orElse(null) : null;
+                    false
+            ).orElse(null) : null;
             if (beanDefinition != null && beanDefinition.getBeanType().isInstance(singleton)) {
                 try (BeanResolutionContext context = newResolutionContext(beanDefinition, null)) {
                     doInject(context, singleton, beanDefinition);
@@ -702,7 +701,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public <T> BeanDefinition<T> getBeanDefinition(Argument<T> beanType, Qualifier<T> qualifier) {
-        return findConcreteCandidate(null, beanType, qualifier, true, false)
+        return findConcreteCandidate(null, beanType, qualifier, true)
                 .orElseThrow(() -> new NoSuchBeanException(beanType, qualifier));
     }
 
@@ -729,7 +728,7 @@ public class DefaultBeanContext implements BeanContext {
             if (beanCandidates.size() == 1) {
                 return Optional.of(beanCandidates.iterator().next());
             } else {
-                return findConcreteCandidate(null, beanKey.beanType, qualifier, false, true);
+                return findConcreteCandidate(null, beanKey.beanType, qualifier, false);
             }
         }
     }
@@ -952,8 +951,7 @@ public class DefaultBeanContext implements BeanContext {
                 null,
                 beanArg,
                 qualifier,
-                true,
-                false
+                true
         );
         if (candidate.isPresent()) {
             try (BeanResolutionContext resolutionContext = newResolutionContext(candidate.get(), null)) {
@@ -983,8 +981,7 @@ public class DefaultBeanContext implements BeanContext {
                 null,
                 beanArg,
                 qualifier,
-                true,
-                false
+                true
         );
         if (candidate.isPresent()) {
             BeanDefinition<T> definition = candidate.get();
@@ -1093,8 +1090,7 @@ public class DefaultBeanContext implements BeanContext {
                         null,
                         beanKey.beanType,
                         qualifier,
-                        false,
-                        true
+                        false
                 ).orElse(null);
                 if (candidate != null) {
                     BeanRegistration<T> registration = findExistingCompatibleSingleton(beanType, null, qualifier, candidate);
@@ -1123,7 +1119,6 @@ public class DefaultBeanContext implements BeanContext {
                 null,
                 arg,
                 null,
-                false,
                 false
         ).orElse(null);
         if (concreteCandidate != null) {
@@ -1233,8 +1228,7 @@ public class DefaultBeanContext implements BeanContext {
                 resolutionContext,
                 beanArgument,
                 qualifier,
-                true,
-                false
+                true
         );
         if (concreteCandidate.isPresent()) {
             BeanDefinition<T> candidate = concreteCandidate.get();
@@ -1271,8 +1265,7 @@ public class DefaultBeanContext implements BeanContext {
                 resolutionContext,
                 Argument.of(beanType),
                 null,
-                false,
-                true
+                false
         );
         if (concreteCandidate.isPresent()) {
             BeanDefinition definition = concreteCandidate.get();
@@ -2653,8 +2646,7 @@ public class DefaultBeanContext implements BeanContext {
                     resolutionContext,
                     beanType,
                     qualifier,
-                    throwNonUnique,
-                    false
+                    throwNonUnique
             );
             T bean = null;
 
@@ -2948,7 +2940,6 @@ public class DefaultBeanContext implements BeanContext {
      * @param beanType        The bean type
      * @param qualifier       The qualifier
      * @param throwNonUnique  Whether to throw an exception if the bean is not found
-     * @param includeProvided Whether to include provided resolution
      * @param <T>             The bean generic type
      * @return The concrete bean definition candidate
      */
@@ -2957,8 +2948,7 @@ public class DefaultBeanContext implements BeanContext {
             BeanResolutionContext resolutionContext,
             Argument<T> beanType,
             Qualifier<T> qualifier,
-            boolean throwNonUnique,
-            boolean includeProvided) {
+            boolean throwNonUnique) {
         BeanKey bk = new BeanKey(beanType, qualifier);
         Optional beanDefinition = beanConcreteCandidateCache.get(bk);
         //noinspection OptionalAssignedToNull

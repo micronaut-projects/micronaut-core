@@ -2,10 +2,112 @@ package io.micronaut.inject.factory.beanfield
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.reflect.ReflectionUtils
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Unroll
 
 class FactoryBeanFieldSpec extends AbstractTypeElementSpec {
+    @Unroll
+    void "test produce bean for primitive #primitiveType array type from field"() {
+        given:
+        def context = buildContext("""
+package primitive.fields.factory;
+
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Factory;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
+
+@Factory
+class PrimitiveFactory {
+    @Bean
+    @Named("totals")
+    $primitiveType[] totals = { 10 };
+}
+
+@Singleton
+class MyBean {
+    public final $primitiveType[] totals;
+
+    @Inject
+    @Named("totals")
+    public $primitiveType[] totalsFromField;
+
+    public $primitiveType[] totalsFromMethod;
+
+    MyBean(@Named $primitiveType[] totals) {
+        this.totals = totals;
+    }
+    
+    @Inject
+    void setTotals(@Named $primitiveType[] totals) {
+        this.totalsFromMethod = totals;
+    }
+}
+""")
+
+        def bean = getBean(context, 'primitive.fields.factory.MyBean')
+
+        expect:
+        bean.totals[0] == 10
+        bean.totalsFromField[0] == 10
+        bean.totalsFromMethod[0] == 10
+
+        where:
+        primitiveType << ['int', 'short', 'long', 'double', 'float', 'byte']
+    }
+
+    @Unroll
+    void "test produce bean for primitive #primitiveType type from field"() {
+        given:
+        def context = buildContext("""
+package primitive.fields.factory;
+
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Factory;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
+
+@Factory
+class PrimitiveFactory {
+    @Bean
+    @Named("total")
+    $primitiveType total = 10;
+}
+
+@Singleton
+class MyBean {
+    public final $primitiveType total;
+
+    @Inject
+    @Named("total")
+    public $primitiveType totalFromField;
+
+    public $primitiveType totalFromMethod;
+
+    MyBean(@Named $primitiveType total) {
+        this.total = total;
+    }
+    
+    @Inject
+    void setTotal(@Named $primitiveType total) {
+        this.totalFromMethod = total;
+    }
+}
+""")
+
+        def bean = getBean(context, 'primitive.fields.factory.MyBean')
+
+        expect:
+        bean.total == 10
+        bean.totalFromField == 10
+
+        where:
+        primitiveType << ['int', 'short', 'long', 'double', 'float', 'byte']
+    }
+
     void "test a factory bean can be supplied from a field"() {
         given:
         ApplicationContext context = buildContext('test.TestFactory$TestField', '''\
@@ -89,27 +191,6 @@ class TestConstructInterceptor implements ConstructorInterceptor<Object> {
 
         cleanup:
         context.close()
-    }
-
-    void 'test fail compilation on bean field primitive'() {
-        when:
-        buildBeanDefinition('testprim.TestFactory', '''
-package testprim;
-
-import io.micronaut.inject.annotation.*;
-import io.micronaut.context.annotation.*;
-import jakarta.inject.*;
-
-@Factory
-class TestFactory {
-    @Bean
-    int junk;
-}
-''')
-
-        then:
-        def e = thrown(RuntimeException)
-        e.message.contains('Produced type from a bean factory cannot be primitive')
     }
 
     @Unroll
