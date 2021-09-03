@@ -23,7 +23,6 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.jackson.databind.JacksonDatabindMapper;
-import io.micronaut.jackson.databind.JacksonFeatures;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.codec.MapperMediaTypeCodec;
@@ -74,6 +73,12 @@ public abstract class JacksonMediaTypeCodec extends MapperMediaTypeCodec {
         return cloneWithFeatures((JacksonFeatures) features);
     }
 
+    /**
+     * Create a new codec with the provided features.
+     *
+     * @param jacksonFeatures The jackson features
+     * @return The new codec
+     */
     public abstract JacksonMediaTypeCodec cloneWithFeatures(JacksonFeatures jacksonFeatures);
 
     @Override

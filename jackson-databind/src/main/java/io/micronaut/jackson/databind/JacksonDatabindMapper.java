@@ -24,6 +24,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.jackson.JacksonConfiguration;
+import io.micronaut.jackson.codec.JacksonFeatures;
 import io.micronaut.jackson.core.tree.MicronautTreeCodec;
 import io.micronaut.jackson.core.tree.TreeGenerator;
 import io.micronaut.json.JsonStreamConfig;
