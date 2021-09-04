@@ -28,6 +28,7 @@ import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.inject.Singleton
+import javax.validation.Valid
 
 class PojoValidatorSpec extends Specification {
 
@@ -52,6 +53,18 @@ class PojoValidatorSpec extends Specification {
         constraintViolations.size() == 1
         constraintViolations.first().message == "Both name and lastName can't be null"
     }
+
+    void "test custom constraint validator on a nested Pojo"() {
+        given:
+        SearchAny search = new SearchAny(new Search())
+
+        when:
+        def constraintViolations = validator.validate(search)
+
+        then:
+        constraintViolations.size() == 1
+        constraintViolations.first().message == "Both name and lastName can't be null"
+    }
 }
 
 @Introspected
@@ -59,6 +72,15 @@ class PojoValidatorSpec extends Specification {
 class Search {
     String name
     String lastName
+}
+
+@Introspected
+class SearchAny {
+    @Valid
+    List<Search> searches;
+    SearchAny(Search... searches) {
+        this.searches = searches;
+    }
 }
 
 @Factory
