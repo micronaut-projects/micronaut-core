@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import io.netty.buffer.ByteBuf;
@@ -136,10 +137,7 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
 
     @Override
     public Optional<MediaType> getContentType() {
-        return Optional.of(
-                MediaType.forMediaTypeAndFilename(fileUpload.getContentType(), fileUpload.getFilename())
-                        .orElse(MediaType.of(fileUpload.getContentType()))
-        );
+        return Optional.of(new MediaType(fileUpload.getContentType(), NameUtils.extension(fileUpload.getFilename())));
     }
 
     @Override

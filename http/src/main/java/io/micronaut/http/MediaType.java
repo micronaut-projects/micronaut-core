@@ -804,20 +804,6 @@ public class MediaType implements CharSequence {
     }
 
     /**
-     * Resolve the {@link MediaType} for the given file name only if mediaType matches the name.
-     *
-     * @param mediaType The text
-     * @param filename The file name
-     * @return The {@link MediaType}
-     */
-    public static Optional<MediaType> forMediaTypeAndFilename(String mediaType, String filename) {
-        if (StringUtils.isNotEmpty(mediaType) && StringUtils.isNotEmpty(mediaType)) {
-            return forExtension(NameUtils.extension(filename)).filter(m -> m.getName().equals(mediaType));
-        }
-        return Optional.empty();
-    }
-
-    /**
      * Resolve the {@link MediaType} for the given file name. Defaults
      * to text/plain.
      *
