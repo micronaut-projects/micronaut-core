@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,14 @@
 package io.micronaut.http.server.netty.jackson
 
 import com.fasterxml.jackson.core.JsonFactory
-import com.fasterxml.jackson.databind.ObjectMapper
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import spock.lang.Specification
 
+/**
+ * @author Vladislav Chernogorov
+ * @since 1.0
+ */
 class JsonFactorySetupSpec extends Specification {
 
     void "verify default jackson setup with JsonFactory bean"() {
