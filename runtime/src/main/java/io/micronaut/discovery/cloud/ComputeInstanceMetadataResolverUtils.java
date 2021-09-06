@@ -115,7 +115,6 @@ public class ComputeInstanceMetadataResolverUtils {
         }
     }
 
-
     /**
      * Resolve a value as a string from the metadata json.
      *

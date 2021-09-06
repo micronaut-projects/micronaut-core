@@ -91,6 +91,7 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
         jsonFactory = new JsonFactory();
         jsonStreamConfig = JsonStreamConfig.DEFAULT;
     }
+
     /**
      *
      * @param objectMapper To read and write JSON
