@@ -37,19 +37,19 @@ import java.util.Map;
  * @since 3.1
  */
 @Experimental
-public final class MicronautTreeCodec {
-    private static final MicronautTreeCodec INSTANCE = new MicronautTreeCodec(JsonStreamConfig.DEFAULT);
+public final class JsonNodeTreeCodec {
+    private static final JsonNodeTreeCodec INSTANCE = new JsonNodeTreeCodec(JsonStreamConfig.DEFAULT);
 
     private final JsonStreamConfig config;
 
-    private MicronautTreeCodec(JsonStreamConfig config) {
+    private JsonNodeTreeCodec(JsonStreamConfig config) {
         this.config = config;
     }
 
     /**
      * @return The default instance, using {@link JsonStreamConfig#DEFAULT}.
      */
-    public static MicronautTreeCodec getInstance() {
+    public static JsonNodeTreeCodec getInstance() {
         return INSTANCE;
     }
 
@@ -57,8 +57,8 @@ public final class MicronautTreeCodec {
      * @param config The stream config to use.
      * @return A new codec that will use the given stream config.
      */
-    public MicronautTreeCodec withConfig(JsonStreamConfig config) {
-        return new MicronautTreeCodec(config);
+    public JsonNodeTreeCodec withConfig(JsonStreamConfig config) {
+        return new JsonNodeTreeCodec(config);
     }
 
     /**
@@ -168,7 +168,7 @@ public final class MicronautTreeCodec {
      * @return The parser that will visit the json node.
      */
     public JsonParser treeAsTokens(JsonNode node) {
-        return new TraversingParser(node);
+        return new JsonNodeTraversingParser(node);
     }
 
     /**

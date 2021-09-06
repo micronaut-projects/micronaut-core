@@ -4,10 +4,10 @@ import com.fasterxml.jackson.core.JsonFactory
 import io.micronaut.json.JsonStreamConfig
 import spock.lang.Specification
 
-class MicronautTreeCodecSpec extends Specification {
+class JsonNodeTreeCodecSpec extends Specification {
     def roundtrip() {
         given:
-        def treeCodec = MicronautTreeCodec.getInstance()
+        def treeCodec = JsonNodeTreeCodec.getInstance()
         def factory = new JsonFactory()
 
         def parsed = treeCodec.readTree(factory.createParser(json))
@@ -39,7 +39,7 @@ class MicronautTreeCodecSpec extends Specification {
 
     def 'roundtrip bignum'() {
         given:
-        def treeCodec = MicronautTreeCodec.getInstance().withConfig(JsonStreamConfig.DEFAULT
+        def treeCodec = JsonNodeTreeCodec.getInstance().withConfig(JsonStreamConfig.DEFAULT
                 .withUseBigIntegerForInts(true)
                 .withUseBigDecimalForFloats(true))
         def factory = new JsonFactory()

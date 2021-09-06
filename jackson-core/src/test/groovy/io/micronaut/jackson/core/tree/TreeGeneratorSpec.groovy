@@ -6,7 +6,7 @@ import spock.lang.Specification
 class TreeGeneratorSpec extends Specification {
     def scalar() {
         given:
-        def gen = MicronautTreeCodec.getInstance().createTreeGenerator()
+        def gen = JsonNodeTreeCodec.getInstance().createTreeGenerator()
 
         when:
         gen.writeString("abc")
@@ -18,7 +18,7 @@ class TreeGeneratorSpec extends Specification {
 
     def array() {
         given:
-        def gen = MicronautTreeCodec.getInstance().createTreeGenerator()
+        def gen = JsonNodeTreeCodec.getInstance().createTreeGenerator()
 
         when:
         gen.writeStartArray()
@@ -35,7 +35,7 @@ class TreeGeneratorSpec extends Specification {
 
     def object() {
         given:
-        def gen = MicronautTreeCodec.getInstance().createTreeGenerator()
+        def gen = JsonNodeTreeCodec.getInstance().createTreeGenerator()
 
         when:
         gen.writeStartObject()
@@ -54,7 +54,7 @@ class TreeGeneratorSpec extends Specification {
 
     def nested() {
         given:
-        def gen = MicronautTreeCodec.getInstance().createTreeGenerator()
+        def gen = JsonNodeTreeCodec.getInstance().createTreeGenerator()
 
         when:
         gen.writeStartObject()

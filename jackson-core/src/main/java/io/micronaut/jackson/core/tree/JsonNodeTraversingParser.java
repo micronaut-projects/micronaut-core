@@ -35,14 +35,20 @@ import java.util.Deque;
 import java.util.Iterator;
 import java.util.Map;
 
-final class TraversingParser extends ParserMinimalBase {
+/**
+ * {@link JsonParser} implementation that iterates over a {@link JsonNode}.
+ *
+ * @author Jonas Konrad
+ * @since 3.1
+ */
+final class JsonNodeTraversingParser extends ParserMinimalBase {
     private final Deque<Context> contextStack = new ArrayDeque<>();
 
     private boolean first = true;
 
     private ObjectCodec codec = null;
 
-    TraversingParser(JsonNode node) {
+    JsonNodeTraversingParser(JsonNode node) {
         Context root;
         if (node.isArray()) {
             root = new ArrayContext(null, node.values().iterator());

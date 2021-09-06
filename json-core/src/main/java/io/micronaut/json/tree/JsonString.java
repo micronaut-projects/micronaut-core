@@ -17,7 +17,13 @@ package io.micronaut.json.tree;
 
 import io.micronaut.core.annotation.NonNull;
 
-class JsonString extends JsonScalar {
+/**
+ * JsonNode implementation for string values.
+ *
+ * @author Jonas Konrad
+ * @since 3.1
+ */
+final class JsonString extends JsonScalar {
     @NonNull
     private final String value;
 

@@ -15,7 +15,7 @@
  */
 package io.micronaut.json.bind;
 
-import io.micronaut.context.BeanLocator;
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.bind.BeanPropertyBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -45,17 +45,17 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
 
     private final JsonMapper jsonMapper;
     private final int arraySizeThreshhold;
-    private final Iterable<JsonBeanPropertyBinderExceptionHandler> exceptionHandlers;
+    private final BeanProvider<JsonBeanPropertyBinderExceptionHandler> exceptionHandlers;
 
     /**
-     * @param jsonMapper    To read/write JSON
-     * @param configuration The configuration for Jackson JSON parser
-     * @param locator       Locator for exception handlers.
+     * @param jsonMapper        To read/write JSON
+     * @param configuration     The configuration for Jackson JSON parser
+     * @param exceptionHandlers Exception handlers for binding exceptions
      */
-    JsonBeanPropertyBinder(JsonMapper jsonMapper, JsonConfiguration configuration, BeanLocator locator) {
+    JsonBeanPropertyBinder(JsonMapper jsonMapper, JsonConfiguration configuration, BeanProvider<JsonBeanPropertyBinderExceptionHandler> exceptionHandlers) {
         this.jsonMapper = jsonMapper;
         this.arraySizeThreshhold = configuration.getArraySizeThreshold();
-        this.exceptionHandlers = locator.getBeansOfType(JsonBeanPropertyBinderExceptionHandler.class);
+        this.exceptionHandlers = exceptionHandlers;
     }
 
     @Override
@@ -269,7 +269,7 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
         JsonNode build();
     }
 
-    private static class FixedValue implements ValueBuilder {
+    private static final class FixedValue implements ValueBuilder {
         static final FixedValue NULL = new FixedValue(JsonNode.nullNode());
 
         final JsonNode value;
@@ -284,12 +284,12 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
         }
     }
 
-    private static class ObjectBuilder implements ValueBuilder {
+    private static final class ObjectBuilder implements ValueBuilder {
         final Map<String, ValueBuilder> values = new LinkedHashMap<>();
 
         @Override
         public JsonNode build() {
-            Map<String, JsonNode> built = new LinkedHashMap<>();
+            Map<String, JsonNode> built = new LinkedHashMap<>(values.size());
             for (Map.Entry<String, ValueBuilder> entry : values.entrySet()) {
                 built.put(entry.getKey(), entry.getValue().build());
             }
@@ -297,7 +297,7 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
         }
     }
 
-    private static class ArrayBuilder implements ValueBuilder {
+    private static final class ArrayBuilder implements ValueBuilder {
         final List<ValueBuilder> values = new ArrayList<>();
 
         @Override

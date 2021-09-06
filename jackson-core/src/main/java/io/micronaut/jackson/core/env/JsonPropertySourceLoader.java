@@ -19,7 +19,7 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import io.micronaut.context.env.AbstractPropertySourceLoader;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.jackson.core.tree.MicronautTreeCodec;
+import io.micronaut.jackson.core.tree.JsonNodeTreeCodec;
 import io.micronaut.json.tree.JsonNode;
 
 import java.io.IOException;
@@ -69,7 +69,7 @@ public class JsonPropertySourceLoader extends AbstractPropertySourceLoader {
 
     private JsonNode readJsonAsObject(InputStream input) throws IOException {
         try (JsonParser parser = new JsonFactory().createParser(input)) {
-            return MicronautTreeCodec.getInstance().readTree(parser);
+            return JsonNodeTreeCodec.getInstance().readTree(parser);
         }
     }
 

@@ -19,10 +19,11 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadata;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadataResolver;
 import io.micronaut.discovery.cloud.NetworkInterface;
-import io.micronaut.jackson.core.tree.MicronautTreeCodec;
+import io.micronaut.jackson.core.tree.JsonNodeTreeCodec;
 import io.micronaut.jackson.databind.JacksonDatabindMapper;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.JsonStreamConfig;
@@ -71,6 +72,7 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
      * @param codec         Codec to use for deserialization
      */
     @Inject
+    @Experimental
     public DigitalOceanMetadataResolver(
             DigitalOceanMetadataConfiguration configuration,
             JsonFactory jsonFactory,
@@ -89,8 +91,11 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
         jsonFactory = new JsonFactory();
         jsonStreamConfig = JsonStreamConfig.DEFAULT;
     }
-
-    @Deprecated
+    /**
+     *
+     * @param objectMapper To read and write JSON
+     * @param configuration Digital Ocean Metadata configuration
+     */
     public DigitalOceanMetadataResolver(ObjectMapper objectMapper, DigitalOceanMetadataConfiguration configuration) {
         this(configuration, objectMapper.getFactory(), new JacksonDatabindMapper(objectMapper));
     }
@@ -109,7 +114,7 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
 
         try {
             String metadataUrl = configuration.getUrl();
-            JsonNode metadataJson = readMetadataUrl(new URL(metadataUrl), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS, MicronautTreeCodec.getInstance().withConfig(jsonStreamConfig), jsonFactory, new HashMap<>());
+            JsonNode metadataJson = readMetadataUrl(new URL(metadataUrl), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS, JsonNodeTreeCodec.getInstance().withConfig(jsonStreamConfig), jsonFactory, new HashMap<>());
             if (metadataJson != null) {
                 instanceMetadata.setInstanceId(textValue(metadataJson, DROPLET_ID));
                 instanceMetadata.setName(textValue(metadataJson, HOSTNAME));

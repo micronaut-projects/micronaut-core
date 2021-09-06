@@ -17,6 +17,12 @@ package io.micronaut.json.tree;
 
 import io.micronaut.core.annotation.NonNull;
 
+/**
+ * JsonNode implementation for boolean values, two singletons.
+ *
+ * @author Jonas Konrad
+ * @since 3.1
+ */
 final class JsonBoolean extends JsonScalar {
     private static final JsonBoolean TRUE = new JsonBoolean(true);
     private static final JsonBoolean FALSE = new JsonBoolean(false);

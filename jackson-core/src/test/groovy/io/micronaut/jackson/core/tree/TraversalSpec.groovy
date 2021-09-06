@@ -14,7 +14,7 @@ class TraversalSpec extends Specification {
     def roundtrip() {
         given:
         def factory = new JsonFactory()
-        def codec = MicronautTreeCodec.getInstance()
+        def codec = JsonNodeTreeCodec.getInstance()
 
         when:
         def stringWriter = new StringWriter()

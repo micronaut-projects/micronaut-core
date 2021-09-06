@@ -24,7 +24,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.processor.SingleThreadedBufferingProcessor;
 import io.micronaut.jackson.core.tree.JsonStreamTransfer;
-import io.micronaut.jackson.core.tree.MicronautTreeCodec;
+import io.micronaut.jackson.core.tree.JsonNodeTreeCodec;
 import io.micronaut.jackson.core.tree.TreeGenerator;
 import io.micronaut.json.JsonStreamConfig;
 import io.micronaut.json.tree.JsonNode;
@@ -53,7 +53,7 @@ public class JacksonCoreProcessor extends SingleThreadedBufferingProcessor<byte[
 
     private final JsonFactory jsonFactory;
     private final JsonStreamConfig deserializationConfig;
-    private final MicronautTreeCodec treeCodec;
+    private final JsonNodeTreeCodec treeCodec;
 
     private final boolean streamArray;
 
@@ -71,7 +71,7 @@ public class JacksonCoreProcessor extends SingleThreadedBufferingProcessor<byte[
     public JacksonCoreProcessor(boolean streamArray, JsonFactory jsonFactory, @NonNull JsonStreamConfig deserializationConfig) {
         this.jsonFactory = jsonFactory;
         this.streamArray = streamArray;
-        this.treeCodec = MicronautTreeCodec.getInstance().withConfig(deserializationConfig);
+        this.treeCodec = JsonNodeTreeCodec.getInstance().withConfig(deserializationConfig);
         this.jsonStream = true;
         this.deserializationConfig = deserializationConfig;
         try {

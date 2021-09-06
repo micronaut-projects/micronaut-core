@@ -7,7 +7,7 @@ import spock.lang.Specification
 class TreeCodecSpec extends Specification {
     def readTree() {
         given:
-        def c = MicronautTreeCodec.getInstance()
+        def c = JsonNodeTreeCodec.getInstance()
 
         expect:
         c.readTree(new JsonFactory().createParser('"bar"')) == JsonNode.createStringNode("bar")

@@ -19,6 +19,12 @@ import io.micronaut.core.annotation.NonNull;
 
 import java.util.Map;
 
+/**
+ * Base JsonNode class for scalar values (null, number, string, boolean).
+ *
+ * @author Jonas Konrad
+ * @since 3.1
+ */
 abstract class JsonScalar extends JsonNode {
     @Override
     public int size() {

@@ -17,6 +17,12 @@ package io.micronaut.json.tree;
 
 import io.micronaut.core.annotation.NonNull;
 
+/**
+ * JsonNode implementation for the null value, singleton.
+ *
+ * @author Jonas Konrad
+ * @since 3.1
+ */
 final class JsonNull extends JsonScalar {
     static final JsonNull INSTANCE = new JsonNull();
 

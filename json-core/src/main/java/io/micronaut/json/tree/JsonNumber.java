@@ -17,7 +17,7 @@ package io.micronaut.json.tree;
 
 import io.micronaut.core.annotation.NonNull;
 
-class JsonNumber extends JsonScalar {
+final class JsonNumber extends JsonScalar {
     @NonNull
     private final Number value;
 

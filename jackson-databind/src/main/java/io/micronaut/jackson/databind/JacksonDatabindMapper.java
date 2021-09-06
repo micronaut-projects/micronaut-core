@@ -25,7 +25,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.jackson.codec.JacksonFeatures;
-import io.micronaut.jackson.core.tree.MicronautTreeCodec;
+import io.micronaut.jackson.core.tree.JsonNodeTreeCodec;
 import io.micronaut.jackson.core.tree.TreeGenerator;
 import io.micronaut.json.JsonStreamConfig;
 import io.micronaut.json.JsonMapper;
@@ -55,7 +55,7 @@ import java.util.function.Consumer;
 public final class JacksonDatabindMapper implements JsonMapper {
     private final ObjectMapper objectMapper;
     private final JsonStreamConfig config;
-    private final MicronautTreeCodec treeCodec;
+    private final JsonNodeTreeCodec treeCodec;
 
     @Inject
     @Internal
@@ -64,7 +64,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
         this.config = JsonStreamConfig.DEFAULT
                 .withUseBigDecimalForFloats(objectMapper.getDeserializationConfig().isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS))
                 .withUseBigIntegerForInts(objectMapper.getDeserializationConfig().isEnabled(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS));
-        this.treeCodec = MicronautTreeCodec.getInstance().withConfig(config);
+        this.treeCodec = JsonNodeTreeCodec.getInstance().withConfig(config);
     }
 
     @Internal

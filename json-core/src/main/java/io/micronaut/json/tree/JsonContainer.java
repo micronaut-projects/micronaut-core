@@ -15,6 +15,12 @@
  */
 package io.micronaut.json.tree;
 
+/**
+ * JsonNode implementation for containers (array, object).
+ *
+ * @author Jonas Konrad
+ * @since 3.1
+ */
 abstract class JsonContainer extends JsonNode {
     @Override
     public boolean isContainerNode() {
