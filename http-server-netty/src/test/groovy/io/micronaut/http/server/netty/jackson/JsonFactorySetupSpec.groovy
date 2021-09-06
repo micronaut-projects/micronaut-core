@@ -16,10 +16,9 @@
 package io.micronaut.http.server.netty.jackson
 
 import com.fasterxml.jackson.core.JsonFactory
+import com.fasterxml.jackson.databind.ObjectMapper
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.env.MapPropertySource
-import io.micronaut.jackson.JacksonConfiguration
 import spock.lang.Specification
 
 class JsonFactorySetupSpec extends Specification {
