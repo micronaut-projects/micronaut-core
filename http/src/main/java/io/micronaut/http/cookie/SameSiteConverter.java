@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Converts a string to a {@link SameSite}.
  *
  * @author Sergio del Amo
- * @since 3.1.0
+ * @since 3.0.1
  */
 @Singleton
 public class SameSiteConverter implements TypeConverter<CharSequence, SameSite> {
