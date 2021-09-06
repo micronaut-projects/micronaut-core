@@ -8,6 +8,11 @@ import javax.inject.Singleton;
 @Factory
 class CustomConstraintsValidatorFactory {
     @Singleton
+    ConstraintValidator<AlwaysInvalidTypeConstraint, CustomTypeInvalidOuter> alwaysInvalidTypeConstraintValidator() {
+        return (value, annotationMetadata, context) -> false;
+    }
+
+    @Singleton
     ConstraintValidator<AlwaysInvalidConstraint, Object> alwaysInvalidConstraintValidator() {
         return (value, annotationMetadata, context) -> false;
     }

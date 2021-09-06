@@ -119,6 +119,19 @@ class CustomConstraintsSpec extends Specification {
         violations[1].message == "custom invalid"
     }
 
+    void "test validation where pojo with cascade from list and custom validation with type"() {
+        given:
+        CustomTestListInvalid testInvalid = new CustomTestListInvalid(
+                invalidOuter: List.of(new CustomTypeInvalidOuter()))
+
+        when:
+        def violations = validator.validate(testInvalid)
+
+        then:
+        violations.size() == 1
+        violations[0].message == "custom invalid type"
+    }
+
     void "test validation where inner custom message constraint fails"() {
         given:
         CustomTestInvalid.CustomInvalidInner invalidInner = new CustomTestInvalid.CustomInvalidInner()
@@ -177,3 +190,13 @@ class CustomTestInvalid {
 @Introspected
 @CustomMessageConstraint
 class CustomInvalidOuter {}
+
+@Introspected
+class CustomTestListInvalid {
+    @Valid
+    List<CustomTypeInvalidOuter> invalidOuter
+}
+
+@Introspected
+@AlwaysInvalidTypeConstraint
+class CustomTypeInvalidOuter {}
