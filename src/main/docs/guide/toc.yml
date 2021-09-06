@@ -209,6 +209,12 @@ configurations:
     cassandraSupport: Configuring Cassandra
     liquibaseSupport: Configuring Liquibase
     flywaySupport: Configuring Flyway
+logging:
+  title: Logging
+  loggingMessages: Logging Messages
+  loggingConfiguration: Configuration
+  logback: Logback
+  loggingSystem: Logging System
 languageSupport:
   title: Language Support
   java:

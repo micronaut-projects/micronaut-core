@@ -112,4 +112,34 @@ logger:
             'foo.bar2'    | Level.INFO
     }
 
+    void 'test that log levels set in application.yaml can be overridden by environment variables'() {
+        given:
+            def map = new YamlPropertySourceLoader().read("application.yml", '''
+logger:
+  levels:
+    foo.bar3: ERROR
+'''.bytes)
+            ((Logger) LoggerFactory.getLogger('foo.bar3')).setLevel(Level.DEBUG)
+
+        when:
+            // Use same order as application.yaml to ensure it loads before environment variable property source
+            ApplicationContext context = ApplicationContext.builder()
+                    .propertySources(PropertySource.of("application", map, YamlPropertySourceLoader.DEFAULT_POSITION))
+                    .build()
+            SystemLambda.withEnvironmentVariable("LOGGER_LEVELS_FOO_BAR3", "INFO")
+                    .execute(() -> {
+                        context.start()
+                    })
+
+        then:
+            ((Logger) LoggerFactory.getLogger(loggerName)).getLevel() == expectedLevel
+
+        cleanup:
+            context.close()
+
+        where:
+            loggerName    | expectedLevel
+            'foo.bar3'    | Level.INFO
+    }
+
 }
