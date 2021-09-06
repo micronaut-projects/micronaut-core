@@ -274,7 +274,7 @@ public class MediaType implements CharSequence {
      * PDF: application/pdf.
      */
     public static final MediaType APPLICATION_PDF_TYPE = new MediaType(APPLICATION_PDF);
-    
+
     /**
      * Png Image: image/png.
      */
