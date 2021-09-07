@@ -83,6 +83,16 @@ class HttpGetSpec extends Specification {
         body.get() == 'success'
     }
 
+    void "test simple get with Publisher<Void> return"() {
+        JavaClient javaClient = embeddedServer.applicationContext.getBean(JavaClient)
+
+        when:
+        javaClient.subscribe(javaClient.simple())
+
+        then:
+        noExceptionThrown()
+    }
+
     void "test simple 404 request"() {
         when:
         Flux<?> flowable = Flux.from(client.exchange(

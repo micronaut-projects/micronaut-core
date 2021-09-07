@@ -2146,7 +2146,9 @@ public class DefaultHttpClient implements
                             redirectExchange
                                     .defaultIfEmpty(io.micronaut.http.HttpResponse.notFound())
                                     .subscribe(oHttpResponse -> {
-                                        emitter.next(oHttpResponse);
+                                        if (bodyType == null || !bodyType.isVoid()) {
+                                            emitter.next(oHttpResponse);
+                                        }
                                         emitter.complete();
                                     }, throwable -> {
                                         if (!emitter.isCancelled()) {
@@ -2167,7 +2169,9 @@ public class DefaultHttpClient implements
 
                         if (complete.compareAndSet(false, true)) {
                             if (convertBodyWithBodyType) {
-                                emitter.next(response);
+                                if (bodyType == null || !bodyType.isVoid()) {
+                                    emitter.next(response);
+                                }
                                 response.onComplete();
                                 emitter.complete();
                             } else { // error flow
