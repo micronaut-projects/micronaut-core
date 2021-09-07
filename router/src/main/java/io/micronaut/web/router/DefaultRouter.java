@@ -21,11 +21,11 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.util.PathMatcher;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.*;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.annotation.FilterMatcher;
+import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.filter.HttpServerFilterResolver;
 import io.micronaut.http.uri.UriMatchTemplate;
@@ -550,12 +550,15 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             if (entry.hasPatterns()) {
                 String path = request.getPath();
                 String[] patterns = entry.getPatterns();
+                FilterPatternStyle patternStyle = entry.getAnnotationMetadata()
+                    .enumValue("patternStyle", FilterPatternStyle.class)
+                    .orElse(FilterPatternStyle.ANT);
                 boolean matches = true;
                 for (String pattern : patterns) {
                     if (!matches) {
                         break;
                     }
-                    matches = Filter.MATCH_ALL_PATTERN.equals(pattern) || PathMatcher.ANT.matches(pattern, path);
+                    matches = Filter.MATCH_ALL_PATTERN.equals(pattern) || patternStyle.getPathMatcher().matches(pattern, path);
                 }
                 if (!matches) {
                     continue;

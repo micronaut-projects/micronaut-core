@@ -52,15 +52,13 @@ The previous example demonstrates some key concepts such as executing logic in a
 
 TIP: The examples use https://projectreactor.io[Project Reactor], however you can use any reactive framework that supports the Reactive streams specifications
 
-The api:http.annotation.Filter[] annotation can use different styles of pattern for path matching by setting the `patternStyle` member. The supported options include Ant and Regex based matching.
-
-By default, api:core.util.AntPathMatcher[] is used for path matching. When using Ant, the mapping matches URLs using the following rules:
+The api:http.annotation.Filter[] can use different styles of pattern for path matching by setting `patternStyle`. By default, it uses api:core.util.AntPathMatcher[] for path matching. When using Ant, the mapping matches URLs using the following rules:
 
 * ? matches one character
 * * matches zero or more characters
 * ** matches zero or more subdirectories in a path
 
-.@Fitler Annotation Path Matching Examples
+.@Filter Annotation Path Matching Examples
 |===
 |Pattern|Example Matched Paths
 
@@ -81,7 +79,7 @@ By default, api:core.util.AntPathMatcher[] is used for path matching. When using
 
 The other option is regular expression based matching. To use regular expressions, set `patternStyle = FilterPatternStyle.REGEX`. The `pattern` attribute is expected to contain a regular expression which will be expected to match the provided URLs exactly (using link:{jdkapi}/java/util/regex/Matcher.html#matches--[Matcher#matches]).
 
-NOTE: Using Ant based matching is preferred because it's more performant than using regular expressions.
+NOTE: Using `FilterPatternStyle.ANT` is preferred as the pattern matching is more performant than using regular expressions. `FilterPatternStyle.REGEX` should be used when your pattern cannot be written properly using Ant.
 
 == Error States
 
