@@ -968,7 +968,7 @@ public class DefaultHttpClient implements
 
                 boolean isJsonStream = response.getContentType().map(mediaType -> mediaType.equals(MediaType.APPLICATION_JSON_STREAM_TYPE)).orElse(false);
                 boolean streamArray = !Iterable.class.isAssignableFrom(type.getType()) && !isJsonStream;
-                Processor<byte[], JsonNode> jsonProcessor = mediaTypeCodec.getJsonCodec().createReactiveParser(p -> {
+                Processor<byte[], JsonNode> jsonProcessor = mediaTypeCodec.getJsonMapper().createReactiveParser(p -> {
                     httpContentReactiveSequence.map(content -> {
                         ByteBuf chunk = content.content();
                         if (log.isTraceEnabled()) {

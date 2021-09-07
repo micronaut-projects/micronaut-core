@@ -96,18 +96,18 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
     /**
      * @return The object mapper
      */
-    public JsonMapper getJsonCodec() {
-        JsonMapper codec = this.mapper;
-        if (codec == null) {
+    public JsonMapper getJsonMapper() {
+        JsonMapper mapper = this.mapper;
+        if (mapper == null) {
             synchronized (this) { // double check
-                codec = this.mapper;
-                if (codec == null) {
-                    codec = mapperProvider.get();
-                    this.mapper = codec;
+                mapper = this.mapper;
+                if (mapper == null) {
+                    mapper = mapperProvider.get();
+                    this.mapper = mapper;
                 }
             }
         }
-        return codec;
+        return mapper;
     }
 
     /**
@@ -118,11 +118,11 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
      * @return A new codec with the features applied, leaving this codec unchanged.
      */
     public MapperMediaTypeCodec cloneWithFeatures(JsonFeatures features) {
-        return cloneWithMapper(getJsonCodec().cloneWithFeatures(features));
+        return cloneWithMapper(getJsonMapper().cloneWithFeatures(features));
     }
 
     public final MapperMediaTypeCodec cloneWithViewClass(Class<?> viewClass) {
-        return cloneWithMapper(getJsonCodec().cloneWithViewClass(viewClass));
+        return cloneWithMapper(getJsonMapper().cloneWithViewClass(viewClass));
     }
 
     protected abstract MapperMediaTypeCodec cloneWithMapper(JsonMapper mapper);
@@ -143,7 +143,7 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
     @Override
     public <T> T decode(Argument<T> type, InputStream inputStream) throws CodecException {
         try {
-            return getJsonCodec().readValue(inputStream, type);
+            return getJsonMapper().readValue(inputStream, type);
         } catch (IOException e) {
             throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage(), e);
         }
@@ -160,7 +160,7 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
      */
     public <T> T decode(Argument<T> type, JsonNode node) throws CodecException {
         try {
-            JsonMapper om = getJsonCodec();
+            JsonMapper om = getJsonMapper();
             return om.readValueFromTree(node, type);
         } catch (IOException e) {
             throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage(), e);
@@ -173,7 +173,7 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
             if (CharSequence.class.isAssignableFrom(type.getType())) {
                 return (T) buffer.toString(applicationConfiguration.getDefaultCharset());
             } else {
-                return getJsonCodec().readValue(buffer.toByteArray(), type);
+                return getJsonMapper().readValue(buffer.toByteArray(), type);
             }
         } catch (IOException e) {
             throw new CodecException("Error decoding stream for type [" + type.getType() + "]: " + e.getMessage(), e);
@@ -186,7 +186,7 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
             if (CharSequence.class.isAssignableFrom(type.getType())) {
                 return (T) new String(bytes, applicationConfiguration.getDefaultCharset());
             } else {
-                return getJsonCodec().readValue(bytes, type);
+                return getJsonMapper().readValue(bytes, type);
             }
         } catch (IOException e) {
             throw new CodecException("Error decoding stream for type [" + type.getType() + "]: " + e.getMessage(), e);
@@ -197,7 +197,7 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
     @Override
     public <T> T decode(Argument<T> type, String data) throws CodecException {
         try {
-            return getJsonCodec().readValue(data, type);
+            return getJsonMapper().readValue(data, type);
         } catch (IOException e) {
             throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage(), e);
         }
@@ -206,7 +206,7 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
     @Override
     public <T> void encode(T object, OutputStream outputStream) throws CodecException {
         try {
-            getJsonCodec().writeValue(outputStream, object);
+            getJsonMapper().writeValue(outputStream, object);
         } catch (IOException e) {
             throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
         }
@@ -218,7 +218,7 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
             if (object instanceof byte[]) {
                 return (byte[]) object;
             } else {
-                return getJsonCodec().writeValueAsBytes(object);
+                return getJsonMapper().writeValueAsBytes(object);
             }
         } catch (IOException e) {
             throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);

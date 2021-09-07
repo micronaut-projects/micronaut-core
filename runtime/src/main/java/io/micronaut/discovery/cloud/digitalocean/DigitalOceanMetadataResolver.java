@@ -69,18 +69,18 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
     /**
      * @param configuration Digital Ocean Metadata configuration
      * @param jsonFactory   Factory to use for json parsing
-     * @param codec         Codec to use for deserialization
+     * @param mapper        Mapper to use for deserialization
      */
     @Inject
     @Experimental
     public DigitalOceanMetadataResolver(
             DigitalOceanMetadataConfiguration configuration,
             JsonFactory jsonFactory,
-            JsonMapper codec
+            JsonMapper mapper
     ) {
         this.configuration = configuration;
         this.jsonFactory = jsonFactory;
-        this.jsonStreamConfig = codec.getStreamConfig();
+        this.jsonStreamConfig = mapper.getStreamConfig();
     }
 
     /**
