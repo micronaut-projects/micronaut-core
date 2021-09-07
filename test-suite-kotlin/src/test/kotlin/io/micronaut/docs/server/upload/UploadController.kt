@@ -23,6 +23,13 @@ import io.micronaut.http.MediaType.TEXT_PLAIN
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.multipart.StreamingFileUpload
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.reduce
+import kotlinx.coroutines.reactive.asFlow
+import kotlinx.coroutines.reactive.awaitFirst
+import kotlinx.coroutines.reactive.awaitFirstOrNull
+import kotlinx.coroutines.reactive.awaitLast
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import java.io.File
 
@@ -44,6 +51,16 @@ class UploadController {
                         .body("Upload Failed")
                 }
             }
+    }
+
+    @Post(value = "/flow", consumes = [MULTIPART_FORM_DATA], produces = [TEXT_PLAIN])
+    suspend fun uploadFlow(file: StreamingFileUpload): Int {
+        return file.asFlow().map { it.bytes.size }.reduce { accumulator, value -> accumulator + value }
+    }
+
+    @Post(value = "/await", consumes = [MULTIPART_FORM_DATA], produces = [TEXT_PLAIN])
+    suspend fun uploadAwaitFlux(file: StreamingFileUpload): Int {
+        return Flux.from(file).map { it.bytes.size }.reduce { accumulator, value -> accumulator + value }.awaitFirstOrNull() ?: 0
     }
 }
 // end::class[]

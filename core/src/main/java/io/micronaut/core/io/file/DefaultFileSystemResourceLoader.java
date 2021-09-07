@@ -16,6 +16,7 @@
 package io.micronaut.core.io.file;
 
 import io.micronaut.core.io.ResourceLoader;
+import io.micronaut.core.util.SupplierUtil;
 
 import java.io.File;
 import java.io.IOException;
@@ -26,6 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 
@@ -37,15 +39,13 @@ import java.util.stream.Stream;
  */
 public class DefaultFileSystemResourceLoader implements FileSystemResourceLoader {
 
-    private final Path baseDirPath;
-    private final boolean baseExists;
+    private final Supplier<BaseDir> baseDir;
 
     /**
      * Default constructor.
      */
     public DefaultFileSystemResourceLoader() {
-        this.baseDirPath = null;
-        this.baseExists = true;
+        this.baseDir = SupplierUtil.memoized(BaseDir::new);
     }
 
     /**
@@ -66,14 +66,15 @@ public class DefaultFileSystemResourceLoader implements FileSystemResourceLoader
      * @param path The path
      */
     public DefaultFileSystemResourceLoader(Path path) {
-        Path baseDirPath;
-        try {
-            baseDirPath = path.normalize().toRealPath();
-        } catch (IOException e) {
-            baseDirPath = null;
-        }
-        this.baseExists = baseDirPath != null;
-        this.baseDirPath = baseDirPath;
+        this.baseDir = SupplierUtil.memoizedNonEmpty(() -> {
+            Path baseDirPath;
+            try {
+                baseDirPath = path.normalize().toRealPath();
+                return new BaseDir(baseDirPath);
+            } catch (IOException e) {
+                return null;
+            }
+        });
     }
 
     @Override
@@ -133,23 +134,61 @@ public class DefaultFileSystemResourceLoader implements FileSystemResourceLoader
     }
 
     private Path getFilePath(String path) {
-        if (baseDirPath != null) {
-            return baseDirPath.resolve(path);
+        BaseDir base = baseDir.get();
+        if (base != null) {
+            return base.resolve(path);
         } else {
             return Paths.get(path);
         }
     }
 
     private boolean startsWithBase(Path path) {
-        if (baseDirPath != null) {
-            Path relativePath;
+        BaseDir base = baseDir.get();
+        if (base != null) {
+            return base.startsWith(path);
+        }
+        return false;
+    }
+
+    private static class BaseDir {
+        final boolean exists;
+        final Path dir;
+
+        BaseDir() {
+            exists = true;
+            dir = null;
+        }
+
+        BaseDir(Path path) {
+            Path baseDirPath;
             try {
-                relativePath = baseDirPath.resolve(path).toRealPath();
-                return relativePath.startsWith(baseDirPath);
+                baseDirPath = path.normalize().toRealPath();
             } catch (IOException e) {
-                return false;
+                baseDirPath = null;
+            }
+            this.exists = baseDirPath != null;
+            this.dir = baseDirPath;
+        }
+
+        Path resolve(String path) {
+            if (dir != null) {
+                return dir.resolve(path);
+            } else {
+                return Paths.get(path);
             }
         }
-        return baseExists;
+
+        boolean startsWith(Path path) {
+            if (dir != null) {
+                Path relativePath;
+                try {
+                    relativePath = dir.resolve(path).toRealPath();
+                    return relativePath.startsWith(dir);
+                } catch (IOException e) {
+                    return false;
+                }
+            }
+            return exists;
+        }
     }
 }

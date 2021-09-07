@@ -39,16 +39,17 @@ import static io.micronaut.http.HttpHeaders.*
 class StaticResourceResolutionSpec extends AbstractMicronautSpec {
 
     private static File tempFile
+    private static File tempSubDir
 
     static {
         tempFile = File.createTempFile("staticResourceResolutionSpec", ".html")
         tempFile.write("<html><head></head><body>HTML Page from static file</body></html>")
-        tempFile
+        tempSubDir = new File(tempFile.getParentFile(), "doesntexist")
     }
 
     @Override
     Map<String, Object> getConfiguration() {
-        ['micronaut.router.static-resources.default.paths': ['classpath:public', 'file:' + tempFile.parent]]
+        ['micronaut.router.static-resources.default.paths': ['classpath:public', 'file:' + tempFile.parent, 'file:' + tempSubDir.absolutePath]]
     }
 
     @Override
@@ -110,13 +111,32 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         response.body() == "<html><head></head><body>HTML Page from resources</body></html>"
     }
 
+    void "test creating the directory and adding a file after start can still resolve"() {
+        when:
+        tempSubDir.mkdir()
+        File file = new File(tempSubDir, "nowexists.html")
+        file.write("<html><head></head><body>HTML Page created after start</body></html>")
+
+        def response = rxClient.toBlocking().exchange(
+                HttpRequest.GET('/nowexists.html'), String)
+
+        then:
+        file.exists()
+        response.status == HttpStatus.OK
+        response.header(CONTENT_TYPE) == "text/html"
+        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
+        response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
+        response.header(CACHE_CONTROL) == "private, max-age=60"
+        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(file.lastModified()), ZoneId.of("GMT")).truncatedTo(ChronoUnit.SECONDS)
+        response.body() == "<html><head></head><body>HTML Page created after start</body></html>"
+    }
+
     void "test resources with configured mapping"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'micronaut.router.static-resources.default.paths': ['classpath:public', 'file:' + tempFile.parent],
                 'micronaut.router.static-resources.default.mapping': '/static/**'], Environment.TEST)
         HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
-
 
         when:
         HttpResponse<String> response = Flux.from(rxClient.exchange(
