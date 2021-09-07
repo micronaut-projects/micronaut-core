@@ -214,8 +214,7 @@ class ValidatedSpec extends Specification {
     def "test validated controller validates @Valid classes with standard embedded errors"() {
         given:
         ApplicationContext context = ApplicationContext.run([
-                'spec.name': getClass().simpleName,
-                'jackson.always-serialize-errors-as-list': true
+                'spec.name': getClass().simpleName
         ])
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
@@ -247,8 +246,7 @@ class ValidatedSpec extends Specification {
     def "test validated controller validates @Valid collection with standard embedded errors"() {
         given:
         ApplicationContext context = ApplicationContext.run([
-                'spec.name': getClass().simpleName,
-                'jackson.always-serialize-errors-as-list': true
+                'spec.name': getClass().simpleName
         ])
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
@@ -346,8 +344,7 @@ class ValidatedSpec extends Specification {
     def "test validated controller args with standard embedded errors"() {
         given:
         ApplicationContext context = ApplicationContext.run([
-                'spec.name': getClass().simpleName,
-                'jackson.always-serialize-errors-as-list': true
+                'spec.name': getClass().simpleName
         ])
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
@@ -411,8 +408,7 @@ class ValidatedSpec extends Specification {
     void "test validated controller optional query param with standard embedded errors"() {
         given:
         ApplicationContext context = ApplicationContext.run([
-                'spec.name': getClass().simpleName,
-                'jackson.always-serialize-errors-as-list': true
+                'spec.name': getClass().simpleName
         ])
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
@@ -498,8 +494,7 @@ class ValidatedSpec extends Specification {
     void "test validated controller empty optional query param with not null with standard embedded errors"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
-                'spec.name': getClass().simpleName,
-                'jackson.always-serialize-errors-as-list': true
+                'spec.name': getClass().simpleName
         ])
         HttpClient client = server.applicationContext.createBean(HttpClient, server.getURL())
 
@@ -545,9 +540,7 @@ class ValidatedSpec extends Specification {
 
     void "test validated response with annotation with standard embedded errors"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
-                'jackson.always-serialize-errors-as-list': true
-        ])
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
         TestClient client = server.applicationContext.getBean(TestClient)
 
         when:
@@ -660,8 +653,7 @@ class ValidatedSpec extends Specification {
     void "test validated controller with non introspected pojo with standard embedded errors"() {
         given:
         ApplicationContext context = ApplicationContext.run([
-                'spec.name': getClass().simpleName,
-                'jackson.always-serialize-errors-as-list': true
+                'spec.name': getClass().simpleName
         ])
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
