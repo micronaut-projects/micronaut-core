@@ -24,6 +24,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.*;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
+import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.filter.ServerFilterChain;
@@ -559,18 +560,6 @@ public final class RouteExecutor {
                 });
     }
 
-    private Flux<MutableHttpResponse<?>> buildResponsePublisher(HttpRequest<?> request,
-                                                                RouteInfo<?> routeInfo,
-                                                                Flux<Object> body) {
-        // build the result emitter. This result emitter emits the response from a controller action
-        final ExecutorService executor = findExecutor(routeInfo);
-        Flux<MutableHttpResponse<?>> reactiveSequence = body.flatMap(obj -> createResponseForBody(request, obj, routeInfo));
-        if (executor != null) {
-            reactiveSequence = applyExecutorToPublisher(reactiveSequence, executor);
-        }
-        return reactiveSequence;
-    }
-
     private Flux<MutableHttpResponse<?>> buildResultEmitter(
             AtomicReference<HttpRequest<?>> requestReference,
             boolean executeFilters,
@@ -595,19 +584,20 @@ public final class RouteExecutor {
                 final RouteMatch<?> finalRoute;
 
                 // ensure the route requirements are completely satisfied
+                final HttpRequest<?> httpRequest = requestReference.get();
                 if (!routeMatch.isExecutable()) {
                     finalRoute = requestArgumentSatisfier
-                            .fulfillArgumentRequirements(routeMatch, requestReference.get(), true);
+                            .fulfillArgumentRequirements(routeMatch, httpRequest, true);
                 } else {
                     finalRoute = routeMatch;
                 }
 
-                Object body = finalRoute.execute();
+                Object body = ServerRequestContext.with(httpRequest, (Supplier<Object>) finalRoute::execute);
                 if (body instanceof Optional) {
                     body = ((Optional<?>) body).orElse(null);
                 }
 
-                return createResponseForBody(requestReference.get(), body, finalRoute);
+                return createResponseForBody(httpRequest, body, finalRoute);
             } catch (Throwable e) {
                 return Flux.error(e);
             }

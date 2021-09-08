@@ -34,6 +34,19 @@ import spock.util.concurrent.PollingConditions
  */
 class RequestScopeSpec extends AbstractMicronautSpec {
 
+    void 'test request scope no request'() {
+        when:
+        RequestBean requestBean = applicationContext.getBean(RequestBean)
+        requestBean.count()
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message == 'No request present'
+
+        cleanup:
+        RequestBean.BEANS_CREATED.clear()
+    }
+
     void "test @Request bean created per request"() {
         given:
         PollingConditions conditions = new PollingConditions(delay: 0.5, timeout: 3)

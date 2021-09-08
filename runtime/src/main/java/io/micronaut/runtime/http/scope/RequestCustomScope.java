@@ -77,7 +77,7 @@ class RequestCustomScope extends AbstractConcurrentCustomScope<RequestScope> imp
             //noinspection ConstantConditions
             return getRequestAttributeMap(request, forCreation);
         } else {
-            return Collections.emptyMap();
+            throw new IllegalStateException("No request present");
         }
     }
 
