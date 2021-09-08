@@ -12,6 +12,7 @@ import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 import jakarta.inject.Inject
 import spock.lang.AutoCleanup
+import spock.lang.Issue
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -25,6 +26,7 @@ class InputStreamBodySpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
 
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6100')
     void "test apply load to InputStream read"() {
         given:
         HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURI())
