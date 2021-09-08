@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server.netty.binders;
 
+import java.util.concurrent.ExecutorService;
+
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.event.BeanCreatedEvent;
@@ -26,6 +28,8 @@ import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.multipart.MultipartBodyArgumentBinder;
+import io.micronaut.scheduling.TaskExecutors;
+import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
 /**
@@ -41,6 +45,7 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
     private final HttpContentProcessorResolver httpContentProcessorResolver;
     private final BeanLocator beanLocator;
     private final BeanProvider<HttpServerConfiguration> httpServerConfiguration;
+    private final BeanProvider<ExecutorService> ioExecutor;
 
     /**
      * Default constructor.
@@ -49,16 +54,20 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
      * @param httpContentProcessorResolver The processor resolver
      * @param beanLocator                  The bean locator
      * @param httpServerConfiguration      The server config
+     * @param ioExecutor                   The executor service
      */
     NettyBinderRegistrar(
             @Nullable ConversionService<?> conversionService,
             HttpContentProcessorResolver httpContentProcessorResolver,
             BeanLocator beanLocator,
-            BeanProvider<HttpServerConfiguration> httpServerConfiguration) {
+            BeanProvider<HttpServerConfiguration> httpServerConfiguration,
+            @Named(TaskExecutors.IO)
+            BeanProvider<ExecutorService> ioExecutor) {
         this.conversionService = conversionService == null ? ConversionService.SHARED : conversionService;
         this.httpContentProcessorResolver = httpContentProcessorResolver;
         this.beanLocator = beanLocator;
         this.httpServerConfiguration = httpServerConfiguration;
+        this.ioExecutor = ioExecutor;
     }
 
     @Override
@@ -77,7 +86,8 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
                 httpServerConfiguration
         ));
         registry.addRequestArgumentBinder(new InputStreamBodyBinder(
-                httpContentProcessorResolver
+                httpContentProcessorResolver,
+                ioExecutor.orElse(null)
         ));
         return registry;
     }
