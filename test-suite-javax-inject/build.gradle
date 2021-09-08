@@ -3,5 +3,5 @@ dependencies {
     testCompileOnly project(":inject-groovy")
     testImplementation project(":context")
     testImplementation project(":inject")
-    testImplementation group: 'javax.inject', name: 'javax.inject', version: '1'
+    testImplementation libs.javax.inject
 }

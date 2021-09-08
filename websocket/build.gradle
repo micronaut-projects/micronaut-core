@@ -7,7 +7,7 @@ dependencies {
     api project(":inject")
     api project(':aop')
 
-    implementation dependencyVersion("reactor")
+    implementation libs.managed.reactor
 
     testImplementation project(":inject-groovy")
 }

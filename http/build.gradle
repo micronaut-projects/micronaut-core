@@ -7,7 +7,7 @@ dependencies {
     annotationProcessor project(":graal")
     api project(":inject")
     api project(":core-reactive")
-    compileOnly "org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinCoroutinesVersion"
+    compileOnly libs.kotlinx.coroutines.core
 
     testCompileOnly project(":inject-groovy")
     testAnnotationProcessor project(":inject-java")

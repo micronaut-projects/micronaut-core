@@ -9,7 +9,7 @@ dependencies {
     api project(':inject')
     api project(':core')
     compileOnly project(':core-reactive')
-    compileOnly "org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinCoroutinesVersion"
+    compileOnly libs.kotlinx.coroutines.core
 }
 
 compileKotlin {
