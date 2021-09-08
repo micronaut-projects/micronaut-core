@@ -17,6 +17,7 @@ package io.micronaut.jackson.codec;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.BeanProvider;
+import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Secondary;
 import io.micronaut.core.annotation.Nullable;
@@ -44,6 +45,7 @@ import java.util.List;
 @Secondary
 @Singleton
 @BootstrapContextCompatible
+@Bean(typed = {JsonStreamMediaTypeCodec.class, JacksonMediaTypeCodec.class}) // do not expose MapperMediaTypeCodec
 public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
 
     public static final String CONFIGURATION_QUALIFIER = "json-stream";
