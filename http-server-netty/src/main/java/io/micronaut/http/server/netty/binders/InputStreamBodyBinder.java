@@ -96,7 +96,6 @@ public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<Inpu
                     Flux.from(processor)
                         .onBackpressureBuffer()
                             .publishOn(ioExecutor)
-                            .subscribeOn(ioExecutor)
                             .subscribe(new CompletionAwareSubscriber<ByteBufHolder>() {
 
                                 @Override
