@@ -34,7 +34,7 @@ dependencies {
         exclude module:'micronaut-inject'
         exclude module:'micronaut-http'
     }
-    testImplementation libs.jackson.databind
+    testImplementation libs.managed.jackson.databind
 
     // following 3 dependencies needed for Http2PostTest
     testImplementation libs.vertx

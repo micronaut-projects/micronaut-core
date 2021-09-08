@@ -1,7 +1,7 @@
 dependencies {
     annotationProcessor project(":inject-java")
     api project(":inject")
-    implementation libs.jackson.databind
+    implementation libs.managed.jackson.databind
 
     testImplementation project(":inject")
     testImplementation project(":http")

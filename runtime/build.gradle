@@ -11,23 +11,23 @@ dependencies {
     api project(':context')
     api project(":core-reactive")
     api libs.managed.validation
-    api libs.jackson.databind
+    api libs.managed.jackson.databind
 
     implementation libs.managed.reactor
 
-    api libs.jackson.datatype.jdk8
-    api libs.jackson.datatype.jsr310
+    api libs.managed.jackson.datatype.jdk8
+    api libs.managed.jackson.datatype.jsr310
 
     compileOnly libs.managed.graal
     compileOnly libs.managed.jcache
 
-    compileOnly(libs.jackson.module.kotlin) {
+    compileOnly(libs.managed.jackson.module.kotlin) {
         transitive = false
     }
-    compileOnly(libs.jackson.module.afterburner) {
+    compileOnly(libs.managed.jackson.module.afterburner) {
         transitive = false
     }
-    compileOnly(libs.jackson.module.parameterNames) {
+    compileOnly(libs.managed.jackson.module.parameterNames) {
         transitive = false
     }
 
