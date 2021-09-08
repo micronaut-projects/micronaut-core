@@ -1517,7 +1517,8 @@ public class DefaultHttpClient implements
             ClientFilterChain filterChain = buildChain(requestWrapper, filters);
             if (parentRequest != null) {
                 responsePublisher = ServerRequestContext.with(parentRequest, (Supplier<Publisher<io.micronaut.http.HttpResponse<O>>>) () ->
-                        (Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0).doFilter(request, filterChain));
+                         Flux.from((Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0).doFilter(request, filterChain))
+                                .contextWrite(ctx-> ctx.put(ServerRequestContext.KEY, parentRequest)));
             } else {
                 responsePublisher = (Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0)
                         .doFilter(request, filterChain);
