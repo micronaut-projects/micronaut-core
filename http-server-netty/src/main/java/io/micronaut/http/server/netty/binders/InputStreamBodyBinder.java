@@ -104,7 +104,7 @@ public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<Inpu
                                 }
 
                                 @Override
-                                protected void doOnNext(ByteBufHolder message) {
+                                protected synchronized void doOnNext(ByteBufHolder message) {
                                     if (LOG.isTraceEnabled()) {
                                         LOG.trace("Server received streaming message for argument [{}]: {}", context.getArgument(), message);
                                     }
@@ -124,7 +124,7 @@ public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<Inpu
                                 }
 
                                 @Override
-                                protected void doOnError(Throwable t) {
+                                protected synchronized void doOnError(Throwable t) {
                                     if (LOG.isTraceEnabled()) {
                                         LOG.trace("Server received error for argument [" + context.getArgument() + "]: " + t.getMessage(), t);
                                     }
@@ -137,7 +137,7 @@ public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<Inpu
                                 }
 
                                 @Override
-                                protected void doOnComplete() {
+                                protected synchronized void doOnComplete() {
                                     if (LOG.isTraceEnabled()) {
                                         LOG.trace("Done receiving messages for argument: {}", context.getArgument());
                                     }
