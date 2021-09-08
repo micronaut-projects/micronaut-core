@@ -15,13 +15,17 @@
  */
 package io.micronaut.jackson.codec;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.codec.CodecException;
+import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.jackson.databind.JacksonDatabindMapper;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.JsonFeatures;
@@ -101,9 +105,20 @@ public abstract class JacksonMediaTypeCodec extends MapperMediaTypeCodec {
      */
     public <T> T decode(Argument<T> type, JsonNode node) throws CodecException {
         try {
-            return getObjectMapper().treeToValue(node, type.getType());
+            ObjectMapper objectMapper = getObjectMapper();
+            if (type.hasTypeVariables()) {
+                JsonParser jsonParser = objectMapper.treeAsTokens(node);
+                return objectMapper.readValue(jsonParser, constructJavaType(type));
+            } else {
+                return objectMapper.treeToValue(node, type.getType());
+            }
         } catch (IOException e) {
             throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage(), e);
         }
+    }
+
+    private <T> JavaType constructJavaType(Argument<T> type) {
+        TypeFactory typeFactory = getObjectMapper().getTypeFactory();
+        return JacksonConfiguration.constructType(type, typeFactory);
     }
 }
