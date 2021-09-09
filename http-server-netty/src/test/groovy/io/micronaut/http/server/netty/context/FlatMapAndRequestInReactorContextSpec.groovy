@@ -38,34 +38,27 @@ import javax.validation.constraints.NotBlank
 import java.util.stream.Stream
 
 class FlatMapAndRequestInReactorContextSpec extends Specification {
-    private static final Logger LOG = LoggerFactory.getLogger(FlatMapAndRequestInReactorContextSpec.class)
 
-    @Shared
-    int inventoryPort = SocketUtils.findAvailableTcpPort()
+    private static final Logger LOG = LoggerFactory.getLogger(FlatMapAndRequestInReactorContextSpec.class)
 
     @Shared
     @AutoCleanup
     EmbeddedServer bookInventoryServer = ApplicationContext.run(EmbeddedServer, [
-            'spec.name': 'FlatMapAndRequestInReactorContextSpec.bookinventory',
-            'micronaut.server.port': inventoryPort,
+            'spec.name': 'FlatMapAndRequestInReactorContextSpec.bookinventory'
     ])
-
-    @Shared
-    int cataloguePort = SocketUtils.findAvailableTcpPort()
 
     @Shared
     @AutoCleanup
     EmbeddedServer bookCatalogueServer = ApplicationContext.run(EmbeddedServer, [
-            'spec.name': 'FlatMapAndRequestInReactorContextSpec.bookcatalogue',
-            'micronaut.server.port': cataloguePort,
+            'spec.name': 'FlatMapAndRequestInReactorContextSpec.bookcatalogue'
     ])
 
     @Shared
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name': 'FlatMapAndRequestInReactorContextSpec.bookrecommendation',
-            'micronaut.http.services.bookcatalogue.url': "http://localhost:$cataloguePort",
-            'micronaut.http.services.bookinventory.url': "http://localhost:$inventoryPort",
+            'micronaut.http.services.bookcatalogue.url': "http://localhost:$bookCatalogueServer.port",
+            'micronaut.http.services.bookinventory.url': "http://localhost:$bookInventoryServer.port",
     ])
 
     @Shared
@@ -73,10 +66,8 @@ class FlatMapAndRequestInReactorContextSpec extends Specification {
     HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.URL)
 
     @Shared
-    @AutoCleanup
     BlockingHttpClient client = httpClient.toBlocking()
 
-    @PendingFeature
     @Unroll
     void "HTTP Client Filters can access original request even if they are executed from calls within a flatMap"(String path, Set<String> expected) {
         when:
