@@ -33,8 +33,6 @@ import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.discovery.EmbeddedServerInstance;
 import io.micronaut.discovery.event.ServiceReadyEvent;
 import io.micronaut.discovery.event.ServiceStoppedEvent;
-import io.micronaut.http.HttpRequestFactory;
-import io.micronaut.http.HttpResponseFactory;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
@@ -78,6 +76,7 @@ import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
@@ -124,6 +123,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.net.BindException;
+import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -142,7 +142,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 
 /**
@@ -255,22 +254,27 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         this.environment = applicationContext.getEnvironment();
         this.serverConfiguration = serverConfiguration;
         this.router = router;
-        this.specifiedPort = getHttpPort(serverConfiguration);
 
-        int port = specifiedPort;
+        int port;
         if (serverSslBuilder != null) {
             this.sslConfiguration = serverSslBuilder.getSslConfiguration();
             this.sslContext = serverSslBuilder.build().orElse(null);
             if (this.sslConfiguration.isEnabled()) {
                 port = sslConfiguration.getPort();
+                this.specifiedPort = port;
+            } else {
+                port = getHttpPort(serverConfiguration);
+                this.specifiedPort = port;
             }
         } else {
+            port = getHttpPort(serverConfiguration);
+            this.specifiedPort = port;
             this.sslConfiguration = null;
             this.sslContext = null;
         }
 
         this.httpVersion = serverConfiguration.getHttpVersion();
-        this.serverPort = getPortOrDefault(port);
+        this.serverPort = port;
         OrderUtil.sort(outboundHandlers);
         this.outboundHandlers = outboundHandlers;
         this.requestArgumentSatisfier = requestArgumentSatisfier;
@@ -295,16 +299,6 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 this.routeExecutor);
         this.channelOptionFactory = channelOptionFactory;
         this.hostResolver = hostResolver;
-    }
-
-    /**
-     * Randomizes port if not set.
-     *
-     * @param port current port value
-     * @return random port number if the original value was -1
-     */
-    private int getPortOrDefault(int port) {
-        return port == -1 ? SocketUtils.findAvailableTcpPort() : port;
     }
 
     /**
@@ -353,8 +347,6 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         if (!isRunning()) {
             //suppress unused
             //done here to prevent a blocking service loader in the event loop
-            final HttpRequestFactory requestFactory = HttpRequestFactory.INSTANCE;
-            final HttpResponseFactory responseFactory = HttpResponseFactory.INSTANCE;
             EventLoopGroupConfiguration workerConfig = resolveWorkerConfiguration();
             workerGroup = createWorkerEventLoopGroup(workerConfig);
             parentGroup = createParentEventLoopGroup();
@@ -367,23 +359,22 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                     .childHandler(new NettyHttpServerInitializer());
 
             Optional<String> host = serverConfiguration.getHost();
-
-            serverPort = bindServerToHost(serverBootstrap, host.orElse(null), serverPort, new AtomicInteger(0));
+            final String definedHost = host.orElse(null);
+            serverPort = bindServerToHost(serverBootstrap, definedHost, serverPort);
             List<Integer> defaultPorts = new ArrayList<>(2);
             defaultPorts.add(serverPort);
             if (serverConfiguration.isDualProtocol()) {
-                // By default we will bind ssl first and then bind http after.
-                int httpPort = getPortOrDefault(getHttpPort(serverConfiguration));
-                defaultPorts.add(httpPort);
-                bindServerToHost(serverBootstrap, host.orElse(null), httpPort, new AtomicInteger(0));
+                defaultPorts.add(
+                        bindServerToHost(serverBootstrap, definedHost, getHttpPort(serverConfiguration))
+                );
             }
             final Set<Integer> exposedPorts = router.getExposedPorts();
             if (CollectionUtils.isNotEmpty(exposedPorts)) {
                 router.applyDefaultPorts(defaultPorts);
                 for (Integer exposedPort : exposedPorts) {
                     try {
-                        if (host.isPresent()) {
-                            serverBootstrap.bind(host.get(), exposedPort).sync();
+                        if (definedHost != null) {
+                            serverBootstrap.bind(definedHost, exposedPort).sync();
                         } else {
                             serverBootstrap.bind(exposedPort).sync();
                         }
@@ -514,7 +505,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     }
 
     @SuppressWarnings("MagicNumber")
-    private int bindServerToHost(ServerBootstrap serverBootstrap, @Nullable String host, int port, AtomicInteger attempts) {
+    private int bindServerToHost(ServerBootstrap serverBootstrap, @Nullable String host, int port) {
         boolean isRandomPort = specifiedPort == -1;
         Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
         if (applicationName.isPresent()) {
@@ -528,10 +519,22 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         }
 
         try {
-            if (host != null) {
-                serverBootstrap.bind(host, port).sync();
+            if (isRandomPort) {
+                // bind to zero to get a random port
+                final ChannelFuture future;
+                if(host != null) {
+                    future = serverBootstrap.bind(host, 0).sync();
+                } else {
+                    future = serverBootstrap.bind(0).sync();
+                }
+                InetSocketAddress ia = (InetSocketAddress) future.channel().localAddress();
+                return ia.getPort();
             } else {
-                serverBootstrap.bind(port).sync();
+                if (host != null) {
+                    serverBootstrap.bind(host, port).sync();
+                } else {
+                    serverBootstrap.bind(port).sync();
+                }
             }
             return port;
         } catch (Throwable e) {
@@ -543,15 +546,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                     LOG.error("Error starting Micronaut server: " + e.getMessage(), e);
                 }
             }
-            int attemptCount = attempts.getAndIncrement();
-
-            if (isRandomPort && attemptCount < 3) {
-                port = SocketUtils.findAvailableTcpPort();
-                return bindServerToHost(serverBootstrap, host, port, attempts);
-            } else {
-                stopInternal();
-                throw new ServerStartupException("Unable to start Micronaut server on port: " + port, e);
-            }
+            stopInternal();
+            throw new ServerStartupException("Unable to start Micronaut server on port: " + port, e);
         }
     }
 
