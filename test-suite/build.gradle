@@ -44,7 +44,7 @@ dependencies {
     }
 
     testImplementation libs.managed.jcache
-    testImplementation libs.jaeger
+    testImplementation libs.managed.jaeger
     testImplementation libs.managed.groovy.json
     // tag::testcontainers-dependencies[]
     testImplementation libs.testcontainers.spock

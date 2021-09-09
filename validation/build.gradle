@@ -5,7 +5,7 @@ dependencies {
     api project(":core-reactive")
     api libs.managed.validation
 
-    compileOnly libs.gorm
+    compileOnly libs.managed.gorm
     compileOnly project(":http-server")
 
     implementation libs.managed.reactor

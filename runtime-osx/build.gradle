@@ -2,6 +2,6 @@ dependencies {
     annotationProcessor project(":inject-java")
 
     api project(":runtime")
-    implementation libs.methvin.directoryWatcher
+    implementation libs.managed.methvin.directoryWatcher
     implementation libs.managed.jna
 }
