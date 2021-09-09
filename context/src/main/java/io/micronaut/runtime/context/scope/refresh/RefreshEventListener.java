@@ -34,6 +34,9 @@ public interface RefreshEventListener extends ApplicationEventListener<RefreshEv
         if (event != null) {
             final Map<String, Object> source = event.getSource();
             if (source != null) {
+                if (source == RefreshEvent.ALL_KEYS) {
+                    return true;
+                }
                 final Set<String> keys = source.keySet();
                 Set<String> prefixes = getObservedConfigurationPrefixes();
                 if (CollectionUtils.isNotEmpty(prefixes)) {
