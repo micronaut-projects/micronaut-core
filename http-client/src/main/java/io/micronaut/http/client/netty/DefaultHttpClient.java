@@ -1517,7 +1517,8 @@ public class DefaultHttpClient implements
             ClientFilterChain filterChain = buildChain(requestWrapper, filters);
             if (parentRequest != null) {
                 responsePublisher = ServerRequestContext.with(parentRequest, (Supplier<Publisher<io.micronaut.http.HttpResponse<O>>>) () ->
-                        (Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0).doFilter(request, filterChain));
+                         Flux.from((Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0).doFilter(request, filterChain))
+                                .contextWrite(ctx-> ctx.put(ServerRequestContext.KEY, parentRequest)));
             } else {
                 responsePublisher = (Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0)
                         .doFilter(request, filterChain);
@@ -2569,6 +2570,10 @@ public class DefaultHttpClient implements
                 .orElse(MediaType.APPLICATION_JSON_TYPE);
 
         boolean permitsBody = io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod());
+
+        if (!(request instanceof MutableHttpRequest)) {
+            throw new IllegalArgumentException("A MutableHttpRequest is required");
+        }
         MutableHttpRequest clientHttpRequest = (MutableHttpRequest) request;
         NettyRequestWriter requestWriter = buildNettyRequest(
                 clientHttpRequest,
@@ -2694,7 +2699,7 @@ public class DefaultHttpClient implements
     public Publisher<MutableHttpResponse<?>> proxy(io.micronaut.http.HttpRequest<?> request) {
         return Flux.from(resolveRequestURI(request))
                 .flatMap(requestURI -> {
-                    AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request);
+                    AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request instanceof MutableHttpRequest ? request : request.mutate());
                     Flux<MutableHttpResponse<Object>> proxyResponsePublisher = Flux.create(emitter -> {
                         SslContext sslContext = buildSslContext(requestURI);
                         ChannelFuture channelFuture;

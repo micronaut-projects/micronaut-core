@@ -80,24 +80,6 @@ NOTE: By default, the endpoint doesn't allow changing the log level by unauthori
 
 == Customization
 
-The loggers endpoint is composed of two customizable parts: a loggers manager and a logging system.
+The loggers endpoint is composed of two customizable parts: a api:management.endpoint.loggers.LoggersManager[] and a api:logging.LoggingSystem[]. See the <<logging, logging section of the documentation>> for information on customizing the logging system.
 
-The loggers manager
-(link:{api}/io/micronaut/management/endpoint/loggers/LoggersManager.html[LoggersManager])
-is responsible for returning a Publisher that returns data collected and transformed for the response, and it is also responsible for updating a logger with a new log level.
-
-To override the default behavior for the loggers manager, either extend the default implementation (link:{api}/io/micronaut/management/endpoint/loggers/impl/DefaultLoggersManager.html[DefaultLoggersManager]) or implement the link:{api}/io/micronaut/management/endpoint/loggers/LoggersManager.html[LoggersManager] interface directly. To ensure your implementation is used instead of the default, add the link:{api}/io/micronaut/context/annotation/Replaces.html[@Replaces] annotation to your class with the value being the default implementation.
-
-api:logging.LoggingSystem[] is responsible for processing requests from the loggers manager against a particular logging
-library (e.g. logback, log4j, etc.)
-
-The current default implementation for the logging system is link:{api}/io/micronaut/management/endpoint/loggers/impl/LogbackLoggingSystem.html[LogbackLoggingSystem], which works with the https://logback.qos.ch/[logback] logging framework. Additional logging systems will be implemented in future revisions of Micronaut. For custom logging system behavior, implement the api:logging.LoggingSystem[] interface directly. To ensure your implementation is used instead of the default, add the link:{api}/io/micronaut/context/annotation/Replaces.html[@Replaces] annotation to your class with the value being the default implementation.
-
-[source,java]
-----
-@Singleton
-@Replaces(LogbackLoggingSystem.class)
-public class CustomLoggingSystem implements LoggingSystem {
-    // ...
-}
-----
+The api:management.endpoint.loggers.LoggersManager[] is responsible for retrieving and setting log levels. If the default implementation is not sufficient for your use case, simply provide your own implementation and replace the api:management.endpoint.loggers.impl.DefaultLoggersManager[default implementation] with the ann:context.annotation.Replaces[] annotation.

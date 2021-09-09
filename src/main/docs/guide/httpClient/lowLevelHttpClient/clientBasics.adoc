@@ -74,7 +74,7 @@ micronaut:
         logger-name: other.client
 ----
 
-Then enable logging in `logback.yml`:
+Then enable logging in `logback.xml`:
 
 .logback.xml
 [source,xml]

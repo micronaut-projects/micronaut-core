@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.multipart;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
 import io.micronaut.core.util.functional.ThrowingSupplier;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.multipart.PartData;
@@ -39,7 +40,6 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
-import java.util.function.Supplier;
 
 /**
  * An implementation of the {@link StreamingFileUpload} interface for Netty.
@@ -76,11 +76,7 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
 
     @Override
     public Optional<MediaType> getContentType() {
-        try {
-            return Optional.of(MediaType.of(fileUpload.getContentType()));
-        } catch (IllegalArgumentException e) {
-            return Optional.empty();
-        }
+        return Optional.of(new MediaType(fileUpload.getContentType(), NameUtils.extension(fileUpload.getFilename())));
     }
 
     @Override

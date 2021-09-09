@@ -2695,6 +2695,99 @@ class Test {
         introspection.getProperty("xForwardedFor", String).get().get(obj) == "localhost"
     }
 
+    void "test introspection on abstract class"() {
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+abstract class Test {
+    private String name;
+    private String author;
+    
+    public String getName() {
+        return name;
+    }
+    
+    public void setName(String name) {
+        this.name = name;
+    }
+    
+    public String getAuthor() {
+        return author;
+    }
+    
+    public void setAuthor(String author) {
+        this.author = author;
+    }
+}
+""")
+
+        expect:
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 2
+    }
+
+    void "test targeting abstract class with @Introspected(classes = "() {
+        ClassLoader classLoader = buildClassLoader("test.Test", """
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(classes = {io.micronaut.inject.visitor.beans.TestClass.class})
+class MyConfig {
+
+}
+""")
+
+        when:
+        BeanIntrospector beanIntrospector = BeanIntrospector.forClassLoader(classLoader)
+
+        then:
+        BeanIntrospection beanIntrospection = beanIntrospector.getIntrospection(TestClass)
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 2
+    }
+
+    void "test introspection on abstract class with extra getter"() {
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+abstract class Test {
+    private String name;
+    private String author;
+    
+    public String getName() {
+        return name;
+    }
+    
+    public void setName(String name) {
+        this.name = name;
+    }
+    
+    public String getAuthor() {
+        return author;
+    }
+    
+    public void setAuthor(String author) {
+        this.author = author;
+    }
+    
+    public int getAge() {
+        return 0;
+    }
+}
+""")
+
+        expect:
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 3
+    }
+
     @Override
     protected JavaParser newJavaParser() {
         return new JavaParser() {

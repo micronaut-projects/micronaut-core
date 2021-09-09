@@ -33,6 +33,8 @@ snippet::io.micronaut.docs.server.upload.UploadController[tags="class,file", ind
 
 It is also possible to pass an output stream with the `transferTo` method.
 
+NOTE: The reading of the file or stream will be offloaded to the IO thread pool to prevent the possibility of blocking the event loop.
+
 snippet::io.micronaut.docs.server.upload.UploadController[tags="class,outputStream", indent=0, title="Streaming file upload"]
 
 <1> The method consumes api:http.MediaType#MULTIPART_FORM_DATA[]
