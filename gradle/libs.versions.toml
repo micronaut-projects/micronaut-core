@@ -4,22 +4,16 @@ awaitility = "4.0.3"
 aws-java-sdk-lambda = "1.11.920"
 bcpkix = "1.69"
 blaze = "1.6.0-Alpha1"
-brave-instrumentation = "5.13.3"
-brave-opentracing = "1.0.0"
 caffeine = "2.9.1"
 compile-testing = "0.19"
 geb = "3.4"
-gorm = "7.1.0.M6"
-gorm-hibernate = "7.1.0.M3"
 grpc = "1.38.0"
 hibernate = "5.4.29.Final"
 hibernate-validator = "6.1.6.Final"
 htmlSanityCheck = "1.1.6"
 htmlunit = "2.47.1"
-jaeger = "1.6.0"
 jakarta-inject-api = "2.0.0"
 jakarta-inject-tck = "2.0.1"
-javax-annotation-api = "1.3.2"
 javax-inject = "1"
 javax-persistence = "2.2"
 jetty = "9.4.38.v20210224"
@@ -47,13 +41,14 @@ systemlambda = "1.2.0"
 testcontainers = "1.15.3"
 vertx = "3.9.4"
 wiremock = "2.27.2"
-zipkin-reporter = "2.16.3"
 
 #
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
 managed-azure-function = "1.4.2"
+managed-brave-instrumentation = "5.13.3"
+managed-brave-opentracing = "1.0.0"
 managed-commons-dbcp = "2.8.0"
 managed-dekorate = "1.0.3"
 managed-elasticsearch = "7.12.1"
@@ -61,13 +56,17 @@ managed-flyway = "7.12.1"
 managed-ignite = "2.8.1"
 managed-google-function-framework = "1.0.2"
 managed-google-function-invoker = "1.0.0"
+managed-gorm = "7.1.0.M6"
+managed-gorm-hibernate = "7.1.0.M3"
 managed-graal = "21.2.0"
 managed-graal-sdk = "21.2.0"
 managed-groovy = "3.0.7"
 managed-h2 = "1.4.200"
 managed-hystrix = "1.5.18"
+managed-jaeger = "1.6.0"
 managed-jakarta-annotation-api = "2.0.0"
 managed-jackson = "2.12.4"
+managed-javax-annotation-api = "1.3.2"
 managed-jcache = "1.1.0"
 managed-jna = "5.3.1"
 managed-jsr305 = "3.0.2"
@@ -142,6 +141,7 @@ managed-springboot = "2.5.3"
 managed-swagger = "2.1.10"
 managed-validation = "2.0.1.Final"
 managed-snakeyaml = "1.29"
+managed-zipkin-reporter = "2.16.3"
 
 micronaut-aws = "3.0.0"
 micronaut-cache = "3.0.0"
@@ -184,7 +184,11 @@ boms-testcontainers = { module = "org.testcontainers:testcontainers-bom", versio
 #
 
 managed-azure-functions = { module = "com.microsoft.azure.functions:azure-functions-java-library", version.ref = "managed-azure-function" }
+
+managed-brave-opentracing = { module = "io.opentracing.brave:brave-opentracing", version.ref = "managed-brave-opentracing" }
+
 managed-commons-dbcp = { module = "org.apache.commons:commons-dbcp2", version.ref = "managed-commons-dbcp" }
+
 managed-dekorate = { module = "io.dekorate:dekorate-project", version.ref = "managed-dekorate" }
 managed-dekorate-jaeger-annotations = { module = "io.dekorate:jaeger-annotations", version.ref = "managed-dekorate" }
 managed-dekorate-knative-annotations = { module = "io.dekorate:knative-annotations", version.ref = "managed-dekorate" }
@@ -200,6 +204,16 @@ managed-flyway = { module = "org.flywaydb:flyway-core", version.ref = "managed-f
 
 managed-google-function-framework = { module = "com.google.cloud.functions:functions-framework-api", version.ref = "managed-google-function-framework" }
 managed-google-function-invoker = { module = "com.google.cloud.functions.invoker:java-function-invoker", version.ref = "managed-google-function-invoker" }
+
+managed-gorm = { module = "org.grails:grails-datastore-core", version.ref = "managed-gorm" }
+managed-gorm-datastore-async = { module = "org.grails:grails-datastore-async", version.ref = "managed-gorm" }
+managed-gorm-datastore-gorm = { module = "org.grails:grails-datastore-gorm", version.ref = "managed-gorm" }
+managed-gorm-datastore-gorm-async = { module = "org.grails:grails-datastore-gorm-async", version.ref = "managed-gorm" }
+managed-gorm-datastore-gorm-support = { module = "org.grails:grails-datastore-gorm-support", version.ref = "managed-gorm" }
+managed-gorm-datastore-gorm-test = { module = "org.grails:grails-datastore-gorm-test", version.ref = "managed-gorm" }
+managed-gorm-datastore-gorm-validation = { module = "org.grails:grails-datastore-gorm-validation", version.ref = "managed-gorm" }
+managed-gorm-datastore-web = { module = "org.grails:grails-datastore-web", version.ref = "managed-gorm" }
+managed-gorm-hibernate = { module = "org.grails:grails-datastore-gorm-hibernate5", version.ref = "managed-gorm-hibernate" }
 
 managed-graal = { module = "org.graalvm.nativeimage:svm", version.ref = "managed-graal" }
 managed-graal-sdk = { module = "org.graalvm.sdk:graal-sdk", version.ref = "managed-graal-sdk" }
@@ -217,6 +231,8 @@ managed-hystrix-serialization = { module = "com.netflix.hystrix:hystrix-serializ
 managed-ignite = { module = "org.apache.ignite:ignite-core", version.ref = "managed-ignite" }
 managed-ignite-kubernetes = { module = "org.apache.ignite:ignite-kubernetes", version.ref = "managed-ignite" }
 
+managed-jaeger = { module = "io.jaegertracing:jaeger-thrift", version.ref = "managed-jaeger" }
+
 managed-jakarta-annotation-api = { module = "jakarta.annotation:jakarta.annotation-api", version.ref = "managed-jakarta-annotation-api" }
 
 managed-jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "managed-jackson" }
@@ -225,6 +241,8 @@ managed-jackson-datatype-jsr310 = { module = "com.fasterxml.jackson.datatype:jac
 managed-jackson-module-afterburner = { module = "com.fasterxml.jackson.module:jackson-module-afterburner", version.ref = "managed-jackson" }
 managed-jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "managed-jackson" }
 managed-jackson-module-parameterNames = { module = "com.fasterxml.jackson.module:jackson-module-parameter-names", version.ref = "managed-jackson" }
+
+managed-javax-annotation-api = { module = "javax.annotation:javax.annotation-api", version.ref = "managed-javax-annotation-api" }
 
 managed-jcache = { module = "javax.cache:cache-api", version.ref = "managed-jcache" }
 
@@ -243,6 +261,8 @@ managed-liquibase = { module = "org.liquibase:liquibase-core", version.ref = "ma
 managed-logback = { module = "ch.qos.logback:logback-classic", version.ref = "managed-logback" }
 
 managed-lombok = { module = "org.projectlombok:lombok", version.ref = "managed-lombok" }
+
+managed-methvin-directoryWatcher = { module = "io.methvin:directory-watcher", version.ref = "managed-methvin-directory-watcher" }
 
 managed-micrometer-core = { module = "io.micrometer:micrometer-core", version.ref = "managed-micrometer" }
 
@@ -424,6 +444,9 @@ managed-swagger-annotations = { module = "io.swagger.core.v3:swagger-annotations
 
 managed-validation = { module = "javax.validation:validation-api", version.ref = "managed-validation" }
 
+managed-zipkin-brave-instrumentation = { module = "io.zipkin.brave:brave-instrumentation-http", version.ref = "managed-brave-instrumentation" }
+managed-zipkin-reporter = { module = "io.zipkin.reporter2:zipkin-reporter", version.ref = "managed-zipkin-reporter" }
+
 #
 # Other libraries are used by Micronaut but will not appear in the BOM
 #
@@ -439,24 +462,11 @@ bcpkix = { module = "org.bouncycastle:bcpkix-jdk15on", version.ref = "bcpkix" }
 
 blaze-persistence-core = { module = "com.blazebit:blaze-persistence-core-impl", version.ref = "blaze" }
 
-brave-instrumentation = { module = "io.zipkin.brave:brave-instrumentation-http", version.ref = "brave-instrumentation" }
-brave-opentracing = { module = "io.opentracing.brave:brave-opentracing", version.ref = "brave-opentracing" }
-
 caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "caffeine" }
 
 compile-testing = { module = "com.google.testing.compile:compile-testing", version.ref = "compile-testing" }
 
 geb-spock = { module = "org.gebish:geb-spock", version.ref = "geb" }
-
-gorm = { module = "org.grails:grails-datastore-core", version.ref = "gorm" }
-gorm-datastore-async = { module = "org.grails:grails-datastore-async", version.ref = "gorm" }
-gorm-datastore-gorm = { module = "org.grails:grails-datastore-gorm", version.ref = "gorm" }
-gorm-datastore-gorm-async = { module = "org.grails:grails-datastore-gorm-async", version.ref = "gorm" }
-gorm-datastore-gorm-support = { module = "org.grails:grails-datastore-gorm-support", version.ref = "gorm" }
-gorm-datastore-gorm-test = { module = "org.grails:grails-datastore-gorm-test", version.ref = "gorm" }
-gorm-datastore-gorm-validation = { module = "org.grails:grails-datastore-gorm-validation", version.ref = "gorm" }
-gorm-datastore-web = { module = "org.grails:grails-datastore-web", version.ref = "gorm" }
-gorm-hibernate = { module = "org.grails:grails-datastore-gorm-hibernate5", version.ref = "gorm-hibernate" }
 
 groovy-test-junit5 = { module = "org.codehaus.groovy:groovy-test-junit5", version.ref = "managed-groovy" }
 
@@ -465,12 +475,9 @@ hibernate-validator = { module = "org.hibernate:hibernate-validator", version.re
 
 htmlunit = { module = "net.sourceforge.htmlunit:htmlunit", version.ref = "htmlunit" }
 
-jaeger = { module = "io.jaegertracing:jaeger-thrift", version.ref = "jaeger" }
-
 jakarta-inject-api = { module = "jakarta.inject:jakarta.inject-api", version.ref = "jakarta-inject-api" }
 jakarta-inject-tck = { module = "jakarta.inject:jakarta.inject-tck", version.ref = "jakarta-inject-tck" }
 
-javax-annotation-api = { module = "javax.annotation:javax.annotation-api", version.ref = "javax-annotation-api" }
 javax-el = { module = "org.glassfish:javax.el", version.ref = "javax-el" }
 javax-el-impl = { module = "org.glassfish:javax.el", version.ref = "javax-el" }
 javax-inject = { module = "javax.inject:javax.inject", version.ref = "javax-inject" }
@@ -505,8 +512,6 @@ log4j = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" 
 
 logbook-netty = { module = "org.zalando:logbook-netty", version.ref = "logbook-netty" }
 
-methvin-directoryWatcher = { module = "io.methvin:directory-watcher", version.ref = "managed-methvin-directory-watcher" }
-
 micronaut-docs = { module = "io.micronaut.docs:micronaut-docs-asciidoc-config-props", version.ref = "micronaut-docs" }
 
 mongo-javadriver = { module = "org.mongodb:mongo-java-driver", version.ref = "mongo-javadriver" }
@@ -536,8 +541,6 @@ vertx = { module = "io.vertx:vertx-core", version.ref = "vertx" }
 vertx-webclient = { module = "io.vertx:vertx-web-client", version.ref = "vertx" }
 
 wiremock = { module = "com.github.tomakehurst:wiremock-jre8", version.ref = "wiremock" }
-
-zipkin-reporter = { module = "io.zipkin.reporter2:zipkin-reporter", version.ref = "zipkin-reporter" }
 
 [bundles]
 asm = ["asm", "asm-commons"]

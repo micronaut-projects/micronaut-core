@@ -2,7 +2,7 @@ ext {
     shadowJarEnabled = true
 }
 dependencies {
-    api libs.javax.annotation.api
+    api libs.managed.javax.annotation.api
     compileOnly libs.javax.inject
     api libs.jakarta.inject.api
     api libs.managed.jakarta.annotation.api
