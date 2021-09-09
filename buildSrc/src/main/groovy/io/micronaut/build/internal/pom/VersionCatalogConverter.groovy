@@ -2,6 +2,7 @@ package io.micronaut.build.internal.pom
 
 import groovy.transform.Canonical
 import io.micronaut.build.catalogs.internal.LenientVersionCatalogParser
+import org.gradle.api.InvalidUserCodeException
 import org.gradle.api.plugins.catalog.CatalogPluginExtension
 import org.gradle.api.tasks.TaskAction
 /**
@@ -43,6 +44,9 @@ class VersionCatalogConverter {
             }
             model.librariesTable.each { library ->
                 if (library.alias.startsWith("managed-") && library.version.reference) {
+                    if (!library.version.reference.startsWith("managed-")) {
+                        throw new InvalidUserCodeException("Version catalog declares a managed library '${library.alias}' referencing a non managed version '${library.version.reference}'. Make sure to use a managed version.")
+                    }
                     builder.alias(library.alias.substring(8))
                         .to(library.group, library.name)
                         .versionRef(library.version.reference.substring(8))
