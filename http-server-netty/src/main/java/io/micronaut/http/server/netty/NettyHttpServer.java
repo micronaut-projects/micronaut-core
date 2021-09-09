@@ -33,8 +33,6 @@ import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.discovery.EmbeddedServerInstance;
 import io.micronaut.discovery.event.ServiceReadyEvent;
 import io.micronaut.discovery.event.ServiceStoppedEvent;
-import io.micronaut.http.HttpRequestFactory;
-import io.micronaut.http.HttpResponseFactory;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
@@ -125,7 +123,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.net.BindException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URI;
@@ -145,7 +142,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 
 /**
@@ -273,7 +269,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         }
 
         this.httpVersion = serverConfiguration.getHttpVersion();
-        this.serverPort = getPortOrDefault(port);
+        this.serverPort = port;
         OrderUtil.sort(outboundHandlers);
         this.outboundHandlers = outboundHandlers;
         this.requestArgumentSatisfier = requestArgumentSatisfier;
@@ -298,16 +294,6 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 this.routeExecutor);
         this.channelOptionFactory = channelOptionFactory;
         this.hostResolver = hostResolver;
-    }
-
-    /**
-     * Randomizes port if not set.
-     *
-     * @param port current port value
-     * @return random port number if the original value was -1
-     */
-    private int getPortOrDefault(int port) {
-        return port == -1 ? SocketUtils.findAvailableTcpPort() : port;
     }
 
     /**
@@ -368,23 +354,22 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                     .childHandler(new NettyHttpServerInitializer());
 
             Optional<String> host = serverConfiguration.getHost();
-
-            serverPort = bindServerToHost(serverBootstrap, host.orElse(null), serverPort);
+            final String definedHost = host.orElse(null);
+            serverPort = bindServerToHost(serverBootstrap, definedHost, serverPort);
             List<Integer> defaultPorts = new ArrayList<>(2);
             defaultPorts.add(serverPort);
             if (serverConfiguration.isDualProtocol()) {
-                // By default we will bind ssl first and then bind http after.
-                int httpPort = getPortOrDefault(getHttpPort(serverConfiguration));
-                defaultPorts.add(httpPort);
-                bindServerToHost(serverBootstrap, host.orElse(null), httpPort);
+                defaultPorts.add(
+                        bindServerToHost(serverBootstrap, definedHost, getHttpPort(serverConfiguration))
+                );
             }
             final Set<Integer> exposedPorts = router.getExposedPorts();
             if (CollectionUtils.isNotEmpty(exposedPorts)) {
                 router.applyDefaultPorts(defaultPorts);
                 for (Integer exposedPort : exposedPorts) {
                     try {
-                        if (host.isPresent()) {
-                            serverBootstrap.bind(host.get(), exposedPort).sync();
+                        if (definedHost != null) {
+                            serverBootstrap.bind(definedHost, exposedPort).sync();
                         } else {
                             serverBootstrap.bind(exposedPort).sync();
                         }
