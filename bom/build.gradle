@@ -62,7 +62,9 @@ publishing {
         publication(MavenPublication) {
             artifactId("micronaut-bom")
             from components.javaPlatform
-
+            pom {
+                packaging 'pom'
+            }
             libsCatalog.versionAliases.each { alias ->
                 if (alias.startsWith('managed.')) {
                     libsCatalog.findVersion(alias).ifPresent { version ->
