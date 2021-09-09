@@ -15,19 +15,21 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.condition.Condition;
+import io.micronaut.context.condition.EnvCondition;
 import io.micronaut.context.condition.Failure;
+import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanContextConditional;
+import io.micronaut.inject.EnvironmentConditional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import io.micronaut.core.annotation.NonNull;
 
 /**
  * Abstract implementation of the {@link BeanContextConditional} interface.
@@ -36,12 +38,40 @@ import io.micronaut.core.annotation.NonNull;
  * @since 1.0
  */
 @Internal
-abstract class AbstractBeanContextConditional implements BeanContextConditional, AnnotationMetadataProvider {
+abstract class AbstractBeanContextConditional implements BeanContextConditional, EnvironmentConditional, AnnotationMetadataProvider {
 
     static final Logger LOG = LoggerFactory.getLogger(Condition.class);
+    private Boolean isEnabled;
+    @Override
+    public boolean isEnabled(Environment environment) {
+        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+        EnvCondition condition = annotationMetadata.hasStereotype(Requires.class) ? new RequiresCondition2(annotationMetadata) : null;
+        DefaultConditionContext2<AbstractBeanContextConditional> conditionContext = new DefaultConditionContext2<>(
+                environment,
+                this);
+        if (condition == null) {
+            return true;
+        }
+        boolean enabled = condition.matches(conditionContext);
+        if (!enabled) {
+            if (this instanceof BeanConfiguration) {
+                System.out.println(this + " will not be loaded due to failing conditions:");
+            } else {
+                System.out.println("Bean [" + this + "] will not be loaded due to failing conditions:");
+            }
+            for (Failure failure : conditionContext.getFailures()) {
+                System.out.println("* " + failure.getMessage());
+            }
+        }
+        isEnabled = enabled;
+        return enabled;
+    }
 
     @Override
     public boolean isEnabled(@NonNull BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
+        if (isEnabled != null) {
+            return isEnabled;
+        }
         AnnotationMetadata annotationMetadata = getAnnotationMetadata();
         Condition condition = annotationMetadata.hasStereotype(Requires.class) ? new RequiresCondition(annotationMetadata) : null;
         DefaultConditionContext<AbstractBeanContextConditional> conditionContext = new DefaultConditionContext<>(

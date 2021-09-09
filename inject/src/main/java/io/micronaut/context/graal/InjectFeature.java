@@ -16,6 +16,7 @@
 package io.micronaut.context.graal;
 
 import com.oracle.svm.core.annotate.AutomaticFeature;
+import io.micronaut.context.ApplicationContextConfiguration;
 import io.micronaut.context.annotation.Requirements;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
@@ -28,12 +29,17 @@ import io.micronaut.core.graal.AutomaticFeatureUtils;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.inject.BeanConfiguration;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import io.micronaut.inject.EnvironmentConditional;
+import io.micronaut.inject.ExecutableMethodsDefinition;
+import io.micronaut.inject.ExecutableMethodsDefinitionProvider;
 import org.graalvm.nativeimage.hosted.Feature;
 import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.function.Predicate;
 
 @Internal
@@ -42,7 +48,34 @@ public class InjectFeature implements Feature {
 
     @Override
     public void beforeAnalysis(BeforeAnalysisAccess access) {
+        GraalBuildTimeEnvironment.PRELOADED = new PropertiesLoader(
+                Environment.DEFAULT_NAME,
+                Collections.emptySet(),
+                Arrays.asList("classpath:/", "file:config/"),
+                ClassPathResourceLoader.defaultLoader(GraalBuildTimeEnvironment.class.getClassLoader()))
+                .read();
+
+        GraalBuildTimeEnvironment environment = new GraalBuildTimeEnvironment(new ApplicationContextConfiguration() {
+            @Override
+            public List<String> getEnvironments() {
+                return Collections.singletonList("test");
+            }
+        }, GraalBuildTimeEnvironment.PRELOADED);
+
         Predicate<BeanDefinitionReference> predicate = beanDefinitionReference -> {
+            if (beanDefinitionReference instanceof EnvironmentConditional) {
+                if (!((EnvironmentConditional) beanDefinitionReference).isEnabled(environment)) {
+                    return false;
+                }
+            }
+
+            BeanDefinition beanDefinition = beanDefinitionReference.load();
+            if (beanDefinition instanceof EnvironmentConditional) {
+                if (!((EnvironmentConditional) beanDefinition).isEnabled(environment)) {
+                    return false;
+                }
+            }
+
             try {
                 AnnotationValue<Requirements> annotation = beanDefinitionReference.getAnnotationMetadata().getAnnotation(Requirements.class);
                 if (annotation != null) {
@@ -62,12 +95,23 @@ public class InjectFeature implements Feature {
             } catch (Throwable e) {
                 System.out.println("NOT FOUND DURING ANALYSIS: " + e.getMessage());
             }
+
             return false;
         };
         SoftServiceLoader.preCache(BeanDefinitionReference.class, predicate, BeanDefinitionReference.class.getClassLoader())
                 .forEach(beanDefinitionReference -> {
                     RuntimeClassInitialization.initializeAtBuildTime(beanDefinitionReference.getClass());
                     AutomaticFeatureUtils.initializeAtBuildTime(access, beanDefinitionReference.getBeanDefinitionName());
+                    BeanDefinition beanDefinition = beanDefinitionReference.load();
+                    if (beanDefinition != null) {
+//                RuntimeClassInitialization.initializeAtBuildTime(beanDefinition.getClass());
+                        if (beanDefinition instanceof ExecutableMethodsDefinitionProvider) {
+                            ExecutableMethodsDefinition exec = ((ExecutableMethodsDefinitionProvider) beanDefinition).getExecutableMethodsDefinition();
+                            if (exec != null) {
+                                AutomaticFeatureUtils.initializeAtBuildTime(access, exec.getClass().getName());
+                            }
+                        }
+                    }
                 });
         SoftServiceLoader.preCache(BeanConfiguration.class, BeanConfiguration.class.getClassLoader())
                 .forEach(beanConfiguration -> {
@@ -78,12 +122,6 @@ public class InjectFeature implements Feature {
                     RuntimeClassInitialization.initializeAtBuildTime(propertySourceLoader.getClass());
                 });
 
-        GraalBuildTimeEnvironment.PRELOADED = new PropertiesLoader(
-                Environment.DEFAULT_NAME,
-                Collections.emptySet(),
-                Arrays.asList("classpath:/", "file:config/"),
-                ClassPathResourceLoader.defaultLoader(GraalBuildTimeEnvironment.class.getClassLoader()))
-        .read();
     }
 
 }

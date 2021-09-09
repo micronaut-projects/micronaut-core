@@ -50,6 +50,7 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ConstructorInjectionPoint;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ExecutableMethodsDefinition;
+import io.micronaut.inject.ExecutableMethodsDefinitionProvider;
 import io.micronaut.inject.FieldInjectionPoint;
 import io.micronaut.inject.MethodInjectionPoint;
 import io.micronaut.inject.ValidatedBeanDefinition;
@@ -98,7 +99,7 @@ import java.util.stream.Stream;
  * @since 3.0
  */
 @Internal
-public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextConditional implements BeanDefinition<T>, EnvironmentConfigurable {
+public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextConditional implements BeanDefinition<T>, ExecutableMethodsDefinitionProvider, EnvironmentConfigurable {
     private static final Logger LOG = LoggerFactory.getLogger(AbstractInitializableBeanDefinition.class);
     private static final String NAMED_ATTRIBUTE = Named.class.getName();
 
@@ -188,6 +189,12 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         this.isConfigurationProperties = isConfigurationProperties;
         this.isContainerType = isContainerType;
         this.requiresMethodProcessing = requiresMethodProcessing;
+    }
+
+    @Override
+    @Nullable
+    public ExecutableMethodsDefinition<T> getExecutableMethodsDefinition() {
+        return executableMethodsDefinition;
     }
 
     @Override
