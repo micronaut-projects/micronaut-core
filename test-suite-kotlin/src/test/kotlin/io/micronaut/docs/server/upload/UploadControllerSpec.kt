@@ -41,6 +41,23 @@ class UploadControllerSpec: StringSpec() {
             response.body.get() shouldBe "Uploaded"
         }
 
+        "test file upload outputstream"() {
+            val body = MultipartBody.builder()
+                .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".toByteArray())
+                .build()
+
+            val flowable = Flux.from(client.exchange(
+                HttpRequest.POST("/upload/outputStream", body)
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .accept(MediaType.TEXT_PLAIN_TYPE),
+                String::class.java
+            ))
+            val response = flowable.blockFirst()
+
+            response.status() shouldBe HttpStatus.OK
+            response.body.get() shouldBe "Uploaded"
+        }
+
         "test completed file upload"() {
             val body = MultipartBody.builder()
                     .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".toByteArray())
