@@ -20,6 +20,7 @@ import java.util.Set;
 
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.CollectionUtils;
 
 /**
@@ -28,7 +29,13 @@ import io.micronaut.core.util.CollectionUtils;
  * @author graemerocher
  * @since 3.1.0
  */
-public interface RefreshEventListener extends ApplicationEventListener<RefreshEvent> {
+public interface RefreshEventListener extends ApplicationEventListener<RefreshEvent>, Ordered {
+
+    /**
+     * The default position as defined by {@link io.micronaut.core.order.Ordered#getOrder()}
+     */
+    int DEFAULT_POSITION = Ordered.HIGHEST_PRECEDENCE + 200;
+
     @Override
     default boolean supports(RefreshEvent event) {
         if (event != null) {
@@ -57,4 +64,10 @@ public interface RefreshEventListener extends ApplicationEventListener<RefreshEv
      */
     @NonNull
     Set<String> getObservedConfigurationPrefixes();
+
+    @Override
+    default int getOrder() {
+        // run after configuration properties refresh
+        return DEFAULT_POSITION;
+    }
 }

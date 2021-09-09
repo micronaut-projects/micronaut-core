@@ -35,7 +35,6 @@ import io.micronaut.discovery.event.ServiceReadyEvent;
 import io.micronaut.discovery.event.ServiceStoppedEvent;
 import io.micronaut.http.HttpRequestFactory;
 import io.micronaut.http.HttpResponseFactory;
-import io.micronaut.http.HttpVersion;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
@@ -68,6 +67,8 @@ import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.ApplicationConfiguration;
+import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
+import io.micronaut.runtime.context.scope.refresh.RefreshEventListener;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.runtime.server.event.ServerShutdownEvent;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
@@ -132,6 +133,7 @@ import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -158,7 +160,11 @@ import java.util.function.BiConsumer;
         value = ChannelOption.class,
         accessType = {TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS, TypeHint.AccessType.ALL_DECLARED_FIELDS}
 )
-public class NettyHttpServer implements EmbeddedServer, WebSocketSessionRepository, ChannelPipelineCustomizer {
+public class NettyHttpServer
+        implements EmbeddedServer,
+                   WebSocketSessionRepository,
+                   ChannelPipelineCustomizer,
+                   RefreshEventListener {
 
     @SuppressWarnings("WeakerAccess")
     public static final String OUTBOUND_KEY = "-outbound-";
@@ -178,13 +184,12 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private final int specifiedPort;
     private final HttpCompressionStrategy httpCompressionStrategy;
     private final EventLoopGroupRegistry eventLoopGroupRegistry;
-    private final HttpVersion httpVersion;
     private final HttpRequestCertificateHandler requestCertificateHandler;
     private final RoutingInBoundHandler routingHandler;
     private final RouteExecutor routeExecutor;
+    private final ServerSslBuilder serverSslBuilder;
     private volatile int serverPort;
     private final ApplicationContext applicationContext;
-    private final SslContext sslContext;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final ChannelGroup webSocketSessions = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
     private final EventLoopGroupFactory eventLoopGroupFactory;
@@ -198,6 +203,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private final Collection<ChannelPipelineListener> pipelineListeners = new ArrayList<>(2);
     private final ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher;
     private final ApplicationEventPublisher<HttpRequestReceivedEvent> httpRequestReceivedEventPublisher;
+    private NettyHttpServerInitializer childHandler;
 
     /**
      * @param serverConfiguration                     The Netty HTTP server configuration
@@ -256,20 +262,18 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         this.serverConfiguration = serverConfiguration;
         this.router = router;
         this.specifiedPort = getHttpPort(serverConfiguration);
+        this.serverSslBuilder = serverSslBuilder;
 
         int port = specifiedPort;
         if (serverSslBuilder != null) {
             this.sslConfiguration = serverSslBuilder.getSslConfiguration();
-            this.sslContext = serverSslBuilder.build().orElse(null);
             if (this.sslConfiguration.isEnabled()) {
                 port = sslConfiguration.getPort();
             }
         } else {
             this.sslConfiguration = null;
-            this.sslContext = null;
         }
 
-        this.httpVersion = serverConfiguration.getHttpVersion();
         this.serverPort = getPortOrDefault(port);
         OrderUtil.sort(outboundHandlers);
         this.outboundHandlers = outboundHandlers;
@@ -363,8 +367,9 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
             processOptions(serverConfiguration.getOptions(), serverBootstrap::option);
             processOptions(serverConfiguration.getChildOptions(), serverBootstrap::childOption);
+            childHandler = new NettyHttpServerInitializer();
             serverBootstrap = serverBootstrap.group(parentGroup, workerGroup)
-                    .childHandler(new NettyHttpServerInitializer());
+                    .childHandler(childHandler);
 
             Optional<String> host = serverConfiguration.getHost();
 
@@ -600,6 +605,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 applicationContext.stop();
             }
             serverConfiguration.getMultipart().getLocation().ifPresent(dir -> DiskFileUpload.baseDirectory = null);
+            childHandler = null;
         } catch (Throwable e) {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Error stopping Micronaut server: " + e.getMessage(), e);
@@ -683,6 +689,25 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     @Override
     public void doOnConnect(@NonNull ChannelPipelineListener listener) {
         this.pipelineListeners.add(Objects.requireNonNull(listener, "The listener cannot be null"));
+    }
+
+    @Override
+    public Set<String> getObservedConfigurationPrefixes() {
+        return Collections.singleton(HttpServerConfiguration.PREFIX);
+    }
+
+    @Override
+    public void onApplicationEvent(RefreshEvent event) {
+        // if anything under HttpServerConfiguration.PREFIX changes re-build
+        // the NettyHttpServerInitializer in the server bootstrap to apply changes
+        // this will ensure re-configuration to HTTPS settings, read-timeouts, logging etc. apply
+        // configuration properties are auto-refreshed so will be visible automatically
+        if (childHandler != null) {
+            childHandler.sslContext = serverSslBuilder != null ? serverSslBuilder.build().orElse(null) : null;
+            childHandler.http2OrHttpHandler = new Http2OrHttpHandler(childHandler.sslContext != null, serverConfiguration.getFallbackProtocol());
+            childHandler.loggingHandler = serverConfiguration.getLogLevel().isPresent() ?
+                    new LoggingHandler(NettyHttpServer.class, serverConfiguration.getLogLevel().get()) : null;
+        }
     }
 
     /**
@@ -821,8 +846,9 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * An HTTP server initializer for Netty.
      */
     private class NettyHttpServerInitializer extends ChannelInitializer<SocketChannel> {
-        final Http2OrHttpHandler http2OrHttpHandler = new Http2OrHttpHandler(sslContext != null, serverConfiguration.getFallbackProtocol());
-        final LoggingHandler loggingHandler =
+        SslContext sslContext = serverSslBuilder != null ? serverSslBuilder.build().orElse(null) : null;
+        Http2OrHttpHandler http2OrHttpHandler = new Http2OrHttpHandler(sslContext != null, serverConfiguration.getFallbackProtocol());
+        LoggingHandler loggingHandler =
                 serverConfiguration.getLogLevel().isPresent() ? new LoggingHandler(NettyHttpServer.class, serverConfiguration.getLogLevel().get()) : null;
 
         @Override
@@ -839,7 +865,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 pipeline.addLast(loggingHandler);
             }
 
-            if (httpVersion != io.micronaut.http.HttpVersion.HTTP_2_0) {
+            if (serverConfiguration.getHttpVersion() != io.micronaut.http.HttpVersion.HTTP_2_0) {
                 http2OrHttpHandler.configurePipeline(ApplicationProtocolNames.HTTP_1_1, pipeline);
             } else {
                 if (ssl) {
