@@ -78,6 +78,7 @@ import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
@@ -124,6 +125,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.net.BindException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -353,8 +356,6 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         if (!isRunning()) {
             //suppress unused
             //done here to prevent a blocking service loader in the event loop
-            final HttpRequestFactory requestFactory = HttpRequestFactory.INSTANCE;
-            final HttpResponseFactory responseFactory = HttpResponseFactory.INSTANCE;
             EventLoopGroupConfiguration workerConfig = resolveWorkerConfiguration();
             workerGroup = createWorkerEventLoopGroup(workerConfig);
             parentGroup = createParentEventLoopGroup();
@@ -368,14 +369,14 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
             Optional<String> host = serverConfiguration.getHost();
 
-            serverPort = bindServerToHost(serverBootstrap, host.orElse(null), serverPort, new AtomicInteger(0));
+            serverPort = bindServerToHost(serverBootstrap, host.orElse(null), serverPort);
             List<Integer> defaultPorts = new ArrayList<>(2);
             defaultPorts.add(serverPort);
             if (serverConfiguration.isDualProtocol()) {
                 // By default we will bind ssl first and then bind http after.
                 int httpPort = getPortOrDefault(getHttpPort(serverConfiguration));
                 defaultPorts.add(httpPort);
-                bindServerToHost(serverBootstrap, host.orElse(null), httpPort, new AtomicInteger(0));
+                bindServerToHost(serverBootstrap, host.orElse(null), httpPort);
             }
             final Set<Integer> exposedPorts = router.getExposedPorts();
             if (CollectionUtils.isNotEmpty(exposedPorts)) {
@@ -514,7 +515,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     }
 
     @SuppressWarnings("MagicNumber")
-    private int bindServerToHost(ServerBootstrap serverBootstrap, @Nullable String host, int port, AtomicInteger attempts) {
+    private int bindServerToHost(ServerBootstrap serverBootstrap, @Nullable String host, int port) {
         boolean isRandomPort = specifiedPort == -1;
         Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
         if (applicationName.isPresent()) {
@@ -528,10 +529,22 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         }
 
         try {
-            if (host != null) {
-                serverBootstrap.bind(host, port).sync();
+            if (isRandomPort) {
+                // bind to zero to get a random port
+                final ChannelFuture future;
+                if(host != null) {
+                    future = serverBootstrap.bind(host, 0).sync();
+                } else {
+                    future = serverBootstrap.bind(0).sync();
+                }
+                InetSocketAddress ia = (InetSocketAddress) future.channel().localAddress();
+                return ia.getPort();
             } else {
-                serverBootstrap.bind(port).sync();
+                if (host != null) {
+                    serverBootstrap.bind(host, port).sync();
+                } else {
+                    serverBootstrap.bind(port).sync();
+                }
             }
             return port;
         } catch (Throwable e) {
@@ -543,15 +556,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                     LOG.error("Error starting Micronaut server: " + e.getMessage(), e);
                 }
             }
-            int attemptCount = attempts.getAndIncrement();
-
-            if (isRandomPort && attemptCount < 3) {
-                port = SocketUtils.findAvailableTcpPort();
-                return bindServerToHost(serverBootstrap, host, port, attempts);
-            } else {
-                stopInternal();
-                throw new ServerStartupException("Unable to start Micronaut server on port: " + port, e);
-            }
+            stopInternal();
+            throw new ServerStartupException("Unable to start Micronaut server on port: " + port, e);
         }
     }
 
