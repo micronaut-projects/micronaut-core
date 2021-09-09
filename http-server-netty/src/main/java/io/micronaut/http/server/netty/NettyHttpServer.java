@@ -254,16 +254,21 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         this.environment = applicationContext.getEnvironment();
         this.serverConfiguration = serverConfiguration;
         this.router = router;
-        this.specifiedPort = getHttpPort(serverConfiguration);
 
-        int port = specifiedPort;
+        int port;
         if (serverSslBuilder != null) {
             this.sslConfiguration = serverSslBuilder.getSslConfiguration();
             this.sslContext = serverSslBuilder.build().orElse(null);
             if (this.sslConfiguration.isEnabled()) {
                 port = sslConfiguration.getPort();
+                this.specifiedPort = port;
+            } else {
+                port = getHttpPort(serverConfiguration);
+                this.specifiedPort = port;
             }
         } else {
+            port = getHttpPort(serverConfiguration);
+            this.specifiedPort = port;
             this.sslConfiguration = null;
             this.sslContext = null;
         }
