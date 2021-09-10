@@ -25,6 +25,8 @@ import io.micronaut.aop.chain.MethodInterceptorChain;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.ConfigurationReader;
@@ -108,6 +110,13 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                     Class[].class
             )
     );
+    public static final Method METHOD_GET_PROXY_TARGET_BEAN_WITH_CONTEXT = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
+            DefaultBeanContext.class,
+            "getProxyTargetBean",
+            BeanResolutionContext.class,
+            Argument.class,
+            Qualifier.class
+    ));
     public static final Method METHOD_GET_PROXY_TARGET_BEAN = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
             BeanLocator.class,
             "getProxyTargetBean",
@@ -119,13 +128,14 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     public static final Type TYPE_INTERCEPTOR_CHAIN = Type.getType(InterceptorChain.class);
     public static final Type TYPE_METHOD_INTERCEPTOR_CHAIN = Type.getType(MethodInterceptorChain.class);
     public static final String FIELD_TARGET = "$target";
+    public static final String FIELD_BEAN_RESOLUTION_CONTEXT = "$beanResolutionContext";
     public static final String FIELD_READ_WRITE_LOCK = "$target_rwl";
     public static final Type TYPE_READ_WRITE_LOCK = Type.getType(ReentrantReadWriteLock.class);
     public static final String FIELD_READ_LOCK = "$target_rl";
     public static final String FIELD_WRITE_LOCK = "$target_wl";
     public static final Type TYPE_LOCK = Type.getType(Lock.class);
     public static final Type TYPE_BEAN_LOCATOR = Type.getType(BeanLocator.class);
-    public static final String METHOD_RESOLVE_TARGET = "$resolveTarget";
+    public static final Type TYPE_DEFAULT_BEAN_CONTEXT = Type.getType(DefaultBeanContext.class);
 
     private static final Method METHOD_PROXY_TARGET_TYPE = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(ProxyBeanDefinition.class, "getTargetDefinitionType"));
 
@@ -163,6 +173,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private final Type proxyType;
     private final boolean hotswap;
     private final boolean lazy;
+    private final boolean cacheLazyTarget;
     private final boolean isInterface;
     private final BeanDefinitionWriter parentWriter;
     private final boolean isIntroduction;
@@ -176,6 +187,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private int proxyMethodCount = 0;
     private GeneratorAdapter constructorGenerator;
     private int interceptorArgumentIndex;
+    private int beanResolutionContextArgumentIndex = -1;
     private int beanContextArgumentIndex = -1;
     private int qualifierIndex;
     private final List<Runnable> deferredInjectionPoints = new ArrayList<>();
@@ -208,6 +220,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.isProxyTarget = settings.get(Interceptor.PROXY_TARGET).orElse(false) || parent.isInterface();
         this.hotswap = isProxyTarget && settings.get(Interceptor.HOTSWAP).orElse(false);
         this.lazy = isProxyTarget && settings.get(Interceptor.LAZY).orElse(false);
+        this.cacheLazyTarget = lazy && settings.get(Interceptor.CACHEABLE_LAZY_TARGET).orElse(false);
         this.isInterface = parent.isInterface();
         this.packageName = parent.getPackageName();
         this.targetClassShortName = parent.getBeanSimpleName();
@@ -292,6 +305,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.isInterface = isInterface;
         this.hotswap = false;
         this.lazy = false;
+        this.cacheLazyTarget = false;
         this.targetClassShortName = className;
         this.targetClassFullName = packageName + '.' + targetClassShortName;
         this.parentWriter = null;
@@ -462,8 +476,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         ClassElement proxyClass = ClassElement.of(proxyType.getClassName());
 
         ParameterElement[] constructorParameters = constructor.getParameters();
-        List<ParameterElement> newConstructorParameters = new ArrayList<>(constructorParameters.length + 3);
+        List<ParameterElement> newConstructorParameters = new ArrayList<>(constructorParameters.length + 4);
         newConstructorParameters.addAll(Arrays.asList(constructorParameters));
+        newConstructorParameters.add(ParameterElement.of(BeanResolutionContext.class, "$beanResolutionContext"));
         newConstructorParameters.add(ParameterElement.of(BeanContext.class, "$beanContext"));
         newConstructorParameters.add(qualifierParameter);
         newConstructorParameters.add(interceptorParameter);
@@ -475,9 +490,10 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 "<init>",
                 newConstructorParameters.toArray(new ParameterElement[0])
         );
-        this.beanContextArgumentIndex = constructorParameters.length;
-        this.qualifierIndex = constructorParameters.length + 1;
-        this.interceptorArgumentIndex = constructorParameters.length + 2;
+        this.beanResolutionContextArgumentIndex = constructorParameters.length;
+        this.beanContextArgumentIndex = constructorParameters.length + 1;
+        this.qualifierIndex = constructorParameters.length + 2;
+        this.interceptorArgumentIndex = constructorParameters.length + 3;
     }
 
     @NonNull
@@ -759,12 +775,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             );
 
             writeWithQualifierMethod(proxyClassWriter);
-
-            if (lazy) {
-                interceptedInterface = InterceptedProxy.class;
-            } else {
-                interceptedInterface = hotswap ? HotSwappableInterceptedProxy.class : InterceptedProxy.class;
-
+            if (!lazy || cacheLazyTarget) {
                 // add the $target field for the target bean
                 int modifiers = hotswap ? ACC_PRIVATE : ACC_PRIVATE | ACC_FINAL;
                 proxyClassWriter.visitField(
@@ -774,6 +785,18 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                         null,
                         null
                 );
+            }
+            if (lazy) {
+                interceptedInterface = InterceptedProxy.class;
+                proxyClassWriter.visitField(
+                        ACC_PRIVATE,
+                        FIELD_BEAN_RESOLUTION_CONTEXT,
+                        Type.getType(BeanResolutionContext.class).getDescriptor(),
+                        null,
+                        null
+                );
+            } else {
+                interceptedInterface = hotswap ? HotSwappableInterceptedProxy.class : InterceptedProxy.class;
                 if (hotswap) {
                     // Add ReadWriteLock field
                     // private final ReentrantReadWriteLock $target_rwl = new ReentrantReadWriteLock();
@@ -832,17 +855,24 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             proxyConstructorGenerator.loadArg(qualifierIndex);
             proxyConstructorGenerator.putField(proxyType, FIELD_BEAN_QUALIFIER, Type.getType(Qualifier.class));
 
-            Method resolveTargetMethodDesc = writeResolveTargetMethod(proxyClassWriter, targetType);
-
             if (!lazy) {
                 proxyConstructorGenerator.loadThis();
-                proxyConstructorGenerator.loadThis();
-                proxyConstructorGenerator.invokeVirtual(proxyType, resolveTargetMethodDesc);
+                pushResolveProxyTargetBean(proxyConstructorGenerator, targetType);
                 proxyConstructorGenerator.putField(proxyType, FIELD_TARGET, targetType);
+            } else {
+                proxyConstructorGenerator.loadThis();
+                proxyConstructorGenerator.loadArg(beanResolutionContextArgumentIndex);
+                proxyConstructorGenerator.invokeInterface(
+                        Type.getType(BeanResolutionContext.class),
+                        Method.getMethod(
+                                ReflectionUtils.getRequiredMethod(BeanResolutionContext.class, "copy")
+                        )
+                );
+                proxyConstructorGenerator.putField(proxyType, FIELD_BEAN_RESOLUTION_CONTEXT, Type.getType(BeanResolutionContext.class));
             }
 
             // Write the Object interceptedTarget() method
-            writeInterceptedTargetMethod(proxyClassWriter, targetType, resolveTargetMethodDesc);
+            writeInterceptedTargetMethod(proxyClassWriter, targetType);
 
             // Write the swap method
             // e. T swap(T newInstance);
@@ -984,6 +1014,55 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
 
         proxyClassWriter.visitEnd();
+    }
+
+    private void pushResolveLazyProxyTargetBean(GeneratorAdapter generatorAdapter, Type targetType) {
+        // add the logic to create to the bean instance
+        generatorAdapter.loadThis();
+        // load the bean context
+        generatorAdapter.getField(proxyType, FIELD_BEAN_LOCATOR, TYPE_BEAN_LOCATOR);
+        pushCastToType(generatorAdapter, TYPE_DEFAULT_BEAN_CONTEXT);
+
+        // 1st argument: the bean resolution context
+        generatorAdapter.loadThis();
+        generatorAdapter.getField(proxyType, FIELD_BEAN_RESOLUTION_CONTEXT, Type.getType(BeanResolutionContext.class));
+        // 2nd argument: the type
+        buildProxyLookupArgument(generatorAdapter, targetType);
+        // 3rd argument: null qualifier
+        generatorAdapter.loadThis();
+        // the bean qualifier
+        generatorAdapter.getField(proxyType, FIELD_BEAN_QUALIFIER, Type.getType(Qualifier.class));
+
+        generatorAdapter.invokeVirtual(
+                TYPE_DEFAULT_BEAN_CONTEXT,
+                METHOD_GET_PROXY_TARGET_BEAN_WITH_CONTEXT
+
+        );
+        pushCastToType(generatorAdapter, getTypeReferenceForName(targetClassFullName));
+    }
+
+    private void pushResolveProxyTargetBean(GeneratorAdapter generatorAdapter, Type targetType) {
+        // add the logic to create to the bean instance
+        generatorAdapter.loadThis();
+        // load the bean context
+        generatorAdapter.loadArg(beanContextArgumentIndex);
+        pushCastToType(generatorAdapter, TYPE_DEFAULT_BEAN_CONTEXT);
+
+        // 1st argument: the bean resolution context
+        generatorAdapter.loadArg(beanResolutionContextArgumentIndex);
+        // 2nd argument: the type
+        buildProxyLookupArgument(generatorAdapter, targetType);
+        // 3rd argument: null qualifier
+        generatorAdapter.loadThis();
+        // the bean qualifier
+        generatorAdapter.getField(proxyType, FIELD_BEAN_QUALIFIER, Type.getType(Qualifier.class));
+
+        generatorAdapter.invokeVirtual(
+                TYPE_DEFAULT_BEAN_CONTEXT,
+                METHOD_GET_PROXY_TARGET_BEAN_WITH_CONTEXT
+
+        );
+        pushCastToType(generatorAdapter, getTypeReferenceForName(targetClassFullName));
     }
 
     private void buildProxyLookupArgument(GeneratorAdapter proxyConstructorGenerator, Type targetType) {
@@ -1249,40 +1328,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         interceptedTargetVisitor.invokeInterface(TYPE_LOCK, method);
     }
 
-    private Method writeResolveTargetMethod(ClassWriter proxyClassWriter, Type targetType) {
-        Method resolveTargetMethodDesc = Method.getMethod(targetClassFullName + " " + METHOD_RESOLVE_TARGET + "()");
-        GeneratorAdapter resolveTargetMethod = new GeneratorAdapter(proxyClassWriter.visitMethod(
-                ACC_PRIVATE,
-                resolveTargetMethodDesc.getName(),
-                resolveTargetMethodDesc.getDescriptor(),
-                null, null
-
-        ), ACC_PRIVATE, METHOD_RESOLVE_TARGET, resolveTargetMethodDesc.getDescriptor());
-
-
-        // add the logic to create to the bean instance
-        resolveTargetMethod.loadThis();
-        // load the bean context
-        resolveTargetMethod.getField(proxyType, FIELD_BEAN_LOCATOR, TYPE_BEAN_LOCATOR);
-
-        // 1st argument: the type
-        buildProxyLookupArgument(resolveTargetMethod, targetType);
-        // 2nd argument: null qualifier
-        resolveTargetMethod.loadThis();
-        // the bean qualifier
-        resolveTargetMethod.getField(proxyType, FIELD_BEAN_QUALIFIER, Type.getType(Qualifier.class));
-
-        resolveTargetMethod.invokeInterface(
-                TYPE_BEAN_LOCATOR,
-                METHOD_GET_PROXY_TARGET_BEAN
-
-        );
-        pushCastToType(resolveTargetMethod, getTypeReferenceForName(targetClassFullName));
-        resolveTargetMethod.returnValue();
-        resolveTargetMethod.visitMaxs(1, 1);
-        return resolveTargetMethodDesc;
-    }
-
     private void writeWithQualifierMethod(ClassWriter proxyClassWriter) {
         GeneratorAdapter withQualifierMethod = startPublicMethod(proxyClassWriter, "$withBeanQualifier", void.class.getName(), Qualifier.class.getName());
 
@@ -1335,7 +1380,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         swapGenerator.visitEnd();
     }
 
-    private void writeInterceptedTargetMethod(ClassWriter proxyClassWriter, Type targetType, Method resolveTargetMethodDesc) {
+    private void writeInterceptedTargetMethod(ClassWriter proxyClassWriter, Type targetType) {
         // add interceptedTarget() method
         GeneratorAdapter interceptedTargetVisitor = startPublicMethod(
                 proxyClassWriter,
@@ -1343,9 +1388,66 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 Object.class.getName());
 
         if (lazy) {
-            interceptedTargetVisitor.loadThis();
-            interceptedTargetVisitor.invokeVirtual(proxyType, resolveTargetMethodDesc);
-            interceptedTargetVisitor.returnValue();
+            if (cacheLazyTarget) {
+                // Object local = this.$target;
+                int targetLocal = interceptedTargetVisitor.newLocal(targetType);
+                interceptedTargetVisitor.loadThis();
+                interceptedTargetVisitor.getField(proxyType, FIELD_TARGET, targetType);
+                interceptedTargetVisitor.storeLocal(targetLocal, targetType);
+                // if (local == null) {
+                interceptedTargetVisitor.loadLocal(targetLocal, targetType);
+                Label returnLabel = new Label();
+                interceptedTargetVisitor.ifNonNull(returnLabel);
+                // synchronized (this) {
+                Label synchronizationEnd = new Label();
+                interceptedTargetVisitor.loadThis();
+                interceptedTargetVisitor.monitorEnter();
+
+                Label tryLabel = new Label();
+                Label catchLabel = new Label();
+
+                interceptedTargetVisitor.visitTryCatchBlock(tryLabel, returnLabel, catchLabel, null);
+
+                // Try body
+                interceptedTargetVisitor.visitLabel(tryLabel);
+                // local = this.$target
+                interceptedTargetVisitor.loadThis();
+                interceptedTargetVisitor.getField(proxyType, FIELD_TARGET, targetType);
+                interceptedTargetVisitor.storeLocal(targetLocal, targetType);
+                // if (local == null) {
+                interceptedTargetVisitor.loadLocal(targetLocal, targetType);
+                interceptedTargetVisitor.ifNonNull(synchronizationEnd);
+                // this.$target =
+                interceptedTargetVisitor.loadThis();
+                pushResolveLazyProxyTargetBean(interceptedTargetVisitor, targetType);
+                interceptedTargetVisitor.putField(proxyType, FIELD_TARGET, targetType);
+                // cleanup this.$beanResolutionContext
+                interceptedTargetVisitor.loadThis();
+                interceptedTargetVisitor.push((String) null);
+                interceptedTargetVisitor.putField(proxyType, FIELD_BEAN_RESOLUTION_CONTEXT, Type.getType(BeanResolutionContext.class));
+                interceptedTargetVisitor.goTo(synchronizationEnd);
+
+                // Catch body
+                interceptedTargetVisitor.visitLabel(catchLabel);
+                interceptedTargetVisitor.loadThis();
+                interceptedTargetVisitor.monitorExit();
+                interceptedTargetVisitor.throwException();
+
+                // Synchronization end label
+                interceptedTargetVisitor.visitLabel(synchronizationEnd);
+                interceptedTargetVisitor.loadThis();
+                interceptedTargetVisitor.monitorExit();
+                interceptedTargetVisitor.goTo(returnLabel);
+
+                // Return label just loads and returns value
+                interceptedTargetVisitor.visitLabel(returnLabel);
+                interceptedTargetVisitor.loadThis();
+                interceptedTargetVisitor.getField(proxyType, FIELD_TARGET, targetType);
+                interceptedTargetVisitor.returnValue();
+            } else {
+                pushResolveLazyProxyTargetBean(interceptedTargetVisitor, targetType);
+                interceptedTargetVisitor.returnValue();
+            }
         } else {
             int localRef = -1;
             Label l1 = null;

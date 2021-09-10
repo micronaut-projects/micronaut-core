@@ -54,6 +54,13 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
     }
 
     @Override
+    public BeanResolutionContext copy() {
+        DefaultBeanResolutionContext copy = new DefaultBeanResolutionContext(context, rootDefinition);
+        copy.copyStateFrom(this);
+        return copy;
+    }
+
+    @Override
     public void close() {
         beansInCreation.clear();
     }

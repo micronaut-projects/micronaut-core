@@ -249,6 +249,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             List.class,
             BeanDefinition.class,
             BeanConstructor.class,
+            int.class,
             Object[].class
     ));
     private static final String METHOD_DESCRIPTOR_INTERCEPTED_LIFECYCLE = getMethodDescriptor(Object.class, Arrays.asList(
@@ -2474,7 +2475,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         generatorAdapter.loadThis();
         // 5th argument: The constructor
         generatorAdapter.loadLocal(constructorLocalIndex);
-        // 6th argument:  load the Object[] for the parameters
+        // 6th argument:  additional proxy parameters count
+        if (getInterceptedType().isPresent()) {
+            generatorAdapter.push(4);
+        } else {
+            generatorAdapter.push(0);
+        }
+        // 7th argument:  load the Object[] for the parameters
         generatorAdapter.loadLocal(parametersLocalIndex);
 
         generatorAdapter.visitMethodInsn(

@@ -15,12 +15,12 @@
  */
 package io.micronaut.aop;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * <p>Annotation stereotype to applied to other annotations to indicate the annotation provides Around advice.</p>
@@ -81,6 +81,14 @@ public @interface Around {
      * @return True if the proxy target should be resolved lazily
      */
     boolean lazy() default false;
+
+    /**
+     * If true the proxy cache and reuse the target,
+     *
+     * @since 3.1.0
+     * @return True if the proxy target should be cacheable
+     */
+    boolean cacheableLazyTarget() default false;
 
     /**
      * Sets the {@link io.micronaut.aop.Around.ProxyTargetConstructorMode}. See the

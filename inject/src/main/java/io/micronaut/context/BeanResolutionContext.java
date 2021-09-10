@@ -43,6 +43,14 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     }
 
     /**
+     * Copy current context to be used later.
+     *
+     * @return The bean resolution context
+     * @since 3.1.0
+     */
+    BeanResolutionContext copy();
+
+    /**
      * @return The context
      */
     BeanContext getContext();
