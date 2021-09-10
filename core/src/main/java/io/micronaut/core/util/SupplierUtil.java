@@ -16,6 +16,9 @@
 package io.micronaut.core.util;
 
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.Future;
 import java.util.function.Supplier;
 
 /**
@@ -25,6 +28,38 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 public class SupplierUtil {
+
+    /**
+     * Starts loading the supplier on method invocation.
+     *
+     * @param actual          The supplier providing the result
+     * @param <T>             The type of result
+     * @return A new supplier that will cache the result
+     * @since 3.1
+     */
+    public static <T> Supplier<T> preload(Supplier<T> actual) {
+        return preload(actual, ForkJoinPool.commonPool());
+    }
+
+    /**
+     * Starts loading the supplier on method invocation.
+     *
+     * @param actual          The supplier providing the result
+     * @param executorService The executor service to use for fetching the value
+     * @param <T>             The type of result
+     * @return A new supplier that will cache the result
+     * @since 3.1
+     */
+    public static <T> Supplier<T> preload(Supplier<T> actual, ExecutorService executorService) {
+        Future<T> future = executorService.submit(() -> actual.get());
+        return memoized(() -> {
+            try {
+                return future.get();
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to preload supplier: " + e.getMessage(), e);
+            }
+        });
+    }
 
     /**
      * Caches the result of supplier in a thread safe manner.

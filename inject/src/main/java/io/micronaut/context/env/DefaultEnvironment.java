@@ -32,6 +32,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.inject.BeanConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,6 +50,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -84,9 +86,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     protected final ClassPathResourceLoader resourceLoader;
     protected final List<PropertySource> refreshablePropertySources = new ArrayList<>(10);
 
-    private EnvironmentsAndPackage environmentsAndPackage;
-
-    private final Set<String> names;
     private final ClassLoader classLoader;
     private final Collection<String> packages = new ConcurrentLinkedQueue<>();
     private final BeanIntrospectionScanner annotationScanner;
@@ -100,7 +99,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private final Boolean deduceEnvironments;
     private final ApplicationContextConfiguration configuration;
     private final Collection<String> configLocations;
-
+    private final Supplier<EnvironmentsAndPackage> environmentsAndPackageSupplier;
     /**
      * Construct a new environment for the given configuration.
      *
@@ -110,41 +109,57 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         super(configuration.getConversionService());
         this.configuration = configuration;
         this.resourceLoader = configuration.getResourceLoader();
-
-        Set<String> environments = new LinkedHashSet<>(3);
-        List<String> specifiedNames = new ArrayList<>(configuration.getEnvironments());
-
-        specifiedNames.addAll(0, Stream.of(System.getProperty(ENVIRONMENTS_PROPERTY),
-                System.getenv(ENVIRONMENTS_ENV))
-                .filter(StringUtils::isNotEmpty)
-                .flatMap(s -> Arrays.stream(s.split(",")))
-                .map(String::trim)
-                .collect(Collectors.toList()));
-
         this.deduceEnvironments = configuration.getDeduceEnvironments().orElse(null);
-        EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage(specifiedNames);
-        if (environmentsAndPackage.enviroments.isEmpty() && specifiedNames.isEmpty()) {
-            specifiedNames = configuration.getDefaultEnvironments();
-        }
-        environments.addAll(environmentsAndPackage.enviroments);
-        String aPackage = environmentsAndPackage.aPackage;
-        if (aPackage != null) {
-            packages.add(aPackage);
-        }
+        this.environmentsAndPackageSupplier = createEnvironmentsAndPackageSupplier(configuration);
 
-        environments.removeAll(specifiedNames);
-        environments.addAll(specifiedNames);
         this.classLoader = configuration.getClassLoader();
         this.annotationScanner = createAnnotationScanner(classLoader);
-        this.names = environments;
-        if (LOG.isInfoEnabled() && !environments.isEmpty()) {
-            LOG.info("Established active environments: {}", environments);
-        }
+
         List<String> configLocations = configuration.getOverrideConfigLocations() == null ?
                 new ArrayList<>(DEFAULT_CONFIG_LOCATIONS) : configuration.getOverrideConfigLocations();
         // Search config locations in reverse order
         Collections.reverse(configLocations);
         this.configLocations = configLocations;
+    }
+
+    private Supplier<EnvironmentsAndPackage> createEnvironmentsAndPackageSupplier(ApplicationContextConfiguration configuration) {
+        return SupplierUtil.preload(new Supplier<EnvironmentsAndPackage>() {
+            @Override
+            public EnvironmentsAndPackage get() {
+                Set<String> environments = new LinkedHashSet<>(3);
+                List<String> specifiedNames = new ArrayList<>(configuration.getEnvironments());
+                specifiedNames.addAll(0, Stream.of(System.getProperty(ENVIRONMENTS_PROPERTY),
+                                System.getenv(ENVIRONMENTS_ENV))
+                        .filter(StringUtils::isNotEmpty)
+                        .flatMap(s -> Arrays.stream(s.split(",")))
+                        .map(String::trim)
+                        .collect(Collectors.toList()));
+
+                final boolean extendedDeduction = !specifiedNames.contains(Environment.FUNCTION);
+                EnvironmentsAndPackage environmentsAndPackage = deduceEnvironmentsAndPackage(
+                        shouldDeduceEnvironments(),
+                        extendedDeduction,
+                        extendedDeduction,
+                        !extendedDeduction
+                );
+                if (environmentsAndPackage.enviroments.isEmpty() && specifiedNames.isEmpty()) {
+                    specifiedNames = configuration.getDefaultEnvironments();
+                }
+                environments.addAll(environmentsAndPackage.enviroments);
+                String aPackage = environmentsAndPackage.aPackage;
+                if (aPackage != null) {
+                    packages.add(aPackage);
+                }
+
+                specifiedNames.forEach(environments::remove);
+                environments.addAll(specifiedNames);
+                environmentsAndPackage.names = environments;
+                if (LOG.isInfoEnabled() && !environments.isEmpty()) {
+                    LOG.info("Established active environments: {}", environments);
+                }
+                return environmentsAndPackage;
+            }
+        });
     }
 
     @Override
@@ -233,7 +248,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Set<String> getActiveNames() {
-        return this.names;
+        return environmentsAndPackageSupplier.get().names;
     }
 
     @Override
@@ -514,7 +529,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         if (!this.propertySources.containsKey(EnvironmentPropertySource.NAME) && configuration.isEnvironmentPropertySource()) {
             List<String> includes = configuration.getEnvironmentVariableIncludes();
             List<String> excludes = configuration.getEnvironmentVariableExcludes();
-            if (this.names.contains(Environment.KUBERNETES)) {
+            if (environmentsAndPackageSupplier.get().names.contains(Environment.KUBERNETES)) {
                 propertySources.add(new KubernetesEnvironmentPropertySource(includes, excludes));
             } else {
                 propertySources.add(new EnvironmentPropertySource(includes, excludes));
@@ -596,26 +611,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         } catch (IOException e) {
             throw new ConfigurationException("Unsupported properties file: " + fileName);
         }
-    }
-
-    private EnvironmentsAndPackage getEnvironmentsAndPackage(List<String> specifiedNames) {
-        EnvironmentsAndPackage environmentsAndPackage = this.environmentsAndPackage;
-        final boolean extendedDeduction = !specifiedNames.contains(Environment.FUNCTION);
-        if (environmentsAndPackage == null) {
-            synchronized (EnvironmentsAndPackage.class) { // double check
-                environmentsAndPackage = this.environmentsAndPackage;
-                if (environmentsAndPackage == null) {
-                    environmentsAndPackage = deduceEnvironmentsAndPackage(
-                            shouldDeduceEnvironments(),
-                            extendedDeduction,
-                            extendedDeduction,
-                            !extendedDeduction
-                    );
-                    this.environmentsAndPackage = environmentsAndPackage;
-                }
-            }
-        }
-        return environmentsAndPackage;
     }
 
     private static EnvironmentsAndPackage deduceEnvironmentsAndPackage(
@@ -974,6 +969,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * Helper class for handling environments and package.
      */
     private static class EnvironmentsAndPackage {
+        Set<String> names;
         String aPackage;
         Set<String> enviroments = new LinkedHashSet<>(1);
     }
