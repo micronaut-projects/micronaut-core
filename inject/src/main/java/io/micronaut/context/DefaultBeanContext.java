@@ -730,7 +730,7 @@ public class DefaultBeanContext implements BeanContext {
     @NonNull
     private BeanResolutionContext newResolutionContext(BeanDefinition<?> beanDefinition, @Nullable BeanResolutionContext currentContext) {
         if (currentContext == null) {
-            return new DefaultBeanResolutionContext(beanDefinition);
+            return new SingletonBeanResolutionContext(beanDefinition);
         } else {
             return currentContext;
         }
@@ -4329,15 +4329,15 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
-    private class DefaultBeanResolutionContext extends AbstractBeanResolutionContext {
+    private class SingletonBeanResolutionContext extends AbstractBeanResolutionContext {
 
-        public DefaultBeanResolutionContext(BeanDefinition<?> beanDefinition) {
+        public SingletonBeanResolutionContext(BeanDefinition<?> beanDefinition) {
             super(DefaultBeanContext.this, beanDefinition);
         }
 
         @Override
         public BeanResolutionContext copy() {
-            DefaultBeanResolutionContext copy = new DefaultBeanResolutionContext(rootDefinition);
+            SingletonBeanResolutionContext copy = new SingletonBeanResolutionContext(rootDefinition);
             copy.copyStateFrom(this);
             return copy;
         }
