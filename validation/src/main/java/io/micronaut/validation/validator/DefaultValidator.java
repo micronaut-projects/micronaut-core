@@ -1112,7 +1112,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     null,
                     context,
                     overallViolations,
-                    rootBeanClass,
+                    object.getClass(),
                     object,
                     pojoConstraint,
                     introspection.getAnnotation(pojoConstraint));
