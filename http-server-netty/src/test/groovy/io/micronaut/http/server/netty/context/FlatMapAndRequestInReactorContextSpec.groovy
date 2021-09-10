@@ -24,6 +24,8 @@ import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ExecuteOn
 import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import org.slf4j.Logger
@@ -162,11 +164,13 @@ class FlatMapAndRequestInReactorContextSpec extends Specification {
         }
 
         @Get("/fourblocking")
+        @ExecuteOn(TaskExecutors.IO)
         Stream<BookRecommendation> fourblocking() {
             blockingrecommendations()
         }
 
         @Get("/zeroblocking")
+        @ExecuteOn(TaskExecutors.IO)
         Stream<BookRecommendation> zeroblocking() {
             blockingrecommendations()
         }
