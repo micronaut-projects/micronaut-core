@@ -3655,7 +3655,8 @@ public class DefaultBeanContext implements BeanContext {
                     ));
                 }
             } else {
-                beansOfTypeList.add(new BeanRegistration(null, candidate, bean));
+                BeanKey<T> key = new BeanKey<>(candidate, candidate.getDeclaredQualifier());
+                beansOfTypeList.add(new BeanRegistration(key, candidate, bean));
             }
         }
     }

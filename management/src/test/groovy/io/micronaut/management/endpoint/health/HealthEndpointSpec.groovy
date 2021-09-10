@@ -157,12 +157,14 @@ class HealthEndpointSpec extends Specification {
         result.details.diskSpace.details.total > 0
         result.details.diskSpace.details.threshold == 1024L * 1024L * 10
         result.details.jdbc.status == "UP"
-        result.details.jdbc.details."jdbc:h2:mem:oneDb".status == "UP"
-        result.details.jdbc.details."jdbc:h2:mem:oneDb".details.database == "H2"
-        result.details.jdbc.details."jdbc:h2:mem:oneDb".details.version == "1.4.200 (2019-10-14)"
-        result.details.jdbc.details."jdbc:h2:mem:twoDb".status == "UP"
-        result.details.jdbc.details."jdbc:h2:mem:twoDb".details.database == "H2"
-        result.details.jdbc.details."jdbc:h2:mem:twoDb".details.version == "1.4.200 (2019-10-14)"
+        result.details.jdbc.details.one.status == "UP"
+        result.details.jdbc.details.one.details.database == "H2"
+        result.details.jdbc.details.one.details.version == "1.4.200 (2019-10-14)"
+        result.details.jdbc.details.one.details.url == "jdbc:h2:mem:oneDb"
+        result.details.jdbc.details.two.status == "UP"
+        result.details.jdbc.details.two.details.database == "H2"
+        result.details.jdbc.details.two.details.version == "1.4.200 (2019-10-14)"
+        result.details.jdbc.details.two.details.url == "jdbc:h2:mem:twoDb"
         result.details.service.status == "UP"
 
         cleanup:
@@ -248,9 +250,9 @@ class HealthEndpointSpec extends Specification {
         result.status == "DOWN"
         result.details
         result.details.jdbc.status == "DOWN"
-        result.details.jdbc.details."jdbc:mysql://localhost:59654/foo".status == "DOWN"
-        result.details.jdbc.details."jdbc:mysql://localhost:59654/foo".details.error.startsWith("com.mysql.cj.jdbc.exceptions.CommunicationsException")
-        result.details.jdbc.details."jdbc:h2:mem:oneDb".status == "UP"
+        result.details.jdbc.details.two.status == "DOWN"
+        result.details.jdbc.details.two.details.error.startsWith("com.mysql.cj.jdbc.exceptions.CommunicationsException")
+        result.details.jdbc.details.one.status == "UP"
 
         cleanup:
         embeddedServer?.close()

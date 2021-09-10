@@ -17,6 +17,7 @@ package io.micronaut.context.scope;
 
 import io.micronaut.context.exceptions.BeanDestructionException;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 
@@ -35,6 +36,7 @@ public interface CreatedBean<T> extends Closeable, AutoCloseable {
     /**
      * @return The bean definition.
      */
+    @NonNull
     BeanDefinition<T> definition();
 
     /**
@@ -46,8 +48,9 @@ public interface CreatedBean<T> extends Closeable, AutoCloseable {
     /**
      * Returns an ID that is unique to the bean and can be used to cache the instance if necessary.
      *
-     * @return The id
+     * @return The id or {@code null} if the bean has no qualifier
      */
+    @Nullable
     BeanIdentifier id();
 
     /**
