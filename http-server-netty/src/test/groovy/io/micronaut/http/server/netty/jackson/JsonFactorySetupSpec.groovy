@@ -16,8 +16,15 @@
 package io.micronaut.http.server.netty.jackson
 
 import com.fasterxml.jackson.core.JsonFactory
+import com.fasterxml.jackson.core.util.BufferRecycler
+import com.fasterxml.jackson.databind.ObjectMapper
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.context.env.MapPropertySource
+import io.micronaut.docs.context.annotation.primary.ColorPicker
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import spock.lang.Specification
 
 /**
@@ -33,8 +40,28 @@ class JsonFactorySetupSpec extends Specification {
 
         expect:
         applicationContext.containsBean(JsonFactory)
+        applicationContext.containsBean(ObjectMapper)
 
         cleanup:
         applicationContext?.close()
+    }
+
+    void "verify JsonFactory properties are injected into the bean"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(MapPropertySource.of(
+                'jackson.factory.use-thread-local-for-buffer-recycling': false
+        ))
+        applicationContext.start()
+
+        expect:
+        applicationContext.containsBean(ObjectMapper)
+
+        when:
+        ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
+
+        then:
+        !objectMapper.getFactory().isEnabled(JsonFactory.Feature.USE_THREAD_LOCAL_FOR_BUFFER_RECYCLING)
+
     }
 }
