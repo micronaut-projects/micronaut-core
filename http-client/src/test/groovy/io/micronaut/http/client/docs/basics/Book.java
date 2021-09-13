@@ -17,12 +17,11 @@ package io.micronaut.http.client.docs.basics;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
 
-/**
- * @author graemerocher
- * @since 1.0
- */
+@Introspected
 public class Book {
+
     private String title;
 
     @JsonCreator

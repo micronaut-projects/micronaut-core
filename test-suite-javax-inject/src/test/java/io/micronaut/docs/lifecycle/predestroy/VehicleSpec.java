@@ -16,9 +16,8 @@
 package io.micronaut.docs.lifecycle.predestroy;
 
 import io.micronaut.context.BeanContext;
-import org.junit.Test;
-
-import static org.junit.Assert.assertTrue;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 public class VehicleSpec {
 
@@ -31,8 +30,8 @@ public class VehicleSpec {
         System.out.println(vehicle.start());
         // end::start[]
 
-        assertTrue(vehicle.engine instanceof V8Engine);
-        assertTrue(((V8Engine) vehicle.engine).isInitialized());
+        Assertions.assertTrue(vehicle.engine instanceof V8Engine);
+        Assertions.assertTrue(((V8Engine) vehicle.engine).isInitialized());
 
         context.close();
     }
