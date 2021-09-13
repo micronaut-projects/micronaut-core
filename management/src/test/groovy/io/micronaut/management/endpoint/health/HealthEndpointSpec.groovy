@@ -248,8 +248,8 @@ class HealthEndpointSpec extends Specification {
         result.status == "DOWN"
         result.details
         result.details.jdbc.status == "DOWN"
-        result.details.jdbc.details."jdbc:mysql://localhost:59654/foo".status == "DOWN"
-        result.details.jdbc.details."jdbc:mysql://localhost:59654/foo".details.error.startsWith("com.mysql.cj.jdbc.exceptions.CommunicationsException")
+        result.details.jdbc.details."localhost:59654/foo".status == "DOWN"
+        result.details.jdbc.details."localhost:59654/foo".details.error.startsWith("com.mysql.cj.jdbc.exceptions.CommunicationsException")
         result.details.jdbc.details."jdbc:h2:mem:oneDb".status == "UP"
 
         cleanup:
