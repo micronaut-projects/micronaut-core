@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,47 +15,21 @@
  */
 package io.micronaut.web.router.resource;
 
-import io.micronaut.core.io.ResourceLoader;
-import io.micronaut.core.util.AntPathMatcher;
-import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.util.PathMatcher;
-import io.micronaut.core.util.StringUtils;
-import jakarta.inject.Singleton;
-
 import java.net.URL;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 /**
- * Resolves resources from a set of resource loaders.
+ * Interface for resolving static resources.
  *
+ * @author graemerocher
  * @author James Kleeh
  * @since 1.0
  */
-@Singleton
-public class StaticResourceResolver {
-
-    private static final String INDEX_PAGE = "index.html";
-    private final AntPathMatcher pathMatcher;
-    private final Map<String, List<ResourceLoader>> resourceMappings = new LinkedHashMap<>();
-
+public interface StaticResourceResolver {
     /**
-     * Default constructor.
-     *
-     * @param configurations The static resource configurations
+     * Empty resolver.
      */
-    StaticResourceResolver(List<StaticResourceConfiguration> configurations) {
-        this.pathMatcher = PathMatcher.ANT;
-        if (CollectionUtils.isNotEmpty(configurations)) {
-            for (StaticResourceConfiguration config: configurations) {
-                if (config.isEnabled()) {
-                    this.resourceMappings.put(config.getMapping(), config.getResourceLoaders());
-                }
-            }
-        }
-    }
+    StaticResourceResolver EMPTY = resourcePath -> Optional.empty();
 
     /**
      * Resolves a path to a URL.
@@ -63,39 +37,5 @@ public class StaticResourceResolver {
      * @param resourcePath The path to the resource
      * @return The optional URL
      */
-    public Optional<URL> resolve(String resourcePath) {
-        for (Map.Entry<String, List<ResourceLoader>> entry : resourceMappings.entrySet()) {
-            List<ResourceLoader> loaders = entry.getValue();
-            String mapping = entry.getKey();
-            if (!loaders.isEmpty() && pathMatcher.matches(mapping, resourcePath)) {
-                String path = pathMatcher.extractPathWithinPattern(mapping, resourcePath);
-                //A request to the root of the mapping
-                if (StringUtils.isEmpty(path)) {
-                    path = INDEX_PAGE;
-                }
-                if (path.startsWith("/")) {
-                    path = path.substring(1);
-                }
-                for (ResourceLoader loader : loaders) {
-                    Optional<URL> resource = loader.getResource(path);
-                    if (resource.isPresent()) {
-                        return resource;
-                    } else {
-                        if (path.indexOf('.') == -1) {
-                            if (!path.endsWith("/")) {
-                                path = path + "/";
-                            }
-                            path += INDEX_PAGE;
-                            resource = loader.getResource(path);
-                            if (resource.isPresent()) {
-                                return resource;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return Optional.empty();
-    }
+    Optional<URL> resolve(String resourcePath);
 }

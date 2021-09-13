@@ -32,6 +32,7 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import java.util.Optional;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 
@@ -96,5 +97,10 @@ public class DefaultExecutorSelector implements ExecutorSelector {
             return Optional.of(ioExecutor.get());
         }
         return Optional.empty();
+    }
+
+    @Override
+    public Optional<ExecutorService> select(String name) {
+        return beanLocator.findBean(ExecutorService.class, Qualifiers.byName(name));
     }
 }

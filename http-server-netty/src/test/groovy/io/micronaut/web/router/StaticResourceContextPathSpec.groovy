@@ -1,6 +1,7 @@
 package io.micronaut.web.router
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.web.router.resource.DefaultStaticResourceResolver
 import io.micronaut.web.router.resource.StaticResourceResolver
 import spock.lang.Specification
 

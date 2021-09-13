@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router
+package io.micronaut.web.router.resource
 
 import io.micronaut.core.io.ResourceResolver
 import io.micronaut.web.router.resource.StaticResourceConfiguration
-import io.micronaut.web.router.resource.StaticResourceResolver
+import io.micronaut.web.router.resource.DefaultStaticResourceResolver
 import spock.lang.Specification
 
 class StaticResourceResolverSpec extends Specification {
@@ -31,7 +31,7 @@ class StaticResourceResolverSpec extends Specification {
         StaticResourceConfiguration config2 = new StaticResourceConfiguration(rr, null)
         config2.setPaths(["classpath:other"])
         config2.setMapping("/other/**")
-        StaticResourceResolver resolver = new StaticResourceResolver([config1, config2])
+        DefaultStaticResourceResolver resolver = new DefaultStaticResourceResolver([config1, config2])
 
         when:
         URL url = resolver.resolve("/").get()

@@ -547,7 +547,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void validateExposedTypes(AnnotationMetadata annotationMetadata, VisitorContext visitorContext) {
-        final String[] types = annotationMetadata.stringValues(Bean.class, "typed");
+        if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
+            annotationMetadata = annotationMetadata.getDeclaredMetadata();
+        }
+        final String[] types = annotationMetadata
+                .stringValues(Bean.class, "typed");
         if (ArrayUtils.isNotEmpty(types) && !beanTypeElement.isProxy()) {
             for (String name : types) {
                 final ClassElement exposedType = visitorContext.getClassElement(name).orElse(null);
