@@ -55,7 +55,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         this.path = new DefaultPath();
     }
 
-    public void copyStateFrom(AbstractBeanResolutionContext context) {
+    /**
+     * Copy the state from a previous resolution context.
+     * @param context The previous context
+     */
+    public void copyStateFrom(@NonNull AbstractBeanResolutionContext context) {
         path.addAll(context.path);
         qualifier = context.qualifier;
         if (context.attributes != null) {
