@@ -69,42 +69,23 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
     private final String beanDefinitionClassInternalName;
     private final String beanDefinitionReferenceClassName;
     private final Type interceptedType;
+    private final Type providedType;
     private boolean contextScope = false;
     private boolean requiresMethodProcessing;
 
     /**
-     * @param beanTypeName        The bean type name
-     * @param beanDefinitionName  The bean definition name
-     * @param originatingElements The originating element
-     * @param annotationMetadata  The annotation metadata
-     */
-    @Deprecated
-    public BeanDefinitionReferenceWriter(
-            String beanTypeName,
-            String beanDefinitionName,
-            OriginatingElements originatingElements,
-            AnnotationMetadata annotationMetadata) {
-        super(beanDefinitionName + REF_SUFFIX, originatingElements, annotationMetadata, true);
-        this.beanTypeName = beanTypeName;
-        this.beanDefinitionName = beanDefinitionName;
-        this.beanDefinitionReferenceClassName = beanDefinitionName + REF_SUFFIX;
-        this.beanDefinitionClassInternalName = getInternalName(beanDefinitionName) + REF_SUFFIX;
-        this.interceptedType = null;
-    }
-
-    /**
      * Default constructor.
      *
-     * @param beanTypeName The bean type name
      * @param visitor      The visitor
      */
-    public BeanDefinitionReferenceWriter(String beanTypeName, BeanDefinitionVisitor visitor) {
+    public BeanDefinitionReferenceWriter(BeanDefinitionVisitor visitor) {
         super(
                 visitor.getBeanDefinitionName() + REF_SUFFIX,
                 visitor,
                 visitor.getAnnotationMetadata(),
                 true);
-        this.beanTypeName = beanTypeName;
+        this.providedType = visitor.getProvidedType();
+        this.beanTypeName = visitor.getBeanTypeName();
         this.beanDefinitionName = visitor.getBeanDefinitionName();
         this.beanDefinitionReferenceClassName = beanDefinitionName + REF_SUFFIX;
         this.beanDefinitionClassInternalName = getInternalName(beanDefinitionName) + REF_SUFFIX;
@@ -251,7 +232,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
 
         // start method: Class getBeanType()
         GeneratorAdapter getBeanType = startPublicMethodZeroArgs(classWriter, Class.class, "getBeanType");
-        getBeanType.push(getTypeReferenceForName(beanTypeName));
+        getBeanType.push(providedType);
         getBeanType.returnValue();
         getBeanType.visitMaxs(2, 1);
 

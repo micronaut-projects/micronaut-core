@@ -293,9 +293,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             beanDefinitionWriter.visitBeanDefinitionEnd();
             if (beanDefinitionWriter.isEnabled()) {
                 beanDefinitionWriter.accept(classWriterOutputVisitor);
-                String beanTypeName = beanDefinitionWriter.getBeanTypeName();
                 BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
-                        new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionWriter);
+                        new BeanDefinitionReferenceWriter(beanDefinitionWriter);
                 beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
 
                 String className = beanDefinitionReferenceWriter.getBeanDefinitionQualifiedClassName();
@@ -786,7 +785,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             // handle @Bean annotation for @Factory class
             JavaMethodElement javaMethodElement = elementFactory.newMethodElement(concreteClassElement, method, methodAnnotationMetadata);
-            if (isFactoryType && javaMethodElement.hasDeclaredStereotype(Bean.class.getName(), AnnotationUtil.SCOPE) && !javaMethodElement.getReturnType().isPrimitive()) {
+            if (isFactoryType && javaMethodElement.hasDeclaredStereotype(Bean.class.getName(), AnnotationUtil.SCOPE)) {
                 if (!modelUtils.overridingOrHidingMethod(method, concreteClass, true).isPresent()) {
                     visitBeanFactoryElement(method);
                 }
@@ -973,27 +972,48 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 producedType = element.asType();
             }
 
-            TypeElement producedTypeElement = modelUtils.classElementFor(typeUtils.asElement(producedType));
+            final TypeKind producedTypeKind = producedType.getKind();
+            final boolean isPrimitive = producedTypeKind.isPrimitive();
+            final boolean isArray = producedTypeKind == TypeKind.ARRAY;
+            final Element producedElement = typeUtils.asElement(producedType);
+            TypeElement producedTypeElement = modelUtils.classElementFor(producedElement);
             TypeElement factoryTypeElement = modelUtils.classElementFor(element);
+            AnnotationMetadata methodAnnotationMetadata;
+            String producedTypeName;
 
-            if (producedType.getKind().isPrimitive()) {
-                error(element, "Produced type from a bean factory cannot be primitive");
+            if (factoryTypeElement == null) {
                 return;
             }
-            if (producedTypeElement == null || factoryTypeElement == null) {
-                return;
+
+            if (isPrimitive ) {
+                PrimitiveType pt = (PrimitiveType) producedType;
+                producedTypeName = pt.toString();
+                methodAnnotationMetadata = annotationUtils.newAnnotationBuilder().build(element);
+            } else {
+
+                if (producedTypeElement == null) {
+                    if (isArray) {
+                        methodAnnotationMetadata = annotationUtils.newAnnotationBuilder().build(element);
+                        producedTypeName = null;
+                    } else {
+                        error("Cannot produce bean for unsupported return type: " + producedType, element);
+                        return;
+                    }
+                } else {
+                    methodAnnotationMetadata = annotationUtils.newAnnotationBuilder().buildForParent(
+                            producedTypeElement,
+                            element
+                    );
+                    producedTypeName = producedTypeElement.getQualifiedName().toString();
+                }
+
             }
-            String producedTypeName = producedTypeElement.getQualifiedName().toString();
 
             ClassElement declaringClassElement = elementFactory.newClassElement(
                     factoryTypeElement,
                     concreteClassMetadata
             );
 
-            AnnotationMetadata methodAnnotationMetadata = annotationUtils.newAnnotationBuilder().buildForParent(
-                    producedTypeElement,
-                    element
-            );
 
             io.micronaut.inject.ast.Element beanProducingElement;
             ClassElement producedClassElement;
@@ -1045,6 +1065,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
 
             if (methodAnnotationMetadata.hasStereotype(AROUND_TYPE) && !modelUtils.isAbstract(concreteClass)) {
+                if (isPrimitive) {
+                    error(element, "Cannot apply AOP advice to primitive beans");
+                    return;
+                } else if (isArray) {
+                    error(element, "Cannot apply AOP advice to arrays");
+                    return;
+                }
+
                 io.micronaut.core.annotation.AnnotationValue<?>[] interceptorTypes = InterceptedMethodUtil.resolveInterceptorBinding(methodAnnotationMetadata, InterceptorKind.AROUND);
 
                 if (producedClassElement.isFinal()) {
@@ -1055,7 +1083,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 MethodElement constructor = producedClassElement.getPrimaryConstructor().orElse(null);
                 if (!producedClassElement.isInterface() && constructor != null && constructor.getParameters().length > 0) {
-                    final Element nativeElement = (Element) constructor.getNativeType();
                     final String proxyTargetMode = methodAnnotationMetadata.stringValue(AROUND_TYPE, "proxyTargetMode")
                             .orElseGet(() -> {
                                 // temporary workaround until micronaut-test can be upgraded to 3.0
@@ -1103,35 +1130,46 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     protected void accept(DeclaredType type, Element element, AopProxyWriter aopProxyWriter) {
                         ExecutableElement method = (ExecutableElement) element;
                         TypeElement owningType = modelUtils.classElementFor(method);
-                        ClassElement declaringClassElement = elementFactory.newClassElement(
-                                owningType,
-                                concreteClassMetadata
-                        );
-                        AnnotationMetadata annotationMetadata;
-                        // if the method is annotated we build metadata for the method
-                        if (annotationUtils.isAnnotated(producedTypeName, method)) {
-                            annotationMetadata = annotationUtils.getAnnotationMetadata(element, method);
-                        } else {
-                            // otherwise we setup a reference to the parent metadata (essentially the annotations declared on the bean factory method)
-                            annotationMetadata = new AnnotationMetadataReference(
-                                    beanMethodWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
-                                    methodAnnotationMetadata
+                        if (owningType != null) {
+
+                            ClassElement declaringClassElement = elementFactory.newClassElement(
+                                    owningType,
+                                    concreteClassMetadata
+                            );
+                            AnnotationMetadata annotationMetadata;
+                            // if the method is annotated we build metadata for the method
+                            if (producedTypeName != null && annotationUtils.isAnnotated(producedTypeName, method)) {
+                                annotationMetadata = annotationUtils.getAnnotationMetadata(element, method);
+                            } else {
+                                // otherwise we setup a reference to the parent metadata (essentially the annotations declared on the bean factory method)
+                                annotationMetadata = new AnnotationMetadataReference(
+                                        beanMethodWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
+                                        methodAnnotationMetadata
+                                );
+                            }
+
+                            MethodElement advisedMethodElement = elementFactory.newMethodElement(
+                                    declaringClassElement,
+                                    method,
+                                    annotationMetadata
+                            );
+
+                            aopProxyWriter.visitAroundMethod(
+                                    declaringClassElement,
+                                    advisedMethodElement
                             );
                         }
-
-                        MethodElement advisedMethodElement = elementFactory.newMethodElement(
-                                declaringClassElement,
-                                method,
-                                annotationMetadata
-                        );
-
-                        aopProxyWriter.visitAroundMethod(
-                                declaringClassElement,
-                                advisedMethodElement
-                        );
                     }
                 }, proxyWriter);
             } else if (methodAnnotationMetadata.hasStereotype(Executable.class)) {
+                if (isPrimitive) {
+                    error("Using '@Executable' is not allowed on primitive type beans");
+                    return;
+                }
+                if (isArray) {
+                    error("Using '@Executable' is not allowed on array type beans");
+                    return;
+                }
                 DeclaredType dt = (DeclaredType) producedType;
                 Map<String, Map<String, TypeMirror>> finalBeanTypeArgumentsMirrors = genericUtils.buildGenericTypeArgumentElementInfo(dt.asElement(), dt, Collections.emptyMap());
                 producedType.accept(new PublicMethodVisitor<Object, BeanDefinitionWriter>(javaVisitorContext) {
@@ -1147,7 +1185,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 methodAnnotationMetadata
                         );
 
-                        ClassElement declaringClassElement = elementFactory.newClassElement(producedTypeElement, concreteClassMetadata);
+                        ClassElement declaringClassElement = elementFactory.newClassElement(
+                                producedTypeElement,
+                                concreteClassMetadata
+                        );
                         MethodElement executableMethod = elementFactory.newMethodElement(
                                 declaringClassElement,
                                 method,
@@ -1166,11 +1207,20 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
 
             if (methodAnnotationMetadata.isPresent(Bean.class, "preDestroy")) {
+                if (isPrimitive) {
+                    error("Using 'preDestroy' is not allowed on primitive type beans");
+                    return;
+                }
+                if (isArray) {
+                    error("Using 'preDestroy' is not allowed on array type beans");
+                    return;
+                }
+
                 Optional<String> preDestroyMethod = methodAnnotationMetadata.getValue(Bean.class, "preDestroy", String.class);
                 preDestroyMethod
                         .ifPresent(destroyMethodName -> {
                             if (StringUtils.isNotEmpty(destroyMethodName)) {
-                                TypeElement destroyMethodDeclaringClass = (TypeElement) typeUtils.asElement(producedType);
+                                TypeElement destroyMethodDeclaringClass = (TypeElement) producedElement;
                                 ClassElement destroyMethodDeclaringElement = elementFactory.newClassElement(destroyMethodDeclaringClass, AnnotationMetadata.EMPTY_METADATA);
                                 final Optional<MethodElement> destroyMethod = destroyMethodDeclaringElement.getEnclosedElement(
                                         ElementQuery.ALL_METHODS
@@ -1595,26 +1645,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             } else {
                 error("Unexpected call to visitAnnotatedMethod(%s)", method);
             }
-        }
-
-        private @Nullable
-        AopProxyWriter resolveAopWriter(BeanDefinitionVisitor writer) {
-            Name proxyKey = createProxyKey(writer.getBeanDefinitionName());
-            final BeanDefinitionVisitor aopWriter = beanDefinitionWriters.get(proxyKey);
-            if (aopWriter instanceof AopProxyWriter) {
-                return (AopProxyWriter) aopWriter;
-            } else if (isAopProxyType) {
-                io.micronaut.core.annotation.AnnotationValue<?>[] interceptorTypes =
-                        InterceptedMethodUtil.resolveInterceptorBinding(concreteClassMetadata, InterceptorKind.AROUND);
-                return resolveAopProxyWriter(
-                        writer,
-                        aopSettings,
-                        isFactoryType,
-                        constructorElement,
-                        interceptorTypes
-                );
-            }
-            return null;
         }
 
         @Override
@@ -2084,8 +2114,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
         }
 
-        private BeanDefinitionWriter createFactoryBeanMethodWriterFor(Element method, TypeElement producedElement) {
-            AnnotationMetadata annotationMetadata = annotationUtils.newAnnotationBuilder().buildForParent(producedElement, method, false);
+        private BeanDefinitionWriter createFactoryBeanMethodWriterFor(Element method, @Nullable TypeElement producedElement) {
+            AnnotationMetadata annotationMetadata;
+
+            if (producedElement != null) {
+                annotationMetadata = annotationUtils.newAnnotationBuilder()
+                        .buildForParent(producedElement, method, false);
+            } else {
+                annotationMetadata = annotationUtils.newAnnotationBuilder()
+                        .buildDeclared(method);
+            }
 
             annotationMetadata = new AnnotationMetadataHierarchy(
                     concreteClassMetadata,
