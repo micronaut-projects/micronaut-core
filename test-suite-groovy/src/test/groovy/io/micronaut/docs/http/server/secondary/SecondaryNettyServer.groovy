@@ -4,6 +4,8 @@ package io.micronaut.docs.http.server.secondary
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Context
 import io.micronaut.context.annotation.Factory
+import io.micronaut.context.annotation.Requires
+import io.micronaut.context.env.Environment
 import io.micronaut.discovery.ServiceInstanceList
 import io.micronaut.discovery.StaticServiceInstanceList
 import io.micronaut.http.server.netty.NettyEmbeddedServer
@@ -21,6 +23,7 @@ class SecondaryNettyServer {
     @Named(SERVER_ID)
     @Context
     @Bean(preDestroy = "stop") // <2>
+    @Requires(beans = Environment.class)
     NettyEmbeddedServer nettyEmbeddedServer(NettyEmbeddedServerFactory serverFactory) { // <3>
         def configuration =
                 new NettyHttpServerConfiguration() // <4>

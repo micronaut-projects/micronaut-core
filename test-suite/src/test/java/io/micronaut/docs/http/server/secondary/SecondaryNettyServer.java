@@ -5,6 +5,8 @@ import java.util.Collections;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.env.Environment;
 import io.micronaut.discovery.ServiceInstanceList;
 import io.micronaut.discovery.StaticServiceInstanceList;
 import io.micronaut.http.server.netty.NettyEmbeddedServer;
@@ -22,6 +24,7 @@ public class SecondaryNettyServer {
     @Named(SERVER_ID)
     @Context
     @Bean(preDestroy = "close") // <2>
+    @Requires(beans = Environment.class)
     NettyEmbeddedServer nettyEmbeddedServer(NettyEmbeddedServerFactory serverFactory) { // <3>
         final NettyHttpServerConfiguration configuration =
                 new NettyHttpServerConfiguration(); // <4>
