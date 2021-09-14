@@ -144,4 +144,17 @@ public interface BeanProvider<T> extends Iterable<T> {
         return (Argument) Argument.of(BeanProvider.class, Objects.requireNonNull(type, "Type cannot be null"));
     }
 
+    /**
+     * Allows selecting an alternative bean if the backing bean is not present.
+     * @param alternative The alternative, can be {@code null}
+     * @return The bean if present or else the supplied alternative
+     * @since 3.0.2
+     */
+    default @Nullable T orElse(@Nullable T alternative) {
+        if (isPresent()) {
+            return get();
+        } else {
+            return alternative;
+        }
+    }
 }

@@ -4,8 +4,7 @@ dependencies {
     testImplementation project(":context")
     testImplementation project(":graal")
     testImplementation project(":inject")
-    testImplementation 'jakarta.inject:jakarta.inject-tck:2.0.1'
-    testImplementation "org.junit.vintage:junit-vintage-engine:$junitVersion"
+    testImplementation libs.jakarta.inject.tck
+    testImplementation libs.junit.vintage
     testImplementation project(":inject-java-test")
 }
-

@@ -2,28 +2,28 @@ ext {
     shadowJarEnabled = true
 }
 dependencies {
-    api dependencyVersion("javax.annotation-api")
-    compileOnly group: 'javax.inject', name: 'javax.inject', version: '1'
-    api "jakarta.inject:jakarta.inject-api:2.0.0"
-    api "jakarta.annotation:jakarta.annotation-api:$jakartaAnnotationApiVersion"
+    api libs.managed.javax.annotation.api
+    compileOnly libs.javax.inject
+    api libs.jakarta.inject.api
+    api libs.managed.jakarta.annotation.api
     api project(':core')
-    api dependencyVersion("snakeyaml")
+    api libs.managed.snakeyaml
 
-    compileOnly "javax.persistence:javax.persistence-api:2.2"
-    compileOnly dependencyModuleVersion("groovy", "groovy")
-    compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
-    compileOnly dependencyVersion("validation")
+    compileOnly libs.javax.persistence
+    compileOnly libs.managed.groovy
+    compileOnly libs.kotlin.stdlib.jdk8
+    compileOnly libs.managed.validation
 
-//    testImplementation dependencyVersion("validation")
+//    testImplementation libs.managed.validation
     testImplementation project(":context")
     testImplementation project(":inject-groovy")
     testImplementation project(":inject-test-utils")
-    testImplementation "com.github.stefanbirkner:system-lambda:1.2.0"
+    testImplementation libs.systemlambda
 
-    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-junit5"), {
+    testImplementation(libs.managed.micronaut.test.junit5) {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
-    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$junitVersion"
+    testRuntimeOnly libs.junit.jupiter.engine
 
 }

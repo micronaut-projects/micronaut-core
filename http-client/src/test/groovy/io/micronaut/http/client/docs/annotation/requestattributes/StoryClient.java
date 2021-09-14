@@ -15,10 +15,12 @@
  */
 package io.micronaut.http.client.docs.annotation.requestattributes;
 
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.RequestAttribute;
 import io.micronaut.http.annotation.RequestAttributes;
 import io.micronaut.http.client.annotation.Client;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
 // tag::class[]
@@ -30,6 +32,7 @@ import reactor.core.publisher.Mono;
 public interface StoryClient {
 
     @Get("/{storyId}")
-    Mono<Story> getById(@RequestAttribute String storyId);
+    @SingleResult
+    Publisher<Story> getById(@RequestAttribute String storyId);
 }
 // end::class[]

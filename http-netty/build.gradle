@@ -1,19 +1,19 @@
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")
-    compileOnly "org.graalvm.nativeimage:svm:$graalVersion"
-    compileOnly dependencyModuleVersion("netty", "netty-transport-native-epoll")
-    compileOnly dependencyModuleVersion("netty", "netty-transport-native-kqueue")
+    compileOnly libs.managed.graal
+    compileOnly libs.managed.netty.transport.native.epoll
+    compileOnly libs.managed.netty.transport.native.kqueue
 
     api project(":http")
     api project(":websocket")
     api project(":buffer-netty")
 
-    api dependencyModuleVersion("netty", "netty-codec-http")
-    api dependencyModuleVersion("netty", "netty-handler")
-    api dependencyModuleVersion("netty", "netty-codec-http2")
+    api libs.managed.netty.codec.http
+    api libs.managed.netty.codec.http2
+    api libs.managed.netty.handler
 
-    implementation dependencyVersion("reactor")
+    implementation libs.managed.reactor
 
     testImplementation project(":runtime")
 }

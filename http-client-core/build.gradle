@@ -1,11 +1,11 @@
 dependencies {
     annotationProcessor project(":inject-java")
 
-    implementation dependencyVersion("reactor")
+    implementation libs.managed.reactor
 
     api project(":runtime")
 
-    compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
+    compileOnly libs.kotlin.stdlib
 }
 
 //tasks.withType(Test) {

@@ -986,9 +986,8 @@ public class DefaultHttpClient implements
                         super.subscribe(downstreamSubscriber);
                     }
                 };
-                return Flux.from(jacksonProcessor).map(jsonNode ->
-                        mediaTypeCodec.decode(type, jsonNode)
-                );
+                return Flux.from(jacksonProcessor)
+                        .map(jsonNode -> mediaTypeCodec.decode(type, jsonNode));
             }).doOnTerminate(() -> {
                 final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
                 if (o instanceof Channel) {
@@ -1260,7 +1259,7 @@ public class DefaultHttpClient implements
         URI requestURI = request.getUri();
         if (requestURI.getScheme() != null) {
             // if the request URI includes a scheme then it is fully qualified so use the direct server
-            return Publishers.just(requestURI);
+            return Flux.just(requestURI);
         } else {
             return resolveURI(request, includeContextPath);
         }
@@ -1276,7 +1275,7 @@ public class DefaultHttpClient implements
         URI requestURI = request.getUri();
         if (requestURI.getScheme() != null) {
             // if the request URI includes a scheme then it is fully qualified so use the direct server
-            return Publishers.just(requestURI);
+            return Flux.just(requestURI);
         } else {
             if (parentRequest == null) {
                 return resolveURI(request, false);
@@ -1287,7 +1286,7 @@ public class DefaultHttpClient implements
                         .userInfo(parentURI.getUserInfo())
                         .host(parentURI.getHost())
                         .port(parentURI.getPort());
-                return Publishers.just(uriBuilder.build());
+                return Flux.just(uriBuilder.build());
             }
         }
     }
@@ -1804,10 +1803,10 @@ public class DefaultHttpClient implements
     private <I> Publisher<URI> resolveURI(io.micronaut.http.HttpRequest<I> request, boolean includeContextPath) {
         URI requestURI = request.getUri();
         if (loadBalancer == null) {
-            return Publishers.just(new NoHostException("Request URI specifies no host to connect to"));
+            return Flux.error(new NoHostException("Request URI specifies no host to connect to"));
         }
 
-        return Publishers.map(loadBalancer.select(getLoadBalancerDiscriminator()), server -> {
+        return Flux.from(loadBalancer.select(getLoadBalancerDiscriminator())).map(server -> {
                     Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
                     if (request instanceof MutableHttpRequest && authInfo.isPresent()) {
                         ((MutableHttpRequest) request).getHeaders().auth(authInfo.get());
@@ -2146,7 +2145,9 @@ public class DefaultHttpClient implements
                             redirectExchange
                                     .defaultIfEmpty(io.micronaut.http.HttpResponse.notFound())
                                     .subscribe(oHttpResponse -> {
-                                        emitter.next(oHttpResponse);
+                                        if (bodyType == null || !bodyType.isVoid()) {
+                                            emitter.next(oHttpResponse);
+                                        }
                                         emitter.complete();
                                     }, throwable -> {
                                         if (!emitter.isCancelled()) {
@@ -2167,7 +2168,9 @@ public class DefaultHttpClient implements
 
                         if (complete.compareAndSet(false, true)) {
                             if (convertBodyWithBodyType) {
-                                emitter.next(response);
+                                if (bodyType == null || !bodyType.isVoid()) {
+                                    emitter.next(response);
+                                }
                                 response.onComplete();
                                 emitter.complete();
                             } else { // error flow

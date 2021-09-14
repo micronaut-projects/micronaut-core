@@ -1,12 +1,12 @@
 dependencies {
-    testImplementation "org.gebish:geb-spock:$gebVersion"
-    testImplementation "org.seleniumhq.selenium:htmlunit-driver:2.47.1"
-    testRuntimeOnly 'net.sourceforge.htmlunit:htmlunit:2.47.1'
-    testImplementation "org.seleniumhq.selenium:selenium-remote-driver:$seleniumVersion"
-    testImplementation "org.seleniumhq.selenium:selenium-api:$seleniumVersion"
-    testImplementation "org.seleniumhq.selenium:selenium-support:$seleniumVersion"
-    testRuntimeOnly "org.seleniumhq.selenium:selenium-chrome-driver:$seleniumVersion"
-    testRuntimeOnly "org.seleniumhq.selenium:selenium-firefox-driver:$seleniumVersion"
+    testImplementation libs.geb.spock
+    testImplementation libs.selenium.driver.htmlunit
+    testRuntimeOnly libs.htmlunit
+    testImplementation libs.selenium.remote.driver
+    testImplementation libs.selenium.api
+    testImplementation libs.selenium.support
+    testRuntimeOnly libs.selenium.driver.chrome
+    testRuntimeOnly libs.selenium.driver.firefox
 }
 
 test {
@@ -14,4 +14,3 @@ test {
     systemProperty "webdriver.chrome.driver", System.getProperty('webdriver.chrome.driver')
     systemProperty "webdriver.gecko.driver", System.getProperty('webdriver.gecko.driver')
 }
-

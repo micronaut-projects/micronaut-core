@@ -1,31 +1,30 @@
 dependencies {
     annotationProcessor project(":inject-java")
-    api dependencyVersion("opentracing")
-    api dependencyModuleVersion('opentracing', 'opentracing-util')
+    api libs.managed.opentracing
+    api libs.managed.opentracing.util
     api project(":runtime")
     api project(":http-client")
     implementation project(":core")
 
-    implementation dependencyVersion("reactor")
+    implementation libs.managed.reactor
 
     // the following are Tracing implementations and instrumentations which
     // are optionally loaded and not required
-    compileOnly "com.netflix.hystrix:hystrix-core:$hystrixVersion"
-    compileOnly dependencyVersion("brave.instrumentation")
-    compileOnly dependencyVersion("zipkin.reporter")
-    compileOnly 'io.zipkin.reporter:zipkin-reporter:1.1.2'
-    compileOnly dependencyVersion("brave.opentracing")
+    compileOnly libs.managed.hystrix
+    compileOnly libs.managed.zipkin.brave.instrumentation
+    compileOnly libs.managed.zipkin.reporter
+    compileOnly libs.managed.brave.opentracing
 
-    compileOnly dependencyVersion("jaeger")
+    compileOnly libs.managed.jaeger
 
     testImplementation project(":inject-groovy")
     testImplementation project(":inject-java")
     testAnnotationProcessor project(":inject-java")
     testImplementation project(":http-server-netty")
 
-    testImplementation dependencyVersion("zipkin.reporter")
-    testImplementation dependencyVersion("brave.instrumentation")
-    testImplementation dependencyVersion("brave.opentracing")
+    testImplementation libs.managed.zipkin.reporter
+    testImplementation libs.managed.zipkin.brave.instrumentation
+    testImplementation libs.managed.brave.opentracing
 
 }
 

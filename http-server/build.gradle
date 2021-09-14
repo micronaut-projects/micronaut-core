@@ -3,7 +3,7 @@ dependencies {
     api project(":websocket")
     api project(":runtime")
     api project(":router")
-    implementation dependencyVersion("reactor")
+    implementation libs.managed.reactor
     annotationProcessor project(":inject-java")
 }
 

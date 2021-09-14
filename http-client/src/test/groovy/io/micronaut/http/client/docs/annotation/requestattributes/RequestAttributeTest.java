@@ -17,8 +17,9 @@ package io.micronaut.http.client.docs.annotation.requestattributes;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Mono;
 
 import java.util.Map;
 
@@ -31,15 +32,15 @@ public class RequestAttributeTest {
             StoryClient client = embeddedServer.getApplicationContext().getBean(StoryClient.class);
             StoryClientFilter filter = embeddedServer.getApplicationContext().getBean(StoryClientFilter.class);
 
-            Story story = client.getById("jan2019").block();
+            Story story = Mono.from(client.getById("jan2019")).block();
 
-            Assert.assertNotNull(story);
+            Assertions.assertNotNull(story);
 
             Map<String, Object> attributes = filter.getLatestRequestAttributes();
-            Assert.assertNotNull(attributes);
-            Assert.assertEquals("jan2019", attributes.get("story-id"));
-            Assert.assertEquals("storyClient", attributes.get("client-name"));
-            Assert.assertEquals("1", attributes.get("version"));
+            Assertions.assertNotNull(attributes);
+            Assertions.assertEquals("jan2019", attributes.get("story-id"));
+            Assertions.assertEquals("storyClient", attributes.get("client-name"));
+            Assertions.assertEquals("1", attributes.get("version"));
         }
     }
 }

@@ -9,6 +9,8 @@ pluginManagement {
     }
 }
 
+enableFeaturePreview("VERSION_CATALOGS")
+
 rootProject.name = 'micronaut'
 
 include "aop"

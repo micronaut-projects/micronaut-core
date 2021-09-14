@@ -6,8 +6,8 @@ dependencies {
 //    api "com.google.testing.compile:compile-testing:0.19", {
 //        exclude group:'com.google.truth', module:'truth'
 //    }
-    api dependencyModuleVersion("groovy", "groovy")
-    api(dependencyVersion("spock")) {
+    api libs.managed.groovy
+    api(libs.managed.spock) {
         exclude module:'groovy-all'
     }
     if (!JavaVersion.current().isJava9Compatible()) {
@@ -16,12 +16,12 @@ dependencies {
 
     testAnnotationProcessor project(":inject-java")
     testCompileOnly project(":inject-groovy")
-    testImplementation dependencyVersion("validation")
-    testImplementation "javax.persistence:javax.persistence-api:2.2"
+    testImplementation libs.managed.validation
+    testImplementation libs.javax.persistence
     testImplementation project(":runtime")
-    testImplementation group: 'javax.inject', name: 'javax.inject', version: '1'
-    testImplementation "com.blazebit:blaze-persistence-core-impl:1.6.0-Alpha1"
-    testImplementation 'io.smallrye:smallrye-fault-tolerance:5.1.0'
+    testImplementation libs.javax.inject
+    testImplementation libs.blaze.persistence.core
+    testImplementation libs.smallrye
 }
 
 afterEvaluate {

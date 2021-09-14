@@ -16,7 +16,6 @@ import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Produces
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
-import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -169,6 +168,16 @@ class ClientRedirectSpec extends Specification {
 
         cleanup:
         otherServer.close()
+    }
+
+    void "test redirecting with Publisher<Void> return type"() {
+        JavaClient client = embeddedServer.applicationContext.getBean(JavaClient)
+
+        when:
+        client.subscribe(client.redirect())
+
+        then:
+        noExceptionThrown()
     }
 
     @Requires(property = 'spec.name', value = 'ClientRedirectSpec')

@@ -18,14 +18,14 @@ package io.micronaut.http.client.docs.streaming;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.publisher.Flux;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import static io.micronaut.http.HttpRequest.GET;
-import static org.junit.Assert.*;
 
 /**
  * @author graemerocher
@@ -44,8 +44,8 @@ public class HeadlineControllerTest {
             Headline headline = headlineClient.streamHeadlines() // <2>
                     .blockFirst(); // <3>
 
-            assertNotNull( headline );
-            assertTrue( headline.getText().startsWith("Latest Headline") );
+            Assertions.assertNotNull( headline );
+            Assertions.assertTrue( headline.getText().startsWith("Latest Headline") );
         }
     }
     // end::streamingClient[]
@@ -84,10 +84,10 @@ public class HeadlineControllerTest {
         // end::streaming[]
         try {
             Headline headline = future.get(3, TimeUnit.SECONDS);
-            assertTrue(headline.getText().startsWith("Latest Headline"));
+            Assertions.assertTrue(headline.getText().startsWith("Latest Headline"));
 
         } catch (Throwable e) {
-            fail("Asynchronous error occurred: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
+            Assertions.fail("Asynchronous error occurred: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
         }
 
         //cleanup:

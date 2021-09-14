@@ -5,7 +5,7 @@ dependencies {
     if (!JavaVersion.current().isJava9Compatible()) {
         compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
-    compileOnly dependencyVersion("validation")
+    compileOnly libs.managed.validation
 
     testImplementation project(":context")
     testImplementation project(':aop')
@@ -14,29 +14,33 @@ dependencies {
     testImplementation project(":inject-test-utils")
     testImplementation project(":runtime")
 
-    testImplementation dependencyVersion("reactor")
+    testImplementation libs.managed.reactor
 
-    testImplementation dependencyVersion("spotbugs")
-    testImplementation "org.hibernate:hibernate-core:5.4.29.Final"
-    testImplementation "junit:junit:4.13.2"
-    testImplementation "com.google.testing.compile:compile-testing:0.19"
-    testImplementation 'org.mongodb:mongo-java-driver:3.12.10'
-    testImplementation 'org.neo4j.driver:neo4j-java-driver:1.4.5'
-    testImplementation dependencyModuleVersion("groovy", "groovy-json")
+    testImplementation libs.managed.spotbugs
+    testImplementation libs.hibernate
+    testImplementation libs.junit4
+    testImplementation libs.compile.testing
+    testImplementation libs.mongo.javadriver
+    testImplementation(libs.managed.neo4j.bolt) {
+        version {
+            require "1.4.5"
+        }
+    }
+    testImplementation libs.managed.groovy.json
     if (!JavaVersion.current().isJava9Compatible()) {
         testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
-    testImplementation dependencyModuleVersion("micrometer", "micrometer-core")
+    testImplementation libs.managed.micrometer.core
     testImplementation project(":validation")
-    testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
-    testImplementation dependencyVersion("zipkin.reporter")
-    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-core"), {
+    testImplementation libs.junit.jupiter.api
+    testImplementation libs.managed.zipkin.reporter
+    testImplementation(libs.managed.micronaut.test.core) {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-bom'
         exclude module:'micronaut-inject'
     }
-    testRuntimeOnly 'org.glassfish.web:el-impl:2.2.1-b05'
-    testRuntimeOnly 'org.glassfish:javax.el:3.0.1-b12'
+    testRuntimeOnly libs.javax.el.impl
+    testRuntimeOnly libs.javax.el
 }
 
 //compileTestJava.options.fork = true

@@ -19,6 +19,7 @@ import io.micronaut.docs.streaming.Headline
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.sse.Event
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 
 import static io.micronaut.http.MediaType.TEXT_EVENT_STREAM
@@ -28,6 +29,6 @@ import static io.micronaut.http.MediaType.TEXT_EVENT_STREAM
 interface HeadlineClient {
 
     @Get(value = "/headlines", processes = TEXT_EVENT_STREAM)
-    Flux<Event<Headline>> streamHeadlines()
+    Publisher<Event<Headline>> streamHeadlines()
 }
 // end::class[]

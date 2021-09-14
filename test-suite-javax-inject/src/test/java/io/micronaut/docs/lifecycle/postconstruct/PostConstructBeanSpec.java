@@ -16,10 +16,8 @@
 package io.micronaut.docs.lifecycle.postconstruct;
 
 import io.micronaut.context.BeanContext;
-import org.junit.Assert;
-import org.junit.Test;
-
-import static org.junit.Assert.assertTrue;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 public class PostConstructBeanSpec {
 
@@ -28,9 +26,9 @@ public class PostConstructBeanSpec {
         // tag::start[]
         try(BeanContext ctx = BeanContext.run()) {
             final B bean = ctx.getBean(B.class);
-            Assert.assertNotNull(bean.getA());
-            assertTrue(bean.injectedFirst);
-            assertTrue(bean.setupComplete);
+            Assertions.assertNotNull(bean.getA());
+            Assertions.assertTrue(bean.injectedFirst);
+            Assertions.assertTrue(bean.setupComplete);
         }
     }
 }

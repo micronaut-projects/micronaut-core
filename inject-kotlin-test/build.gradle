@@ -7,8 +7,8 @@ dependencies {
     annotationProcessor project(":inject-java")
 
     api project(":inject-java")
-    api dependencyModuleVersion("groovy", "groovy")
-    api(dependencyVersion("spock")) {
+    api libs.managed.groovy
+    api(libs.managed.spock) {
         exclude module:'groovy-all'
     }
     if (!JavaVersion.current().isJava9Compatible()) {
@@ -17,14 +17,14 @@ dependencies {
 
     testAnnotationProcessor project(":inject-java")
     testCompileOnly project(":inject-groovy")
-    testImplementation dependencyVersion("validation")
-    testImplementation "javax.persistence:javax.persistence-api:2.2"
+    testImplementation libs.managed.validation
+    testImplementation libs.javax.persistence
     testImplementation project(":runtime")
-    api "com.blazebit:blaze-persistence-core-impl:1.6.0-Alpha1"
+    api libs.blaze.persistence.core
 
-    implementation "org.jetbrains.kotlin:kotlin-compiler-embeddable:$kotlinVersion"
-    implementation "org.jetbrains.kotlin:kotlin-annotation-processing-embeddable:$kotlinVersion"
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
+    implementation libs.kotlin.compiler.embeddable
+    implementation libs.kotlin.annotation.processing.embeddable
+    implementation libs.kotlin.stdlib
 }
 
 afterEvaluate {

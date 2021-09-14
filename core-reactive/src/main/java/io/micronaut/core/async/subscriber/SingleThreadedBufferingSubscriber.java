@@ -87,25 +87,32 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
 
             case DEMANDING:
                 try {
-                    try {
-                        doOnNext(message);
-                    } catch (Exception e) {
-                        onError(e);
-                    }
+                    forwardMessageDownstream(message);
                 } finally {
-                    if (upstreamState != BackPressureState.DONE && upstreamDemand < Long.MAX_VALUE) {
-                        upstreamDemand--;
-                        if (upstreamDemand == 0 && upstreamState != BackPressureState.FLOWING) {
-                            if (upstreamBuffer.isEmpty()) {
-                                upstreamState = BackPressureState.IDLE;
-                            } else {
-                                upstreamState = BackPressureState.BUFFERING;
-                            }
+                    if (upstreamDemand == 0 && upstreamState != BackPressureState.FLOWING && upstreamState != BackPressureState.DONE) {
+                        if (upstreamBuffer.isEmpty()) {
+                            upstreamState = BackPressureState.IDLE;
+                        } else {
+                            upstreamState = BackPressureState.BUFFERING;
                         }
                     }
                 }
             default:
                 // no-op
+        }
+    }
+
+    private void forwardMessageDownstream(T message) {
+        try {
+            try {
+                doOnNext(message);
+            } catch (Exception e) {
+                onError(e);
+            }
+        } finally {
+            if (upstreamState != BackPressureState.DONE && upstreamDemand < Long.MAX_VALUE) {
+                upstreamDemand--;
+            }
         }
     }
 
@@ -180,7 +187,7 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
 
     private void flushBuffer() {
         while (!upstreamBuffer.isEmpty() && (upstreamDemand > 0 || upstreamDemand == Long.MAX_VALUE)) {
-            onNext(upstreamBuffer.remove());
+            forwardMessageDownstream(upstreamBuffer.remove());
         }
         if (upstreamBuffer.isEmpty()) {
             if (upstreamDemand > 0) {

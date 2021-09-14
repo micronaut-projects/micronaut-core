@@ -15,17 +15,9 @@
  */
 package io.micronaut.http.client.docs.annotation;
 
-// tag::imports[]
 import io.micronaut.http.annotation.Controller;
 import reactor.core.publisher.Mono;
-// end::imports[]
 
-
-/**
- * @author graemerocher
- * @since 1.0
- */
-// tag::class[]
 @Controller("/pets")
 class PetController implements PetOperations {
 
@@ -38,4 +30,3 @@ class PetController implements PetOperations {
         return Mono.just(pet);
     }
 }
-// end::class[]

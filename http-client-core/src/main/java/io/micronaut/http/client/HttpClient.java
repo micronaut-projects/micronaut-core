@@ -17,7 +17,6 @@ package io.micronaut.http.client;
 
 import io.micronaut.context.LifeCycle;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
@@ -26,6 +25,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.hateoas.JsonError;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 import java.io.Closeable;
 import java.net.URL;
@@ -152,7 +152,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @return A {@link Publisher} that emits a result of the given type
      */
     default <I, O, E> Publisher<O> retrieve(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
-        return Publishers.map(exchange(request, bodyType, errorType), response -> {
+        return Flux.from(exchange(request, bodyType, errorType)).map(response -> {
             if (bodyType.getType() == HttpStatus.class) {
                 return (O) response.getStatus();
             } else {

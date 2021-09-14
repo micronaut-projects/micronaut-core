@@ -23,7 +23,8 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 
 import java.util.Collections;
@@ -32,8 +33,6 @@ import java.util.Optional;
 
 import static io.micronaut.http.HttpRequest.GET;
 import static io.micronaut.http.HttpRequest.POST;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 /**
  * @author graemerocher
@@ -50,11 +49,11 @@ public class HelloControllerTest {
         String uri = UriBuilder.of("/hello/{name}")
                                .expand(Collections.singletonMap("name", "John"))
                                .toString();
-        assertEquals("/hello/John", uri);
+        Assertions.assertEquals("/hello/John", uri);
 
         String result = client.toBlocking().retrieve(uri);
 
-        assertEquals(
+        Assertions.assertEquals(
                 "Hello John",
                 result
         );
@@ -76,7 +75,7 @@ public class HelloControllerTest {
         ));
         // end::headers[]
 
-        assertEquals(
+        Assertions.assertEquals(
                 "Hello John",
                 response.blockFirst()
         );
@@ -96,7 +95,7 @@ public class HelloControllerTest {
         ));
         // end::jsonmap[]
 
-        assertEquals(
+        Assertions.assertEquals(
                 "Hello John",
                 response.blockFirst().get("text")
         );
@@ -108,7 +107,7 @@ public class HelloControllerTest {
         ));
         // end::jsonmaptypes[]
 
-        assertEquals(
+        Assertions.assertEquals(
                 "Hello John",
                 response.blockFirst().get("text")
         );
@@ -126,7 +125,7 @@ public class HelloControllerTest {
                 GET("/greet/John"), Message.class
         ));
 
-        assertEquals(
+        Assertions.assertEquals(
                 "Hello John",
                 response.blockFirst().getText()
         );
@@ -149,13 +148,13 @@ public class HelloControllerTest {
         HttpResponse<Message> response = call.blockFirst();
         Optional<Message> message = response.getBody(Message.class); // <2>
         // check the status
-        assertEquals(
+        Assertions.assertEquals(
                 HttpStatus.OK,
                 response.getStatus() // <3>
         );
         // check the body
-        assertTrue(message.isPresent());
-        assertEquals(
+        Assertions.assertTrue(message.isPresent());
+        Assertions.assertEquals(
                 "Hello John",
                 message.get().getText()
         );
@@ -182,13 +181,13 @@ public class HelloControllerTest {
         HttpResponse<String> response = call.blockFirst();
         Optional<String> message = response.getBody(String.class); // <2>
         // check the status
-        assertEquals(
+        Assertions.assertEquals(
                 HttpStatus.CREATED,
                 response.getStatus() // <3>
         );
         // check the body
-        assertTrue(message.isPresent());
-        assertEquals(
+        Assertions.assertTrue(message.isPresent());
+        Assertions.assertEquals(
                 "Hello John",
                 message.get()
         );
@@ -212,17 +211,16 @@ public class HelloControllerTest {
         HttpResponse<Message> response = call.blockFirst();
         Optional<Message> message = response.getBody(Message.class); // <2>
         // check the status
-        assertEquals(
+        Assertions.assertEquals(
                 HttpStatus.CREATED,
                 response.getStatus() // <3>
         );
         // check the body
-        assertTrue(message.isPresent());
-        assertEquals(
+        Assertions.assertTrue(message.isPresent());
+        Assertions.assertEquals(
                 "Hello John",
                 message.get().getText()
         );
-
 
         embeddedServer.stop();
         client.stop();
