@@ -151,7 +151,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
                             new ConfigurationException("Could not resolve expression: [" + expression + "] in placeholder ${" + context + "}"));
         }
         if (NameUtils.isEnvironmentName(expression)) {
-            String envVar = System.getenv(expression);
+            String envVar = CachedEnvironment.getenv(expression);
             if (StringUtils.isNotEmpty(envVar)) {
                 return conversionService.convert(envVar, type)
                         .orElseThrow(() ->

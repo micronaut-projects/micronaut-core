@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.reflect.ClassUtils;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -50,49 +51,66 @@ import java.util.function.Supplier;
 public class Publishers {
 
     @SuppressWarnings("ConstantName")
-    private static final List<Class<?>> REACTIVE_TYPES = new ArrayList<>(3);
+    private static final List<Class<?>> REACTIVE_TYPES;
     @SuppressWarnings("ConstantName")
-    private static final List<Class<?>> SINGLE_TYPES = new ArrayList<>(3);
+    private static final List<Class<?>> SINGLE_TYPES;
 
-    private static final List<Class<?>> COMPLETABLE_TYPES = new ArrayList<>(3);
+    private static final List<Class<?>> COMPLETABLE_TYPES;
 
     static {
+        List<Class<?>> reactiveTypes ;
+        List<Class<?>> singleTypes;
+        List<Class<?>> completableTypes;
         ClassLoader classLoader = Publishers.class.getClassLoader();
-        Publishers.SINGLE_TYPES.add(CompletableFuturePublisher.class);
-        Publishers.SINGLE_TYPES.add(JustPublisher.class);
-        COMPLETABLE_TYPES.add(Completable.class);
-        List<String> typeNames = Arrays.asList(
-            "io.reactivex.Observable",
-            "reactor.core.publisher.Flux",
-            "kotlinx.coroutines.flow.Flow",
-            "io.reactivex.rxjava3.core.Flowable",
-            "io.reactivex.rxjava3.core.Observable"
-        );
-        for (String name : typeNames) {
-            Optional<Class> aClass = ClassUtils.forName(name, classLoader);
-            aClass.ifPresent(Publishers.REACTIVE_TYPES::add);
-        }
-        for (String name : Arrays.asList(
-                "io.reactivex.Single",
-                "reactor.core.publisher.Mono",
-                "io.reactivex.Maybe",
-                "io.reactivex.rxjava3.core.Single",
-                "io.reactivex.rxjava3.core.Maybe"
-                )) {
-            Optional<Class> aClass = ClassUtils.forName(name, classLoader);
-            aClass.ifPresent(aClass1 -> {
-                Publishers.SINGLE_TYPES.add(aClass1);
-                Publishers.REACTIVE_TYPES.add(aClass1);
-            });
-        }
+        Optional<PublishersOptimizations> publishers = StaticOptimizations.get(PublishersOptimizations.class);
+        if (publishers.isPresent()) {
+            PublishersOptimizations optimizations = publishers.get();
+            reactiveTypes = optimizations.getReactiveTypes();
+            singleTypes = optimizations.getSingleTypes();
+            completableTypes = optimizations.getCompletableTypes();
+        } else {
+            reactiveTypes = new ArrayList<>(3);
+            singleTypes = new ArrayList<>(3);
+            completableTypes = new ArrayList<>(3);
+            singleTypes.add(CompletableFuturePublisher.class);
+            singleTypes.add(JustPublisher.class);
+            completableTypes.add(Completable.class);
+            List<String> typeNames = Arrays.asList(
+                    "io.reactivex.Observable",
+                    "reactor.core.publisher.Flux",
+                    "kotlinx.coroutines.flow.Flow",
+                    "io.reactivex.rxjava3.core.Flowable",
+                    "io.reactivex.rxjava3.core.Observable"
+            );
+            for (String name : typeNames) {
+                Optional<Class> aClass = ClassUtils.forName(name, classLoader);
+                aClass.ifPresent(reactiveTypes::add);
+            }
+            for (String name : Arrays.asList(
+                    "io.reactivex.Single",
+                    "reactor.core.publisher.Mono",
+                    "io.reactivex.Maybe",
+                    "io.reactivex.rxjava3.core.Single",
+                    "io.reactivex.rxjava3.core.Maybe"
+            )) {
+                Optional<Class> aClass = ClassUtils.forName(name, classLoader);
+                aClass.ifPresent(aClass1 -> {
+                    singleTypes.add(aClass1);
+                    reactiveTypes.add(aClass1);
+                });
+            }
 
-        for (String name : Arrays.asList("io.reactivex.Completable", "io.reactivex.rxjava3.core.Completable")) {
-            Optional<Class> aClass = ClassUtils.forName(name, classLoader);
-            aClass.ifPresent(aClass1 -> {
-                Publishers.COMPLETABLE_TYPES.add(aClass1);
-                Publishers.REACTIVE_TYPES.add(aClass1);
-            });
+            for (String name : Arrays.asList("io.reactivex.Completable", "io.reactivex.rxjava3.core.Completable")) {
+                Optional<Class> aClass = ClassUtils.forName(name, classLoader);
+                aClass.ifPresent(aClass1 -> {
+                    completableTypes.add(aClass1);
+                    reactiveTypes.add(aClass1);
+                });
+            }
         }
+        REACTIVE_TYPES = reactiveTypes;
+        SINGLE_TYPES = singleTypes;
+        COMPLETABLE_TYPES = completableTypes;
     }
 
     /**
@@ -135,6 +153,20 @@ public class Publishers {
      */
     public static List<Class<?>> getKnownReactiveTypes() {
         return Collections.unmodifiableList(new ArrayList<>(REACTIVE_TYPES));
+    }
+
+    /**
+     * @return A list of known single types.
+     */
+    public static List<Class<?>> getKnownSingleTypes() {
+        return Collections.unmodifiableList(new ArrayList<>(SINGLE_TYPES));
+    }
+
+    /**
+     * @return A list of known single types.
+     */
+    public static List<Class<?>> getKnownCompletableTypes() {
+        return Collections.unmodifiableList(new ArrayList<>(COMPLETABLE_TYPES));
     }
 
     /**
@@ -370,6 +402,9 @@ public class Publishers {
         if (Publisher.class.isAssignableFrom(type)) {
             return true;
         } else {
+            if (type.isPrimitive() || packageOf(type).startsWith("java.")) {
+                return false;
+            }
             for (Class<?> reactiveType : REACTIVE_TYPES) {
                 if (reactiveType.isAssignableFrom(type)) {
                     return true;
@@ -377,6 +412,14 @@ public class Publishers {
             }
             return false;
         }
+    }
+
+    private static String packageOf(Class<?> type) {
+        Package pkg = type.getPackage();
+        if (pkg == null) {
+            return "";
+        }
+        return pkg.getName();
     }
 
     /**
@@ -497,7 +540,7 @@ public class Publishers {
      *
      * @param <T> The type
      */
-    private static class JustPublisher<T> implements MicronautPublisher<T> {
+    public static class JustPublisher<T> implements MicronautPublisher<T> {
         private final T value;
 
         public JustPublisher(T value) {

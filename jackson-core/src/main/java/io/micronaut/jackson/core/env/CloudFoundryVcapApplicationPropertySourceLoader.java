@@ -16,6 +16,7 @@
 package io.micronaut.jackson.core.env;
 
 import com.fasterxml.jackson.core.JsonParseException;
+import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.MapPropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
@@ -57,7 +58,7 @@ public class CloudFoundryVcapApplicationPropertySourceLoader extends EnvJsonProp
 
     @Override
     protected String getEnvValue() {
-        return System.getenv(VCAP_APPLICATION);
+        return CachedEnvironment.getenv(VCAP_APPLICATION);
     }
 
     @Override

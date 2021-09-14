@@ -30,7 +30,7 @@ import java.util.function.Supplier;
  * @author Graeme Rocher
  * @since 1.0
  */
-class CompletableFuturePublisher<T> implements Publishers.MicronautPublisher<T> {
+public class CompletableFuturePublisher<T> implements Publishers.MicronautPublisher<T> {
 
     private final Supplier<CompletableFuture<T>> futureSupplier;
 
