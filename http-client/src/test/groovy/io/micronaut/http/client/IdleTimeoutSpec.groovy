@@ -9,6 +9,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.channel.Channel
 import io.netty.channel.pool.AbstractChannelPoolMap
+import spock.lang.Retry
 import spock.lang.Specification
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -16,6 +17,7 @@ import spock.util.concurrent.PollingConditions
 
 import java.lang.reflect.Field
 
+@Retry
 class IdleTimeoutSpec extends Specification {
 
     @AutoCleanup

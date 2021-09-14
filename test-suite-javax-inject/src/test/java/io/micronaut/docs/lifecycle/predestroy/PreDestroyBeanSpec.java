@@ -16,9 +16,8 @@
 package io.micronaut.docs.lifecycle.predestroy;
 
 import io.micronaut.context.BeanContext;
-import org.junit.Test;
-
-import static org.junit.Assert.assertTrue;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 public class PreDestroyBeanSpec {
 
@@ -31,7 +30,7 @@ public class PreDestroyBeanSpec {
         ctx.stop();
         // end::start[]
 
-        assertTrue(preDestroyBean.stopped.get());
-        assertTrue(connection.stopped.get());
+        Assertions.assertTrue(preDestroyBean.stopped.get());
+        Assertions.assertTrue(connection.stopped.get());
     }
 }

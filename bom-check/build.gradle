@@ -1,8 +1,5 @@
-import groovy.xml.XmlSlurper
-
 plugins {
-    id 'java'
-    id 'java-library'
+    id 'io.micronaut.build.internal.bom-checker'
 }
 
 repositories {
@@ -11,86 +8,9 @@ repositories {
 
 boolean micronautSnapshot = rootProject.version.toString().endsWith("-SNAPSHOT")
 
-// checks all the BOMs are resolvable from central
-task("checkBom") {
-    doLast {
-        // verify BOMs
-        def centralURL = repositories.findByName("MavenRepo").url
-        List<String> errors = []
-        for (dep in bomVersions) {
-            def info = dep.value
-            def versionExpr = info.version
-
-            def pom = new groovy.xml.XmlSlurper()
-                    .parse("$centralURL${info.group.replace('.', '/')}/${info.name}/$versionExpr/${info.name}-${versionExpr}.pom")
-            if (!info.group.startsWith("io.micronaut")) {
-                pom.dependencyManagement.dependencies.dependency.each {
-
-                    String groupId = it.groupId.text()
-                    groupId = groupId.replace('${project.groupId}', info.group)
-
-                    if (!groupId.startsWith(info.group)) {
-                        errors << "Error validating BOM [${info.name}]: includes the dependency [${it.groupId}:${it.artifactId}:${it.version}] that doesn't belong to the group id of the BOM: [${info.group}]".toString()
-                    }
-
-                }
-            }
-
-        }
-
-        // verify dependencies
-        for (dep in dependencyVersions) {
-            def info = dep.value
-            // don't include snapshots
-            if (info.version.toString().endsWith("-SNAPSHOT") && !micronautSnapshot) {
-                continue
-            }
-
-            def versionExpr = dep.value.version
-            def moduleName = info.name
-            if (moduleName) {
-                validatePom(centralURL, info, moduleName, versionExpr, errors)
-            }
-            info.modules?.each {
-                validatePom(centralURL, info, it, versionExpr, errors)
-            }
-
-        }
-
-        if (errors) {
-            throw new GradleException("Bom Check Failed: " + errors.join("\n"))
-        }
-    }
-}
-
-check.dependsOn(checkBom)
-
-private validatePom(centralURL, info, moduleName, versionExpr, List errors) {
-    def pom = null
-
-    try {
-        pom = new XmlSlurper()
-                .parse("$centralURL${info.group.replace('.', '/')}/${moduleName}/$versionExpr/${moduleName}-${versionExpr}.pom")
-    } catch (e) {
-        println "WARNING: Dependency ${moduleName} is not in Maven Central or has an invalid POM: $e.message"
-    }
-
-    // try other repos
-    if (pom == null) {
-        for (repo in repositories) {
-            try {
-                def url = "${repo.url}${info.group.replace('.', '/')}/${moduleName}/$versionExpr/${moduleName}-${versionExpr}.pom"
-                pom = new XmlSlurper()
-                        .parse(url)
-                if (pom != null) {
-                    break
-                }
-            } catch (e) {
-
-            }
-        }
-    }
-    if (pom == null) {
-        errors << "Error validating POM for dependency [${moduleName}]: POM Not Found or not Parseable".toString()
+tasks.withType(io.micronaut.build.internal.pom.PomChecker).configureEach {
+    onlyIf {
+        // We only perform validation on releases
+        !micronautSnapshot || providers.gradleProperty("force.check.bom").isPresent()
     }
 }

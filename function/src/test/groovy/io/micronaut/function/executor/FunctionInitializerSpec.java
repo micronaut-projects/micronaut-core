@@ -17,10 +17,11 @@ package io.micronaut.function.executor;
 
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-import org.junit.Assert;
-import org.junit.Test;
 
 import jakarta.annotation.PostConstruct;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -33,9 +34,9 @@ public class FunctionInitializerSpec   {
     @Test
     public void testFunctionInitializer() {
         MathFunction mathFunction = new MathFunction();
-        Assert.assertEquals(1, MathFunction.initCount.get());
-        Assert.assertEquals(1, MathFunction.injectCount.get());
-        Assert.assertEquals(2, mathFunction.round(1.6f));
+        Assertions.assertEquals(1, MathFunction.initCount.get());
+        Assertions.assertEquals(1, MathFunction.injectCount.get());
+        Assertions.assertEquals(2, mathFunction.round(1.6f));
     }
 
     @Singleton

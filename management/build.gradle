@@ -4,26 +4,25 @@ dependencies {
 
     api project(":router")
     api project(":runtime")
-    compileOnly dependencyModuleVersion("micronaut.sql", "micronaut-jdbc"), {
+    compileOnly(libs.managed.micronaut.sql.jdbc) {
         exclude module:'micronaut-inject'
         exclude module:'micronaut-bom'
     }
 
-    implementation dependencyVersion("reactor")
+    implementation libs.managed.reactor
 
     testImplementation project(":http-client")
     testImplementation project(":inject-groovy")
     testImplementation project(":http-server-netty")
-    testImplementation dependencyModuleVersion("micronaut.sql", "micronaut-jdbc-tomcat"), {
+    testImplementation(libs.managed.micronaut.sql.jdbc.tomcat) {
         exclude module:'micronaut-inject'
         exclude module:'micronaut-bom'
     }
-    testImplementation dependencyModuleVersion("groovy", "groovy-json")
-    testImplementation dependencyVersion("h2")
-    testImplementation "mysql:mysql-connector-java:8.0.26"
+    testImplementation libs.managed.groovy.json
+    testImplementation libs.managed.h2
+    testImplementation libs.mysql.driver
 
-    compileOnly "ch.qos.logback:logback-classic:1.2.3"
-    compileOnly "org.apache.logging.log4j:log4j-core:2.14.1"
+    compileOnly libs.managed.logback
+    compileOnly libs.log4j
 
 }
-

@@ -21,18 +21,18 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 import java.util.Optional;
 import static io.micronaut.http.HttpRequest.POST;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 /**
  * @author graemerocher
  * @since 1.0
  */
 public class BookControllerTest {
+
     @Test
     public void testPostWithURITemplate() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
@@ -48,13 +48,13 @@ public class BookControllerTest {
         HttpResponse<Book> response = call.blockFirst();
         Optional<Book> message = response.getBody(Book.class); // <2>
         // check the status
-        assertEquals(
+        Assertions.assertEquals(
                 HttpStatus.CREATED,
                 response.getStatus() // <3>
         );
         // check the body
-        assertTrue(message.isPresent());
-        assertEquals(
+        Assertions.assertTrue(message.isPresent());
+        Assertions.assertEquals(
                 "The Stand",
                 message.get().getTitle()
         );
@@ -79,13 +79,13 @@ public class BookControllerTest {
         HttpResponse<Book> response = call.blockFirst();
         Optional<Book> message = response.getBody(Book.class); // <2>
         // check the status
-        assertEquals(
+        Assertions.assertEquals(
                 HttpStatus.CREATED,
                 response.getStatus() // <3>
         );
         // check the body
-        assertTrue(message.isPresent());
-        assertEquals(
+        Assertions.assertTrue(message.isPresent());
+        Assertions.assertEquals(
                 "The Stand",
                 message.get().getTitle()
         );

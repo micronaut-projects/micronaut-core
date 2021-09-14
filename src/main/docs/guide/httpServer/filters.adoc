@@ -77,8 +77,7 @@ The api:http.annotation.Filter[] can use different styles of pattern for path ma
 |`customer/**/*.html`
 |customer/index.html, customer/adam/profile.html, customer/adam/job/description.html
 
-
-When using `patternStyle = FilterPatternStyle.REGEX`, the `pattern` attribute is expected to contain a regular expression which will be matched against the URLs.
+The other option is regular expression based matching. To use regular expressions, set `patternStyle = FilterPatternStyle.REGEX`. The `pattern` attribute is expected to contain a regular expression which will be expected to match the provided URLs exactly (using link:{jdkapi}/java/util/regex/Matcher.html#matches--[Matcher#matches]).
 
 NOTE: Using `FilterPatternStyle.ANT` is preferred as the pattern matching is more performant than using regular expressions. `FilterPatternStyle.REGEX` should be used when your pattern cannot be written properly using Ant.
 

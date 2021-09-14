@@ -83,6 +83,16 @@ class HttpGetSpec extends Specification {
         body.get() == 'success'
     }
 
+    void "test simple get with Publisher<Void> return"() {
+        JavaClient javaClient = embeddedServer.applicationContext.getBean(JavaClient)
+
+        when:
+        javaClient.subscribe(javaClient.simple())
+
+        then:
+        noExceptionThrown()
+    }
+
     void "test simple 404 request"() {
         when:
         Flux<?> flowable = Flux.from(client.exchange(
@@ -588,6 +598,17 @@ class HttpGetSpec extends Specification {
     }
 
     @Requires(property = 'spec.name', value = 'HttpGetSpec')
+    void "test deserializing map wrapped by Reactive type"() {
+        when:
+        def response = Mono.from(myGetClient.reactiveMap()).block()
+        def book1 = response.get("key1")
+
+        then:
+        book1 instanceof Book
+        book1.title == "title1"
+    }
+
+    @Requires(property = 'spec.name', value = 'HttpGetSpec')
     @Controller("/get")
     static class GetController {
 
@@ -700,6 +721,13 @@ class HttpGetSpec extends Specification {
         @Get(value = "/invalidContentType", produces = "does/notexist")
         String invalidContentType() {
             return "hello"
+        }
+
+        @Get("/reactiveMap")
+        @SingleResult
+        Publisher<Map<String, Book>> reactiveMap() {
+            def map = ["key1": new Book(title: "title1"), "key2": new Book(title: "title2")]
+            return Mono.just(map)
         }
 
         @Get(value = "/nestedPublishers")
@@ -880,6 +908,10 @@ class HttpGetSpec extends Specification {
         @Get(value = "/invalidContentType", consumes = "does/notexist")
         @SingleResult
         Publisher<Book> invalidContentTypeReactive()
+
+        @Get("/reactiveMap")
+        @SingleResult
+        Publisher<Map<String, Book>> reactiveMap()
     }
 
     @Requires(property = 'spec.name', value = 'HttpGetSpec')

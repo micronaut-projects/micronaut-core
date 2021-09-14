@@ -15,14 +15,23 @@
  */
 package io.micronaut.http.server.netty.types
 
+
+import com.fasterxml.jackson.databind.json.JsonMapper
+import com.fasterxml.jackson.databind.node.JsonNodeFactory
+import com.fasterxml.jackson.databind.node.ObjectNode
+import groovy.transform.CompileStatic
 import io.micronaut.context.annotation.Requires
-import io.micronaut.http.*
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.MediaType
+import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.http.server.netty.types.files.FileTypeHandler
-import io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration
 import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType
 import io.micronaut.http.server.types.files.StreamedFile
@@ -38,7 +47,13 @@ import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ExecutorService
 
-import static io.micronaut.http.HttpHeaders.*
+import static io.micronaut.http.HttpHeaders.CACHE_CONTROL
+import static io.micronaut.http.HttpHeaders.CONTENT_DISPOSITION
+import static io.micronaut.http.HttpHeaders.CONTENT_LENGTH
+import static io.micronaut.http.HttpHeaders.CONTENT_TYPE
+import static io.micronaut.http.HttpHeaders.DATE
+import static io.micronaut.http.HttpHeaders.EXPIRES
+import static io.micronaut.http.HttpHeaders.LAST_MODIFIED
 
 class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
@@ -96,10 +111,11 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
         when:
         def response = e.response
+        def body = sortJson(response.body())
 
         then:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
-        response.body() == '{"message":"Internal Server Error","_links":{"self":{"href":"/test/not-found","templated":false}},"_embedded":{"errors":[{"message":"Internal Server Error: Could not find file"}]}}'
+        body == '{"_embedded":{"errors":[{"message":"Internal Server Error: Could not find file"}]},"_links":{"self":{"href":"/test/not-found","templated":false}},"message":"Internal Server Error"}'
     }
 
     void "test when an attached file is returned"() {
@@ -262,7 +278,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test supports"() {
         when:
-        FileTypeHandler fileTypeHandler = new FileTypeHandler(new FileTypeHandlerConfiguration())
+        FileTypeHandler fileTypeHandler = new FileTypeHandler(new NettyHttpServerConfiguration.FileTypeHandlerConfiguration())
 
         then:
         fileTypeHandler.supports(type) == expected
@@ -365,5 +381,22 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
             return new StreamedFile(input, MediaType.TEXT_PLAIN_TYPE)
         }
 
+    }
+
+    @CompileStatic
+    private static String sortJson(String input) {
+        def mapper = JsonMapper.builder()
+                .nodeFactory(new SortingNodeFactory())
+                .build()
+        def tree = mapper.readTree(input)
+        mapper.writeValueAsString(tree)
+    }
+
+    @CompileStatic
+    static class SortingNodeFactory extends JsonNodeFactory {
+        @Override
+        ObjectNode objectNode() {
+            return new ObjectNode(this, new TreeMap<>())
+        }
     }
 }

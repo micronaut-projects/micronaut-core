@@ -44,6 +44,15 @@ class DefaultBeanIntrospector implements BeanIntrospector {
     private static final Logger LOG = ClassUtils.getLogger(DefaultBeanIntrospector.class);
 
     private Map<String, BeanIntrospectionReference<Object>> introspectionMap;
+    private final ClassLoader classLoader;
+
+    DefaultBeanIntrospector() {
+        this.classLoader = DefaultBeanIntrospector.class.getClassLoader();
+    }
+
+    DefaultBeanIntrospector(ClassLoader classLoader) {
+        this.classLoader = classLoader;
+    }
 
     @NonNull
     @Override
@@ -100,7 +109,7 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                 introspectionMap = this.introspectionMap;
                 if (introspectionMap == null) {
                     introspectionMap = new HashMap<>(30);
-                    final SoftServiceLoader<BeanIntrospectionReference> services = SoftServiceLoader.load(BeanIntrospectionReference.class);
+                    final SoftServiceLoader<BeanIntrospectionReference> services = SoftServiceLoader.load(BeanIntrospectionReference.class, classLoader);
 
                     for (ServiceDefinition<BeanIntrospectionReference> definition : services) {
                         if (definition.isPresent()) {

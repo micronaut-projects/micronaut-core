@@ -163,9 +163,8 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         final BeanDefinitionWriter beanDefinitionWriter = beanDefinitionBuilder.build();
         if (beanDefinitionWriter != null) {
             beanDefinitionWriter.accept(classWriterOutputVisitor);
-            String beanTypeName = beanDefinitionWriter.getBeanTypeName();
             BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
-                    new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionWriter);
+                    new BeanDefinitionReferenceWriter(beanDefinitionWriter);
             beanDefinitionReferenceWriter
                     .setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
             beanDefinitionReferenceWriter.accept(classWriterOutputVisitor);

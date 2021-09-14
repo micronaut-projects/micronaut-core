@@ -17,7 +17,7 @@ dependencies {
     api project(":inject")
 
     testImplementation project(":context")
-    testImplementation dependencyModuleVersion("netty", "netty-codec-http")
+    testImplementation libs.managed.netty.codec.http
     testImplementation project(":http-server-netty")
     testImplementation project(":http-client")
     testImplementation project(":validation")
@@ -31,47 +31,51 @@ dependencies {
     testImplementation project(":function-client")
     testImplementation project(":function-web")
     testImplementation project(":session")
-    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-junit5"), {
+    testImplementation(libs.managed.micronaut.test.junit5) {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
-    testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
+    testImplementation libs.junit.jupiter.api
 
-    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-spock"), {
+    testImplementation(libs.managed.micronaut.test.spock) {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
 
-    testImplementation dependencyVersion("jcache")
-    testImplementation dependencyVersion("jaeger")
-    testImplementation dependencyModuleVersion("groovy", "groovy-json")
+    testImplementation libs.managed.jcache
+    testImplementation libs.managed.jaeger
+    testImplementation libs.managed.groovy.json
     // tag::testcontainers-dependencies[]
-    testImplementation "org.testcontainers:spock:1.15.1"
+    testImplementation libs.testcontainers.spock
     // end::testcontainers-dependencies[]
-    testImplementation 'org.awaitility:awaitility:4.0.3'
+    testImplementation libs.awaitility
 
     testAnnotationProcessor project(":test-suite-helper")
     testAnnotationProcessor project(":inject-java")
     testAnnotationProcessor project(":test-suite")
 
-    testRuntimeOnly dependencyVersion("h2")
-    testRuntimeOnly "org.junit.vintage:junit-vintage-engine:$junitVersion"
-    testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
-    testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.920'
+    testRuntimeOnly libs.managed.h2
+    testRuntimeOnly libs.junit.vintage
+    testRuntimeOnly libs.managed.logback
+    testRuntimeOnly libs.aws.java.sdk.lambda
 
     // needed for HTTP/2 tests
-    testImplementation 'io.netty:netty-tcnative:2.0.40.Final'
-    testImplementation 'io.netty:netty-tcnative-boringssl-static:2.0.40.Final'
-    testImplementation "io.netty:netty-tcnative-boringssl-static:2.0.40.Final:${Os.isFamily(Os.FAMILY_MAC) ? 'osx-x86_64' : 'linux-x86_64'}"
-    testImplementation 'org.zalando:logbook-netty:2.4.1'
-    testImplementation "ch.qos.logback:logback-classic:1.2.3"
+    testImplementation libs.netty.tcnative
+    testImplementation libs.netty.tcnative.boringssl
+    testImplementation(libs.netty.tcnative.boringssl) {
+        artifact {
+            classifier = Os.isFamily(Os.FAMILY_MAC) ? 'osx-x86_64' : 'linux-x86_64'
+        }
+    }
+    testImplementation libs.logbook.netty
+    testImplementation libs.managed.logback
 
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
-        testImplementation('org.bouncycastle:bcpkix-jdk15on:1.69')
+        testImplementation libs.bcpkix
     }
 
-    testImplementation dependencyVersion("reactor")
+    testImplementation libs.managed.reactor
 }
 
 //tasks.withType(Test) {

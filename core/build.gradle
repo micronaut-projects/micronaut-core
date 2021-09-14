@@ -7,15 +7,14 @@ shadowJar {
 }
 
 dependencies {
-    api dependencyVersion("slf4j")
-    compileOnly dependencyVersion('jsr305')
-    compileOnly "org.graalvm.nativeimage:svm:$graalVersion"
-    compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
-    compileOnly "org.ow2.asm:asm-tree:$asmVersion"
-    shadowCompile "org.ow2.asm:asm:$asmVersion"
-    shadowCompile "org.ow2.asm:asm-commons:$asmVersion"
-    shadowCompile "org.ow2.asm:asm-tree:$asmVersion"
-    shadowCompile("com.github.ben-manes.caffeine:caffeine:$caffeineVersion") {
+    api libs.managed.slf4j
+    compileOnly libs.managed.jsr305
+    compileOnly libs.managed.graal
+    compileOnly libs.kotlin.stdlib
+    compileOnly libs.asm.tree
+    shadowCompile libs.bundles.asm
+    shadowCompile libs.asm.tree
+    shadowCompile(libs.caffeine) {
         exclude group: "com.google.errorprone", module: "error_prone_annotations"
         exclude group: "org.checkerframework", module: "checker-qual"
     }

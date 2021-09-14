@@ -461,6 +461,31 @@ class Test {
                 }
                 return super.findClass(name)
             }
+
+            @Override
+            protected Enumeration<URL> findResources(String name) {
+                String fileName = "/CLASS_OUTPUT/" + name
+                JavaFileObject generated = files.find { it.name == fileName }
+                if (generated == null) {
+                    return super.findResources(name)
+                } else {
+                    URL url = new URL(null, generated.toUri().toString(), new URLStreamHandler() {
+                        @Override
+                        protected URLConnection openConnection(URL u) throws IOException {
+                            return new URLConnection(u) {
+                                @Override
+                                void connect() throws IOException {
+
+                                }
+                                InputStream getInputStream() throws IOException {
+                                    return generated.openInputStream()
+                                }
+                            }
+                        }
+                    })
+                    return Collections.enumeration(Collections.singletonList(url))
+                }
+            }
         }
         classLoader
     }

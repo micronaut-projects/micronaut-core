@@ -18,6 +18,7 @@ package io.micronaut.context.scope;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.LifeCycle;
 import io.micronaut.context.exceptions.BeanDestructionException;
+import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
@@ -61,6 +62,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
     /**
      * @param forCreation Whether it is for creation
      * @return Obtains the scope map, never null
+     * @throws java.lang.IllegalStateException if the scope map cannot be obtained in the current context
      */
     @NonNull
     protected abstract Map<BeanIdentifier, CreatedBean<?>> getScopeMap(boolean forCreation);
@@ -81,8 +83,12 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
     public final AbstractConcurrentCustomScope<A> stop() {
         w.lock();
         try {
-            final Map<BeanIdentifier, CreatedBean<?>> scopeMap = getScopeMap(false);
-            destroyScope(scopeMap);
+            try {
+                final Map<BeanIdentifier, CreatedBean<?>> scopeMap = getScopeMap(false);
+                destroyScope(scopeMap);
+            } catch (IllegalStateException e) {
+                // scope map not available in current context
+            }
             close();
             return this;
         } finally {
@@ -166,7 +172,12 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
         }
         w.lock();
         try {
-            final Map<BeanIdentifier, CreatedBean<?>> scopeMap = getScopeMap(false);
+            final Map<BeanIdentifier, CreatedBean<?>> scopeMap;
+            try {
+                scopeMap = getScopeMap(false);
+            } catch (IllegalStateException e) {
+                return Optional.empty();
+            }
             if (CollectionUtils.isNotEmpty(scopeMap)) {
 
                 final CreatedBean<?> createdBean = scopeMap.get(identifier);
@@ -202,7 +213,13 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
     public final <T> Optional<BeanRegistration<T>> findBeanRegistration(T bean) {
         r.lock();
         try {
-            for (CreatedBean<?> createdBean : getScopeMap(false).values()) {
+            final Map<BeanIdentifier, CreatedBean<?>> scopeMap;
+            try {
+                scopeMap = getScopeMap(false);
+            } catch (IllegalStateException e) {
+                return Optional.empty();
+            }
+            for (CreatedBean<?> createdBean : scopeMap.values()) {
                 if (createdBean.bean() == bean) {
                     return Optional.of(
                             new BeanRegistration<>(

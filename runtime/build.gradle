@@ -1,6 +1,7 @@
 ext {
     shadowJarEnabled = true
 }
+
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")
@@ -9,45 +10,45 @@ dependencies {
     api project(':aop')
     api project(':context')
     api project(":core-reactive")
-    api dependencyVersion("validation")
-    api "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion"
+    api libs.managed.validation
+    api libs.managed.jackson.databind
 
-    implementation dependencyVersion("reactor")
+    implementation libs.managed.reactor
 
-    api "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jacksonVersion"
-    api "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion"
+    api libs.managed.jackson.datatype.jdk8
+    api libs.managed.jackson.datatype.jsr310
 
-    compileOnly "org.graalvm.nativeimage:svm:$graalVersion"
-    compileOnly dependencyVersion("jcache")
+    compileOnly libs.managed.graal
+    compileOnly libs.managed.jcache
 
-    compileOnly("com.fasterxml.jackson.module:jackson-module-kotlin:$jacksonVersion") {
+    compileOnly(libs.managed.jackson.module.kotlin) {
         transitive = false
     }
-    compileOnly("com.fasterxml.jackson.module:jackson-module-afterburner:$jacksonVersion") {
+    compileOnly(libs.managed.jackson.module.afterburner) {
         transitive = false
     }
-    compileOnly("com.fasterxml.jackson.module:jackson-module-parameter-names:$jacksonVersion") {
+    compileOnly(libs.managed.jackson.module.parameterNames) {
         transitive = false
     }
 
-    compileOnly "org.apache.logging.log4j:log4j-core:2.14.1"
-    compileOnly 'org.glassfish:javax.el:3.0.1-b12'
-    compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
-    compileOnly "org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinCoroutinesVersion"
-    compileOnly "org.jetbrains.kotlinx:kotlinx-coroutines-reactive:$kotlinCoroutinesVersion"
-    compileOnly "ch.qos.logback:logback-classic:1.2.3"
-    testImplementation "ch.qos.logback:logback-classic:1.2.3"
+    compileOnly libs.log4j
+    compileOnly libs.javax.el
+    compileOnly libs.caffeine
+    compileOnly libs.kotlinx.coroutines.core
+    compileOnly libs.kotlinx.coroutines.reactive
+    compileOnly libs.managed.logback
+    testImplementation libs.managed.logback
 
     testAnnotationProcessor project(":inject-java")
-    testImplementation 'org.jsr107.ri:cache-ri-impl:1.1.1'
-    testImplementation dependencyVersion("jcache")
+    testImplementation libs.jsr107
+    testImplementation libs.managed.jcache
     testImplementation project(":inject-java")
     testImplementation project(":inject-java-test")
     testImplementation project(":inject-groovy")
     if (!JavaVersion.current().isJava9Compatible()) {
         testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
-    testImplementation "com.github.stefanbirkner:system-lambda:1.2.0"
+    testImplementation libs.systemlambda
 }
 
 //compileJava.options.fork = true

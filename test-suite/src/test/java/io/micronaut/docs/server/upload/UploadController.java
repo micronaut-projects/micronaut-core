@@ -23,8 +23,12 @@ import io.micronaut.http.multipart.StreamingFileUpload;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 import io.micronaut.core.async.annotation.SingleResult;
+
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Files;
 
 import static io.micronaut.http.HttpStatus.CONFLICT;
 import static io.micronaut.http.MediaType.MULTIPART_FORM_DATA;
@@ -54,6 +58,25 @@ public class UploadController {
                                        .body("Upload Failed");
                 }
             });
+    }
+
+    @Post(value = "/outputStream", consumes = MULTIPART_FORM_DATA, produces = TEXT_PLAIN) // <1>
+    @SingleResult
+    public Mono<HttpResponse<String>> uploadOutputStream(StreamingFileUpload file) { // <2>
+
+        OutputStream outputStream = new ByteArrayOutputStream(); // <3>
+
+        Publisher<Boolean> uploadPublisher = file.transferTo(outputStream); // <4>
+
+        return Mono.from(uploadPublisher)  // <5>
+                .map(success -> {
+                    if (success) {
+                        return HttpResponse.ok("Uploaded");
+                    } else {
+                        return HttpResponse.<String>status(CONFLICT)
+                                .body("Upload Failed");
+                    }
+                });
     }
 }
 // end::class[]

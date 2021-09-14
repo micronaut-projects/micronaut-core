@@ -22,12 +22,11 @@ import io.micronaut.core.bind.BoundExecutable;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.bind.RequestBinderRegistry;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.netty.websocket.AbstractNettyWebSocketHandler;
 import io.micronaut.http.netty.websocket.NettyWebSocketSession;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
+import io.micronaut.http.server.netty.NettyEmbeddedServices;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.websocket.CloseReason;
@@ -71,34 +70,30 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      */
     public static final String ID = "websocket-handler";
 
-    private final ApplicationEventPublisher eventPublisher;
+    private final NettyEmbeddedServices nettyEmbeddedServices;
 
     /**
      * Default constructor.
+     * @param nettyEmbeddedServices The netty embedded services
      * @param webSocketSessionRepository The web socket sessions repository
-     *  @param handshaker     The handshaker
+     * @param handshaker     The handshaker
      * @param request        The request used to create the websocket
      * @param routeMatch     The route match
      * @param webSocketBean  The web socket bean
-     * @param binderRegistry The binder registry
-     * @param mediaTypeCodecRegistry The codec registry
-     * @param eventPublisher The event publisher
      * @param ctx            The channel handler context
      */
     NettyServerWebSocketHandler(
+            NettyEmbeddedServices nettyEmbeddedServices,
             WebSocketSessionRepository webSocketSessionRepository,
             WebSocketServerHandshaker handshaker,
+            WebSocketBean<?> webSocketBean,
             HttpRequest<?> request,
             UriRouteMatch<Object, Object> routeMatch,
-            WebSocketBean<?> webSocketBean,
-            RequestBinderRegistry binderRegistry,
-            MediaTypeCodecRegistry mediaTypeCodecRegistry,
-            ApplicationEventPublisher eventPublisher,
             ChannelHandlerContext ctx) {
         super(
                 ctx,
-                binderRegistry,
-                mediaTypeCodecRegistry,
+                nettyEmbeddedServices.getRequestArgumentSatisfier().getBinderRegistry(),
+                nettyEmbeddedServices.getMediaTypeCodecRegistry(),
                 webSocketBean,
                 request,
                 routeMatch.getVariableValues(),
@@ -106,10 +101,11 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                 handshaker.selectedSubprotocol(),
                 webSocketSessionRepository);
 
-
+        this.nettyEmbeddedServices = nettyEmbeddedServices;
         request.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
         request.setAttribute(HttpAttributes.ROUTE, routeMatch.getRoute());
-        this.eventPublisher = eventPublisher;
+        ApplicationEventPublisher<WebSocketSessionOpenEvent> eventPublisher =
+                nettyEmbeddedServices.getEventPublisher(WebSocketSessionOpenEvent.class);
 
         try {
             eventPublisher.publishEvent(new WebSocketSessionOpenEvent(session));
@@ -157,13 +153,14 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
             @Override
             public Set<? extends WebSocketSession> getOpenSessions() {
-                return webSocketSessionRepository.getChannelGroup().stream().flatMap((Function<Channel, Stream<WebSocketSession>>) ch -> {
-                    NettyWebSocketSession s = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).get();
-                    if (s != null && s.isOpen()) {
-                        return Stream.of(s);
-                    }
-                    return Stream.empty();
-                }).collect(Collectors.toSet());
+                return webSocketSessionRepository.getChannelGroup().stream()
+                        .flatMap((Function<Channel, Stream<WebSocketSession>>) ch -> {
+                            NettyWebSocketSession s = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).get();
+                            if (s != null && s.isOpen()) {
+                                return Stream.of(s);
+                            }
+                            return Stream.empty();
+                        }).collect(Collectors.toSet());
             }
 
             @Override
@@ -192,41 +189,55 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     @Override
     protected Publisher<?> instrumentPublisher(ChannelHandlerContext ctx, Object result) {
         Publisher<?> actual = Publishers.convertPublisher(result, Publisher.class);
-        Publisher<?> traced = (Publisher<Object>) subscriber -> ServerRequestContext.with(originatingRequest, () -> actual.subscribe(new Subscriber<Object>() {
-            @Override
-            public void onSubscribe(Subscription s) {
-                ServerRequestContext.with(originatingRequest, () -> subscriber.onSubscribe(s));
-            }
+        Publisher<?> traced = (Publisher<Object>) subscriber -> ServerRequestContext.with(originatingRequest,
+                                                                                          () -> actual.subscribe(new Subscriber<Object>() {
+              @Override
+              public void onSubscribe(Subscription s) {
+                  ServerRequestContext.with(
+                          originatingRequest,
+                          () -> subscriber.onSubscribe(
+                                  s));
+              }
 
-            @Override
-            public void onNext(Object object) {
-                ServerRequestContext.with(originatingRequest, () -> subscriber.onNext(object));
-            }
+              @Override
+              public void onNext(Object object) {
+                  ServerRequestContext.with(
+                          originatingRequest,
+                          () -> subscriber.onNext(
+                                  object));
+              }
 
-            @Override
-            public void onError(Throwable t) {
-                ServerRequestContext.with(originatingRequest, () -> subscriber.onError(t));
-            }
+              @Override
+              public void onError(Throwable t) {
+                  ServerRequestContext.with(
+                          originatingRequest,
+                          () -> subscriber.onError(
+                                  t));
+              }
 
-            @Override
-            public void onComplete() {
-                ServerRequestContext.with(originatingRequest, subscriber::onComplete);
-            }
-        }));
+              @Override
+              public void onComplete() {
+                  ServerRequestContext.with(
+                          originatingRequest,
+                          subscriber::onComplete);
+              }
+          }));
 
         return Flux.from(traced).subscribeOn(Schedulers.fromExecutorService(ctx.channel().eventLoop()));
     }
 
     @Override
     protected Object invokeExecutable(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
-        return ServerRequestContext.with(originatingRequest, (Supplier<Object>) () -> boundExecutable.invoke(messageHandler.getTarget()));
+        return ServerRequestContext.with(originatingRequest,
+                                         (Supplier<Object>) () -> boundExecutable.invoke(messageHandler.getTarget()));
     }
 
     @Override
     protected void messageHandled(ChannelHandlerContext ctx, NettyWebSocketSession session, Object message) {
         ctx.executor().execute(() -> {
             try {
-                eventPublisher.publishEvent(new WebSocketMessageProcessedEvent<>(session, message));
+                nettyEmbeddedServices.getEventPublisher(WebSocketMessageProcessedEvent.class)
+                        .publishEvent(new WebSocketMessageProcessedEvent<>(session, message));
             } catch (Exception e) {
                 if (LOG.isErrorEnabled()) {
                     LOG.error("Error publishing WebSocket message processed event: " + e.getMessage(), e);
@@ -244,7 +255,8 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         }
         webSocketSessionRepository.removeChannel(channel);
         try {
-            eventPublisher.publishEvent(new WebSocketSessionClosedEvent(session));
+            nettyEmbeddedServices.getEventPublisher(WebSocketSessionClosedEvent.class)
+                    .publishEvent(new WebSocketSessionClosedEvent(session));
         } catch (Exception e) {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Error publishing WebSocket closed event: " + e.getMessage(), e);

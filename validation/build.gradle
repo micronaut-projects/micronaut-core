@@ -3,21 +3,21 @@ dependencies {
 
     api project(":inject")
     api project(":core-reactive")
-    api dependencyVersion("validation")
+    api libs.managed.validation
 
-    compileOnly dependencyVersion("gorm")
+    compileOnly libs.managed.gorm
     compileOnly project(":http-server")
 
-    implementation dependencyVersion("reactor")
+    implementation libs.managed.reactor
 
-    testImplementation dependencyVersion("spotbugs")
+    testImplementation libs.managed.spotbugs
     testAnnotationProcessor project(":inject-java")
     testCompileOnly project(":inject-groovy")
     testImplementation project(":inject")
 
     testImplementation project(":http-client")
     testImplementation project(":http-server-netty")
-    testImplementation dependencyModuleVersion("groovy", "groovy-json")
+    testImplementation libs.managed.groovy.json
     testImplementation project(":inject-java-test")
 
 }

@@ -123,6 +123,7 @@ httpServer:
     https: Securing the Server with HTTPS
     dualProtocol: Enabling HTTP and HTTPS
     accessLogger: Enabling Access Logger
+    secondaryServers: Starting Secondary Servers
   views:
     title: Server Side View Rendering
   openapi: OpenAPI / Swagger Support
@@ -209,6 +210,12 @@ configurations:
     cassandraSupport: Configuring Cassandra
     liquibaseSupport: Configuring Liquibase
     flywaySupport: Configuring Flyway
+logging:
+  title: Logging
+  loggingMessages: Logging Messages
+  loggingConfiguration: Configuration
+  logback: Logback
+  loggingSystem: Logging System
 languageSupport:
   title: Language Support
   java:

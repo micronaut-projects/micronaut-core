@@ -19,8 +19,23 @@ import groovy.lang.GroovyClassLoader;
 import io.micronaut.core.annotation.Internal;
 import org.codehaus.groovy.control.CompilerConfiguration;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLConnection;
+import java.net.URLStreamHandler;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * Extended version of {@link GroovyClassLoader} that can be used to test dependency injection compilation.
@@ -32,6 +47,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
 
     private Map<String, byte[]> generatedClasses = new ConcurrentHashMap<>();
+    private List<URL> generatedUrls = new ArrayList<>();
     private Map<String, Class> loadedClasses = new ConcurrentHashMap<>();
 
     /**
@@ -86,6 +102,24 @@ public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
         }
     }
 
+    public void addService(String name, Set<String> classes) throws MalformedURLException {
+        generatedUrls.add(new URL(null, "mem:META-INF/services/" + name, new URLStreamHandler() {
+            @Override
+            protected URLConnection openConnection(URL u) {
+                return new URLConnection(u) {
+                    @Override
+                    public void connect() { }
+
+                    @Override
+                    public InputStream getInputStream() {
+                        byte[] data = classes.stream().collect(Collectors.joining("\n")).getBytes(StandardCharsets.UTF_8);
+                        return new ByteArrayInputStream(data);
+                    }
+                };
+            }
+        }));
+    }
+
     @Override
     public Class<?> loadClass(String name) throws ClassNotFoundException {
         if (loadedClasses.containsKey(name)) {
@@ -96,6 +130,16 @@ public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
             return cls;
         } else {
             return super.loadClass(name);
+        }
+    }
+
+    @Override
+    public Enumeration<URL> findResources(String name) throws IOException {
+        final Optional<URL> first = generatedUrls.stream().filter(url -> url.getPath().equals(name)).findFirst();
+        if (first.isPresent()) {
+            return Collections.enumeration(Collections.singletonList(first.get()));
+        } else {
+            return super.findResources(name);
         }
     }
 }

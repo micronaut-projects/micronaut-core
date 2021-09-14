@@ -17,6 +17,8 @@ package io.micronaut.http.server;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.exceptions.BeanCreationException;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ReferenceCounted;
@@ -24,6 +26,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.*;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
+import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.filter.ServerFilterChain;
@@ -42,6 +45,7 @@ import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,6 +80,7 @@ import static io.micronaut.inject.util.KotlinExecutableMethodUtils.isKotlinFunct
  * @author James Kleeh
  * @since 3.0.0
  */
+@Singleton
 public final class RouteExecutor {
 
     private static final Logger LOG = LoggerFactory.getLogger(RouteExecutor.class);
@@ -111,6 +116,35 @@ public final class RouteExecutor {
         this.serverConfiguration = serverConfiguration;
         this.errorResponseProcessor = errorResponseProcessor;
         this.executorSelector = executorSelector;
+    }
+
+    /**
+     * @return The router
+     */
+    public @NonNull Router getRouter() {
+        return router;
+    }
+
+    /**
+     * @return The request argument satisfier
+     */
+    @Internal
+    public @NonNull RequestArgumentSatisfier getRequestArgumentSatisfier() {
+        return requestArgumentSatisfier;
+    }
+
+    /**
+     * @return The error response processor
+     */
+    public @NonNull ErrorResponseProcessor<?> getErrorResponseProcessor() {
+        return errorResponseProcessor;
+    }
+
+    /**
+     * @return The executor selector
+     */
+    public @NonNull ExecutorSelector getExecutorSelector() {
+        return executorSelector;
     }
 
     /**
@@ -297,12 +331,11 @@ public final class RouteExecutor {
             boolean executeFilters,
             Flux<RouteMatch<?>> routePublisher) {
         AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(request);
-        final Flux<MutableHttpResponse<?>> resultEmitter = buildResultEmitter(
+        return buildResultEmitter(
                 requestReference,
                 executeFilters,
                 routePublisher
         );
-        return resultEmitter;
     }
 
     /**
@@ -559,18 +592,6 @@ public final class RouteExecutor {
                 });
     }
 
-    private Flux<MutableHttpResponse<?>> buildResponsePublisher(HttpRequest<?> request,
-                                                                RouteInfo<?> routeInfo,
-                                                                Flux<Object> body) {
-        // build the result emitter. This result emitter emits the response from a controller action
-        final ExecutorService executor = findExecutor(routeInfo);
-        Flux<MutableHttpResponse<?>> reactiveSequence = body.flatMap(obj -> createResponseForBody(request, obj, routeInfo));
-        if (executor != null) {
-            reactiveSequence = applyExecutorToPublisher(reactiveSequence, executor);
-        }
-        return reactiveSequence;
-    }
-
     private Flux<MutableHttpResponse<?>> buildResultEmitter(
             AtomicReference<HttpRequest<?>> requestReference,
             boolean executeFilters,
@@ -595,19 +616,20 @@ public final class RouteExecutor {
                 final RouteMatch<?> finalRoute;
 
                 // ensure the route requirements are completely satisfied
+                final HttpRequest<?> httpRequest = requestReference.get();
                 if (!routeMatch.isExecutable()) {
                     finalRoute = requestArgumentSatisfier
-                            .fulfillArgumentRequirements(routeMatch, requestReference.get(), true);
+                            .fulfillArgumentRequirements(routeMatch, httpRequest, true);
                 } else {
                     finalRoute = routeMatch;
                 }
 
-                Object body = finalRoute.execute();
+                Object body = ServerRequestContext.with(httpRequest, (Supplier<Object>) finalRoute::execute);
                 if (body instanceof Optional) {
                     body = ((Optional<?>) body).orElse(null);
                 }
 
-                return createResponseForBody(requestReference.get(), body, finalRoute);
+                return createResponseForBody(httpRequest, body, finalRoute);
             } catch (Throwable e) {
                 return Flux.error(e);
             }
