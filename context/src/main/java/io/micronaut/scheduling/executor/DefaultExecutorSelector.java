@@ -32,7 +32,6 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import java.util.Optional;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 
