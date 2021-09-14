@@ -16,9 +16,11 @@
 package io.micronaut.http.server.netty.configuration;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
@@ -112,6 +114,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private Map<ChannelOption, Object> options = Collections.emptyMap();
     private Worker worker;
     private Parent parent;
+    private FileTypeHandlerConfiguration fileTypeHandlerConfiguration = new FileTypeHandlerConfiguration();
     private int maxInitialLineLength = DEFAULT_MAXINITIALLINELENGTH;
     private int maxHeaderSize = DEFAULT_MAXHEADERSIZE;
     private int maxChunkSize = DEFAULT_MAXCHUNKSIZE;
@@ -126,6 +129,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private AccessLogger accessLogger;
     private Http2Settings http2Settings = new Http2Settings();
     private boolean keepAliveOnServerError = DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR;
+    private boolean bindToRouterExposedPorts = true;
 
     /**
      * Default empty constructor.
@@ -306,7 +310,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
     /**
      * @return The Netty child channel options.
-     * @see io.netty.bootstrap.ServerBootstrap#childOptions()
+     * @see io.netty.bootstrap.ServerBootstrap#childOption(io.netty.channel.ChannelOption, Object)
      */
     public Map<ChannelOption, Object> getChildOptions() {
         return childOptions;
@@ -314,7 +318,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
     /**
      * @return The Netty channel options.
-     * @see io.netty.bootstrap.ServerBootstrap#options()
+     * @see io.netty.bootstrap.ServerBootstrap#childOption(io.netty.channel.ChannelOption, Object)
      */
     public Map<ChannelOption, Object> getOptions() {
         return options;
@@ -325,6 +329,26 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public Worker getWorker() {
         return worker;
+    }
+
+    /**
+     * @return The file type handler configuration.
+     * @since 3.1.0
+     */
+    public @NonNull FileTypeHandlerConfiguration getFileTypeHandlerConfiguration() {
+        return fileTypeHandlerConfiguration;
+    }
+
+    /**
+     * Sets the file type handler configuration.
+     * @param fileTypeHandlerConfiguration The file type handler configuration
+     * @since 3.1.0
+     */
+    @Inject
+    public void setFileTypeHandlerConfiguration(@NonNull FileTypeHandlerConfiguration fileTypeHandlerConfiguration) {
+        if (fileTypeHandlerConfiguration != null) {
+            this.fileTypeHandlerConfiguration = fileTypeHandlerConfiguration;
+        }
     }
 
     /**
@@ -691,6 +715,109 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          */
         Parent() {
             super(NAME);
+        }
+    }
+
+    /**
+     * Allows configuration of properties for the {@link io.micronaut.http.server.netty.types.files.FileTypeHandler}.
+     *
+     * @author James Kleeh
+     * @author graemerocher
+     * @since @since 3.1.0
+     */
+    @ConfigurationProperties("responses.file")
+    public static class FileTypeHandlerConfiguration {
+
+        /**
+         * The default cache seconds.
+         */
+        @SuppressWarnings("WeakerAccess")
+        public static final int DEFAULT_CACHESECONDS = 60;
+
+        private int cacheSeconds = DEFAULT_CACHESECONDS;
+        private CacheControlConfiguration cacheControl = new CacheControlConfiguration();
+
+        /**
+         * Default constructor.
+         */
+        public FileTypeHandlerConfiguration() {
+        }
+
+        /**
+         * Deprecated constructor.
+         *
+         * @param cacheSeconds Deprecated constructor parameter
+         * @param isPublic Deprecated constructor parameter
+         */
+        @Deprecated
+        @Inject
+        public FileTypeHandlerConfiguration(@Nullable @Property(name = "netty.responses.file.cache-seconds") Integer cacheSeconds,
+                                            @Nullable @Property(name = "netty.responses.file.cache-control.public") Boolean isPublic) {
+            if (cacheSeconds != null) {
+                this.cacheSeconds = cacheSeconds;
+            }
+            if (isPublic != null) {
+                this.cacheControl.setPublic(isPublic);
+            }
+        }
+
+        /**
+         * @return the cache seconds
+         */
+        public int getCacheSeconds() {
+            return cacheSeconds;
+        }
+
+        /**
+         * Cache Seconds. Default value ({@value #DEFAULT_CACHESECONDS}).
+         * @param cacheSeconds cache seconds
+         */
+        public void setCacheSeconds(int cacheSeconds) {
+            this.cacheSeconds = cacheSeconds;
+        }
+
+        /**
+         * @return The cache control configuration
+         */
+        public CacheControlConfiguration getCacheControl() {
+            return cacheControl;
+        }
+
+        /**
+         * Sets the cache control configuration.
+         *
+         * @param cacheControl The cache control configuration
+         */
+        public void setCacheControl(CacheControlConfiguration cacheControl) {
+            this.cacheControl = cacheControl;
+        }
+
+        /**
+         * Configuration for the Cache-Control header.
+         */
+        @ConfigurationProperties("cache-control")
+        public static class CacheControlConfiguration {
+
+            private static final boolean DEFAULT_PUBLIC_CACHE = false;
+
+            private boolean publicCache = DEFAULT_PUBLIC_CACHE;
+
+            /**
+             * Sets whether the cache control is public. Default value ({@value #DEFAULT_PUBLIC_CACHE})
+             *
+             * @param publicCache Public cache value
+             */
+            public void setPublic(boolean publicCache) {
+                this.publicCache = publicCache;
+            }
+
+            /**
+             * @return True if the cache control should be public
+             */
+            @NonNull
+            public boolean getPublic() {
+                return publicCache;
+            }
         }
     }
 

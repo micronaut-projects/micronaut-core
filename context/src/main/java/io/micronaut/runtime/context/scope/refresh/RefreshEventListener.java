@@ -32,7 +32,7 @@ import io.micronaut.core.util.CollectionUtils;
 public interface RefreshEventListener extends ApplicationEventListener<RefreshEvent>, Ordered {
 
     /**
-     * The default position as defined by {@link io.micronaut.core.order.Ordered#getOrder()}
+     * The default position as defined by {@link io.micronaut.core.order.Ordered#getOrder()}.
      */
     int DEFAULT_POSITION = Ordered.HIGHEST_PRECEDENCE + 200;
 

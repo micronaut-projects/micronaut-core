@@ -3,7 +3,10 @@ package io.micronaut.http.server.netty.websocket
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.netty.websocket.WebSocketSessionRepository
 import io.micronaut.http.server.HttpServerConfiguration
+import io.micronaut.http.server.binding.RequestArgumentSatisfier
+import io.micronaut.http.server.netty.NettyEmbeddedServices
 import io.micronaut.http.server.netty.NettyHttpRequest
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.http.DefaultFullHttpRequest
@@ -22,7 +25,10 @@ class UpgradeSpec extends Specification {
         for (HeaderTuple header : headers) {
             nettyRequest.headers().set(header.name, header.value)
         }
-        NettyServerWebSocketUpgradeHandler handler = new NettyServerWebSocketUpgradeHandler(null, null, null, null, null, null, null)
+
+        def mock = Mock(NettyEmbeddedServices)
+        mock.getRequestArgumentSatisfier() >> new RequestArgumentSatisfier(null)
+        NettyServerWebSocketUpgradeHandler handler = new NettyServerWebSocketUpgradeHandler(mock, Mock(WebSocketSessionRepository))
 
         when:
         HttpRequest<?> request = new NettyHttpRequest(

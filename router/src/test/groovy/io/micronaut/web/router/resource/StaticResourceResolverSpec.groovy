@@ -13,11 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router
+package io.micronaut.web.router.resource
 
 import io.micronaut.core.io.ResourceResolver
-import io.micronaut.web.router.resource.StaticResourceConfiguration
-import io.micronaut.web.router.resource.StaticResourceResolver
 import spock.lang.Specification
 
 class StaticResourceResolverSpec extends Specification {

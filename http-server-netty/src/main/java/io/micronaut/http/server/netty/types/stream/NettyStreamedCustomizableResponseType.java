@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.types.stream;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
@@ -41,6 +42,7 @@ import java.io.InputStream;
  * @author James Kleeh
  * @since 2.5.0
  */
+@Internal
 public interface NettyStreamedCustomizableResponseType extends NettyCustomizableResponseType {
 
     Logger LOG = LoggerFactory.getLogger(NettyStreamedCustomizableResponseType.class);

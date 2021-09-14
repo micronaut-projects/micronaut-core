@@ -64,10 +64,6 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
     @Override
     public RequestBinderRegistry onCreated(BeanCreatedEvent<RequestBinderRegistry> event) {
         RequestBinderRegistry registry = event.getBean();
-        registry.addRequestArgumentBinder(new PublisherBodyBinder(
-                conversionService,
-                httpContentProcessorResolver
-        ));
         registry.addRequestArgumentBinder(new CompletableFutureBodyBinder(
                 httpContentProcessorResolver,
                 conversionService

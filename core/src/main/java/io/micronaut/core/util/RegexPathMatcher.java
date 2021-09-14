@@ -25,11 +25,13 @@ import java.util.regex.Pattern;
  * @since 3.1
  */
 public class RegexPathMatcher implements PathMatcher {
-  private final Map<String, Pattern> compiledPatterns = new ConcurrentHashMap<>();
+    private final Map<String, Pattern> compiledPatterns = new ConcurrentHashMap<>();
 
-  @Override
-  public boolean matches(String pattern, String source) {
-    if (pattern == null || source == null) return false;
-    return compiledPatterns.computeIfAbsent(pattern, Pattern::compile).matcher(source).matches();
-  }
+    @Override
+    public boolean matches(String pattern, String source) {
+        if (pattern == null || source == null) {
+            return false;
+        }
+        return compiledPatterns.computeIfAbsent(pattern, Pattern::compile).matcher(source).matches();
+    }
 }

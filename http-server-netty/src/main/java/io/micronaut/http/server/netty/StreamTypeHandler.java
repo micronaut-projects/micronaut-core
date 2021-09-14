@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty.types.stream;
+package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
+import io.micronaut.http.server.netty.types.stream.NettyStreamedCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
 import io.netty.channel.ChannelHandlerContext;
-import jakarta.inject.Singleton;
 
 import java.io.InputStream;
 import java.util.Arrays;
@@ -32,7 +32,6 @@ import java.util.Arrays;
  * @author James Kleeh
  * @since 2.5.0
  */
-@Singleton
 @Internal
 class StreamTypeHandler implements NettyCustomizableResponseTypeHandler<Object> {
 
