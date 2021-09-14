@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2021 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,21 +15,61 @@
  */
 package io.micronaut.web.router.resource;
 
+import io.micronaut.core.io.ResourceLoader;
+import io.micronaut.core.util.AntPathMatcher;
+import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.PathMatcher;
+import io.micronaut.core.util.StringUtils;
+
 import java.net.URL;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
- * Interface for resolving static resources.
+ * Resolves resources from a set of resource loaders.
  *
- * @author graemerocher
  * @author James Kleeh
  * @since 1.0
  */
-public interface StaticResourceResolver {
+public class StaticResourceResolver {
     /**
-     * Empty resolver.
+     * An empty resolver to use as a constant.
      */
-    StaticResourceResolver EMPTY = resourcePath -> Optional.empty();
+    public static final StaticResourceResolver EMPTY = new StaticResourceResolver(Collections.emptyList()) {
+        @Override
+        public Optional<URL> resolve(String resourcePath) {
+            return Optional.empty();
+        }
+    };
+
+    private static final String INDEX_PAGE = "index.html";
+    private final AntPathMatcher pathMatcher;
+    private final Map<String, List<ResourceLoader>> resourceMappings;
+
+    /**
+     * Default constructor.
+     *
+     * @param configurations The static resource configurations
+     */
+    StaticResourceResolver(List<StaticResourceConfiguration> configurations) {
+        if (CollectionUtils.isEmpty(configurations)) {
+            this.pathMatcher = null;
+            this.resourceMappings = Collections.emptyMap();
+        } else {
+            this.resourceMappings = new LinkedHashMap<>();
+            this.pathMatcher = PathMatcher.ANT;
+            if (CollectionUtils.isNotEmpty(configurations)) {
+                for (StaticResourceConfiguration config: configurations) {
+                    if (config.isEnabled()) {
+                        this.resourceMappings.put(config.getMapping(), config.getResourceLoaders());
+                    }
+                }
+            }
+        }
+    }
 
     /**
      * Resolves a path to a URL.
@@ -37,5 +77,39 @@ public interface StaticResourceResolver {
      * @param resourcePath The path to the resource
      * @return The optional URL
      */
-    Optional<URL> resolve(String resourcePath);
+    public Optional<URL> resolve(String resourcePath) {
+        for (Map.Entry<String, List<ResourceLoader>> entry : resourceMappings.entrySet()) {
+            List<ResourceLoader> loaders = entry.getValue();
+            String mapping = entry.getKey();
+            if (!loaders.isEmpty() && pathMatcher.matches(mapping, resourcePath)) {
+                String path = pathMatcher.extractPathWithinPattern(mapping, resourcePath);
+                //A request to the root of the mapping
+                if (StringUtils.isEmpty(path)) {
+                    path = INDEX_PAGE;
+                }
+                if (path.startsWith("/")) {
+                    path = path.substring(1);
+                }
+                for (ResourceLoader loader : loaders) {
+                    Optional<URL> resource = loader.getResource(path);
+                    if (resource.isPresent()) {
+                        return resource;
+                    } else {
+                        if (path.indexOf('.') == -1) {
+                            if (!path.endsWith("/")) {
+                                path = path + "/";
+                            }
+                            path += INDEX_PAGE;
+                            resource = loader.getResource(path);
+                            if (resource.isPresent()) {
+                                return resource;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return Optional.empty();
+    }
 }

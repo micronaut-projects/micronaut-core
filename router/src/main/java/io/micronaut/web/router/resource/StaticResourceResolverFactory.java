@@ -42,7 +42,7 @@ public class StaticResourceResolverFactory {
         if (configurations.isEmpty()) {
             return StaticResourceResolver.EMPTY;
         } else {
-            return new DefaultStaticResourceResolver(configurations);
+            return new StaticResourceResolver(configurations);
         }
     }
 }
