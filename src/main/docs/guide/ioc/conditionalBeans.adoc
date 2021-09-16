@@ -83,6 +83,12 @@ The link:{api}/io/micronaut/context/annotation/Requires.html[@Requires] annotati
 
 |Require the current operating system to *not* be in the list
 |`@Requires(notOs={Requires.Family.WINDOWS})`
+
+|Requires configuration properties bean to be present in case no method specified
+|`@Requires(configurationProperties=Config.class)`
+
+|Requires the specified method of configuration properties class to return true
+|`@Requires(configurationProperties=Config.class, method="isEnabled")`
 |===
 
 === Additional Notes on Property Requirements.
