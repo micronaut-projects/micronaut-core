@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty.stream
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.*
 import io.micronaut.http.annotation.*
 import io.micronaut.http.client.HttpClient
@@ -24,7 +25,9 @@ import java.util.concurrent.Executors
 
 class InputStreamBodySpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+            'spec.name': InputStreamBodySpec.class.name
+    ])
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6100')
     void "test apply load to InputStream read"() {
@@ -68,50 +71,52 @@ class InputStreamBodySpec extends Specification {
         responses.size() == 30
         responses.every({ it == HttpStatus.OK})
     }
+
+    @Requires(property = "spec.name", value = "io.micronaut.http.server.netty.stream.InputStreamBodySpec")
+    @Controller("/input-stream-test")
+    static class PayloadInputStream {
+
+        @Inject
+        @Client("/")
+        private HttpClient httpClient
+
+        private String responsePayload = "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n" +
+                "   <soap:Body>\n" +
+                "      <ns2:getHelloWorldAsStringResponse xmlns:ns2=\"http://sample.soap.oracle/\">\n" +
+                "         <return>Hello World %s</return>\n" +
+                "      </ns2:getHelloWorldAsStringResponse>\n" +
+                "   </soap:Body>\n" +
+                "</soap:Envelope>"
+
+
+        @Post("/hello")
+        @Produces(MediaType.APPLICATION_JSON)
+        @Consumes(MediaType.ALL)
+        @ExecuteOn(TaskExecutors.IO)
+        MutableHttpResponse<String> stream(@Body @Nullable InputStream payload) throws IOException {
+
+            //blocking read on injected http client
+            HttpResponse<String> resp = httpClient.toBlocking().exchange(HttpRequest
+                    .GET(URI.create("/input-stream-test/hello/other")), String.class)
+            System.out.println(resp.getBody(String.class).get())
+
+
+            byte[] body = payload.bytes
+            String b = new String(body)
+            int l = body.length
+
+            responsePayload = "{\n" +
+                    "\t\"payload\" : {\n" +
+                    "\t\t\"name\" : \"1542\"\n" +
+                    "\t}\n" +
+                    "}"
+            return HttpResponse.ok().body(responsePayload).contentType(MediaType.APPLICATION_JSON)
+        }
+
+        @Get("/hello/other")
+        String other() {
+            return "Some body content"
+        }
+    }
 }
 
-@Controller("/input-stream-test")
-class PayloadInputStream {
-
-    @Inject
-    @Client("/")
-    private HttpClient httpClient
-
-    private String responsePayload = "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n" +
-            "   <soap:Body>\n" +
-            "      <ns2:getHelloWorldAsStringResponse xmlns:ns2=\"http://sample.soap.oracle/\">\n" +
-            "         <return>Hello World %s</return>\n" +
-            "      </ns2:getHelloWorldAsStringResponse>\n" +
-            "   </soap:Body>\n" +
-            "</soap:Envelope>"
-
-
-    @Post("/hello")
-    @Produces(MediaType.APPLICATION_JSON)
-    @Consumes(MediaType.ALL)
-    @ExecuteOn(TaskExecutors.IO)
-    MutableHttpResponse<String> stream(@Body @Nullable InputStream payload) throws IOException {
-
-        //blocking read on injected http client
-        HttpResponse<String> resp = httpClient.toBlocking().exchange(HttpRequest
-                .GET(URI.create("/input-stream-test/hello/other")), String.class)
-        System.out.println(resp.getBody(String.class).get())
-
-
-        byte[] body = payload.bytes
-        String b = new String(body)
-        int l = body.length
-
-        responsePayload = "{\n" +
-                "\t\"payload\" : {\n" +
-                "\t\t\"name\" : \"1542\"\n" +
-                "\t}\n" +
-                "}"
-        return HttpResponse.ok().body(responsePayload).contentType(MediaType.APPLICATION_JSON)
-    }
-
-    @Get("/hello/other")
-    String other() {
-        return "Some body content"
-    }
-}
