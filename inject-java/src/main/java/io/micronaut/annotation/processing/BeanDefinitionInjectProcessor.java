@@ -270,6 +270,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             } finally {
                 AnnotationUtils.invalidateCache();
                 AbstractAnnotationMetadataBuilder.clearMutated();
+                JavaAnnotationMetadataBuilder.clearCaches();
             }
         }
 
