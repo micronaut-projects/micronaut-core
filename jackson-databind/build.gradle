@@ -3,16 +3,16 @@ dependencies {
 
     api project(":jackson-core")
 
-    api "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion"
-    api "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jacksonVersion"
-    api "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion"
-    compileOnly("com.fasterxml.jackson.module:jackson-module-kotlin:$jacksonVersion") {
+    api libs.managed.jackson.databind
+    api libs.managed.jackson.datatype.jdk8
+    api libs.managed.jackson.datatype.jsr310
+    compileOnly(libs.managed.jackson.module.kotlin) {
         transitive = false
     }
-    compileOnly("com.fasterxml.jackson.module:jackson-module-afterburner:$jacksonVersion") {
+    compileOnly(libs.managed.jackson.module.afterburner) {
         transitive = false
     }
-    compileOnly("com.fasterxml.jackson.module:jackson-module-parameter-names:$jacksonVersion") {
+    compileOnly(libs.managed.jackson.module.parameterNames) {
         transitive = false
     }
 

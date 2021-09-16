@@ -3,8 +3,8 @@ dependencies {
 
     api project(':json-core')
 
-    api("com.fasterxml.jackson.core:jackson-core:$jacksonVersion")
-    api("com.fasterxml.jackson.core:jackson-annotations:$jacksonVersion")
+    api libs.managed.jackson.core
+    api libs.managed.jackson.annotations
 
     testAnnotationProcessor project(":inject-java")
     testAnnotationProcessor project(":inject-groovy")
