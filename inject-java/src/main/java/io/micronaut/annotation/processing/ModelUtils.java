@@ -467,15 +467,14 @@ public class ModelUtils {
      */
     @SuppressWarnings("Duplicates")
     private Set<TypeElement> populateInterfaces(TypeElement aClass, Set<TypeElement> interfaces) {
-        Set<TypeElement> theInterfaces = aClass.getInterfaces()
-                .stream().map(typeUtils::asElement)
-                .filter(e -> e instanceof TypeElement)
-                .map(TypeElement.class::cast)
-                .collect(Collectors.toSet());
-        interfaces.addAll(theInterfaces);
-        for (TypeElement theInterface : theInterfaces) {
-            if (!interfaces.contains(theInterface)) {
-                populateInterfaces(theInterface, interfaces);
+        for (TypeMirror anInterface : aClass.getInterfaces()) {
+            final Element e = typeUtils.asElement(anInterface);
+            if (e instanceof TypeElement) {
+                final TypeElement te = (TypeElement) e;
+                if (!interfaces.contains(te)) {
+                    interfaces.add(te);
+                    populateInterfaces(te, interfaces);
+                }
             }
         }
         if (aClass.getKind() != ElementKind.INTERFACE) {
