@@ -1,27 +1,36 @@
 package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.processing.Dependencies
+import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSFile
+import com.google.devtools.ksp.symbol.KSNode
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.value.MutableConvertibleValues
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
+import io.micronaut.core.util.StringUtils
 import io.micronaut.inject.ast.Element
-import io.micronaut.inject.ast.ElementFactory
+import io.micronaut.inject.ast.beans.BeanElement
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.GeneratedFile
 import io.micronaut.kotlin.processing.AnnotationUtils
 import java.io.OutputStream
 import java.util.*
+import java.util.function.BiConsumer
+import javax.tools.Diagnostic
 
-class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment) : VisitorContext {
+class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment,
+                           val resolver: Resolver) : VisitorContext {
 
     private val visitorAttributes: MutableConvertibleValues<Any>
     private val annotationUtil: AnnotationUtils
+    private val elementFactory: KotlinElementFactory
 
     init {
         visitorAttributes = MutableConvertibleValuesMap()
         annotationUtil = AnnotationUtils(environment)
+        elementFactory = KotlinElementFactory(this)
     }
 
     override fun <T : Any?> get(name: CharSequence?, conversionContext: ArgumentConversionContext<T>?): Optional<T> {
@@ -86,23 +95,32 @@ class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment) 
         TODO("Not yet implemented")
     }
 
-    override fun getElementFactory(): KotlinElementFactory {
-        TODO("Not yet implemented")
+    override fun getElementFactory(): KotlinElementFactory = elementFactory
+
+    override fun info(message: String, element: Element?) {
+        printMessage(message, environment.logger::info, element)
     }
 
-    override fun info(message: String?, element: Element?) {
-        TODO("Not yet implemented")
+    override fun info(message: String) {
+        printMessage(message, environment.logger::info, null)
     }
 
-    override fun info(message: String?) {
-        TODO("Not yet implemented")
+    override fun fail(message: String, element: Element?) {
+        printMessage(message, environment.logger::error, element)
     }
 
-    override fun fail(message: String?, element: Element?) {
-        TODO("Not yet implemented")
+    override fun warn(message: String, element: Element?) {
+        printMessage(message, environment.logger::warn, element)
     }
 
-    override fun warn(message: String?, element: Element?) {
-        TODO("Not yet implemented")
+    private fun printMessage(message: String, logger: BiConsumer<String, KSNode?>, element: Element?) {
+        if (StringUtils.isNotEmpty(message)) {
+            if (element is AbstractKotlinElement) {
+                val el = element.nativeType
+                logger.accept(message, el)
+            } else {
+                logger.accept(message, null)
+            }
+        }
     }
 }

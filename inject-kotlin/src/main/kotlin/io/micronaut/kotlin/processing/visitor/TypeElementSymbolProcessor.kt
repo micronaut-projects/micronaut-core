@@ -48,7 +48,7 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
 
         typeElementVisitors = findTypeElementVisitors()
         loadedVisitors = ArrayList(typeElementVisitors.size)
-        visitorContext = KotlinVisitorContext(environment)
+        visitorContext = KotlinVisitorContext(environment, resolver)
 
         //resolver.createKSTypeReferenceFromKSType(KSType)
 
@@ -85,9 +85,7 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
                             continue
                         }
                         val className = typeElement.qualifiedName.toString()
-                        typeElement.accept<Any, Any>(
-                            KSVisitor<*, *>() {}, className
-                        )
+                        typeElement.accept(ElementVisitor(), className)
                     }
                 }
             }
@@ -118,7 +116,6 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
                         visitorContext
                     )
                 )
-                reso
             } catch (e: TypeNotPresentException) {
                 // ignored, means annotations referenced are not on the classpath
             } catch (e: NoClassDefFoundError) {
@@ -172,18 +169,17 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
         return typeElementVisitors.values
     }
 
-    private class ElementVisitor(private val classDeclaration: KSClassDeclaration,
-                                 private val loadedVisitors: List<LoadedVisitor>): KSDefaultVisitor<Object, Object>() {
+    private class ElementVisitor() : KSDefaultVisitor<Any, Any>() {
 
-        override fun visitClassDeclaration(classDeclaration: KSClassDeclaration, data: Object): Object {
+        override fun visitClassDeclaration(classDeclaration: KSClassDeclaration, data: Any): Any {
             TODO("Not yet implemented")
         }
 
-        override fun visitFunctionDeclaration(function: KSFunctionDeclaration, data: Object): Object {
+        override fun visitFunctionDeclaration(function: KSFunctionDeclaration, data: Any): Any {
             TODO("Not yet implemented")
         }
 
-        override fun defaultHandler(node: KSNode, data: Object): Object {
+        override fun defaultHandler(node: KSNode, data: Any): Any {
             return data
         }
 
