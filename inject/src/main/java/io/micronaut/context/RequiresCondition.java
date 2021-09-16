@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import groovy.lang.GroovySystem;
+import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
@@ -78,6 +79,8 @@ public class RequiresCondition implements Condition {
     public static final String MEMBER_MISSING_BEANS = "missingBeans";
     public static final String MEMBER_OS = "os";
     public static final String MEMBER_NOT_OS = "notOs";
+    public static final String MEMBER_CONFIGURATION_PROPERTIES = "configurationProperties";
+    public static final String MEMBER_METHOD = "method";
 
     private final AnnotationMetadata annotationMetadata;
 
@@ -215,6 +218,10 @@ public class RequiresCondition implements Condition {
         }
 
         if (!matchesAbsenceOfBeans(context, requirements)) {
+            return;
+        }
+
+        if (!matchesConfigurationPropertiesMethod(context, requirements)) {
             return;
         }
 
@@ -644,6 +651,51 @@ public class RequiresCondition implements Condition {
                     context.fail("The current operating system [" + currentOs.name() + "] is one of the disallowed systems [" + notOs + "]");
                     return false;
                 }
+            }
+        }
+        return true;
+    }
+
+    private boolean matchesConfigurationPropertiesMethod(ConditionContext context, AnnotationValue<Requires> requirements) {
+        if (requirements.contains(MEMBER_CONFIGURATION_PROPERTIES)) {
+            Class<?> type = requirements.classValue(MEMBER_CONFIGURATION_PROPERTIES).orElse(null);
+            String methodName = requirements.stringValue(MEMBER_METHOD).orElse("");
+
+            if (type == null) {
+                return true;
+            }
+
+            BeanContext beanContext = context.getBeanContext();
+            Object bean = beanContext.findBeanDefinition(type)
+                            .filter(definition -> definition.isAnnotationPresent(ConfigurationProperties.class))
+                            .flatMap(definition -> beanContext.findBean(type))
+                            .orElse(null);
+
+            if (bean == null) {
+                context.fail("No configuration properties bean of type [" + type + "] present within context");
+                return false;
+            }
+
+            if (StringUtils.isEmpty(methodName)) {
+                return true;
+            }
+
+            Method method = ReflectionUtils.findMethod(type, methodName).orElse(null);
+            if (method == null) {
+                context.fail("Method with name [" + methodName + "] not found on [" + type + "]");
+                return false;
+            }
+
+            Class<?> returnType = method.getReturnType();
+            if (!returnType.equals(boolean.class) && !returnType.equals(Boolean.class)) {
+                context.fail("Configuration properties method [" + methodName + "] doesn't return boolean value");
+                return false;
+            }
+
+            Boolean matches = ReflectionUtils.invokeMethod(bean, method);
+            if (matches == null || !matches) {
+                context.fail("Configuration properties method [" + methodName + "] invocation returned false");
+                return false;
             }
         }
         return true;

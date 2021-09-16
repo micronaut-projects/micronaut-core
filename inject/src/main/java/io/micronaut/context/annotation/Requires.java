@@ -205,6 +205,22 @@ public @interface Requires {
     Family[] notOs() default {};
 
     /**
+     * Expresses that configuration properties of the given type should be available for the bean or
+     * configuration to load.
+     *
+     * @return The configuration properties class
+     */
+    Class configurationProperties() default void.class;
+
+    /**
+     * Used in combination with {@link #configurationProperties()} to express the required method of the
+     * configuration properties bean that should return true for the bean or configuration to load.
+     *
+     * @return The method name
+     */
+    String method() default "";
+
+    /**
      * Used to express a required SDK version.
      */
     enum Sdk {
