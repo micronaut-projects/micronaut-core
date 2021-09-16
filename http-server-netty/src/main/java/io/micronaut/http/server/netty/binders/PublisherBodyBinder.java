@@ -103,8 +103,8 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                             }
                         }
 
-                    ArgumentConversionContext<?> conversionContext = context.with(targetType);
-                    Optional<?> converted = conversionService.convert(message, conversionContext);
+                        ArgumentConversionContext<?> conversionContext = context.with(targetType);
+                        Optional<?> converted = conversionService.convert(message, conversionContext);
 
                         if (converted.isPresent()) {
                             subscriber.onNext(converted.get());
