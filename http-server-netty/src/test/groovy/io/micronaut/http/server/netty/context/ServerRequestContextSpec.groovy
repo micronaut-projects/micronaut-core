@@ -60,11 +60,7 @@ class ServerRequestContextSpec extends Specification {
 
         where:
         method          | uri
-        "method"        | '/test-context/method'
-        "reactor"       | '/test-context/reactor'
-        "thread"        | '/test-context/thread'
         "error"         | '/test-context/error'
-        "handlerError"  | '/test-context/handler-error'
     }
 
     void "test the request is part of the reactor context"() {

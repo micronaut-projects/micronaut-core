@@ -46,7 +46,7 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
     private final HttpContentProcessorResolver httpContentProcessorResolver;
     private final BeanLocator beanLocator;
     private final BeanProvider<HttpServerConfiguration> httpServerConfiguration;
-    private final ExecutorService executorService;
+    private final BeanProvider<ExecutorService> executorService;
 
     /**
      * Default constructor.
@@ -62,7 +62,7 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
             HttpContentProcessorResolver httpContentProcessorResolver,
             BeanLocator beanLocator,
             BeanProvider<HttpServerConfiguration> httpServerConfiguration,
-            @Named(TaskExecutors.IO) ExecutorService executorService) {
+            @Named(TaskExecutors.IO) BeanProvider<ExecutorService> executorService) {
         this.conversionService = conversionService == null ? ConversionService.SHARED : conversionService;
         this.httpContentProcessorResolver = httpContentProcessorResolver;
         this.beanLocator = beanLocator;
@@ -87,7 +87,7 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
         ));
         registry.addRequestArgumentBinder(new InputStreamBodyBinder(
                 httpContentProcessorResolver,
-                executorService
+                executorService.get()
         ));
         return registry;
     }
