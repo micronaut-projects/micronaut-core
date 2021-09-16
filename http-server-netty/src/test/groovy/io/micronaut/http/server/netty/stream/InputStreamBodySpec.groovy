@@ -25,15 +25,26 @@ import java.util.concurrent.Executors
 
 class InputStreamBodySpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name': InputStreamBodySpec.class.name
     ])
+    @Shared
+    @AutoCleanup
+    HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURI())
+
+    void "test nullable body"() {
+        when:
+        def response = client.toBlocking()
+                .exchange(HttpRequest.POST("/input-stream-test/hello", null))
+
+        then:
+        response.status() == HttpStatus.NO_CONTENT
+    }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6100')
     void "test apply load to InputStream read"() {
-        given:
-        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURI())
-
         when:
         int max = 30
         CountDownLatch latch = new CountDownLatch(max)
@@ -69,7 +80,7 @@ class InputStreamBodySpec extends Specification {
 
         then:
         responses.size() == 30
-        responses.every({ it == HttpStatus.OK})
+        responses.every({ it == HttpStatus.OK })
     }
 
     @Requires(property = "spec.name", value = "io.micronaut.http.server.netty.stream.InputStreamBodySpec")
@@ -94,23 +105,27 @@ class InputStreamBodySpec extends Specification {
         @Consumes(MediaType.ALL)
         @ExecuteOn(TaskExecutors.IO)
         MutableHttpResponse<String> stream(@Body @Nullable InputStream payload) throws IOException {
+            if (payload == null) {
+                return HttpResponse.noContent()
+            } else {
 
-            //blocking read on injected http client
-            HttpResponse<String> resp = httpClient.toBlocking().exchange(HttpRequest
-                    .GET(URI.create("/input-stream-test/hello/other")), String.class)
-            System.out.println(resp.getBody(String.class).get())
+                //blocking read on injected http client
+                HttpResponse<String> resp = httpClient.toBlocking().exchange(HttpRequest
+                        .GET(URI.create("/input-stream-test/hello/other")), String.class)
+                System.out.println(resp.getBody(String.class).get())
 
 
-            byte[] body = payload.bytes
-            String b = new String(body)
-            int l = body.length
+                byte[] body = payload.bytes
+                String b = new String(body)
+                int l = body.length
 
-            responsePayload = "{\n" +
-                    "\t\"payload\" : {\n" +
-                    "\t\t\"name\" : \"1542\"\n" +
-                    "\t}\n" +
-                    "}"
-            return HttpResponse.ok().body(responsePayload).contentType(MediaType.APPLICATION_JSON)
+                responsePayload = "{\n" +
+                        "\t\"payload\" : {\n" +
+                        "\t\t\"name\" : \"1542\"\n" +
+                        "\t}\n" +
+                        "}"
+                return HttpResponse.ok().body(responsePayload).contentType(MediaType.APPLICATION_JSON)
+            }
         }
 
         @Get("/hello/other")
@@ -118,5 +133,5 @@ class InputStreamBodySpec extends Specification {
             return "Some body content"
         }
     }
-}
 
+}
