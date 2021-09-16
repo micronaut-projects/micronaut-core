@@ -1,24 +1,29 @@
 package io.micronaut.kotlin.processing.visitor
 
+import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.symbol.*
+import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.inject.ast.*
 import java.util.*
 import java.util.function.Predicate
-import javax.lang.model.element.ElementKind
-import javax.lang.model.element.ExecutableElement
-import javax.lang.model.element.TypeElement
-import javax.lang.model.element.VariableElement
 
 class KotlinClassElement(private val classDeclaration: KSClassDeclaration,
+                         annotationMetadata: AnnotationMetadata,
                          private val visitorContext: KotlinVisitorContext,
-                         private val arrayDimensions: Int = 0): AbstractKotlinElement(classDeclaration), ArrayableClassElement {
+                         private val arrayDimensions: Int = 0): AbstractKotlinElement(classDeclaration, annotationMetadata, visitorContext), ArrayableClassElement {
 
     override fun getName(): String {
         return classDeclaration.qualifiedName!!.asString()
     }
 
-    override fun isAssignable(type: String?): Boolean {
-        TODO("Not yet implemented")
+    override fun isAssignable(type: String): Boolean {
+        val ksType = visitorContext.resolver.getClassDeclarationByName(type)?.asStarProjectedType()
+        return if (ksType != null) {
+            classDeclaration.asStarProjectedType().isAssignableFrom(ksType)
+        } else {
+            false
+        }
     }
 
     override fun isArray(): Boolean {
@@ -30,11 +35,23 @@ class KotlinClassElement(private val classDeclaration: KSClassDeclaration,
     }
 
     override fun withArrayDimensions(arrayDimensions: Int): ClassElement {
-        return KotlinClassElement(classDeclaration, visitorContext, arrayDimensions);
+        return KotlinClassElement(classDeclaration, annotationMetadata, visitorContext, arrayDimensions);
     }
 
     override fun isInner(): Boolean {
         return classDeclaration.parentDeclaration is KSClassDeclaration
+    }
+
+    override fun getTypeArguments(): Map<String, ClassElement> {
+        return emptyMap()
+    }
+
+    override fun getTypeArguments(type: String): Map<String, ClassElement> {
+        return emptyMap()
+    }
+
+    override fun getAllTypeArguments(): Map<String, Map<String, ClassElement>> {
+        return emptyMap()
     }
 
     override fun getEnclosingType(): Optional<ClassElement> {
