@@ -145,7 +145,7 @@ managed-zipkin-reporter = "2.16.3"
 
 micronaut-aws = "3.0.0"
 micronaut-cache = "3.0.0"
-micronaut-coherence = "1.0.0"
+micronaut-coherence = 3.0.0
 micronaut-data = "3.0.0"
 micronaut-docs = "2.0.0.RC1"
 micronaut-groovy = "3.0.0"
