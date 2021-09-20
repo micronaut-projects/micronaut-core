@@ -32,14 +32,12 @@ class HttpClientFilterRequestInReactorContextSpec extends Specification {
     @Unroll
     void "HTTP Client filers can access original request via Reactor Context"(String path, String expected) {
         given:
-        int mockPort = SocketUtils.findAvailableTcpPort()
         EmbeddedServer mockServer = ApplicationContext.run(EmbeddedServer, [
-                'spec.name': 'HttpClientFilterRequestInReactorContextSpec.server',
-                'micronaut.server.port': mockPort,
+                'spec.name': 'HttpClientFilterRequestInReactorContextSpec.server'
         ])
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': 'HttpClientFilterRequestInReactorContextSpec',
-                'micronaut.http.services.foo.url': "http://localhost:$mockPort",
+                'micronaut.http.services.foo.url': "http://localhost:$mockServer.port",
         ])
         HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.URL)
         BlockingHttpClient client = httpClient.toBlocking()
