@@ -27,6 +27,7 @@ import io.micronaut.http.annotation.Header
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.IgnoreIf
 import spock.lang.Requires
+import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -128,6 +129,7 @@ class HostHeaderSpec extends Specification {
         asyncClient.close()
     }
 
+    @Retry // may fail with port binder error due to binding to 8443
     void "test host header with https server on custom port"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.builder([
