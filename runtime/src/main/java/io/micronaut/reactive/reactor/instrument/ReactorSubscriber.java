@@ -39,7 +39,8 @@ final class ReactorSubscriber<T> implements CoreSubscriber<T> {
         this.subscriber = subscriber;
     }
 
-    public Context getContext() {
+    @Override
+    public Context currentContext() {
         return subscriber.currentContext();
     }
 

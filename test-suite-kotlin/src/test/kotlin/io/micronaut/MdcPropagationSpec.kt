@@ -20,6 +20,8 @@ import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.single
+import kotlinx.coroutines.reactive.asFlow
 import kotlinx.coroutines.reactive.awaitFirst
 import kotlinx.coroutines.slf4j.MDCContext
 import kotlinx.coroutines.withContext
@@ -29,6 +31,7 @@ import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import reactor.core.publisher.toFlux
 import java.net.URI
 import java.util.*
 
@@ -121,7 +124,7 @@ class NamingClient(@Client(id = "/") private val client: HttpClient) {
                 header("X-TrackingId", trackingId)
             }
 
-            client.exchange(request, String::class.java).awaitFirst()
+            client.exchange(request, String::class.java).asFlow().single()
         }
     }
 }
