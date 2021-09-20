@@ -18,7 +18,6 @@ package io.micronaut.http.server.netty;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.util.Toggleable;
 import io.netty.buffer.ByteBufHolder;
-import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 
 /**

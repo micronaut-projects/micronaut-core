@@ -60,6 +60,7 @@ public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<Inpu
 
     /**
      * @param processorResolver The http content processor resolver
+     * @param executorService  The executor service to use
      */
     public InputStreamBodyBinder(HttpContentProcessorResolver processorResolver,
                                  ExecutorService executorService) {
