@@ -2310,6 +2310,15 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         public <U> U unwrap(Class<U> type) {
             throw new UnsupportedOperationException("Unwrapping is unsupported by this implementation");
         }
+
+        @Override
+        public String toString() {
+            return "DefaultConstraintViolation{" +
+                    "rootBean=" + rootBean +
+                    ", invalidValue=" + invalidValue +
+                    ", path=" + path +
+                    '}';
+        }
     }
 
     /**
