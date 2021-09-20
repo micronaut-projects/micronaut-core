@@ -37,7 +37,6 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 
 import java.util.Optional;
 
@@ -51,7 +50,6 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
     private static final Argument<Publisher> TYPE = Argument.of(Publisher.class);
-    private static final BindingResult<Publisher> EMPTY_FLUX = () -> Optional.of(Flux.empty());
 
     private final HttpContentProcessorResolver httpContentProcessorResolver;
 
@@ -156,6 +154,6 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                 }));
             }
         }
-        return EMPTY_FLUX;
+        return BindingResult.EMPTY;
     }
 }

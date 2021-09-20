@@ -8,6 +8,7 @@ import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
@@ -35,8 +36,8 @@ class FluxBodySpec extends Specification {
                 .exchange(HttpRequest.POST("/body/flux/test", null), String)
 
         then:
-        response.status() == HttpStatus.OK
-        response.body() == '[]'
+        def e = thrown(HttpClientResponseException)
+        e.response.status() == HttpStatus.BAD_REQUEST
     }
 
     @Controller("/body/flux/test")
