@@ -151,7 +151,7 @@ micronaut-docs = "2.0.0.RC1"
 micronaut-groovy = "3.0.0"
 micronaut-oraclecloud = "2.0.0"
 micronaut-r2dbc = "2.0.0"
-micronaut-views = "3.0.0"
+micronaut-views = "3.0.1"
 
 [libraries]
 # Libraries prefixed with bom- are BOM files
