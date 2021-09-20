@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package io.micronaut.jackson;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.TSFBuilder;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonDeserializer;
@@ -32,6 +33,7 @@ import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.reflect.GenericTypeUtils;
@@ -79,6 +81,21 @@ public class ObjectMapperFactory {
 
     @Inject
     protected KeyDeserializer[] keyDeserializers = new KeyDeserializer[0];
+
+    /**
+     * Builds default Factory {@link JsonFactory} using properties from {@link JacksonConfiguration}.
+     *
+     * @param jacksonConfiguration The configuration
+     * @return The {@link JsonFactory}
+     */
+    @Requires(beans = JacksonConfiguration.class)
+    @Singleton
+    @BootstrapContextCompatible
+    public JsonFactory jsonFactory(JacksonConfiguration jacksonConfiguration) {
+        final TSFBuilder<?, ?> jsonFactoryBuilder = JsonFactory.builder();
+        jacksonConfiguration.getFactorySettings().forEach(jsonFactoryBuilder::configure);
+        return jsonFactoryBuilder.build();
+    }
 
     /**
      * Builds the core Jackson {@link ObjectMapper} from the optional configuration and {@link JsonFactory}.

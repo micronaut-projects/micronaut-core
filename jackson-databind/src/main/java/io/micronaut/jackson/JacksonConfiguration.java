@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package io.micronaut.jackson;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -86,6 +87,7 @@ public class JacksonConfiguration implements JsonConfiguration {
     private Map<MapperFeature, Boolean> mapper = Collections.emptyMap();
     private Map<JsonParser.Feature, Boolean> parser = Collections.emptyMap();
     private Map<JsonGenerator.Feature, Boolean> generator = Collections.emptyMap();
+    private Map<JsonFactory.Feature, Boolean> factory = Collections.emptyMap();
     private JsonInclude.Include serializationInclusion = JsonInclude.Include.NON_EMPTY;
     private ObjectMapper.DefaultTyping defaultTyping = null;
     private PropertyNamingStrategy propertyNamingStrategy = null;
@@ -196,6 +198,13 @@ public class JacksonConfiguration implements JsonConfiguration {
      */
     public Map<JsonGenerator.Feature, Boolean> getGeneratorSettings() {
         return generator;
+    }
+
+    /**
+     * @return Settings for the factory
+     */
+    public Map<JsonFactory.Feature, Boolean> getFactorySettings() {
+        return factory;
     }
 
     /**
@@ -311,6 +320,16 @@ public class JacksonConfiguration implements JsonConfiguration {
     public void setGenerator(Map<JsonGenerator.Feature, Boolean> generator) {
         if (CollectionUtils.isNotEmpty(generator)) {
             this.generator = generator;
+        }
+    }
+
+    /**
+     * Sets the factory features to use.
+     * @param factory The generator features
+     */
+    public void setFactory(Map<JsonFactory.Feature, Boolean> factory) {
+        if (CollectionUtils.isNotEmpty(factory)) {
+            this.factory = factory;
         }
     }
 

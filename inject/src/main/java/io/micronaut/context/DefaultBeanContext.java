@@ -186,7 +186,7 @@ public class DefaultBeanContext implements BeanContext {
     final Map<BeanIdentifier, Object> singlesInCreation = new ConcurrentHashMap<>(5);
     final Map<BeanKey, Provider<Object>> scopedProxies = new ConcurrentHashMap<>(20);
     Set<Map.Entry<Class, List<BeanInitializedEventListener>>> beanInitializedEventListeners;
-    
+
     private final BeanContextConfiguration beanContextConfiguration;
     private final Collection<BeanDefinitionReference> beanDefinitionsClasses = new ConcurrentLinkedQueue<>();
     private final Map<String, BeanConfiguration> beanConfigurations = new HashMap<>(10);
@@ -1249,8 +1249,8 @@ public class DefaultBeanContext implements BeanContext {
     @NonNull
     private <T extends EventListener> List<T> resolveListeners(Class<T> type, Argument<?> genericType) {
         return streamOfType(Argument.of(type, genericType))
-            .sorted(OrderUtil.COMPARATOR)
-            .collect(Collectors.toList());
+                .sorted(OrderUtil.COMPARATOR)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -3743,14 +3743,31 @@ public class DefaultBeanContext implements BeanContext {
         return false;
     }
 
+    private static <T> List<T> nullSafe(List<T> list) {
+        if (list == null) {
+            return Collections.emptyList();
+        }
+        return list;
+    }
+
     private List<BeanRegistration> topologicalSort(Collection<BeanRegistration> beans) {
-        List<BeanRegistration> sorted = new ArrayList<>();
-        List<BeanRegistration> unsorted = new ArrayList<>(beans);
+        Map<Boolean, List<BeanRegistration>> initial = beans.stream()
+                .sorted(Comparator.comparing(s -> s.getBeanDefinition().getRequiredComponents().size()))
+                .collect(Collectors.groupingBy(b -> b.getBeanDefinition().getRequiredComponents().isEmpty()));
+        List<BeanRegistration> sorted = new ArrayList<>(nullSafe(initial.get(true)));
+        List<BeanRegistration> unsorted = new ArrayList<>(nullSafe(initial.get(false)));
+        // Optimization which knows about types which are already in the sorted list
+        Set<Class> satisfied = new HashSet<>();
+
+        // Optimization for types which we know are already unsatisified
+        // in a single iteration, allowing to skip the loop on unsorted elements
+        Set<Class> unsatisfied = new HashSet<>();
 
         //loop until all items have been sorted
         while (!unsorted.isEmpty()) {
             boolean acyclic = false;
 
+            unsatisfied.clear();
             Iterator<BeanRegistration> i = unsorted.iterator();
             while (i.hasNext()) {
                 BeanRegistration bean = i.next();
@@ -3759,13 +3776,18 @@ public class DefaultBeanContext implements BeanContext {
                 //determine if any components are in the unsorted list
                 Collection<Class> components = bean.getBeanDefinition().getRequiredComponents();
                 for (Class<?> clazz : components) {
-                    if (unsorted.stream()
+                    if (satisfied.contains(clazz)) {
+                        continue;
+                    }
+                    if (unsatisfied.contains(clazz) || unsorted.stream()
                             .map(BeanRegistration::getBeanDefinition)
                             .map(BeanDefinition::getBeanType)
                             .anyMatch(clazz::isAssignableFrom)) {
                         found = true;
+                        unsatisfied.add(clazz);
                         break;
                     }
+                    satisfied.add(clazz);
                 }
 
                 //none of the required components are in the unsorted list
