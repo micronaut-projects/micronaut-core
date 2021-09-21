@@ -617,7 +617,7 @@ public final class RouteExecutor {
     private Flux<MutableHttpResponse<?>> executeRoute(AtomicReference<HttpRequest<?>> requestReference,
                                                       RouteMatch<?> routeMatch) {
 
-        return Flux.defer(() -> {
+        return Flux.deferContextual(contextView -> {
             try {
                 final RouteMatch<?> finalRoute;
 
@@ -628,6 +628,9 @@ public final class RouteExecutor {
                             .fulfillArgumentRequirements(routeMatch, httpRequest, true);
                 } else {
                     finalRoute = routeMatch;
+                }
+                if (finalRoute.isSuspended()) {
+                    ContinuationArgumentBinder.setupCoroutineContext(httpRequest, contextView);
                 }
 
                 Object body = ServerRequestContext.with(httpRequest, (Supplier<Object>) finalRoute::execute);
