@@ -29,4 +29,6 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-micronaut-core-wrapper-
     - name: Build with Gradle
+      env:
+        GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
       run: unset HOSTNAME ; LANG=en_US.utf-8 LC_ALL=en_US.utf-8 ./gradlew check --no-daemon --parallel --continue

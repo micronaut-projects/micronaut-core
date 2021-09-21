@@ -9,6 +9,10 @@ pluginManagement {
     }
 }
 
+plugins {
+    id 'io.micronaut.build.shared.settings' version '4.1.2'
+}
+
 enableFeaturePreview("VERSION_CATALOGS")
 
 rootProject.name = 'micronaut'
