@@ -23,6 +23,7 @@ import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.Qualifier;
+import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationInject;
@@ -86,6 +87,7 @@ import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.JavaModelUtils;
+import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.visitor.BeanElementVisitor;
 import io.micronaut.inject.visitor.BeanElementVisitorContext;
@@ -338,6 +340,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final org.objectweb.asm.commons.Method METHOD_QUALIFIER_BY_NAME =
             org.objectweb.asm.commons.Method.getMethod(
                     ReflectionUtils.getRequiredMethod(Qualifiers.class, "byName", String.class)
+            );
+    private static final org.objectweb.asm.commons.Method METHOD_QUALIFIER_BY_ANNOTATION =
+            org.objectweb.asm.commons.Method.getMethod(
+                    ReflectionUtils.getRequiredMethod(Qualifiers.class, "byAnnotationSimple", AnnotationMetadata.class, String.class)
             );
 
     private final ClassWriter classWriter;
@@ -1716,19 +1722,40 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private void pushQualifier(GeneratorAdapter generatorAdapter, Element element, Runnable resolveArgument) {
         final List<String> qualifierNames = element.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER);
         if (!qualifierNames.isEmpty()) {
-            final boolean isNamed = qualifierNames.size() == 1 && qualifierNames.contains(AnnotationUtil.NAMED);
-            if (isNamed) {
-                final String n = element.stringValue(AnnotationUtil.NAMED).orElse(element.getName());
-                if (!n.contains("$")) {
-                    generatorAdapter.push(n);
-                    generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), METHOD_QUALIFIER_BY_NAME);
+            if (qualifierNames.size() == 1) {
+                if (qualifierNames.contains(AnnotationUtil.NAMED)) {
+                    final String n = element.stringValue(AnnotationUtil.NAMED)
+                                            .orElse(element.getName());
+                    if (!n.contains("$")) {
+                        generatorAdapter.push(n);
+                        generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), METHOD_QUALIFIER_BY_NAME);
+                    } else {
+                        // need to resolve the name at runtime
+                        doResolveArgument(generatorAdapter, resolveArgument);
+                    }
+                } else if (qualifierNames.contains(Any.NAME)) {
+                    final Type t = Type.getType(AnyQualifier.class);
+                    generatorAdapter.getStatic(
+                            t,
+                            "INSTANCE",
+                            t
+                    );
                 } else {
                     resolveArgument.run();
-                    generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), METHOD_QUALIFIER_FOR_ARGUMENT);
+                    generatorAdapter.invokeInterface(
+                            Type.getType(AnnotationMetadataProvider.class),
+                            org.objectweb.asm.commons.Method.getMethod(
+                                    ReflectionUtils.getRequiredInternalMethod(
+                                            AnnotationMetadataProvider.class,
+                                            "getAnnotationMetadata"
+                                    )
+                            )
+                    );
+                    generatorAdapter.push(qualifierNames.iterator().next());
+                    generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), METHOD_QUALIFIER_BY_ANNOTATION);
                 }
             } else {
-                resolveArgument.run();
-                generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), METHOD_QUALIFIER_FOR_ARGUMENT);
+                doResolveArgument(generatorAdapter, resolveArgument);
             }
         } else if (element.hasAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER)) {
             resolveArgument.run();
@@ -1749,6 +1776,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 generatorAdapter.push((String) null);
             }
         }
+    }
+
+    private void doResolveArgument(GeneratorAdapter generatorAdapter, Runnable resolveArgument) {
+        resolveArgument.run();
+        generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), METHOD_QUALIFIER_FOR_ARGUMENT);
     }
 
     private void pushArrayOfClasses(GeneratorAdapter writer, String[] byType) {
