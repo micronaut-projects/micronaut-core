@@ -132,7 +132,7 @@ class DefaultEnvironmentSpec extends Specification {
         def e = thrown(ConfigurationException)
         String extension = NameUtils.extension(unsupportedFile.absolutePath);
         String fileName = NameUtils.filename(unsupportedFile.absolutePath);
-        e.message == "Unsupported properties file format while reading " + fileName + "." + extension +" from " + unsupportedFile.absolutePath
+        e.message == "Unsupported properties file format while reading " + fileName + "." + extension + " from " + unsupportedFile.absolutePath
 
         when: "file from system property source loader does not override the key"
         System.setProperty("foo.baz", "10")
@@ -201,7 +201,7 @@ class DefaultEnvironmentSpec extends Specification {
         def e = thrown(ConfigurationException)
         String extension = NameUtils.extension(unsupportedFile.absolutePath);
         String fileName = NameUtils.filename(unsupportedFile.absolutePath);
-        e.message == "Unsupported properties file format while reading " + fileName + "." + extension +" from " + unsupportedFile.absolutePath
+        e.message == "Unsupported properties file format while reading " + fileName + "." + extension + " from " + unsupportedFile.absolutePath
 
         when: "file from system property source loader does not override the key"
         System.setProperty("foo.baz", "10")
