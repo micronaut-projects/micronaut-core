@@ -15,7 +15,6 @@
  */
 package io.micronaut.reactive.reactor.instrument;
 
-import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
@@ -26,6 +25,8 @@ import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Hooks;
+import reactor.core.publisher.Operators;
 import reactor.core.scheduler.Schedulers;
 
 import javax.annotation.PostConstruct;
@@ -47,14 +48,13 @@ class ReactorInstrumentation {
     /**
      * Initialize instrumentation for reactor with the tracer and factory.
      *
-     * @param beanContext   The bean context
      * @param instrumenterFactory The instrumenter factory
      */
     @SuppressWarnings("unchecked")
     @PostConstruct
-    void init(BeanContext beanContext, ReactorInstrumenterFactory instrumenterFactory) {
-        Schedulers.onScheduleHook("reactor-micronaut-instrumentation", runnable -> {
-            if (instrumenterFactory.hasInstrumenters()) {
+    void init(ReactorInstrumenterFactory instrumenterFactory) {
+        if (instrumenterFactory.hasInstrumenters()) {
+            Schedulers.onScheduleHook(Environment.MICRONAUT, runnable -> {
                 InvocationInstrumenter instrumenter = instrumenterFactory.create();
                 if (instrumenter != null) {
                     return () -> {
@@ -63,9 +63,19 @@ class ReactorInstrumentation {
                         }
                     };
                 }
-            }
-            return runnable;
-        });
+                return runnable;
+            });
+            Hooks.onEachOperator(Environment.MICRONAUT, Operators.lift((scannable, coreSubscriber) -> {
+                if (coreSubscriber instanceof ReactorSubscriber) {
+                    return coreSubscriber;
+                }
+                InvocationInstrumenter instrumenter = instrumenterFactory.create();
+                if (instrumenter != null) {
+                    return new ReactorSubscriber<>(instrumenter, coreSubscriber);
+                }
+                return coreSubscriber;
+            }));
+        }
     }
 
     /**
@@ -74,6 +84,7 @@ class ReactorInstrumentation {
     @PreDestroy
     void removeInstrumentation() {
         Schedulers.removeExecutorServiceDecorator(Environment.MICRONAUT);
+        Hooks.resetOnEachOperator(Environment.MICRONAUT);
     }
 
 
