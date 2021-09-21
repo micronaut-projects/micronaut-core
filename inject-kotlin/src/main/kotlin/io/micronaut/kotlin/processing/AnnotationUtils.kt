@@ -1,5 +1,6 @@
 package io.micronaut.kotlin.processing
 
+import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
@@ -14,7 +15,8 @@ import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.annotation.AnnotatedElementValidator
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 
-class AnnotationUtils(private val environment: SymbolProcessorEnvironment) {
+class AnnotationUtils(private val environment: SymbolProcessorEnvironment,
+                      private val resolver: Resolver) {
 
     private val annotationMetadataBuilder = newAnnotationBuilder()
     private var elementValidator: AnnotatedElementValidator? = null
@@ -171,7 +173,7 @@ class AnnotationUtils(private val environment: SymbolProcessorEnvironment) {
      * @return The visitor context
      */
     fun newVisitorContext(): KotlinVisitorContext {
-        return KotlinVisitorContext(environment)
+        return KotlinVisitorContext(environment, resolver)
     }
 
     /**

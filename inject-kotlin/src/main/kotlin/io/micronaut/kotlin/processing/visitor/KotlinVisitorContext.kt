@@ -5,20 +5,17 @@ import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSNode
-import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.value.MutableConvertibleValues
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
 import io.micronaut.core.util.StringUtils
 import io.micronaut.inject.ast.Element
-import io.micronaut.inject.ast.beans.BeanElement
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.GeneratedFile
 import io.micronaut.kotlin.processing.AnnotationUtils
 import java.io.OutputStream
 import java.util.*
 import java.util.function.BiConsumer
-import javax.tools.Diagnostic
 
 class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment,
                            val resolver: Resolver) : VisitorContext {
@@ -29,7 +26,7 @@ class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment,
 
     init {
         visitorAttributes = MutableConvertibleValuesMap()
-        annotationUtil = AnnotationUtils(environment)
+        annotationUtil = AnnotationUtils(environment, resolver)
         elementFactory = KotlinElementFactory(this)
     }
 

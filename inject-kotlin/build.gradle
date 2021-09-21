@@ -12,3 +12,9 @@ dependencies {
         api files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
 }
+
+afterEvaluate {
+    sourcesJar {
+        from "$projectDir/src/main/kotlin"
+    }
+}
