@@ -1,7 +1,10 @@
 package io.micronaut.kotlin.processing
 
+import com.google.devtools.ksp.closestClassDeclaration
 import com.google.devtools.ksp.symbol.KSAnnotation
+import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSDeclaration
+import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.visitor.VisitorContext
@@ -11,14 +14,18 @@ import java.util.*
 class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSDeclaration, KSAnnotation>() {
 
     override fun isMethodOrClassElement(element: KSDeclaration?): Boolean {
-        TODO("Not yet implemented")
+        return element is KSClassDeclaration || element is KSFunctionDeclaration
     }
 
     override fun getDeclaringType(element: KSDeclaration): String {
-        TODO("Not yet implemented")
+        val closestClassDeclaration = element.closestClassDeclaration()
+        if (closestClassDeclaration != null) {
+            return closestClassDeclaration.qualifiedName!!.asString()
+        }
+        return element.simpleName.asString()
     }
 
-    override fun getTypeForAnnotation(annotationMirror: KSAnnotation?): KSDeclaration {
+    override fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSDeclaration {
         TODO("Not yet implemented")
     }
 

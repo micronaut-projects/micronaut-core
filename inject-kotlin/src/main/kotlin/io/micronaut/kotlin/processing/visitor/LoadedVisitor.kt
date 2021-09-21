@@ -2,6 +2,7 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSType
 import io.micronaut.core.order.Ordered
 import io.micronaut.inject.visitor.TypeElementVisitor
 
@@ -10,10 +11,11 @@ class LoadedVisitor(val visitor: TypeElementVisitor<*, *>,
 
     init {
         val javaClass = visitor.javaClass
+        val resolver = visitorContext.resolver
+        val declaration = resolver.getClassDeclarationByName(javaClass.name)
 
-        val declaration = visitorContext.resolver.getClassDeclarationByName(javaClass.name)
-//        if (declaration != null) {
-//            declaration.typeParameters.
+        if (declaration != null) {
+            //resolver.getTypeArgument()
 //            val generics = declaration.asStarProjectedType().arguments.filter { typeArgument ->
 //                typeArgument.type!!.resolve().declaration.qualifiedName!!.asString() == TypeElementVisitor::class.java.name
 //            }
@@ -51,7 +53,7 @@ class LoadedVisitor(val visitor: TypeElementVisitor<*, *>,
 //                classAnnotation = Any::class.java.name
 //                elementAnnotation = Any::class.java.name
 //            }
-//        }
+        }
     }
 
     fun matches(classDeclaration: KSClassDeclaration) = true
