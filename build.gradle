@@ -5,7 +5,7 @@ buildscript {
     }
     dependencies {
         classpath "gradle.plugin.com.github.jengelman.gradle.plugins:shadow:7.0.0"
-        classpath "io.micronaut.build.internal:micronaut-gradle-plugins:4.1.1"
+        classpath "io.micronaut.build.internal:micronaut-gradle-plugins:4.1.3"
         classpath "org.aim42:htmlSanityCheck:${libs.versions.htmlSanityCheck.get()}"
         classpath 'javax.xml.bind:jaxb-api:2.3.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${libs.versions.kotlin.asProvider().get()}"
