@@ -75,17 +75,19 @@ private class CustomContinuation(
 }
 
 private class ServerRequestScopeHandler(
-    private val httpRequest: HttpRequest<*>
-) : ThreadContextElement<Unit> {
+        private val httpRequest: HttpRequest<*>
+) : ThreadContextElement<HttpRequest<*>?> {
 
     companion object Key : CoroutineContext.Key<ServerRequestScopeHandler>
 
     override val key: CoroutineContext.Key<ServerRequestScopeHandler>
         get() = Key
 
-    override fun updateThreadContext(context: CoroutineContext) =
+    override fun updateThreadContext(context: CoroutineContext): HttpRequest<*>? {
+        val previous = ServerRequestContext.currentRequest<HttpRequest<*>>().orElse(null)
         ServerRequestContext.set(httpRequest)
+        return previous
+    }
 
-    override fun restoreThreadContext(context: CoroutineContext, oldState: Unit) =
-        ServerRequestContext.set(null)
+    override fun restoreThreadContext(context: CoroutineContext, oldState: HttpRequest<*>?) = ServerRequestContext.set(oldState)
 }
