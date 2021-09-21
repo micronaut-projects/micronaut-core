@@ -321,9 +321,6 @@ public final class RouteExecutor {
             return upstreamResponsePublisher;
         }
         List<HttpFilter> filters = new ArrayList<>(httpFilters);
-        if (filters.isEmpty()) {
-            return upstreamResponsePublisher;
-        }
         AtomicInteger integer = new AtomicInteger();
         int len = filters.size();
         final Function<MutableHttpResponse<?>, Publisher<MutableHttpResponse<?>>> handleStatusException = (response) ->
@@ -343,13 +340,13 @@ public final class RouteExecutor {
                     return upstreamResponsePublisher;
                 }
                 HttpFilter httpFilter = filters.get(pos);
-                return Flux.from((Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.getAndSet(request), this))
+                return Flux.defer(() -> (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.getAndSet(request), this))
                         .flatMap(handleStatusException)
                         .onErrorResume(onError);
             }
         };
         HttpFilter httpFilter = filters.get(0);
-        return Flux.from((Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.get(), filterChain))
+        return Flux.defer(() -> (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.get(), filterChain))
                 .flatMap(handleStatusException)
                 .onErrorResume(onError);
     }

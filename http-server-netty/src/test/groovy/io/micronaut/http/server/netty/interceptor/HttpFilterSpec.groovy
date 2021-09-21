@@ -121,6 +121,18 @@ class HttpFilterSpec extends Specification {
         response.headers.contains("X-Another-Matched-Filter")
     }
 
+    void "test a miss behaving filter which throws exception"() {
+        when:
+        HttpResponse response = rxClient.exchange("/a-miss-behaving-filter")
+                .onErrorResume(throwable -> {
+                    HttpResponse rsp = ((HttpClientResponseException) throwable).response
+                    return Flux.just(rsp)
+                }).blockFirst()
+
+        then:
+        response.status == HttpStatus.INTERNAL_SERVER_ERROR
+    }
+
     @Requires(property = 'spec.name', value = "HttpFilterSpec")
     @Filter("/**")
     static class RootFilter implements HttpServerFilter {
@@ -160,6 +172,17 @@ class HttpFilterSpec extends Specification {
             return Flux.from(chain.proceed(request)).doOnNext({ response ->
                 response.header("X-Another-Matched-Filter", "processed")
             })
+        }
+    }
+
+    @Filter("/a-miss-behaving-filter")
+    @AnotherMarkerStereotypeAnnotation
+    @Requires(property = 'spec.name', value = "HttpFilterSpec")
+    static class AMissBehavingMatchedFilter implements HttpServerFilter {
+
+        @Override
+        Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+            throw new Exception("Bang")
         }
     }
 
