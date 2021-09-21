@@ -54,7 +54,7 @@ class ReactorInstrumentation {
     @PostConstruct
     void init(ReactorInstrumenterFactory instrumenterFactory) {
         if (instrumenterFactory.hasInstrumenters()) {
-            Schedulers.onScheduleHook("reactor-micronaut-instrumentation", runnable -> {
+            Schedulers.onScheduleHook(Environment.MICRONAUT, runnable -> {
                 InvocationInstrumenter instrumenter = instrumenterFactory.create();
                 if (instrumenter != null) {
                     return () -> {
