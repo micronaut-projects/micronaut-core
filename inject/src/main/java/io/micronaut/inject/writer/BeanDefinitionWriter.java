@@ -331,6 +331,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             Argument.class, // argument;
             boolean.class // requiresReflection;
     ));
+    private static final org.objectweb.asm.commons.Method METHOD_QUALIFIER_FOR_ARGUMENT =
+            org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredMethod(Qualifiers.class, "forArgument", Argument.class)
+    );
+    private static final org.objectweb.asm.commons.Method METHOD_QUALIFIER_BY_NAME =
+            org.objectweb.asm.commons.Method.getMethod(
+                    ReflectionUtils.getRequiredMethod(Qualifiers.class, "byName", String.class)
+            );
 
     private final ClassWriter classWriter;
     private final String beanFullClassName;
@@ -1705,12 +1713,23 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         return type.isAssignable(Map.class) || type.isAssignable(Collection.class) || isConfigurationProperties(type);
     }
 
-    private void pushQualifier(GeneratorAdapter generatorAdapter, AnnotationMetadata element, Runnable resolveArgument) {
-        if (!element.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER).isEmpty()) {
-            resolveArgument.run();
-            generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), org.objectweb.asm.commons.Method.getMethod(
-                    ReflectionUtils.getRequiredMethod(Qualifiers.class, "forArgument", Argument.class)
-            ));
+    private void pushQualifier(GeneratorAdapter generatorAdapter, Element element, Runnable resolveArgument) {
+        final List<String> qualifierNames = element.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER);
+        if (!qualifierNames.isEmpty()) {
+            final boolean isNamed = qualifierNames.size() == 1 && qualifierNames.contains(AnnotationUtil.NAMED);
+            if (isNamed) {
+                final String n = element.stringValue(AnnotationUtil.NAMED).orElse(element.getName());
+                if (!n.contains("$")) {
+                    generatorAdapter.push(n);
+                    generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), METHOD_QUALIFIER_BY_NAME);
+                } else {
+                    resolveArgument.run();
+                    generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), METHOD_QUALIFIER_FOR_ARGUMENT);
+                }
+            } else {
+                resolveArgument.run();
+                generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), METHOD_QUALIFIER_FOR_ARGUMENT);
+            }
         } else if (element.hasAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER)) {
             resolveArgument.run();
             generatorAdapter.invokeInterface(Type.getType(AnnotationMetadataProvider.class), org.objectweb.asm.commons.Method.getMethod(
