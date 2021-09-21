@@ -41,6 +41,8 @@ jobs:
           distribution: 'adopt'
           java-version: ${{ matrix.java }}
       - name: Optional setup step
+        env:
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
         run: |
           [ -f ./setup.sh ] && ./setup.sh || true
       - name: Build with Gradle
