@@ -45,7 +45,7 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
     private volatile ChannelHandlerContext ctx;
 
     private State state = NO_SUBSCRIPTION_OR_CONTEXT;
-    private ChannelFuture lastWriteFuture;
+    protected ChannelFuture lastWriteFuture;
 
     /**
      * Create a new handler subscriber with the default low and high watermarks.

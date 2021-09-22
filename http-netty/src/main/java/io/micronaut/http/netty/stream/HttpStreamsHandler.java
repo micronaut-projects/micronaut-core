@@ -381,7 +381,8 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                 @Override
                 public void onNext(HttpContent httpContent) {
                     if (messageWritten.compareAndSet(false, true)) {
-                        ctx.writeAndFlush(message).addListener(future -> super.onNext(httpContent));
+                        lastWriteFuture = ctx.writeAndFlush(message);
+                        lastWriteFuture.addListener(future -> super.onNext(httpContent));
                     } else {
                         super.onNext(httpContent);
                     }
@@ -403,7 +404,8 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                 @Override
                 protected void complete() {
                     if (messageWritten.compareAndSet(false, true)) {
-                        ctx.writeAndFlush(message).addListener(future -> doOnComplete());
+                        lastWriteFuture = ctx.writeAndFlush(message);
+                        lastWriteFuture.addListener(future -> doOnComplete());
                     } else {
                         doOnComplete();
                     }
@@ -430,12 +432,15 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
         removeHandlerIfActive(ctx, ctx.name() + "-body-subscriber");
 
         if (sendLastHttpContent) {
-            ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT, promise);
+            ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT, promise).addListener((f) -> {
+                sentOutMessage(ctx);
+                ctx.read();
+            });
         } else {
             promise.setSuccess();
+            sentOutMessage(ctx);
+            ctx.read();
         }
-        sentOutMessage(ctx);
-        ctx.read();
     }
 
     /**
