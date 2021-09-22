@@ -195,6 +195,19 @@ public class Qualifiers {
     }
 
     /**
+     * <p>Builds a qualifier that uses the given repeatable annotation.</p>
+     *
+     * @param metadata The metadata
+     * @param repeatableType  The annotation repeatable type. That is the annotation specified to {@link java.lang.annotation.Repeatable#value()}
+     * @param <T>      The component type
+     * @return The qualifier
+     */
+    @UsedByGeneratedCode
+    public static <T> Qualifier<T> byRepeatableAnnotation(AnnotationMetadata metadata, String repeatableType) {
+        return new RepeatableAnnotationQualifier<>(metadata, repeatableType);
+    }
+
+    /**
      * <p>Build a qualifier for the given annotation. </p>
      *
      * <p>Unlike {@link #byAnnotation(io.micronaut.core.annotation.AnnotationMetadata, String)} this method will not attempt to pick the qualifier strategy to use at runtime based on the passed annotation name.</p>

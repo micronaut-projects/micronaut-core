@@ -1122,7 +1122,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         while (listIterator.hasNext()) {
             A annotationMirror = listIterator.next();
             String annotationName = getAnnotationTypeName(annotationMirror);
-            if (AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName)) {
+            if (isExcludedAnnotation(element, annotationName)) {
                 continue;
             }
             if (DEPRECATED_ANNOTATION_NAMES.containsKey(annotationName)) {
@@ -1176,6 +1176,16 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 processAnnotationStereotype(element, parent, annotationMirror, annotationMetadata, isDeclared);
             }
         }
+    }
+
+    /**
+     * Is the given annotation excluded for the specified element.
+     * @param element The element
+     * @param annotationName The annotation name
+     * @return True if it is excluded
+     */
+    protected boolean isExcludedAnnotation(@NonNull T element, @NonNull String annotationName) {
+        return AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName);
     }
 
     /**

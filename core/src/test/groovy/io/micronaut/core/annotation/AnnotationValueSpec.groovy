@@ -4,6 +4,15 @@ import spock.lang.Specification
 
 class AnnotationValueSpec extends Specification {
 
+    void "test toString()"() {
+        given:
+        def av = AnnotationValue.builder("test.Foo")
+            .value(10).build()
+
+        expect:
+        av.toString() == "@test.Foo(value=10)"
+    }
+
     void "test get properties"() {
         given:
         def av = AnnotationValue.builder("test.Foo")

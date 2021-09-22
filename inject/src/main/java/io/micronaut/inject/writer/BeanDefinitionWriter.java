@@ -105,6 +105,7 @@ import org.objectweb.asm.signature.SignatureVisitor;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.annotation.Annotation;
+import java.lang.annotation.Repeatable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.time.Duration;
@@ -344,6 +345,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final org.objectweb.asm.commons.Method METHOD_QUALIFIER_BY_ANNOTATION =
             org.objectweb.asm.commons.Method.getMethod(
                     ReflectionUtils.getRequiredMethod(Qualifiers.class, "byAnnotationSimple", AnnotationMetadata.class, String.class)
+            );
+    private static final org.objectweb.asm.commons.Method METHOD_QUALIFIER_BY_REPEATABLE_ANNOTATION =
+            org.objectweb.asm.commons.Method.getMethod(
+                    ReflectionUtils.getRequiredMethod(Qualifiers.class, "byRepeatableAnnotation", AnnotationMetadata.class, String.class)
             );
 
     private final ClassWriter classWriter;
@@ -1741,6 +1746,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                             t
                     );
                 } else {
+                    final String annotationName = qualifierNames.iterator().next();
+                    final String repeatableName = visitorContext
+                            .getClassElement(annotationName)
+                            .flatMap(ce -> ce.stringValue(Repeatable.class)).orElse(null);
                     resolveArgument.run();
                     generatorAdapter.invokeInterface(
                             Type.getType(AnnotationMetadataProvider.class),
@@ -1751,8 +1760,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                     )
                             )
                     );
-                    generatorAdapter.push(qualifierNames.iterator().next());
-                    generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), METHOD_QUALIFIER_BY_ANNOTATION);
+                    if (repeatableName != null) {
+                        generatorAdapter.push(repeatableName);
+                        generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), METHOD_QUALIFIER_BY_REPEATABLE_ANNOTATION);
+                    } else {
+                        generatorAdapter.push(annotationName);
+                        generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), METHOD_QUALIFIER_BY_ANNOTATION);
+                    }
                 }
             } else {
                 doResolveArgument(generatorAdapter, resolveArgument);
