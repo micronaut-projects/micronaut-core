@@ -32,6 +32,7 @@ import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
 import javax.sql.DataSource;
+import java.net.URI;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.SQLException;
@@ -101,7 +102,14 @@ public class JdbcIndicator implements HealthIndicator {
             } catch (SQLException e) {
                 throwable = Optional.of(e);
                 try {
-                    key = dataSource.getClass().getMethod("getUrl").invoke(dataSource).toString();
+                    String url = dataSource.getClass().getMethod("getUrl").invoke(dataSource).toString();
+                    if (url.startsWith("jdbc:")) {
+                        url = url.substring(5);
+                    }
+                    url = url.replaceFirst(";", "?");
+                    url = url.replaceAll(";", "&");
+                    URI uri = new URI(url);
+                    key = uri.getHost() + ":" + uri.getPort() + uri.getPath();
                 } catch (Exception n) {
                     key = dataSource.getClass().getName() + "@" + Integer.toHexString(dataSource.hashCode());
                 }

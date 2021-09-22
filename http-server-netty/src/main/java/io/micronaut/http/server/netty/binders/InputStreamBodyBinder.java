@@ -33,12 +33,15 @@ import io.netty.buffer.EmptyByteBuf;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Responsible for binding to a {@link InputStream} argument from the body of the request.
@@ -53,12 +56,16 @@ public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<Inpu
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
 
     private final HttpContentProcessorResolver processorResolver;
+    private final ExecutorService executorService;
 
     /**
      * @param processorResolver The http content processor resolver
+     * @param executorService  The executor service to use
      */
-    public InputStreamBodyBinder(HttpContentProcessorResolver processorResolver) {
+    public InputStreamBodyBinder(HttpContentProcessorResolver processorResolver,
+                                 ExecutorService executorService) {
         this.processorResolver = processorResolver;
+        this.executorService = executorService;
     }
 
     @Override
@@ -81,7 +88,9 @@ public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<Inpu
                         private void init() {
                             if (processor == null) {
                                 processor = (HttpContentProcessor<ByteBufHolder>) processorResolver.resolve(nettyHttpRequest, context.getArgument());
-                                processor.subscribe(new CompletionAwareSubscriber<ByteBufHolder>() {
+                                Flux.from(processor)
+                                        .publishOn(Schedulers.fromExecutor(executorService))
+                                        .subscribe(new CompletionAwareSubscriber<ByteBufHolder>() {
 
                                     @Override
                                     protected void doOnSubscribe(Subscription subscription) {

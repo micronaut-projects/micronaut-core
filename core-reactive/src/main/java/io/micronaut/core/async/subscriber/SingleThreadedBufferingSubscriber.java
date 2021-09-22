@@ -65,6 +65,7 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
             case NO_SUBSCRIBER:
             case BUFFERING:
                 upstreamState = BackPressureState.FLOWING;
+                break;
 
             default:
                 doOnComplete();
@@ -190,10 +191,14 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
             forwardMessageDownstream(upstreamBuffer.remove());
         }
         if (upstreamBuffer.isEmpty()) {
-            if (upstreamDemand > 0) {
+            if (upstreamState == BackPressureState.FLOWING) {
+                // we're done!
+                doOnComplete();
+                upstreamState = BackPressureState.DONE;
+            } else if (upstreamDemand > 0) {
                 if (upstreamState == BackPressureState.BUFFERING) {
                     upstreamState = BackPressureState.DEMANDING;
-                } // otherwise we're flowing
+                }
                 upstreamSubscription.request(upstreamDemand);
             } else if (upstreamState == BackPressureState.BUFFERING) {
                 upstreamState = BackPressureState.IDLE;
@@ -231,7 +236,7 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
         DEMANDING,
 
         /**
-         * The data has been read, however the buffer is not empty.
+         * The data has been read ({@link #onComplete()} has been called), however the buffer is not empty.
          */
         FLOWING,
 
