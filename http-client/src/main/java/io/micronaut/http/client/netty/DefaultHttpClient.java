@@ -1520,7 +1520,11 @@ public class DefaultHttpClient implements
                          Flux.from((Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0).doFilter(request, filterChain))
                                 .contextWrite(ctx-> ctx.put(ServerRequestContext.KEY, parentRequest)));
             } else {
-                responsePublisher = wrapAsFlux(() -> (Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0).doFilter(request, filterChain));
+                try {
+                    responsePublisher = (Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0).doFilter(request, filterChain);
+                } catch (Throwable t) {
+                    responsePublisher = Flux.error(t);
+                }
             }
         }
 
@@ -2417,7 +2421,11 @@ public class DefaultHttpClient implements
                     throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
                 }
                 HttpClientFilter httpFilter = filters.get(pos);
-                return wrapAsFlux(() -> httpFilter.doFilter(requestWrapper.getAndSet(request), this));
+                try {
+                    return  httpFilter.doFilter(requestWrapper.getAndSet(request), this);
+                } catch (Throwable t) {
+                    return Flux.error(t);
+                }
             }
         };
     }
@@ -3346,14 +3354,4 @@ public class DefaultHttpClient implements
         Duration retry;
     }
 
-    private static <T> Flux<T> wrapAsFlux(Callable<Publisher<T>> supplier) {
-        Flux<T> safeFlux;
-        try {
-            Publisher<T> call = supplier.call();
-            safeFlux = Flux.from(call);
-        } catch (Throwable e) {
-            safeFlux = Flux.error(e);
-        }
-        return safeFlux;
-    }
 }
