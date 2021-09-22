@@ -299,6 +299,9 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             List<AnnotatedNode> hierarchy = new ArrayList<>()
             ClassNode cn = (ClassNode) element
             hierarchy.add(cn)
+            if (cn.isAnnotationDefinition()) {
+                return hierarchy
+            }
             populateTypeHierarchy(cn, hierarchy)
             return hierarchy.reverse()
         } else if (element instanceof MethodNode) {
