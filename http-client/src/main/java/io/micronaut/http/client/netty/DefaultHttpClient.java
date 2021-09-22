@@ -181,6 +181,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -1519,7 +1520,7 @@ public class DefaultHttpClient implements
                          Flux.from((Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0).doFilter(request, filterChain))
                                 .contextWrite(ctx-> ctx.put(ServerRequestContext.KEY, parentRequest)));
             } else {
-                responsePublisher = Flux.defer(() -> (Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0).doFilter(request, filterChain));
+                responsePublisher = wrapAsFlux(() -> (Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0).doFilter(request, filterChain));
             }
         }
 
@@ -2416,7 +2417,7 @@ public class DefaultHttpClient implements
                     throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
                 }
                 HttpClientFilter httpFilter = filters.get(pos);
-                return Flux.defer(() -> httpFilter.doFilter(requestWrapper.getAndSet(request), this));
+                return wrapAsFlux(() -> httpFilter.doFilter(requestWrapper.getAndSet(request), this));
             }
         };
     }
@@ -3343,5 +3344,16 @@ public class DefaultHttpClient implements
         String id;
         String name;
         Duration retry;
+    }
+
+    private static <T> Flux<T> wrapAsFlux(Callable<Publisher<T>> supplier) {
+        Flux<T> safeFlux;
+        try {
+            Publisher<T> call = supplier.call();
+            safeFlux = Flux.from(call);
+        } catch (Throwable e) {
+            safeFlux = Flux.error(e);
+        }
+        return safeFlux;
     }
 }
