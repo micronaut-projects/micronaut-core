@@ -174,7 +174,7 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
     public String toString() {
         if (this.qualifierAnn != null) {
             final Map<CharSequence, Object> values = qualifierAnn.getValues();
-            String annName = annotationType != null ? annotationType.getSimpleName() : "@" + NameUtils.getSimpleName(qualifierAnn.getAnnotationName());
+            String annName = annotationType != null ? "@" + annotationType.getSimpleName() : "@" + NameUtils.getSimpleName(qualifierAnn.getAnnotationName());
             annName += "(" + values.entrySet().stream().map(entry -> entry.getKey() + "=" + valueToString(entry)).collect(Collectors.joining(", ")) + ")";
             return annName;
         } else {
