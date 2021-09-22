@@ -55,6 +55,8 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
             return PrimitiveElement.valueOf(classNode.getName());
         } else if (classNode.isEnum()) {
             return new GroovyEnumElement(visitorContext, classNode, annotationMetadata);
+        } else if (classNode.isAnnotationDefinition()) {
+            return new GroovyAnnotationElement(visitorContext, classNode, annotationMetadata);
         } else {
             return new GroovyClassElement(visitorContext, classNode, annotationMetadata);
         }
@@ -80,7 +82,9 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
                     return super.getTypeArguments();
                 }
             };
-        } else {
+        } else if (classNode.isAnnotationDefinition()) {
+            return new GroovyAnnotationElement(visitorContext, classNode, annotationMetadata);
+        }else {
             return new GroovyClassElement(visitorContext, classNode, annotationMetadata) {
                 @NonNull
                 @Override
