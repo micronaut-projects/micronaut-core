@@ -350,6 +350,19 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             org.objectweb.asm.commons.Method.getMethod(
                     ReflectionUtils.getRequiredMethod(Qualifiers.class, "byRepeatableAnnotation", AnnotationMetadata.class, String.class)
             );
+    private static final org.objectweb.asm.commons.Method METHOD_QUALIFIER_BY_QUALIFIERS =
+            org.objectweb.asm.commons.Method.getMethod(
+                    ReflectionUtils.getRequiredMethod(Qualifiers.class, "byQualifiers", Qualifier[].class)
+            );
+    private static final org.objectweb.asm.commons.Method METHOD_QUALIFIER_BY_INTERCEPTOR_BINDING =
+            org.objectweb.asm.commons.Method.getMethod(
+                    ReflectionUtils.getRequiredMethod(Qualifiers.class, "byInterceptorBinding", AnnotationMetadata.class)
+            );
+    private static final org.objectweb.asm.commons.Method METHOD_QUALIFIER_BY_TYPE = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredMethod(Qualifiers.class, "byType", Class[].class)
+    );
+    private static final Type TYPE_QUALIFIERS = Type.getType(Qualifiers.class);
+    private static final Type TYPE_QUALIFIER = Type.getType(Qualifier.class);
 
     private final ClassWriter classWriter;
     private final String beanFullClassName;
@@ -1728,73 +1741,83 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         final List<String> qualifierNames = element.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER);
         if (!qualifierNames.isEmpty()) {
             if (qualifierNames.size() == 1) {
-                if (qualifierNames.contains(AnnotationUtil.NAMED)) {
-                    final String n = element.stringValue(AnnotationUtil.NAMED)
-                                            .orElse(element.getName());
-                    if (!n.contains("$")) {
-                        generatorAdapter.push(n);
-                        generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), METHOD_QUALIFIER_BY_NAME);
-                    } else {
-                        // need to resolve the name at runtime
-                        doResolveArgument(generatorAdapter, resolveArgument);
-                    }
-                } else if (qualifierNames.contains(Any.NAME)) {
-                    final Type t = Type.getType(AnyQualifier.class);
-                    generatorAdapter.getStatic(
-                            t,
-                            "INSTANCE",
-                            t
-                    );
-                } else {
-                    final String annotationName = qualifierNames.iterator().next();
-                    final String repeatableName = visitorContext
-                            .getClassElement(annotationName)
-                            .flatMap(ce -> ce.stringValue(Repeatable.class)).orElse(null);
-                    resolveArgument.run();
-                    generatorAdapter.invokeInterface(
-                            Type.getType(AnnotationMetadataProvider.class),
-                            org.objectweb.asm.commons.Method.getMethod(
-                                    ReflectionUtils.getRequiredInternalMethod(
-                                            AnnotationMetadataProvider.class,
-                                            "getAnnotationMetadata"
-                                    )
-                            )
-                    );
-                    if (repeatableName != null) {
-                        generatorAdapter.push(repeatableName);
-                        generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), METHOD_QUALIFIER_BY_REPEATABLE_ANNOTATION);
-                    } else {
-                        generatorAdapter.push(annotationName);
-                        generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), METHOD_QUALIFIER_BY_ANNOTATION);
-                    }
-                }
+                // simple qualifier
+                final String annotationName = qualifierNames.iterator().next();
+                pushQualifierForAnnotation(generatorAdapter, element, annotationName, resolveArgument);
             } else {
-                doResolveArgument(generatorAdapter, resolveArgument);
+                // composite qualifier
+                final int len = qualifierNames.size();
+                pushNewArray(generatorAdapter, TYPE_QUALIFIER, len);
+                for (int i = 0; i < len; i++) {
+                    final String annotationName = qualifierNames.get(i);
+                    pushStoreInArray(generatorAdapter, i, len, () ->
+                        pushQualifierForAnnotation(generatorAdapter, element, annotationName, resolveArgument)
+                    );
+                }
+                generatorAdapter.invokeStatic(TYPE_QUALIFIERS, METHOD_QUALIFIER_BY_QUALIFIERS);
+
             }
         } else if (element.hasAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER)) {
             resolveArgument.run();
-            generatorAdapter.invokeInterface(Type.getType(AnnotationMetadataProvider.class), org.objectweb.asm.commons.Method.getMethod(
-                    ReflectionUtils.getRequiredMethod(AnnotationMetadataProvider.class, "getAnnotationMetadata")
-            ));
-            generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), org.objectweb.asm.commons.Method.getMethod(
-                    ReflectionUtils.getRequiredMethod(Qualifiers.class, "byInterceptorBinding", AnnotationMetadata.class)
-            ));
+            retrieveAnnotationMetadataFromProvider(generatorAdapter);
+            generatorAdapter.invokeStatic(TYPE_QUALIFIERS, METHOD_QUALIFIER_BY_INTERCEPTOR_BINDING);
         } else {
             String[] byType = element.hasDeclaredAnnotation(io.micronaut.context.annotation.Type.NAME) ? element.stringValues(io.micronaut.context.annotation.Type.NAME) : null;
             if (byType != null && byType.length > 0) {
                 pushArrayOfClasses(generatorAdapter, byType);
-                generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), org.objectweb.asm.commons.Method.getMethod(
-                        ReflectionUtils.getRequiredMethod(Qualifiers.class, "byType", Class[].class)
-                ));
+                generatorAdapter.invokeStatic(TYPE_QUALIFIERS, METHOD_QUALIFIER_BY_TYPE);
             } else {
                 generatorAdapter.push((String) null);
             }
         }
     }
 
+    private void retrieveAnnotationMetadataFromProvider(GeneratorAdapter generatorAdapter) {
+        generatorAdapter.invokeInterface(Type.getType(AnnotationMetadataProvider.class), org.objectweb.asm.commons.Method.getMethod(
+                ReflectionUtils.getRequiredMethod(AnnotationMetadataProvider.class, "getAnnotationMetadata")
+        ));
+    }
+
+    private void pushQualifierForAnnotation(GeneratorAdapter generatorAdapter,
+                                            Element element,
+                                            String annotationName,
+                                            Runnable resolveArgument) {
+        if (annotationName.equals(AnnotationUtil.NAMED)) {
+            final String n = element.stringValue(AnnotationUtil.NAMED)
+                                    .orElse(element.getName());
+            if (!n.contains("$")) {
+                generatorAdapter.push(n);
+                generatorAdapter.invokeStatic(TYPE_QUALIFIERS, METHOD_QUALIFIER_BY_NAME);
+            } else {
+                // need to resolve the name at runtime
+                doResolveArgument(generatorAdapter, resolveArgument);
+            }
+        } else if (annotationName.equals(Any.NAME)) {
+            final Type t = Type.getType(AnyQualifier.class);
+            generatorAdapter.getStatic(
+                    t,
+                    "INSTANCE",
+                    t
+            );
+        } else {
+            final String repeatableName = visitorContext
+                    .getClassElement(annotationName)
+                    .flatMap(ce -> ce.stringValue(Repeatable.class)).orElse(null);
+            resolveArgument.run();
+            retrieveAnnotationMetadataFromProvider(generatorAdapter);
+            if (repeatableName != null) {
+                generatorAdapter.push(repeatableName);
+                generatorAdapter.invokeStatic(TYPE_QUALIFIERS, METHOD_QUALIFIER_BY_REPEATABLE_ANNOTATION);
+            } else {
+                generatorAdapter.push(annotationName);
+                generatorAdapter.invokeStatic(TYPE_QUALIFIERS, METHOD_QUALIFIER_BY_ANNOTATION);
+            }
+        }
+    }
+
     private void doResolveArgument(GeneratorAdapter generatorAdapter, Runnable resolveArgument) {
         resolveArgument.run();
-        generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), METHOD_QUALIFIER_FOR_ARGUMENT);
+        generatorAdapter.invokeStatic(TYPE_QUALIFIERS, METHOD_QUALIFIER_FOR_ARGUMENT);
     }
 
     private void pushArrayOfClasses(GeneratorAdapter writer, String[] byType) {

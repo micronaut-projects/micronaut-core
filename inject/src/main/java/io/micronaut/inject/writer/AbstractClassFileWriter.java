@@ -947,10 +947,20 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param size          The size
      */
     protected static void pushNewArray(GeneratorAdapter methodVisitor, Class<?> arrayType, int size) {
+        final Type t = Type.getType(arrayType);
+        pushNewArray(methodVisitor, t, size);
+    }
+
+    /**
+     * @param methodVisitor The method visitor as {@link org.objectweb.asm.commons.GeneratorAdapter}
+     * @param arrayType     The array class
+     * @param size          The size
+     */
+    protected static void pushNewArray(GeneratorAdapter methodVisitor, Type arrayType, int size) {
         // the size of the array
         methodVisitor.push(size);
         // define the array
-        methodVisitor.newArray(Type.getType(arrayType));
+        methodVisitor.newArray(arrayType);
         // add a reference to the array on the stack
         if (size > 0) {
             methodVisitor.visitInsn(DUP);
