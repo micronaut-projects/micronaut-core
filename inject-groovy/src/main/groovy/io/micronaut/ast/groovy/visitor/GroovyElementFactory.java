@@ -84,7 +84,7 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
             };
         } else if (classNode.isAnnotationDefinition()) {
             return new GroovyAnnotationElement(visitorContext, classNode, annotationMetadata);
-        }else {
+        } else {
             return new GroovyClassElement(visitorContext, classNode, annotationMetadata) {
                 @NonNull
                 @Override

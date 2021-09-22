@@ -102,6 +102,12 @@ public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
         }
     }
 
+    /**
+     * Adds one or many services that can be loaded via {@link java.util.ServiceLoader}.
+     * @param name The name of the service
+     * @param classes The classes
+     * @throws MalformedURLException If the name is not valid
+     */
     public void addService(String name, Set<String> classes) throws MalformedURLException {
         generatedUrls.add(new URL(null, "mem:META-INF/services/" + name, new URLStreamHandler() {
             @Override
@@ -112,7 +118,7 @@ public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
 
                     @Override
                     public InputStream getInputStream() {
-                        byte[] data = classes.stream().collect(Collectors.joining("\n")).getBytes(StandardCharsets.UTF_8);
+                        byte[] data = String.join("\n", classes).getBytes(StandardCharsets.UTF_8);
                         return new ByteArrayInputStream(data);
                     }
                 };
