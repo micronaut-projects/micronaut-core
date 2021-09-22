@@ -58,10 +58,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -340,13 +337,16 @@ public final class RouteExecutor {
                     return upstreamResponsePublisher;
                 }
                 HttpFilter httpFilter = filters.get(pos);
-                return Flux.defer(() -> (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.getAndSet(request), this))
+
+                return wrapAsFlux(() ->
+                        (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.getAndSet(request), this)
+                )
                         .flatMap(handleStatusException)
                         .onErrorResume(onError);
             }
         };
         HttpFilter httpFilter = filters.get(0);
-        return Flux.defer(() -> (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.get(), filterChain))
+        return wrapAsFlux(() -> (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.get(), filterChain))
                 .flatMap(handleStatusException)
                 .onErrorResume(onError);
     }
@@ -779,4 +779,14 @@ public final class RouteExecutor {
         return HttpResponse.status(status);
     }
 
+    private static <T> Flux<T> wrapAsFlux(Callable<Publisher<T>> supplier) {
+        Flux<T> safeFlux;
+        try {
+            Publisher<T> call = supplier.call();
+            safeFlux = Flux.from(call);
+        } catch (Throwable e) {
+            safeFlux = Flux.error(e);
+        }
+        return safeFlux;
+    }
 }
