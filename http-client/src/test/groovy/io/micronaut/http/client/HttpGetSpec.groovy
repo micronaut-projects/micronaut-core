@@ -584,7 +584,7 @@ class HttpGetSpec extends Specification {
     void "format query param declared in URI"() {
         given:
         MyGetClient client = this.myGetClient
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")
         LocalDateTime dt = LocalDateTime.now()
 
         expect:
@@ -712,7 +712,7 @@ class HttpGetSpec extends Specification {
         }
 
         @Get("/formatUriDeclaredQueryParam")
-        String formatUriDeclaredQueryParam(@QueryValue @Format("yyyy-MM-dd'T'HH:mm:ss.SSS") LocalDateTime time) {
+        String formatUriDeclaredQueryParam(@QueryValue @Format("MMMM dd yyyy 'at' h:m a") LocalDateTime time) {
             return time.toString();
         }
 
@@ -914,7 +914,7 @@ class HttpGetSpec extends Specification {
         Book invalidContentType()
 
         @Get(value = "/formatUriDeclaredQueryParam{?time}")
-        String formatUriDeclaredQueryParam(@QueryValue @Format("yyyy-MM-dd'T'HH:mm:ss.SSS") LocalDateTime time);
+        String formatUriDeclaredQueryParam(@QueryValue @Format("MMMM dd yyyy 'at' h:m a") LocalDateTime time);
 
         @Get(value = "/invalidContentType", consumes = "does/notexist")
         @SingleResult

@@ -105,8 +105,7 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
                       .orElse(null);
 
             if (convertedValue != null) {
-                Object pathParameter = context.getAnnotationMetadata().hasStereotype(Format.class) ? convertedValue : value;
-                uriContext.setPathParameter(parameterName, pathParameter);
+                uriContext.setPathParameter(parameterName, convertedValue);
                 uriContext.addQueryParameter(parameterName, convertedValue);
             } else {
                 uriContext.setPathParameter(parameterName, value);
