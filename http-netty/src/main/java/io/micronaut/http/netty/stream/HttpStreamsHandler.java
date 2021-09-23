@@ -381,7 +381,11 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                 @Override
                 public void onNext(HttpContent httpContent) {
                     if (messageWritten.compareAndSet(false, true)) {
-                        ctx.writeAndFlush(message).addListener(future -> super.onNext(httpContent));
+                        ChannelPromise messageWritePromise = ctx.newPromise();
+                        //if oncomplete gets called before the message is written the promise
+                        //set to lastWriteFuture shouldn't complete until the first content is written
+                        lastWriteFuture = messageWritePromise;
+                        ctx.writeAndFlush(message).addListener(f -> super.onNext(httpContent, messageWritePromise));
                     } else {
                         super.onNext(httpContent);
                     }
@@ -430,12 +434,15 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
         removeHandlerIfActive(ctx, ctx.name() + "-body-subscriber");
 
         if (sendLastHttpContent) {
-            ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT, promise);
+            ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT, promise).addListener((f) -> {
+                sentOutMessage(ctx);
+                ctx.read();
+            });
         } else {
             promise.setSuccess();
+            sentOutMessage(ctx);
+            ctx.read();
         }
-        sentOutMessage(ctx);
-        ctx.read();
     }
 
     /**

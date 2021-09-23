@@ -41,6 +41,8 @@ import spock.util.concurrent.PollingConditions
 
 import javax.annotation.Nullable
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.function.Consumer
 
 /**
@@ -588,6 +590,17 @@ class HttpGetSpec extends Specification {
         ex.message == "Failed to decode the body for the given content type [does/notexist]"
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/5223")
+    void "format query param declared in URI"() {
+        given:
+        MyGetClient client = this.myGetClient
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")
+        LocalDateTime dt = LocalDateTime.now()
+
+        expect:
+        client.formatUriDeclaredQueryParam(dt) == formatter.format(dt)
+    }
+
     void "test an invalid content type reactive response"() {
         when:
         Mono.from(myGetClient.invalidContentTypeReactive()).block()
@@ -706,6 +719,11 @@ class HttpGetSpec extends Specification {
         @Get("/dateTimeQuery")
         String formatDateTimeQuery(@QueryValue @Format('yyyy-MM-dd') LocalDate myDate) {
             return myDate.toString()
+        }
+
+        @Get("/formatUriDeclaredQueryParam")
+        String formatUriDeclaredQueryParam(@QueryValue @Format("MMMM dd yyyy 'at' h:m a") LocalDateTime time) {
+            return time.toString();
         }
 
         @Get("/host")
@@ -904,6 +922,9 @@ class HttpGetSpec extends Specification {
 
         @Get(value = "/invalidContentType", consumes = "does/notexist")
         Book invalidContentType()
+
+        @Get(value = "/formatUriDeclaredQueryParam{?time}")
+        String formatUriDeclaredQueryParam(@QueryValue @Format("MMMM dd yyyy 'at' h:m a") LocalDateTime time);
 
         @Get(value = "/invalidContentType", consumes = "does/notexist")
         @SingleResult

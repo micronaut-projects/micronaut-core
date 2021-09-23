@@ -103,6 +103,30 @@ class FilterErrorSpec extends Specification {
         ctx.close()
     }
 
+    void "test non once per request filter throwing error directly does not loop"() {
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': FilterErrorSpec.simpleName + '2b'])
+        def ctx = server.applicationContext
+        HttpClient client = ctx.createBean(HttpClient, server.getURL())
+
+        when:
+        HttpResponse<String> response = Flux.from(client.exchange("/filter-error-spec", String))
+                .onErrorResume(t -> {
+                    if (t instanceof HttpClientResponseException) {
+                        return Flux.just(((HttpClientResponseException) t).response)
+                    }
+                    throw t
+                })
+                .blockFirst()
+
+        then:
+        response.status() == HttpStatus.BAD_REQUEST
+        response.body() == "from filter exception handler"
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     void "test filter throwing exception handled by exception handler throwing exception"() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': FilterErrorSpec.simpleName + '3'])
         def ctx = server.applicationContext
@@ -212,6 +236,24 @@ class FilterErrorSpec extends Specification {
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             executedCount.incrementAndGet()
             return Publishers.just(new FilterException())
+        }
+
+        @Override
+        int getOrder() {
+            10
+        }
+    }
+
+    @Requires(property = 'spec.name', value = 'FilterErrorSpec2b')
+    @Filter("/**")
+    static class FirstEveryThrows implements HttpServerFilter {
+
+        AtomicInteger executedCount = new AtomicInteger(0)
+
+        @Override
+        Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+            executedCount.incrementAndGet()
+            throw new FilterException()
         }
 
         @Override

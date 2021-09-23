@@ -71,6 +71,21 @@ class ClientFilterSpec extends Specification{
         client.close()
     }
 
+    void "test a client filter that throws an exception"() {
+        given:
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange("/filter-exception/name", String.class)
+
+        then:
+        def ex = thrown(RuntimeException)
+        ex.message == "from filter"
+
+        cleanup:
+        client.close()
+    }
+
     void "test a client filter matching to the root"() {
         given:
         RootApi rootApi = context.getBean(RootApi)
@@ -192,6 +207,17 @@ class ClientFilterSpec extends Specification{
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
             request.header("X-Root-Filter", "processed")
             return chain.proceed(request)
+        }
+    }
+
+    // this filter should not match the test
+    @Requires(property = 'spec.name', value = "ClientFilterSpec")
+    @Filter('/filter-exception/**')
+    static class ThrowingFilter implements HttpClientFilter {
+
+        @Override
+        Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
+            throw new RuntimeException("from filter")
         }
     }
 }

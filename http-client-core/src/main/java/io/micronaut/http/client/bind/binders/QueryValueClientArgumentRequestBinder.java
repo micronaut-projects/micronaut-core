@@ -23,10 +23,12 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.client.bind.AnnotatedClientArgumentRequestBinder;
 import io.micronaut.http.client.bind.ClientRequestUriContext;
+import io.micronaut.http.uri.UriMatchVariable;
 
 import java.util.List;
 import java.util.Map;
@@ -76,35 +78,48 @@ public class QueryValueClientArgumentRequestBinder implements AnnotatedClientArg
             @NonNull Object value,
             @NonNull MutableHttpRequest<?> request
     ) {
-        ArgumentConversionContext<ConvertibleMultiValues> conversionContext = context.with(
-                Argument.of(ConvertibleMultiValues.class, context.getArgument().getName(), context.getAnnotationMetadata()));
-        Optional<ConvertibleMultiValues> convertedValue = conversionService.convert(value, conversionContext);
+        String parameterName = context.getAnnotationMetadata().stringValue(QueryValue.class)
+                .filter(StringUtils::isNotEmpty)
+                .orElse(context.getArgument().getName());
 
-        if (convertedValue.isPresent()) {
-            ConvertibleMultiValues<String> multiValues;
-            // noinspection unchecked
-            multiValues = convertedValue.get();
+        final UriMatchVariable uriVariable = uriContext.getUriTemplate().getVariables()
+                .stream()
+                .filter(v -> v.getName().equals(parameterName))
+                .findFirst()
+                .orElse(null);
 
-            Map<String, List<String>> queryParameters = uriContext.getQueryParameters();
-
-            // Add all the parameters
-            multiValues.forEach((k, v) -> {
-                if (queryParameters.containsKey(k)) {
-                    queryParameters.get(k).addAll(v);
-                } else {
-                    queryParameters.put(k, v);
-                }
-            });
-        } else {
-            Argument<Object> argument = context.getArgument();
-            String name = argument.getAnnotationMetadata()
-                    .getValue(Bindable.class, String.class).orElse(argument.getName());
-
-            if (context.getAnnotationMetadata().hasStereotype(Format.class)) {
-                conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
-                        .ifPresent(v -> uriContext.setPathParameter(name, v));
+        if (uriVariable != null) {
+            if (uriVariable.isExploded()) {
+                uriContext.setPathParameter(parameterName, value);
             } else {
-                uriContext.setPathParameter(name, value);
+                String convertedValue
+                        = conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
+                        .filter(StringUtils::isNotEmpty)
+                        .orElse(null);
+                if (convertedValue != null) {
+                    uriContext.setPathParameter(parameterName, convertedValue);
+                } else {
+                    uriContext.setPathParameter(parameterName, value);
+                }
+            }
+        } else {
+            ArgumentConversionContext<ConvertibleMultiValues> conversionContext = context.with(
+                    Argument.of(ConvertibleMultiValues.class, context.getArgument().getName(), context.getAnnotationMetadata()));
+            final Optional<ConvertibleMultiValues<String>> multiValues = conversionService.convert(value, conversionContext)
+                    .map(values -> (ConvertibleMultiValues<String>) values);
+            if (multiValues.isPresent())  {
+                Map<String, List<String>> queryParameters = uriContext.getQueryParameters();
+                // Add all the parameters
+                multiValues.get().forEach((k, v) -> {
+                    if (queryParameters.containsKey(k)) {
+                        queryParameters.get(k).addAll(v);
+                    } else {
+                        queryParameters.put(k, v);
+                    }
+                });
+            } else {
+                conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
+                        .ifPresent(v -> uriContext.addQueryParameter(parameterName, v));
             }
         }
     }
