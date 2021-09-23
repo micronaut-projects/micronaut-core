@@ -1515,9 +1515,14 @@ public class DefaultHttpClient implements
 
             ClientFilterChain filterChain = buildChain(requestWrapper, filters);
             if (parentRequest != null) {
-                responsePublisher = ServerRequestContext.with(parentRequest, (Supplier<Publisher<io.micronaut.http.HttpResponse<O>>>) () ->
-                         Flux.from((Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0).doFilter(request, filterChain))
-                                .contextWrite(ctx -> ctx.put(ServerRequestContext.KEY, parentRequest)));
+                responsePublisher = ServerRequestContext.with(parentRequest, (Supplier<Publisher<io.micronaut.http.HttpResponse<O>>>) () -> {
+                    try {
+                        return Flux.from((Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0).doFilter(request, filterChain))
+                                .contextWrite(ctx -> ctx.put(ServerRequestContext.KEY, parentRequest));
+                    } catch (Throwable t) {
+                        return Flux.error(t);
+                    }
+                });
             } else {
                 try {
                     responsePublisher = (Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0).doFilter(request, filterChain);
@@ -2421,7 +2426,7 @@ public class DefaultHttpClient implements
                 }
                 HttpClientFilter httpFilter = filters.get(pos);
                 try {
-                    return  httpFilter.doFilter(requestWrapper.getAndSet(request), this);
+                    return httpFilter.doFilter(requestWrapper.getAndSet(request), this);
                 } catch (Throwable t) {
                     return Flux.error(t);
                 }

@@ -344,7 +344,7 @@ public final class RouteExecutor {
                             .flatMap(handleStatusException)
                             .onErrorResume(onError);
                 } catch (Throwable t) {
-                    return onError(t, requestForFilter);
+                    return onError.apply(t);
                 }
             }
         };
@@ -355,7 +355,7 @@ public final class RouteExecutor {
                     .flatMap(handleStatusException)
                     .onErrorResume(onError);
         } catch (Throwable t) {
-            return onError(t, request);
+            return onError.apply(t);
         }
 
     }
