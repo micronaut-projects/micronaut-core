@@ -44,6 +44,7 @@ import io.micronaut.http.client.bind.binders.HeaderClientRequestBinder;
 import io.micronaut.http.client.bind.binders.VersionClientRequestBinder;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
+import io.micronaut.http.uri.UriMatchVariable;
 import jakarta.inject.Singleton;
 import kotlin.coroutines.Continuation;
 
@@ -99,18 +100,33 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
                     .filter (StringUtils::isNotEmpty)
                     .orElse(context.getArgument().getName());
 
-            String convertedValue
-                = conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
-                      .filter(StringUtils::isNotEmpty)
-                      .orElse(null);
+            final UriMatchVariable uriVariable = uriContext.getUriTemplate().getVariables()
+                    .stream()
+                    .filter(v -> v.getName().equals(parameterName))
+                    .findFirst()
+                    .orElse(null);
 
-            if (convertedValue != null) {
-                uriContext.setPathParameter(parameterName, convertedValue);
-                uriContext.addQueryParameter(parameterName, convertedValue);
+            if (uriVariable != null) {
+                if (uriVariable.isExploded()) {
+                    uriContext.setPathParameter(parameterName, value);
+                } else {
+                    String convertedValue
+                            = conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
+                            .filter(StringUtils::isNotEmpty)
+                            .orElse(null);
+                    if (convertedValue != null) {
+                        uriContext.setPathParameter(parameterName, convertedValue);
+                    } else {
+                        uriContext.setPathParameter(parameterName, value);
+                    }
+                }
             } else {
-                uriContext.setPathParameter(parameterName, value);
+                conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
+                        .filter(StringUtils::isNotEmpty)
+                        .ifPresent(convertedValue -> uriContext.addQueryParameter(parameterName, convertedValue));
             }
         });
+
         byAnnotation.put(PathVariable.class, (context, uriContext, value, request) -> {
             String parameterName = context.getAnnotationMetadata().stringValue(PathVariable.class)
                     .filter (StringUtils::isNotEmpty)
