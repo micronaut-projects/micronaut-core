@@ -118,6 +118,15 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     }
 
     @Override
+    protected boolean isExcludedAnnotation(@NonNull AnnotatedNode element, @NonNull String annotationName) {
+        if (element instanceof ClassNode && element.isAnnotationDefinition() && annotationName.startsWith("java.lang.annotation")) {
+            return false
+        } else {
+            return super.isExcludedAnnotation(element, annotationName)
+        }
+    }
+
+    @Override
     protected AnnotatedNode getAnnotationMember(AnnotatedNode originatingElement, CharSequence member) {
         if (originatingElement instanceof ClassNode) {
             def methods = ((ClassNode) originatingElement).getMethods(member.toString())
@@ -290,6 +299,9 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             List<AnnotatedNode> hierarchy = new ArrayList<>()
             ClassNode cn = (ClassNode) element
             hierarchy.add(cn)
+            if (cn.isAnnotationDefinition()) {
+                return hierarchy
+            }
             populateTypeHierarchy(cn, hierarchy)
             return hierarchy.reverse()
         } else if (element instanceof MethodNode) {
