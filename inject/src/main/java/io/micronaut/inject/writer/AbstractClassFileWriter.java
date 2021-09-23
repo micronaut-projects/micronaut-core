@@ -544,7 +544,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param declaringClassWriter The declaring class writer
      * @param generatorAdapter     The generator adapter
      * @param argumentName         The argument name
-     * @param classElement         The class name
+     * @param typedElement         The typed element
      * @param annotationMetadata   The annotation metadata
      * @param typeArguments        The type arguments
      * @param defaults             The annotation defaults
@@ -556,12 +556,12 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             ClassWriter declaringClassWriter,
             GeneratorAdapter generatorAdapter,
             String argumentName,
-            ClassElement classElement,
+            TypedElement typedElement,
             AnnotationMetadata annotationMetadata,
             Map<String, ClassElement> typeArguments,
             Map<String, Integer> defaults,
             Map<String, GeneratorAdapter> loadTypeMethods) {
-        Type argumentType = JavaModelUtils.getTypeReference(classElement);
+        Type argumentType = JavaModelUtils.getTypeReference(typedElement);
 
         // 1st argument: The type
         generatorAdapter.push(argumentType);
@@ -569,7 +569,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         // 2nd argument: The argument name
         generatorAdapter.push(argumentName);
 
-        boolean hasAnnotations = annotationMetadata instanceof DefaultAnnotationMetadata;
+        boolean hasAnnotations = !annotationMetadata.isEmpty() && annotationMetadata instanceof DefaultAnnotationMetadata;
         boolean hasTypeArguments = typeArguments != null && !typeArguments.isEmpty();
 
         if (!hasAnnotations && !hasTypeArguments) {
@@ -610,11 +610,16 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             generatorAdapter.visitInsn(ACONST_NULL);
         }
 
+        boolean typeVariable = false;
+        if (typedElement instanceof ClassElement) {
+            typeVariable = ((ClassElement) typedElement).isTypeVariable();
+        }
+
         // Argument.create( .. )
         invokeInterfaceStaticMethod(
                 generatorAdapter,
                 Argument.class,
-                classElement.isTypeVariable() ? METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
+                typeVariable ? METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
         );
     }
 
