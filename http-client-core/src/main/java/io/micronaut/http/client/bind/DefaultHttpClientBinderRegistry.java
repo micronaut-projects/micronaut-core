@@ -24,6 +24,7 @@ import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
@@ -98,10 +99,19 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
                     .filter (StringUtils::isNotEmpty)
                     .orElse(context.getArgument().getName());
 
-            uriContext.setPathParameter(parameterName, value);
-            conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
-                    .filter(StringUtils::isNotEmpty)
-                    .ifPresent(o -> uriContext.addQueryParameter(parameterName, o));
+            String convertedValue
+                = conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
+                      .filter(StringUtils::isNotEmpty)
+                      .orElse(null);
+
+            if (convertedValue != null) {
+                Object pathParameter = context.getAnnotationMetadata().hasStereotype(Format.class) ? convertedValue : value;
+                uriContext.setPathParameter(parameterName, pathParameter);
+                uriContext.addQueryParameter(parameterName, convertedValue);
+            }
+            else {
+                uriContext.setPathParameter(parameterName, value);
+            }
         });
         byAnnotation.put(PathVariable.class, (context, uriContext, value, request) -> {
             String parameterName = context.getAnnotationMetadata().stringValue(PathVariable.class)
