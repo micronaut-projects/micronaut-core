@@ -1,0 +1,15 @@
+dependencies {
+    annotationProcessor project(":inject-java")
+
+    api project(':context')
+    api project(":http")
+
+    testAnnotationProcessor project(":inject-java")
+    testAnnotationProcessor project(":inject-groovy")
+    testImplementation project(":inject-java")
+    testImplementation project(":inject-java-test")
+    testImplementation project(":inject-groovy")
+    if (!JavaVersion.current().isJava9Compatible()) {
+        testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    }
+}
