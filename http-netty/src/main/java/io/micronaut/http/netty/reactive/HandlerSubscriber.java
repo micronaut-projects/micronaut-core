@@ -39,6 +39,8 @@ import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.*;
 @Internal
 public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscriber<T> {
 
+    protected ChannelFuture lastWriteFuture;
+
     private final EventExecutor executor;
     private final AtomicBoolean hasSubscription = new AtomicBoolean();
 
@@ -46,7 +48,6 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
     private volatile ChannelHandlerContext ctx;
 
     private State state = NO_SUBSCRIPTION_OR_CONTEXT;
-    protected ChannelFuture lastWriteFuture;
 
     /**
      * Create a new handler subscriber with the default low and high watermarks.
@@ -170,7 +171,12 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
         onNext(t, ctx.newPromise());
     }
 
-    public void onNext(T t, ChannelPromise promise) {
+    /**
+     * Write the message with the supplied promise
+     * @param t The message
+     * @param promise The promise
+     */
+    protected void onNext(T t, ChannelPromise promise) {
         // Publish straight to the context.
         lastWriteFuture = ctx.writeAndFlush(t, promise);
         lastWriteFuture.addListener(future ->
