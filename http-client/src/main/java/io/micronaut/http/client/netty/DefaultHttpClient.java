@@ -1517,7 +1517,7 @@ public class DefaultHttpClient implements
             if (parentRequest != null) {
                 responsePublisher = ServerRequestContext.with(parentRequest, (Supplier<Publisher<io.micronaut.http.HttpResponse<O>>>) () ->
                          Flux.from((Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0).doFilter(request, filterChain))
-                                .contextWrite(ctx-> ctx.put(ServerRequestContext.KEY, parentRequest)));
+                                .contextWrite(ctx -> ctx.put(ServerRequestContext.KEY, parentRequest)));
             } else {
                 responsePublisher = (Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0)
                         .doFilter(request, filterChain);

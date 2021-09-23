@@ -13,7 +13,7 @@ class MutableHttpMessageSpec extends Specification {
         response.contentType("application/json")
 
         then:
-        response.headers.asMap()[HttpHeaders.CONTENT_TYPE] == List.of("application/json")
+        response.headers.asMap()[HttpHeaders.CONTENT_TYPE] == Arrays.asList("application/json")
     }
 
     void "test does not add duplicate content length header"() {
@@ -25,7 +25,7 @@ class MutableHttpMessageSpec extends Specification {
         response.contentLength(100)
 
         then:
-        response.headers.asMap()[HttpHeaders.CONTENT_LENGTH] == List.of("100")
+        response.headers.asMap()[HttpHeaders.CONTENT_LENGTH] == Arrays.asList("100")
     }
 
     void "test does not add duplicate content encoding header"() {
@@ -37,6 +37,6 @@ class MutableHttpMessageSpec extends Specification {
         response.contentEncoding("test")
 
         then:
-        response.headers.asMap()[HttpHeaders.CONTENT_ENCODING] == List.of("test")
+        response.headers.asMap()[HttpHeaders.CONTENT_ENCODING] == Arrays.asList("test")
     }
 }
