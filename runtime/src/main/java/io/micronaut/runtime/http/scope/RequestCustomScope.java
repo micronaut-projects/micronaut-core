@@ -27,8 +27,6 @@ import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.inject.BeanIdentifier;
 import jakarta.inject.Singleton;
-
-import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 

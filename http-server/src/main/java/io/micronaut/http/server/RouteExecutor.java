@@ -58,10 +58,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -118,7 +115,7 @@ public final class RouteExecutor {
      * Creates a response publisher to represent the response after being handled
      * by any available error route or exception handler.
      *
-     * @param t The exception that occurred
+     * @param t           The exception that occurred
      * @param httpRequest The request that caused the exception
      * @return A response publisher
      */
@@ -222,7 +219,7 @@ public final class RouteExecutor {
      * from any other method.
      *
      * @param httpRequest The request that case the exception
-     * @param cause The exception that occurred
+     * @param cause       The exception that occurred
      * @return A response to represent the exception
      */
     public MutableHttpResponse<?> createDefaultErrorResponse(HttpRequest<?> httpRequest,
@@ -259,7 +256,7 @@ public final class RouteExecutor {
     }
 
     /**
-     * @param request The request
+     * @param request    The request
      * @param finalRoute The route
      * @return The default content type declared on the route
      */
@@ -288,7 +285,7 @@ public final class RouteExecutor {
     /**
      * Executes a route.
      *
-     * @param request The request that matched to the route
+     * @param request        The request that matched to the route
      * @param executeFilters Whether or not to execute server filters
      * @param routePublisher The route match publisher
      * @return A response publisher
@@ -309,7 +306,7 @@ public final class RouteExecutor {
     /**
      * Applies server filters to a request/response.
      *
-     * @param requestReference The request reference
+     * @param requestReference          The request reference
      * @param upstreamResponsePublisher The original response publisher
      * @return A new response publisher that executes server filters
      */
@@ -321,9 +318,6 @@ public final class RouteExecutor {
             return upstreamResponsePublisher;
         }
         List<HttpFilter> filters = new ArrayList<>(httpFilters);
-        if (filters.isEmpty()) {
-            return upstreamResponsePublisher;
-        }
         AtomicInteger integer = new AtomicInteger();
         int len = filters.size();
         final Function<MutableHttpResponse<?>, Publisher<MutableHttpResponse<?>>> handleStatusException = (response) ->
@@ -343,19 +337,31 @@ public final class RouteExecutor {
                     return upstreamResponsePublisher;
                 }
                 HttpFilter httpFilter = filters.get(pos);
-                return Flux.from((Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.getAndSet(request), this))
-                        .flatMap(handleStatusException)
-                        .onErrorResume(onError);
+
+                HttpRequest<?> requestForFilter = requestReference.getAndSet(request);
+                try {
+                    return Flux.from((Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestForFilter, this))
+                            .flatMap(handleStatusException)
+                            .onErrorResume(onError);
+                } catch (Throwable t) {
+                    return onError.apply(t);
+                }
             }
         };
         HttpFilter httpFilter = filters.get(0);
-        return Flux.from((Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.get(), filterChain))
-                .flatMap(handleStatusException)
-                .onErrorResume(onError);
+        HttpRequest<?> request = requestReference.get();
+        try {
+            return Flux.from((Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(request, filterChain))
+                    .flatMap(handleStatusException)
+                    .onErrorResume(onError);
+        } catch (Throwable t) {
+            return onError.apply(t);
+        }
+
     }
 
     private Mono<MutableHttpResponse<?>> createDefaultErrorResponsePublisher(HttpRequest<?> httpRequest,
-                                                                                  Throwable cause) {
+                                                                             Throwable cause) {
         return Mono.fromCallable(() -> createDefaultErrorResponse(httpRequest, cause));
     }
 
@@ -522,7 +528,7 @@ public final class RouteExecutor {
             mutableHttpResponse = HttpResponse.status(httpStatus, httpStatus.getReason());
             mutableHttpResponse.body(message.body());
             message.getHeaders().forEach((name, value) -> {
-                for (String val: value) {
+                for (String val : value) {
                     mutableHttpResponse.header(name, val);
                 }
             });
