@@ -59,7 +59,7 @@ tasks.named("generateCatalogAsToml") {
 
 publishing {
     publications {
-        publication(MavenPublication) {
+        maven(MavenPublication) {
             artifactId("micronaut-bom")
             from components.javaPlatform
             pom {

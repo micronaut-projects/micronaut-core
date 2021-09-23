@@ -1515,12 +1515,20 @@ public class DefaultHttpClient implements
 
             ClientFilterChain filterChain = buildChain(requestWrapper, filters);
             if (parentRequest != null) {
-                responsePublisher = ServerRequestContext.with(parentRequest, (Supplier<Publisher<io.micronaut.http.HttpResponse<O>>>) () ->
-                         Flux.from((Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0).doFilter(request, filterChain))
-                                .contextWrite(ctx -> ctx.put(ServerRequestContext.KEY, parentRequest)));
+                responsePublisher = ServerRequestContext.with(parentRequest, (Supplier<Publisher<io.micronaut.http.HttpResponse<O>>>) () -> {
+                    try {
+                        return Flux.from((Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0).doFilter(request, filterChain))
+                                .contextWrite(ctx -> ctx.put(ServerRequestContext.KEY, parentRequest));
+                    } catch (Throwable t) {
+                        return Flux.error(t);
+                    }
+                });
             } else {
-                responsePublisher = (Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0)
-                        .doFilter(request, filterChain);
+                try {
+                    responsePublisher = (Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0).doFilter(request, filterChain);
+                } catch (Throwable t) {
+                    responsePublisher = Flux.error(t);
+                }
             }
         }
 
@@ -2417,7 +2425,11 @@ public class DefaultHttpClient implements
                     throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
                 }
                 HttpClientFilter httpFilter = filters.get(pos);
-                return httpFilter.doFilter(requestWrapper.getAndSet(request), this);
+                try {
+                    return httpFilter.doFilter(requestWrapper.getAndSet(request), this);
+                } catch (Throwable t) {
+                    return Flux.error(t);
+                }
             }
         };
     }
@@ -3345,4 +3357,5 @@ public class DefaultHttpClient implements
         String name;
         Duration retry;
     }
+
 }

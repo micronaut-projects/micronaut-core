@@ -163,7 +163,6 @@ class HttpFilterSpec extends Specification {
         }
     }
 
-
     @Controller
     @Requires(property = 'spec.name', value = "HttpFilterSpec")
     static class RootController {
