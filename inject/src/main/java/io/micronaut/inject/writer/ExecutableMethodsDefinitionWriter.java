@@ -39,9 +39,16 @@ import org.objectweb.asm.commons.TableSwitchGenerator;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 /**
  * Writes out a {@link io.micronaut.inject.ExecutableMethodsDefinition} class.
@@ -60,19 +67,11 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
     private static final Type SUPER_TYPE = Type.getType(AbstractExecutableMethodsDefinition.class);
 
     private static final Method SUPER_CONSTRUCTOR = Method.getMethod(ReflectionUtils.findConstructor(
-            AbstractExecutableMethodsDefinition.class,
-            AbstractExecutableMethodsDefinition.MethodReference[].class)
+                    AbstractExecutableMethodsDefinition.class,
+                    AbstractExecutableMethodsDefinition.MethodReference[].class)
             .get());
 
     private static final Method WITH_INTERCEPTED_CONSTRUCTOR = new Method(CONSTRUCTOR_NAME, getConstructorDescriptor(boolean.class));
-
-    private static final Method DISPATCH_METHOD = Method.getMethod(
-            ReflectionUtils.findMethod(AbstractExecutableMethodsDefinition.class, "dispatch", int.class, Object.class, Object[].class).get()
-    );
-
-    private static final Method GET_TARGET_METHOD = Method.getMethod(
-            ReflectionUtils.findMethod(AbstractExecutableMethodsDefinition.class, "getTargetMethodByIndex", int.class).get()
-    );
 
     private static final Method GET_METHOD = Method.getMethod(
             ReflectionUtils.findMethod(AbstractExecutableMethodsDefinition.class, "getMethod", String.class, Class[].class).get()
@@ -81,15 +80,6 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
     private static final Method AT_INDEX_MATCHED_METHOD = Method.getMethod(
             ReflectionUtils.findMethod(AbstractExecutableMethodsDefinition.class, "methodAtIndexMatches", int.class, String.class, Class[].class).get()
     );
-
-    private static final Method UNKNOWN_METHOD_AT_INDEX = Method.getMethod(
-            ReflectionUtils.findMethod(AbstractExecutableMethodsDefinition.class, "unknownMethodAtIndexException", int.class).get()
-    );
-
-    private static final Type TYPE_REFLECTION_UTILS = Type.getType(ReflectionUtils.class);
-
-    private static final org.objectweb.asm.commons.Method METHOD_GET_REQUIRED_METHOD = org.objectweb.asm.commons.Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "getRequiredMethod", Class.class, String.class, Class[].class));
 
     private static final String FIELD_METHODS_REFERENCES = "$METHODS_REFERENCES";
     private static final String FIELD_INTERCEPTABLE = "$interceptable";
@@ -101,10 +91,11 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
     private final Type thisType;
     private final String beanDefinitionReferenceClassName;
 
-    private final List<ExecutableMethodVisitData> executableMethodsVisits = new ArrayList<>(10);
     private final Map<String, Integer> defaultsStorage = new HashMap<>();
     private final Map<String, GeneratorAdapter> loadTypeMethods = new LinkedHashMap<>();
     private final List<String> addedMethods = new ArrayList<>();
+
+    private final DispatchWriter methodDispatchWriter;
 
     public ExecutableMethodsDefinitionWriter(String beanDefinitionClassName,
                                              String beanDefinitionReferenceClassName,
@@ -114,6 +105,7 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
         this.internalName = getInternalName(className);
         this.thisType = Type.getObjectType(internalName);
         this.beanDefinitionReferenceClassName = beanDefinitionReferenceClassName;
+        this.methodDispatchWriter = new DispatchWriter(thisType);
     }
 
     /**
@@ -131,7 +123,7 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
     }
 
     private MethodElement getMethodElement(int index) {
-        return executableMethodsVisits.get(index).methodElement;
+        return ((DispatchWriter.MethodDispatchTarget) methodDispatchWriter.getDispatchTargets().get(index)).methodElement;
     }
 
     /**
@@ -140,7 +132,7 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
      * @return Does method supports intercepted proxy
      */
     public boolean isSupportsInterceptedProxy() {
-        return executableMethodsVisits.stream().anyMatch(it -> it.interceptedProxyClassName != null);
+        return methodDispatchWriter.isHasInterceptedMethod();
     }
 
     /**
@@ -211,9 +203,11 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
             return index;
         }
         addedMethods.add(methodKey);
-
-        executableMethodsVisits.add(new ExecutableMethodVisitData(declaringType, methodElement, interceptedProxyClassName, interceptedProxyBridgeMethodName));
-        return addedMethods.size() - 1;
+        if (interceptedProxyClassName == null) {
+            return methodDispatchWriter.addMethod(declaringType, methodElement);
+        } else {
+            return methodDispatchWriter.addInterceptedMethod(declaringType, methodElement, interceptedProxyClassName, interceptedProxyBridgeMethodName);
+        }
     }
 
     @Override
@@ -230,9 +224,9 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
 
         buildStaticInit(classWriter, methodsFieldType);
         buildConstructor(classWriter, methodsFieldType);
-        buildDispatchMethod(classWriter);
-        buildGetTargetMethodByIndex(classWriter);
-        if (executableMethodsVisits.size() > MIN_METHODS_TO_GENERATE_GET_METHOD) {
+        methodDispatchWriter.buildDispatchMethod(classWriter);
+        methodDispatchWriter.buildGetTargetMethodByIndex(classWriter);
+        if (methodDispatchWriter.getDispatchTargets().size() > MIN_METHODS_TO_GENERATE_GET_METHOD) {
             buildGetMethod(classWriter);
         }
 
@@ -251,10 +245,11 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
     private void buildStaticInit(ClassWriter classWriter, Type methodsFieldType) {
         GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
         classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_METHODS_REFERENCES, methodsFieldType.getDescriptor(), null, null);
-        pushNewArray(staticInit, AbstractExecutableMethodsDefinition.MethodReference.class, executableMethodsVisits.size());
+        pushNewArray(staticInit, AbstractExecutableMethodsDefinition.MethodReference.class, methodDispatchWriter.getDispatchTargets().size());
         int i = 0;
-        for (ExecutableMethodVisitData method : executableMethodsVisits) {
-            pushStoreInArray(staticInit, i++, executableMethodsVisits.size(), () ->
+        for (DispatchWriter.DispatchTarget dispatchTarget : methodDispatchWriter.getDispatchTargets()) {
+            DispatchWriter.MethodDispatchTarget method = (DispatchWriter.MethodDispatchTarget) dispatchTarget;
+            pushStoreInArray(staticInit, i++, methodDispatchWriter.getDispatchTargets().size(), () ->
                     pushNewMethodReference(
                             classWriter,
                             staticInit,
@@ -270,7 +265,7 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
     }
 
     private void buildConstructor(ClassWriter classWriter, Type methodsFieldType) {
-        boolean includeInterceptedField = executableMethodsVisits.stream().anyMatch(it -> it.interceptedProxyClassName != null);
+        boolean includeInterceptedField = methodDispatchWriter.isHasInterceptedMethod();
         if (includeInterceptedField) {
             classWriter.visitField(ACC_FINAL | ACC_PRIVATE, FIELD_INTERCEPTABLE, Type.getType(boolean.class).getDescriptor(), null, null);
 
@@ -304,107 +299,6 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
         }
     }
 
-    private void buildDispatchMethod(ClassWriter classWriter) {
-        GeneratorAdapter dispatchMethod = new GeneratorAdapter(classWriter.visitMethod(
-                Opcodes.ACC_PROTECTED | Opcodes.ACC_FINAL,
-                DISPATCH_METHOD.getName(),
-                DISPATCH_METHOD.getDescriptor(),
-                null,
-                null),
-                ACC_PROTECTED | Opcodes.ACC_FINAL,
-                DISPATCH_METHOD.getName(),
-                DISPATCH_METHOD.getDescriptor()
-        );
-        dispatchMethod.loadArg(0);
-        dispatchMethod.tableSwitch(IntStream.range(0, executableMethodsVisits.size()).toArray(), new TableSwitchGenerator() {
-            @Override
-            public void generateCase(int key, Label end) {
-                ExecutableMethodVisitData method = executableMethodsVisits.get(key);
-
-                TypedElement declaringType = method.declaringType;
-                MethodElement methodElement = method.methodElement;
-                String interceptedProxyClassName = method.interceptedProxyClassName;
-                String interceptedProxyBridgeMethodName = method.interceptedProxyBridgeMethodName;
-
-                String methodName = methodElement.getName();
-
-                List<ParameterElement> argumentTypes = Arrays.asList(methodElement.getSuspendParameters());
-                Type declaringTypeObject = JavaModelUtils.getTypeReference(declaringType);
-
-                ClassElement returnType = methodElement.isSuspend() ? ClassElement.of(Object.class) : methodElement.getReturnType();
-                boolean isInterface = declaringType.getType().isInterface();
-                buildInvokeMethod(declaringTypeObject, methodName, isInterface,
-                        returnType, argumentTypes, dispatchMethod, interceptedProxyClassName, interceptedProxyBridgeMethodName);
-
-                dispatchMethod.returnValue();
-            }
-
-            @Override
-            public void generateDefault() {
-                dispatchMethod.loadThis();
-                dispatchMethod.loadArg(0);
-                dispatchMethod.invokeVirtual(thisType, UNKNOWN_METHOD_AT_INDEX);
-                dispatchMethod.throwException();
-            }
-        }, true);
-        dispatchMethod.visitMaxs(DEFAULT_MAX_STACK, 1);
-        dispatchMethod.visitEnd();
-    }
-
-    private void buildGetTargetMethodByIndex(ClassWriter classWriter) {
-        GeneratorAdapter getTargetMethodByIndex = new GeneratorAdapter(classWriter.visitMethod(
-                Opcodes.ACC_PROTECTED | Opcodes.ACC_FINAL,
-                GET_TARGET_METHOD.getName(),
-                GET_TARGET_METHOD.getDescriptor(),
-                null,
-                null),
-                ACC_PROTECTED | Opcodes.ACC_FINAL,
-                GET_TARGET_METHOD.getName(),
-                GET_TARGET_METHOD.getDescriptor()
-        );
-        getTargetMethodByIndex.loadArg(0);
-        getTargetMethodByIndex.tableSwitch(IntStream.range(0, executableMethodsVisits.size()).toArray(), new TableSwitchGenerator() {
-            @Override
-            public void generateCase(int key, Label end) {
-                ExecutableMethodVisitData method = executableMethodsVisits.get(key);
-                Type declaringTypeObject = JavaModelUtils.getTypeReference(method.declaringType);
-                List<ParameterElement> argumentTypes = Arrays.asList(method.methodElement.getSuspendParameters());
-
-                getTargetMethodByIndex.push(declaringTypeObject);
-                getTargetMethodByIndex.push(method.methodElement.getName());
-                if (!argumentTypes.isEmpty()) {
-                    int len = argumentTypes.size();
-                    Iterator<ParameterElement> iter = argumentTypes.iterator();
-                    pushNewArray(getTargetMethodByIndex, Class.class, len);
-                    for (int i = 0; i < len; i++) {
-                        ParameterElement type = iter.next();
-                        pushStoreInArray(
-                                getTargetMethodByIndex,
-                                i,
-                                len,
-                                () -> getTargetMethodByIndex.push(JavaModelUtils.getTypeReference(type))
-                        );
-
-                    }
-                } else {
-                    getTargetMethodByIndex.getStatic(TYPE_REFLECTION_UTILS, "EMPTY_CLASS_ARRAY", Type.getType(Class[].class));
-                }
-                getTargetMethodByIndex.invokeStatic(TYPE_REFLECTION_UTILS, METHOD_GET_REQUIRED_METHOD);
-                getTargetMethodByIndex.returnValue();
-            }
-
-            @Override
-            public void generateDefault() {
-                getTargetMethodByIndex.loadThis();
-                getTargetMethodByIndex.loadArg(0);
-                getTargetMethodByIndex.invokeVirtual(thisType, UNKNOWN_METHOD_AT_INDEX);
-                getTargetMethodByIndex.throwException();
-            }
-        }, true);
-        getTargetMethodByIndex.visitMaxs(DEFAULT_MAX_STACK, 1);
-        getTargetMethodByIndex.visitEnd();
-    }
-
     private void buildGetMethod(ClassWriter classWriter) {
         GeneratorAdapter findMethod = new GeneratorAdapter(classWriter.visitMethod(
                 Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL,
@@ -420,17 +314,18 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
         findMethod.loadArg(0);
         findMethod.invokeVirtual(Type.getType(Object.class), new Method("hashCode", Type.INT_TYPE, new Type[]{}));
 
-        Map<Integer, List<ExecutableMethodVisitData>> hashToMethods = new TreeMap<>();
-        for (ExecutableMethodVisitData em : executableMethodsVisits) {
-            int hash = em.methodElement.getName().hashCode();
-            hashToMethods.computeIfAbsent(hash, h -> new ArrayList<>()).add(em);
+        Map<Integer, List<DispatchWriter.MethodDispatchTarget>> hashToMethods = new TreeMap<>();
+        for (DispatchWriter.DispatchTarget dispatchTarget : methodDispatchWriter.getDispatchTargets()) {
+            DispatchWriter.MethodDispatchTarget method = (DispatchWriter.MethodDispatchTarget) dispatchTarget;
+            int hash = method.methodElement.getName().hashCode();
+            hashToMethods.computeIfAbsent(hash, h -> new ArrayList<>()).add(method);
         }
         int[] hashCodeArray = hashToMethods.keySet().stream().mapToInt(i -> i).toArray();
         findMethod.tableSwitch(hashCodeArray, new TableSwitchGenerator() {
             @Override
             public void generateCase(int hashCode, Label end) {
-                for (ExecutableMethodVisitData em : hashToMethods.get(hashCode)) {
-                    int index = executableMethodsVisits.indexOf(em);
+                for (DispatchWriter.MethodDispatchTarget method : hashToMethods.get(hashCode)) {
+                    int index = methodDispatchWriter.getDispatchTargets().indexOf(method);
                     if (index < 0) {
                         throw new IllegalStateException();
                     }
