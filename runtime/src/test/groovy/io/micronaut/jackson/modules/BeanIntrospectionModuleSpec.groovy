@@ -48,6 +48,7 @@ class BeanIntrospectionModuleSpec extends Specification {
     void "Bean introspection works with a bean without JsonInclude annotations"() {
         given:
         ApplicationContext ctx = ApplicationContext.run()
+        ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
         ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
 
         when:
@@ -61,6 +62,9 @@ class BeanIntrospectionModuleSpec extends Specification {
 
         cleanup:
         ctx.close()
+
+        where:
+        ignoreReflectiveProperties << [true, false]
     }
 
     void "Bean introspection works with a bean without JsonInclude annotations - serializationInclusion ALWAYS"() {

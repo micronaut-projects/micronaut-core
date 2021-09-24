@@ -87,6 +87,11 @@ public class BeanIntrospectionModule extends SimpleModule {
     private static final Logger LOG = LoggerFactory.getLogger(BeanIntrospectionModule.class);
 
     /**
+     * For testing.
+     */
+    boolean ignoreReflectiveProperties = false;
+
+    /**
      * Default constructor.
      */
     public BeanIntrospectionModule() {
@@ -153,7 +158,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                 newBuilder.setAnyGetter(builder.getAnyGetter());
                 final List<BeanPropertyWriter> properties = builder.getProperties();
                 final Collection<BeanProperty<Object, Object>> beanProperties = introspection.getBeanProperties();
-                if (CollectionUtils.isEmpty(properties) && CollectionUtils.isNotEmpty(beanProperties)) {
+                if (ignoreReflectiveProperties || (CollectionUtils.isEmpty(properties) && CollectionUtils.isNotEmpty(beanProperties))) {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Bean {} has no properties, while BeanIntrospection does. Recreating from introspection.", beanClass);
                     }
@@ -176,6 +181,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                             propertyName = beanProperty.stringValue(JsonProperty.class).orElse(beanProperty.getName());
                         }
                         BeanPropertyWriter writer = new BeanIntrospectionPropertyWriter(
+                                config,
                                 propertyName,
                                 beanProperty,
                                 config.getTypeFactory()
@@ -662,6 +668,7 @@ public class BeanIntrospectionModule extends SimpleModule {
         }
 
         BeanIntrospectionPropertyWriter(
+                SerializationConfig config,
                 String name,
                 BeanProperty<Object, Object> introspection,
                 TypeFactory typeFactory) {
@@ -671,7 +678,8 @@ public class BeanIntrospectionModule extends SimpleModule {
             this.type = JacksonConfiguration.constructType(beanProperty.asArgument(), typeFactory);
             _dynamicSerializers = PropertySerializerMap
                     .emptyForProperties();
-            shouldSuppressNulls = shouldSuppressNulls(_suppressNulls);
+            // can't use super._suppressNulls here, because it's not set to the config value in this constructor
+            shouldSuppressNulls = shouldSuppressNulls(config.getDefaultPropertyInclusion().getValueInclusion() != JsonInclude.Include.ALWAYS);
             this.unwrapping = introspection.hasAnnotation(JsonUnwrapped.class);
         }
 
