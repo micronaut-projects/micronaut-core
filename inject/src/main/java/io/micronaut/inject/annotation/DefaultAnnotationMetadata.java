@@ -91,9 +91,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     Map<String, List<String>> annotationsByStereotype;
     @Nullable
     Map<String, Map<CharSequence, Object>> annotationDefaultValues;
-    private Map<Class, List> annotationValuesByType = new ConcurrentHashMap<>(2);
-
     Map<String, String> repeated = null;
+
+    private Map<Class, List> annotationValuesByType = new ConcurrentHashMap<>(2);
     private Set<String> sourceRetentionAnnotations;
     private final boolean hasPropertyExpressions;
     // This should be removed in the next major version
