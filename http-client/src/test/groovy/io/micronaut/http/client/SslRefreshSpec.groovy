@@ -33,6 +33,7 @@ class SslRefreshSpec extends Specification {
     @Shared Map<String, Object> config = [
             'spec.name': 'SslRefreshSpec',
             'micronaut.ssl.enabled': true,
+            'micronaut.server.ssl.port':-1,
             'micronaut.server.ssl.client-authentication': 'NEED',
             'micronaut.server.ssl.key-store.path': 'classpath:certs/server.p12',
             'micronaut.server.ssl.key-store.password': 'secret',
