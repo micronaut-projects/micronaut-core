@@ -7,7 +7,9 @@ dependencies {
     annotationProcessor project(":graal")
     api project(":inject")
     api project(":core-reactive")
+    implementation libs.managed.reactor
     compileOnly libs.kotlinx.coroutines.core
+    compileOnly libs.kotlinx.coroutines.reactor
 
     testCompileOnly project(":inject-groovy")
     testAnnotationProcessor project(":inject-java")
