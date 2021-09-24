@@ -233,6 +233,7 @@ languageSupport:
     openandaop: Kotlin and AOP Advice
     kotlinretainparamnames: Kotlin and Retaining Parameter Names
     coroutines: Coroutines Support
+    context: Reactive Context Propagation
   graal:
     title: Micronaut for GraalVM
     graalServices: Microservices as GraalVM native images

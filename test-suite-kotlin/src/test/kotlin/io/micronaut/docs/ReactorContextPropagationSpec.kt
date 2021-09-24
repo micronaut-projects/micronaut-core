@@ -1,14 +1,12 @@
-package io.micronaut
+package io.micronaut.docs
 
+import io.micronaut.NameRequestBody
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MutableHttpResponse
-import io.micronaut.http.annotation.Body
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Filter
-import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.*
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
@@ -72,6 +70,14 @@ class TestController(private val someService: SomeService) {
         }
     }
 
+    // tag::readctx[]
+    @Get("/data")
+    suspend fun getTracingId(request: HttpRequest<*>): String {
+        val reactorContextView = currentCoroutineContext()[ReactorContext.Key]!!.context
+        return reactorContextView.get("reactorTrackingId") as String
+    }
+    // end::readctx[]
+
 }
 
 @Introspected
@@ -85,7 +91,7 @@ class SomeService {
         delay(50)
         return withContext(Dispatchers.Default) {
             delay(50)
-            val context = currentCoroutineContext()[ReactorContext.Key]!!.context!!
+            val context = currentCoroutineContext()[ReactorContext.Key]!!.context
             val reactorTrackingId = context.get("reactorTrackingId") as String
             val suspendTrackingId = context.get("suspendTrackingId") as String
             if (reactorTrackingId != suspendTrackingId) {
@@ -98,6 +104,23 @@ class SomeService {
 }
 
 @Requires(property = "mdc.reactortestpropagation.enabled")
+// tag::simplefilter[]
+@Filter(Filter.MATCH_ALL_PATTERN)
+class ReactorHttpServerFilter : HttpServerFilter {
+
+    override fun doFilter(request: HttpRequest<*>, chain: ServerFilterChain): Publisher<MutableHttpResponse<*>> {
+        val trackingId = request.headers["X-TrackingId"] as String
+        return Mono.from(chain.proceed(request)).contextWrite {
+            it.put("reactorTrackingId", trackingId)
+        }
+    }
+
+}
+
+// end::simplefilter[]
+
+@Requires(property = "mdc.reactortestpropagation.enabled")
+// tag::suspendfilter[]
 @Filter("/**")
 class SuspendHttpServerFilter : CoroutineHttpServerFilter {
 
@@ -110,26 +133,13 @@ class SuspendHttpServerFilter : CoroutineHttpServerFilter {
 
 }
 
-@Requires(property = "mdc.reactortestpropagation.enabled")
-@Filter("/**")
-class ReactorHttpServerFilter : HttpServerFilter {
-
-    override fun doFilter(request: HttpRequest<*>, chain: ServerFilterChain): Publisher<MutableHttpResponse<*>> {
-        val trackingId = request.headers["X-TrackingId"] as String
-        return Mono.from(chain.proceed(request)).contextWrite {
-            it.put("reactorTrackingId", trackingId)
-        }
-    }
-
-}
-
 interface CoroutineHttpServerFilter : HttpServerFilter {
 
     suspend fun filter(request: HttpRequest<*>, chain: ServerFilterChain): MutableHttpResponse<*>
 
-    override fun doFilter(request: HttpRequest<*>?, chain: ServerFilterChain?): Publisher<MutableHttpResponse<*>> {
+    override fun doFilter(request: HttpRequest<*>, chain: ServerFilterChain): Publisher<MutableHttpResponse<*>> {
         return mono {
-            filter(request!!, chain!!)
+            filter(request, chain)
         }
     }
 
@@ -138,3 +148,5 @@ interface CoroutineHttpServerFilter : HttpServerFilter {
 suspend fun ServerFilterChain.next(request: HttpRequest<*>): MutableHttpResponse<*> {
     return this.proceed(request).asFlow().single()
 }
+// end::suspendfilter[]
+
