@@ -1,4 +1,4 @@
-package io.micronaut.docs
+package io.micronaut.docs.reactor
 
 import io.micronaut.NameRequestBody
 import io.micronaut.context.ApplicationContext
@@ -121,7 +121,7 @@ class ReactorHttpServerFilter : HttpServerFilter {
 
 @Requires(property = "mdc.reactortestpropagation.enabled")
 // tag::suspendfilter[]
-@Filter("/**")
+@Filter(Filter.MATCH_ALL_PATTERN)
 class SuspendHttpServerFilter : CoroutineHttpServerFilter {
 
     override suspend fun filter(request: HttpRequest<*>, chain: ServerFilterChain): MutableHttpResponse<*> {
