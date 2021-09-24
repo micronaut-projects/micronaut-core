@@ -64,6 +64,12 @@ publishing {
             from components.javaPlatform
             pom {
                 packaging 'pom'
+                withXml {
+                    def xml = asNode()
+                    xml.children().find {
+                        it.name().localPart == 'packaging'
+                    } + project.ext.pomInfo
+                }
             }
             libsCatalog.versionAliases.each { alias ->
                 if (alias.startsWith('managed.')) {
