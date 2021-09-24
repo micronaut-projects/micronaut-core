@@ -24,7 +24,6 @@ import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
@@ -45,7 +44,6 @@ import io.micronaut.http.client.bind.binders.QueryValueClientArgumentRequestBind
 import io.micronaut.http.client.bind.binders.VersionClientRequestBinder;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
-import io.micronaut.http.uri.UriMatchVariable;
 import jakarta.inject.Singleton;
 import kotlin.coroutines.Continuation;
 
