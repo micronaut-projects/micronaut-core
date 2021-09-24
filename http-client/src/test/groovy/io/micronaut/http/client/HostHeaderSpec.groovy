@@ -31,6 +31,7 @@ import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 
+@Retry
 class HostHeaderSpec extends Specification {
 
     @Shared
@@ -104,6 +105,7 @@ class HostHeaderSpec extends Specification {
 
     // Unix-like environments (e.g. Travis) may not allow to bind on reserved ports without proper privileges.
     @IgnoreIf({ os.linux })
+    @Requires({ SocketUtils.isTcpPortAvailable(443) })
     void "test host header with https server on 443"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.builder([
@@ -129,11 +131,11 @@ class HostHeaderSpec extends Specification {
         asyncClient.close()
     }
 
-    @Retry // may fail with port binder error due to binding to 8443
     void "test host header with https server on custom port"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.builder([
                 'spec.name': 'HostHeaderSpec',
+                'micronaut.ssl.port': -1,
                 'micronaut.ssl.enabled': true,
                 'micronaut.ssl.buildSelfSigned': true
         ]).run(EmbeddedServer)
