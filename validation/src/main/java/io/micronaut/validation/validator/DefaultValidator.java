@@ -2314,7 +2314,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         @Override
         public String toString() {
             return "DefaultConstraintViolation{" +
-                    "rootBean=" + rootBean +
+                    "rootBean=" + rootBean.getClass() +
                     ", invalidValue=" + invalidValue +
                     ", path=" + path +
                     '}';
