@@ -842,7 +842,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 }
                 @Override
                 protected boolean isAcceptable(MethodNode node) {
-                    return node.name == destroyMethodName
+                    return node.name == destroyMethodName && node.parameters.length == 0 && node.isPublic()
                 }
             }.accept(producedClassNode)
 
