@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.writer;
 
+import io.micronaut.core.annotation.Internal;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
@@ -33,6 +34,7 @@ import java.util.TreeSet;
  * @author Denis Stepanov
  * @since 3.1
  */
+@Internal
 public abstract class StringSwitchWriter {
 
     /**
