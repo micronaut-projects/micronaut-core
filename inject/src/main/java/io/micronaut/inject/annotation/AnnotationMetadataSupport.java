@@ -245,6 +245,7 @@ public final class AnnotationMetadataSupport {
      *
      * @param repeatableAnnotations the repeatable annotations
      */
+    @Internal
     static void registerRepeatableAnnotations(Map<String, String> repeatableAnnotations) {
         REPEATABLE_ANNOTATIONS.putAll(repeatableAnnotations);
     }
