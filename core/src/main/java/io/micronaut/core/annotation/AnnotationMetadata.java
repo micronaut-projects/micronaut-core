@@ -1371,9 +1371,8 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default boolean hasAnnotation(@Nullable Class<? extends Annotation> annotation) {
         if (annotation != null) {
-            Optional<String> repeatable = findRepeatableAnnotation(annotation);
-            if (repeatable.isPresent()) {
-                return hasAnnotation(repeatable.get());
+            if (isRepeatableAnnotation(annotation)) {
+                return hasAnnotation(findRepeatableAnnotation(annotation).get());
             } else {
                 return hasAnnotation(annotation.getName());
             }
@@ -1391,9 +1390,8 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default boolean hasStereotype(@Nullable Class<? extends Annotation> annotation) {
         if (annotation != null) {
-            Optional<String> repeatable = findRepeatableAnnotation(annotation);
-            if (repeatable.isPresent()) {
-                return hasStereotype(repeatable.get());
+            if (isRepeatableAnnotation(annotation)) {
+                return hasStereotype(findRepeatableAnnotation(annotation).get());
             } else {
                 return hasStereotype(annotation.getName());
             }
@@ -1446,9 +1444,8 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default boolean hasDeclaredAnnotation(@Nullable Class<? extends Annotation> annotation) {
         if (annotation != null) {
-            Optional<String> repeatable = findRepeatableAnnotation(annotation);
-            if (repeatable.isPresent()) {
-                return hasDeclaredAnnotation(repeatable.get());
+            if (isRepeatableAnnotation(annotation)) {
+                return hasDeclaredAnnotation(findRepeatableAnnotation(annotation).get());
             } else {
                 return hasDeclaredAnnotation(annotation.getName());
             }
@@ -1464,9 +1461,8 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default boolean hasDeclaredStereotype(@Nullable Class<? extends Annotation> stereotype) {
         if (stereotype != null) {
-            Optional<String> repeatable = findRepeatableAnnotation(stereotype);
-            if (repeatable.isPresent()) {
-                return hasDeclaredStereotype(repeatable.get());
+            if (isRepeatableAnnotation(stereotype)) {
+                return hasDeclaredStereotype(findRepeatableAnnotation(stereotype).get());
             } else {
                 return hasDeclaredStereotype(stereotype.getName());
             }
