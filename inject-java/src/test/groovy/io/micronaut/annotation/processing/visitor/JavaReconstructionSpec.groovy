@@ -9,7 +9,7 @@ import spock.lang.PendingFeature
 import spock.lang.Unroll
 
 /**
- * These tests are based on a {@link #reconstruct} method that looks at {@link ClassElement#getBoundGenericTypes()}
+ * These tests are based on a {@link #reconstructTypeSignature} method that looks at {@link ClassElement#getBoundGenericTypes()}
  * to transform a {@link ClassElement} back to its string representation. This way, we can easily check what
  * {@link ClassElement}s returned by various methods look like.
  */
@@ -29,7 +29,7 @@ class Test<T> {
         def field = element.getFields()[0]
 
         expect:
-        reconstruct(field.genericType) == fieldType
+        reconstructTypeSignature(field.genericType) == fieldType
 
         where:
         fieldType << [
@@ -59,7 +59,7 @@ abstract class Test<T> extends $superType {
 """)
 
         expect:
-        reconstruct(element.superType.get()) == superType
+        reconstructTypeSignature(element.superType.get()) == superType
 
         where:
         superType << [
@@ -89,7 +89,7 @@ abstract class Test<T> implements $superType {
 """)
 
         expect:
-        reconstruct(element.interfaces[0]) == superType
+        reconstructTypeSignature(element.interfaces[0]) == superType
 
         where:
         superType << [
@@ -119,7 +119,7 @@ abstract class Test<A, $decl> {
 """)
 
         expect:
-        reconstruct(element.declaredGenericPlaceholders[1], true) == decl
+        reconstructTypeSignature(element.declaredGenericPlaceholders[1], true) == decl
 
         where:
         decl << [
@@ -150,7 +150,7 @@ abstract class Test<A> {
         def method = element.<MethodElement> getEnclosedElement(ElementQuery.ALL_METHODS.named(s -> s == 'method')).get()
 
         expect:
-        reconstruct(method.declaredTypeVariables[0], true) == decl
+        reconstructTypeSignature(method.declaredTypeVariables[0], true) == decl
 
         where:
         decl << [
@@ -185,7 +185,7 @@ class Test<T> {
         def field = element.getFields()[0].genericType.getFields()[0]
 
         expect:
-        reconstruct(field.genericType) == expectedType
+        reconstructTypeSignature(field.genericType) == expectedType
 
         where:
         fieldType                               | expectedType
@@ -219,7 +219,7 @@ class Test<T> {
         def field = element.getFields()[0].genericType.getFields()[0]
 
         expect:
-        reconstruct(field.genericType) == expectedType
+        reconstructTypeSignature(field.genericType) == expectedType
 
         where:
         fieldType                               | expectedType
@@ -254,7 +254,7 @@ class Test<T> {
         def field = element.getFields()[0].genericType.getFields()[0]
 
         expect:
-        reconstruct(field.genericType) == expectedType
+        reconstructTypeSignature(field.genericType) == expectedType
 
         where:
         fieldType                               | expectedType
@@ -288,7 +288,7 @@ class Test<T> {
         def field = element.getFields()[0].genericType.getFields()[0]
 
         expect:
-        reconstruct(field.genericType) == expectedType
+        reconstructTypeSignature(field.genericType) == expectedType
 
         where:
         fieldType                               | expectedType
@@ -328,8 +328,8 @@ interface Sup<$decl> {
 """)
 
         expect:
-        reconstruct(superElement.getSuperType().get()) == expected
-        reconstruct(interfaceElement.getInterfaces()[0]) == expected
+        reconstructTypeSignature(superElement.getSuperType().get()) == expected
+        reconstructTypeSignature(interfaceElement.getInterfaces()[0]) == expected
 
         where:
         decl | params              | expected
@@ -364,8 +364,8 @@ interface Sup<$decl> {
 """).withBoundGenericTypes([ClassElement.of(String)])
 
         expect:
-        reconstruct(superElement.getSuperType().get()) == expected
-        reconstruct(interfaceElement.getInterfaces()[0]) == expected
+        reconstructTypeSignature(superElement.getSuperType().get()) == expected
+        reconstructTypeSignature(interfaceElement.getInterfaces()[0]) == expected
 
         where:
         decl | params              | expected
@@ -399,8 +399,8 @@ interface Sup<$decl> {
 """).withBoundGenericTypes([ClassElement.of(String)])
 
         expect:
-        reconstruct(superElement.getSuperType().get()) == expected
-        reconstruct(interfaceElement.getInterfaces()[0]) == expected
+        reconstructTypeSignature(superElement.getSuperType().get()) == expected
+        reconstructTypeSignature(interfaceElement.getInterfaces()[0]) == expected
 
         where:
         decl | params              | expected
@@ -425,7 +425,7 @@ class Test<T> {
         def fieldType = classElement.fields[0].type
 
         expect:
-        reconstruct(fieldType.foldBoundGenericTypes {
+        reconstructTypeSignature(fieldType.foldBoundGenericTypes {
             if (it.isGenericPlaceholder() && ((GenericPlaceholderElement) it).variableName == 'T') {
                 return ClassElement.of(String)
             } else {

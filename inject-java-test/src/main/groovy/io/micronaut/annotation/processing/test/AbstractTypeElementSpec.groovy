@@ -581,27 +581,27 @@ class Test {
      * context.
      */
     @Experimental
-    protected static String reconstruct(ClassElement classElement, boolean typeVarsAsDeclarations = false) {
+    protected static String reconstructTypeSignature(ClassElement classElement, boolean typeVarsAsDeclarations = false) {
         if (classElement.isArray()) {
-            return reconstruct(classElement.fromArray()) + "[]"
+            return reconstructTypeSignature(classElement.fromArray()) + "[]"
         } else if (classElement.isGenericPlaceholder()) {
             def freeVar = (GenericPlaceholderElement) classElement
             def name = freeVar.variableName
             if (typeVarsAsDeclarations) {
                 def bounds = freeVar.bounds
-                if (reconstruct(bounds[0]) != 'Object') {
-                    name += bounds.stream().map(AbstractTypeElementSpec::reconstruct).collect(Collectors.joining(" & ", " extends ", ""))
+                if (reconstructTypeSignature(bounds[0]) != 'Object') {
+                    name += bounds.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", " extends ", ""))
                 }
             }
             return name
         } else if (classElement.isWildcard()) {
             def we = (WildcardElement) classElement
             if (!we.lowerBounds.isEmpty()) {
-                return we.lowerBounds.stream().map(AbstractTypeElementSpec::reconstruct).collect(Collectors.joining(" | ", "? super ", ""))
-            } else if (we.upperBounds.size() == 1 && reconstruct(we.upperBounds.get(0)) == "Object") {
+                return we.lowerBounds.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(" | ", "? super ", ""))
+            } else if (we.upperBounds.size() == 1 && reconstructTypeSignature(we.upperBounds.get(0)) == "Object") {
                 return "?"
             } else {
-                return we.upperBounds.stream().map(AbstractTypeElementSpec::reconstruct).collect(Collectors.joining(" & ", "? extends ", ""))
+                return we.upperBounds.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", "? extends ", ""))
             }
         } else {
             def boundTypeArguments = classElement.getBoundGenericTypes()
@@ -609,7 +609,7 @@ class Test {
                 return classElement.getSimpleName()
             } else {
                 return classElement.getSimpleName() +
-                        boundTypeArguments.stream().map(AbstractTypeElementSpec::reconstruct).collect(Collectors.joining(", ", "<", ">"))
+                        boundTypeArguments.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(", ", "<", ">"))
             }
         }
     }
