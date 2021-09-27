@@ -21,6 +21,8 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.stream.Collectors;
 
 /**
@@ -36,6 +38,13 @@ public interface MethodElement extends MemberElement {
      */
     @NonNull
     ClassElement getReturnType();
+
+    /**
+     * @return The type arguments declared on this method.
+     */
+    default List<? extends FreeTypeVariableElement> getDeclaredTypeVariables() {
+        return Collections.emptyList();
+    }
 
     /**
      * @return The method parameters

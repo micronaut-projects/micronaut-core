@@ -19,8 +19,9 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 
 import java.lang.reflect.Array;
-import java.lang.reflect.Modifier;
-import java.util.Objects;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Implementation of {@link ClassElement} backed by reflection.
@@ -29,42 +30,14 @@ import java.util.Objects;
  * @since 2.3
  */
 @Internal
-class ReflectClassElement implements ClassElement {
-    private final Class<?> type;
-
+class ReflectClassElement extends ReflectTypeElement<Class<?>> {
     /**
      * Default constructor.
+     *
      * @param type The type
      */
     ReflectClassElement(Class<?> type) {
-        this.type = type;
-    }
-
-    @Override
-    public String toString() {
-        return type.getName();
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        ReflectClassElement that = (ReflectClassElement) o;
-        return type.equals(that.type);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(type);
-    }
-
-    @Override
-    public boolean isPrimitive() {
-        return type.isPrimitive();
+        super(type);
     }
 
     @Override
@@ -87,23 +60,6 @@ class ReflectClassElement implements ClassElement {
     }
 
     @Override
-    public boolean isAssignable(Class<?> type) {
-        return type.isAssignableFrom(this.type);
-    }
-
-    @Override
-    public boolean isAssignable(String type) {
-        // unsupported by this impl
-        return false;
-    }
-
-    @Override
-    public boolean isAssignable(ClassElement type) {
-        // unsupported by this impl
-        return false;
-    }
-
-    @Override
     public ClassElement toArray() {
         Class<?> arrayType = Array.newInstance(type, 0).getClass();
         return ClassElement.of(arrayType);
@@ -116,29 +72,9 @@ class ReflectClassElement implements ClassElement {
 
     @NonNull
     @Override
-    public String getName() {
-        return type.getName();
-    }
-
-    @Override
-    public boolean isPackagePrivate() {
-        int modifiers = type.getModifiers();
-        return !Modifier.isPublic(modifiers) && !Modifier.isProtected(modifiers) && !Modifier.isPrivate(modifiers);
-    }
-
-    @Override
-    public boolean isProtected() {
-        return !isPublic();
-    }
-
-    @Override
-    public boolean isPublic() {
-        return Modifier.isPublic(type.getModifiers());
-    }
-
-    @NonNull
-    @Override
-    public Object getNativeType() {
-        return type;
+    public List<? extends FreeTypeVariableElement> getDeclaredTypeVariables() {
+        return Arrays.stream(type.getTypeParameters())
+                .map(tv -> new ReflectFreeTypeVariableElement(tv, 0))
+                .collect(Collectors.toList());
     }
 }

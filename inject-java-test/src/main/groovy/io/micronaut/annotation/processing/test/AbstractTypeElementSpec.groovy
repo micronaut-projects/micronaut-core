@@ -28,6 +28,7 @@ import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.Qualifier
 import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.Experimental
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.beans.BeanIntrospection
@@ -40,6 +41,8 @@ import io.micronaut.inject.annotation.AnnotationMapper
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import io.micronaut.inject.annotation.AnnotationTransformer
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.FreeTypeVariableElement
+import io.micronaut.inject.ast.WildcardElement
 import io.micronaut.inject.provider.BeanProviderDefinition
 import io.micronaut.inject.provider.JakartaProviderBeanDefinition
 import io.micronaut.inject.visitor.TypeElementVisitor
@@ -570,6 +573,45 @@ class Test {
      * @param contextBuilder The context builder
      */
     protected void configureContext(ApplicationContextBuilder contextBuilder) {
+    }
+
+    /**
+     * Create a rough source signature of the given ClassElement, using {@link ClassElement#getBoundTypeArguments()}.
+     * Can be used to test that {@link ClassElement#getBoundTypeArguments()} returns the right types in the right
+     * context.
+     */
+    @Experimental
+    protected static String reconstruct(ClassElement classElement, boolean typeVarsAsDeclarations = false) {
+        if (classElement.isArray()) {
+            return reconstruct(classElement.fromArray()) + "[]"
+        } else if (classElement.isFreeTypeVariable()) {
+            def freeVar = (FreeTypeVariableElement) classElement
+            def name = freeVar.variableName
+            if (typeVarsAsDeclarations) {
+                def bounds = freeVar.bounds
+                if (reconstruct(bounds[0]) != 'Object') {
+                    name += bounds.stream().map(AbstractTypeElementSpec::reconstruct).collect(Collectors.joining(" & ", " extends ", ""))
+                }
+            }
+            return name
+        } else if (classElement.isWildcard()) {
+            def we = (WildcardElement) classElement
+            if (!we.lowerBounds.isEmpty()) {
+                return we.lowerBounds.stream().map(AbstractTypeElementSpec::reconstruct).collect(Collectors.joining(" | ", "? super ", ""))
+            } else if (we.upperBounds.size() == 1 && reconstruct(we.upperBounds.get(0)) == "Object") {
+                return "?"
+            } else {
+                return we.upperBounds.stream().map(AbstractTypeElementSpec::reconstruct).collect(Collectors.joining(" & ", "? extends ", ""))
+            }
+        } else {
+            def boundTypeArguments = classElement.getBoundTypeArguments()
+            if (boundTypeArguments.isEmpty()) {
+                return classElement.getSimpleName()
+            } else {
+                return classElement.getSimpleName() +
+                        boundTypeArguments.stream().map(AbstractTypeElementSpec::reconstruct).collect(Collectors.joining(", ", "<", ">"))
+            }
+        }
     }
 
     static class TypeElementInfo {
