@@ -153,6 +153,24 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate {
     }
 
     /**
+     * Obtain the property index position.
+     *
+     * @param name The name of the property
+     * @return A property index or -1 of not found.
+     * @since 3.1
+     */
+    default int propertyIndexOf(@NonNull String name) {
+        int index = 0;
+        for (BeanProperty<T, Object> property : getBeanProperties()) {
+            if (property.getName().equals(name)) {
+                return index;
+            }
+            index++;
+        }
+        return -1;
+    }
+
+    /**
      * Gets a property of the given name and type or throws {@link IntrospectionException} if the property is not present.
      * @param name The name
      * @param type The type

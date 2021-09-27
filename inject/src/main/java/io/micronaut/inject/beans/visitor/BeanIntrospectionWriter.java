@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.AbstractBeanIntrospectionReference;
-import io.micronaut.inject.beans.AbstractInitializableBeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospectionReference;
 import io.micronaut.core.naming.NameUtils;
@@ -39,22 +38,22 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.beans.AbstractInitializableBeanIntrospection;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.writer.AbstractAnnotationMetadataWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.DispatchWriter;
+import io.micronaut.inject.writer.StringSwitchWriter;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
-import org.objectweb.asm.commons.TableSwitchGenerator;
 
 import javax.validation.constraints.NotNull;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -66,7 +65,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
@@ -87,8 +85,8 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private static final String FIELD_CONSTRUCTOR_ARGUMENTS = "$CONSTRUCTOR_ARGUMENTS";
     private static final String FIELD_BEAN_PROPERTIES_REFERENCES = "$PROPERTIES_REFERENCES";
     private static final String FIELD_BEAN_METHODS_REFERENCES = "$METHODS_REFERENCES";
-    private static final Method FIND_METHOD = Method.getMethod(
-            ReflectionUtils.findMethod(AbstractInitializableBeanIntrospection.class, "findProperty", String.class).get()
+    private static final Method PROPERTY_INDEX_OF = Method.getMethod(
+            ReflectionUtils.findMethod(BeanIntrospection.class, "propertyIndexOf", String.class).get()
     );
     private static final Method FIND_PROPERTY_BY_INDEX_METHOD = Method.getMethod(
             ReflectionUtils.findMethod(AbstractInitializableBeanIntrospection.class, "getPropertyByIndex", int.class).get()
@@ -112,6 +110,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private final Type beanType;
     private final Map<AnnotationWithValue, String> indexByAnnotationAndValue = new HashMap<>(2);
     private final Map<String, Set<String>> indexByAnnotations = new HashMap<>(2);
+    private final Map<String, String> annotationIndexFields = new HashMap<>(2);
     private final ClassElement classElement;
     private boolean executed = false;
     private MethodElement constructor;
@@ -290,8 +289,8 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      * Builds an index for the given property and annotation.
      *
      * @param annotationName The annotation
-     * @param property   The property
-     * @param value      the value of the annotation
+     * @param property       The property
+     * @param value          the value of the annotation
      */
     void indexProperty(String annotationName, String property, @Nullable String value) {
         indexByAnnotationAndValue.put(new AnnotationWithValue(annotationName, value), property);
@@ -383,6 +382,26 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             }
             staticInit.putStatic(introspectionType, FIELD_BEAN_METHODS_REFERENCES, beanMethodsRefs);
         }
+
+        int indexesIndex = 0;
+        for (String annotationName : indexByAnnotations.keySet()) {
+            int[] indexes = indexByAnnotations.get(annotationName)
+                    .stream()
+                    .mapToInt(prop -> getPropertyIndex(prop))
+                    .toArray();
+
+            String newIndexField = "INDEX_" + (++indexesIndex);
+            Type type = Type.getType(int[].class);
+            classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, newIndexField, type.getDescriptor(), null, null);
+            pushNewArray(staticInit, int.class, indexes.length);
+            int i = 0;
+            for (int index : indexes) {
+                pushStoreInArray(staticInit, Type.INT_TYPE, i++, indexes.length, () -> staticInit.push(index));
+            }
+            staticInit.putStatic(introspectionType, newIndexField, type);
+            annotationIndexFields.put(annotationName, newIndexField);
+        }
+
         staticInit.returnValue();
         staticInit.visitMaxs(DEFAULT_MAX_STACK, 1);
         staticInit.visitEnd();
@@ -590,7 +609,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
         dispatchWriter.buildDispatchOneMethod(classWriter);
         dispatchWriter.buildDispatchMethod(classWriter);
-        buildFindMethod(classWriter);
+        buildPropertyIndexOfMethod(classWriter);
         buildFindIndexedProperty(classWriter);
         buildGetIndexedProperties(classWriter);
 
@@ -613,59 +632,45 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         }
     }
 
-    private void buildFindMethod(ClassWriter classWriter) {
+    private void buildPropertyIndexOfMethod(ClassWriter classWriter) {
         GeneratorAdapter findMethod = new GeneratorAdapter(classWriter.visitMethod(
-                Opcodes.ACC_PROTECTED | Opcodes.ACC_FINAL,
-                FIND_METHOD.getName(),
-                FIND_METHOD.getDescriptor(),
+                Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL,
+                PROPERTY_INDEX_OF.getName(),
+                PROPERTY_INDEX_OF.getDescriptor(),
                 null,
                 null),
-                ACC_PROTECTED | Opcodes.ACC_FINAL,
-                FIND_METHOD.getName(),
-                FIND_METHOD.getDescriptor()
+                ACC_PUBLIC | Opcodes.ACC_FINAL,
+                PROPERTY_INDEX_OF.getName(),
+                PROPERTY_INDEX_OF.getDescriptor()
         );
-        findMethod.loadThis();
-        findMethod.loadArg(0);
-        findMethod.invokeVirtual(Type.getType(Object.class), new Method("hashCode", Type.INT_TYPE, new Type[]{}));
+        new StringSwitchWriter() {
 
-        Map<Integer, List<Map.Entry<String, Integer>>> hashToMethods = new TreeMap<>();
-        for (BeanPropertyData prop : beanProperties) {
-            String name = prop.name;
-            int index = beanProperties.indexOf(prop);
-            hashToMethods.computeIfAbsent(name.hashCode(), h -> new ArrayList<>())
-                    .add(new AbstractMap.SimpleEntry<>(name, index));
-        }
-        for (BeanFieldData field : beanFields) {
-            String name = field.beanField.getName();
-            int index = beanProperties.size() + beanFields.indexOf(field);
-            hashToMethods.computeIfAbsent(name.hashCode(), h -> new ArrayList<>())
-                    .add(new AbstractMap.SimpleEntry<>(name, index));
-        }
-        int[] hashCodeArray = hashToMethods.keySet().stream().mapToInt(i -> i).toArray();
-        findMethod.tableSwitch(hashCodeArray, new TableSwitchGenerator() {
             @Override
-            public void generateCase(int hashCode, Label end) {
-                for (Map.Entry<String, Integer> e : hashToMethods.get(hashCode)) {
-                    findMethod.loadArg(0);
-                    findMethod.push(e.getKey());
-                    findMethod.invokeVirtual(Type.getType(Object.class), new Method("equals", Type.BOOLEAN_TYPE, new Type[]{Type.getType(Object.class)}));
-                    findMethod.push(true);
-                    Label falseLabel = new Label();
-                    findMethod.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.NE, falseLabel);
-                    findMethod.loadThis();
-                    findMethod.push(e.getValue());
-                    findMethod.invokeVirtual(introspectionType, FIND_PROPERTY_BY_INDEX_METHOD);
-                    findMethod.returnValue();
-                    findMethod.visitLabel(falseLabel);
+            protected Set<String> getKeys() {
+                Set<String> keys = new HashSet<>();
+                for (BeanPropertyData prop : beanProperties) {
+                    keys.add(prop.name);
                 }
-                findMethod.goTo(end);
+                for (BeanFieldData field : beanFields) {
+                    keys.add(field.beanField.getName());
+                }
+                return keys;
             }
 
             @Override
-            public void generateDefault() {
+            protected void pushStringValue() {
+                findMethod.loadArg(0);
             }
-        });
-        findMethod.push((String) null);
+
+            @Override
+            protected void onMatch(String value, Label end) {
+                findMethod.loadThis();
+                findMethod.push(getPropertyIndex(value));
+                findMethod.returnValue();
+            }
+
+        }.write(findMethod);
+        findMethod.push(-1);
         findMethod.returnValue();
         findMethod.visitMaxs(DEFAULT_MAX_STACK, 1);
         findMethod.visitEnd();
@@ -691,64 +696,79 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         int classNameLocal = writer.newLocal(Type.getType(String.class));
         writer.storeLocal(classNameLocal);
         writer.loadLocal(classNameLocal);
-        writer.invokeVirtual(Type.getType(Object.class), new Method("hashCode", Type.INT_TYPE, new Type[]{}));
 
-        // hash -> classname
-        Map<Integer, Set<String>> hashToMethods = new TreeMap<>();
-        for (Map.Entry<AnnotationWithValue, String> e : indexByAnnotationAndValue.entrySet()) {
-            hashToMethods.computeIfAbsent(e.getKey().annotationName.hashCode(), i -> new LinkedHashSet<>()).add(e.getKey().annotationName);
-        }
-        int[] hashCodeArray = hashToMethods.keySet().stream().mapToInt(i -> i).toArray();
-        writer.tableSwitch(hashCodeArray, new TableSwitchGenerator() {
+        new StringSwitchWriter() {
+
             @Override
-            public void generateCase(int hashCode, Label end) {
-                for (String annotationName : hashToMethods.get(hashCode)) {
-                    writer.loadLocal(classNameLocal);
-                    writer.push(annotationName);
-                    writer.invokeVirtual(Type.getType(Object.class), new Method("equals", Type.BOOLEAN_TYPE, new Type[]{Type.getType(Object.class)}));
-                    writer.push(true);
+            protected Set<String> getKeys() {
+                return indexByAnnotationAndValue.keySet()
+                        .stream()
+                        .map(s -> s.annotationName)
+                        .collect(Collectors.toSet());
+            }
+
+            @Override
+            protected void pushStringValue() {
+                writer.loadLocal(classNameLocal);
+            }
+
+            @Override
+            protected void onMatch(String annotationName, Label end) {
+                if (indexByAnnotationAndValue.keySet().stream().anyMatch(s -> s.annotationName.equals(annotationName) && s.value == null)) {
                     Label falseLabel = new Label();
-                    writer.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.NE, falseLabel);
-                    matchByAnnotationValues(writer, annotationName, end);
+                    writer.loadArg(1);
+                    writer.ifNonNull(falseLabel);
+
+                    String propertyName = indexByAnnotationAndValue.get(new AnnotationWithValue(annotationName, null));
+                    int propertyIndex = getPropertyIndex(propertyName);
+                    writer.loadThis();
+                    writer.push(propertyIndex);
+                    writer.invokeVirtual(introspectionType, FIND_PROPERTY_BY_INDEX_METHOD);
+                    writer.returnValue();
+
+                    writer.visitLabel(falseLabel);
+                } else {
+                    Label falseLabel = new Label();
+                    writer.loadArg(1);
+                    writer.ifNonNull(falseLabel);
+                    writer.goTo(end);
                     writer.visitLabel(falseLabel);
                 }
-                writer.goTo(end);
-            }
-
-            private void matchByAnnotationValues(GeneratorAdapter writer, String annotationName, Label end) {
-                List<String> values = indexByAnnotationAndValue.keySet()
+                Set<String> valueMatches = indexByAnnotationAndValue.keySet()
                         .stream()
-                        .filter(s -> s.annotationName.equals(annotationName))
+                        .filter(s -> s.annotationName.equals(annotationName) && s.value != null)
                         .map(s -> s.value)
-                        .collect(Collectors.toList());
-                for (String value : values) {
-                    writer.loadArg(1);
-                    writer.push(value);
-                    writer.invokeVirtual(Type.getType(Object.class), new Method("equals", Type.BOOLEAN_TYPE, new Type[]{Type.getType(Object.class)}));
-                    writer.push(true);
-                    Label falseValueLabel = new Label();
-                    writer.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.NE, falseValueLabel);
-                    String propertyName = indexByAnnotationAndValue.get(new AnnotationWithValue(annotationName, value));
-                    int propertyIndex = getPropertyIndex(propertyName);
-                    returnPropertyByIndex(writer, propertyIndex);
-                    writer.visitLabel(falseValueLabel);
+                        .collect(Collectors.toSet());
+                if (!valueMatches.isEmpty()) {
+                    new StringSwitchWriter() {
+
+                        @Override
+                        protected Set<String> getKeys() {
+                            return valueMatches;
+                        }
+
+                        @Override
+                        protected void pushStringValue() {
+                            writer.loadArg(1);
+                        }
+
+                        @Override
+                        protected void onMatch(String value, Label end) {
+                            String propertyName = indexByAnnotationAndValue.get(new AnnotationWithValue(annotationName, value));
+                            int propertyIndex = getPropertyIndex(propertyName);
+                            writer.loadThis();
+                            writer.push(propertyIndex);
+                            writer.invokeVirtual(introspectionType, FIND_PROPERTY_BY_INDEX_METHOD);
+                            writer.returnValue();
+                        }
+
+                    }.write(writer);
                 }
                 writer.goTo(end);
             }
 
-            void returnPropertyByIndex(GeneratorAdapter writer, int propertyIndex) {
-                writer.loadThis();
-                writer.push(propertyIndex);
-                writer.invokeVirtual(introspectionType, FIND_PROPERTY_BY_INDEX_METHOD);
-                writer.returnValue();
-            }
+        }.write(writer);
 
-            @Override
-            public void generateDefault() {
-                writer.push((String) null);
-                writer.returnValue();
-            }
-        });
         writer.push((String) null);
         writer.returnValue();
         writer.visitMaxs(DEFAULT_MAX_STACK, 1);
@@ -775,52 +795,29 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         int classNameLocal = writer.newLocal(Type.getType(String.class));
         writer.storeLocal(classNameLocal);
         writer.loadLocal(classNameLocal);
-        writer.invokeVirtual(Type.getType(Object.class), new Method("hashCode", Type.INT_TYPE, new Type[]{}));
 
-        // hash -> classname
-        Map<Integer, Set<String>> hashToMethods = new TreeMap<>();
-        for (String annotationName: indexByAnnotations.keySet()) {
-            hashToMethods.computeIfAbsent(annotationName.hashCode(), i -> new LinkedHashSet<>()).add(annotationName);
-        }
-        int[] hashCodeArray = hashToMethods.keySet().stream().mapToInt(i -> i).toArray();
-        writer.tableSwitch(hashCodeArray, new TableSwitchGenerator() {
+        new StringSwitchWriter() {
+
             @Override
-            public void generateCase(int hashCode, Label end) {
-                for (String annotationName : hashToMethods.get(hashCode)) {
-                    writer.loadLocal(classNameLocal);
-                    writer.push(annotationName);
-                    writer.invokeVirtual(Type.getType(Object.class), new Method("equals", Type.BOOLEAN_TYPE, new Type[]{Type.getType(Object.class)}));
-                    writer.push(true);
-                    Label falseLabel = new Label();
-                    writer.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.NE, falseLabel);
-                    returnIndexSubsetOfBeanProperties(annotationName);
-                    writer.visitLabel(falseLabel);
-                }
-                writer.goTo(end);
+            protected Set<String> getKeys() {
+                return indexByAnnotations.keySet();
             }
 
-            private void returnIndexSubsetOfBeanProperties(String annotationName) {
-                writer.loadThis();
-                int[] indexes = indexByAnnotations.get(annotationName)
-                        .stream()
-                        .mapToInt(prop -> getPropertyIndex(prop))
-                        .toArray();
+            @Override
+            protected void pushStringValue() {
+                writer.loadLocal(classNameLocal);
+            }
 
-                pushNewArray(writer, int.class, indexes.length);
-                int i = 0;
-                for (int index : indexes) {
-                    pushStoreInArray(writer, Type.INT_TYPE, i++, indexes.length, () -> writer.push(index));
-                }
+            @Override
+            protected void onMatch(String annotationName, Label end) {
+                writer.loadThis();
+                writer.getStatic(introspectionType, annotationIndexFields.get(annotationName), Type.getType(int[].class));
                 writer.invokeVirtual(introspectionType, GET_BP_INDEXED_SUBSET_METHOD);
                 writer.returnValue();
             }
 
-            @Override
-            public void generateDefault() {
-                writer.invokeStatic(Type.getType(Collections.class), COLLECTIONS_EMPTY_LIST);
-                writer.returnValue();
-            }
-        });
+        }.write(writer);
+
         writer.invokeStatic(Type.getType(Collections.class), COLLECTIONS_EMPTY_LIST);
         writer.returnValue();
         writer.visitMaxs(DEFAULT_MAX_STACK, 1);
@@ -924,7 +921,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     }
 
     private ClassWriter generateClassBytes(ClassWriter classWriter) {
-        writeAnnotationMetadataStaticInitializer(classWriter);
+        writeAnnotationMetadataStaticInitializer(classWriter, new HashMap<>());
 
         GeneratorAdapter cv = startConstructor(classWriter);
         cv.loadThis();
