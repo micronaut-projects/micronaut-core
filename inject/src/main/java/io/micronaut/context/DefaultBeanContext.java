@@ -111,7 +111,7 @@ public class DefaultBeanContext implements BeanContext {
     final Map<BeanIdentifier, Object> singlesInCreation = new ConcurrentHashMap<>(5);
     final Map<BeanKey, Provider<Object>> scopedProxies = new ConcurrentHashMap<>(20);
     Set<Map.Entry<Class, List<BeanInitializedEventListener>>> beanInitializedEventListeners;
-    
+
     private final BeanContextConfiguration beanContextConfiguration;
     private final Collection<BeanDefinitionReference> beanDefinitionsClasses = new ConcurrentLinkedQueue<>();
     private final Map<String, BeanConfiguration> beanConfigurations = new HashMap<>(10);
@@ -2180,134 +2180,184 @@ public class DefaultBeanContext implements BeanContext {
         }
         Qualifier<T> declaredQualifier = beanDefinition.getDeclaredQualifier();
         Class<T> beanType = beanDefinition.getBeanType();
-        if (isSingleton) {
+        if (isSingleton(beanDefinition, qualifier, qualifierBeanType, isSingleton, declaredQualifier)) {
             BeanRegistration<T> beanRegistration = singletonObjects.get(new BeanKey<>(beanDefinition, declaredQualifier));
-            final Class<T> beanClass = qualifierBeanType.getType();
-            if (beanRegistration != null) {
-                if (qualifier == null || qualifier.reduce(beanClass, Stream.of(beanRegistration.beanDefinition)).findFirst().isPresent()) {
-                    return beanRegistration.bean;
-                }
-            } else if (qualifier != null) {
-                beanRegistration = singletonObjects.get(new BeanKey<>(beanDefinition, null));
-                if (beanRegistration != null && qualifier.reduce(beanClass, Stream.of(beanRegistration.beanDefinition)).findFirst().isPresent()) {
-                    return beanRegistration.bean;
-                }
-            }
+            return beanRegistration.bean;
         }
 
         T bean;
         if (beanDefinition instanceof BeanFactory) {
-            BeanFactory<T> beanFactory = (BeanFactory<T>) beanDefinition;
-            try {
-                if (beanFactory instanceof ParametrizedBeanFactory) {
-                    ParametrizedBeanFactory<T> parametrizedBeanFactory = (ParametrizedBeanFactory<T>) beanFactory;
-                    Argument<?>[] requiredArguments = parametrizedBeanFactory.getRequiredArguments();
-                    Map<String, Object> convertedValues = new LinkedHashMap<>(argumentValues);
-                    for (Argument<?> requiredArgument : requiredArguments) {
-                        String argumentName = requiredArgument.getName();
-                        Object val = argumentValues.get(argumentName);
-                        if (val == null && !requiredArgument.isDeclaredNullable()) {
-                            throw new BeanInstantiationException(resolutionContext, "Missing bean argument [" + requiredArgument + "] for type: " + beanType.getName() + ". Required arguments: " + ArrayUtils.toString(requiredArguments));
-                        }
-                        Object convertedValue = null;
-                        if (val != null) {
-                            if (requiredArgument.getType().isInstance(val)) {
-                                convertedValue = val;
-                            } else {
-                                convertedValue = ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(() ->
-                                        new BeanInstantiationException(resolutionContext, "Invalid bean argument [" + requiredArgument + "]. Cannot convert object [" + val + "] to required type: " + requiredArgument.getType())
-                                );
-                            }
-                        }
-                        convertedValues.put(argumentName, convertedValue);
-                    }
-
-                    bean = parametrizedBeanFactory.build(
-                            resolutionContext,
-                            this,
-                            beanDefinition,
-                            convertedValues
-                    );
-                } else {
-                    boolean propagateQualifier = beanDefinition.isProxy() && declaredQualifier instanceof Named;
-                    if (propagateQualifier) {
-                        resolutionContext.setAttribute(BeanDefinition.NAMED_ATTRIBUTE, ((Named) declaredQualifier).getName());
-                    }
-                    resolutionContext.setCurrentQualifier(declaredQualifier != null ? declaredQualifier : qualifier);
-                    try {
-                        bean = beanFactory.build(resolutionContext, this, beanDefinition);
-                    } finally {
-                        resolutionContext.setCurrentQualifier(null);
-                        if (propagateQualifier) {
-                            resolutionContext.removeAttribute(BeanDefinition.NAMED_ATTRIBUTE);
-                        }
-                    }
-
-                    if (bean == null) {
-                        throw new BeanInstantiationException(resolutionContext, "Bean Factory [" + beanFactory + "] returned null");
-                    } else {
-                        if (bean instanceof Qualified) {
-                            ((Qualified) bean).$withBeanQualifier(declaredQualifier);
-                        }
-                    }
-                }
-            } catch (Throwable e) {
-                if (e instanceof DependencyInjectionException) {
-                    throw e;
-                }
-                if (e instanceof DisabledBeanException) {
-                    throw e;
-                }
-                if (e instanceof BeanInstantiationException) {
-                    throw e;
-                } else {
-                    if (!resolutionContext.getPath().isEmpty()) {
-                        throw new BeanInstantiationException(resolutionContext, e);
-                    } else {
-                        throw new BeanInstantiationException(beanDefinition, e);
-                    }
-                }
-            }
+            bean = buildBeanWithFactory(resolutionContext, beanDefinition, qualifier, argumentValues, declaredQualifier, beanType);
         } else {
-            ConstructorInjectionPoint<T> constructor = beanDefinition.getConstructor();
-            Argument<?>[] requiredConstructorArguments = constructor.getArguments();
-            if (requiredConstructorArguments.length == 0) {
-                bean = constructor.invoke();
-            } else {
-                Object[] constructorArgs = new Object[requiredConstructorArguments.length];
-                for (int i = 0; i < requiredConstructorArguments.length; i++) {
-                    Class<?> argument = requiredConstructorArguments[i].getType();
-                    constructorArgs[i] = getBean(resolutionContext, argument);
-                }
-                bean = constructor.invoke(constructorArgs);
-            }
+            bean = buildBean(resolutionContext, beanDefinition);
 
             inject(resolutionContext, null, bean);
         }
 
         if (bean != null) {
             Qualifier<T> finalQualifier = qualifier != null ? qualifier : declaredQualifier;
-            if (!(bean instanceof BeanCreatedEventListener) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
-                for (Map.Entry<Class, List<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
-                    if (entry.getKey().isAssignableFrom(beanType)) {
-                        BeanKey<T> beanKey = new BeanKey<>(beanDefinition, finalQualifier);
-                        for (BeanCreatedEventListener<?> listener : entry.getValue()) {
-                            bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, beanKey, bean));
-                            if (bean == null) {
-                                throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
-                            }
+            bean = addBeanCreatedEvent(resolutionContext, beanDefinition, beanType, bean, finalQualifier);
+            bean = validateBean(resolutionContext, beanDefinition, bean);
+            log(beanDefinition, bean, finalQualifier);
+        }
+
+        return bean;
+    }
+
+    private <T> boolean isSingleton(BeanDefinition<T> beanDefinition, Qualifier<T> qualifier, Argument<T> qualifierBeanType, boolean isSingleton, Qualifier<T> declaredQualifier) {
+        if (isSingleton) {
+            BeanRegistration<T> beanRegistration = singletonObjects.get(new BeanKey<>(beanDefinition, declaredQualifier));
+            final Class<T> beanClass = qualifierBeanType.getType();
+            if (beanRegistration != null) {
+                if (qualifier == null || qualifier.reduce(beanClass, Stream.of(beanRegistration.beanDefinition)).findFirst().isPresent()) {
+                    return true;
+                }
+            } else if (qualifier != null) {
+                beanRegistration = singletonObjects.get(new BeanKey<>(beanDefinition, null));
+                if (beanRegistration != null && qualifier.reduce(beanClass, Stream.of(beanRegistration.beanDefinition)).findFirst().isPresent()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private <T> void log(@NonNull BeanDefinition<T> beanDefinition, T bean, Qualifier<T> finalQualifier) {
+        if (LOG_LIFECYCLE.isDebugEnabled()) {
+            LOG_LIFECYCLE.debug("Created bean [{}] from definition [{}] with qualifier [{}]", bean, beanDefinition, finalQualifier);
+        }
+    }
+
+    private <T> T validateBean(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition, T bean) {
+        if (beanDefinition instanceof ValidatedBeanDefinition) {
+            bean = ((ValidatedBeanDefinition<T>) beanDefinition).validate(resolutionContext, bean);
+        }
+        return bean;
+    }
+
+    private <T> T addBeanCreatedEvent(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition, Class<T> beanType, T bean, Qualifier<T> finalQualifier) {
+        if (!(bean instanceof BeanCreatedEventListener) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
+            for (Map.Entry<Class, List<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
+                if (entry.getKey().isAssignableFrom(beanType)) {
+                    BeanKey<T> beanKey = new BeanKey<>(beanDefinition, finalQualifier);
+                    for (BeanCreatedEventListener<?> listener : entry.getValue()) {
+                        bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, beanKey, bean));
+                        if (bean == null) {
+                            throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
                         }
                     }
                 }
             }
-            if (beanDefinition instanceof ValidatedBeanDefinition) {
-                bean = ((ValidatedBeanDefinition<T>) beanDefinition).validate(resolutionContext, bean);
+        }
+        return bean;
+    }
+
+    private <T> T getSingletonBean(BeanDefinition<T> beanDefinition, Qualifier<T> declaredQualifier, Argument<T> qualifierBeanType, Qualifier<T> qualifier) {
+        BeanRegistration<T> beanRegistration = singletonObjects.get(new BeanKey<>(beanDefinition, declaredQualifier));
+        final Class<T> beanClass = qualifierBeanType.getType();
+        if (beanRegistration != null) {
+            if (qualifier == null || qualifier.reduce(beanClass, Stream.of(beanRegistration.beanDefinition)).findFirst().isPresent()) {
+                return beanRegistration.bean;
             }
-            if (LOG_LIFECYCLE.isDebugEnabled()) {
-                LOG_LIFECYCLE.debug("Created bean [{}] from definition [{}] with qualifier [{}]", bean, beanDefinition, finalQualifier);
+        } else if (qualifier != null) {
+            beanRegistration = singletonObjects.get(new BeanKey<>(beanDefinition, null));
+            if (beanRegistration != null && qualifier.reduce(beanClass, Stream.of(beanRegistration.beanDefinition)).findFirst().isPresent()) {
+                return beanRegistration.bean;
             }
         }
+        return null;
+    }
 
+    private <T> T buildBean(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition) {
+        T bean;
+        ConstructorInjectionPoint<T> constructor = beanDefinition.getConstructor();
+        Argument<?>[] requiredConstructorArguments = constructor.getArguments();
+        if (requiredConstructorArguments.length == 0) {
+            bean = constructor.invoke();
+        } else {
+            Object[] constructorArgs = new Object[requiredConstructorArguments.length];
+            for (int i = 0; i < requiredConstructorArguments.length; i++) {
+                Class<?> argument = requiredConstructorArguments[i].getType();
+                constructorArgs[i] = getBean(resolutionContext, argument);
+            }
+            bean = constructor.invoke(constructorArgs);
+        }
+        return bean;
+    }
+
+    private <T> T buildBeanWithFactory(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition, Qualifier<T> qualifier, Map<String, Object> argumentValues, Qualifier<T> declaredQualifier, Class<T> beanType) {
+        T bean;
+        BeanFactory<T> beanFactory = (BeanFactory<T>) beanDefinition;
+        try {
+            if (beanFactory instanceof ParametrizedBeanFactory) {
+                ParametrizedBeanFactory<T> parametrizedBeanFactory = (ParametrizedBeanFactory<T>) beanFactory;
+                Argument<?>[] requiredArguments = parametrizedBeanFactory.getRequiredArguments();
+                Map<String, Object> convertedValues = new LinkedHashMap<>(argumentValues);
+                for (Argument<?> requiredArgument : requiredArguments) {
+                    String argumentName = requiredArgument.getName();
+                    Object val = argumentValues.get(argumentName);
+                    if (val == null && !requiredArgument.isDeclaredNullable()) {
+                        throw new BeanInstantiationException(resolutionContext, "Missing bean argument [" + requiredArgument + "] for type: " + beanType.getName() + ". Required arguments: " + ArrayUtils.toString(requiredArguments));
+                    }
+                    Object convertedValue = null;
+                    if (val != null) {
+                        if (requiredArgument.getType().isInstance(val)) {
+                            convertedValue = val;
+                        } else {
+                            convertedValue = ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(() ->
+                                    new BeanInstantiationException(resolutionContext, "Invalid bean argument [" + requiredArgument + "]. Cannot convert object [" + val + "] to required type: " + requiredArgument.getType())
+                            );
+                        }
+                    }
+                    convertedValues.put(argumentName, convertedValue);
+                }
+
+                bean = parametrizedBeanFactory.build(
+                        resolutionContext,
+                        this,
+                        beanDefinition,
+                        convertedValues
+                );
+            } else {
+                boolean propagateQualifier = beanDefinition.isProxy() && declaredQualifier instanceof Named;
+                if (propagateQualifier) {
+                    resolutionContext.setAttribute(BeanDefinition.NAMED_ATTRIBUTE, ((Named) declaredQualifier).getName());
+                }
+                resolutionContext.setCurrentQualifier(declaredQualifier != null ? declaredQualifier : qualifier);
+                try {
+                    bean = beanFactory.build(resolutionContext, this, beanDefinition);
+                } finally {
+                    resolutionContext.setCurrentQualifier(null);
+                    if (propagateQualifier) {
+                        resolutionContext.removeAttribute(BeanDefinition.NAMED_ATTRIBUTE);
+                    }
+                }
+
+                if (bean == null) {
+                    throw new BeanInstantiationException(resolutionContext, "Bean Factory [" + beanFactory + "] returned null");
+                } else {
+                    if (bean instanceof Qualified) {
+                        ((Qualified) bean).$withBeanQualifier(declaredQualifier);
+                    }
+                }
+            }
+        } catch (Throwable e) {
+            if (e instanceof DependencyInjectionException) {
+                throw e;
+            }
+            if (e instanceof DisabledBeanException) {
+                throw e;
+            }
+            if (e instanceof BeanInstantiationException) {
+                throw e;
+            } else {
+                if (!resolutionContext.getPath().isEmpty()) {
+                    throw new BeanInstantiationException(resolutionContext, e);
+                } else {
+                    throw new BeanInstantiationException(beanDefinition, e);
+                }
+            }
+        }
         return bean;
     }
 
