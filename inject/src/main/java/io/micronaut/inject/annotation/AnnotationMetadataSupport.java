@@ -125,6 +125,7 @@ public final class AnnotationMetadataSupport {
      * @param annotation The annotation
      * @return The repeatable annotation container.
      */
+    @Internal
     public static String getRepeatableAnnotation(String annotation) {
         return REPEATABLE_ANNOTATIONS.get(annotation);
     }
@@ -253,6 +254,7 @@ public final class AnnotationMetadataSupport {
      *
      * @param repeatableAnnotations the repeatable annotations
      */
+    @Internal
     static void removeCoreRepeatableAnnotations(@NotNull Map<String, String> repeatableAnnotations) {
         for (Map.Entry<Class<? extends Annotation>, Class<? extends Annotation>> e : getCoreRepeatableAnnotations()) {
             repeatableAnnotations.remove(e.getKey().getName());

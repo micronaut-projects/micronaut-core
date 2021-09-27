@@ -1499,7 +1499,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return true if repeatable
      * @since 3.1
      */
-    default boolean isRepeatableAnnotation(Class<? extends Annotation> annotation) {
+    default boolean isRepeatableAnnotation(@NonNull Class<? extends Annotation> annotation) {
         return annotation.getAnnotation(Repeatable.class) != null;
     }
 
@@ -1509,7 +1509,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return true if repeatable
      * @since 3.1
      */
-    default boolean isRepeatableAnnotation(String annotation) {
+    default boolean isRepeatableAnnotation(@NonNull String annotation) {
         return false;
     }
 
@@ -1519,7 +1519,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return optional repeatable annotation container
      * @since 3.1
      */
-    default Optional<String> findRepeatableAnnotation(Class<? extends Annotation> annotation) {
+    default Optional<String> findRepeatableAnnotation(@NonNull Class<? extends Annotation> annotation) {
         return Optional.ofNullable(annotation.getAnnotation(Repeatable.class))
                 .map(repeatable -> repeatable.value().getName());
     }
@@ -1530,7 +1530,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return optional repeatable annotation container
      * @since 3.1
      */
-    default Optional<String> findRepeatableAnnotation(String annotation) {
+    default Optional<String> findRepeatableAnnotation(@NonNull String annotation) {
         return Optional.empty();
     }
 
