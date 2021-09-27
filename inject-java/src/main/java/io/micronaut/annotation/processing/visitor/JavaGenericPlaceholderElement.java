@@ -41,8 +41,8 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
     private final List<JavaClassElement> bounds;
 
     JavaGenericPlaceholderElement(
-            TypeVariable realTypeVariable,
-            List<JavaClassElement> bounds,
+            @NonNull TypeVariable realTypeVariable,
+            @NonNull List<JavaClassElement> bounds,
             int arrayDimensions) {
         super(
                 bounds.get(0).classElement,

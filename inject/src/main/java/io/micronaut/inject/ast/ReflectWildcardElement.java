@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.ast;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 
 import java.lang.reflect.WildcardType;
@@ -22,7 +23,14 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
-class ReflectWildcardElement extends ReflectTypeElement<WildcardType> implements WildcardElement {
+/**
+ * An implementation of {@link io.micronaut.inject.ast.WildcardElement} that uses reflection.
+ *
+ * @author Jonas Konrad
+ * @since 3.1.0
+ */
+@Internal
+final class ReflectWildcardElement extends ReflectTypeElement<WildcardType> implements WildcardElement {
     ReflectWildcardElement(WildcardType type) {
         super(type);
     }

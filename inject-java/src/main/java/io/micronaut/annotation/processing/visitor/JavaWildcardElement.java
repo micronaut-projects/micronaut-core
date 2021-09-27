@@ -15,6 +15,7 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.ClassElement;
@@ -24,11 +25,18 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-class JavaWildcardElement extends JavaClassElement implements WildcardElement {
+/**
+ * Implementation of {@link io.micronaut.inject.ast.WildcardElement} for Java.
+ *
+ * @author Jonas Konrad
+ * @since 3.1.0
+ */
+@Internal
+final class JavaWildcardElement extends JavaClassElement implements WildcardElement {
     private final List<JavaClassElement> upperBounds;
     private final List<JavaClassElement> lowerBounds;
 
-    JavaWildcardElement(List<JavaClassElement> upperBounds, List<JavaClassElement> lowerBounds) {
+    JavaWildcardElement(@NonNull List<JavaClassElement> upperBounds, @NonNull List<JavaClassElement> lowerBounds) {
         super(
                 upperBounds.get(0).classElement,
                 upperBounds.get(0).getAnnotationMetadata(),

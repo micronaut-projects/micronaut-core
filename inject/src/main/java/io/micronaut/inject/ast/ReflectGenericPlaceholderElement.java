@@ -33,19 +33,19 @@ import java.util.stream.Collectors;
  * @since 3.1.0
  */
 @Internal
-final class ReflectFreeTypeVariableElement
+final class ReflectGenericPlaceholderElement
         extends ReflectTypeElement<TypeVariable<?>>
         implements GenericPlaceholderElement, ArrayableClassElement {
     private final int arrayDimensions;
 
-    ReflectFreeTypeVariableElement(TypeVariable<?> typeVariable, int arrayDimensions) {
+    ReflectGenericPlaceholderElement(TypeVariable<?> typeVariable, int arrayDimensions) {
         super(typeVariable);
         this.arrayDimensions = arrayDimensions;
     }
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new ReflectFreeTypeVariableElement(type, arrayDimensions);
+        return new ReflectGenericPlaceholderElement(type, arrayDimensions);
     }
 
     @Override

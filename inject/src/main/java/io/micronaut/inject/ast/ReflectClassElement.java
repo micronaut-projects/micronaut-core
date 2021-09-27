@@ -74,7 +74,7 @@ class ReflectClassElement extends ReflectTypeElement<Class<?>> {
     @Override
     public List<? extends GenericPlaceholderElement> getDeclaredGenericPlaceholders() {
         return Arrays.stream(type.getTypeParameters())
-                .map(tv -> new ReflectFreeTypeVariableElement(tv, 0))
+                .map(tv -> new ReflectGenericPlaceholderElement(tv, 0))
                 .collect(Collectors.toList());
     }
 }

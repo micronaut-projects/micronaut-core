@@ -15,6 +15,8 @@
  */
 package io.micronaut.inject.ast;
 
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 
 import java.lang.reflect.Array;
@@ -26,6 +28,15 @@ import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.util.Objects;
 
+/**
+ * Abstract implementation of {@link io.micronaut.inject.ast.ClassElement} that uses reflection.
+ *
+ * @param <T> The generic type
+ * @since 3.1.0
+ * @author Jonas Konrad
+ */
+@Internal
+@Experimental
 abstract class ReflectTypeElement<T extends Type> implements ClassElement {
     protected final T type;
 
@@ -39,22 +50,6 @@ abstract class ReflectTypeElement<T extends Type> implements ClassElement {
             erasure = Array.newInstance(erasure, 0).getClass();
         }
         return erasure;
-    }
-
-    static Class<?> getErasure(Type type) {
-        if (type instanceof Class<?>) {
-            return (Class<?>) type;
-        } else if (type instanceof GenericArrayType) {
-            return Array.newInstance(getErasure(((GenericArrayType) type).getGenericComponentType()), 0).getClass();
-        } else if (type instanceof ParameterizedType) {
-            return getErasure(((ParameterizedType) type).getRawType());
-        } else if (type instanceof TypeVariable<?>) {
-            return getErasure(((TypeVariable<?>) type).getBounds()[0]);
-        } else if (type instanceof WildcardType) {
-            return getErasure(((WildcardType) type).getUpperBounds()[0]);
-        } else {
-            throw new IllegalArgumentException("Unsupported type: " + type.getClass());
-        }
     }
 
     @Override
@@ -138,5 +133,26 @@ abstract class ReflectTypeElement<T extends Type> implements ClassElement {
     @Override
     public ClassElement getRawClassElement() {
         return ClassElement.of(getErasure());
+    }
+
+    /**
+     * Gets the erasure for the given type.
+     * @param type The type
+     * @return The erased class, never {@code null}
+     */
+    static @NonNull Class<?> getErasure(@NonNull Type type) {
+        if (type instanceof Class<?>) {
+            return (Class<?>) type;
+        } else if (type instanceof GenericArrayType) {
+            return Array.newInstance(getErasure(((GenericArrayType) type).getGenericComponentType()), 0).getClass();
+        } else if (type instanceof ParameterizedType) {
+            return getErasure(((ParameterizedType) type).getRawType());
+        } else if (type instanceof TypeVariable<?>) {
+            return getErasure(((TypeVariable<?>) type).getBounds()[0]);
+        } else if (type instanceof WildcardType) {
+            return getErasure(((WildcardType) type).getUpperBounds()[0]);
+        } else {
+            throw new IllegalArgumentException("Unsupported type: " + type.getClass());
+        }
     }
 }

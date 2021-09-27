@@ -502,7 +502,7 @@ public interface ClassElement extends TypedElement {
         if (type instanceof Class) {
             return new ReflectClassElement((Class<?>) type);
         } else if (type instanceof TypeVariable<?>) {
-            return new ReflectFreeTypeVariableElement((TypeVariable<?>) type, 0);
+            return new ReflectGenericPlaceholderElement((TypeVariable<?>) type, 0);
         } else if (type instanceof WildcardType) {
             return new ReflectWildcardElement((WildcardType) type);
         } else if (type instanceof ParameterizedType) {
