@@ -15,8 +15,10 @@
  */
 package io.micronaut.inject.lifecyle
 
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.inject.BeanDefinition
 import jakarta.annotation.PreDestroy
 import spock.lang.Specification
 import jakarta.inject.Inject
@@ -25,7 +27,7 @@ import jakarta.inject.Singleton
 /**
  * Created by graemerocher on 17/05/2017.
  */
-class BeanWithPreDestroySpec extends Specification{
+class BeanWithPreDestroySpec extends AbstractBeanDefinitionSpec {
 
     void "test that a bean with a pre-destroy hook works"() {
         given:
@@ -67,6 +69,38 @@ class BeanWithPreDestroySpec extends Specification{
         then:
         b.noArgsDestroyCalled
         b.injectedDestroyCalled
+    }
+
+    void "test predestroy on an interface method"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition("test.\$FooFactory\$Foo0", """
+package test
+
+import io.micronaut.context.annotation.Bean
+import io.micronaut.context.annotation.Factory
+
+@Factory
+class FooFactory {
+
+    @Bean(preDestroy="close")
+    Foo foo() {
+        new Foo() { 
+            @Override
+             void close()throws Exception{
+                println("closed")     
+            }
+        }
+    }
+}
+
+interface Foo extends AutoCloseable {
+
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanDefinition != null
     }
 
 
