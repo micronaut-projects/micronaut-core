@@ -89,7 +89,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
             for (BeanMethodRef beanMethodRef : methodsRefs) {
                 beanMethods.add(new BeanMethodImpl<>(beanMethodRef));
             }
-            this.beanMethods = Collections.unmodifiableList(beanMethods);;
+            this.beanMethods = Collections.unmodifiableList(beanMethods);
         } else {
             this.beanMethods = Collections.emptyList();
         }
