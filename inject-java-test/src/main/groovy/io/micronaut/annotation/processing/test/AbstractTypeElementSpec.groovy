@@ -579,6 +579,10 @@ class Test {
      * Create a rough source signature of the given ClassElement, using {@link ClassElement#getBoundGenericTypes()}.
      * Can be used to test that {@link ClassElement#getBoundGenericTypes()} returns the right types in the right
      * context.
+     *
+     * @param classElement The class element to reconstruct
+     * @param typeVarsAsDeclarations Whether type variables should be represented as declarations
+     * @return a String representing the type signature.
      */
     @Experimental
     protected static String reconstructTypeSignature(ClassElement classElement, boolean typeVarsAsDeclarations = false) {
