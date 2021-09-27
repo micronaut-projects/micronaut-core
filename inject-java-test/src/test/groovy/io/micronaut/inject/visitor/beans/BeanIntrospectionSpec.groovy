@@ -1657,6 +1657,7 @@ class Test {
         bi.getConstructorArguments()[1].getAnnotationMetadata().hasAnnotation(Size)
         bi.getIndexedProperties(Id).size() == 1
         bi.getIndexedProperty(Id).isPresent()
+        !bi.getIndexedProperty(Column, null).isPresent()
         bi.getIndexedProperty(Column, "test_name").isPresent()
         bi.getIndexedProperty(Column, "test_name").get().name == 'name'
         bi.getProperty("version").get().hasAnnotation(Version)
