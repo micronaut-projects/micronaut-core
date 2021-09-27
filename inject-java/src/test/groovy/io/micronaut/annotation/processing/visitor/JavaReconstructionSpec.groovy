@@ -9,7 +9,7 @@ import spock.lang.PendingFeature
 import spock.lang.Unroll
 
 /**
- * These tests are based on a {@link #reconstruct} method that looks at {@link ClassElement#getBoundTypeArguments()}
+ * These tests are based on a {@link #reconstruct} method that looks at {@link ClassElement#getBoundGenericTypes()}
  * to transform a {@link ClassElement} back to its string representation. This way, we can easily check what
  * {@link ClassElement}s returned by various methods look like.
  */
@@ -351,7 +351,7 @@ class Sub<U> extends Sup<$params> {
 }
 class Sup<$decl> {
 }
-""").withBoundTypeArguments([ClassElement.of(String)])
+""").withBoundGenericTypes([ClassElement.of(String)])
         def interfaceElement = buildClassElement("""
 package example;
 
@@ -361,7 +361,7 @@ class Sub<U> implements Sup<$params> {
 }
 interface Sup<$decl> {
 }
-""").withBoundTypeArguments([ClassElement.of(String)])
+""").withBoundGenericTypes([ClassElement.of(String)])
 
         expect:
         reconstruct(superElement.getSuperType().get()) == expected
@@ -386,7 +386,7 @@ class Sub<U> extends Sup<$params> {
 }
 class Sup<$decl> {
 }
-""").withBoundTypeArguments([ClassElement.of(String)])
+""").withBoundGenericTypes([ClassElement.of(String)])
         def interfaceElement = buildClassElement("""
 package example;
 
@@ -396,7 +396,7 @@ class Sub<U> implements Sup<$params> {
 }
 interface Sup<$decl> {
 }
-""").withBoundTypeArguments([ClassElement.of(String)])
+""").withBoundGenericTypes([ClassElement.of(String)])
 
         expect:
         reconstruct(superElement.getSuperType().get()) == expected
@@ -425,7 +425,7 @@ class Test<T> {
         def fieldType = classElement.fields[0].type
 
         expect:
-        reconstruct(fieldType.foldTypes {
+        reconstruct(fieldType.foldBoundGenericTypes {
             if (it.isGenericPlaceholder() && ((GenericPlaceholderElement) it).variableName == 'T') {
                 return ClassElement.of(String)
             } else {

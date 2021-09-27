@@ -933,7 +933,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     @NonNull
     @Override
-    public List<ClassElement> getBoundTypeArguments() {
+    public List<ClassElement> getBoundGenericTypes() {
         return typeArguments.stream()
                 //return getGenericTypeInfo().getOrDefault(classElement.getQualifiedName().toString(), Collections.emptyMap()).values().stream()
                 .map(tm -> mirrorToClassElement(tm, visitorContext, getGenericTypeInfo()))
@@ -988,14 +988,14 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             } else {
                 return visitorContext.getTypes().getDeclaredType(
                         ((JavaClassElement) visitorContext.getClassElement(element.getName()).get()).classElement,
-                        element.getBoundTypeArguments().stream().map(ce -> toTypeMirror(visitorContext, ce)).toArray(TypeMirror[]::new));
+                        element.getBoundGenericTypes().stream().map(ce -> toTypeMirror(visitorContext, ce)).toArray(TypeMirror[]::new));
             }
         }
     }
 
     @NonNull
     @Override
-    public ClassElement withBoundTypeArguments(@NonNull List<? extends ClassElement> typeArguments) {
+    public ClassElement withBoundGenericTypes(@NonNull List<? extends ClassElement> typeArguments) {
         if (typeArguments.isEmpty() && this.typeArguments.isEmpty()) {
             return this;
         }
@@ -1019,12 +1019,12 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     }
 
     @Override
-    public ClassElement foldTypes(@NonNull Function<ClassElement, ClassElement> fold) {
-        List<ClassElement> typeArgs = getBoundTypeArguments().stream().map(arg -> arg.foldTypes(fold)).collect(Collectors.toList());
+    public ClassElement foldBoundGenericTypes(@NonNull Function<ClassElement, ClassElement> fold) {
+        List<ClassElement> typeArgs = getBoundGenericTypes().stream().map(arg -> arg.foldBoundGenericTypes(fold)).collect(Collectors.toList());
         if (typeArgs.contains(null)) {
             typeArgs = Collections.emptyList();
         }
-        return fold.apply(withBoundTypeArguments(typeArgs));
+        return fold.apply(withBoundGenericTypes(typeArgs));
     }
 
     @Override

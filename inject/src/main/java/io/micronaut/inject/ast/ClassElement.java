@@ -319,13 +319,13 @@ public interface ClassElement extends TypedElement {
      */
     @NonNull
     @Experimental
-    default List<? extends ClassElement> getBoundTypeArguments() {
+    default List<? extends ClassElement> getBoundGenericTypes() {
         return new ArrayList<>(getTypeArguments().values());
     }
 
     /**
      * The type arguments declared on the raw class. Independent of the actual
-     * {@link #getBoundTypeArguments() bound type arguments}.
+     * {@link #getBoundGenericTypes() bound type arguments}.
      *
      * <p>This method will resolve the generic placeholders defined of the declaring class, if any.
      * </p>
@@ -351,7 +351,7 @@ public interface ClassElement extends TypedElement {
     @NonNull
     @Experimental
     default ClassElement getRawClassElement() {
-        return withBoundTypeArguments(Collections.emptyList());
+        return withBoundGenericTypes(Collections.emptyList());
     }
 
     /**
@@ -365,27 +365,30 @@ public interface ClassElement extends TypedElement {
      */
     @NonNull
     @Experimental
-    default ClassElement withBoundTypeArguments(@NonNull List<? extends ClassElement> typeArguments) {
+    default ClassElement withBoundGenericTypes(@NonNull List<? extends ClassElement> typeArguments) {
         return this;
     }
 
     /**
-     * Perform a fold operation on all this type's component types (type arguments, wildcard bounds), and then on this
+     * Perform a fold operation on the type arguments (type arguments, wildcard bounds, resolved via {@link #getBoundGenericTypes()}), and then on this
      * type. For {@code List<? extends String>}, this returns {@code f(List<f(? extends f(String))>)}. The bounds of
      * type variables are not folded.
+     *
      * <p>
      * {@code null} has special meaning here. Returning {@code null} from a fold operation will try to make the
      * surrounding type a raw type. For example, for {@code Map<String, Object>}, returning {@code null} for the fold
      * on {@code Object} will lead to the parameterized {@code Map<String, null>} type being replaced by {@code Map}.
      * <p>
-     * This also means that this method may return {@code null} if the top-level fold operation returned {@code null}.
+     *
+     * <p>This also means that this method may return {@code null} if the top-level fold operation returned {@code null}.</p>
+     *
      *
      * @param fold The fold operation to apply recursively to all component types.
      * @return The folded type.
      * @since 3.1.0
      */
     @Experimental
-    default ClassElement foldTypes(@NonNull Function<ClassElement, ClassElement> fold) {
+    default ClassElement foldBoundGenericTypes(@NonNull Function<ClassElement, ClassElement> fold) {
         return fold.apply(this);
     }
 
@@ -510,7 +513,7 @@ public interface ClassElement extends TypedElement {
             return new ReflectClassElement(ReflectTypeElement.getErasure(type)) {
                 @NonNull
                 @Override
-                public List<? extends ClassElement> getBoundTypeArguments() {
+                public List<? extends ClassElement> getBoundGenericTypes() {
                     return Arrays.stream(pType.getActualTypeArguments())
                             .map(ClassElement::of)
                             .collect(Collectors.toList());
@@ -552,7 +555,7 @@ public interface ClassElement extends TypedElement {
 
             @NonNull
             @Override
-            public List<? extends ClassElement> getBoundTypeArguments() {
+            public List<? extends ClassElement> getBoundGenericTypes() {
                 return getDeclaredGenericPlaceholders().stream()
                         .map(tv -> typeArguments.get(tv.getVariableName()))
                         .collect(Collectors.toList());

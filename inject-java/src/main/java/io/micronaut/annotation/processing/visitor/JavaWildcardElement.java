@@ -61,9 +61,9 @@ class JavaWildcardElement extends JavaClassElement implements WildcardElement {
     }
 
     @Override
-    public ClassElement foldTypes(@NonNull Function<ClassElement, ClassElement> fold) {
-        List<JavaClassElement> upperBounds = this.upperBounds.stream().map(ele -> toJavaClassElement(ele.foldTypes(fold))).collect(Collectors.toList());
-        List<JavaClassElement> lowerBounds = this.lowerBounds.stream().map(ele -> toJavaClassElement(ele.foldTypes(fold))).collect(Collectors.toList());
+    public ClassElement foldBoundGenericTypes(@NonNull Function<ClassElement, ClassElement> fold) {
+        List<JavaClassElement> upperBounds = this.upperBounds.stream().map(ele -> toJavaClassElement(ele.foldBoundGenericTypes(fold))).collect(Collectors.toList());
+        List<JavaClassElement> lowerBounds = this.lowerBounds.stream().map(ele -> toJavaClassElement(ele.foldBoundGenericTypes(fold))).collect(Collectors.toList());
         return fold.apply(upperBounds.contains(null) || lowerBounds.contains(null) ? null : new JavaWildcardElement(upperBounds, lowerBounds));
     }
 
@@ -77,7 +77,7 @@ class JavaWildcardElement extends JavaClassElement implements WildcardElement {
                 return (JavaClassElement) ((ArrayableClassElement) visitorContext.getClassElement(element.getName())
                         .orElseThrow(() -> new UnsupportedOperationException("Cannot convert ClassElement to JavaClassElement, class was not found on the visitor context")))
                         .withArrayDimensions(element.getArrayDimensions())
-                        .withBoundTypeArguments(element.getBoundTypeArguments());
+                        .withBoundGenericTypes(element.getBoundGenericTypes());
             }
         }
     }

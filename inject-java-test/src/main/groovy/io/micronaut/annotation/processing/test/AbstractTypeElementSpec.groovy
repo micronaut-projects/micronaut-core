@@ -576,8 +576,8 @@ class Test {
     }
 
     /**
-     * Create a rough source signature of the given ClassElement, using {@link ClassElement#getBoundTypeArguments()}.
-     * Can be used to test that {@link ClassElement#getBoundTypeArguments()} returns the right types in the right
+     * Create a rough source signature of the given ClassElement, using {@link ClassElement#getBoundGenericTypes()}.
+     * Can be used to test that {@link ClassElement#getBoundGenericTypes()} returns the right types in the right
      * context.
      */
     @Experimental
@@ -604,7 +604,7 @@ class Test {
                 return we.upperBounds.stream().map(AbstractTypeElementSpec::reconstruct).collect(Collectors.joining(" & ", "? extends ", ""))
             }
         } else {
-            def boundTypeArguments = classElement.getBoundTypeArguments()
+            def boundTypeArguments = classElement.getBoundGenericTypes()
             if (boundTypeArguments.isEmpty()) {
                 return classElement.getSimpleName()
             } else {

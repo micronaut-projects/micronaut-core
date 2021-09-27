@@ -24,6 +24,7 @@ import io.micronaut.inject.ast.GenericPlaceholderElement;
 import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.type.TypeVariable;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -83,7 +84,8 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
     }
 
     @Override
-    public ClassElement foldTypes(@NonNull Function<ClassElement, ClassElement> fold) {
+    public ClassElement foldBoundGenericTypes(@NonNull Function<ClassElement, ClassElement> fold) {
+        Objects.requireNonNull(fold, "Function argument cannot be null");
         return fold.apply(this);
     }
 
