@@ -584,7 +584,7 @@ class Test {
     protected static String reconstruct(ClassElement classElement, boolean typeVarsAsDeclarations = false) {
         if (classElement.isArray()) {
             return reconstruct(classElement.fromArray()) + "[]"
-        } else if (classElement.isFreeTypeVariable()) {
+        } else if (classElement.isGenericPlaceholder()) {
             def freeVar = (GenericPlaceholderElement) classElement
             def name = freeVar.variableName
             if (typeVarsAsDeclarations) {

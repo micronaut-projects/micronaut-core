@@ -975,7 +975,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             }
             TypeMirror lowerBound = lowerBounds.isEmpty() ? null : toTypeMirror(visitorContext, lowerBounds.get(0));
             return visitorContext.getTypes().getWildcardType(upperBound, lowerBound);
-        } else if (element.isFreeTypeVariable()) {
+        } else if (element.isGenericPlaceholder()) {
             if (!(element instanceof JavaGenericPlaceholderElement)) {
                 throw new UnsupportedOperationException("Free type variable on non-java class");
             }

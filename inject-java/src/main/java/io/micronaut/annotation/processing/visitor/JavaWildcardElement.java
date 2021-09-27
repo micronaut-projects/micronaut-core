@@ -71,7 +71,7 @@ class JavaWildcardElement extends JavaClassElement implements WildcardElement {
         if (element instanceof JavaClassElement) {
             return (JavaClassElement) element;
         } else {
-            if (element.isWildcard() || element.isFreeTypeVariable()) {
+            if (element.isWildcard() || element.isGenericPlaceholder()) {
                 throw new UnsupportedOperationException("Cannot convert wildcard / free type variable to JavaClassElement");
             } else {
                 return (JavaClassElement) ((ArrayableClassElement) visitorContext.getClassElement(element.getName())

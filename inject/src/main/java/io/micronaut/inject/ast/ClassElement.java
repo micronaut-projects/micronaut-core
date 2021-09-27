@@ -49,7 +49,7 @@ public interface ClassElement extends TypedElement {
      * Tests whether one type is assignable to another.
      *
      * @param type The type to check
-     * @return {@code true} if and only if the this type is assignable to the second
+     * @return {@code true} if and only if this type is assignable to the second
      */
     boolean isAssignable(String type);
 
@@ -66,10 +66,11 @@ public interface ClassElement extends TypedElement {
 
     /**
      * @see GenericPlaceholderElement
-     * @return Whether this is a free type variable.
+     * @return Whether this is a generic placeholder.
+     * @since 3.1.0
      */
     @Experimental
-    default boolean isFreeTypeVariable() {
+    default boolean isGenericPlaceholder() {
         return this instanceof GenericPlaceholderElement;
     }
 
@@ -86,7 +87,7 @@ public interface ClassElement extends TypedElement {
      * Tests whether one type is assignable to another.
      *
      * @param type The type to check
-     * @return {@code true} if and only if the this type is assignable to the second
+     * @return {@code true} if and only if this type is assignable to the second
      * @since 2.3.0
      */
     default boolean isAssignable(ClassElement type) {
@@ -381,6 +382,7 @@ public interface ClassElement extends TypedElement {
      *
      * @param fold The fold operation to apply recursively to all component types.
      * @return The folded type.
+     * @since 3.1.0
      */
     @Experimental
     default ClassElement foldTypes(@NonNull Function<ClassElement, ClassElement> fold) {

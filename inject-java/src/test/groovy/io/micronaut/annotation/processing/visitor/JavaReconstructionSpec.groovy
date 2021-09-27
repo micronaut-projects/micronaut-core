@@ -426,7 +426,7 @@ class Test<T> {
 
         expect:
         reconstruct(fieldType.foldTypes {
-            if (it.isFreeTypeVariable() && ((GenericPlaceholderElement) it).variableName == 'T') {
+            if (it.isGenericPlaceholder() && ((GenericPlaceholderElement) it).variableName == 'T') {
                 return ClassElement.of(String)
             } else {
                 return it
