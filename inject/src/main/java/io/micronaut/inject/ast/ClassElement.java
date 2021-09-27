@@ -65,12 +65,12 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
-     * @see FreeTypeVariableElement
+     * @see GenericPlaceholderElement
      * @return Whether this is a free type variable.
      */
     @Experimental
     default boolean isFreeTypeVariable() {
-        return this instanceof FreeTypeVariableElement;
+        return this instanceof GenericPlaceholderElement;
     }
 
     /**
@@ -298,7 +298,7 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
-     * @return Whether the type is iterable (either an array or an Iterable)
+     * @return Whether the type is iterable (either an array or an {@link Iterable})
      */
     default boolean isIterable() {
         return isArray() || isAssignable(Iterable.class);
@@ -312,8 +312,9 @@ public interface ClassElement extends TypedElement {
      * this method reflects the <i>declaration</i> type: If there is a {@code class Test<T> { T field; }}, this method
      * will return {@code T} as the field type, even if the field type was obtained through a {@code Test<String>}.
      *
-     * @return The list of type arguments, in the same order as {@link #getDeclaredTypeVariables()}. Must be empty or
-     * of the same length as {@link #getDeclaredTypeVariables()}.
+     * @return The list of type arguments, in the same order as {@link #getDeclaredGenericPlaceholders()}. Must be empty or
+     * of the same length as {@link #getDeclaredGenericPlaceholders()}.
+     * @since 3.1.0
      */
     @NonNull
     @Experimental
@@ -325,11 +326,17 @@ public interface ClassElement extends TypedElement {
      * The type arguments declared on the raw class. Independent of the actual
      * {@link #getBoundTypeArguments() bound type arguments}.
      *
+     * <p>This method will resolve the generic placeholders defined of the declaring class, if any.
+     * </p>
+     *
+     * <p>For example {@code List<String>} will result a single placeholder called {@code E} of type {@link Object}.</p>
+     *
      * @return The type arguments declared on this class.
+     * @since 3.1.0
      */
     @NonNull
     @Experimental
-    default List<? extends FreeTypeVariableElement> getDeclaredTypeVariables() {
+    default List<? extends GenericPlaceholderElement> getDeclaredGenericPlaceholders() {
         return Collections.emptyList();
     }
 
@@ -338,10 +345,11 @@ public interface ClassElement extends TypedElement {
      * {@code List<String>}, this returns {@code List}.
      *
      * @return The raw class of this potentially parameterized type.
+     * @since 3.1.0
      */
     @NonNull
     @Experimental
-    default ClassElement getRawClass() {
+    default ClassElement getRawClassElement() {
         return withBoundTypeArguments(Collections.emptyList());
     }
 
@@ -543,7 +551,7 @@ public interface ClassElement extends TypedElement {
             @NonNull
             @Override
             public List<? extends ClassElement> getBoundTypeArguments() {
-                return getDeclaredTypeVariables().stream()
+                return getDeclaredGenericPlaceholders().stream()
                         .map(tv -> typeArguments.get(tv.getVariableName()))
                         .collect(Collectors.toList());
             }

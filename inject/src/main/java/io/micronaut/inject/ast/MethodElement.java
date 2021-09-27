@@ -42,7 +42,7 @@ public interface MethodElement extends MemberElement {
     /**
      * @return The type arguments declared on this method.
      */
-    default List<? extends FreeTypeVariableElement> getDeclaredTypeVariables() {
+    default List<? extends GenericPlaceholderElement> getDeclaredTypeVariables() {
         return Collections.emptyList();
     }
 

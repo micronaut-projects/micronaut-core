@@ -41,7 +41,7 @@ import io.micronaut.inject.annotation.AnnotationMapper
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import io.micronaut.inject.annotation.AnnotationTransformer
 import io.micronaut.inject.ast.ClassElement
-import io.micronaut.inject.ast.FreeTypeVariableElement
+import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.WildcardElement
 import io.micronaut.inject.provider.BeanProviderDefinition
 import io.micronaut.inject.provider.JakartaProviderBeanDefinition
@@ -585,7 +585,7 @@ class Test {
         if (classElement.isArray()) {
             return reconstruct(classElement.fromArray()) + "[]"
         } else if (classElement.isFreeTypeVariable()) {
-            def freeVar = (FreeTypeVariableElement) classElement
+            def freeVar = (GenericPlaceholderElement) classElement
             def name = freeVar.variableName
             if (typeVarsAsDeclarations) {
                 def bounds = freeVar.bounds

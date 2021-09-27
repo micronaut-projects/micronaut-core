@@ -136,7 +136,7 @@ abstract class ReflectTypeElement<T extends Type> implements ClassElement {
 
     @NonNull
     @Override
-    public ClassElement getRawClass() {
+    public ClassElement getRawClassElement() {
         return ClassElement.of(getErasure());
     }
 }

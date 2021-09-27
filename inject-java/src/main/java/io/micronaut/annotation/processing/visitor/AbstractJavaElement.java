@@ -367,7 +367,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 List<JavaClassElement> bounds = boundsUnresolved.stream()
                         .map(tm -> (JavaClassElement) mirrorToClassElement(tm, visitorContext, finalGenericsInfo, includeTypeAnnotations))
                         .collect(Collectors.toList());
-                return new JavaFreeTypeVariableElement(tv, bounds, 0);
+                return new JavaGenericPlaceholderElement(tv, bounds, 0);
             }
 
         } else if (returnType instanceof ArrayType) {

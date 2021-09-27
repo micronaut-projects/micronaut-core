@@ -15,10 +15,11 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.FreeTypeVariableElement;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 
 import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.type.TypeVariable;
@@ -26,11 +27,22 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 
-final class JavaFreeTypeVariableElement extends JavaClassElement implements FreeTypeVariableElement {
+/**
+ * Implementation of {@link io.micronaut.inject.ast.GenericPlaceholderElement} for Java.
+ *
+ * @author graemerocher
+ * @author Jonas Konrad
+ * @since 3.1.0
+ */
+@Internal
+final class JavaGenericPlaceholderElement extends JavaClassElement implements GenericPlaceholderElement {
     final TypeVariable realTypeVariable;
     private final List<JavaClassElement> bounds;
 
-    JavaFreeTypeVariableElement(TypeVariable realTypeVariable, List<JavaClassElement> bounds, int arrayDimensions) {
+    JavaGenericPlaceholderElement(
+            TypeVariable realTypeVariable,
+            List<JavaClassElement> bounds,
+            int arrayDimensions) {
         super(
                 bounds.get(0).classElement,
                 bounds.get(0).getAnnotationMetadata(),
@@ -55,6 +67,7 @@ final class JavaFreeTypeVariableElement extends JavaClassElement implements Free
     }
 
     @Override
+    @NonNull
     public String getVariableName() {
         return getParameterElement().getSimpleName().toString();
     }
@@ -66,7 +79,7 @@ final class JavaFreeTypeVariableElement extends JavaClassElement implements Free
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new JavaFreeTypeVariableElement(realTypeVariable, bounds, arrayDimensions);
+        return new JavaGenericPlaceholderElement(realTypeVariable, bounds, arrayDimensions);
     }
 
     @Override

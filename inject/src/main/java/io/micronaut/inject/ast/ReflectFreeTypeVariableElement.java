@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.ast;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 
 import java.lang.reflect.GenericDeclaration;
@@ -24,7 +25,17 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-class ReflectFreeTypeVariableElement extends ReflectTypeElement<TypeVariable<?>> implements FreeTypeVariableElement, ArrayableClassElement {
+/**
+ * Reflection-based implementation of {@link io.micronaut.inject.ast.GenericPlaceholderElement}.
+ *
+ * @author graemerocher
+ * @author Jonas Konrad
+ * @since 3.1.0
+ */
+@Internal
+final class ReflectFreeTypeVariableElement
+        extends ReflectTypeElement<TypeVariable<?>>
+        implements GenericPlaceholderElement, ArrayableClassElement {
     private final int arrayDimensions;
 
     ReflectFreeTypeVariableElement(TypeVariable<?> typeVariable, int arrayDimensions) {
@@ -49,6 +60,7 @@ class ReflectFreeTypeVariableElement extends ReflectTypeElement<TypeVariable<?>>
     }
 
     @Override
+    @NonNull
     public String getVariableName() {
         return type.getName();
     }

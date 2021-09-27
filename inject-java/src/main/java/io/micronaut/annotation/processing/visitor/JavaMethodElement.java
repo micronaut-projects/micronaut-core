@@ -21,7 +21,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.FreeTypeVariableElement;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
@@ -96,9 +96,9 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     }
 
     @Override
-    public List<? extends FreeTypeVariableElement> getDeclaredTypeVariables() {
+    public List<? extends GenericPlaceholderElement> getDeclaredTypeVariables() {
         return executableElement.getTypeParameters().stream()
-                .map(tpe -> (FreeTypeVariableElement) mirrorToClassElement(tpe.asType(), visitorContext))
+                .map(tpe -> (GenericPlaceholderElement) mirrorToClassElement(tpe.asType(), visitorContext))
                 .collect(Collectors.toList());
     }
 

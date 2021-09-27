@@ -942,16 +942,16 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     @NonNull
     @Override
-    public List<? extends FreeTypeVariableElement> getDeclaredTypeVariables() {
+    public List<? extends GenericPlaceholderElement> getDeclaredGenericPlaceholders() {
         return classElement.getTypeParameters().stream()
                 // we want the *declared* variables, so we don't pass in our genericsInfo.
-                .map(tpe -> (FreeTypeVariableElement) mirrorToClassElement(tpe.asType(), visitorContext))
+                .map(tpe -> (GenericPlaceholderElement) mirrorToClassElement(tpe.asType(), visitorContext))
                 .collect(Collectors.toList());
     }
 
     @NonNull
     @Override
-    public ClassElement getRawClass() {
+    public ClassElement getRawClassElement() {
         return visitorContext.getElementFactory().newClassElement(classElement, visitorContext.getAnnotationUtils().getAnnotationMetadata(classElement))
                 .withArrayDimensions(getArrayDimensions());
     }
@@ -976,10 +976,10 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             TypeMirror lowerBound = lowerBounds.isEmpty() ? null : toTypeMirror(visitorContext, lowerBounds.get(0));
             return visitorContext.getTypes().getWildcardType(upperBound, lowerBound);
         } else if (element.isFreeTypeVariable()) {
-            if (!(element instanceof JavaFreeTypeVariableElement)) {
+            if (!(element instanceof JavaGenericPlaceholderElement)) {
                 throw new UnsupportedOperationException("Free type variable on non-java class");
             }
-            return ((JavaFreeTypeVariableElement) element).realTypeVariable;
+            return ((JavaGenericPlaceholderElement) element).realTypeVariable;
         } else {
             if (element instanceof JavaClassElement) {
                 return visitorContext.getTypes().getDeclaredType(

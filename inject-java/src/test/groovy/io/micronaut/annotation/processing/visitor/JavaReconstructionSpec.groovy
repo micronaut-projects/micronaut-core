@@ -3,7 +3,7 @@ package io.micronaut.annotation.processing.visitor
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementQuery
-import io.micronaut.inject.ast.FreeTypeVariableElement
+import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.MethodElement
 import spock.lang.PendingFeature
 import spock.lang.Unroll
@@ -119,7 +119,7 @@ abstract class Test<A, $decl> {
 """)
 
         expect:
-        reconstruct(element.declaredTypeVariables[1], true) == decl
+        reconstruct(element.declaredGenericPlaceholders[1], true) == decl
 
         where:
         decl << [
@@ -426,7 +426,7 @@ class Test<T> {
 
         expect:
         reconstruct(fieldType.foldTypes {
-            if (it.isFreeTypeVariable() && ((FreeTypeVariableElement) it).variableName == 'T') {
+            if (it.isFreeTypeVariable() && ((GenericPlaceholderElement) it).variableName == 'T') {
                 return ClassElement.of(String)
             } else {
                 return it

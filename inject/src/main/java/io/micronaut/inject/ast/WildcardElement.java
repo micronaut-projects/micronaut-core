@@ -21,8 +21,11 @@ import io.micronaut.core.annotation.NonNull;
 import java.util.List;
 
 /**
- * Represents a wildcard. For compatibility, this wildcard acts like its first upper bound when used as a
+ * Represents a wildcard, for example {@code List<?>}. For compatibility, this wildcard acts like its first upper bound when used as a
  * {@link ClassElement}.
+ *
+ * @since 3.1.0
+ * @author Jonas Konrad
  */
 @Experimental
 public interface WildcardElement extends ClassElement {
