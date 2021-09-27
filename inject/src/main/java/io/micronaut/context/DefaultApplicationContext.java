@@ -28,6 +28,7 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
@@ -530,7 +531,10 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * Bootstrap environment.
      */
     private static class BootstrapEnvironment extends DefaultEnvironment {
+        private List<PropertySource> propertySourceList;
+
         BootstrapEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, ApplicationContextConfiguration configuration, String... activeEnvironments) {
+
             super(new ApplicationContextConfiguration() {
                 @Override
                 public Optional<Boolean> getDeduceEnvironments() {
@@ -600,10 +604,13 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
         @Override
         protected List<PropertySource> readPropertySourceList(String name) {
-            return super.readPropertySourceList(name)
-                    .stream()
-                    .map(BootstrapPropertySource::new)
-                    .collect(Collectors.toList());
+            if (propertySourceList == null) {
+                propertySourceList = super.readPropertySourceList(name)
+                        .stream()
+                        .map(BootstrapPropertySource::new)
+                        .collect(Collectors.toList());
+            }
+            return propertySourceList;
         }
     }
 
@@ -686,20 +693,12 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     private class RuntimeConfiguredEnvironment extends DefaultEnvironment {
 
         private final ApplicationContextConfiguration configuration;
-        private final boolean isRuntimeConfigured;
         private BootstrapPropertySourceLocator bootstrapPropertySourceLocator;
         private BootstrapEnvironment bootstrapEnvironment;
 
         RuntimeConfiguredEnvironment(ApplicationContextConfiguration configuration) {
             super(configuration);
             this.configuration = configuration;
-            this.isRuntimeConfigured = Boolean.getBoolean(Environment.BOOTSTRAP_CONTEXT_PROPERTY) ||
-                    DefaultApplicationContext.this.resourceLoader.getResource(Environment.BOOTSTRAP_NAME + ".yml").isPresent() ||
-                    DefaultApplicationContext.this.resourceLoader.getResource(Environment.BOOTSTRAP_NAME + ".properties").isPresent();
-        }
-
-        boolean isRuntimeConfigured() {
-            return isRuntimeConfigured;
         }
 
         @Override
@@ -712,16 +711,20 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
         @Override
         public Environment start() {
-            if (isRuntimeConfigured && bootstrapEnvironment == null) {
-                bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(new String[0]));
+            String bootstrapContextProp = System.getProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY);
+            Boolean bootstrapEnabled = bootstrapContextProp == null ? null : Boolean.parseBoolean(bootstrapContextProp);
+            if (bootstrapEnvironment == null && (bootstrapEnabled == null || bootstrapEnabled)) {
+                BootstrapEnvironment bootstrapEnv = createBootstrapEnvironment(getActiveNames().toArray(new String[0]));
+                if (bootstrapEnabled != null || CollectionUtils.isNotEmpty(bootstrapEnv.readPropertySourceList(bootstrapEnv.getPropertySourceRootName()))) {
+                    bootstrapEnvironment = startBootstrapEnvironment(bootstrapEnv);
+                }
             }
             return super.start();
         }
 
         @Override
         protected synchronized List<PropertySource> readPropertySourceList(String name) {
-
-            if (isRuntimeConfigured) {
+            if (bootstrapEnvironment != null) {
                 if (LOG.isInfoEnabled()) {
                     LOG.info("Reading Startup environment from bootstrap.yml");
                 }
@@ -740,11 +743,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                 for (PropertySource bootstrapPropertySource : bootstrapPropertySources) {
                     addPropertySource(bootstrapPropertySource);
                 }
-
-                return super.readPropertySourceList(name);
-            } else {
-                return super.readPropertySourceList(name);
             }
+            return super.readPropertySourceList(name);
         }
 
         private BootstrapPropertySourceLocator resolveBootstrapPropertySourceLocator(String... environmentNames) {
@@ -764,11 +764,14 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
         private BootstrapEnvironment createBootstrapEnvironment(String... environmentNames) {
             BootstrapEnvironment bootstrapEnvironment = new BootstrapEnvironment(
-                resourceLoader,
-                conversionService,
-                configuration,
-                environmentNames);
+                    resourceLoader,
+                    conversionService,
+                    configuration,
+                    environmentNames);
+            return bootstrapEnvironment;
+        }
 
+        private BootstrapEnvironment startBootstrapEnvironment(BootstrapEnvironment bootstrapEnvironment) {
             for (PropertySource source : propertySources.values()) {
                 bootstrapEnvironment.addPropertySource(source);
             }
