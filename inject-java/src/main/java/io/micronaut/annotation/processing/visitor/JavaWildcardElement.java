@@ -76,7 +76,7 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
     }
 
     private JavaClassElement toJavaClassElement(ClassElement element) {
-        if (element instanceof JavaClassElement) {
+        if (element == null || element instanceof JavaClassElement) {
             return (JavaClassElement) element;
         } else {
             if (element.isWildcard() || element.isGenericPlaceholder()) {

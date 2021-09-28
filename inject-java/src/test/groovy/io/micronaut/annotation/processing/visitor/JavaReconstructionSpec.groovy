@@ -442,4 +442,36 @@ class Test<T> {
         'List<? extends T>' | 'List<? extends String>'
         'List<? super T>'   | 'List<? super String>'
     }
+
+    @Unroll('declaration is #decl')
+    def 'fold type variable to null'() {
+        given:
+        def classElement = buildClassElement("""
+package example;
+
+import java.util.*;
+
+class Test<T> {
+    $decl field;
+}
+""")
+        def fieldType = classElement.fields[0].type
+
+        expect:
+        reconstructTypeSignature(fieldType.foldBoundGenericTypes {
+            if (it != null && it.isGenericPlaceholder() && ((GenericPlaceholderElement) it).variableName == 'T') {
+                return null
+            } else {
+                return it
+            }
+        }) == expected
+
+        where:
+        decl                | expected
+        'String'            | 'String'
+        'List<T>'           | 'List'
+        'Map<Object, T>'    | 'Map'
+        'List<? extends T>' | 'List'
+        'List<? super T>'   | 'List'
+    }
 }
