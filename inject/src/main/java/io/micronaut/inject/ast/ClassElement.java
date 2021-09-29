@@ -389,7 +389,11 @@ public interface ClassElement extends TypedElement {
      */
     @Experimental
     default ClassElement foldBoundGenericTypes(@NonNull Function<ClassElement, ClassElement> fold) {
-        return fold.apply(this);
+        List<ClassElement> typeArgs = getBoundGenericTypes().stream().map(arg -> arg.foldBoundGenericTypes(fold)).collect(Collectors.toList());
+        if (typeArgs.contains(null)) {
+            typeArgs = Collections.emptyList();
+        }
+        return fold.apply(withBoundGenericTypes(typeArgs));
     }
 
     /**

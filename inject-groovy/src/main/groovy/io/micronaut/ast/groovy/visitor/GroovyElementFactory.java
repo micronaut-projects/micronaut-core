@@ -57,6 +57,8 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
             return new GroovyEnumElement(visitorContext, classNode, annotationMetadata);
         } else if (classNode.isAnnotationDefinition()) {
             return new GroovyAnnotationElement(visitorContext, classNode, annotationMetadata);
+        } else if (classNode.isGenericsPlaceHolder()) {
+            return new GroovyGenericPlaceholderElement(visitorContext, classNode, annotationMetadata, 0);
         } else {
             return new GroovyClassElement(visitorContext, classNode, annotationMetadata);
         }

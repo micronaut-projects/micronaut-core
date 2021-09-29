@@ -38,7 +38,6 @@ import javax.lang.model.type.TypeVariable;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import java.util.*;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -1016,15 +1015,6 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
         Map<String, Map<String, TypeMirror>> genericsInfo = visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement, null, boundByName);
         return new JavaClassElement(classElement, getAnnotationMetadata(), visitorContext, typeMirrors, genericsInfo, arrayDimensions);
-    }
-
-    @Override
-    public ClassElement foldBoundGenericTypes(@NonNull Function<ClassElement, ClassElement> fold) {
-        List<ClassElement> typeArgs = getBoundGenericTypes().stream().map(arg -> arg.foldBoundGenericTypes(fold)).collect(Collectors.toList());
-        if (typeArgs.contains(null)) {
-            typeArgs = Collections.emptyList();
-        }
-        return fold.apply(withBoundGenericTypes(typeArgs));
     }
 
     @Override
