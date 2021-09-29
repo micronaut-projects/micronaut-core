@@ -474,4 +474,31 @@ class Test<T> {
         'List<? extends T>' | 'List'
         'List<? super T>'   | 'List'
     }
+
+    def 'distinguish list types'() {
+        given:
+        def classElement = buildClassElement("""
+package example;
+
+import java.util.*;
+
+class Test {
+    List field1;
+    List<?> field2;
+    List<Object> field3;
+}
+""")
+        def rawType = classElement.fields[0].genericType
+        def wildcardType = classElement.fields[1].genericType
+        def objectType = classElement.fields[2].genericType
+
+        expect:
+        rawType.boundGenericTypes.isEmpty()
+
+        wildcardType.boundGenericTypes.size() == 1
+        wildcardType.boundGenericTypes[0].isWildcard()
+
+        objectType.boundGenericTypes.size() == 1
+        !objectType.boundGenericTypes[0].isWildcard()
+    }
 }
