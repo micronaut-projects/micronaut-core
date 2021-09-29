@@ -54,7 +54,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private boolean banner = true;
     private ClassPathResourceLoader classPathResourceLoader;
     private boolean allowEmptyProviders = false;
-    private boolean bootstrapEnvironment = true;
+    private Boolean bootstrapEnvironment = null;
 
     /**
      * Default constructor.
@@ -93,8 +93,9 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         return banner;
     }
 
+    @Nullable
     @Override
-    public boolean isBootstrapEnvironmentEnabled() {
+    public Boolean isBootstrapEnvironmentEnabled() {
         return bootstrapEnvironment;
     }
 

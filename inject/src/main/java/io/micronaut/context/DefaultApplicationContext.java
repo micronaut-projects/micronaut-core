@@ -695,7 +695,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         private final ApplicationContextConfiguration configuration;
         private BootstrapPropertySourceLocator bootstrapPropertySourceLocator;
         private BootstrapEnvironment bootstrapEnvironment;
-        private boolean bootstrapEnabled;
+        private Boolean bootstrapEnabled;
 
         RuntimeConfiguredEnvironment(ApplicationContextConfiguration configuration) {
             super(configuration);
@@ -718,9 +718,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             if (bootstrapEnabled == null) {
                 bootstrapEnabled = this.bootstrapEnabled;
             }
-            if (bootstrapEnvironment == null && bootstrapEnabled) {
+            if (bootstrapEnvironment == null && (bootstrapEnabled == null || bootstrapEnabled)) {
                 BootstrapEnvironment bootstrapEnv = createBootstrapEnvironment(getActiveNames().toArray(new String[0]));
-                if (CollectionUtils.isNotEmpty(bootstrapEnv.readPropertySourceList(bootstrapEnv.getPropertySourceRootName()))) {
+                if (bootstrapEnabled != null || CollectionUtils.isNotEmpty(bootstrapEnv.readPropertySourceList(bootstrapEnv.getPropertySourceRootName()))) {
                     bootstrapEnvironment = startBootstrapEnvironment(bootstrapEnv);
                 } else {
                     if (LOG.isInfoEnabled()) {

@@ -111,7 +111,8 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
         return true;
     }
 
-    default boolean isBootstrapEnvironmentEnabled() {
+    @Nullable
+    default Boolean isBootstrapEnvironmentEnabled() {
         return true;
     }
 }
