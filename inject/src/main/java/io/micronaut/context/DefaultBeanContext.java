@@ -297,6 +297,15 @@ public class DefaultBeanContext implements BeanContext {
         return new DefaultCustomScopeRegistry(this);
     }
 
+    /**
+     * @return The custom scope registry
+     */
+    @Internal
+    @NonNull
+    CustomScopeRegistry getCustomScopeRegistry() {
+        return customScopeRegistry;
+    }
+
     @Override
     public boolean isRunning() {
         return running.get() && !initializing.get();
@@ -2821,7 +2830,7 @@ public class DefaultBeanContext implements BeanContext {
                 && (definition.getDeclaredQualifier() == null || !definition.getDeclaredQualifier().contains(AnyQualifier.INSTANCE))) {
             // With scopes proxies we have to inject a reference into the injection point
             Argument<T> proxiedType = (Argument<T>) resolveProxiedType(beanType, definition);
-            BeanKey<T> key = new BeanKey(proxiedType, qualifier);
+            BeanKey<T> key = new BeanKey<>(proxiedType, qualifier);
             BeanDefinition<T> finalDefinition = definition;
             return (T) scopedProxies.computeIfAbsent(key, beanKey -> ProviderUtils.memoized(() -> {
                 Qualifier<T> q = qualifier;
@@ -2832,13 +2841,13 @@ public class DefaultBeanContext implements BeanContext {
                 T createBean = doCreateBean(
                         resolutionContext,
                         finalDefinition,
-                        qualifier,
+                        q,
                         beanType,
                         false,
                         null
                 );
                 if (createBean instanceof Qualified) {
-                    ((Qualified) createBean).$withBeanQualifier(qualifier);
+                    ((Qualified<T>) createBean).$withBeanQualifier(q);
                 }
                 if (createBean == null && throwNoSuchBean) {
                     throw new NoSuchBeanException(finalDefinition.asArgument(), qualifier);
