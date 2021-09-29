@@ -1,6 +1,8 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.convert.ArgumentConversionContext
+import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.convert.ConversionService
 import spock.lang.Specification
 
@@ -20,16 +22,27 @@ class SocketAddressSpec extends Specification {
         ((InetSocketAddress) address.get()).getPort() == 8080
 
         when:
+        address = converter.convert("https://foo.bar:8081", SocketAddress.class)
+
+        then:
+        address.isPresent()
+        address.get() instanceof InetSocketAddress
+        ((InetSocketAddress) address.get()).getHostName() == "foo.bar"
+        ((InetSocketAddress) address.get()).getPort() == 8081
+
+        when:
         address = converter.convert("abc", SocketAddress.class)
 
         then:
         !address.isPresent()
 
         when:
-        converter.convert("abc:456456456456", SocketAddress.class)
+        ConversionContext conversionContext = ArgumentConversionContext.of(SocketAddress.class)
+        address = converter.convert("abc:456456456456", conversionContext)
 
         then:
-        thrown(IllegalArgumentException)
+        !address.isPresent()
+        conversionContext.lastError.get().cause instanceof IllegalArgumentException
 
         cleanup:
         ctx.close()

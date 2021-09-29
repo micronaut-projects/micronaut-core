@@ -27,6 +27,7 @@ import io.micronaut.http.MediaType;
 import jakarta.inject.Singleton;
 
 import java.net.InetSocketAddress;
+import java.net.MalformedURLException;
 import java.net.ProxySelector;
 import java.net.SocketAddress;
 import java.net.URL;
@@ -114,11 +115,31 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
                 CharSequence.class,
                 SocketAddress.class,
                 (object, targetType, context) -> {
-                    String[] parts = object.toString().split(":");
-                    if (parts.length == 2) {
-                        int port = Integer.parseInt(parts[1]);
-                        return Optional.of(InetSocketAddress.createUnresolved(parts[0], port));
-                    } else {
+                    try {
+                        String address = object.toString();
+                        if (address.contains("://")) {
+                            URL url = new URL(object.toString());
+                            int port = url.getPort();
+                            if (port == -1) {
+                                port = url.getDefaultPort();
+                            }
+                            if (port == -1) {
+                                context.reject(object, new ConfigurationException("Failed to find a port in the given value"));
+                                return Optional.empty();
+                            }
+                            return Optional.of(InetSocketAddress.createUnresolved(url.getHost(), port));
+                        } else {
+                            String[] parts = object.toString().split(":");
+                            if (parts.length == 2) {
+                                int port = Integer.parseInt(parts[1]);
+                                return Optional.of(InetSocketAddress.createUnresolved(parts[0], port));
+                            } else {
+                                context.reject(object, new ConfigurationException("The address is not in a proper format of IP:PORT or a standard URL"));
+                                return Optional.empty();
+                            }
+                        }
+                    } catch (MalformedURLException | IllegalArgumentException e) {
+                        context.reject(object, e);
                         return Optional.empty();
                     }
                 }
