@@ -15,6 +15,7 @@
  */
 package io.micronaut.management.endpoint;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -39,6 +40,7 @@ import java.util.Optional;
  * @author Sergio del Amo
  * @since 1.0
  */
+@Requires(missingClasses = "io.micronaut.security.filters.SecurityFilter")
 @Filter("/**")
 public class EndpointsFilter extends OncePerRequestHttpServerFilter {
 
