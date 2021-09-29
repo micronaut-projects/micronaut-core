@@ -695,10 +695,12 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         private final ApplicationContextConfiguration configuration;
         private BootstrapPropertySourceLocator bootstrapPropertySourceLocator;
         private BootstrapEnvironment bootstrapEnvironment;
+        private boolean bootstrapEnabled;
 
         RuntimeConfiguredEnvironment(ApplicationContextConfiguration configuration) {
             super(configuration);
             this.configuration = configuration;
+            this.bootstrapEnabled = configuration.isBootstrapEnvironmentEnabled();
         }
 
         @Override
@@ -713,10 +715,17 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         public Environment start() {
             String bootstrapContextProp = System.getProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY);
             Boolean bootstrapEnabled = bootstrapContextProp == null ? null : Boolean.parseBoolean(bootstrapContextProp);
-            if (bootstrapEnvironment == null && (bootstrapEnabled == null || bootstrapEnabled)) {
+            if (bootstrapEnabled == null) {
+                bootstrapEnabled = this.bootstrapEnabled;
+            }
+            if (bootstrapEnvironment == null && bootstrapEnabled) {
                 BootstrapEnvironment bootstrapEnv = createBootstrapEnvironment(getActiveNames().toArray(new String[0]));
-                if (bootstrapEnabled != null || CollectionUtils.isNotEmpty(bootstrapEnv.readPropertySourceList(bootstrapEnv.getPropertySourceRootName()))) {
+                if (CollectionUtils.isNotEmpty(bootstrapEnv.readPropertySourceList(bootstrapEnv.getPropertySourceRootName()))) {
                     bootstrapEnvironment = startBootstrapEnvironment(bootstrapEnv);
+                } else {
+                    if (LOG.isInfoEnabled()) {
+                        LOG.info("The bootstrap environment is enabled but no local property sources were found. Consider disabling the bootstrap environment to gain startup time.");
+                    }
                 }
             }
             return super.start();
@@ -726,7 +735,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         protected synchronized List<PropertySource> readPropertySourceList(String name) {
             if (bootstrapEnvironment != null) {
                 if (LOG.isInfoEnabled()) {
-                    LOG.info("Reading Startup environment from bootstrap.yml");
+                    LOG.info("Reading bootstrap environment configuration");
                 }
 
                 refreshablePropertySources.addAll(bootstrapEnvironment.getRefreshablePropertySources());

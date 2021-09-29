@@ -54,6 +54,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private boolean banner = true;
     private ClassPathResourceLoader classPathResourceLoader;
     private boolean allowEmptyProviders = false;
+    private boolean bootstrapEnvironment = true;
 
     /**
      * Default constructor.
@@ -90,6 +91,11 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public boolean isBannerEnabled() {
         return banner;
+    }
+
+    @Override
+    public boolean isBootstrapEnvironmentEnabled() {
+        return bootstrapEnvironment;
     }
 
     @Override
@@ -252,6 +258,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
+    public @NonNull ApplicationContextBuilder bootstrapEnvironment(boolean bootstrapEnv) {
+        this.bootstrapEnvironment = bootstrapEnv;
+        return this;
+    }
+
+    @Override
     @SuppressWarnings("MagicNumber")
     public @NonNull ApplicationContext build() {
         ApplicationContext applicationContext = newApplicationContext();
@@ -337,7 +349,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
-    public ApplicationContextBuilder allowEmptyProviders(boolean shouldAllow) {
+    public @NonNull ApplicationContextBuilder allowEmptyProviders(boolean shouldAllow) {
         this.allowEmptyProviders = shouldAllow;
         return this;
     }

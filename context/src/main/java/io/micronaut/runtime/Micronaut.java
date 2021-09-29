@@ -253,6 +253,11 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
         return (Micronaut) super.packages(packages);
     }
 
+    @Override
+    public @NonNull Micronaut bootstrapEnvironment(boolean bootstrapEnv) {
+        return (Micronaut) super.bootstrapEnvironment(bootstrapEnv);
+    }
+
     /**
      * Maps an exception to the given error code.
      *
