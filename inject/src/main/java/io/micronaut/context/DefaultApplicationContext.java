@@ -142,7 +142,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             return false;
         }
         if (systemBootstrapEnabled == Boolean.TRUE) {
-            return isCustomBootstrapPropertySourceLocatorPresent();
+            return true;
         }
         if (configBootstrapEnabled == Boolean.FALSE) {
             return false;
