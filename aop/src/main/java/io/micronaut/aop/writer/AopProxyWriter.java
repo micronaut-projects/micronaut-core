@@ -530,6 +530,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
         final Optional<MethodElement> overridden = methodElement.getOwningType()
                 .getEnclosedElement(ElementQuery.ALL_METHODS
+                        .onlyInstance()
                         .named(name -> name.equals(methodElement.getName()))
                         .filter(el -> el.overrides(methodElement)));
 
