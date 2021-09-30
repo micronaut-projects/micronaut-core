@@ -832,7 +832,20 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         Optional<String> preDestroy = methodAnnotationMetadata.getValue(Bean, "preDestroy", String.class)
         if (preDestroy.isPresent()) {
             String destroyMethodName = preDestroy.get()
-            MethodNode destroyMethod = ((ClassNode) producedClassElement.nativeType).getMethod(destroyMethodName)
+            MethodNode destroyMethod
+            ClassNode producedClassNode = (ClassNode) producedClassElement.nativeType
+            SourceUnit source = this.sourceUnit
+            new PublicMethodVisitor(source) {
+                @Override
+                void accept(ClassNode classNode, MethodNode methodNode) {
+                    destroyMethod = methodNode
+                }
+                @Override
+                protected boolean isAcceptable(MethodNode node) {
+                    return node.name == destroyMethodName && node.parameters.length == 0 && node.isPublic()
+                }
+            }.accept(producedClassNode)
+
             if (destroyMethod != null) {
                 def destroyMethodElement = elementFactory.newMethodElement(
                         producedClassElement,

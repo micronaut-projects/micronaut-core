@@ -105,9 +105,9 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
             );
 
             if (value instanceof BigInteger) {
-                return ((BigInteger) value).compareTo(BigInteger.valueOf(max)) < 0;
+                return ((BigInteger) value).compareTo(BigInteger.valueOf(max)) <= 0;
             } else if (value instanceof BigDecimal) {
-                return ((BigDecimal) value).compareTo(BigDecimal.valueOf(max)) < 0;
+                return ((BigDecimal) value).compareTo(BigDecimal.valueOf(max)) <= 0;
             }
             return value.longValue() <= max;
         };

@@ -30,7 +30,7 @@ import spock.lang.Unroll
 class HttpClientFilterRequestInReactorContextSpec extends Specification {
 
     @Unroll
-    void "HTTP Client filers can access original request via Reactor Context"(String path, String expected) {
+    void "HTTP Client filters can access original request via Reactor Context"(String path, String expected) {
         given:
         EmbeddedServer mockServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': 'HttpClientFilterRequestInReactorContextSpec.server'
@@ -114,15 +114,15 @@ class HttpClientFilterRequestInReactorContextSpec extends Specification {
         @Get("/foo")
         @Produces(MediaType.TEXT_PLAIN)
         @SingleResult
-        Publisher<String> foo() {
-            fooClient.hi()
+        String foo() {
+            fooClient.hello()
         }
 
         @Get("/bar")
         @Produces(MediaType.TEXT_PLAIN)
         @SingleResult
-        Publisher<String> bar() {
-            fooClient.hi()
+        String bar() {
+            fooClient.hello()
         }
     }
 
