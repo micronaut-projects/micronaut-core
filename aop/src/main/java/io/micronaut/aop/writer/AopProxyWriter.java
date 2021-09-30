@@ -533,7 +533,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                         .named(name -> name.equals(methodElement.getName()))
                         .filter(el -> el.overrides(methodElement)));
 
-        if (!overridden.isPresent()) {
+        if (overridden.isPresent()) {
             MethodElement overriddenBy = overridden.get();
 
             String methodElementKey = methodElement.getName() +
