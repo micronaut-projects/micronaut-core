@@ -36,7 +36,6 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
@@ -711,17 +710,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
         @Override
         public Environment start() {
-            if (bootstrapEnvironment == null && bootstrapEnabled) {
-
-                String bootstrapContextProp = System.getProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY);
-                boolean forceBootstrap = bootstrapContextProp != null && Boolean.parseBoolean(bootstrapContextProp) == Boolean.TRUE;
-
-                BootstrapEnvironment bootstrapEnv = createBootstrapEnvironment(getActiveNames().toArray(new String[0]));
-                if (forceBootstrap || CollectionUtils.isNotEmpty(bootstrapEnv.readPropertySourceList(bootstrapEnv.getPropertySourceRootName()))) {
-                    bootstrapEnvironment = startBootstrapEnvironment(bootstrapEnv);
-                } else {
-                    LOG.info("The bootstrap environment is enabled but no local property sources were found. Consider disabling the bootstrap environment to gain startup time.");
-                }
+            if (bootstrapEnvironment == null && isRuntimeConfigured()) {
+                bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(new String[0]));
+                startBootstrapEnvironment();
             }
             return super.start();
         }
@@ -774,7 +765,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                     environmentNames);
         }
 
-        private BootstrapEnvironment startBootstrapEnvironment(BootstrapEnvironment bootstrapEnvironment) {
+        private void startBootstrapEnvironment() {
             for (PropertySource source : propertySources.values()) {
                 bootstrapEnvironment.addPropertySource(source);
             }
@@ -782,8 +773,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             for (String pkg : bootstrapEnvironment.getPackages()) {
                 addPackage(pkg);
             }
-
-            return bootstrapEnvironment;
         }
     }
 }

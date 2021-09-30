@@ -227,6 +227,7 @@ public class DefaultBeanContext implements BeanContext {
     private BeanDefinitionValidator beanValidator;
     private List<BeanDefinitionReference> beanDefinitionReferences;
     private List<BeanConfiguration> beanConfigurationsList;
+
     /**
      * Construct a new bean context using the same classloader that loaded this DefaultBeanContext class.
      */
