@@ -540,7 +540,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
             String methodElementKey = methodElement.getName() +
                     Arrays.stream(methodElement.getSuspendParameters())
-                            .map(p -> p.getGenericType().getName())
+                            .map(p -> p.getType().getName())
                             .collect(Collectors.joining(","));
 
             String overriddenByKey = overriddenBy.getName() +
