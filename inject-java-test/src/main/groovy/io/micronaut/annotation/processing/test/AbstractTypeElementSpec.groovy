@@ -21,11 +21,7 @@ import io.micronaut.annotation.processing.*
 import io.micronaut.annotation.processing.visitor.JavaElementFactory
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext
 import io.micronaut.aop.internal.InterceptorRegistryBean
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.ApplicationContextBuilder
-import io.micronaut.context.ApplicationContextConfiguration
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.Qualifier
+import io.micronaut.context.*
 import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.NonNull
@@ -56,7 +52,6 @@ import javax.lang.model.element.TypeElement
 import javax.lang.model.element.VariableElement
 import javax.tools.JavaFileObject
 import java.lang.annotation.Annotation
-import java.util.function.Predicate
 import java.util.stream.Collectors
 import java.util.stream.StreamSupport
 /**
@@ -228,7 +223,7 @@ class Test {
         configureContext(builder)
         return new DefaultApplicationContext((ApplicationContextConfiguration) builder) {
             @Override
-            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences(Predicate<BeanDefinitionReference> predicate) {
+            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
                 def references = StreamSupport.stream(files.spliterator(), false)
                         .filter({ JavaFileObject jfo ->
                             jfo.kind == JavaFileObject.Kind.CLASS && jfo.name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX + ".class")
@@ -238,10 +233,9 @@ class Test {
                             name = name.replace('/', '.') - '.class'
                             return (BeanDefinitionReference) classLoader.loadClass(name).newInstance()
                         })
-                        .filter({ bdr -> predicate == null || predicate.test(bdr) })
                         .collect(Collectors.toList())
 
-                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences(predicate) : getBuiltInBeanReferences())
+                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences() : getBuiltInBeanReferences())
             }
         }.start()
     }
