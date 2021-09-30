@@ -147,20 +147,12 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     private boolean isBootstrapPropertySourceLocatorPresent() {
-        List<BeanDefinitionReference> references = resolveBeanDefinitionReferences();
-        long start = System.nanoTime();
-        try {
-            for (BeanDefinitionReference beanDefinitionReference : references) {
-                if (BootstrapPropertySourceLocator.class.isAssignableFrom(beanDefinitionReference.getBeanType())) {
-                    return true;
-                }
+        for (BeanDefinitionReference beanDefinitionReference : resolveBeanDefinitionReferences()) {
+            if (BootstrapPropertySourceLocator.class.isAssignableFrom(beanDefinitionReference.getBeanType())) {
+                return true;
             }
-            return false;
         }
-        finally {
-            long end = System.nanoTime();
-            System.out.println("finding the locator took " + (end - start) + " nanos");
-        }
+        return false;
     }
 
     /**
