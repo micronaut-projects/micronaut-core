@@ -64,6 +64,20 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     }
 
     @Override
+    public ClassElement[] getThrownTypes() {
+        final ClassNode[] exceptions = methodNode.getExceptions();
+        if (ArrayUtils.isNotEmpty(exceptions)) {
+            return Arrays.stream(exceptions)
+                    .map(cn -> getGenericElement(cn, visitorContext.getElementFactory().newClassElement(
+                            cn,
+                            AnnotationMetadata.EMPTY_METADATA,
+                            Collections.emptyMap()
+                    ))).toArray(ClassElement[]::new);
+        }
+        return ClassElement.ZERO_CLASS_ELEMENTS;
+    }
+
+    @Override
     public Set<ElementModifier> getModifiers() {
         return resolveModifiers(this.methodNode);
     }
