@@ -15,10 +15,13 @@
  */
 package io.micronaut.jackson.databind.convert
 
-
+import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.databind.node.NullNode
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.ConversionService
+import io.micronaut.core.type.Argument
+import io.micronaut.json.tree.JsonNode
 import spock.lang.Specification
 
 class JsonNodeToObjectConverterSpec extends Specification {
@@ -41,5 +44,37 @@ class JsonNodeToObjectConverterSpec extends Specification {
 
     class Pojo {
 
+    }
+
+    void "deserialize optional arguments properly"() {
+        given:
+        def ctx = ApplicationContext.run()
+        def converter = ctx.getBean(ConversionService)
+
+        when:
+        Optional<Optional<WrappedValue>> optional = converter.convert(JsonNode.createStringNode("foo"), Optional.class, new ArgumentConversionContext() {
+            @Override
+            Argument getArgument() {
+                return Argument.of(Optional.class, WrappedValue.class)
+            }
+        })
+
+        then:
+        noExceptionThrown()
+        optional.isPresent()
+        optional.get().isPresent()
+        optional.get().get().value == 'foo'
+
+        cleanup:
+        ctx.close()
+    }
+
+    static class WrappedValue {
+        String value
+
+        @JsonCreator
+        WrappedValue(String value) {
+            this.value = value
+        }
     }
 }
