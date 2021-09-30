@@ -135,25 +135,32 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     private boolean isBootstrapEnabled(ApplicationContextConfiguration configuration) {
-        Boolean configBootstrapEnabled = configuration.isBootstrapEnvironmentEnabled();
         String bootstrapContextProp = System.getProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY);
-        Boolean systemBootstrapEnabled = bootstrapContextProp == null ? null : Boolean.parseBoolean(bootstrapContextProp);
-        if (systemBootstrapEnabled != null) {
-            return systemBootstrapEnabled;
+        if (bootstrapContextProp != null) {
+            return Boolean.parseBoolean(bootstrapContextProp);
         }
-        if (configBootstrapEnabled == Boolean.FALSE) {
-            return false;
+        Boolean configBootstrapEnabled = configuration.isBootstrapEnvironmentEnabled();
+        if (configBootstrapEnabled != null) {
+            return configBootstrapEnabled;
         }
-        return isCustomBootstrapPropertySourceLocatorPresent();
+        return isBootstrapPropertySourceLocatorPresent();
     }
 
-    private boolean isCustomBootstrapPropertySourceLocatorPresent() {
-        for (BeanDefinitionReference beanDefinitionReference : resolveBeanDefinitionReferences()) {
-            if (BootstrapPropertySourceLocator.class.isAssignableFrom(beanDefinitionReference.getBeanType())) {
-                return true;
+    private boolean isBootstrapPropertySourceLocatorPresent() {
+        List<BeanDefinitionReference> references = resolveBeanDefinitionReferences();
+        long start = System.nanoTime();
+        try {
+            for (BeanDefinitionReference beanDefinitionReference : references) {
+                if (BootstrapPropertySourceLocator.class.isAssignableFrom(beanDefinitionReference.getBeanType())) {
+                    return true;
+                }
             }
+            return false;
         }
-        return false;
+        finally {
+            long end = System.nanoTime();
+            System.out.println("finding the locator took " + (end - start) + " nanos");
+        }
     }
 
     /**
