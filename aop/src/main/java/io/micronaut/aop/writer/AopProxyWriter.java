@@ -530,14 +530,28 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
         final List<MethodElement> overridden = methodElement.getOwningType()
                 .getEnclosedElements(ElementQuery.ALL_METHODS
-                        .filter(el -> el.overrides(methodElement)));
+                        .filter(el -> el.getName().equals(methodElement.getName()) && el.overrides(methodElement)));
 
         if (!overridden.isEmpty()) {
             if (overridden.size() != 1) {
                 throw new IllegalStateException("Expected exactly one overridden method!");
             }
-            buildMethodDelegate(methodElement, overridden.iterator().next());
-            return;
+            MethodElement overriddenBy = overridden.iterator().next();
+
+            String methodElementKey = methodElement.getName() +
+                    Arrays.stream(methodElement.getSuspendParameters())
+                            .map(p -> p.getGenericType().getName())
+                            .collect(Collectors.joining(","));
+
+            String overriddenByKey = overriddenBy.getName() +
+                    Arrays.stream(methodElement.getSuspendParameters())
+                            .map(p -> p.getGenericType().getName())
+                            .collect(Collectors.joining(","));
+
+            if (!methodElementKey.equals(overriddenByKey)) {
+                buildMethodDelegate(methodElement, overriddenBy);
+                return;
+            }
         }
 
         String methodName = methodElement.getName();
