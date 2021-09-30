@@ -96,7 +96,7 @@ managed-micronaut-jms = "2.0.0-M1"
 managed-micronaut-jmx = "3.0.0"
 managed-micronaut-kafka = "4.0.0"
 managed-micronaut-kotlin = "3.0.0"
-managed-micronaut-kubernetes = "3.0.0"
+managed-micronaut-kubernetes = "3.1.0"
 managed-micronaut-liquibase = "4.0.2"
 managed-micronaut-micrometer = "4.0.0"
 managed-micronaut-mongo = "4.0.0"
@@ -326,6 +326,8 @@ managed-micronaut-kubernetes-discovery-client = { module = "io.micronaut.kuberne
 managed-micronaut-kubernetes-client = { module = "io.micronaut.kubernetes:micronaut-kubernetes-client", version.ref = "managed-micronaut-kubernetes" }
 managed-micronaut-kubernetes-client-processor = { module = "io.micronaut.kubernetes:micronaut-kubernetes-client-processor", version.ref = "managed-micronaut-kubernetes" }
 managed-micronaut-kubernetes-client-rxjava2 = { module = "io.micronaut.kubernetes:micronaut-kubernetes-client-rxjava2", version.ref = "managed-micronaut-kubernetes" }
+managed-micronaut-kubernetes-client-reactor = { module = "io.micronaut.kubernetes:micronaut-kubernetes-client-reactor", version.ref = "managed-micronaut-kubernetes" }
+managed-micronaut-kubernetes-informer = { module = "io.micronaut.kubernetes:micronaut-kubernetes-informer", version.ref = "managed-micronaut-kubernetes" }
 managed-micronaut-liquibase = { module = "io.micronaut.liquibase:micronaut-liquibase", version.ref = "managed-micronaut-liquibase" }
 managed-micronaut-micrometer = { module = "io.micronaut.micrometer:micronaut-micrometer-core", version.ref = "managed-micronaut-micrometer" }
 managed-micronaut-micrometer-registry-appoptics = { module = "io.micronaut.micrometer:micronaut-micrometer-registry-appoptics", version.ref = "managed-micronaut-micrometer" }
