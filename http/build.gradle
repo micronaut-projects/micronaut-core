@@ -11,6 +11,8 @@ dependencies {
     compileOnly libs.kotlinx.coroutines.core
     compileOnly libs.kotlinx.coroutines.reactor
 
+    compileOnly libs.managed.jackson.annotations
+
     testCompileOnly project(":inject-groovy")
     testAnnotationProcessor project(":inject-java")
     testImplementation project(":inject")

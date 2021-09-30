@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.hateoas;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
@@ -74,6 +75,7 @@ public class JsonError extends AbstractResource<JsonError> {
     /**
      * @return The logref
      */
+    @JsonProperty("logref")
     public Optional<String> getLogref() {
         return logref == null ? Optional.empty() : Optional.of(logref);
     }
@@ -81,6 +83,7 @@ public class JsonError extends AbstractResource<JsonError> {
     /**
      * @return The path
      */
+    @JsonProperty("path")
     public Optional<String> getPath() {
         return path == null ? Optional.empty() : Optional.of(path);
     }
@@ -91,6 +94,7 @@ public class JsonError extends AbstractResource<JsonError> {
      * @param path The path
      * @return This error object
      */
+    @JsonProperty
     public JsonError path(@Nullable String path) {
         this.path = path;
         return this;
@@ -102,6 +106,7 @@ public class JsonError extends AbstractResource<JsonError> {
      * @param logref The logref
      * @return This error object
      */
+    @JsonProperty
     public JsonError logref(@Nullable String logref) {
         this.logref = logref;
         return this;
