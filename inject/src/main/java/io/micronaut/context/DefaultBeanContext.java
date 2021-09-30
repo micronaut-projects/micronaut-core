@@ -225,7 +225,8 @@ public class DefaultBeanContext implements BeanContext {
     private final boolean eagerInitSingletons;
     private Set<Map.Entry<Class, List<BeanCreatedEventListener>>> beanCreationEventListeners;
     private BeanDefinitionValidator beanValidator;
-
+    private List<BeanDefinitionReference> beanDefinitionReferences;
+    private List<BeanConfiguration> beanConfigurationsList;
     /**
      * Construct a new bean context using the same classloader that loaded this DefaultBeanContext class.
      */
@@ -1779,7 +1780,12 @@ public class DefaultBeanContext implements BeanContext {
      */
     protected @NonNull
     List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-        return resolveBeanDefinitionReferences(null);
+        if (beanDefinitionReferences == null) {
+            final SoftServiceLoader<BeanDefinitionReference> definitions = SoftServiceLoader.load(BeanDefinitionReference.class, classLoader);
+            beanDefinitionReferences = new ArrayList<>(300);
+            definitions.collectAll(beanDefinitionReferences, BeanDefinitionReference::isPresent);
+        }
+        return beanDefinitionReferences;
     }
 
     /**
@@ -1788,12 +1794,20 @@ public class DefaultBeanContext implements BeanContext {
      * @param predicate The filter predicate, can be null
      * @return The bean definition classes
      */
+    @Deprecated
     protected @NonNull
     List<BeanDefinitionReference> resolveBeanDefinitionReferences(@Nullable Predicate<BeanDefinitionReference> predicate) {
-        final SoftServiceLoader<BeanDefinitionReference> definitions = SoftServiceLoader.load(BeanDefinitionReference.class, classLoader);
-        List<BeanDefinitionReference> list = new ArrayList<>(300);
-        definitions.collectAll(list, reference -> reference.isPresent() && (predicate == null || predicate.test(reference)));
-        return list;
+        if (predicate != null) {
+            List<BeanDefinitionReference> allRefs = resolveBeanDefinitionReferences();
+            List<BeanDefinitionReference> newRefs = new ArrayList<>(allRefs.size());
+            for (BeanDefinitionReference reference : allRefs) {
+                if (predicate.test(reference)) {
+                    newRefs.add(reference);
+                }
+            }
+            return newRefs;
+        }
+        return resolveBeanDefinitionReferences();
     }
 
     /**
@@ -1803,10 +1817,12 @@ public class DefaultBeanContext implements BeanContext {
      */
     protected @NonNull
     Iterable<BeanConfiguration> resolveBeanConfigurations() {
-        final SoftServiceLoader<BeanConfiguration> definitions = SoftServiceLoader.load(BeanConfiguration.class, classLoader);
-        List<BeanConfiguration> list = new ArrayList<>(300);
-        definitions.collectAll(list, null);
-        return list;
+        if (beanConfigurationsList == null) {
+            final SoftServiceLoader<BeanConfiguration> definitions = SoftServiceLoader.load(BeanConfiguration.class, classLoader);
+            beanConfigurationsList = new ArrayList<>(300);
+            definitions.collectAll(beanConfigurationsList, null);
+        }
+        return beanConfigurationsList;
     }
 
     /**
@@ -3391,7 +3407,7 @@ public class DefaultBeanContext implements BeanContext {
         List<BeanDefinitionReference> processedBeans = new ArrayList<>(10);
         List<BeanDefinitionReference> parallelBeans = new ArrayList<>(10);
 
-        List<BeanDefinitionReference> beanDefinitionReferences = resolveBeanDefinitionReferences(null);
+        List<BeanDefinitionReference> beanDefinitionReferences = resolveBeanDefinitionReferences();
         beanDefinitionsClasses.addAll(beanDefinitionReferences);
 
         Set<BeanConfiguration> configurationsDisabled = new HashSet<>();
@@ -3436,6 +3452,9 @@ public class DefaultBeanContext implements BeanContext {
             }
 
         }
+
+        beanDefinitionReferences = null;
+        beanConfigurationsList = null;
 
         initializeEventListeners();
         initializeContext(contextScopeBeans, processedBeans, parallelBeans);
