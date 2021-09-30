@@ -528,15 +528,13 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     public void visitAroundMethod(TypedElement beanType,
                                   MethodElement methodElement) {
 
-        final List<MethodElement> overridden = methodElement.getOwningType()
-                .getEnclosedElements(ElementQuery.ALL_METHODS
-                        .filter(el -> el.getName().equals(methodElement.getName()) && el.overrides(methodElement)));
+        final Optional<MethodElement> overridden = methodElement.getOwningType()
+                .getEnclosedElement(ElementQuery.ALL_METHODS
+                        .named(name -> name.equals(methodElement.getName()))
+                        .filter(el -> el.overrides(methodElement)));
 
-        if (!overridden.isEmpty()) {
-            if (overridden.size() != 1) {
-                throw new IllegalStateException("Expected exactly one overridden method!");
-            }
-            MethodElement overriddenBy = overridden.iterator().next();
+        if (!overridden.isPresent()) {
+            MethodElement overriddenBy = overridden.get();
 
             String methodElementKey = methodElement.getName() +
                     Arrays.stream(methodElement.getSuspendParameters())

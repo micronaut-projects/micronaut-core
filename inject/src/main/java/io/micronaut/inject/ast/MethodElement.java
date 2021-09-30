@@ -126,7 +126,7 @@ public interface MethodElement extends MemberElement {
      * @return true if this overrides passed method element
      * @since 3.1
      */
-    default boolean overrides(MethodElement overridden) {
+    default boolean overrides(@NonNull MethodElement overridden) {
         return false;
     }
 
