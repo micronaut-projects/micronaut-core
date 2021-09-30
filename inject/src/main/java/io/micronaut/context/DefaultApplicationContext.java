@@ -64,7 +64,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     private final ConversionService conversionService;
     private final ClassPathResourceLoader resourceLoader;
-    private final Environment environment;
+    private final ApplicationContextConfiguration configuration;
+    private Environment environment;
 
     /**
      * Construct a new ApplicationContext for the given environment name.
@@ -113,9 +114,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     public DefaultApplicationContext(@NonNull ApplicationContextConfiguration configuration) {
         super(configuration);
         ArgumentUtils.requireNonNull("configuration", configuration);
+        this.configuration = configuration;
         this.conversionService = createConversionService();
         this.resourceLoader = configuration.getResourceLoader();
-        this.environment = createEnvironment(configuration);
     }
 
     @Override
@@ -174,6 +175,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     @Override
     public @NonNull Environment getEnvironment() {
+        if (environment == null) {
+            environment = createEnvironment(configuration);
+        }
         return environment;
     }
 
