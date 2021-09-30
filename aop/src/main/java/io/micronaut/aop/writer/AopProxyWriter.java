@@ -47,6 +47,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -527,6 +528,17 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     public void visitAroundMethod(TypedElement beanType,
                                   MethodElement methodElement) {
 
+        final List<MethodElement> overridden = methodElement.getOwningType()
+                .getEnclosedElements(ElementQuery.ALL_METHODS
+                        .filter(el -> el.overrides(methodElement)));
+
+        if (!overridden.isEmpty()) {
+            if (overridden.size() != 1) {
+                throw new IllegalStateException("Expected exactly one overridden method!");
+            }
+            buildMethodDelegate(methodElement, overridden.iterator().next());
+            return;
+        }
 
         String methodName = methodElement.getName();
         ClassElement returnType = methodElement.isSuspend() ? ClassElement.of(Object.class) : methodElement.getReturnType();
@@ -671,6 +683,33 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             pushReturnValue(overriddenMethodGenerator, returnType);
         }
         overriddenMethodGenerator.visitMaxs(DEFAULT_MAX_STACK, chainVar);
+        overriddenMethodGenerator.visitEnd();
+    }
+
+    private void buildMethodDelegate(MethodElement methodElement, MethodElement overriddenBy) {
+        String desc = getMethodDescriptor(methodElement.getReturnType().getType(), Arrays.asList(methodElement.getSuspendParameters()));
+        MethodVisitor overridden = classWriter.visitMethod(ACC_PUBLIC, methodElement.getName(), desc, null, null);
+        GeneratorAdapter overriddenMethodGenerator = new GeneratorAdapter(overridden, ACC_PUBLIC, methodElement.getName(), desc);
+        overriddenMethodGenerator.loadThis();
+        int i = 0;
+        for (ParameterElement param : methodElement.getSuspendParameters()) {
+            overriddenMethodGenerator.loadArg(i++);
+            pushCastToType(overriddenMethodGenerator, param.getGenericType());
+        }
+        overriddenMethodGenerator.visitMethodInsn(INVOKESPECIAL,
+                proxyType.getInternalName(),
+                overriddenBy.getName(),
+                getMethodDescriptor(overriddenBy.getReturnType().getType(), Arrays.asList(overriddenBy.getSuspendParameters())),
+                this.isInterface && overriddenBy.isDefault());
+
+        ClassElement returnType = overriddenBy.getReturnType();
+        if (returnType.isTypeVariable()) {
+            returnVoid(overriddenMethodGenerator);
+        } else {
+            pushCastToType(overriddenMethodGenerator, returnType);
+            pushReturnValue(overriddenMethodGenerator, returnType);
+        }
+        overriddenMethodGenerator.visitMaxs(DEFAULT_MAX_STACK, 1);
         overriddenMethodGenerator.visitEnd();
     }
 
