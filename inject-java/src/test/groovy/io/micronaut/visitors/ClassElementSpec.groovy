@@ -20,6 +20,7 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.BeanContextException
 import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ConstructorElement
 import io.micronaut.inject.ast.ElementModifier
@@ -43,15 +44,26 @@ class ClassElementSpec extends AbstractTypeElementSpec {
         def element = buildClassElement("""
 package receivertypetest;
 
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
 class Test {
     Test() {}
     
-    void instance(Test this) {}
+    void instance(@SomeAnn Test this) {}
     static void staticMethod() {}
     
     class Inner {
-        Inner(Test Test.this) {}
+        Inner(@SomeAnn Test Test.this) {}
     }
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE_USE)
+@interface SomeAnn {
+    
 }
 """)
 
@@ -66,8 +78,10 @@ class Test {
 
         expect:
         innerConstructor.receiverType.isPresent()
+        innerConstructor.receiverType.get().hasAnnotation('receivertypetest.SomeAnn')
         !constructorElement.receiverType.isPresent()
         instanceMethod.receiverType.isPresent()
+        instanceMethod.receiverType.get().hasAnnotation('receivertypetest.SomeAnn')
         !staticMethod.receiverType.isPresent()
     }
 
