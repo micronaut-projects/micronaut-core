@@ -138,11 +138,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         Boolean configBootstrapEnabled = configuration.isBootstrapEnvironmentEnabled();
         String bootstrapContextProp = System.getProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY);
         Boolean systemBootstrapEnabled = bootstrapContextProp == null ? null : Boolean.parseBoolean(bootstrapContextProp);
-        if (systemBootstrapEnabled == Boolean.FALSE) {
-            return false;
-        }
-        if (systemBootstrapEnabled == Boolean.TRUE) {
-            return true;
+        if (systemBootstrapEnabled != null) {
+            return systemBootstrapEnabled;
         }
         if (configBootstrapEnabled == Boolean.FALSE) {
             return false;
