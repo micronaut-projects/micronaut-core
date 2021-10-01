@@ -21,6 +21,8 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -37,6 +39,13 @@ public interface MethodElement extends MemberElement {
      */
     @NonNull
     ClassElement getReturnType();
+
+    /**
+     * @return The type arguments declared on this method.
+     */
+    default List<? extends GenericPlaceholderElement> getDeclaredTypeVariables() {
+        return Collections.emptyList();
+    }
 
     /**
      * <p>Returns the receiver type of this executable, or empty if the method has no receiver type.</p>

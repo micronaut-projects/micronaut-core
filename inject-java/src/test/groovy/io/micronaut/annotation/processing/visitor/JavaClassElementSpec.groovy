@@ -26,7 +26,7 @@ import javax.lang.model.element.TypeElement
 class JavaClassElementSpec extends AbstractClassElementSpec {
     @Override
     protected List<ClassElement> getClassElements() {
-        return [new JavaClassElement(Mock(TypeElement), null, null, [:]),
+        return [new JavaClassElement(Mock(TypeElement), null, null, [], [:]),
                 new JavaEnumElement(Mock(TypeElement), null, null)]
     }
 
