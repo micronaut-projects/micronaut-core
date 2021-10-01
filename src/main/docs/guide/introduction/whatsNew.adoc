@@ -1,5 +1,11 @@
 Micronaut {version} includes the following changes:
 
+=== 3.1.0
+
+==== Kubernetes Informer integration
+
+Micronaut Kubernetes 3.1 introduces new annotation https://micronaut-projects.github.io/micronaut-kubernetes/latest/api/io/micronaut/kubernetes/client/informer/Informer.html[@Informer]. By using the annotation on the https://javadoc.io/doc/io.kubernetes/client-java/latest/io/kubernetes/client/informer/ResourceEventHandler.html[ResourceEventHandler] the Micronaut will instantiate the https://javadoc.io/doc/io.kubernetes/client-java/latest/io/kubernetes/client/informer/SharedIndexInformer.html[SharedInformer] from the official https://github.com/kubernetes-client/java[Kubernetes Java SDK]. Then you only need to take care of handling the changes of the watched Kubernetes resource. See more on https://micronaut-projects.github.io/micronaut-kubernetes/latest/guide/#kubernetes-informer[Kubernetes Informer].
+
 === Core Features
 
 ==== Optimized Build-Time Metadata
