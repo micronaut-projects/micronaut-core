@@ -34,8 +34,8 @@ class MyRepoIntroductionSpec extends Specification {
             def interceptorDeclaredMethods = Arrays.stream(bean.getClass().getMethods()).filter(m -> m.getDeclaringClass() == bean.getClass()).collect(Collectors.toList())
             def repoDeclaredMethods = Arrays.stream(MyRepo.class.getMethods()).filter(m -> m.getDeclaringClass() == MyRepo.class).collect(Collectors.toList())
         then:
-            repoDeclaredMethods.size() == 4
-            interceptorDeclaredMethods.size() == 4
+            repoDeclaredMethods.size() == 3
+            interceptorDeclaredMethods.size() == 3
             bean.getClass().getName().contains("Intercepted")
             MyRepoIntroducer.EXECUTED_METHODS.isEmpty()
         when:
@@ -57,16 +57,17 @@ class MyRepoIntroductionSpec extends Specification {
             def findByIdMethods = beanDef.getExecutableMethods().findAll(m -> m.getName() == "findById")
         then:
             MyRepoIntroducer.EXECUTED_METHODS.size() == 0
-            findByIdMethods.size() == 1
+            findByIdMethods.size() == 2
             findByIdMethods[0].hasAnnotation(Marker)
         when:
-            bean.findById(111)
+            Object id = 111
+            bean.findById(id)
         then:
             MyRepoIntroducer.EXECUTED_METHODS.size() == 1
             MyRepoIntroducer.EXECUTED_METHODS.clear()
         when:
             CrudRepo<Object, Object> crudRepo = bean
-            crudRepo.findById(111)
+            crudRepo.findById(id)
         then:
             MyRepoIntroducer.EXECUTED_METHODS.size() == 1
             MyRepoIntroducer.EXECUTED_METHODS.clear()
@@ -79,16 +80,17 @@ class MyRepoIntroductionSpec extends Specification {
             def findByIdMethods = beanDef.getExecutableMethods().findAll(m -> m.getName() == "findById")
         then:
             MyRepoIntroducer.EXECUTED_METHODS.size() == 0
-            findByIdMethods.size() == 1
+            findByIdMethods.size() == 2
             findByIdMethods[0].hasAnnotation(Marker)
         when:
-            bean.findById(111)
+            Object id = 111
+            bean.findById(id)
         then:
             MyRepoIntroducer.EXECUTED_METHODS.size() == 1
             MyRepoIntroducer.EXECUTED_METHODS.clear()
         when:
             CrudRepo<Object, Object> crudRepo = bean
-            crudRepo.findById(111)
+            crudRepo.findById(id)
         then:
             MyRepoIntroducer.EXECUTED_METHODS.size() == 1
             MyRepoIntroducer.EXECUTED_METHODS.clear()
@@ -101,16 +103,17 @@ class MyRepoIntroductionSpec extends Specification {
             def findByIdMethods = beanDef.getExecutableMethods().findAll(m -> m.getName() == "findById")
         then:
             MyRepoIntroducer.EXECUTED_METHODS.size() == 0
-            findByIdMethods.size() == 1
+            findByIdMethods.size() == 2
             findByIdMethods[0].hasAnnotation(Marker)
         when:
-            bean.findById(111)
+            def id = 111
+            bean.findById(id)
         then:
             MyRepoIntroducer.EXECUTED_METHODS.size() == 1
             MyRepoIntroducer.EXECUTED_METHODS.clear()
         when:
             AbstractCrudRepo<Object, Object> crudRepo = bean
-            crudRepo.findById(111)
+            crudRepo.findById(id)
         then:
             MyRepoIntroducer.EXECUTED_METHODS.size() == 1
             MyRepoIntroducer.EXECUTED_METHODS.clear()

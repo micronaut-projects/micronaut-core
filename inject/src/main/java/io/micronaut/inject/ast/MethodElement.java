@@ -147,6 +147,16 @@ public interface MethodElement extends MemberElement {
     }
 
     /**
+     * Checks if this method element overrides another.
+     * @param overridden Possible overridden method
+     * @return true if this overrides passed method element
+     * @since 3.1
+     */
+    default boolean overrides(@NonNull MethodElement overridden) {
+        return false;
+    }
+
+    /**
      * Creates a {@link MethodElement} for the given parameters.
      * @param declaredType The declaring type
      * @param annotationMetadata The annotation metadata

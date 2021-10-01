@@ -105,6 +105,18 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
         return executableElement.isDefault();
     }
 
+    @Override
+    public boolean overrides(MethodElement methodElement) {
+        if (methodElement instanceof JavaMethodElement) {
+            return visitorContext.getElements().overrides(
+                    executableElement,
+                    ((JavaMethodElement) methodElement).executableElement,
+                    declaringClass.classElement
+            );
+        }
+        return false;
+    }
+
     @NonNull
     @Override
     public ClassElement getGenericReturnType() {
