@@ -210,7 +210,7 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
                     return Optional.of(node.toString());
                 } else {
                     Argument<?> argument = null;
-                    if (node.isContainerNode() && context instanceof ArgumentConversionContext && targetType.getTypeParameters().length != 0) {
+                    if (context instanceof ArgumentConversionContext && targetType.getTypeParameters().length != 0) {
                         argument = ((ArgumentConversionContext<?>) context).getArgument();
                     }
                     if (argument == null) {

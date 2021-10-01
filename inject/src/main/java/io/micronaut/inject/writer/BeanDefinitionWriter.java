@@ -31,6 +31,7 @@ import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.InjectScope;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Property;
@@ -1891,9 +1892,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         boolean hasArguments = methodElement.hasParameters();
         int argCount = hasArguments ? argumentTypes.size() : 0;
         Type declaringTypeRef = JavaModelUtils.getTypeReference(declaringType);
-
+        boolean hasInjectScope = false;
         for (ParameterElement value : argumentTypes) {
             DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, value.getAnnotationMetadata());
+            if (value.hasDeclaredAnnotation(InjectScope.class)) {
+                hasInjectScope = true;
+            }
         }
 
         if (!requiresReflection) {
@@ -1942,8 +1946,22 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             injectMethodVisitor.invokeVirtual(superType, INVOKE_WITH_REFLECTION_METHOD);
         }
 
+        destroyInjectScopeBeansIfNecessary(injectMethodVisitor, hasInjectScope);
+
         // increment the method index
         currentMethodIndex++;
+    }
+
+    private void destroyInjectScopeBeansIfNecessary(GeneratorAdapter injectMethodVisitor, boolean hasInjectScope) {
+        if (hasInjectScope) {
+            injectMethodVisitor.loadArg(0);
+            injectMethodVisitor.invokeInterface(
+                Type.getType(BeanResolutionContext.class),
+                org.objectweb.asm.commons.Method.getMethod(
+                    ReflectionUtils.getRequiredInternalMethod(BeanResolutionContext.class, "destroyInjectScopedBeans")
+                )
+            );
+        }
     }
 
     private void pushMethodParameterValue(GeneratorAdapter injectMethodVisitor, int i, ParameterElement entry) {
@@ -2419,6 +2437,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             buildMethodVisitor.loadLocal(factoryVar);
             pushCastToType(buildMethodVisitor, factoryClass);
             String methodDescriptor = getMethodDescriptorForReturnType(beanType, parameterList);
+            boolean hasInjectScope = false;
             if (isIntercepted) {
                 int constructorIndex = initInterceptedConstructorWriter(
                         buildMethodVisitor,
@@ -2431,13 +2450,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             } else {
 
                 if (!parameterList.isEmpty()) {
-                    pushConstructorArguments(buildMethodVisitor, parameters);
+                    hasInjectScope = pushConstructorArguments(buildMethodVisitor, parameters);
                 }
                 if (factoryMethod instanceof MethodElement) {
                     buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
                             factoryType.getInternalName(),
                             factoryMethod.getName(),
-                            methodDescriptor, false);
+                            methodDescriptor,
+                            false
+                    );
                 } else {
                     buildMethodVisitor.getField(
                             factoryType,
@@ -2455,6 +2476,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 pushCastToType(buildMethodVisitor, beanType);
                 buildMethodVisitor.storeLocal(buildInstanceLocalVarIndex);
             }
+            destroyInjectScopeBeansIfNecessary(buildMethodVisitor, hasInjectScope);
             buildMethodVisitor.loadLocal(buildInstanceLocalVarIndex);
             initLifeCycleMethodsIfNecessary();
         }
@@ -2828,15 +2850,20 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         });
     }
 
-    private void pushConstructorArguments(GeneratorAdapter buildMethodVisitor,
-                                          ParameterElement[] parameters) {
+    private boolean pushConstructorArguments(GeneratorAdapter buildMethodVisitor,
+                                             ParameterElement[] parameters) {
         int size = parameters.length;
+        boolean hasInjectScope = false;
         if (size > 0) {
             for (int i = 0; i < parameters.length; i++) {
                 ParameterElement parameter = parameters[i];
                 pushConstructorArgument(buildMethodVisitor, parameter.getName(), parameter, parameter.getAnnotationMetadata(), i);
+                if (parameter.hasDeclaredAnnotation(InjectScope.class)) {
+                    hasInjectScope = true;
+                }
             }
         }
+        return hasInjectScope;
     }
 
     private void pushConstructorArgument(GeneratorAdapter buildMethodVisitor,

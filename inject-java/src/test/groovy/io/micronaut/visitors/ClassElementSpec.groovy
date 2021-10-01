@@ -18,7 +18,9 @@ package io.micronaut.visitors
 import io.micronaut.annotation.processing.visitor.JavaClassElement
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.exceptions.BeanContextException
 import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ConstructorElement
 import io.micronaut.inject.ast.ElementModifier
@@ -29,11 +31,111 @@ import io.micronaut.inject.ast.PackageElement
 import jakarta.inject.Singleton
 import spock.lang.IgnoreIf
 import spock.lang.Issue
+import spock.lang.Unroll
 import spock.util.environment.Jvm
 
+import java.sql.SQLException
 import java.util.function.Supplier
 
 class ClassElementSpec extends AbstractTypeElementSpec {
+
+    void "test resolve receiver type on method"() {
+        given:
+        def element = buildClassElement("""
+package receivertypetest;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+class Test {
+    Test() {}
+    
+    void instance(@SomeAnn Test this) {}
+    static void staticMethod() {}
+    
+    class Inner {
+        Inner(@SomeAnn Test Test.this) {}
+    }
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE_USE)
+@interface SomeAnn {
+    
+}
+""")
+
+        ConstructorElement constructorElement =
+                element.getEnclosedElement(ElementQuery.of(ConstructorElement)).get()
+        MethodElement instanceMethod = element
+                .getEnclosedElement(ElementQuery.ALL_METHODS.named(n -> n == 'instance')).get()
+        MethodElement staticMethod = element
+                .getEnclosedElement(ElementQuery.ALL_METHODS.named(n -> n == 'staticMethod')).get()
+        ClassElement innerClass = element.getEnclosedElement(ElementQuery.ALL_INNER_CLASSES).get()
+        MethodElement innerConstructor = innerClass.getEnclosedElement(ElementQuery.of(ConstructorElement)).get()
+
+        expect:
+        innerConstructor.receiverType.isPresent()
+        innerConstructor.receiverType.get().hasAnnotation('receivertypetest.SomeAnn')
+        !constructorElement.receiverType.isPresent()
+        instanceMethod.receiverType.isPresent()
+        instanceMethod.receiverType.get().hasAnnotation('receivertypetest.SomeAnn')
+        !staticMethod.receiverType.isPresent()
+    }
+
+    @Unroll
+    void "test throws declarations on method with generics"() {
+        given:
+        def element = buildClassElement("""
+package throwstest;
+
+import io.micronaut.context.exceptions.BeanContextException;
+
+class Test extends Parent<BeanContextException> {}
+
+class Parent<T extends RuntimeException> {
+    void test() throws ${types.join(',')}{}
+}
+""")
+
+        MethodElement methodElement = element.getEnclosedElement(ElementQuery.ALL_METHODS)
+                .get()
+        expect:
+        methodElement.thrownTypes.size() == types.size()
+        methodElement.thrownTypes*.name == expected
+
+        where:
+        types                                          | expected
+        [SQLException.name]                            | [SQLException.name]
+        [SQLException.name, BeanContextException.name] | [SQLException.name, BeanContextException.name]
+        [SQLException.name, "T"]                       | [SQLException.name, BeanContextException.name]
+    }
+
+    @Unroll
+    void "test throws declarations on method"() {
+        given:
+        def element = buildClassElement("""
+package throwstest;
+
+class Test<T extends RuntimeException> {
+    void test() throws ${types.join(',')}{}
+}
+""")
+
+        MethodElement methodElement = element.getEnclosedElement(ElementQuery.ALL_METHODS)
+                .get()
+        expect:
+        methodElement.thrownTypes.size() == types.size()
+        methodElement.thrownTypes*.name == expected
+
+        where:
+        types                                          | expected
+        [SQLException.name]                            | [SQLException.name]
+        [SQLException.name, BeanContextException.name] | [SQLException.name, BeanContextException.name]
+        [SQLException.name, "T"]                       | [SQLException.name, RuntimeException.name]
+    }
 
     void "test modifiers #modifiers"() {
         given:
@@ -97,7 +199,7 @@ class PckElementTest {
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/5611')
     void 'test visit enum with custom annotation'() {
-        when:"An enum has an annotation that is visited by CustomAnnVisitor"
+        when: "An enum has an annotation that is visited by CustomAnnVisitor"
         def context = buildContext('''
 package test;
 
@@ -107,7 +209,7 @@ enum EnumTest {
 }
 ''')
 
-        then:"No compilation error occurs"
+        then: "No compilation error occurs"
         context != null
 
         cleanup:
@@ -176,22 +278,22 @@ interface AnotherInterface {
     boolean unimplementedItfeMethod();
 }
 ''')
-        when:"all methods are retrieved"
+        when: "all methods are retrieved"
         def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
 
-        then:"All methods, including non-accessible are returned but not overridden"
+        then: "All methods, including non-accessible are returned but not overridden"
         allMethods.size() == 10
 
-        when:"only abstract methods are requested"
+        when: "only abstract methods are requested"
         def abstractMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyAbstract())
 
-        then:"The result is correct"
+        then: "The result is correct"
         abstractMethods*.name as Set == ['unimplementedItfeMethod', 'unimplementedSuperMethod', 'unimplementedMethod'] as Set
 
-        when:"only concrete methods are requested"
+        when: "only concrete methods are requested"
         def concrete = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyConcrete().onlyAccessible())
 
-        then:"The result is correct"
+        then: "The result is correct"
         concrete*.name as Set == ['packagePrivateMethod', 'publicMethod', 'staticMethod', 'otherSuper', 'itfeMethod'] as Set
     }
 
@@ -250,47 +352,47 @@ interface AnotherInterface {
     boolean publicMethod();
 }
 ''')
-        when:"all methods are retrieved"
+        when: "all methods are retrieved"
         def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
 
-        then:"All methods, including non-accessible are returned but not overridden"
+        then: "All methods, including non-accessible are returned but not overridden"
         allMethods.size() == 7
-        allMethods.find { it.name == 'publicMethod'}.declaringType.simpleName == 'Test'
-        allMethods.find { it.name == 'otherSuper'}.declaringType.simpleName == 'SuperType'
+        allMethods.find { it.name == 'publicMethod' }.declaringType.simpleName == 'Test'
+        allMethods.find { it.name == 'otherSuper' }.declaringType.simpleName == 'SuperType'
 
-        when:"obtaining only the declared methods"
+        when: "obtaining only the declared methods"
         def declared = classElement.getEnclosedElements(ElementQuery.of(MethodElement).onlyDeclared())
 
-        then:"The declared are correct"
+        then: "The declared are correct"
         declared.size() == 4
         declared*.name as Set == ['privateMethod', 'packagePrivateMethod', 'publicMethod', 'staticMethod'] as Set
 
-        when:"Accessible methods are retrieved"
+        when: "Accessible methods are retrieved"
         def accessible = classElement.getEnclosedElements(ElementQuery.of(MethodElement).onlyAccessible())
 
-        then:"Only accessible methods, excluding those that require reflection"
+        then: "Only accessible methods, excluding those that require reflection"
         accessible.size() == 5
         accessible*.name as Set == ['otherSuper', 'itfeMethod', 'publicMethod', 'packagePrivateMethod', 'staticMethod'] as Set
 
-        when:"static methods are resolved"
+        when: "static methods are resolved"
         def staticMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.modifiers({
             it.contains(ElementModifier.STATIC)
         }))
 
-        then:"We only get statics"
+        then: "We only get statics"
         staticMethods.size() == 1
         staticMethods.first().name == 'staticMethod'
 
-        when:"All fields are retrieved"
+        when: "All fields are retrieved"
         def allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
 
-        then:"we get everything"
+        then: "we get everything"
         allFields.size() == 4
 
-        when:"Accessible fields are retrieved"
+        when: "Accessible fields are retrieved"
         def accessibleFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.onlyAccessible())
 
-        then:"we get everything"
+        then: "we get everything"
         accessibleFields.size() == 2
         accessibleFields*.name as Set == ['s1', 't1'] as Set
     }
@@ -319,13 +421,13 @@ class SuperType {
         when:
         def constructors = classElement.getEnclosedElements(ElementQuery.CONSTRUCTORS)
 
-        then:"only our own instance constructors"
+        then: "only our own instance constructors"
         constructors.size() == 2
 
         when:
         def allConstructors = classElement.getEnclosedElements(ElementQuery.of(ConstructorElement.class))
 
-        then:"superclass constructors, but not including static initializers"
+        then: "superclass constructors, but not including static initializers"
         allConstructors.size() == 4
     }
 

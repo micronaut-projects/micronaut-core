@@ -44,6 +44,11 @@ import static io.micronaut.inject.writer.BeanDefinitionVisitor.PROXY_SUFFIX;
  * @since 1.0
  */
 public interface ClassElement extends TypedElement {
+    /**
+     * Constant for an empty class element array.
+     * @since 3.1.0
+     */
+    ClassElement[] ZERO_CLASS_ELEMENTS = new ClassElement[0];
 
     /**
      * Tests whether one type is assignable to another.

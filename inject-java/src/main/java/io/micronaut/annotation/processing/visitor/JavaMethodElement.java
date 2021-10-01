@@ -73,6 +73,36 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     }
 
     @Override
+    public Optional<ClassElement> getReceiverType() {
+        final TypeMirror receiverType = executableElement.getReceiverType();
+        if (receiverType != null) {
+            if (receiverType.getKind() != TypeKind.NONE) {
+                final ClassElement classElement = mirrorToClassElement(receiverType,
+                                                                       visitorContext,
+                                                                       declaringClass.getGenericTypeInfo());
+                return Optional.of(classElement);
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    @NonNull
+    public ClassElement[] getThrownTypes() {
+        final List<? extends TypeMirror> thrownTypes = executableElement.getThrownTypes();
+        if (!thrownTypes.isEmpty()) {
+            return thrownTypes.stream()
+                    .map(tm -> mirrorToClassElement(
+                            tm,
+                            visitorContext,
+                            declaringClass.getGenericTypeInfo()
+                    )).toArray(ClassElement[]::new);
+        }
+
+        return ClassElement.ZERO_CLASS_ELEMENTS;
+    }
+
+    @Override
     public boolean isDefault() {
         return executableElement.isDefault();
     }

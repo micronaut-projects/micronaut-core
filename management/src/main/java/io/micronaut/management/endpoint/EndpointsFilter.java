@@ -39,7 +39,7 @@ import java.util.Optional;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Filter("/**")
+@Filter(Filter.MATCH_ALL_PATTERN)
 public class EndpointsFilter extends OncePerRequestHttpServerFilter {
 
     private final Map<ExecutableMethod, Boolean> endpointMethods;

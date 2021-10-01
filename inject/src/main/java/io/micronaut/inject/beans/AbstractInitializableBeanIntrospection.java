@@ -89,7 +89,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
             for (BeanMethodRef beanMethodRef : methodsRefs) {
                 beanMethods.add(new BeanMethodImpl<>(beanMethodRef));
             }
-            this.beanMethods = Collections.unmodifiableList(beanMethods);;
+            this.beanMethods = Collections.unmodifiableList(beanMethods);
         } else {
             this.beanMethods = Collections.emptyList();
         }
@@ -105,19 +105,6 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
     @Internal
     @UsedByGeneratedCode
     protected abstract B instantiateInternal(@Nullable Object[] arguments);
-
-    /**
-     * Obtain a property by name.
-     *
-     * @param name The name of the property
-     * @return A bean property if found
-     */
-    @Nullable
-    @Internal
-    @UsedByGeneratedCode
-    protected BeanProperty<B, Object> findProperty(@NonNull String name) {
-        return null;
-    }
 
     /**
      * Obtain a property by its index.
@@ -289,7 +276,8 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
     @Override
     public Optional<BeanProperty<B, Object>> getProperty(@NonNull String name) {
         ArgumentUtils.requireNonNull("name", name);
-        return Optional.ofNullable(findProperty(name));
+        int index = propertyIndexOf(name);
+        return index == -1 ? Optional.empty() : Optional.of(beanProperties.get(index));
     }
 
     @Override

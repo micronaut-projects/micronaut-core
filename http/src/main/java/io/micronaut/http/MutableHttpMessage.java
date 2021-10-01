@@ -117,7 +117,7 @@ public interface MutableHttpMessage<B> extends HttpMessage<B> {
      * @return This response
      */
     default MutableHttpMessage<B> contentLength(long length) {
-        getHeaders().add(HttpHeaders.CONTENT_LENGTH, String.valueOf(length));
+        getHeaders().set(HttpHeaders.CONTENT_LENGTH, String.valueOf(length));
         return this;
     }
 
@@ -131,7 +131,7 @@ public interface MutableHttpMessage<B> extends HttpMessage<B> {
         if (contentType == null) {
             getHeaders().remove(HttpHeaders.CONTENT_TYPE);
         } else {
-            getHeaders().add(HttpHeaders.CONTENT_TYPE, contentType);
+            getHeaders().set(HttpHeaders.CONTENT_TYPE, contentType);
         }
         return this;
     }
@@ -146,7 +146,7 @@ public interface MutableHttpMessage<B> extends HttpMessage<B> {
         if (mediaType == null) {
             getHeaders().remove(HttpHeaders.CONTENT_TYPE);
         } else {
-            getHeaders().add(HttpHeaders.CONTENT_TYPE, mediaType);
+            getHeaders().set(HttpHeaders.CONTENT_TYPE, mediaType);
         }
         return this;
     }
@@ -161,7 +161,7 @@ public interface MutableHttpMessage<B> extends HttpMessage<B> {
         if (encoding == null) {
             getHeaders().remove(HttpHeaders.CONTENT_ENCODING);
         } else {
-            getHeaders().add(HttpHeaders.CONTENT_ENCODING, encoding);
+            getHeaders().set(HttpHeaders.CONTENT_ENCODING, encoding);
         }
         return this;
     }

@@ -23,6 +23,7 @@ import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -44,6 +45,31 @@ public interface MethodElement extends MemberElement {
      */
     default List<? extends GenericPlaceholderElement> getDeclaredTypeVariables() {
         return Collections.emptyList();
+    }
+
+    /**
+     * <p>Returns the receiver type of this executable, or empty if the method has no receiver type.</p>
+     *
+     * <p>A MethodElement which is an instance method, or a constructor of an inner class, has a receiver type derived from the declaring type.</p>
+     *
+     * <p>A MethodElement which is a static method, or a constructor of a non-inner class, or an initializer (static or instance), has no receiver type.</p>
+     *
+     * @return The receiver type for the method if one exists.
+     * @since 3.1.0
+     */
+    default Optional<ClassElement> getReceiverType() {
+        return Optional.empty();
+    }
+
+    /**
+     * Returns the types declared in the {@code throws} declaration of a method.
+     *
+     * @return The {@code throws} types, if any. Never {@code null}.
+     * @since 3.1.0
+     */
+    @NonNull
+    default ClassElement[] getThrownTypes() {
+        return ClassElement.ZERO_CLASS_ELEMENTS;
     }
 
     /**

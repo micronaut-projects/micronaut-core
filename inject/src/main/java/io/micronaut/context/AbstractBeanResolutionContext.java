@@ -15,7 +15,9 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.annotation.InjectScope;
 import io.micronaut.context.exceptions.CircularDependencyException;
+import io.micronaut.context.scope.CustomScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -73,6 +75,16 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             dependentBeans = new ArrayList<>(3);
         }
         dependentBeans.add(new BeanRegistration<>(identifier, definition, bean));
+    }
+
+    @Override
+    public void destroyInjectScopedBeans() {
+        final CustomScope<?> injectScope = ((DefaultBeanContext) context).getCustomScopeRegistry()
+                .findScope(InjectScope.class.getName())
+                .orElse(null);
+        if (injectScope instanceof LifeCycle<?>) {
+            ((LifeCycle<?>) injectScope).stop();
+        }
     }
 
     @NonNull

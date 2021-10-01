@@ -17,10 +17,13 @@ package io.micronaut.bootstrap
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySource
 import io.micronaut.core.io.ResourceLoader
 import io.micronaut.core.io.scan.ClassPathResourceLoader
+import io.micronaut.core.util.StringUtils
 import spock.lang.Specification
+import spock.util.environment.RestoreSystemProperties
 
 import java.util.stream.Stream
 
@@ -30,8 +33,11 @@ import java.util.stream.Stream
  */
 class CustomPropertySourceLocatorSpec extends Specification {
 
+    @RestoreSystemProperties
     void "test that a PropertySource from a PropertySourceLocator overrides application config"() {
         given:
+        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
+
         def cl = getClass().getClassLoader()
         ResourceLoader resourceLoader = new ClassPathResourceLoader() {
             @Override

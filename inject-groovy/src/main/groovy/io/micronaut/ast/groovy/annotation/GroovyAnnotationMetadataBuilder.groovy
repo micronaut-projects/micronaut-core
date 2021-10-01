@@ -42,16 +42,17 @@ import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.PackageNode
 import org.codehaus.groovy.ast.Parameter
 import org.codehaus.groovy.ast.PropertyNode
+import org.codehaus.groovy.ast.Variable
 import org.codehaus.groovy.ast.expr.AnnotationConstantExpression
 import org.codehaus.groovy.ast.expr.ClassExpression
 import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.expr.ListExpression
 import org.codehaus.groovy.ast.expr.PropertyExpression
+import org.codehaus.groovy.ast.expr.VariableExpression
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.ast.stmt.Statement
-import org.codehaus.groovy.ast.tools.ParameterUtils
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.SourceUnit
 
@@ -530,6 +531,12 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             }
             // for some reason this is necessary to produce correct array type in Groovy
             return ConversionService.SHARED.convert(converted, Array.newInstance(arrayType, 0).getClass()).orElse(null)
+        } else if (annotationValue instanceof VariableExpression) {
+            VariableExpression ve = (VariableExpression) annotationValue
+            Variable variable = ve.accessedVariable
+            if (variable != null && variable.hasInitialExpression()) {
+                return readAnnotationValue(originatingElement, member, memberName, variable.getInitialExpression())
+            }
         } else if (annotationValue != null) {
             if (ClassUtils.isJavaLangType(annotationValue.getClass())) {
                 return annotationValue
