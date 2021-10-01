@@ -31,6 +31,8 @@ import io.netty.channel.ChannelOption;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import jakarta.inject.Inject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -47,6 +49,8 @@ import java.util.Optional;
 @ConfigurationProperties("netty")
 @Replaces(HttpServerConfiguration.class)
 public class NettyHttpServerConfiguration extends HttpServerConfiguration {
+
+    private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServerConfiguration.class);
 
     /**
      * The default use netty's native transport flag.
@@ -755,9 +759,11 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
                                             @Nullable @Property(name = "netty.responses.file.cache-control.public") Boolean isPublic) {
             if (cacheSeconds != null) {
                 this.cacheSeconds = cacheSeconds;
+                LOG.warn("The configuration `netty.responses.file.cache-seconds` is deprecated and will be removed in a future release. Use `micronaut.server.netty.responses.file.cache-seconds` instead.");
             }
             if (isPublic != null) {
                 this.cacheControl.setPublic(isPublic);
+                LOG.warn("The configuration `netty.responses.file.cache-control.public` is deprecated and will be removed in a future release. Use `micronaut.server.netty.responses.file.cache-control.public` instead.");
             }
         }
 

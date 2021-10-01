@@ -1,10 +1,46 @@
-Micronaut {version} includes the following changes:
+//Micronaut {version} includes the following changes:
+== 3.1.0
 
-=== 3.1.0
+=== Core Features
 
-==== Kubernetes Informer integration
+==== Filter By Regex
+
+HTTP filters now support matching URLs by a regular expression. Set the `patternStyle` member of the annotation to `REGEX` and the value will be treated as a regular expression.
+
+==== Random Port Binding
+
+The way the server binds to random ports has improved and should result in fewer address in use exceptions in tests.
+
+==== Client Data Formatting
+
+The ann:core.convert.Format[] annotation now supports several new values that can be used in conjunction with the declarative HTTP client to support formatting data in several new ways. See the <<clientParameters, client parameters>> documentation for more information.
+
+==== StreamingFileUpload
+
+The api:http.multipart.StreamingFileUpload[] API has been improved to support streaming directly to an output stream. As with the other `transferTo` methods, the write to the stream is offloaded to the IO pool automatically.
+
+==== Server SSL Configuration
+
+The SSL configuration for the Netty server now responds to refresh events. This allows for swapping out certificates without having to restart the server. See the <<https, https documentation>> for information on how to trigger the refresh.
+
+==== Configuration Deprecation
+
+The `netty.responses.file.\*` configuration is deprecated in favor of `micronaut.server.netty.responses.file.*`. The old configuration key will be removed in the next major version of the framework.
+
+=== Module Upgrades
+
+==== Micronaut Data 3.1.0
+
+- Kotlin's coroutines support. New repository interface `CoroutineCrudRepository`.
+- Support for `AttributeConverter`
+- R2DBC upgraded to `Arabba-SR11`
+- JPA Criteria specifications
+
+==== Micronaut Kubernetes 3.1.0
 
 Micronaut Kubernetes 3.1 introduces new annotation https://micronaut-projects.github.io/micronaut-kubernetes/latest/api/io/micronaut/kubernetes/client/informer/Informer.html[@Informer]. By using the annotation on the https://javadoc.io/doc/io.kubernetes/client-java/latest/io/kubernetes/client/informer/ResourceEventHandler.html[ResourceEventHandler] the Micronaut will instantiate the https://javadoc.io/doc/io.kubernetes/client-java/latest/io/kubernetes/client/informer/SharedIndexInformer.html[SharedInformer] from the official https://github.com/kubernetes-client/java[Kubernetes Java SDK]. Then you only need to take care of handling the changes of the watched Kubernetes resource. See more on https://micronaut-projects.github.io/micronaut-kubernetes/latest/guide/#kubernetes-informer[Kubernetes Informer].
+
+== 3.0.0
 
 === Core Features
 
