@@ -157,4 +157,16 @@ class UriBuilderSpec extends Specification {
         expect:
         uri == 'myurl?%24top=10&%24filter=xyz'
     }
+
+    void "test uri build parse query param"() {
+        given:
+        String uri = "https://google.com/search?q1=v1#foo"
+        UriBuilder builder = UriBuilder.of(uri)
+
+        when:
+        builder.queryParam("q2", "v2")
+
+        then:
+        builder.build().toString() == "https://google.com/search?q1=v1&q2=v2#foo"
+    }
 }

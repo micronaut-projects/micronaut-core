@@ -51,8 +51,8 @@ public class UriTemplate implements Comparable<UriTemplate> {
     private static final String STRING_PATTERN_HOST_IPV6 = "\\[[\\p{XDigit}\\:\\.]*[%\\p{Alnum}]*\\]";
     private static final String STRING_PATTERN_HOST = "(" + STRING_PATTERN_HOST_IPV6 + "|" + STRING_PATTERN_HOST_IPV4 + ")";
     private static final String STRING_PATTERN_PORT = "(\\d*(?:\\{[^/]+?\\})?)";
-    private static final String STRING_PATTERN_PATH = "([^#]*)";
-    private static final String STRING_PATTERN_QUERY = "([^#]*)";
+    private static final String STRING_PATTERN_PATH = "([^$# |^?]*)";
+    private static final String STRING_PATTERN_QUERY = "([?][^#]*)";
     private static final String STRING_PATTERN_REMAINING = "(.*)";
     private static final char QUERY_OPERATOR = '?';
     private static final char SLASH_OPERATOR = '/';
@@ -70,7 +70,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
     static final Pattern PATTERN_FULL_PATH = Pattern.compile("^([^#\\?]*)(\\?([^#]*))?(\\#(.*))?$");
     static final Pattern PATTERN_FULL_URI = Pattern.compile(
             "^(" + STRING_PATTERN_SCHEME + ")?" + "(//(" + STRING_PATTERN_USER_INFO + "@)?" + STRING_PATTERN_HOST + "(:" + STRING_PATTERN_PORT +
-                    ")?" + ")?" + STRING_PATTERN_PATH + "(\\?" + STRING_PATTERN_QUERY + ")?" + "(#" + STRING_PATTERN_REMAINING + ")?");
+                    ")?" + ")?" + STRING_PATTERN_PATH + "(" + STRING_PATTERN_QUERY + ")?" + "(#" + STRING_PATTERN_REMAINING + ")?");
 
     protected final String templateString;
     final List<PathSegment> segments = new ArrayList<>();
