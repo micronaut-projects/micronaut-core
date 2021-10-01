@@ -50,8 +50,6 @@ import java.util.Optional;
 @Replaces(HttpServerConfiguration.class)
 public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
-    private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServerConfiguration.class);
-
     /**
      * The default use netty's native transport flag.
      */
@@ -111,6 +109,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR = false;
+
+    private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServerConfiguration.class);
 
     private final List<ChannelPipelineListener> pipelineCustomizers;
 
