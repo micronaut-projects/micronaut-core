@@ -26,10 +26,11 @@ import io.micronaut.management.endpoint.management.ManagementDataCollector;
 import io.micronaut.management.endpoint.management.ManagementController;
 import io.micronaut.web.router.MethodBasedRoute;
 import io.micronaut.web.router.UriRoute;
-import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
 import jakarta.inject.Singleton;
+import reactor.core.publisher.Mono;
+
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -81,7 +82,7 @@ public class DefaultManagementDataCollector implements ManagementDataCollector<R
             collectedPaths.add(path);
         });
 
-        return Flowable.fromArray(new Resource[]{resource}).firstOrError().toFlowable();
+        return Mono.just(resource);
     }
 
     private String getEndpointId(UriRoute route) {

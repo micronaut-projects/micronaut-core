@@ -22,7 +22,7 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.UriRoute;
-import io.reactivex.Single;
+import reactor.core.publisher.Mono;
 
 import java.util.stream.Stream;
 
@@ -50,12 +50,12 @@ public final class ManagementController {
     }
 
     @Get("management")
-    public Single<?> getManagementRoutes(HttpRequest<?> httpRequest) {
+    public Mono<?> getManagementRoutes(HttpRequest<?> httpRequest) {
         String routeBase = httpHostResolver.resolve(httpRequest);
         String managementDiscoveryPath = httpRequest.getPath();
         Stream<UriRoute> uriRoutes = managementRoutesResolver.getRoutes();
 
-        return Single.fromPublisher(managementDataCollector.collectData(uriRoutes, routeBase,
+        return Mono.from(managementDataCollector.collectData(uriRoutes, routeBase,
                 managementDiscoveryPath, false));
     }
 }
