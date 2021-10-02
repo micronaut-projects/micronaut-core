@@ -4,7 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.server.util.HttpHostResolver
 import io.micronaut.management.endpoint.annotation.Endpoint
 import io.micronaut.management.endpoint.annotation.Read
@@ -27,7 +27,7 @@ class ManagementControllerSpec extends Specification {
     final String MANAGEMENT_PATH = "/management"
 
     @Shared EmbeddedServer server
-    @Shared RxHttpClient client
+    @Shared HttpClient client
     @Shared HttpHostResolver httpHostResolver
 
     void setup() {
@@ -41,7 +41,7 @@ class ManagementControllerSpec extends Specification {
                 'endpoints.timecustom.enabled': true,
                 'endpoints.timecustom.sensitive': false,
         ])
-        client = server.applicationContext.createBean(RxHttpClient, server.URL)
+        client = server.applicationContext.createBean(HttpClient, server.URL)
         httpHostResolver = server.applicationContext.createBean(HttpHostResolver)
     }
 
@@ -143,14 +143,14 @@ class ManagementControllerSpec extends Specification {
     }
 
     private HttpResponse<ManagementControllerResponse> getManagementResponse(HttpRequest request) {
-        client.exchange(request, ManagementControllerResponse).blockingFirst()
+        client.exchange(request, ManagementControllerResponse).blockFirst()
     }
 
     @Endpoint('datecustom')
     static class DateEndpoint {
         @Read
         LocalDate getCurrentDate() {
-            return LocalDate.now()
+            LocalDate.now()
         }
     }
 
@@ -158,7 +158,7 @@ class ManagementControllerSpec extends Specification {
     static class TimeEndpoint {
         @Read
         LocalTime getCurrentTime() {
-            return LocalTime.now()
+            LocalTime.now()
         }
     }
 }
