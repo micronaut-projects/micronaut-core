@@ -28,7 +28,6 @@ import io.micronaut.web.router.UriRoute;
 import org.reactivestreams.Publisher;
 
 import jakarta.inject.Singleton;
-import reactor.core.publisher.Mono;
 
 import java.util.*;
 import java.util.stream.Stream;
@@ -58,7 +57,7 @@ public class DefaultManagementDataCollector implements ManagementDataCollector<R
     @Override
     public Resource collectData(Stream<UriRoute> routes, String routeBase,
                                            String managementDiscoveryPath, boolean isManagementDiscoveryPathTemplated) {
-        AbstractResource<ManagementControllerResponse> resource = new ManagementControllerResponse();
+        AbstractResource<AvailableEndpoints> resource = new AvailableEndpoints();
 
         resource.link(Link.SELF, Link.build(routeBase + managementDiscoveryPath)
                 .templated(isManagementDiscoveryPathTemplated).build());

@@ -8,7 +8,7 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.server.util.HttpHostResolver
 import io.micronaut.management.endpoint.annotation.Endpoint
 import io.micronaut.management.endpoint.annotation.Read
-import io.micronaut.management.endpoint.management.impl.ManagementControllerResponse
+import io.micronaut.management.endpoint.management.impl.AvailableEndpoints
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Shared
 import spock.lang.Specification
@@ -142,8 +142,8 @@ class ManagementControllerSpec extends Specification {
         httpHostResolver.resolve(request)
     }
 
-    private HttpResponse<ManagementControllerResponse> getManagementResponse(HttpRequest request) {
-        client.exchange(request, ManagementControllerResponse).blockFirst()
+    private HttpResponse<AvailableEndpoints> getManagementResponse(HttpRequest request) {
+        client.exchange(request, AvailableEndpoints).blockFirst()
     }
 
     @Endpoint('datecustom')

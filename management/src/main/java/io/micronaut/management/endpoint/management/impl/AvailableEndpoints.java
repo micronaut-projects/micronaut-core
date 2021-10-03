@@ -15,6 +15,7 @@
  */
 package io.micronaut.management.endpoint.management.impl;
 
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.http.hateoas.AbstractResource;
 import io.micronaut.management.endpoint.management.ManagementController;
 
@@ -24,5 +25,6 @@ import io.micronaut.management.endpoint.management.ManagementController;
  * @author Hernán Cervera
  * @since 3.0.0
  */
-public class ManagementControllerResponse extends AbstractResource<ManagementControllerResponse> {
+@Introspected
+public class AvailableEndpoints extends AbstractResource<AvailableEndpoints> {
 }
