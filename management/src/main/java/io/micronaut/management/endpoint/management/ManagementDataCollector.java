@@ -42,6 +42,6 @@ public interface ManagementDataCollector<T> {
      * @param isManagementDiscoveryPathTemplated whether the discovery endpoint path is templated.
      * @return the {@link Publisher}.
      */
-    Publisher<T> collectData(Stream<UriRoute> routes, String routeBase,
+    T collectData(Stream<UriRoute> routes, String routeBase,
                              String managementDiscoveryPath, boolean isManagementDiscoveryPathTemplated);
 }

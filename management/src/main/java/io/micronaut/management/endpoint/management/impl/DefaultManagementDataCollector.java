@@ -56,7 +56,7 @@ public class DefaultManagementDataCollector implements ManagementDataCollector<R
      * @return {@link Publisher} with the Resource.
      */
     @Override
-    public Publisher<Resource> collectData(Stream<UriRoute> routes, String routeBase,
+    public Resource collectData(Stream<UriRoute> routes, String routeBase,
                                            String managementDiscoveryPath, boolean isManagementDiscoveryPathTemplated) {
         AbstractResource<ManagementControllerResponse> resource = new ManagementControllerResponse();
 
@@ -87,7 +87,7 @@ public class DefaultManagementDataCollector implements ManagementDataCollector<R
             collectedPaths.add(path);
         });
 
-        return Mono.just(resource);
+        return resource;
     }
 
     private String getEndpointId(UriRoute route) {

@@ -24,6 +24,7 @@ import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.UriRoute;
 import reactor.core.publisher.Mono;
 
+import java.util.Collections;
 import java.util.stream.Stream;
 
 /**
@@ -55,7 +56,7 @@ public final class ManagementController {
         String managementDiscoveryPath = httpRequest.getPath();
         Stream<UriRoute> uriRoutes = managementRoutesResolver.getRoutes();
 
-        return Mono.justOrEmpty(managementDataCollector.collectData(uriRoutes, routeBase,
+        return Mono.just(managementDataCollector.collectData(uriRoutes, routeBase,
                 managementDiscoveryPath, false));
     }
 }
