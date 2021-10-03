@@ -16,7 +16,6 @@
 package io.micronaut.management.endpoint.management.impl;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.management.ManagementController;
 import io.micronaut.management.endpoint.management.ManagementRoutesResolver;
@@ -25,7 +24,6 @@ import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRoute;
 import jakarta.inject.Singleton;
 
-import java.util.Objects;
 import java.util.stream.Stream;
 
 /**
@@ -57,9 +55,8 @@ public class DefaultManagementRoutesResolver implements ManagementRoutesResolver
 
     private boolean isManagementRoute(UriRoute route) {
         if (route instanceof MethodBasedRoute) {
-            AnnotationValue<Endpoint> endpoint = ((MethodBasedRoute) route).getTargetMethod()
-                    .getAnnotationMetadata().getAnnotation(Endpoint.class);
-            return Objects.nonNull(endpoint);
+            return ((MethodBasedRoute) route).getTargetMethod()
+                    .getAnnotationMetadata().hasAnnotation(Endpoint.class);
         }
         return false;
     }

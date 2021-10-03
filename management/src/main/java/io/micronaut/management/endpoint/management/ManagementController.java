@@ -55,7 +55,7 @@ public final class ManagementController {
         String managementDiscoveryPath = httpRequest.getPath();
         Stream<UriRoute> uriRoutes = managementRoutesResolver.getRoutes();
 
-        return Mono.from(managementDataCollector.collectData(uriRoutes, routeBase,
+        return Mono.justOrEmpty(managementDataCollector.collectData(uriRoutes, routeBase,
                 managementDiscoveryPath, false));
     }
 }

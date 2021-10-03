@@ -16,7 +16,6 @@
 package io.micronaut.management.endpoint.management.impl;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.http.hateoas.AbstractResource;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.Resource;
@@ -76,6 +75,12 @@ public class DefaultManagementDataCollector implements ManagementDataCollector<R
             }
 
             CharSequence endpointId = getEndpointId(route);
+
+            // Ignore endpoints with a null id.
+            if (Objects.isNull(endpointId)) {
+                return;
+            }
+
             boolean isTemplated = !uriMatchTemplate.getVariables().isEmpty();
             resource.link(endpointId, Link.build(routeBase + path).templated(isTemplated).build());
 
@@ -87,11 +92,8 @@ public class DefaultManagementDataCollector implements ManagementDataCollector<R
 
     private String getEndpointId(UriRoute route) {
         if (route instanceof MethodBasedRoute) {
-            AnnotationValue<Endpoint> endpoint = ((MethodBasedRoute) route).getTargetMethod()
-                    .getAnnotationMetadata().getAnnotation(Endpoint.class);
-            Objects.requireNonNull(endpoint);
-            return endpoint.get("value", String.class)
-                    .orElseGet(() -> endpoint.get("id", String.class).get());
+            return ((MethodBasedRoute) route).getTargetMethod()
+                    .getAnnotationMetadata().stringValue(Endpoint.class).orElse(null);
         }
         throw new IllegalArgumentException("Route must be an instance of " + MethodBasedRoute.class.getName());
     }
