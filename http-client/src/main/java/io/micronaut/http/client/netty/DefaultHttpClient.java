@@ -168,7 +168,6 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
-import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -928,8 +927,9 @@ public class DefaultHttpClient implements
     }
 
     /**
-     * @param request The request
-     * @param <I>     The input type
+     * @param request   The request
+     * @param errorType The error type
+     * @param <I>       The input type
      * @return A {@link Function}
      */
     protected <I> Function<URI, Publisher<HttpResponse<ByteBuffer<?>>>> buildExchangeStreamPublisher(io.micronaut.http.HttpRequest<I> request,
@@ -973,6 +973,7 @@ public class DefaultHttpClient implements
      * @param parentRequest The parent request
      * @param request       The request
      * @param type          The type
+     * @param errorType     The error type
      * @param <I>           The input type
      * @param <O>           The output type
      * @return A {@link Function}
@@ -1038,10 +1039,10 @@ public class DefaultHttpClient implements
         return buildDataStreamPublisher(request, null);
     }
 
-
     /**
-     * @param request The request
-     * @param <I>     The input type
+     * @param request   The request
+     * @param errorType The error type
+     * @param <I>       The input type
      * @return A {@link Function}
      */
     protected <I> Function<URI, Publisher<ByteBuffer<?>>> buildDataStreamPublisher(io.micronaut.http.HttpRequest<I> request,
@@ -1097,6 +1098,7 @@ public class DefaultHttpClient implements
      * @param parentRequest The parent request
      * @param request       The request
      * @param requestURI    The request URI
+     * @param errorType     The error type
      * @param <I>           The input type
      * @return A {@link Flux}
      */
