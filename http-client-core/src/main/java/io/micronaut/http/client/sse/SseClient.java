@@ -57,6 +57,21 @@ public interface SseClient {
      */
     <I, B> Publisher<Event<B>> eventStream(HttpRequest<I> request, Argument<B> eventType);
 
+
+    /**
+     * <p>Perform an HTTP request and receive data as a stream of SSE {@link Event} objects as they become available without blocking.</p>
+     * <p>
+     * <p>The downstream {@link org.reactivestreams.Subscriber} can regulate demand via the subscription</p>
+     *
+     * @param request   The {@link HttpRequest} to execute
+     * @param eventType The event data type
+     * @param errorType The type that the response body should be coerced into if the server responds with an error
+     * @param <I>       The request body type
+     * @param <B>       The event body type
+     * @return A {@link Publisher} that emits an {@link Event} with the data represented by the eventType argument
+     */
+    <I, B> Publisher<Event<B>> eventStream(HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType);
+
     /**
      * <p>Perform an HTTP request and receive data as a stream of SSE {@link Event} objects as they become available without blocking.</p>
      * <p>

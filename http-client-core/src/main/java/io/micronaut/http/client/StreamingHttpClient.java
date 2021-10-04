@@ -42,6 +42,17 @@ public interface StreamingHttpClient extends HttpClient {
      */
     <I> Publisher<ByteBuffer<?>> dataStream(HttpRequest<I> request);
 
+
+    /**
+     * Request a stream of data where each emitted item is a {@link ByteBuffer} instance.
+     *
+     * @param request   The request
+     * @param errorType The type that the response body should be coerced into if the server responds with an error
+     * @param <I>       The request body type
+     * @return A {@link Publisher} that emits a stream of {@link ByteBuffer} instances
+     */
+    <I> Publisher<ByteBuffer<?>> dataStream(HttpRequest<I> request, Argument<?> errorType);
+
     /**
      * Requests a stream data where each emitted item is a {@link ByteBuffer} wrapped in the {@link HttpResponse} object
      * (which remains the same for each emitted item).
@@ -51,6 +62,17 @@ public interface StreamingHttpClient extends HttpClient {
      * @return A {@link Publisher} that emits a stream of {@link ByteBuffer} instances wrapped by a {@link HttpResponse}
      */
     <I> Publisher<HttpResponse<ByteBuffer<?>>> exchangeStream(HttpRequest<I> request);
+
+    /**
+     * Requests a stream data where each emitted item is a {@link ByteBuffer} wrapped in the {@link HttpResponse} object
+     * (which remains the same for each emitted item).
+     *
+     * @param request   The {@link HttpRequest}
+     * @param errorType The type that the response body should be coerced into if the server responds with an error
+     * @param <I>       The request body type
+     * @return A {@link Publisher} that emits a stream of {@link ByteBuffer} instances wrapped by a {@link HttpResponse}
+     */
+    <I> Publisher<HttpResponse<ByteBuffer<?>>> exchangeStream(HttpRequest<I> request, Argument<?> errorType);
 
     /**
      * <p>Perform an HTTP request and receive data as a stream of JSON objects as they become available without blocking.</p>
@@ -76,6 +98,22 @@ public interface StreamingHttpClient extends HttpClient {
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
     <I, O> Publisher<O> jsonStream(HttpRequest<I> request, Argument<O> type);
+
+
+    /**
+     * <p>Perform an HTTP request and receive data as a stream of JSON objects as they become available without blocking.</p>
+     * <p>
+     * <p>The downstream {@link org.reactivestreams.Subscriber} can regulate demand via the subscription. Incoming data
+     * is buffered.</p>
+     *
+     * @param request   The {@link HttpRequest} to execute
+     * @param type      The type of object to convert the JSON into
+     * @param errorType The type that the response body should be coerced into if the server responds with an error
+     * @param <I>       The request body type
+     * @param <O>       The response type
+     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
+     */
+    <I, O> Publisher<O> jsonStream(HttpRequest<I> request, Argument<O> type, Argument<?> errorType);
 
     /**
      * <p>Perform an HTTP request and receive data as a stream of JSON objects as they become available without blocking.</p>
