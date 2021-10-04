@@ -852,6 +852,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                                         pipelineListener.onConnect(p);
                                     }
                                     super.upgradeTo(ctx, upgradeRequest);
+                                    ctx.fireChannelRead(ReferenceCountUtil.retain(upgradeRequest));
                                 }
                             };
                         } else {
