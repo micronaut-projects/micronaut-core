@@ -50,6 +50,6 @@ public interface SseClientFactory {
      * @since 2.2.0
      */
     @NonNull
-    SseClient createSseClient(@Nullable URL url, HttpClientConfiguration configuration);
+    SseClient createSseClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration);
 
 }

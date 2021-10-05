@@ -262,7 +262,7 @@ public class DefaultHttpClient implements
      * @param filters                         The filters to use
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
-            HttpClientConfiguration configuration,
+            @NonNull HttpClientConfiguration configuration,
             @Nullable String contextPath,
             @Nullable ThreadFactory threadFactory,
             NettyClientSslBuilder nettyClientSslBuilder,
@@ -424,7 +424,7 @@ public class DefaultHttpClient implements
     /**
      * @param url The URL
      */
-    public DefaultHttpClient(URL url) {
+    public DefaultHttpClient(@Nullable URL url) {
         this(url, new DefaultHttpClientConfiguration());
     }
 
@@ -439,7 +439,7 @@ public class DefaultHttpClient implements
      * @param url           The URL
      * @param configuration The {@link HttpClientConfiguration} object
      */
-    public DefaultHttpClient(URL url, HttpClientConfiguration configuration) {
+    public DefaultHttpClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
         this(
                 url == null ? null : LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
                 new NettyClientSslBuilder(new ResourceResolver()),
@@ -589,11 +589,11 @@ public class DefaultHttpClient implements
 
     @SuppressWarnings("SubscriberImplementation")
     @Override
-    public <I> Publisher<Event<ByteBuffer<?>>> eventStream(io.micronaut.http.HttpRequest<I> request) {
+    public <I> Publisher<Event<ByteBuffer<?>>> eventStream(@NonNull io.micronaut.http.HttpRequest<I> request) {
         return eventStreamOrError(request, null);
     }
 
-    private <I> Publisher<Event<ByteBuffer<?>>> eventStreamOrError(io.micronaut.http.HttpRequest<I> request, Argument<?> errorType) {
+    private <I> Publisher<Event<ByteBuffer<?>>> eventStreamOrError(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<?> errorType) {
 
         if (request instanceof MutableHttpRequest) {
             ((MutableHttpRequest) request).accept(MediaType.TEXT_EVENT_STREAM_TYPE);
@@ -720,13 +720,13 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public <I, B> Publisher<Event<B>> eventStream(io.micronaut.http.HttpRequest<I> request,
-                                                  Argument<B> eventType) {
-        return eventStream(request, eventType, null);
+    public <I, B> Publisher<Event<B>> eventStream(@NonNull io.micronaut.http.HttpRequest<I> request,
+                                                  @NonNull Argument<B> eventType) {
+        return eventStream(request, eventType, DEFAULT_ERROR_TYPE);
     }
 
     @Override
-    public <I, B> Publisher<Event<B>> eventStream(io.micronaut.http.HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
+    public <I, B> Publisher<Event<B>> eventStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<B> eventType, @NonNull Argument<?> errorType) {
         return Flux.from(eventStreamOrError(request, errorType)).map(byteBufferEvent -> {
             ByteBuffer<?> data = byteBufferEvent.getData();
             Optional<MediaTypeCodec> registeredCodec;
@@ -747,12 +747,12 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public <I> Publisher<ByteBuffer<?>> dataStream(io.micronaut.http.HttpRequest<I> request) {
-        return dataStream(request, null);
+    public <I> Publisher<ByteBuffer<?>> dataStream(@NonNull io.micronaut.http.HttpRequest<I> request) {
+        return dataStream(request, DEFAULT_ERROR_TYPE);
     }
 
     @Override
-    public <I> Publisher<ByteBuffer<?>> dataStream(io.micronaut.http.HttpRequest<I> request, Argument<?> errorType) {
+    public <I> Publisher<ByteBuffer<?>> dataStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<?> errorType) {
         return new MicronautFlux<>(Flux.from(resolveRequestURI(request)).flatMap(buildDataStreamPublisher(request, errorType)))
                 .doAfterNext(buffer -> {
                     Object o = buffer.asNativeBuffer();
@@ -766,12 +766,12 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public <I> Publisher<io.micronaut.http.HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.HttpRequest<I> request) {
-        return exchangeStream(request, null);
+    public <I> Publisher<io.micronaut.http.HttpResponse<ByteBuffer<?>>> exchangeStream(@NonNull io.micronaut.http.HttpRequest<I> request) {
+        return exchangeStream(request, DEFAULT_ERROR_TYPE);
     }
 
     @Override
-    public <I> Publisher<io.micronaut.http.HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.HttpRequest<I> request, Argument<?> errorType) {
+    public <I> Publisher<io.micronaut.http.HttpResponse<ByteBuffer<?>>> exchangeStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<?> errorType) {
         return new MicronautFlux<>(Flux.from(resolveRequestURI(request)).flatMap(buildExchangeStreamPublisher(request, errorType)))
                 .doAfterNext(byteBufferHttpResponse -> {
                     ByteBuffer<?> buffer = byteBufferHttpResponse.body();
@@ -782,12 +782,12 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public <I, O> Publisher<O> jsonStream(io.micronaut.http.HttpRequest<I> request, Argument<O> type) {
-        return jsonStream(request, type, null);
+    public <I, O> Publisher<O> jsonStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<O> type) {
+        return jsonStream(request, type, DEFAULT_ERROR_TYPE);
     }
 
     @Override
-    public <I, O> Publisher<O> jsonStream(io.micronaut.http.HttpRequest<I> request, Argument<O> type, Argument<?> errorType) {
+    public <I, O> Publisher<O> jsonStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<O> type, @NonNull Argument<?> errorType) {
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         return Flux.from(resolveRequestURI(request))
                 .flatMap(buildJsonStreamPublisher(parentRequest, request, type, errorType));
@@ -795,17 +795,17 @@ public class DefaultHttpClient implements
 
     @SuppressWarnings("unchecked")
     @Override
-    public <I> Publisher<Map<String, Object>> jsonStream(io.micronaut.http.HttpRequest<I> request) {
+    public <I> Publisher<Map<String, Object>> jsonStream(@NonNull io.micronaut.http.HttpRequest<I> request) {
         return (Publisher) jsonStream(request, Map.class);
     }
 
     @Override
-    public <I, O> Publisher<O> jsonStream(io.micronaut.http.HttpRequest<I> request, Class<O> type) {
+    public <I, O> Publisher<O> jsonStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Class<O> type) {
         return jsonStream(request, io.micronaut.core.type.Argument.of(type));
     }
 
     @Override
-    public <I, O, E> Publisher<io.micronaut.http.HttpResponse<O>> exchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
+    public <I, O, E> Publisher<io.micronaut.http.HttpResponse<O>> exchange(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType) {
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         Publisher<URI> uriPublisher = resolveRequestURI(request);
         return Flux.from(uriPublisher)
@@ -932,8 +932,8 @@ public class DefaultHttpClient implements
      * @param <I>       The input type
      * @return A {@link Function}
      */
-    protected <I> Function<URI, Publisher<HttpResponse<ByteBuffer<?>>>> buildExchangeStreamPublisher(io.micronaut.http.HttpRequest<I> request,
-                                                                                                     Argument<?> errorType) {
+    protected <I> Function<URI, Publisher<HttpResponse<ByteBuffer<?>>>> buildExchangeStreamPublisher(@NonNull io.micronaut.http.HttpRequest<I> request,
+                                                                                                     @NonNull Argument<?> errorType) {
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         return requestURI -> {
             Flux<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = Flux.from(buildStreamExchange(parentRequest, request, requestURI, errorType));
@@ -1045,8 +1045,8 @@ public class DefaultHttpClient implements
      * @param <I>       The input type
      * @return A {@link Function}
      */
-    protected <I> Function<URI, Publisher<ByteBuffer<?>>> buildDataStreamPublisher(io.micronaut.http.HttpRequest<I> request,
-                                                                                   @Nullable Argument<?> errorType) {
+    protected <I> Function<URI, Publisher<ByteBuffer<?>>> buildDataStreamPublisher(@NonNull io.micronaut.http.HttpRequest<I> request,
+                                                                                   @NonNull Argument<?> errorType) {
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         return requestURI -> {
             Flux<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = Flux.from(buildStreamExchange(parentRequest, request, requestURI, errorType));
@@ -1105,9 +1105,9 @@ public class DefaultHttpClient implements
     @SuppressWarnings("MagicNumber")
     protected <I> Publisher<io.micronaut.http.HttpResponse<Object>> buildStreamExchange(
             @Nullable io.micronaut.http.HttpRequest<?> parentRequest,
-            io.micronaut.http.HttpRequest<I> request,
-            URI requestURI,
-            Argument<?> errorType) {
+            @NonNull io.micronaut.http.HttpRequest<I> request,
+            @NonNull URI requestURI,
+            @NonNull Argument<?> errorType) {
         SslContext sslContext = buildSslContext(requestURI);
 
         AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request);
@@ -1186,8 +1186,8 @@ public class DefaultHttpClient implements
     protected <I, O, E> Function<URI, Publisher<? extends io.micronaut.http.HttpResponse<O>>> buildExchangePublisher(
             io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<I> request,
-            Argument<O> bodyType,
-            Argument<E> errorType) {
+            @NonNull Argument<O> bodyType,
+            @NonNull Argument<E> errorType) {
         AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request);
         return requestURI -> {
             Flux<io.micronaut.http.HttpResponse<O>> responsePublisher = Flux.create(emitter -> {
@@ -1871,14 +1871,14 @@ public class DefaultHttpClient implements
 
     }
 
-    private Flux<io.micronaut.http.HttpResponse<Object>> readBodyOnError(Argument<?> errorType, Flux<io.micronaut.http.HttpResponse<Object>> publisher) {
+    private Flux<io.micronaut.http.HttpResponse<Object>> readBodyOnError(@NonNull Argument<?> errorType, @NonNull Flux<io.micronaut.http.HttpResponse<Object>> publisher) {
         if (errorType != null && errorType != HttpClient.DEFAULT_ERROR_TYPE) {
             return publisher.onErrorResume(clientException -> {
                 if (clientException instanceof HttpClientResponseException) {
                     final HttpResponse<?> response = ((HttpClientResponseException) clientException).getResponse();
                     if (response instanceof NettyStreamedHttpResponse) {
                         return Mono.create(emitter -> {
-                            NettyStreamedHttpResponse streamedResponse = (NettyStreamedHttpResponse<?>) response;
+                            NettyStreamedHttpResponse<?> streamedResponse = (NettyStreamedHttpResponse<?>) response;
                             final StreamedHttpResponse nettyResponse = streamedResponse.getNettyResponse();
                             nettyResponse.subscribe(new Subscriber<HttpContent>() {
                                 final CompositeByteBuf buffer = byteBufferFactory.getNativeAllocator().compositeBuffer();
@@ -1897,26 +1897,30 @@ public class DefaultHttpClient implements
 
                                 @Override
                                 public void onError(Throwable t) {
+                                    buffer.release();
                                     emitter.error(t);
                                 }
 
                                 @Override
                                 public void onComplete() {
-                                    FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), buffer, nettyResponse.headers(), new DefaultHttpHeaders(true));
-                                    final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, response.status(), mediaTypeCodecRegistry, byteBufferFactory, (Argument<Object>) errorType, true);
-                                    fullNettyClientHttpResponse.onComplete();
-                                    buffer.release();
-                                    emitter.error(new HttpClientResponseException(
-                                            fullHttpResponse.status().reasonPhrase(),
-                                            null,
-                                            fullNettyClientHttpResponse,
-                                            new HttpClientErrorDecoder() {
-                                                @Override
-                                                public Argument<?> getErrorType(MediaType mediaType) {
-                                                    return errorType;
+                                    try {
+                                        FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), buffer, nettyResponse.headers(), new DefaultHttpHeaders(true));
+                                        final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, response.status(), mediaTypeCodecRegistry, byteBufferFactory, (Argument<Object>) errorType, true);
+                                        fullNettyClientHttpResponse.onComplete();
+                                        emitter.error(new HttpClientResponseException(
+                                                fullHttpResponse.status().reasonPhrase(),
+                                                null,
+                                                fullNettyClientHttpResponse,
+                                                new HttpClientErrorDecoder() {
+                                                    @Override
+                                                    public Argument<?> getErrorType(MediaType mediaType) {
+                                                        return errorType;
+                                                    }
                                                 }
-                                            }
-                                    ));
+                                        ));
+                                    } finally {
+                                        buffer.release();
+                                    }
                                 }
                             });
                         });
@@ -2304,7 +2308,7 @@ public class DefaultHttpClient implements
                             } else { // error flow
                                 try {
                                     HttpClientResponseException clientError;
-                                    if (errorType != HttpClient.DEFAULT_ERROR_TYPE) {
+                                    if (errorType != null && errorType != HttpClient.DEFAULT_ERROR_TYPE) {
                                         clientError = new HttpClientResponseException(
                                                 status.reasonPhrase(),
                                                 null,
@@ -2832,7 +2836,7 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public Publisher<MutableHttpResponse<?>> proxy(io.micronaut.http.HttpRequest<?> request) {
+    public Publisher<MutableHttpResponse<?>> proxy(@NonNull io.micronaut.http.HttpRequest<?> request) {
         return Flux.from(resolveRequestURI(request))
                 .flatMap(requestURI -> {
                     AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request instanceof MutableHttpRequest ? request : request.mutate());

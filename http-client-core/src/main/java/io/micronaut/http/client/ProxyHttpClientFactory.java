@@ -49,6 +49,6 @@ public interface ProxyHttpClientFactory {
      * @since 2.2.0
      */
     @NonNull
-    ProxyHttpClient createProxyClient(@Nullable URL url, HttpClientConfiguration configuration);
+    ProxyHttpClient createProxyClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration);
 
 }
