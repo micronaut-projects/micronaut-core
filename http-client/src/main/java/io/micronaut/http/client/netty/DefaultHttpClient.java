@@ -3104,7 +3104,7 @@ public class DefaultHttpClient implements
                 @Override
                 protected boolean isValidInMessage(Object msg) {
                     // ignore data on stream 1, that is the response to our initial upgrade request
-                    return super.isValidInMessage(msg) && (sslContext != null || discardH2cStream((HttpMessage) msg));
+                    return super.isValidInMessage(msg) && (sslContext != null || !discardH2cStream((HttpMessage) msg));
                 }
             });
         }
