@@ -22,6 +22,7 @@ import io.netty.handler.codec.http.HttpVersion
 import io.netty.handler.codec.http2.DefaultHttp2Connection
 import io.netty.handler.codec.http2.DelegatingDecompressorFrameListener
 import io.netty.handler.codec.http2.Http2ClientUpgradeCodec
+import io.netty.handler.codec.http2.HttpConversionUtil
 import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder
 import io.netty.handler.codec.http2.InboundHttp2ToHttpAdapterBuilder
 import jakarta.inject.Inject
@@ -75,6 +76,9 @@ class H2cSpec extends Specification {
                                 void channelRead(@NotNull ChannelHandlerContext ctx, @NotNull Object msg) throws Exception {
                                     ctx.read()
                                     if (msg instanceof HttpMessage) {
+                                        if (msg.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), -1) != 1) {
+                                            responseFuture.completeExceptionally(new AssertionError("Response must be on stream 1"));
+                                        }
                                         responseFuture.complete(msg)
                                     }
                                     super.channelRead(ctx, msg)
