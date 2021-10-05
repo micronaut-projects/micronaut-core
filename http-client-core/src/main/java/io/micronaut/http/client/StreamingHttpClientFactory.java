@@ -49,6 +49,6 @@ public interface StreamingHttpClientFactory {
      * @since 2.2.0
      */
     @NonNull
-    StreamingHttpClient createStreamingClient(@Nullable URL url, HttpClientConfiguration configuration);
+    StreamingHttpClient createStreamingClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration);
 
 }

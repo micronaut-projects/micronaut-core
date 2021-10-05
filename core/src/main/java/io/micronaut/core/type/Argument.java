@@ -133,7 +133,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * @param other The type type
      * @return True if they are equal
      */
-    boolean equalsType(Argument<?> other);
+    boolean equalsType(@Nullable Argument<?> other);
 
     /**
      * The hash code including only the types. The regular {@link Object#hashCode()} implementation includes the
