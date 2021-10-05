@@ -46,6 +46,7 @@ public interface StreamingHttpClient extends HttpClient {
     /**
      * Request a stream of data where each emitted item is a {@link ByteBuffer} instance.
      *
+     * @since 3.1.0
      * @param request   The request
      * @param errorType The type that the response body should be coerced into if the server responds with an error
      * @param <I>       The request body type
@@ -67,6 +68,7 @@ public interface StreamingHttpClient extends HttpClient {
      * Requests a stream data where each emitted item is a {@link ByteBuffer} wrapped in the {@link HttpResponse} object
      * (which remains the same for each emitted item).
      *
+     * @since 3.1.0
      * @param request   The {@link HttpRequest}
      * @param errorType The type that the response body should be coerced into if the server responds with an error
      * @param <I>       The request body type
@@ -106,6 +108,7 @@ public interface StreamingHttpClient extends HttpClient {
      * <p>The downstream {@link org.reactivestreams.Subscriber} can regulate demand via the subscription. Incoming data
      * is buffered.</p>
      *
+     * @since 3.1.0
      * @param request   The {@link HttpRequest} to execute
      * @param type      The type of object to convert the JSON into
      * @param errorType The type that the response body should be coerced into if the server responds with an error

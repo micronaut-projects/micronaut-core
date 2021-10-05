@@ -63,6 +63,7 @@ public interface SseClient {
      * <p>
      * <p>The downstream {@link org.reactivestreams.Subscriber} can regulate demand via the subscription</p>
      *
+     * @since 3.1.0
      * @param request   The {@link HttpRequest} to execute
      * @param eventType The event data type
      * @param errorType The type that the response body should be coerced into if the server responds with an error
