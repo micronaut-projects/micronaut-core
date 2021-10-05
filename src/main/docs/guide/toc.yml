@@ -52,6 +52,7 @@ config:
   eachBean: Using @EachBean to Drive Configuration
   immutableConfig: Immutable Configuration
   # validation: Validating Configuration
+  bootstrap: Bootstrap Configuration
   jmx:
     title: JMX Support
 aop:
