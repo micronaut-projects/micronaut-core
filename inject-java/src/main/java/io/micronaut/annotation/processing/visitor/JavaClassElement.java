@@ -81,6 +81,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
      * @param annotationMetadata The annotation metadata
      * @param visitorContext     The visitor context
      * @param genericsInfo       The generic type info
+     * @param arrayDimensions    The number of array dimensions
      */
     JavaClassElement(
             TypeElement classElement,
