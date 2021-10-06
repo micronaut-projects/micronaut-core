@@ -306,6 +306,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
             // write the reference
             writeIntrospectionReference(classWriterOutputVisitor);
+            loadTypeMethods.clear();
             // write the introspection
             writeIntrospectionClass(classWriterOutputVisitor);
 
