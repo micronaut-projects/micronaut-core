@@ -254,6 +254,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
             List<BeanDefinition<T>> transformedCandidates = new ArrayList<>();
             for (BeanDefinition candidate : candidates) {
+                if (!candidate.isIterable()) {
+                    continue;
+                }
                 if (candidate.hasDeclaredStereotype(EachProperty.class)) {
                     boolean isList = candidate.booleanValue(EachProperty.class, "list").orElse(false);
                     String property = candidate.stringValue(ConfigurationReader.class, "prefix")
