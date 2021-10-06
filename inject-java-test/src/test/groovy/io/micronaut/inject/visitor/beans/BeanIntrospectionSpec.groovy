@@ -2789,6 +2789,48 @@ abstract class Test {
         beanIntrospection.getBeanProperties().size() == 3
     }
 
+    void "test class loading is not shared between the introspection and the ref"() {
+        when:
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+import java.util.Set;
+
+@Introspected(excludedAnnotations = Deprecated.class)
+public class Test {
+
+    private Set<Author> authors;
+    
+    public Set<Author> getAuthors() {
+        return authors;
+    }
+
+    public void setAuthors(Set<Author> authors) {
+        this.authors = authors;
+    }
+}
+@Introspected(excludedAnnotations = Deprecated.class)
+class Author {
+    private String name;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 1
+    }
+
     @Override
     protected JavaParser newJavaParser() {
         return new JavaParser() {
