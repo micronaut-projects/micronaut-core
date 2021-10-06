@@ -254,7 +254,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
             List<BeanDefinition<T>> transformedCandidates = new ArrayList<>();
             for (BeanDefinition candidate : candidates) {
-                if (!candidate.isIterable()) {
+                if (candidate.isIterable()) {
                     if (candidate.hasDeclaredStereotype(EachProperty.class)) {
                         boolean isList = candidate.booleanValue(EachProperty.class, "list").orElse(false);
                         String property = candidate.stringValue(ConfigurationReader.class, "prefix")
@@ -314,7 +314,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
                         if (!dependentCandidates.isEmpty()) {
                             for (BeanDefinition dependentCandidate : dependentCandidates) {
-    
+
                                 BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(candidate);
                                 Optional<Qualifier> optional;
                                 if (dependentCandidate instanceof BeanDefinitionDelegate) {
