@@ -255,30 +255,44 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             List<BeanDefinition<T>> transformedCandidates = new ArrayList<>();
             for (BeanDefinition candidate : candidates) {
                 if (!candidate.isIterable()) {
-                    transformedCandidates.add(candidate);
-                    continue;
-                }
-                if (candidate.hasDeclaredStereotype(EachProperty.class)) {
-                    boolean isList = candidate.booleanValue(EachProperty.class, "list").orElse(false);
-                    String property = candidate.stringValue(ConfigurationReader.class, "prefix")
-                            .map(prefix ->
-                                    //strip the .* or [*]
-                                    prefix.substring(0, prefix.length() - (isList ? 3 : 2)))
-                            .orElseGet(() -> candidate.stringValue(EachProperty.class).orElse(null));
-                    String primaryPrefix = candidate.stringValue(EachProperty.class, "primary").orElse(null);
-                    if (StringUtils.isNotEmpty(property)) {
-                        if (isList) {
-                            List entries = getEnvironment().getProperty(property, List.class, Collections.emptyList());
-                            if (!entries.isEmpty()) {
-                                for (int i = 0; i < entries.size(); i++) {
-                                    if (entries.get(i) != null) {
+                    if (candidate.hasDeclaredStereotype(EachProperty.class)) {
+                        boolean isList = candidate.booleanValue(EachProperty.class, "list").orElse(false);
+                        String property = candidate.stringValue(ConfigurationReader.class, "prefix")
+                                .map(prefix ->
+                                        //strip the .* or [*]
+                                        prefix.substring(0, prefix.length() - (isList ? 3 : 2)))
+                                .orElseGet(() -> candidate.stringValue(EachProperty.class).orElse(null));
+                        String primaryPrefix = candidate.stringValue(EachProperty.class, "primary").orElse(null);
+                        if (StringUtils.isNotEmpty(property)) {
+                            if (isList) {
+                                List entries = getEnvironment().getProperty(property, List.class, Collections.emptyList());
+                                if (!entries.isEmpty()) {
+                                    for (int i = 0; i < entries.size(); i++) {
+                                        if (entries.get(i) != null) {
+                                            BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
+                                            String index = String.valueOf(i);
+                                            if (primaryPrefix != null && primaryPrefix.equals(index)) {
+                                                delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
+                                            }
+                                            delegate.put("Array", index);
+                                            delegate.put(Named.class.getName(), index);
+
+                                            if (delegate.isEnabled(this, resolutionContext)) {
+                                                transformedCandidates.add(delegate);
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                Collection<String> propertyEntries = getEnvironment().getPropertyEntries(property);
+                                if (!propertyEntries.isEmpty()) {
+                                    for (String key : propertyEntries) {
                                         BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
-                                        String index = String.valueOf(i);
-                                        if (primaryPrefix != null && primaryPrefix.equals(index)) {
+                                        if (primaryPrefix != null && primaryPrefix.equals(key)) {
                                             delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
                                         }
-                                        delegate.put("Array", index);
-                                        delegate.put(Named.class.getName(), index);
+                                        delegate.put(EachProperty.class.getName(), delegate.getBeanType());
+                                        delegate.put(Named.class.getName(), key);
 
                                         if (delegate.isEnabled(this, resolutionContext)) {
                                             transformedCandidates.add(delegate);
@@ -287,71 +301,55 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                 }
                             }
                         } else {
-                            Collection<String> propertyEntries = getEnvironment().getPropertyEntries(property);
-                            if (!propertyEntries.isEmpty()) {
-                                for (String key : propertyEntries) {
-                                    BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
-                                    if (primaryPrefix != null && primaryPrefix.equals(key)) {
-                                        delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
-                                    }
-                                    delegate.put(EachProperty.class.getName(), delegate.getBeanType());
-                                    delegate.put(Named.class.getName(), key);
-
-                                    if (delegate.isEnabled(this, resolutionContext)) {
-                                        transformedCandidates.add(delegate);
-                                    }
-                                }
-                            }
+                            throw new IllegalArgumentException("Blank value specified to @Each property for bean: " + candidate);
                         }
-                    } else {
-                        throw new IllegalArgumentException("Blank value specified to @Each property for bean: " + candidate);
-                    }
-                } else if (candidate.hasDeclaredStereotype(EachBean.class)) {
-                    Class dependentType = candidate.classValue(EachBean.class).orElse(null);
-                    if (dependentType == null) {
-                        transformedCandidates.add(candidate);
-                        continue;
-                    }
+                    } else if (candidate.hasDeclaredStereotype(EachBean.class)) {
+                        Class dependentType = candidate.classValue(EachBean.class).orElse(null);
+                        if (dependentType == null) {
+                            transformedCandidates.add(candidate);
+                            continue;
+                        }
 
-                    Collection<BeanDefinition> dependentCandidates = findBeanCandidates(resolutionContext, Argument.of(dependentType), filterProxied, null);
+                        Collection<BeanDefinition> dependentCandidates = findBeanCandidates(resolutionContext, Argument.of(dependentType), filterProxied, null);
 
-                    if (!dependentCandidates.isEmpty()) {
-                        for (BeanDefinition dependentCandidate : dependentCandidates) {
-
-                            BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(candidate);
-                            Optional<Qualifier> optional;
-                            if (dependentCandidate instanceof BeanDefinitionDelegate) {
-                                BeanDefinitionDelegate<?> parentDelegate = (BeanDefinitionDelegate) dependentCandidate;
-                                optional = parentDelegate.get(Named.class.getName(), String.class).map(Qualifiers::byName);
-                            } else {
-                                Optional<String> qualifierName = dependentCandidate.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER);
-                                optional = qualifierName.map(name -> Qualifiers.byAnnotation(dependentCandidate, name));
-                            }
-
-                            if (dependentCandidate.isPrimary()) {
-                                delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
-                            }
-
-                            optional.ifPresent(qualifier -> {
-                                    String qualifierKey = AnnotationUtil.QUALIFIER;
-                                    Argument<?>[] arguments = candidate.getConstructor().getArguments();
-                                    for (Argument<?> argument : arguments) {
-                                        Class<?> argumentType = argument.getType();
-                                        if (argumentType.equals(dependentType)) {
-                                            Map<? extends Argument<?>, Qualifier> qualifedArg = Collections.singletonMap(argument, qualifier);
-                                            delegate.put(qualifierKey, qualifedArg);
-                                            break;
-                                        }
-                                    }
-
-                                    if (qualifier instanceof Named) {
-                                        delegate.put(Named.class.getName(), ((Named) qualifier).getName());
-                                    }
-                                    if (delegate.isEnabled(this, resolutionContext)) {
-                                        transformedCandidates.add((BeanDefinition<T>) delegate);
-                                    }
+                        if (!dependentCandidates.isEmpty()) {
+                            for (BeanDefinition dependentCandidate : dependentCandidates) {
+    
+                                BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(candidate);
+                                Optional<Qualifier> optional;
+                                if (dependentCandidate instanceof BeanDefinitionDelegate) {
+                                    BeanDefinitionDelegate<?> parentDelegate = (BeanDefinitionDelegate) dependentCandidate;
+                                    optional = parentDelegate.get(Named.class.getName(), String.class).map(Qualifiers::byName);
+                                } else {
+                                    Optional<String> qualifierName = dependentCandidate.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER);
+                                    optional = qualifierName.map(name -> Qualifiers.byAnnotation(dependentCandidate, name));
                                 }
-                            );
+
+                                if (dependentCandidate.isPrimary()) {
+                                    delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
+                                }
+
+                                optional.ifPresent(qualifier -> {
+                                            String qualifierKey = AnnotationUtil.QUALIFIER;
+                                            Argument<?>[] arguments = candidate.getConstructor().getArguments();
+                                            for (Argument<?> argument : arguments) {
+                                                Class<?> argumentType = argument.getType();
+                                                if (argumentType.equals(dependentType)) {
+                                                    Map<? extends Argument<?>, Qualifier> qualifedArg = Collections.singletonMap(argument, qualifier);
+                                                    delegate.put(qualifierKey, qualifedArg);
+                                                    break;
+                                                }
+                                            }
+
+                                            if (qualifier instanceof Named) {
+                                                delegate.put(Named.class.getName(), ((Named) qualifier).getName());
+                                            }
+                                            if (delegate.isEnabled(this, resolutionContext)) {
+                                                transformedCandidates.add((BeanDefinition<T>) delegate);
+                                            }
+                                        }
+                                );
+                            }
                         }
                     }
                 } else {
