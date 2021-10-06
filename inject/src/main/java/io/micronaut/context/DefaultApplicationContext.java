@@ -255,6 +255,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             List<BeanDefinition<T>> transformedCandidates = new ArrayList<>();
             for (BeanDefinition candidate : candidates) {
                 if (!candidate.isIterable()) {
+                    transformedCandidates.add(candidate);
                     continue;
                 }
                 if (candidate.hasDeclaredStereotype(EachProperty.class)) {
