@@ -115,6 +115,7 @@ import io.netty.handler.codec.http2.Http2Connection;
 import io.netty.handler.codec.http2.Http2FrameListener;
 import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2ServerUpgradeCodec;
+import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
 import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
 import io.netty.handler.flow.FlowControlHandler;
@@ -852,6 +853,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                                         pipelineListener.onConnect(p);
                                     }
                                     super.upgradeTo(ctx, upgradeRequest);
+                                    // HTTP1 request is on the implicit stream 1
+                                    upgradeRequest.headers().set(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), 1);
+                                    ctx.fireChannelRead(ReferenceCountUtil.retain(upgradeRequest));
                                 }
                             };
                         } else {

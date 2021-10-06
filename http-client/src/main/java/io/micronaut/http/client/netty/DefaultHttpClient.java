@@ -1195,7 +1195,8 @@ public class DefaultHttpClient implements
                 boolean multipart = MediaType.MULTIPART_FORM_DATA_TYPE.equals(request.getContentType().orElse(null));
                 if (poolMap != null && !multipart) {
                     try {
-                        ChannelPool channelPool = poolMap.get(new RequestKey(requestURI));
+                        RequestKey requestKey = new RequestKey(requestURI);
+                        ChannelPool channelPool = poolMap.get(requestKey);
                         Future<Channel> channelFuture = channelPool.acquire();
                         addInstrumentedListener(channelFuture, future -> {
                             if (future.isSuccess()) {
@@ -1207,6 +1208,7 @@ public class DefaultHttpClient implements
                                             errorType,
                                             emitter,
                                             channel,
+                                            requestKey.isSecure(),
                                             channelPool
                                     );
                                 } catch (Exception e) {
@@ -1243,6 +1245,7 @@ public class DefaultHttpClient implements
                                         errorType,
                                         emitter,
                                         connectionFuture.channel(),
+                                        sslContext != null,
                                         null);
                             } catch (Throwable e) {
                                 emitter.error(e);
@@ -1954,6 +1957,7 @@ public class DefaultHttpClient implements
             Argument<E> errorType,
             FluxSink<io.micronaut.http.HttpResponse<O>> emitter,
             Channel channel,
+            boolean secure,
             ChannelPool channelPool) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         io.micronaut.http.HttpRequest<I> finalRequest = requestWrapper.get();
         URI requestURI = finalRequest.getUri();
@@ -1997,6 +2001,7 @@ public class DefaultHttpClient implements
         addFullHttpResponseHandler(
                 finalRequest,
                 channel,
+                secure,
                 channelPool,
                 emitter,
                 bodyType,
@@ -2222,10 +2227,32 @@ public class DefaultHttpClient implements
         }
     }
 
+    /**
+     * Note: caller must ensure this is only called for plaintext HTTP, not TLS HTTP2
+     */
+    private boolean discardH2cStream(HttpMessage message) {
+        // only applies to h2c
+        if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
+            int streamId = message.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), -1);
+            if (streamId == 1) {
+                // ignore this message
+                if (log.isDebugEnabled()) {
+                    log.debug("Received response on HTTP2 stream 1, the stream used to respond to the initial upgrade request. Ignoring.");
+                }
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+
     @SuppressWarnings("MagicNumber")
     private <O, E> void addFullHttpResponseHandler(
             io.micronaut.http.HttpRequest<?> request,
             Channel channel,
+            boolean secure,
             ChannelPool channelPool,
             FluxSink<io.micronaut.http.HttpResponse<O>> emitter,
             Argument<O> bodyType, Argument<E> errorType) {
@@ -2234,6 +2261,11 @@ public class DefaultHttpClient implements
 
             AtomicBoolean complete = new AtomicBoolean(false);
             boolean keepAlive = true;
+
+            @Override
+            public boolean acceptInboundMessage(Object msg) {
+                return msg instanceof FullHttpResponse && (secure || !discardH2cStream((HttpMessage) msg));
+            }
 
             @Override
             protected void channelReadInstrumented(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
@@ -3194,6 +3226,12 @@ public class DefaultHttpClient implements
                         ctx.close();
                     }
                     super.userEventTriggered(ctx, evt);
+                }
+
+                @Override
+                protected boolean isValidInMessage(Object msg) {
+                    // ignore data on stream 1, that is the response to our initial upgrade request
+                    return super.isValidInMessage(msg) && (sslContext != null || !discardH2cStream((HttpMessage) msg));
                 }
             });
         }
