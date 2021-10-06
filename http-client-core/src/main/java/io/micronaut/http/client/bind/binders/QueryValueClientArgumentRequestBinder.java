@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
@@ -59,12 +58,12 @@ public class QueryValueClientArgumentRequestBinder implements AnnotatedClientArg
      * If value can be converted to ConvertibleMultiValues, then use it and add it to the uriContext.queryParameters.
      * The ConvertibleMultiValues converters are found in
      * {@link io.micronaut.core.convert.converters.MultiValuesConverterFactory} and perform conversion only when the
-     * {@link Format} annotation has one of the supported values.
-     * Otherwise if the {@link Format} annotation is present, it is converted to {@link String}. If none of these
+     * {@link io.micronaut.core.convert.format.Format} annotation has one of the supported values.
+     * Otherwise if the {@link io.micronaut.core.convert.format.Format} annotation is present, it is converted to {@link String}. If none of these
      * are satisfied, the{@link io.micronaut.http.uri.UriTemplate} decides what to do with the given value which
      * is supplied as an Object (it is added to uriContext.pathParameter).
      *
-     * <br> By default value is converted to ConvertibleMultiValues when the {@link Format} annotation is present and has
+     * <br> By default value is converted to ConvertibleMultiValues when the {@link io.micronaut.core.convert.format.Format} annotation is present and has
      * one of the defined above formats. Otherwise empty optional is returned.
      *
      * <br> The default {@link io.micronaut.http.uri.UriTemplate} will convert the value to String and to parameters.

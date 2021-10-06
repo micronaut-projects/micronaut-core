@@ -986,7 +986,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return;
             }
 
-            if (isPrimitive ) {
+            if (isPrimitive) {
                 PrimitiveType pt = (PrimitiveType) producedType;
                 producedTypeName = pt.toString();
                 methodAnnotationMetadata = annotationUtils.newAnnotationBuilder().build(element);

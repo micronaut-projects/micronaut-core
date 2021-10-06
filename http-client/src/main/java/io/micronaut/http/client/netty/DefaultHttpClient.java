@@ -2228,7 +2228,7 @@ public class DefaultHttpClient implements
     }
 
     /**
-     * Note: caller must ensure this is only called for plaintext HTTP, not TLS HTTP2
+     * Note: caller must ensure this is only called for plaintext HTTP, not TLS HTTP2.
      */
     private boolean discardH2cStream(HttpMessage message) {
         // only applies to h2c

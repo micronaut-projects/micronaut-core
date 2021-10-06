@@ -73,9 +73,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         this(classElement, annotationMetadata, visitorContext, Collections.emptyList(), null, 0, false);
     }
 
-
     /**
-     * Used by OpenAPI
+     * Used by OpenAPI.
      *
      * @param classElement       The {@link TypeElement}
      * @param annotationMetadata The annotation metadata
