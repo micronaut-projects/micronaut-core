@@ -28,6 +28,9 @@ import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
@@ -79,8 +82,8 @@ public class RequiresCondition implements Condition {
     public static final String MEMBER_MISSING_BEANS = "missingBeans";
     public static final String MEMBER_OS = "os";
     public static final String MEMBER_NOT_OS = "notOs";
-    public static final String MEMBER_CONFIGURATION_PROPERTIES = "configurationProperties";
-    public static final String MEMBER_METHOD = "method";
+    public static final String MEMBER_CONFIGURATION_PROPERTIES = "configProperties";
+    public static final String MEMBER_CONFIGURATION_PROPERTY = "configProperty";
 
     private final AnnotationMetadata annotationMetadata;
 
@@ -204,7 +207,8 @@ public class RequiresCondition implements Condition {
     }
 
     /**
-     * This method will run conditions that require all beans to be loaded. These conditions included "beans", "missingBeans" and custom conditions.
+     * This method will run conditions that require all beans to be loaded. These conditions included "beans",
+     * "missingBeans", "configProperties" and custom conditions.
      */
     private void processPostStartRequirements(ConditionContext context, AnnotationValue<Requires> requirements) {
         processPreStartRequirements(context, requirements);
@@ -221,7 +225,7 @@ public class RequiresCondition implements Condition {
             return;
         }
 
-        if (!matchesConfigurationPropertiesMethod(context, requirements)) {
+        if (!matchesConfigurationProperties(context, requirements)) {
             return;
         }
 
@@ -656,46 +660,74 @@ public class RequiresCondition implements Condition {
         return true;
     }
 
-    private boolean matchesConfigurationPropertiesMethod(ConditionContext context, AnnotationValue<Requires> requirements) {
+    private boolean matchesConfigurationProperties(ConditionContext context, AnnotationValue<Requires> requirements) {
         if (requirements.contains(MEMBER_CONFIGURATION_PROPERTIES)) {
-            Class<?> type = requirements.classValue(MEMBER_CONFIGURATION_PROPERTIES).orElse(null);
-            String methodName = requirements.stringValue(MEMBER_METHOD).orElse("");
+            Class configPropertiesClass = requirements.classValue(MEMBER_CONFIGURATION_PROPERTIES).orElse(null);
+            String configProperty = requirements.stringValue(MEMBER_CONFIGURATION_PROPERTY).orElse(null);
 
-            if (type == null) {
-                return true;
-            }
+            if (configPropertiesClass != null) {
+                BeanContext beanContext = context.getBeanContext();
+                if (beanContext.containsBean(configPropertiesClass)) {
+                    BeanDefinition<?> beanDefinition = beanContext.getBeanDefinition(configPropertiesClass);
 
-            BeanContext beanContext = context.getBeanContext();
-            Object bean = beanContext.findBeanDefinition(type)
-                            .filter(definition -> definition.isAnnotationPresent(ConfigurationProperties.class))
-                            .flatMap(definition -> beanContext.findBean(type))
-                            .orElse(null);
+                    AnnotationValue<ConfigurationProperties> configurationProperties =
+                        beanDefinition.getAnnotationMetadata().getDeclaredAnnotation(ConfigurationProperties.class);
 
-            if (bean == null) {
-                context.fail("No configuration properties bean of type [" + type + "] present within context");
-                return false;
-            }
+                    if (configurationProperties == null) {
+                        context.fail("ConfigurationProperties bean of type [" + configPropertiesClass + "] is not " +
+                                         "registered in context");
+                        return false;
+                    }
 
-            if (StringUtils.isEmpty(methodName)) {
-                return true;
-            }
+                    if (StringUtils.isNotEmpty(configProperty)) {
+                        try {
+                            BeanIntrospection<Object> introspection = BeanIntrospection.getIntrospection(configPropertiesClass);
+                            BeanProperty<Object, Object> beanProperty = introspection.getProperty(configProperty).orElse(null);
 
-            Method method = ReflectionUtils.findMethod(type, methodName).orElse(null);
-            if (method == null) {
-                context.fail("Method with name [" + methodName + "] not found on [" + type + "]");
-                return false;
-            }
+                            if (beanProperty != null) {
+                                String value = requirements.stringValue().orElse(null);
+                                Object bean = beanContext.getBean(beanDefinition);
 
-            Class<?> returnType = method.getReturnType();
-            if (!returnType.equals(boolean.class) && !returnType.equals(Boolean.class)) {
-                context.fail("Configuration properties method [" + methodName + "] doesn't return boolean value");
-                return false;
-            }
+                                String propertyValue = null;
+                                try {
+                                    propertyValue = beanProperty.get(bean, String.class).orElse(null);
+                                } catch (NullPointerException ex) {
+                                    // NPE is thrown in case wrapper types like Boolean or Integer are null
+                                }
 
-            Boolean matches = ReflectionUtils.invokeMethod(bean, method);
-            if (matches == null || !matches) {
-                context.fail("Configuration properties method [" + methodName + "] invocation returned false");
-                return false;
+                                if (StringUtils.isEmpty(propertyValue)) {
+                                    if (requirements.contains(MEMBER_NOT_EQUALS)) {
+                                        return true;
+                                    } else {
+                                        context.fail("Required configuration property [" + configProperty + "] is not present");
+                                        return false;
+                                    }
+                                } else if (StringUtils.isNotEmpty(value)) {
+                                    if (!propertyValue.equals(value)) {
+                                        context.fail("Configuration property [" + configProperty + "] with value [" + propertyValue + "] does " +
+                                                         "not equal required value: " + value);
+                                        return false;
+                                    }
+                                } else if (requirements.contains(MEMBER_NOT_EQUALS)) {
+                                    String notEquals = requirements.stringValue(MEMBER_NOT_EQUALS).orElse(null);
+                                    if (propertyValue.equals(notEquals)) {
+                                        context.fail("Property [" + configProperty + "] with value [" + propertyValue + "] should not equal: " + notEquals);
+                                        return false;
+                                    }
+                                }
+                            } else {
+                                context.fail("Configuration property [" + configProperty + "] is not present in class [" + configPropertiesClass + "]");
+                                return false;
+                            }
+                        } catch (IntrospectionException ex) {
+                            context.fail("Failed to load introspection for class [" + configPropertiesClass + "]");
+                            return false;
+                        }
+                    }
+                } else {
+                    context.fail("ConfigurationProperties bean of type [" + configPropertiesClass + "] is not registered in context");
+                    return false;
+                }
             }
         }
         return true;
