@@ -373,6 +373,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     @Override
     public int getPort() {
+        if (!isRunning() && serverPort == -1) {
+            throw new UnsupportedOperationException("Retrieving the port from the server before it has started is not supported when binding to a random port");
+        }
         return serverPort;
     }
 
