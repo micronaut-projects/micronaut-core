@@ -15,6 +15,7 @@
  */
 package io.micronaut.websocket;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -171,7 +172,8 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
      * {@link WebSocketPongMessage}.
      * @return A future that completes when the ping has been sent. (Not when the pong has been received!)
      */
-    default CompletableFuture<?> sendPingAsync(byte[] content) {
+    @NonNull
+    default CompletableFuture<?> sendPingAsync(@NonNull byte[] content) {
         throw new UnsupportedOperationException("Ping not supported by this implementation");
     }
 
