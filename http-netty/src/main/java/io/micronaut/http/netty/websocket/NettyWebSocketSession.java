@@ -27,9 +27,11 @@ import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.util.AttributeKey;
 import reactor.core.publisher.Flux;
@@ -215,6 +217,26 @@ public class NettyWebSocketSession implements WebSocketSession {
                 });
             }
         }, FluxSink.OverflowStrategy.ERROR);
+    }
+
+    @Override
+    public CompletableFuture<?> sendPingAsync(byte[] content) {
+        if (isOpen()) {
+            ByteBuf messageBuffer = channel.alloc().buffer(content.length);
+            messageBuffer.writeBytes(content);
+            PingWebSocketFrame frame = new PingWebSocketFrame(messageBuffer);
+            CompletableFuture<Object> future = new CompletableFuture<>();
+            channel.writeAndFlush(frame).addListener(f -> {
+                if (f.isSuccess()) {
+                    future.complete(null);
+                } else {
+                    future.completeExceptionally(new WebSocketSessionException("Send Failure: " + f.cause().getMessage(), f.cause()));
+                }
+            });
+            return future;
+        } else {
+            throw new WebSocketSessionException("Session closed");
+        }
     }
 
     @Override

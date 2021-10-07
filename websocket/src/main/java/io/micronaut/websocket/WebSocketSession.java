@@ -163,6 +163,19 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
     }
 
     /**
+     * Send a ping through this WebSocket. The pong reply can be intercepted using a
+     * {@link io.micronaut.websocket.annotation.OnMessage @OnMessage} method that accepts a
+     * {@link WebSocketPongMessage}.
+     *
+     * @param content The content of the ping. The remote should return the same content in its
+     * {@link WebSocketPongMessage}.
+     * @return A future that completes when the ping has been sent. (Not when the pong has been received!)
+     */
+    default CompletableFuture<?> sendPingAsync(byte[] content) {
+        throw new UnsupportedOperationException("Ping not supported by this implementation");
+    }
+
+    /**
      * The subprotocol if one is used.
      * @return The subprotocol
      */

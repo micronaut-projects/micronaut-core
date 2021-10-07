@@ -177,4 +177,26 @@ class BinaryWebSocketSpec extends Specification {
         wsClient.close()
         embeddedServer.close()
     }
+
+    void "test sending ping messages"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.builder('micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
+        PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
+
+        when:"a websocket connection is established"
+        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
+        BinaryChatClientWebSocket fred = wsClient.connect(BinaryChatClientWebSocket, "/binary/chat/stuff/fred").blockFirst()
+
+        then:"The connection is valid"
+        fred.session != null
+        fred.session.id != null
+
+        when:'A ping is sent'
+        fred.sendPing('foo')
+
+        then:
+        conditions.eventually {
+            fred.pingReplies.contains('foo') && fred.pingReplies.size() == 1
+        }
+    }
 }
