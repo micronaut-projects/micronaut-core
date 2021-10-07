@@ -15,11 +15,17 @@
  */
 package io.micronaut.websocket;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ByteBuffer;
+
+import java.util.Objects;
 
 /**
  * Special message class that can be accepted by a {@link io.micronaut.websocket.annotation.OnMessage @OnMessage}
  * method to listen to WebSocket pongs.
+ *
+ * @since 3.1
+ * @author Jonas Konrad
  */
 public final class WebSocketPongMessage {
     private final ByteBuffer<?> content;
@@ -27,13 +33,15 @@ public final class WebSocketPongMessage {
     /**
      * @param content The content of the pong message.
      */
-    public WebSocketPongMessage(ByteBuffer<?> content) {
+    public WebSocketPongMessage(@NonNull ByteBuffer<?> content) {
+        Objects.requireNonNull(content, "content");
         this.content = content;
     }
 
     /**
      * @return The content of the pong message. This buffer may be released after the message handler has completed.
      */
+    @NonNull
     public ByteBuffer<?> getContent() {
         return content;
     }

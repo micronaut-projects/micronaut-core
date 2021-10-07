@@ -53,6 +53,7 @@ public interface WebSocketBean<T> {
      * messages.
      *
      * @return the method
+     * @since 3.1
      */
     default Optional<MethodExecutionHandle<T, ?>> pongMethod() {
         return Optional.empty();
