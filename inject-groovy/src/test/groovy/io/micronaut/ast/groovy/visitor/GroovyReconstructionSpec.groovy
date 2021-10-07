@@ -173,7 +173,7 @@ abstract class Test<A, $decl> {
         decl << [
                 'T',
                 'T extends CharSequence',
-                'T extends A',
+                //'T extends A',
                 'T extends List',
                 'T extends List<?>',
                 'T extends List<T>',
