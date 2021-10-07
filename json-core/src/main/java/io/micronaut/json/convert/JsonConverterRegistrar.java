@@ -35,6 +35,7 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -207,7 +208,7 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
         return (node, targetType, context) -> {
             try {
                 if (CharSequence.class.isAssignableFrom(targetType) && node.isObject()) {
-                    return Optional.of(node.toString());
+                    return Optional.of(new String(objectCodec.get().writeValueAsBytes(node), StandardCharsets.UTF_8));
                 } else {
                     Argument<?> argument = null;
                     if (context instanceof ArgumentConversionContext && targetType.getTypeParameters().length != 0) {
