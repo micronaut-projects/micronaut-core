@@ -3,8 +3,10 @@ package io.micronaut.http.server.netty.http2
 import io.micronaut.context.annotation.Property
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Put
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
@@ -182,6 +184,14 @@ class H2cSpec extends Specification {
         stream("http://localhost:${embeddedServer.port}/h2c/test") == 'foo'
     }
 
+    def 'http1.1 put'() {
+        given:
+        def http1Client = HttpClient.create(new URL("http://localhost:${embeddedServer.port}/"))
+
+        expect:
+        http1Client.toBlocking().exchange(HttpRequest.PUT("http://localhost:${embeddedServer.port}/h2c/put", "foo"), String).body() == 'Example response: foo'
+    }
+
     @Controller("/h2c")
     static class TestController {
         @Get("/test")
@@ -205,6 +215,11 @@ class H2cSpec extends Specification {
                     sink.complete()
                 }).start()
             }
+        }
+
+        @Put('/put')
+        String put(@Body String body) {
+            return "Example response: $body"
         }
     }
 }
