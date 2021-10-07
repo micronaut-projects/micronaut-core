@@ -77,4 +77,21 @@ class JsonNodeToObjectConverterSpec extends Specification {
             this.value = value
         }
     }
+
+    void "test the converter converts to string properly"() {
+        given:
+        def ctx = ApplicationContext.run()
+        def converter = ctx.getBean(ConversionService)
+
+        when:
+        Optional optional = converter.convert(JsonNode.createObjectNode([:]), String)
+
+        then:
+        noExceptionThrown()
+        optional.isPresent()
+        optional.get() == '{}'
+
+        cleanup:
+        ctx.close()
+    }
 }
