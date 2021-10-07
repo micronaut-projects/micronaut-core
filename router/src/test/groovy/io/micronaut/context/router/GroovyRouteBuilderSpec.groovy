@@ -195,9 +195,9 @@ class GroovyRouteBuilderSpec extends Specification {
         }
     }
 
-    class A extends B {}
-    class B extends C {}
-    class C extends D {}
-    class D extends E {}
-    class E extends RuntimeException {}
+    static class A extends B {}
+    static class B extends C {}
+    static class C extends D {}
+    static class D extends E {}
+    static class E extends RuntimeException {}
 }
