@@ -22,4 +22,3 @@ See the <<distributedConfiguration, distributed configuration>> section of the d
 === Bootstrap Context Beans
 
 In order for a bean to be resolvable in the bootstrap context it must be annotated with ann:context.annotation.BootstrapContextCompatible[]. If any given bean is not annotated then it will not be able to be resolved in the bootstrap context. Typically any bean that is participating in the process of retrieving distributed configuration needs to be annotated.
-=======
