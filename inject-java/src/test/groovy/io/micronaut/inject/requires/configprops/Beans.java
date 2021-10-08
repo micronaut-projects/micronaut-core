@@ -1,5 +1,6 @@
 package io.micronaut.inject.requires.configprops;
 
+import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requirements;
 import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Singleton;
@@ -38,3 +39,11 @@ class F {}
 @Singleton
 @Requires(configProperties = NotConfigurationProperties.class)
 class G {}
+
+@Singleton
+@Requires(configProperties = ToggleableConfig.class)
+class H {}
+
+@Singleton
+@Requires(configProperties =  ToggleableConfig.class, configProperty = "property", value = "true")
+class I {}

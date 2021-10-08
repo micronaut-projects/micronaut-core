@@ -2,8 +2,10 @@ package io.micronaut.inject.requires.configprops;
 
 import groovy.lang.Singleton;
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.util.Toggleable;
 
-
+@Introspected
 @ConfigurationProperties("inherited")
 class InheritedConfig extends OuterConfig {
     private String inheritedProperty;
@@ -19,6 +21,7 @@ class InheritedConfig extends OuterConfig {
     }
 }
 
+@Introspected
 @Singleton
 class NotConfigurationProperties {
     private String property;
@@ -32,6 +35,7 @@ class NotConfigurationProperties {
     }
 }
 
+@Introspected
 @ConfigurationProperties("outer")
 class OuterConfig {
 
@@ -45,6 +49,7 @@ class OuterConfig {
         this.outerProperty = outerProperty;
     }
 
+    @Introspected
     @ConfigurationProperties("inner")
     public static class InnerConfig {
 
@@ -61,6 +66,7 @@ class OuterConfig {
 
 }
 
+@Introspected
 @ConfigurationProperties("type")
 class TypesConfig {
 
@@ -92,5 +98,30 @@ class TypesConfig {
 
     public void setStringProperty(String stringProperty) {
         this.stringProperty = stringProperty;
+    }
+}
+
+@Introspected
+@ConfigurationProperties("toggleable")
+class ToggleableConfig implements Toggleable {
+
+    private Boolean enabled;
+    private Boolean property;
+
+    @Override
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(Boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public Boolean getProperty() {
+        return property;
+    }
+
+    public void setProperty(Boolean property) {
+        this.property = property;
     }
 }

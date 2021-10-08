@@ -128,4 +128,37 @@ class RequiresConfigPropsSpec extends AbstractTypeElementSpec {
         cleanup:
         context.close()
     }
+
+    void "test disabled toggleable configuration properties"() {
+        given:
+        ApplicationContext context = ApplicationContext
+                .builder('toggleable.enabled': 'false')
+                .build();
+
+        context.start()
+
+        expect:
+        !context.containsBean(H.class)
+
+        cleanup:
+        context.close()
+    }
+
+    void "test disabled toggleable configuration precedence over specified property value"() {
+        given:
+        ApplicationContext context = ApplicationContext
+                .builder(
+                        'toggleable.property': 'true',
+                        'toggleable.enabled': 'false'
+                )
+                .build();
+
+        context.start()
+
+        expect:
+        !context.containsBean(I.class)
+
+        cleanup:
+        context.close()
+    }
 }
