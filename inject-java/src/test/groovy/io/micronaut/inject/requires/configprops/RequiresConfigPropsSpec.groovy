@@ -2,6 +2,7 @@ package io.micronaut.inject.requires.configprops
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.exceptions.ConditionalBeanException
 
 class RequiresConfigPropsSpec extends AbstractTypeElementSpec {
 
@@ -157,6 +158,40 @@ class RequiresConfigPropsSpec extends AbstractTypeElementSpec {
 
         expect:
         !context.containsBean(I.class)
+
+        cleanup:
+        context.close()
+    }
+    
+    void "test not introspected configuration properties"() {
+        when:
+        def context = buildContext('''
+package test;
+
+import io.micronaut.context.annotation.*;import jakarta.inject.Singleton;
+
+@ConfigurationProperties("not-introspected")
+class NotIntrospectedConfig {
+    private String property;
+    
+    public String getProperty() {
+        return property;
+    }
+    
+    public void setProperty(String property) {
+        this.property = property;
+    }
+}
+
+@Singleton
+@Requires(configProperties = NotIntrospectedConfig.class, configProperty = "property")
+class ConditionalBean {}
+''')
+        getBean(context, 'test.ConditionalBean')
+
+        then:
+        def e = thrown(ConditionalBeanException)
+        e.message.contains('Bean introspection must be available for the @ConfigurationProperties class [class test.NotIntrospectedConfig]')
 
         cleanup:
         context.close()
