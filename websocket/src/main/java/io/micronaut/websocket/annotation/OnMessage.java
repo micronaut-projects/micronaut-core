@@ -42,4 +42,39 @@ public @interface OnMessage {
      * @return The max size
      */
     int maxPayloadLength() default 65536;
+
+    /**
+     * Web socket servers must set this to true processed incoming masked payload. Client implementations must set this to false.
+     *
+     * @return will the server expect masked frames
+     */
+    boolean expectMaskedFrames() default true;
+
+    /**
+     * When set to true, frames which are not masked properly according to the standard will still be  accepted.
+     *
+     * @return are mask mismatches allowed
+     */
+    boolean allowMaskMismatch() default false;
+
+    /**
+     * Flag to allow reserved extension bits to be used or not
+     *
+     * @return are extension bits allowed
+     */
+    boolean allowExtensions() default false;
+
+    /**
+     * Should the connection close on any type of protocol violations
+     *
+     * @return will connections close on exceptions
+     */
+    boolean closeOnProtocolViolation() default true;
+
+    /**
+     * Checks if the message bytes are encoded using UTF-8
+     *
+     * @return is validator enabled
+     */
+    boolean withUTF8Validator() default true;
 }

@@ -54,6 +54,7 @@ import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.WebSocketDecoderConfig;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory;
 import io.netty.handler.ssl.SslHandler;
@@ -223,18 +224,41 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
      **/
     protected ChannelFuture handleHandshake(ChannelHandlerContext ctx, NettyHttpRequest req, WebSocketBean<?> webSocketBean, MutableHttpResponse<?> response) {
         int maxFramePayloadLength = webSocketBean.messageMethod()
-                .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
-                .orElse(65536)).orElse(65536);
+                .map(m -> m.intValue(OnMessage.class, "maxPayloadLength").orElse(65536))
+                .orElse(65536);
+        boolean expectMaskedFrames = webSocketBean.messageMethod()
+                .map(m -> m.booleanValue(OnMessage.class, "expectMaskedFrames").orElse(true))
+                .orElse(true);
+        boolean allowMaskMismatch = webSocketBean.messageMethod()
+                .map(m -> m.booleanValue(OnMessage.class, "allowMaskMismatch").orElse(false))
+                .orElse(false);
+        boolean allowExtensions = webSocketBean.messageMethod()
+                .map(m -> m.booleanValue(OnMessage.class, "allowExtensions").orElse(false))
+                .orElse(false);
+        boolean closeOnProtocolViolation = webSocketBean.messageMethod()
+                .map(m -> m.booleanValue(OnMessage.class, "closeOnProtocolViolation").orElse(true))
+                .orElse(true);
+        boolean withUTF8Validator = webSocketBean.messageMethod()
+                .map(m -> m.booleanValue(OnMessage.class, "withUTF8Validator").orElse(true))
+                .orElse(true);
+
         String subprotocols = webSocketBean.getBeanDefinition().stringValue(ServerWebSocket.class, "subprotocols")
-                                           .filter(s -> !StringUtils.isEmpty(s))
-                                           .orElse(null);
-        WebSocketServerHandshakerFactory wsFactory =
-                new WebSocketServerHandshakerFactory(
-                        getWebSocketURL(ctx, req),
-                        subprotocols,
-                        true,
-                        maxFramePayloadLength
-                );
+                .filter(s -> !StringUtils.isEmpty(s))
+                .orElse(null);
+
+        WebSocketServerHandshakerFactory wsFactory = new WebSocketServerHandshakerFactory(
+                getWebSocketURL(ctx, req),
+                subprotocols,
+                WebSocketDecoderConfig.newBuilder()
+                        .maxFramePayloadLength(maxFramePayloadLength)
+                        .expectMaskedFrames(expectMaskedFrames)
+                        .allowMaskMismatch(allowMaskMismatch)
+                        .allowExtensions(allowExtensions)
+                        .closeOnProtocolViolation(closeOnProtocolViolation)
+                        .withUTF8Validator(withUTF8Validator)
+                        .build()
+        );
+
         handshaker = wsFactory.newHandshaker(req.getNativeRequest());
         MutableHttpHeaders headers = response.getHeaders();
         io.netty.handler.codec.http.HttpHeaders nettyHeaders;
