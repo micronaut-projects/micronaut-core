@@ -32,31 +32,30 @@ import java.util.Optional;
  */
 public abstract class SslBuilder<T> {
 
-    protected final SslConfiguration ssl;
     private final ResourceResolver resourceResolver;
-    private KeyStore keyStoreCache = null;
-    private KeyStore trustStoreCache = null;
 
     /**
-     * @param ssl              The SSL configuration
      * @param resourceResolver The resource resolver
      */
-    public SslBuilder(SslConfiguration ssl, ResourceResolver resourceResolver) {
-        this.ssl = ssl;
+    public SslBuilder(ResourceResolver resourceResolver) {
         this.resourceResolver = resourceResolver;
     }
 
     /**
+     * @param ssl The ssl configuration
+     *
      * @return Builds the SSL configuration wrapped inside an optional
      */
-    public abstract Optional<T> build();
+    public abstract Optional<T> build(SslConfiguration ssl);
 
     /**
+     * @param ssl The ssl configuration
+     *
      * @return The {@link TrustManagerFactory}
      */
-    protected TrustManagerFactory getTrustManagerFactory() {
+    protected TrustManagerFactory getTrustManagerFactory(SslConfiguration ssl) {
         try {
-            Optional<KeyStore> store = getTrustStore();
+            Optional<KeyStore> store = getTrustStore(ssl);
             TrustManagerFactory trustManagerFactory = TrustManagerFactory
                 .getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(store.orElse(null));
@@ -67,27 +66,28 @@ public abstract class SslBuilder<T> {
     }
 
     /**
+     * @param ssl The ssl configuration
+     *
      * @return An optional {@link KeyStore}
      * @throws Exception if there is an error
      */
-    protected Optional<KeyStore> getTrustStore() throws Exception {
-        if (trustStoreCache == null) {
-            SslConfiguration.TrustStoreConfiguration trustStore = ssl.getTrustStore();
-            if (!trustStore.getPath().isPresent()) {
-                return Optional.empty();
-            }
-            trustStoreCache = load(trustStore.getType(),
-                trustStore.getPath().get(), trustStore.getPassword());
+    protected Optional<KeyStore> getTrustStore(SslConfiguration ssl) throws Exception {
+        SslConfiguration.TrustStoreConfiguration trustStore = ssl.getTrustStore();
+        if (!trustStore.getPath().isPresent()) {
+            return Optional.empty();
         }
-        return Optional.of(trustStoreCache);
+        return Optional.of(load(trustStore.getType(),
+            trustStore.getPath().get(), trustStore.getPassword()));
     }
 
     /**
+     * @param ssl The ssl configuration
+     *
      * @return The {@link KeyManagerFactory}
      */
-    protected KeyManagerFactory getKeyManagerFactory() {
+    protected KeyManagerFactory getKeyManagerFactory(SslConfiguration ssl) {
         try {
-            Optional<KeyStore> keyStore = getKeyStore();
+            Optional<KeyStore> keyStore = getKeyStore(ssl);
             KeyManagerFactory keyManagerFactory = KeyManagerFactory
                 .getInstance(KeyManagerFactory.getDefaultAlgorithm());
             Optional<String> password = ssl.getKey().getPassword();
@@ -103,19 +103,18 @@ public abstract class SslBuilder<T> {
     }
 
     /**
+     * @param ssl The ssl configuration
+     *
      * @return An optional {@link KeyStore}
      * @throws Exception if there is an error
      */
-    protected Optional<KeyStore> getKeyStore() throws Exception {
-        if (keyStoreCache == null) {
-            SslConfiguration.KeyStoreConfiguration keyStore = ssl.getKeyStore();
-            if (!keyStore.getPath().isPresent()) {
-                return Optional.empty();
-            }
-            keyStoreCache = load(keyStore.getType(),
-                keyStore.getPath().get(), keyStore.getPassword());
+    protected Optional<KeyStore> getKeyStore(SslConfiguration ssl) throws Exception {
+        SslConfiguration.KeyStoreConfiguration keyStore = ssl.getKeyStore();
+        if (!keyStore.getPath().isPresent()) {
+            return Optional.empty();
         }
-        return Optional.of(keyStoreCache);
+        return Optional.of(load(keyStore.getType(),
+            keyStore.getPath().get(), keyStore.getPassword()));
     }
 
     /**

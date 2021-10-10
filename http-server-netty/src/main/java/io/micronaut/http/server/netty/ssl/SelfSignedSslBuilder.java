@@ -44,24 +44,30 @@ import static io.micronaut.core.util.StringUtils.TRUE;
 @Internal
 public class SelfSignedSslBuilder extends SslBuilder<SslContext> implements ServerSslBuilder {
 
+    private final ServerSslConfiguration ssl;
+
     /**
      * @param ssl              The SSL configuration
      * @param resourceResolver The resource resolver
      */
     public SelfSignedSslBuilder(ServerSslConfiguration ssl, ResourceResolver resourceResolver) {
-        super(ssl, resourceResolver);
+        super(resourceResolver);
+        this.ssl = ssl;
     }
 
-    /**
-     * @return The SSL configuration
-     */
+    @Override
     public ServerSslConfiguration getSslConfiguration() {
-        return (ServerSslConfiguration) ssl;
+        return ssl;
+    }
+
+    @Override
+    public Optional<SslContext> build() {
+        return build(ssl);
     }
 
     @SuppressWarnings("Duplicates")
     @Override
-    public Optional<SslContext> build() {
+    public Optional<SslContext> build(SslConfiguration ssl) {
         try {
             SelfSignedCertificate ssc = new SelfSignedCertificate();
             return Optional.of(SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey()).build());

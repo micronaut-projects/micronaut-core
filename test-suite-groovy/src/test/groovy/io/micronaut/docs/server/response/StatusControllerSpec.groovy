@@ -1,0 +1,65 @@
+/*
+ * Copyright 2017-2019 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.docs.server.response
+
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.*
+
+class StatusControllerSpec extends Specification {
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
+            ["spec.name": "httpstatus"],
+            Environment.TEST)
+
+    @AutoCleanup
+    @Shared
+    RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+    @Unroll("#description")
+    void "verify default HTTP status and @Status override"() {
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET(uri), String)
+        Optional<String> body = response.getBody()
+
+        then:
+        response.status == status
+        body.isPresent()
+        body.get() == 'success'
+
+        where:
+        uri                          | status              | description
+        "/status"                    | HttpStatus.CREATED  | 'It is possible to control the status with @Status'
+        "/status/http-response"      | HttpStatus.CREATED  | 'You can specify status with HttpResponse.status'
+    }
+
+    void "Verify a controller can return HttpStatus"() {
+        given:
+        String uri = "/status/http-status"
+        when:
+        HttpResponse response = client.toBlocking().exchange(HttpRequest.GET(uri))
+
+        then:
+        response.status == HttpStatus.CREATED
+    }
+}

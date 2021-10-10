@@ -15,7 +15,10 @@
  */
 package io.micronaut.inject.configuration;
 
+import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.util.CollectionUtils;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -75,6 +78,9 @@ public abstract class ConfigurationMetadataBuilder<T> {
         configurationMetadata.name = NameUtils.hyphenate(path, true);
         configurationMetadata.type = getTypeString(type);
         configurationMetadata.description = description;
+        AnnotationMetadata annotationMetadata = getAnnotationMetadata(type);
+        configurationMetadata.includes = CollectionUtils.setOf(annotationMetadata.stringValues(ConfigurationReader.class, "includes"));
+        configurationMetadata.excludes = CollectionUtils.setOf(annotationMetadata.stringValues(ConfigurationReader.class, "excludes"));
         this.configurations.add(configurationMetadata);
         return configurationMetadata;
     }
@@ -188,6 +194,12 @@ public abstract class ConfigurationMetadataBuilder<T> {
      * @return The string
      */
     protected abstract String getTypeString(T type);
+
+    /**
+     * @param type The type
+     * @return The annotation metadata for the type
+     */
+    protected abstract AnnotationMetadata getAnnotationMetadata(T type);
 
     /**
      * Quote a string.

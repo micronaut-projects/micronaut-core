@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
+import io.micronaut.http.client.annotation.Client
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
@@ -170,6 +171,21 @@ class HttpPutSpec extends Specification {
         result == "enable=true"
     }
 
+    void "test multiple uris"() {
+        def client = embeddedServer.applicationContext.getBean(MyPutClient)
+
+        when:
+        String val = client.multiple()
+
+        then:
+        val == "multiple mappings"
+
+        when:
+        val = client.multipleMappings()
+
+        then:
+        val == "multiple mappings"
+    }
 
     @Controller('/put')
     static class PostController {
@@ -213,10 +229,27 @@ class HttpPutSpec extends Specification {
             })
             sb.toString()
         }
+
+        @Put(uris = ["/multiple", "/multiple/mappings"])
+        String multipleMappings() {
+            return "multiple mappings"
+        }
     }
+
     @EqualsAndHashCode
     static class Book {
         String title
         Integer pages
+    }
+
+    @Client("/put")
+    static interface MyPutClient {
+
+        @Put("/multiple")
+        String multiple()
+
+        @Put("/multiple/mappings")
+        String multipleMappings()
+
     }
 }

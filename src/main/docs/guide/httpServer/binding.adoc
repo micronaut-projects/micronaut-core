@@ -1,39 +1,21 @@
-The examples in the previous section demonstrates how Micronaut allows you to bind method parameters from URI path variables.
+The examples in the previous section demonstrates how Micronaut allows you to bind method parameters from URI path variables. This section will discuss how to bind arguments from other parts of the request.
 
 == Binding Annotations
 
-You can customize the name of the variable bound with the link:{api}/io/micronaut/http/annotation/QueryValue.html[@QueryValue] annotation which accepts a value which is the name of the URI variable or request parameter to bind from.
-
-//TODO: No example
-
-Also, in order to bind all request URI variables or request parameters to a command object, you can define URI route variable as `?pojo*`. For example:
-
-.Binding Request parameters to POJO
-[source,java]
-----
-include::{testsuite}/server/binding/BookmarkController.java[tags=imports, indent=0]
-
-include::{testsuite}/server/binding/BookmarkController.java[tags=class, indent=0]
-
-include::{testsuite}/server/binding/BookmarkController.java[tags=listBooks, indent=0]
-----
-
-
-In addition, there are other annotations within the link:{api}/io/micronaut/http/annotation/package-summary.html[io.micronaut.http.annotation] package to bind from different sources.
+All of the binding annotations support customization of the name of the variable being bound from with their `name` member.
 
 The following table summarizes the annotations, their purpose and provides an example:
-
 
 .Parameter Binding Annotations
 |===
 |Annotation|Description |Example
 
 |link:{api}/io/micronaut/http/annotation/Body.html[@Body]
-|Allows to specify the parameter the body of the request should bind to
+|Binds from the body of the request
 |`@Body String body`
 
 |link:{api}/io/micronaut/http/annotation/CookieValue.html[@CookieValue]
-|Binds a parameter from a Cookie
+|Binds a parameter from a cookie
 |`@CookieValue String myCookie`
 
 |link:{api}/io/micronaut/http/annotation/Header.html[@Header]
@@ -41,38 +23,35 @@ The following table summarizes the annotations, their purpose and provides an ex
 |`@Header String contentType`
 
 |link:{api}/io/micronaut/http/annotation/QueryValue.html[@QueryValue]
-|Bindings from a request URI variable or request parameter
+|Binds from a request query parameter
 |`@QueryValue String myParam`
+
+|link:{api}/io/micronaut/http/annotation/Part.html[@Part]
+|Binds from a part of a multipart request
+|`@Part CompletedFileUpload file`
+
+|link:{api}/io/micronaut/http/annotation/RequestAttribute.html[@RequestAttribute]
+|Binds from an attribute of the request. Attributes are typically created in filters
+|`@RequestAttribute String myAttribute`
+
+|link:{api}/io/micronaut/http/annotation/RequestAttribute.html[@PathVariable]
+|Binds from the path of the request
+|`@PathVariable String id`
 |===
 
 When a value is not specified to any binding annotation then the parameter name is used. In other words the following two methods are equivalent and both bind from a cookie called `myCookie`:
 
-[source,groovy]
-----
-String hello(@CookieValue("myCookie") String myCookie) {
-    ...
-}
+snippet::io.micronaut.docs.server.binding.BindingController[tags="cookie1,cookie2",indent=0]
 
-String hello(@CookieValue String myCookie) {
-    ...
-}
-----
+Because hyphens are not allowed in variable names it may be necessary to set the name in the annotation. The following two definitions are equivalent:
 
-Since Java doesn't allow hyphens in variable names in the case of headers the following two definitions are equivalent:
+snippet::io.micronaut.docs.server.binding.BindingController[tags="header1,header2",indent=0]
 
+== Binding from Multiple values
 
-[source,java]
-----
-public String hello(@Header("Content-Type") String contentType) {
-    ...
-}
+Instead of binding from a single section of the request, it may be desirable to bind all query values for example to a POJO. This can be achieved by using the exploded operator (`?pojo*`) in the URI template. For example:
 
-public String hello(@Header String contentType) {
-    ...
-}
-----
-
-
+snippet::io.micronaut.docs.server.binding.BookmarkController[tags="imports,class", indent=0, title="Binding Request parameters to POJO"]
 
 == Bindable Types
 
@@ -80,40 +59,23 @@ Generally any type that can be converted from a String representation to a Java 
 
 This includes most common Java types, however additional link:{api}/io/micronaut/core/convert/TypeConverter.html[TypeConverter] instances can be registered simply be creating `@Singleton` beans of type `TypeConverter`.
 
-The handling of link:{jdkapi}/java/util/Optional.html[Optional] deserves special mention. Consider for example the following example:
+The handling of nullability deserves special mention. Consider for example the following example:
 
-[source,java]
-----
-public String hello(@Header String contentType) {
-    ...
-}
-----
+snippet::io.micronaut.docs.server.binding.BindingController[tags="header2",indent=0]
 
 In this case if the HTTP header `Content-Type` is not present in the request the route is considered invalid, since it cannot be satisfied and a HTTP 400 `BAD REQUEST` is returned.
 
 If you wish for the `Content-Type` header to be optional, you can instead write:
 
-[source,java]
-----
-public String hello(@Header Optional<String> contentType) {
-    ...
-}
-----
+snippet::io.micronaut.docs.server.binding.BindingController[tags="header3",indent=0]
 
-An empty `Optional` will be passed if the header is absent from the request.
+An null string will be passed if the header is absent from the request.
+
+NOTE: `java.util.Optional` can also be used, however that is discouraged for method parameters.
 
 Additionally, any `DateTime` that conforms to link:{jdkapi}/java/time/format/DateTimeFormatter.html#RFC_1123_DATE_TIME[RFC-1123] can be bound to a parameter, alternatively the format can be customized with the link:{api}/io/micronaut/core/convert/format/Format.html[Format] annotation:
 
-[source,java]
-----
-public String hello(@Header ZonedDateTime date) {
-    ...
-}
-
-public String hello(@Format('dd/MM/yyy') @Header ZonedDateTime date) {
-    ...
-}
-----
+snippet::io.micronaut.docs.server.binding.BindingController[tags="format1,format2",indent=0]
 
 == Variables resolution
 

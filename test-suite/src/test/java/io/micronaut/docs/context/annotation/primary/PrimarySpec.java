@@ -44,7 +44,7 @@ public class PrimarySpec {
     public void testPrimaryAnnotatedBeanIsInjectedWhenMultipleOptionsExist() {
         assertEquals(embeddedServer.getApplicationContext().getBeansOfType(ColorPicker.class).size(), 2);
 
-        HttpResponse<String> rsp = rxClient.toBlocking().exchange(HttpRequest.GET("/test"), String.class);
+        HttpResponse<String> rsp = rxClient.toBlocking().exchange(HttpRequest.GET("/testPrimary"), String.class);
 
         assertEquals(rsp.status(), HttpStatus.OK);
         assertEquals(rsp.body(), "green");

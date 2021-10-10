@@ -40,7 +40,9 @@ import java.util.Set;
  *
  * @author Iván López
  * @since 1.1.0
+ * @deprecated No replacement because mixed case keys can now be resolved
  */
+@Deprecated
 public class MixedCasePropertyTypeElementVisitor implements TypeElementVisitor<Object, Object> {
 
     private boolean skipValidation = false;

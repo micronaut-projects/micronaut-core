@@ -155,6 +155,7 @@ public interface BeanDefinitionVisitor {
      * Visits an injection point for a field and setter pairing.
      *
      * @param declaringType      The declaring type
+     * @param returnType         The return type
      * @param annotationMetadata The annotation metadata
      * @param requiresReflection Whether the setter requires reflection
      * @param fieldType          The field type
@@ -164,6 +165,7 @@ public interface BeanDefinitionVisitor {
      * @param isOptional         Whether the setter is optional
      */
     void visitSetterValue(Object declaringType,
+                          Object returnType,
                           AnnotationMetadata annotationMetadata,
                           boolean requiresReflection,
                           Object fieldType,
@@ -177,6 +179,7 @@ public interface BeanDefinitionVisitor {
      * Visits an injection point for a setter.
      *
      * @param declaringType          The declaring type
+     * @param returnType             The return type
      * @param methodMetadata         The annotation metadata
      * @param requiresReflection     Whether the setter requires reflection
      * @param valueType              The field type
@@ -186,6 +189,7 @@ public interface BeanDefinitionVisitor {
      * @param isOptional             Whether the setter is optional
      */
     void visitSetterValue(Object declaringType,
+                          Object returnType,
                           AnnotationMetadata methodMetadata,
                           boolean requiresReflection,
                           Object valueType,

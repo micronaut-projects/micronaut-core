@@ -45,39 +45,23 @@ import java.util.Optional;
 public class NettyClientSslBuilder extends SslBuilder<SslContext> {
 
     /**
-     * @param ssl              The SSL configuration
      * @param resourceResolver The resource resolver
      */
     @Inject
-    public NettyClientSslBuilder(ClientSslConfiguration ssl, ResourceResolver resourceResolver) {
-        super(ssl, resourceResolver);
-    }
-
-    /**
-     * @param ssl The SSL configuration
-     */
-    public NettyClientSslBuilder(SslConfiguration ssl/*, ResourceResolver resourceResolver*/) {
-        super(ssl, new ResourceResolver());
-    }
-
-
-    /**
-     * @return The SSL configuration
-     */
-    public SslConfiguration getSslConfiguration() {
-        return ssl;
+    public NettyClientSslBuilder(ResourceResolver resourceResolver) {
+        super(resourceResolver);
     }
 
     @SuppressWarnings("Duplicates")
     @Override
-    public Optional<SslContext> build() {
+    public Optional<SslContext> build(SslConfiguration ssl) {
         if (!ssl.isEnabled()) {
             return Optional.empty();
         }
         SslContextBuilder sslBuilder = SslContextBuilder
             .forClient()
-            .keyManager(getKeyManagerFactory())
-            .trustManager(getTrustManagerFactory());
+            .keyManager(getKeyManagerFactory(ssl))
+            .trustManager(getTrustManagerFactory(ssl));
         if (ssl.getProtocols().isPresent()) {
             sslBuilder.protocols(ssl.getProtocols().get());
         }
@@ -101,10 +85,10 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> {
     }
 
     @Override
-    protected KeyManagerFactory getKeyManagerFactory() {
+    protected KeyManagerFactory getKeyManagerFactory(SslConfiguration ssl) {
         try {
-            if (this.getKeyStore().isPresent()) {
-                return super.getKeyManagerFactory();
+            if (this.getKeyStore(ssl).isPresent()) {
+                return super.getKeyManagerFactory(ssl);
             } else {
                 return null;
             }
@@ -114,10 +98,10 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> {
     }
 
     @Override
-    protected TrustManagerFactory getTrustManagerFactory() {
+    protected TrustManagerFactory getTrustManagerFactory(SslConfiguration ssl) {
         try {
-            if (this.getTrustStore().isPresent()) {
-                return super.getTrustManagerFactory();
+            if (this.getTrustStore(ssl).isPresent()) {
+                return super.getTrustManagerFactory(ssl);
             } else {
                 return InsecureTrustManagerFactory.INSTANCE;
             }

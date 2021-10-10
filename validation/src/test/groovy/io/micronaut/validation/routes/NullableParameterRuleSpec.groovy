@@ -180,4 +180,155 @@ class Foo {
         noExceptionThrown()
     }
 
+    void "test nullable with multiple uris"() {
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import javax.annotation.Nullable;
+
+@Controller("/foo")
+class Foo {
+
+    @Get(uris = {"/{?abc}"})
+    String abc(@Nullable String abc) {
+        return "";
+    }
+}
+
+""")
+
+        then:
+        noExceptionThrown()
+
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import javax.annotation.Nullable;
+
+@Controller("/foo")
+class Foo {
+
+    @Get(uris = {"/{abc}", "/{?def}"})
+    String abc(String abc, @Nullable String def) {
+        return "";
+    }
+}
+
+""")
+
+        then: "abc is optional because /{?def} may be matched and it does not have {abc}"
+        def ex = thrown(RuntimeException)
+        ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+
+@Controller("/foo")
+class Foo {
+
+    @Get(uris = {"/{abc}", "/{?abc}"})
+    String abc(String abc) {
+        return "";
+    }
+}
+
+""")
+        then: "abc is optional because it is optional in at least one template"
+        ex = thrown(RuntimeException)
+        ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+
+@Controller("/foo")
+class Foo {
+
+    @Get(uris = {"/{abc}", "/{abc}"})
+    String abc(String abc) {
+        return "";
+    }
+}
+
+""")
+        then:
+        noExceptionThrown()
+
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import javax.annotation.Nullable;
+
+@Controller("/foo")
+class Foo {
+
+    @Get(uris = {"/{?abc}", "/{?abc}"})
+    String abc(@Nullable String abc) {
+        return "";
+    }
+}
+
+""")
+        then:
+        noExceptionThrown()
+
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+
+@Controller("/foo")
+class Foo {
+
+    @Get(uris = {"/{?abc}", "/{abc}"})
+    String abc(String abc) {
+        return "";
+    }
+}
+
+""")
+        then: "abc is optional because it is optional in at least one template"
+        ex = thrown(RuntimeException)
+        ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import javax.annotation.Nullable;
+
+@Controller("/foo")
+class Foo {
+
+    @Get(uris = {"/{abc}", "/{def}"})
+    String abc(String abc, String def) {
+        return "";
+    }
+}
+
+""")
+        then:
+        ex = thrown(RuntimeException)
+        ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+    }
 }

@@ -25,6 +25,7 @@ import java.util.Optional;
  * an the SSLContext supplied later to the micronaut http server.
  */
 public interface ServerSslBuilder {
+
     /**
      * @return The SSL configuration
      */

@@ -15,6 +15,7 @@
  */
 package io.micronaut.cache
 
+import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.async.annotation.SingleResult
 import io.reactivex.Flowable
 import io.reactivex.Single
@@ -240,6 +241,25 @@ class SyncCacheSpec extends Specification {
             !syncCache.get("three", Integer).isPresent()
             !syncCache.get("four", Integer).isPresent()
         }
+
+        cleanup:
+        applicationContext.stop()
+    }
+
+    void "test exception is thrown if non configured cache is retrieved"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'micronaut.caches.test.initialCapacity':1,
+                'micronaut.caches.test.maximumSize':3
+        )
+        CacheManager cacheManager = applicationContext.getBean(CacheManager)
+
+        when:
+        cacheManager.getCache("fooBar")
+
+        then:
+        def ex = thrown(ConfigurationException)
+        ex.message == "No cache configured for name: fooBar"
 
         cleanup:
         applicationContext.stop()

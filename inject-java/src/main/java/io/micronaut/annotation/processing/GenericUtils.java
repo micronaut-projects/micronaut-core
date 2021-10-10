@@ -280,7 +280,15 @@ public class GenericUtils {
                         if (extendsBound != null) {
                             resolveGenericTypeParameter(resolvedParameters, parameterName, extendsBound, boundTypes);
                         } else if (superBound != null) {
-                            resolveGenericTypeParameter(resolvedParameters, parameterName, superBound, boundTypes);
+                            if (superBound instanceof TypeVariable) {
+                                TypeVariable superTypeVar = (TypeVariable) superBound;
+                                final TypeMirror upperBound = superTypeVar.getUpperBound();
+                                if (upperBound != null && !type.equals(upperBound)) {
+                                    resolveGenericTypeParameter(resolvedParameters, parameterName, superBound, boundTypes);
+                                }
+                            } else {
+                                resolveGenericTypeParameter(resolvedParameters, parameterName, superBound, boundTypes);
+                            }
                         } else {
                             resolvedParameters.put(parameterName, Object.class);
                         }

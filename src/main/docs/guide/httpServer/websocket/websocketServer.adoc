@@ -1,10 +1,6 @@
 The ann:websocket.annotation.ServerWebSocket[] annotation can be applied to any class that should map to a WebSocket URI. The following example is a simple chat WebSocket implementation:
 
-.WebSocket Chat Example
-[source,java]
-----
-include::{testswebsocket}/ChatServerWebSocket.java[tag=clazz]
-----
+snippet::io.micronaut.docs.http.server.netty.websocket.ChatServerWebSocket[tags="clazz", indent=0,title="WebSocket Chat Example"]
 
 <1> The ann:websocket.annotation.ServerWebSocket[] annotation is used to define the path the WebSocket is mapped under. The URI can be a URI template.
 <2> The ann:websocket.annotation.OnOpen[] annotation is used to declare a method that is invoked when the WebSocket is opened.
@@ -40,11 +36,7 @@ A method annotated with ann:websocket.annotation.OnError[] can be added to imple
 
 The previous example uses the `broadcastSync` method of the api:websocket.WebSocketSession[] interface which blocks until the broadcast is complete. You can however implement non-blocking WebSocket servers by instead returning a rs:Publisher[] or a `Future` from each WebSocket handler method. For example:
 
-.WebSocket Chat Example
-[source,java]
-----
-include::{testswebsocket}/ReactivePojoChatServerWebSocket.java[tag=onmessage, indent=0]
-----
+snippet::io.micronaut.docs.http.server.netty.websocket.ReactivePojoChatServerWebSocket[tags="onmessage", indent=0,title="WebSocket Chat Example"]
 
 === @ServerWebSocket and Scopes
 

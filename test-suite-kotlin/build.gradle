@@ -26,7 +26,13 @@ dependencies {
     kaptTest project(':inject-java')
     kaptTest project(':validation')
     testCompile project(":http-client")
+    testCompile project(":session")
+    testCompile dependencyVersion("reactor")
     testCompile dependencyModuleVersion("micronaut.test", "micronaut-test-junit5"), {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+    }
+    testCompile dependencyModuleVersion("micronaut.test", "micronaut-test-kotlintest"), {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }

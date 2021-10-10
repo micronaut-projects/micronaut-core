@@ -7,11 +7,7 @@ The ann:http.annotation.Header[] annotation can be declared at the type level an
 
 The following example serves to illustrate this:
 
-.Defining Headers via Configuration
-[source,java]
-----
-include::{testsclient}/annotation/headers/PetClient.java[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.annotation.headers.PetClient[tags="class", indent=0, title="Defining Headers via Configuration"]
 
 The above example defines a ann:http.annotation.Header[] annotation on the `PetClient` interface that reads a property using property placeholder configuration called `pet.client.id`.
 

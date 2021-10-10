@@ -2,7 +2,6 @@ If you need more control over request processing then you can instead write a me
 
 In fact, there are several higher level interfaces that can be bound to method parameters of controllers. These include:
 
-
 .Bindable Micronaut Interfaces
 |===
 |Interface |Description |Example
@@ -30,19 +29,12 @@ In addition, for full control over the emitted HTTP response you can use the sta
 
 The following example implements the previous `MessageController` example using the api:io.micronaut.http.HttpRequest[] and api:io.micronaut.http.HttpResponse[] objects:
 
-.Request and Response Example
-[source,java]
-----
-include::{testsuite}/server/request/MessageController.java[tags=imports, indent=0]
+snippet::io.micronaut.docs.server.request.MessageController[tags="imports,class", indent=0, title="Request and Response Example"]
 
-include::{testsuite}/server/request/MessageController.java[tags=class, indent=0]
-----
+<1> The method is mapped to the URI `/hello` and accepts a api:io.micronaut.http.HttpRequest[]
+<2> The api:http.HttpRequest[] is used to obtain the value of a query parameter called `name`.
+<3> The api:http.HttpResponse.ok(T)[] method is used to return a api:http.MutableHttpResponse[] with a text body. A header called `X-My-Header` is also added to the response object.
 
-<1> The factory methods of the api:http.HttpResponse[] are statically imported
-<2> The method is mapped to the URI `/hello` and accepts a api:io.micronaut.http.HttpRequest[]
-<3> The api:http.HttpRequest[] is used to obtain the value of a query parameter called `name`.
-<4> The api:http.HttpResponse.ok(T)[] method is used to return a api:http.MutableHttpResponse[] with a text body. A header called `X-My-Header` is also added to the response object.
+api:io.micronaut.http.HttpRequest[] is also available from static context via api:io.micronaut.http.context.ServerRequestContext[].
 
-api:io.micronaut.http.HttpRequest[] is also availble from static context via io.micronaut.http.context.ServerRequestContext[].
-
-IMPORTANT: Generally io.micronaut.http.context.ServerRequestContext[] is available within reactive flow, but recommended aproach is to propogate necessary state through lambdas.
+IMPORTANT: Generally api:io.micronaut.http.context.ServerRequestContext[] is available within reactive flow, but the recommended approach is to propagate the necessary state through lambdas.

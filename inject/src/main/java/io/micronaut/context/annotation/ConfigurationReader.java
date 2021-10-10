@@ -45,4 +45,14 @@ public @interface ConfigurationReader {
      * @return The prefix to use
      */
     String prefix() default "";
+
+    /**
+     * @return The names of the properties to include
+     */
+    String[] includes() default {};
+
+    /**
+     * @return The names of the properties to exclude
+     */
+    String[] excludes() default {};
 }

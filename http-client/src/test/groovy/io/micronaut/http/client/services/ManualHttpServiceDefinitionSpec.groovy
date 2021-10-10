@@ -17,21 +17,25 @@ package io.micronaut.http.client.services
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Put
+import io.micronaut.http.client.DefaultHttpClient
 import io.micronaut.http.client.ServiceHttpClientConfiguration
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.client.RxHttpClient
-import io.micronaut.http.ssl.ClientSslConfiguration
-import io.micronaut.http.ssl.DefaultSslConfiguration
+import io.micronaut.http.server.netty.NettyHttpRequest
+import io.micronaut.http.ssl.ClientAuthentication
 import io.micronaut.http.ssl.SslConfiguration
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.server.EmbeddedServer
+import io.netty.handler.ssl.SslHandler
 import spock.lang.Specification
 
+import java.security.cert.X509Certificate
 import java.time.Duration
 
 class ManualHttpServiceDefinitionSpec extends Specification {
@@ -49,12 +53,20 @@ class ManualHttpServiceDefinitionSpec extends Specification {
                 'micronaut.http.services.foo.health-check-interval':'100ms',
                 'micronaut.http.services.foo.read-timeout':'15s',
                 'micronaut.http.services.foo.pool.enabled':false,
+                "micronaut.http.services.foo.ssl.enabled": false,
+                "micronaut.http.services.foo.ssl.client-authentication": "NEED",
+                "micronaut.http.services.foo.ssl.key-store.path": "classpath:foo",
+                "micronaut.http.services.foo.ssl.key-store.password": "secret",
                 'micronaut.http.services.bar.url': firstApp.getURI(),
                 'micronaut.http.services.bar.path': '/manual/http/service',
                 'micronaut.http.services.bar.health-check':true,
                 'micronaut.http.services.bar.health-check-interval':'100ms',
                 'micronaut.http.services.bar.read-timeout':'10s',
                 'micronaut.http.services.bar.pool.enabled':true,
+                "micronaut.http.services.bar.ssl.enabled": false,
+                "micronaut.http.services.bar.ssl.client-authentication": "NEED",
+                "micronaut.http.services.bar.ssl.key-store.path": "classpath:bar",
+                "micronaut.http.services.bar.ssl.key-store.password": "secret",
                 'micronaut.http.services.baz.url': firstApp.getURI(),
                 'micronaut.http.services.baz.path': '/manual/http/service',
         )
@@ -66,7 +78,12 @@ class ManualHttpServiceDefinitionSpec extends Specification {
 
         then:
         config.readTimeout.get() == Duration.ofSeconds(15)
-        !config.getConnectionPoolConfiguration().isEnabled()
+        !config.connectionPoolConfiguration.enabled
+        !config.sslConfiguration.enabled
+        config.sslConfiguration.keyStore.password.get() == "secret"
+        config.sslConfiguration.keyStore.path.get() == "classpath:foo"
+        config.sslConfiguration.clientAuthentication.get() == ClientAuthentication.NEED
+
 
         when:
         RxHttpClient client = clientApp.getBean(RxHttpClient, Qualifiers.byName("foo"))
@@ -83,6 +100,10 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         then:
         config.readTimeout.get() == Duration.ofSeconds(10)
         config.getConnectionPoolConfiguration().isEnabled()
+        !config.sslConfiguration.enabled
+        config.sslConfiguration.keyStore.password.get() == "secret"
+        config.sslConfiguration.keyStore.path.get() == "classpath:bar"
+        config.sslConfiguration.clientAuthentication.get() == ClientAuthentication.NEED
 
         when:
         client = clientApp.getBean(RxHttpClient, Qualifiers.byName("bar"))
@@ -156,6 +177,48 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         clientApp.close()
     }
 
+    void "test working SSL configuration"() {
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.ssl.enabled': true,
+                'micronaut.server.ssl.client-authentication': 'NEED',
+                'micronaut.server.ssl.key-store.path': 'classpath:certs/server.p12',
+                'micronaut.server.ssl.key-store.password': 'secret',
+                'micronaut.server.ssl.trust-store.path': 'classpath:certs/truststore',
+                'micronaut.server.ssl.trust-store.password': 'secret'
+        ])
+
+        ApplicationContext ctx = ApplicationContext.run(
+                'micronaut.http.services.client1.urls': ['https://localhost:8443'],
+                'micronaut.http.services.client1.path': ['/ssl-test'],
+                'micronaut.http.services.client1.ssl.enabled': true,
+                'micronaut.http.services.client1.ssl.client-authentication': 'NEED',
+                'micronaut.http.services.client1.ssl.key-store.path': 'classpath:certs/client1.p12',
+                'micronaut.http.services.client1.ssl.key-store.password': 'secret'
+        )
+        SslClient client1 = ctx.getBean(SslClient)
+        final String DN = "CN=client1.test.example.com, OU=IT, O=Whatever, L=Munich, ST=Bavaria, C=DE, EMAILADDRESS=info@example.com"
+
+
+        when:
+        def client = new DefaultHttpClient(embeddedServer.getURL(), ctx.getBean(HttpClientConfiguration, Qualifiers.byName("client1")))
+
+        then:
+        client.toBlocking().retrieve(HttpRequest.GET("/ssl-test"), String) == DN
+
+        when:
+        client = ctx.getBean(RxHttpClient, Qualifiers.byName("client1"))
+
+        then:
+        client.toBlocking().retrieve(HttpRequest.GET("/"), String) == DN
+
+        expect:
+        client1.test().body() == "CN=client1.test.example.com, OU=IT, O=Whatever, L=Munich, ST=Bavaria, C=DE, EMAILADDRESS=info@example.com"
+
+        cleanup:
+        ctx.close()
+        embeddedServer.close()
+    }
+
     @Client(id = "foo")
     static interface TestClientFoo {
         @Get
@@ -217,5 +280,26 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         String update() {
             return "updated-other"
         }
+    }
+
+    @Controller("/ssl-test")
+    static class SslController {
+
+        @Get
+        HttpResponse<String> test(HttpRequest request) {
+            def pipeline = (request as NettyHttpRequest).getChannelHandlerContext().pipeline()
+            def sslHandler = pipeline.get(SslHandler)
+            def certs = sslHandler.engine().getSession().getPeerCertificates()
+
+            def cert = certs.first() as X509Certificate
+
+            return HttpResponse.ok(cert.subjectDN.name)
+        }
+    }
+
+    @Client("client1")
+    static interface SslClient {
+        @Get
+        HttpResponse<String> test()
     }
 }

@@ -36,6 +36,28 @@ class PropertySourcePropertyResolverSpec extends Specification {
     @Rule
     private final EnvironmentVariables environmentVariables = new EnvironmentVariables()
 
+    void "test resolve raw properties"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", [TWITTER_OAUTH2_ACCESS_TOKEN: 'xxx'], PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE),
+                PropertySource.of("test",
+                        ['camelCase.fooBar': 'xxx',
+                         'camelCase.URL'   : "http://localhost"],
+                        PropertySource.PropertyConvention.JAVA_PROPERTIES
+                )
+        )
+
+        expect:
+        resolver.containsProperty('TWITTER_OAUTH2_ACCESS_TOKEN')
+        resolver.getProperty('TWITTER_OAUTH2_ACCESS_TOKEN', String).get() == 'xxx'
+        resolver.containsProperty("camelCase.URL")
+        resolver.containsProperties("camel-case")
+        resolver.containsProperties("camelCase")
+        resolver.getProperties("camelCase", StringConvention.RAW) == ['fooBar': 'xxx',
+                                                                            'URL'   : "http://localhost"]
+        resolver.getProperty("camelCase.URL", URL).get() == new URL("http://localhost")
+    }
+
     @Unroll
     void "test property resolution rules for key #key"() {
         given:

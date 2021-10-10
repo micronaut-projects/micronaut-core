@@ -46,6 +46,10 @@ To configure a weigher to be used with the `maximumWeight` configuration, create
 
 include::{includedir}configurationProperties/io.micronaut.cache.DefaultCacheConfiguration.adoc[]
 
+== Dynamic Cache Creation
+
+For use cases where caches cannot be configured ahead of time, a api:cache.DynamicCacheManager[] bean can be registered. When a cache is attempted to be retrieved that was not predefined, the dynamic cache manager will be invoked to return a cache. By default there is no dynamic cache manager configured, however other cache implementations may do so.
+
 == Other Cache Implementations
 
 Check the https://micronaut-projects.github.io/micronaut-cache/latest/guide/index.html[Micronaut Cache] project for more

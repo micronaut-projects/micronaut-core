@@ -26,8 +26,8 @@ import java.util.function.Supplier;
 /**
  * <p>A synchronous API for accessing cache values that is useful for in-memory caching implementations.</p>
  * <p>
- * <p>Caching implementations that require blocking IO should implement the {@link #async()} method to provide a
- * non-blocking implementation of this interface</p>
+ * <p>Caching implementations that require blocking IO should implement the {@link #getExecutorService()} method to provide an
+ * executor service to offload the operations to. If the cache natively supports asynchronous operations, override the {@link #async()} method to provide a more customized asynchronous solution.</p>
  * <p>
  * <p>Implementers of this interface should mark the implementation as {@link io.micronaut.core.annotation.Blocking} if a blocking operation is
  * required to read or write cache values</p>
@@ -132,12 +132,11 @@ public interface SyncCache<C> extends Cache<C> {
     }
 
     /**
-     * <p>This method should return an async API version of this cache interface implementation.</p>
+     * <p>This method returns an async version of this cache interface implementation.</p>
      * <p>
-     * <p>The default behaviour assumes the cache implementation is running in-memory and performs no blocking
-     * operations and hence simply delegates to the {@link SyncCache} implementation.
-     * If I/O operations are required implementors should override this API and provide an API that implements
-     * {@link AsyncCache} in a non-blocking manner.</p>
+     * <p>The default behaviour will execute the operations in the same thread if null
+     * is returned from {@link #getExecutorService()}. If an executor service is returned, the
+     * operations will be offloaded to the provided executor service.</p>
      *
      * @return The {@link AsyncCache} implementation for this cache
      */

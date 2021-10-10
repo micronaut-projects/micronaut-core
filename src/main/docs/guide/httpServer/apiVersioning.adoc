@@ -2,14 +2,7 @@ Since 1.1.x, Micronaut supports API versioning via a dedicated ann:core.version.
 
 The following example demonstrates how to version an API:
 
-.Versioning an API
-[source,java]
-----
-include::router/src/test/groovy/io/micronaut/web/router/version/VersionedController.java[tags=imports, indent=0]
-
-include::router/src/test/groovy/io/micronaut/web/router/version/VersionedController.java[tags=clazz, indent=0]
-}
-----
+snippet::io.micronaut.docs.web.router.version.VersionedController[tags="imports,clazz", indent=0, title="Versioning an API"]
 
 <1> The `helloV1` method is declared as version `1`
 <2> The `helloV2` method is declared as version `2`

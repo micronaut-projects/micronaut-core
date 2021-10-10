@@ -519,6 +519,22 @@ class HttpGetSpec extends Specification {
         val == "success"
     }
 
+    void "test multiple uris"() {
+        def client = embeddedServer.applicationContext.getBean(MyGetClient)
+
+        when:
+        String val = client.multiple()
+
+        then:
+        val == "multiple mappings"
+
+        when:
+        val = client.multipleMappings()
+
+        then:
+        val == "multiple mappings"
+    }
+
     @Controller("/get")
     static class GetController {
 
@@ -615,6 +631,11 @@ class HttpGetSpec extends Specification {
         @Get("/completable/error")
         Completable completableError() {
             return Completable.error(new RuntimeException("completable error"))
+        }
+
+        @Get(uris = ["/multiple", "/multiple/mappings"])
+        String multipleMappings() {
+            return "multiple mappings"
         }
     }
 
@@ -724,6 +745,12 @@ class HttpGetSpec extends Specification {
 
         @Get("/completable/error")
         Completable completableError()
+
+        @Get("/multiple")
+        String multiple()
+
+        @Get("/multiple/mappings")
+        String multipleMappings()
     }
 
     @Client("http://not.used")

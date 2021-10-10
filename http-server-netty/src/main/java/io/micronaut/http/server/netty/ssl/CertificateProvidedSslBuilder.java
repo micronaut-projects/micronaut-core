@@ -25,6 +25,7 @@ import io.netty.handler.ssl.SslContextBuilder;
 
 import javax.inject.Singleton;
 import javax.net.ssl.SSLException;
+import java.security.KeyStore;
 import java.util.Arrays;
 import java.util.Optional;
 
@@ -41,28 +42,35 @@ import static io.micronaut.core.util.StringUtils.TRUE;
 @Internal
 public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implements ServerSslBuilder {
 
+    private final ServerSslConfiguration ssl;
+    private KeyStore keyStoreCache = null;
+    private KeyStore trustStoreCache = null;
+
     /**
-     * @param ssl              The SSL configuration
+     * @param ssl              The ssl configuration
      * @param resourceResolver The resource resolver
      */
     public CertificateProvidedSslBuilder(ServerSslConfiguration ssl, ResourceResolver resourceResolver) {
-        super(ssl, resourceResolver);
+        super(resourceResolver);
+        this.ssl = ssl;
     }
 
-    /**
-     * @return The SSL configuration
-     */
     @Override
     public ServerSslConfiguration getSslConfiguration() {
-        return (ServerSslConfiguration) ssl;
+        return ssl;
+    }
+
+    @Override
+    public Optional<SslContext> build() {
+        return build(ssl);
     }
 
     @SuppressWarnings("Duplicates")
     @Override
-    public Optional<SslContext> build() {
+    public Optional<SslContext> build(SslConfiguration ssl) {
         SslContextBuilder sslBuilder = SslContextBuilder
-            .forServer(getKeyManagerFactory())
-            .trustManager(getTrustManagerFactory());
+            .forServer(getKeyManagerFactory(ssl))
+            .trustManager(getTrustManagerFactory(ssl));
 
         if (ssl.getProtocols().isPresent()) {
             sslBuilder.protocols(ssl.getProtocols().get());
@@ -84,5 +92,21 @@ public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implem
         } catch (SSLException ex) {
             throw new SslConfigurationException("An error occurred while setting up SSL", ex);
         }
+    }
+
+    @Override
+    protected Optional<KeyStore> getTrustStore(SslConfiguration ssl) throws Exception {
+        if (trustStoreCache == null) {
+            super.getTrustStore(ssl).ifPresent(trustStore -> trustStoreCache = trustStore);
+        }
+        return Optional.ofNullable(trustStoreCache);
+    }
+
+    @Override
+    protected Optional<KeyStore> getKeyStore(SslConfiguration ssl) throws Exception {
+        if (keyStoreCache == null) {
+            super.getKeyStore(ssl).ifPresent(keyStore -> keyStoreCache = keyStore);
+        }
+        return Optional.ofNullable(keyStoreCache);
     }
 }

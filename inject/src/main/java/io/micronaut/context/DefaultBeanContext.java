@@ -43,7 +43,6 @@ import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.inject.*;
 import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.qualifiers.Qualifiers;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,7 +59,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -507,24 +505,15 @@ public class DefaultBeanContext implements BeanContext {
     @Nonnull
     private BeanResolutionContext newResolutionContext(BeanDefinition<?> beanDefinition, @Nullable BeanResolutionContext currentContext) {
         if (currentContext == null) {
-            AtomicInteger counter = new AtomicInteger(0);
             return new AbstractBeanResolutionContext(this, beanDefinition) {
-                @Override
-                public void close() {
-                    int i = counter.getAndDecrement();
-                    if (i == 0) {
-                        singlesInCreation.clear();
-                    }
-                }
-
-                @Override
-                public void nest() {
-                    counter.getAndIncrement();
-                }
-
                 @Override
                 public <T> void addInFlightBean(BeanIdentifier beanIdentifier, T instance) {
                     singlesInCreation.put(beanIdentifier, instance);
+                }
+
+                @Override
+                public void removeInFlightBean(BeanIdentifier beanIdentifier) {
+                    singlesInCreation.remove(beanIdentifier);
                 }
 
                 @Nullable
@@ -534,7 +523,6 @@ public class DefaultBeanContext implements BeanContext {
                 }
             };
         } else {
-            currentContext.nest();
             return currentContext;
         }
     }
@@ -1546,6 +1534,9 @@ public class DefaultBeanContext implements BeanContext {
                        @Nullable Qualifier<T> qualifier,
                        boolean isSingleton,
                        @Nullable Map<String, Object> argumentValues) {
+        if (argumentValues == null) {
+            argumentValues = Collections.emptyMap();
+        }
         Qualifier declaredQualifier = resolveDeclaredQualifier(beanDefinition);
         T bean;
         Class<T> beanType = beanDefinition.getBeanType();
@@ -1574,15 +1565,12 @@ public class DefaultBeanContext implements BeanContext {
                 if (beanFactory instanceof ParametrizedBeanFactory) {
                     ParametrizedBeanFactory<T> parametrizedBeanFactory = (ParametrizedBeanFactory<T>) beanFactory;
                     Argument<?>[] requiredArguments = parametrizedBeanFactory.getRequiredArguments();
-                    if (argumentValues == null) {
-                        throw new BeanInstantiationException(resolutionContext, "Missing bean arguments for type: " + beanType.getName() + ". Requires arguments: " + ArrayUtils.toString(requiredArguments));
-                    }
                     Map<String, Object> convertedValues = new LinkedHashMap<>(argumentValues);
                     for (Argument<?> requiredArgument : requiredArguments) {
                         String argumentName = requiredArgument.getName();
                         Object val = argumentValues.get(argumentName);
                         if (val == null && !requiredArgument.isDeclaredNullable()) {
-                            throw new BeanInstantiationException(resolutionContext, "Missing bean argument [" + requiredArgument + "].");
+                            throw new BeanInstantiationException(resolutionContext, "Missing bean argument [" + requiredArgument + "] for type: " + beanType.getName() + ". Required arguments: " + ArrayUtils.toString(requiredArguments));
                         }
                         BeanResolutionContext finalResolutionContext = resolutionContext;
                         Object convertedValue = null;

@@ -17,9 +17,8 @@ package io.micronaut.inject.factory
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.annotation.Parameter
-import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Factory
+import io.micronaut.context.annotation.Parameter
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.context.exceptions.BeanInstantiationException
 import spock.lang.Specification
@@ -55,7 +54,7 @@ class ParametrizedFactorySpec extends Specification  {
 
         then:
         def e = thrown(BeanInstantiationException)
-        e.message.contains('Missing bean arguments for type: io.micronaut.inject.factory.ParametrizedFactorySpec$C')
+        e.message.contains('Missing bean argument [int count] for type: io.micronaut.inject.factory.ParametrizedFactorySpec$C. Required arguments: int count')
 
     }
 
