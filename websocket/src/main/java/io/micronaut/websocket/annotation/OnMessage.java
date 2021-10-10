@@ -58,21 +58,21 @@ public @interface OnMessage {
     boolean allowMaskMismatch() default false;
 
     /**
-     * Flag to allow reserved extension bits to be used or not
+     * Flag to allow reserved extension bits to be used or not.
      *
      * @return are extension bits allowed
      */
     boolean allowExtensions() default false;
 
     /**
-     * Should the connection close on any type of protocol violations
+     * Should the connection close on any type of protocol violations.
      *
      * @return will connections close on exceptions
      */
     boolean closeOnProtocolViolation() default true;
 
     /**
-     * Checks if the message bytes are encoded using UTF-8
+     * Checks if the message bytes are encoded using UTF-8.
      *
      * @return is validator enabled
      */
