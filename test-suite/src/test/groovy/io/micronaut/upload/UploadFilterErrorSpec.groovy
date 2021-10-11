@@ -10,16 +10,15 @@ import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Post
-import io.micronaut.http.client.HttpClient
-import io.micronaut.http.client.RxStreamingHttpClient
+import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
-import io.micronaut.http.filter.OncePerRequestHttpServerFilter
+import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.http.multipart.StreamingFileUpload
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 class UploadFilterErrorSpec extends Specification {
@@ -30,8 +29,8 @@ class UploadFilterErrorSpec extends Specification {
         config.put("micronaut.http.client.read-timeout", "10m")
         config.put("micronaut.netty.event-loops.other.num-threads", 10)
         config.put("micronaut.http.client.event-loop-group", "other")
-        EmbeddedServer server = ApplicationContext.build(config).run(EmbeddedServer)
-        RxStreamingHttpClient client = (RxStreamingHttpClient) server.getApplicationContext().createBean(HttpClient, server.getURL())
+        EmbeddedServer server = ApplicationContext.builder(config).run(EmbeddedServer)
+        StreamingHttpClient client = server.getApplicationContext().createBean(StreamingHttpClient, server.getURL())
         MultipartBody.Builder builder = MultipartBody.builder()
         builder.addPart(
                 "file",
@@ -71,10 +70,10 @@ class UploadFilterErrorSpec extends Specification {
 
     @Requires(property = "spec.name", value = "UploadFilterErrorSpec")
     @Filter("/upload/unauthorized")
-    static class ErrorFilter extends OncePerRequestHttpServerFilter {
+    static class ErrorFilter implements HttpServerFilter {
         @Override
-        protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
-            return Flowable.just(HttpResponse.unauthorized())
+        Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+            return Flux.just(HttpResponse.unauthorized())
         }
     }
 }
