@@ -51,10 +51,10 @@ class ProxyInterceptFullResponseSpec extends Specification {
             return "from server"
         }
 
-//        @Error(global = true, status = HttpStatus.NOT_FOUND)
-//        HttpResponse error(HttpRequest<?> request) {
-//
-//        }
+        @Error(global = true, status = HttpStatus.NOT_FOUND)
+        HttpResponse error(HttpRequest<?> request) {
+
+        }
     }
 
     @Requires(property = "spec.name", value = "ProxyInterceptFullResponseSpec")
