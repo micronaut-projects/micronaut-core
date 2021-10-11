@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,7 +18,7 @@ package io.micronaut.core.beans;
 import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.util.ArgumentUtils;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import javax.annotation.concurrent.Immutable;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
@@ -43,12 +43,33 @@ public interface BeanIntrospector {
     BeanIntrospector SHARED = new DefaultBeanIntrospector();
 
     /**
+     * Creates a new default bean introspector that uses the given
+     * classloader.
+     *
+     * @since 3.0.1
+     * @param classLoader The class loader to load introspections
+     * @return A new bean introspector
+     */
+    static BeanIntrospector forClassLoader(ClassLoader classLoader) {
+        return new DefaultBeanIntrospector(classLoader);
+    }
+
+    /**
      * Finds introspections with the given filter.
      * @param filter A filter that receives a {@link BeanIntrospectionReference}
      * @return A collection of introspections
      */
     @NonNull
-    Collection<BeanIntrospection<Object>> findIntrospections(@NonNull Predicate<? super BeanIntrospectionReference> filter);
+    Collection<BeanIntrospection<Object>> findIntrospections(@NonNull Predicate<? super BeanIntrospectionReference<?>> filter);
+
+    /**
+     * Finds introspections with the given filter.
+     * @param filter A filter that receives a {@link BeanIntrospectionReference}
+     * @return A collection of introspections
+     * @since 3.0
+     */
+    @NonNull
+    Collection<Class<?>> findIntrospectedTypes(@NonNull Predicate<? super BeanIntrospectionReference<?>> filter);
 
     /**
      * Find a {@link BeanIntrospection} for the given bean type.

@@ -15,7 +15,7 @@
  */
 package io.micronaut.docs.aop.validation
 
-import edu.umd.cs.findbugs.annotations.NonNull
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.Environment
@@ -23,7 +23,7 @@ import io.micronaut.validation.Validated
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import javax.validation.ConstraintViolationException
 import javax.validation.constraints.NotNull
 

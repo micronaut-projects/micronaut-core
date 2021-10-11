@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,13 +20,13 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.docs.streaming.Headline;
 import io.micronaut.http.sse.Event;
-import io.reactivex.Flowable;
+import reactor.core.publisher.Flux;
 
 // tag::class[]
 @Client("/streaming/sse")
 public interface HeadlineClient {
 
     @Get(value = "/headlines", processes = MediaType.TEXT_EVENT_STREAM)
-    Flowable<Event<Headline>> streamHeadlines();
+    Flux<Event<Headline>> streamHeadlines();
 }
 // end::class[]

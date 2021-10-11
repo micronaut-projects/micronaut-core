@@ -20,15 +20,19 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Error
-import io.micronaut.http.annotation.*
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.hateoas.Link
-import io.reactivex.Maybe
-import io.reactivex.Single
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Mono
 import java.util.Optional
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
+import io.micronaut.core.async.annotation.SingleResult
 
 @Requires(property = "spec.name", value = "PersonControllerSpec")
 // tag::class[]
@@ -44,17 +48,18 @@ class PersonController {
     }
 
     @Get("/{name}")
-    operator fun get(name: String): Maybe<Person> {
-        val person = inMemoryDatastore[name]
-        return if (person != null) {
-            Maybe.just(person)
-        } else Maybe.empty()
+    @SingleResult
+    operator fun get(name: String): Publisher<Person> {
+        return if (inMemoryDatastore.containsKey(name)) {
+            Mono.just(inMemoryDatastore[name])
+        } else Mono.empty()
     }
 
     // tag::single[]
     @Post("/saveReactive")
-    fun save(@Body person: Single<Person>): Single<HttpResponse<Person>> { // <1>
-        return person.map { p ->
+    @SingleResult
+    fun save(@Body person: Publisher<Person>): Publisher<HttpResponse<Person>> { // <1>
+        return Mono.from(person).map { p ->
             inMemoryDatastore[p.firstName] = p // <2>
             HttpResponse.created(p) // <3>
         }
@@ -91,8 +96,8 @@ class PersonController {
 
     // tag::localError[]
     @Error
-    fun jsonError(request: HttpRequest<*>, jsonParseException: JsonParseException): HttpResponse<JsonError> { // <1>
-        val error = JsonError("Invalid JSON: " + jsonParseException.message) // <2>
+    fun jsonError(request: HttpRequest<*>, e: JsonParseException): HttpResponse<JsonError> { // <1>
+        val error = JsonError("Invalid JSON: ${e.message}") // <2>
                 .link(Link.SELF, Link.of(request.uri))
 
         return HttpResponse.status<JsonError>(HttpStatus.BAD_REQUEST, "Fix Your JSON")
@@ -108,7 +113,7 @@ class PersonController {
     // tag::globalError[]
     @Error(global = true) // <1>
     fun error(request: HttpRequest<*>, e: Throwable): HttpResponse<JsonError> {
-        val error = JsonError("Bad Things Happened: " + e.message) // <2>
+        val error = JsonError("Bad Things Happened: ${e.message}") // <2>
                 .link(Link.SELF, Link.of(request.uri))
 
         return HttpResponse.serverError<JsonError>()

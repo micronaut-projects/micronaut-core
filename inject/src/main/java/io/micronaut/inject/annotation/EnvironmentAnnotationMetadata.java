@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,8 +19,8 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.function.Function;
@@ -33,6 +33,14 @@ import java.util.function.Function;
  */
 @Internal
 interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
+    /**
+     * @return Environment metadata always has property expressions.
+     */
+    @Override
+    default boolean hasPropertyExpressions() {
+        return true;
+    }
+
     /**
      * Retrieve the enum value and optionally map its value.
      * @param annotation The annotation
@@ -177,6 +185,16 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      */
     @NonNull
     String[] stringValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Function<Object, Object> valueMapper);
+
+    /**
+     * Retrieve the string value and optionally map its value.
+     * @param annotation The annotation
+     * @param member The member
+     * @param valueMapper The value mapper
+     * @return The int value
+     */
+    @NonNull
+    String[] stringValues(@NonNull String annotation, @NonNull String member, Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the string value and optionally map its value.

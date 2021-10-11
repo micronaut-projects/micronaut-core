@@ -1,627 +1,24 @@
 buildscript {
     repositories {
-        maven { url "https://repo.grails.org/grails/core" }
+        gradlePluginPortal()
+        mavenCentral()
     }
     dependencies {
-        classpath "org.grails:grails-docs:$grailsVersion"
-        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.5'
-        classpath 'io.github.groovylang.groovydoc:groovydoc-gradle-plugin:1.0.1'
-        classpath 'com.github.jengelman.gradle.plugins:shadow:5.2.0'
-        classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
-        classpath "org.codehaus.groovy.modules.http-builder:http-builder:0.7.2"
+        classpath "gradle.plugin.com.github.jengelman.gradle.plugins:shadow:7.0.0"
+        classpath "io.micronaut.build.internal:micronaut-gradle-plugins:4.1.5"
+        classpath "org.aim42:htmlSanityCheck:${libs.versions.htmlSanityCheck.get()}"
         classpath 'javax.xml.bind:jaxb-api:2.3.1'
-        classpath "io.micronaut.docs:micronaut-docs-asciidoc-extensions:$micronautDocsVersion"
-        classpath "io.micronaut.docs:micronaut-docs-gradle-plugins:$micronautDocsVersion", {
-            exclude module:'shadow'
-            exclude module:'plugin-shadow'
-        }
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${libs.versions.managed.kotlin.asProvider().get()}"
     }
-}
-
-plugins {
-    id 'com.github.hierynomus.license' version '0.15.0' apply false
-    id 'com.github.ben-manes.versions' version '0.27.0'
 }
 
 apply plugin: 'org.aim42.htmlSanityCheck'
 
 repositories {
-    maven { url "https://repo.grails.org/grails/core" }
-    //maven { url "https://oss.sonatype.org/content/repositories/snapshots/" }
+    mavenCentral()
 }
 
-version project.projectVersion
-
-ext {
-    distInstallDir = file("$buildDir/dist-tmp")
-    homeBinDir = file("bin")
-    homeLibDir = file("lib")
-    homeSrcDir = file("src")
-}
-
-ext {
-
-    dependencyVersions = [
-            groovy                     : [
-                    version: groovyVersion,
-                    group  : 'org.codehaus.groovy',
-                    name   : 'groovy',
-                    modules: ['groovy-test', 'groovy-test-junit5', 'groovy-ant', 'groovy-json', 'groovy-jmx', 'groovy-templates']
-            ],
-            gorm                       : [
-                    version: gormVersion,
-                    group  : 'org.grails',
-                    name   : 'grails-datastore-core',
-                    modules: [
-                            'grails-datastore-gorm',
-                            'grails-datastore-async',
-                            'grails-datastore-gorm-async',
-                            'grails-datastore-gorm-support',
-                            'grails-datastore-gorm-test',
-                            'grails-datastore-gorm-validation',
-                            'grails-datastore-gorm-web'
-                    ]
-            ],
-            'gorm.hibernate'                       : [
-                    version: gormHibernateVersion,
-                    group  : 'org.grails',
-                    name   : 'grails-datastore-gorm-hibernate5'
-            ],
-            jackson                    : [
-                    version: jacksonVersion,
-                    group  : 'com.fasterxml.jackson.core',
-                    modules: ['jackson-core', 'jackson-annotations']
-            ],
-            'jackson.databind'         : [
-                    version: jacksonDatabindVersion,
-                    group  : 'com.fasterxml.jackson.core',
-                    name   : 'jackson-databind',
-            ],
-            'jackson.modules'          : [
-                    version: jacksonVersion,
-                    group  : 'com.fasterxml.jackson.module',
-                    name   : 'jackson-module-afterburner',
-                    modules: ['jackson-module-kotlin', 'jackson-module-parameter-names', 'jackson-module-jaxb-annotations']
-            ],
-            'jackson.datatype'         : [
-                    version: jacksonVersion,
-                    group  : 'com.fasterxml.jackson.datatype',
-                    name   : 'jackson-datatype-jdk8',
-                    modules: ['jackson-datatype-jsr310']
-            ],
-            'jackson.dataformat'       : [
-                    version : jacksonVersion,
-                    group   : 'com.fasterxml.jackson.dataformat',
-                    modules : ['jackson-dataformat-xml'],
-            ],
-            jaeger                     : [
-                    version: jaegerVersion,
-                    group  : 'io.jaegertracing',
-                    name   : 'jaeger-thrift'
-            ],
-            'zipkin.reporter'          : [
-                    version: zipkinReporterVersion,
-                    group  : 'io.zipkin.reporter2',
-                    name   : 'zipkin-reporter'
-            ],
-            'brave.instrumentation'    : [
-                    version: braveInstrumentationHttpVersion,
-                    group  : 'io.zipkin.brave',
-                    name   : 'brave-instrumentation-http'
-            ],
-            'brave.opentracing'        : [
-                    version: braveOpentracingVersion,
-                    group  : 'io.opentracing.brave',
-                    name   : 'brave-opentracing'
-            ],
-            'javax.annotation-api'     : [
-                    version: javaxAnnotationApiVersion,
-                    group  : 'javax.annotation',
-                    name   : 'javax.annotation-api'
-            ],
-            jsr305                     : [
-                    version: jsr305Version,
-                    group  : 'com.google.code.findbugs',
-                    name   : 'jsr305'
-            ],
-            spotbugs                   : [
-                    version: spotbugsVersion,
-                    group  : 'com.github.spotbugs',
-                    name   : 'spotbugs-annotations'
-            ],
-            'micronaut.kafka': [
-                    version:micronautKafkaVersion,
-                    group:'io.micronaut.kafka',
-                    name:'micronaut-kafka',
-                    modules:['micronaut-kafka-streams']
-            ],
-            'micronaut.cassandra': [
-                    version:micronautCassandraVersion,
-                    group:'io.micronaut.cassandra',
-                    name:'micronaut-cassandra'
-            ],
-            'micronaut.hibernate.validator': [
-                    version:micronautHibernateValidatorVersion,
-                    group:'io.micronaut.configuration',
-                    name:'micronaut-hibernate-validator'
-            ],
-            'micronaut.jmx': [
-                    version:micronautJmxVersion,
-                    group:'io.micronaut.configuration',
-                    name:'micronaut-jmx'
-            ],
-            'micronaut.picocli': [
-                    version:micronautPicocliVersion,
-                    group:'io.micronaut.picocli',
-                    name:'micronaut-picocli'
-            ],
-            'micronaut.rabbitmq': [
-                    version:micronautRabbitMQVersion,
-                    group:'io.micronaut.rabbitmq',
-                    name:'micronaut-rabbitmq'
-            ],
-            'micronaut.nats': [
-                    version:micronautNatsIoVersion,
-                    group:'io.micronaut.nats',
-                    name:'micronaut-nats'
-            ],
-            'micronaut.graphql': [
-                    version:micronautGraphQLVersion,
-                    group:'io.micronaut.graphql',
-                    name:'micronaut-graphql'
-            ],
-            'micronaut.graphql.gorm': [
-                    version:micronautGraphQLGormVersion,
-                    group:'io.micronaut.graphql',
-                    name:'micronaut-graphql-gorm'
-            ],
-            'micronaut.groovy': [
-                    version:micronautGroovyVersion,
-                    group:'io.micronaut',
-                    name:'micronaut-runtime-groovy',
-                    modules:['micronaut-function-groovy']
-            ],
-            'micronaut.aws': [
-                    version:micronautAwsVersion,
-                    group:'io.micronaut.configuration',
-                    name:'micronaut-aws-common'
-            ],
-            'micronaut.gcp': [
-                    version:micronautGcpVersion,
-                    group:'io.micronaut.gcp',
-                    name:'micronaut-gcp-common',
-                    modules:['micronaut-gcp-tracing', 'micronaut-gcp-function-http', 'micronaut-gcp-function', 'micronaut-gcp-http-client']
-            ],
-            'micronaut.azure': [
-                    version:micronautAzureVersion,
-                    group:'io.micronaut.azure',
-                    name:'micronaut-azure-function',
-                    modules:['micronaut-azure-function-http']
-            ],
-            'azure.function': [
-                    version:'1.3.1',
-                    group:'com.microsoft.azure.functions',
-                    name:'azure-functions-java-library'
-            ],
-            'micronaut.elasticsearch': [
-                version:micronautElasticsearch,
-                group:'io.micronaut.configuration',
-                name:'micronaut-elasticsearch'
-            ],
-            'micronaut.flyway': [
-                version:micronautFlyway,
-                group:'io.micronaut.configuration',
-                name:'micronaut-flyway'
-            ],
-            'micronaut.function-aws': [
-                    version:micronautAwsVersion,
-                    group:'io.micronaut',
-                    name:'micronaut-function-aws'
-            ],
-            'micronaut.function.aws': [
-                    version:micronautAwsVersion,
-                    group:'io.micronaut.aws',
-                    name:'micronaut-function-aws-api-proxy',
-                    modules: ['micronaut-function-aws-custom-runtime', 'micronaut-function-aws-alexa', 'micronaut-aws-alexa-httpserver']
-            ],
-            'micronaut.kotlin': [
-                    version:micronautKotlinVersion,
-                    group:'io.micronaut.kotlin',
-                    name:'micronaut-kotlin-runtime',
-                    modules: ['micronaut-ktor', 'micronaut-kotlin-extension-functions']
-            ],
-            'micronaut.gorm': [
-                    version:micronautGroovyVersion,
-                    group:'io.micronaut.configuration',
-                    name:'micronaut-gorm-common',
-                    modules:['micronaut-multitenancy-gorm', 'micronaut-neo4j-gorm', 'micronaut-mongo-gorm', 'micronaut-hibernate-gorm', 'micronaut-graphql-gorm']
-            ],
-            'micronaut.liquibase': [
-                version:micronautLiquibase,
-                group:'io.micronaut.configuration',
-                name:'micronaut-liquibase'
-            ],
-            'micronaut.netflix': [
-                    version:micronautNetflixVersion,
-                    group:'io.micronaut.configuration',
-                    name:'micronaut-netflix-archaius',
-                    modules:['micronaut-netflix-hystrix', 'micronaut-netflix-ribbon']
-            ],
-            'micronaut.openapi': [
-                    version:micronautOpenApi,
-                    group:'io.micronaut.configuration',
-                    name:'micronaut-openapi'
-            ],
-            kafka                      : [
-                    version: kafkaVersion,
-                    group  : 'org.apache.kafka',
-                    name   : 'kafka-clients',
-                    modules: ['kafka_2.12', 'kafka-streams']
-            ],
-            'micronaut.grpc'           : [
-                    version: micronautGrpcVersion,
-                    group  : 'io.micronaut.grpc',
-                    name   : 'micronaut-grpc-runtime',
-                    modules: ['micronaut-grpc-annotation']
-            ],
-            'micronaut.test'           : [
-                    version: micronautTestVersion,
-                    group  : 'io.micronaut.test',
-                    name   : 'micronaut-test-core',
-                    modules: ['micronaut-test-spock', 'micronaut-test-junit5', 'micronaut-test-kotlintest']
-            ],
-            'micronaut.data'           : [
-                                version: micronautDataVersion,
-                                group  : 'io.micronaut.data',
-                                name   : 'micronaut-data-model',
-                                modules: ['micronaut-data-hibernate-jpa', 'micronaut-data-jdbc', 'micronaut-data-processor', 'micronaut-data-runtime', 'micronaut-data-spring','micronaut-data-spring-jpa', 'micronaut-data-rx', 'micronaut-data-rx-hibernate']
-                        ],
-            'micrometer'               : [
-                    version: micrometerVersion,
-                    group  : 'io.micrometer',
-                    name   : 'micrometer-core',
-                    modules: ['micrometer-registry-atlas', 'micrometer-registry-graphite', 'micrometer-registry-prometheus', 'micrometer-registry-statsd']
-            ],
-            'junit5'               : [
-                    version: junit5Version,
-                    group  : 'org.junit.jupiter',
-                    name   : 'junit-jupiter',
-                    modules: ['junit-jupiter-api', 'junit-jupiter-engine', 'junit-jupiter-params']
-            ],
-            'junitVintage'         : [
-                    version: junit5Version,
-                    group  : 'org.junit.vintage',
-                    name   : 'junit-vintage-engine'
-            ],
-            'micronaut.xml':[
-                version:micronautXmlVersion,
-                group:'io.micronaut.xml',
-                name:'micronaut-jackson-xml'
-            ],
-            'micronaut.micrometer': [
-                    version:micronautMicrometerVersion,
-                    group:'io.micronaut.micrometer',
-                    name:'micronaut-micrometer-core',
-                    modules:[
-                            'micronaut-micrometer-registry-appoptics',
-                            'micronaut-micrometer-registry-atlas',
-                            'micronaut-micrometer-registry-azure-monitor',
-                            'micronaut-micrometer-registry-cloudwatch',
-                            'micronaut-micrometer-registry-datadog',
-                            'micronaut-micrometer-registry-dynatrace',
-                            'micronaut-micrometer-registry-elastic',
-                            'micronaut-micrometer-registry-ganglia',
-                            'micronaut-micrometer-registry-graphite',
-                            'micronaut-micrometer-registry-humio',
-                            'micronaut-micrometer-registry-influx',
-                            'micronaut-micrometer-registry-jmx',
-                            'micronaut-micrometer-registry-kairos',
-                            'micronaut-micrometer-registry-new-relic',
-                            'micronaut-micrometer-registry-prometheus',
-                            'micronaut-micrometer-registry-signalfx',
-                            'micronaut-micrometer-registry-stackdriver',
-                            'micronaut-micrometer-registry-statsd',
-                            'micronaut-micrometer-registry-wavefront']
-            ],
-            'micronaut.spring': [
-                    version:micronautSpringVersion,
-                    group:'io.micronaut.spring',
-                    name:'micronaut-spring-annotation',
-                    modules:['micronaut-spring-boot', 'micronaut-spring-boot-annotation', 'micronaut-spring-context', 'micronaut-spring-web', 'micronaut-spring-web-annotation']
-            ],
-            'micronaut.spring.core': [
-                    version:micronautSpringCoreVersion,
-                    group:'io.micronaut',
-                    name:'micronaut-spring'
-            ],
-            'micronaut.sql': [
-                version:micronautSqlVersion,
-                group:'io.micronaut.configuration',
-                name:'micronaut-hibernate-jpa',
-                modules:['micronaut-jdbc-tomcat', 'micronaut-jdbc-hikari', 'micronaut-jdbc-ucp', 'micronaut-jdbc-dbcp', 'micronaut-jasync-sql', 'micronaut-jooq', 'micronaut-jdbi', 'micronaut-hibernate-jpa-spring', 'micronaut-vertx-mysql-client', 'micronaut-vertx-pg-client']
-            ],
-            'micronaut.jdbc': [
-                version:micronautJdbcVersion,
-                group:'io.micronaut',
-                name:'micronaut-jdbc'
-            ],
-            'micronaut.mongo': [
-                    version:micronautMongoVersion,
-                    group:'io.micronaut.mongodb',
-                    name:'micronaut-mongo-reactive',
-                    modules:['micronaut-mongo-core', 'micronaut-mongo-sync']
-            ],
-            'micronaut.redis': [
-                    version:micronautRedisVersion,
-                    group:'io.micronaut.redis',
-                    name:'micronaut-redis-lettuce'
-            ],
-            'micronaut.neo4j': [
-                    version:micronautNeo4jVersion,
-                    group:'io.micronaut.configuration',
-                    name:'micronaut-neo4j-bolt'
-            ],
-            'mongo' : [
-                    version: mongoVersion,
-                    group  : 'org.mongodb',
-                    modules: ['mongodb-driver-async', 'mongodb-driver-sync', 'mongodb-driver-core']
-            ],
-            'mongo.reactive'           : [
-                    version: mongoReactiveVersion,
-                    group  : 'org.mongodb',
-                    name   : 'mongodb-driver-reactivestreams'
-            ],
-            neo4j                      : [
-                    version: neo4jVersion,
-                    group  : 'org.neo4j.test',
-                    name   : 'neo4j-harness'
-            ],
-            'neo4j.bolt': [
-                    version: neo4jDriverVersion,
-                    group:'org.neo4j.driver',
-                    name:'neo4j-java-driver'
-            ],
-            'jcache'                   : [
-                    version: jcacheVersion,
-                    group  : 'javax.cache',
-                    name   : 'cache-api'
-            ],
-            netty                      : [
-                    version: nettyVersion,
-                    group  : 'io.netty',
-                    name   : 'netty-codec-http',
-                    modules: ['netty-all', 'netty-buffer', 'netty-codec', 'netty-codec-dns', 'netty-codec-haproxy',
-                              'netty-codec-http2', 'netty-codec-memcache', 'netty-codec-mqtt',
-                              'netty-codec-redis', 'netty-codec-smtp', 'netty-codec-socks', 'netty-codec-stomp',
-                              'netty-codec-xml', 'netty-common', 'netty-dev-tools', 'netty-handler',
-                              'netty-handler-proxy', 'netty-resolver', 'netty-resolver-dns', 'netty-transport',
-                              'netty-transport-rxtx', 'netty-transport-sctp', 'netty-transport-udt',
-                              'netty-transport-native-epoll', 'netty-transport-native-kqueue', 'netty-codec-http2']
-            ],
-            opentracing                : [
-                    version: opentracingVersion,
-                    group  : 'io.opentracing',
-                    name   : 'opentracing-api',
-                    modules: ['opentracing-util']
-            ],
-            picocli                    : [
-                    version: picocliVersion,
-                    group  : 'info.picocli',
-                    name   : 'picocli'
-            ],
-            lettuce                    : [
-                    version: lettuceVersion,
-                    group  : 'io.lettuce',
-                    name   : 'lettuce-core'
-
-            ],
-            spring                     : [
-                    version: springVersion,
-                    group  : 'org.springframework',
-                    name   : 'spring-core',
-                    modules: ['spring-context', 'spring-tx', 'spring-orm', 'spring-jdbc']
-            ],
-            springboot                 : [
-                version: springBootVersion,
-                group  : 'org.springframework.boot',
-                modules: ['spring-boot-starter', 'spring-boot-starter-web']
-            ],
-            snakeyaml                  : [
-                    version: yamlVersion,
-                    group  : 'org.yaml',
-                    name   : 'snakeyaml'
-            ],
-            slf4j                      : [
-                    version: slf4jVersion,
-                    group  : 'org.slf4j',
-                    name   : 'slf4j-api',
-                    modules: ['slf4j-simple']
-            ],
-            spock                      : [
-                    version: spockVersion,
-                    group  : 'org.spockframework',
-                    name   : 'spock-core'
-            ],
-            swagger                    : [
-                    version: '2.1.1',
-                    group  : 'io.swagger.core.v3',
-                    name   : 'swagger-core',
-                    modules: ['swagger-models', 'swagger-annotations']
-            ],
-            'google.function.framework'                    : [
-                    version: '1.0.1',
-                    group  : 'com.google.cloud.functions',
-                    name   : 'functions-framework-api'
-            ],
-            'google.function.invoker'                    : [
-                    version: '1.0.0-alpha-2-rc4',
-                    group  : 'com.google.cloud.functions.invoker',
-                    name   : 'java-function-invoker'
-            ],
-            'reactive.streams'         : [
-                    version: reactiveStreamsVersion,
-                    group  : 'org.reactivestreams',
-                    name   : 'reactive-streams'
-            ],
-            'reactive.pg.client'       : [
-                    version: reactivePgClientVersion,
-                    group  : 'io.reactiverse',
-                    name   : 'reactive-pg-client'
-            ],
-            rxjava1                    : [
-                    version: rxJava1Version,
-                    group  : 'io.reactivex',
-                    name   : 'rxjava'
-            ],
-            'rxjava1.interop'          : [
-                    version: rxJavaInteropVersion,
-                    group  : 'com.github.akarnokd',
-                    name   : 'rxjava2-interop'
-            ],
-            rxjava2                    : [
-                    version: rxJava2Version,
-                    group  : 'io.reactivex.rxjava2',
-                    name   : 'rxjava'
-            ],
-            'micronaut.rxjava3'        : [
-                    version: micronautRxJava3Version,
-                    group  : 'io.micronaut.rxjava3',
-                    name   : 'micronaut-rxjava3'
-            ],
-            'micronaut.rxjava1'        : [
-                    version: micronautRxJava1Version,
-                    group  : 'io.micronaut.rxjava1',
-                    name   : 'micronaut-rxjava1'
-            ],
-            'micronaut.reactor'        : [
-                    version: micronautReactorVersion,
-                    group  : 'io.micronaut.reactor',
-                    name   : 'micronaut-reactor'
-            ],
-            reactor                    : [
-                    version: reactorVersion,
-                    group  : 'io.projectreactor',
-                    name   : 'reactor-core'
-            ],
-            validation                 : [
-                    version: validationVersion,
-                    group  : 'javax.validation',
-                    name   : 'validation-api'
-            ],
-            hystrix                    : [
-                    version: hystrixVersion,
-                    group  : 'com.netflix.hystrix',
-                    name   : 'hystrix-core',
-                    modules: ['hystrix-serialization']
-            ],
-            graal                      : [
-                    version: graalVersion,
-                    group  : 'org.graalvm.nativeimage',
-                    name   : 'svm'
-            ],
-            h2                         : [
-                    version: h2Version,
-                    group  : 'com.h2database',
-                    name   : 'h2'
-            ],
-            tomcatJdbc                 : [
-                    version: tomcatJdbcVersion,
-                    group  : 'org.apache.tomcat',
-                    name   : 'tomcat-jdbc'
-            ],
-            liquibase                  : [
-                    version: liquibaseVersion,
-                    group  : 'org.liquibase',
-                    name   : 'liquibase-core'
-            ],
-            flyway                     : [
-                    version: flywayVersion,
-                    group  : 'org.flywaydb',
-                    name   : 'flyway-core'
-            ],
-            jna                        : [
-                    version: jnaVersion,
-                    group  : 'net.java.dev.jna',
-                    name   : 'jna'
-            ],
-            hibernate                  : [
-                    version: hibernateVersion,
-                    group  : 'org.hibernate',
-                    name   : 'hibernate-core',
-                    modules: ['hibernate-jcache', 'hibernate-ehcache']
-            ],
-            elasticsearch              : [
-                    version: elasticsearchVersion,
-                    group  : 'org.elasticsearch.client',
-                    name   : 'elasticsearch-rest-high-level-client'
-            ],
-            'methvin.directory-watcher': [
-                    version: methvinDirectoryWatcherVersion,
-                    group  : 'io.methvin',
-                    name   : 'directory-watcher'
-            ],
-            'micronaut.security'       : [
-                    version : micronautSecurityVersion,
-                    group   : 'io.micronaut',
-                    modules : ['micronaut-security', 'micronaut-security-annotations', 'micronaut-security-jwt', 'micronaut-security-session']
-            ],
-            'micronaut.security.configuration'  : [
-                    version : micronautSecurityVersion,
-                    group   : 'io.micronaut.configuration',
-                    modules : ['micronaut-security-ldap', 'micronaut-security-oauth2']
-            ],
-            'micronaut.views': [
-                version: micronautViewsVersion,
-                group  : 'io.micronaut',
-                modules: ['micronaut-views', 'micronaut-views-core', 'micronaut-views-freemarker', 'micronaut-views-handlebars', 'micronaut-views-thymeleaf', 'micronaut-views-velocity']
-            ],
-            'micronaut.rss': [
-                    version:micronautRssVersion,
-                    group:'io.micronaut.configuration',
-                    modules : ['micronaut-rss', 'micronaut-itunespodcast']
-
-            ],
-            'micronaut.kubernetes': [
-                    version:micronautKubernetesVersion,
-                    group:'io.micronaut.kubernetes',
-                    name:'micronaut-kubernetes-discovery-client'
-            ],
-            'micronaut.cache': [
-                    version:micronautCacheVersion,
-                    group:'io.micronaut.cache',
-                    modules: ['micronaut-cache-caffeine', 'micronaut-cache-core', 'micronaut-cache-management', 'micronaut-cache-hazelcast', 'micronaut-cache-ehcache', 'micronaut-cache-noop', 'micronaut-cache-infinispan']
-            ],
-            'micronaut.servlet': [
-                version:micronautServletVersion,
-                group:'io.micronaut.servlet',
-                name:'micronaut-servlet-core',
-                modules: ['micronaut-http-server-tomcat', 'micronaut-http-server-jetty', 'micronaut-http-server-undertow']
-            ],
-            'micronaut.jaxrs': [
-                version: micronautJaxrsVersion,
-                group  : 'io.micronaut.jaxrs',
-                modules: ['micronaut-jaxrs-server', 'micronaut-jaxrs-processor']
-            ],
-    ]
-
-    dependencyVersion = { String name ->
-        def dep = dependencyVersions[name]
-        if (dep == null) {
-            throw new IllegalArgumentException("No core dependency defined for name: $name")
-        }
-        return "$dep.group:$dep.name:$dep.version".toString()
-    }
-    dependencyModuleVersion = { String name, String module ->
-        def dep = dependencyVersions[name]
-        if (dep == null) {
-            throw new IllegalArgumentException("No core dependency defined for name: $name")
-        }
-        return "$dep.group:$module:$dep.version".toString()
-    }
-
-}
-
-task testReportsAggregate {
+tasks.register("testReportsAggregate") {
     group 'verification'
     doLast() {
         int totalFailures = 0
@@ -673,11 +70,7 @@ task testReportsAggregate {
 
 subprojects { Project subproject ->
 
-    version project.projectVersion
-
     ext {
-        userOrg = "grails"
-        isGrailsPlugin = false
         isBuildSnapshot = version.toString().endsWith("-SNAPSHOT")
         shadowJarEnabled = false
     }
@@ -688,73 +81,38 @@ subprojects { Project subproject ->
 
     group projectGroupId
 
-    repositories {
-        mavenLocal()
-        maven { url "https://repo.grails.org/grails/core" }
+    apply plugin: "io.micronaut.build.internal.common"
+    if (!subproject.name.startsWith('test-') &&
+            !subproject.name.startsWith('inject-test-') &&
+            !subproject.toString().contains('benchmarks')) {
+        apply plugin: "io.micronaut.build.internal.publishing"
     }
 
-    if (!subproject.name.contains("bom")) {
-        apply plugin: "groovy"
-        apply plugin: "java-library"
-
-        sourceCompatibility = '1.8'
-        targetCompatibility = '1.8'
-        compileJava.options.compilerArgs.add '-parameters'
-        compileTestJava.options.compilerArgs.add '-parameters'
-
-        if (
-        !subproject.name.startsWith('test-') &&
-                !subproject.toString().contains('build-projects') &&
-                        !subproject.toString().contains('benchmarks')
-        ) {
-
-            apply from: "${rootProject.rootDir}/gradle/publishing.gradle"
-            apply plugin: 'checkstyle'
-
-            checkstyle {
-                toolVersion = 8.16
-                configFile = file("${rootDir}/config/checkstyle/checkstyle.xml")
-
-                // Per submodule
-                maxErrors = 0
-                maxWarnings = 10
-
-                showViolations = true
-            }
-
-            checkstyleTest.enabled = false
-        }
+    micronautBuild {
+        enableBom = false
+        enableProcessing = false
     }
 
-    jar {
-        manifest {
-            attributes('Automatic-Module-Name': "${subproject.group}.${subproject.name}".replaceAll('[^\\w\\.\\$_]', "_"))
-            attributes('Implementation-Version': projectVersion)
-            attributes('Implementation-Title': 'Micronaut')
-        }
-    }
-
-//    tasks.withType(GroovyCompile).configureEach {
-//        options.incremental = true
-//    }
-
-    tasks.withType(Test) {
+    tasks.withType(Test).configureEach {
         useJUnitPlatform()
-        jvmArgs '-Duser.country=US', '-Duser.language=en', '-Xmx2048m'
-        reports.html.enabled = !System.getenv("GITHUB_ACTIONS")
-        reports.junitXml.enabled = !System.getenv("GITHUB_ACTIONS")
-        testLogging {
-            exceptionFormat = 'full'
-        }
-        afterSuite {
-            System.out.print(".")
-            System.out.flush()
-        }
-
+        jvmArgs '-Xmx2048m'
         systemProperty "micronaut.cloud.platform", "OTHER"
+        if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
+            jvmArgs "--enable-preview"
+        }
     }
 
-    tasks.withType(Checkstyle) {
+    tasks.withType(JavaCompile).configureEach {
+       options.compilerArgs.add("-Amicronaut.processing.group=$project.group")
+       options.compilerArgs.add("-Amicronaut.processing.module=micronaut-$project.name")
+       options.forkOptions.memoryMaximumSize = "2g"
+    }
+    tasks.withType(GroovyCompile).configureEach {
+        options.compilerArgs.add("-Amicronaut.processing.group=$project.group")
+        options.compilerArgs.add("-Amicronaut.processing.module=micronaut-$project.name")
+        groovyOptions.forkOptions.memoryMaximumSize = "2g"
+    }
+    tasks.withType(Checkstyle).configureEach {
         reports {
             xml.enabled = !System.getenv("GITHUB_ACTIONS")
             html.enabled = !System.getenv("GITHUB_ACTIONS")
@@ -763,15 +121,11 @@ subprojects { Project subproject ->
 
     configurations {
         shadowCompile
-        documentation
         all {
             resolutionStrategy.eachDependency { DependencyResolveDetails details ->
                 String group = details.requested.group
-                if (group == 'org.codehaus.groovy') {
-                    details.useVersion(groovyVersion)
-                }
                 if (group == 'org.ow2.asm') {
-                    details.useVersion(asmVersion)
+                    details.useVersion(libs.versions.asm.get())
                 }
             }
         }
@@ -788,56 +142,58 @@ subprojects { Project subproject ->
     def isDocumented = subproject.name != 'inject' && subproject.name != 'core' && subproject.name != 'aop' && !subproject.name.contains('asciidoc-config-props')
 
     dependencies {
-        documentation "org.codehaus.groovy:groovy-templates:$groovyVersion"
-        documentation "org.codehaus.groovy:groovy-dateutil:$groovyVersion"
         if (subproject.name != "bom") {
-            api dependencyVersion("slf4j")
+            api libs.managed.slf4j
         }
 
-
         if (isDocumented) {
-            annotationProcessor "io.micronaut.docs:micronaut-docs-asciidoc-config-props:$micronautDocsVersion", {
+            annotationProcessor(libs.micronaut.docs) {
                 transitive = false
             }
         }
-        compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
-        testImplementation "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
-        testImplementation dependencyVersion("groovy")
-        testImplementation(dependencyVersion("spock")) {
+        compileOnly libs.caffeine
+        testAnnotationProcessor project(":http-validation")
+        testImplementation libs.caffeine
+        testImplementation libs.managed.groovy
+        testImplementation(libs.managed.spock) {
             exclude module: 'groovy-all'
         }
-        testImplementation "cglib:cglib-nodep:3.3.0"
-        testImplementation "org.objenesis:objenesis:3.1"
 
-        testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
-        testImplementation "org.codehaus.groovy:groovy-test-junit5:$groovyVersion"
-        compileOnly "org.ow2.asm:asm:$asmVersion"
-        compileOnly "org.ow2.asm:asm-commons:$asmVersion"
-        annotationProcessor "org.ow2.asm:asm:$asmVersion"
-        annotationProcessor "org.ow2.asm:asm-commons:$asmVersion"
+        testImplementation libs.groovy.test.junit5
+        compileOnly libs.bundles.asm
+        annotationProcessor libs.bundles.asm
 
-        testImplementation "org.ow2.asm:asm:$asmVersion"
-        testImplementation "org.ow2.asm:asm-commons:$asmVersion"
-        testAnnotationProcessor "org.ow2.asm:asm:$asmVersion"
-        testAnnotationProcessor "org.ow2.asm:asm-commons:$asmVersion"
+        testImplementation libs.bundles.asm
+        testAnnotationProcessor libs.bundles.asm
     }
-
-    groovydoc {
-        classpath += project.configurations.documentation
+    spotless {
+        java {
+            targetExclude '**/io/micronaut/core/io/scan/AnnotationClassReader.java'
+            targetExclude '**/io/micronaut/core/io/scan/Attribute.java'
+            targetExclude '**/io/micronaut/core/io/scan/Context.java'
+            targetExclude '**/io/micronaut/core/util/clhm/**'
+            targetExclude '**/io/micronaut/core/util/AntPathMatcher.java'
+            targetExclude '**/io/micronaut/discovery/eureka/client/v2/AmazonInfo.java'
+            targetExclude '**/io/micronaut/discovery/eureka/client/v2/DataCenterInfo.java'
+            targetExclude '**/io/micronaut/discovery/eureka/client/v2/LeaseInfo.java'
+            targetExclude '**/io/micronaut/support/InMemoryJavaFileManager.java'
+            targetExclude '**/io/micronaut/scheduling/cron/CronExpression.java'
+            targetExclude '**/org/atinject/tck/auto/Tck.kt'
+            targetExclude '**/io/micronaut/http/uri/QueryStringDecoder.java'
+        }
+        format 'javaMisc', {
+            targetExclude '**/io/micronaut/core/util/clhm/**'
+            targetExclude '**/io/micronaut/http/netty/stream/package-info.java'
+        }
     }
-
-    task allDeps(type: DependencyReportTask) {}
 }
+apply plugin: "io.micronaut.build.internal.docs"
+apply plugin: "io.micronaut.build.internal.version-catalog-updates"
 
-apply from:"https://raw.githubusercontent.com/micronaut-projects/micronaut-docs/v$micronautDocsVersion/gradle/docs.gradle"
-
-// IDEA 2017.2 made a breaking change with IDE build output vs gradle build output
-// [see https://youtrack.jetbrains.com/issue/IDEA-175172]
-// the problem here is the gradle build uses <module-dir>/build/classes/main
-// while IDEA uses <module-dir>/out/production/..
-// As a result, compiling ast or java-inject module and using the IDEA test runner fails because the
-// generated bean classes for injection are in <module-dir>/build, not <module-dir>/out
 allprojects {
+
+    version project.projectVersion
+
     apply plugin: 'idea'
 
     idea {
@@ -846,25 +202,22 @@ allprojects {
             testOutputDir file('build/classes/groovy/test')
         }
     }
-    apply from: rootProject.file('gradle/license.gradle')
 }
 
 htmlSanityCheck {
     sourceDir = new File("${rootProject.buildDir}/docs/")
-    sourceDocuments = ["index.html"]
-
+    sourceDocuments = fileTree(sourceDir) {
+        include "index.html"
+    }
 }
 docs.finalizedBy(htmlSanityCheck)
 
-dependencyUpdates.resolutionStrategy {
-    componentSelection { rules ->
-        rules.all { ComponentSelection selection ->
-            boolean rejected = ['alpha', 'beta', 'rc', 'cr', 'm', 'preview', 'b', 'ea'].any { qualifier ->
-                selection.candidate.version ==~ /(?i).*[.-]$qualifier[.\d-+]*/
-            }
-            if (rejected) {
-                selection.reject('Release candidate')
-            }
-        }
-    }
+tasks.named("updateVersionCatalogs") {
+    // we set the list to empty because we accept upgrades which improve the status
+    rejectedQualifiers = []
+    // Invalid POM files
+    ignoredModules.add("io.micronaut.ignite:micronaut-ignite-core")
+    ignoredModules.add("io.micronaut.ignite:micronaut-ignite-cache")
+    // workaround Gradle variant selection problem
+    ignoredModules.add("com.github.ben-manes.caffeine:caffeine")
 }

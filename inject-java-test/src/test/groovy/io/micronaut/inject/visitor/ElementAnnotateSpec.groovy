@@ -6,10 +6,10 @@ import io.micronaut.annotation.processing.test.JavaParser
 import io.micronaut.aop.Introduction
 import io.micronaut.core.annotation.AnnotationValueBuilder
 import io.micronaut.core.annotation.Introspected
-import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.ast.ParameterElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.writer.BeanDefinitionVisitor
@@ -42,8 +42,9 @@ interface MyInterface{
         then:
         !beanDefinition.isAbstract()
         beanDefinition != null
-        beanDefinition.getRequiredMethod("save", String, int).hasAnnotation(Ann)
-        beanDefinition.getRequiredMethod("saveTwo", String).hasAnnotation(Ann)
+        beanDefinition.hasAnnotation(IntroAnn)
+        beanDefinition.getRequiredMethod("save", String, int).hasAnnotation(RuntimeAnn)
+        beanDefinition.getRequiredMethod("saveTwo", String).hasAnnotation(RuntimeAnn)
     }
 
     void "test that elements can be dynamically annotated at compilation time"() {
@@ -51,7 +52,7 @@ interface MyInterface{
         def definition = buildBeanDefinition('test.TestListener', '''
 package test;
 import io.micronaut.context.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 class TestListener {
@@ -72,13 +73,17 @@ class TestListener {
 }
 
 ''')
+        def receiveMethod = definition.findMethod("receive", String).get()
+        def vArgument = receiveMethod.getArguments()[0]
 
         expect:
-        definition.hasAnnotation(Ann)
-        !definition.booleanValue(Ann, "aggregating").orElse(false)
-        definition.booleanValue(Ann, "isolating").orElse(false)
-        definition.getValue(Ann, "foo", String).get() == 'bar'
-        definition.findMethod("receive", String).get().hasAnnotation(Ann)
+        definition.hasAnnotation(RuntimeAnn)
+        !definition.booleanValue(RuntimeAnn, "aggregating").orElse(false)
+        definition.booleanValue(RuntimeAnn, "isolating").orElse(false)
+        definition.getValue(RuntimeAnn, "foo", String).get() == 'bar'
+        receiveMethod.hasAnnotation(RuntimeAnn)
+        vArgument.getAnnotationMetadata().hasAnnotation(RuntimeAnn)
+        vArgument.getAnnotationMetadata().getValue(RuntimeAnn, "foo", String).get() == 'bar'
     }
 
     void "test annotation bean introspection properties"() {
@@ -140,10 +145,12 @@ class Test {
         @Override
         void visitClass(ClassElement element, VisitorContext context) {
             if (!element.hasStereotype(Introduction)) {
-                element.annotate(Ann) { AnnotationValueBuilder builder ->
+                element.annotate(RuntimeAnn) { AnnotationValueBuilder builder ->
                     builder.member("foo", "bar")
                     builder.member("isolating", "true")
                 }
+            } else {
+                element.annotate(IntroAnn)
             }
 
             if (element.hasStereotype(Introspected)) {
@@ -158,9 +165,17 @@ class Test {
 
         @Override
         void visitMethod(MethodElement element, VisitorContext context) {
-            element.annotate(Ann) { AnnotationValueBuilder builder ->
+            element.annotate(RuntimeAnn) { AnnotationValueBuilder builder ->
                 builder.member("foo", "bar")
             }
+
+            for (ParameterElement parameterElement : element.getParameters()) {
+                parameterElement.annotate(RuntimeAnn) {
+                    AnnotationValueBuilder builder ->
+                        builder.member("foo", "bar")
+                }
+            }
+
         }
     }
 
@@ -174,7 +189,7 @@ class Test {
         @Override
         void visitClass(ClassElement element, VisitorContext context) {
             if (!element.hasStereotype(Introduction)) {
-                element.annotate(Ann) { AnnotationValueBuilder builder ->
+                element.annotate(RuntimeAnn) { AnnotationValueBuilder builder ->
                     builder.member("aggregating", "true")
                 }
             }
@@ -185,4 +200,12 @@ class Test {
 @Retention(RetentionPolicy.SOURCE)
 @interface Ann {
     String foo() default ""
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface RuntimeAnn {
+    String foo() default ""
+}
+@Retention(RetentionPolicy.RUNTIME)
+@interface IntroAnn {
 }

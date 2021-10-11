@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,6 +22,7 @@ import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.EachProperty
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.util.StringUtils
+import io.micronaut.inject.ast.Element
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
@@ -46,6 +47,11 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
     GroovyConfigurationMetadataBuilder(SourceUnit sourceUnit, CompilationUnit compilationUnit) {
         this.compilationUnit = compilationUnit
         this.sourceUnit = sourceUnit
+    }
+
+    @Override
+    Element[] getOriginatingElements() {
+        return Element.EMPTY_ELEMENT_ARRAY
     }
 
     @Override
@@ -98,8 +104,8 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
                 .map(pathEvaluationFunction(annotationMetadata)).orElseGet( {->
             AnnotationMetadata ownerMetadata = getAnnotationMetadata(owningType)
             return ownerMetadata.stringValue(ConfigurationReader.class)
-                                .map(pathEvaluationFunction(ownerMetadata)).orElseThrow({ ->
-                new IllegalStateException("Non @ConfigurationProperties type visited")
+                                .map(pathEvaluationFunction(ownerMetadata)).orElseGet({ ->
+                pathEvaluationFunction(annotationMetadata).apply("")
             })
         })
     }

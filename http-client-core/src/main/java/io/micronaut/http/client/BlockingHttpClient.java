@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,6 +23,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 
 import java.io.Closeable;
+import java.util.Optional;
 
 /**
  * A blocking HTTP client interface that features a subset of the operations provided by {@link HttpClient} and
@@ -54,7 +55,6 @@ public interface BlockingHttpClient extends Closeable {
      * @throws HttpClientResponseException when an error status is returned
      */
     <I, O, E> HttpResponse<O> exchange(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType);
-
 
     /**
      * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned
@@ -141,12 +141,18 @@ public interface BlockingHttpClient extends Closeable {
         if (HttpStatus.class.isAssignableFrom(bodyType.getType())) {
             return (O) response.getStatus();
         } else {
-            return response
-                    .getBody()
-                    .orElseThrow(() -> new HttpClientResponseException(
-                            "Empty body",
-                            response
-                    ));
+            Optional<O> body = response.getBody();
+            if (!body.isPresent() && response.getBody(Argument.of(byte[].class)).isPresent()) {
+                throw new HttpClientResponseException(
+                        String.format("Failed to decode the body for the given content type [%s]", response.getContentType().orElse(null)),
+                        response
+                );
+            } else {
+                return body.orElseThrow(() -> new HttpClientResponseException(
+                        "Empty body",
+                        response
+                ));
+            }
         }
     }
 

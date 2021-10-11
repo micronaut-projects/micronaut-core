@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,7 +19,11 @@ import io.micronaut.aop.Around;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.tracing.interceptor.TraceInterceptor;
 
-import java.lang.annotation.*;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
  * <p>Indicates that a new Open Tracing span should be started.</p>
@@ -31,7 +35,7 @@ import java.lang.annotation.*;
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Inherited
-@Target(value = { ElementType.METHOD })
+@Target(value = { ElementType.METHOD, ElementType.ANNOTATION_TYPE })
 @Around
 @Type(TraceInterceptor.class)
 public @interface NewSpan {

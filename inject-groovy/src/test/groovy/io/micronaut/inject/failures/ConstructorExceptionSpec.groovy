@@ -21,8 +21,8 @@ import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.context.exceptions.DependencyInjectionException
 import spock.lang.Specification
 
-import javax.inject.Inject
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 
 /**
  * Created by graemerocher on 17/05/2017.
@@ -44,7 +44,7 @@ class ConstructorExceptionSpec extends Specification {
 Error instantiating bean of type  [io.micronaut.inject.failures.ConstructorExceptionSpec$A]
 
 Message: bad
-Path Taken: B.a --> new A([C c])'''
+Path Taken: new B() --> B.a --> new A([C c])'''
     }
 
     @Singleton

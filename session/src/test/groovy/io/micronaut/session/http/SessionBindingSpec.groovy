@@ -16,6 +16,8 @@
 package io.micronaut.session.http
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -25,10 +27,9 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.session.Session
 import io.micronaut.session.annotation.SessionValue
-import io.reactivex.Flowable
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 
-import javax.annotation.Nullable
 
 /**
  * @author Graeme Rocher
@@ -45,10 +46,10 @@ class SessionBindingSpec extends Specification {
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/sessiontest/simple"), String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
+        HttpResponse<String> response = flowable.blockFirst()
 
         then:
         response.getBody().get() == "not in session"
@@ -56,12 +57,12 @@ class SessionBindingSpec extends Specification {
 
         when:
         def sessionId = response.header(HttpHeaders.AUTHORIZATION_INFO)
-        flowable = Flowable.fromPublisher(client.exchange(
+        flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/sessiontest/simple")
                         .header(HttpHeaders.AUTHORIZATION_INFO, sessionId)
                 , String
         ))
-        response = flowable.blockingFirst()
+        response = flowable.blockFirst()
 
         then:
         response.getBody().get() == "value in session"
@@ -81,10 +82,10 @@ class SessionBindingSpec extends Specification {
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/sessiontest/simple"), String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
+        HttpResponse<String> response = flowable.blockFirst()
 
         then:
         response.getBody().get() == "not in session"
@@ -92,12 +93,12 @@ class SessionBindingSpec extends Specification {
 
         when:
         def sessionId = response.header(HttpHeaders.SET_COOKIE)
-        flowable = Flowable.fromPublisher(client.exchange(
+        flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/sessiontest/simple")
                         .header(HttpHeaders.COOKIE, sessionId)
                 , String
         ))
-        response = flowable.blockingFirst()
+        response = flowable.blockFirst()
 
         then:
         response.getBody().get() == "value in session"
@@ -116,20 +117,20 @@ class SessionBindingSpec extends Specification {
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/sessiontest/optional"), String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
+        HttpResponse<String> response = flowable.blockFirst()
 
         then:
         response.getBody().get() == "no session"
         !response.header(HttpHeaders.AUTHORIZATION_INFO)
 
         when:
-        flowable = Flowable.fromPublisher(client.exchange(
+        flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/sessiontest/simple"), String
         ))
-        response = flowable.blockingFirst()
+        response = flowable.blockFirst()
 
         then:
         response.getBody().get() == "not in session"
@@ -138,45 +139,45 @@ class SessionBindingSpec extends Specification {
         when:
         def sessionId = response.header(HttpHeaders.AUTHORIZATION_INFO)
 
-        flowable = Flowable.fromPublisher(client.exchange(
+        flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/sessiontest/optional")
                         .header(HttpHeaders.AUTHORIZATION_INFO, sessionId)
                 , String
         ))
-        response = flowable.blockingFirst()
+        response = flowable.blockFirst()
 
         then:
         response.getBody().get() == "value in session"
         response.header(HttpHeaders.AUTHORIZATION_INFO)
 
         when:
-        flowable = Flowable.fromPublisher(client.exchange(
+        flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/sessiontest/value")
                         .header(HttpHeaders.AUTHORIZATION_INFO, sessionId)
                 , String
         ))
-        response = flowable.blockingFirst()
+        response = flowable.blockFirst()
 
         then:
         response.getBody().get() == "value in session"
 
         when:
-        flowable = Flowable.fromPublisher(client.exchange(
+        flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/sessiontest/value-nullable")
                         .header(HttpHeaders.AUTHORIZATION_INFO, sessionId)
                 , String
         ))
-        response = flowable.blockingFirst()
+        response = flowable.blockFirst()
 
         then:
         response.getBody().get() == "value in session"
 
         when:
-        flowable = Flowable.fromPublisher(client.exchange(
+        flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/sessiontest/value-nullable")
                 , String
         ))
-        response = flowable.blockingFirst()
+        response = flowable.blockFirst()
 
         then:
         response.getBody().get() == "no value in session"
@@ -186,6 +187,7 @@ class SessionBindingSpec extends Specification {
         embeddedServer.stop()
     }
 
+    @Requires(property = "spec.name", value = "SessionBindingSpec")
     @Controller('/sessiontest')
     static class SessionController {
 

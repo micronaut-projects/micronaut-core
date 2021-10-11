@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,9 +15,10 @@
  */
 package io.micronaut.context.annotation;
 
+import jakarta.inject.Singleton;
+
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -51,13 +52,13 @@ import java.lang.annotation.Target;
  * <p>In the above example for a configuration property of {@code foo.bar.test}, the value of the {@code name} argument
  * will be {@code "test"}</p>
  * <p>
- * <p>The bean is created as a singleton with a {@link javax.inject.Named} qualifier matching the configuration entry
+ * <p>The bean is created as a singleton with a Named qualifier matching the configuration entry
  * name, thus allowing retrieval with:</p>
  * <pre><code>
  *  ExampleConfiguration exampleConfiguration = applicationContext.getBean(ExampleConfiguration.class, Qualifiers.byName("test"));
  * </code></pre>
  * <p>
- * <p>Or alternatively dependency injection via the {@link javax.inject.Named} qualifier.</p>
+ * <p>Or alternatively dependency injection via the Named qualifier.</p>
  * <p>
  * <p>This annotation is typically used in conjunction with {@link EachBean}. For example, one can drive the
  * configuration of other beans with the {@link EachBean} annotation:</p>

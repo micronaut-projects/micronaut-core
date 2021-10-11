@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,7 +22,7 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import org.slf4j.Logger;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -44,10 +44,19 @@ class DefaultBeanIntrospector implements BeanIntrospector {
     private static final Logger LOG = ClassUtils.getLogger(DefaultBeanIntrospector.class);
 
     private Map<String, BeanIntrospectionReference<Object>> introspectionMap;
+    private final ClassLoader classLoader;
+
+    DefaultBeanIntrospector() {
+        this.classLoader = DefaultBeanIntrospector.class.getClassLoader();
+    }
+
+    DefaultBeanIntrospector(ClassLoader classLoader) {
+        this.classLoader = classLoader;
+    }
 
     @NonNull
     @Override
-    public Collection<BeanIntrospection<Object>> findIntrospections(@NonNull Predicate<? super BeanIntrospectionReference> filter) {
+    public Collection<BeanIntrospection<Object>> findIntrospections(@NonNull Predicate<? super BeanIntrospectionReference<?>> filter) {
         ArgumentUtils.requireNonNull("filter", filter);
         return getIntrospections()
                 .values()
@@ -55,6 +64,18 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                 .filter(filter)
                 .map(BeanIntrospectionReference::load)
                 .collect(Collectors.toList());
+    }
+
+    @NonNull
+    @Override
+    public Collection<Class<?>> findIntrospectedTypes(@NonNull Predicate<? super BeanIntrospectionReference<?>> filter) {
+        ArgumentUtils.requireNonNull("filter", filter);
+        return getIntrospections()
+                .values()
+                .stream()
+                .filter(filter)
+                .map(BeanIntrospectionReference::getBeanType)
+                .collect(Collectors.toSet());
     }
 
     @NonNull
@@ -88,7 +109,7 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                 introspectionMap = this.introspectionMap;
                 if (introspectionMap == null) {
                     introspectionMap = new HashMap<>(30);
-                    final SoftServiceLoader<BeanIntrospectionReference> services = SoftServiceLoader.load(BeanIntrospectionReference.class);
+                    final SoftServiceLoader<BeanIntrospectionReference> services = SoftServiceLoader.load(BeanIntrospectionReference.class, classLoader);
 
                     for (ServiceDefinition<BeanIntrospectionReference> definition : services) {
                         if (definition.isPresent()) {

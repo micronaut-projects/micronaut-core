@@ -1,27 +1,26 @@
 package io.micronaut.http.client.aop
 
-
+import groovy.transform.EqualsAndHashCode
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Header
-import io.micronaut.http.annotation.PathVariable
-import io.micronaut.http.annotation.QueryValue
-import io.micronaut.http.annotation.RequestBean
+import io.micronaut.http.MutableHttpResponse
+import io.micronaut.http.annotation.*
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.http.filter.OncePerRequestHttpServerFilter
+import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
+import jakarta.inject.Singleton
+import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.annotation.Nullable
-import javax.inject.Singleton
 import javax.validation.Valid
 import javax.validation.constraints.Pattern
 
@@ -34,84 +33,122 @@ class RequestBeanSpec extends Specification {
     @Shared
     RequestBeanClient client = embeddedServer.getApplicationContext().getBean(RequestBeanClient)
 
+    void "test client RequestBean"() {
+        ClientRequestBean bean = new ClientRequestBean()
+        bean.queryValues = ["ABC", "XYZ"]
+        bean.queryValue = "FOO"
+        bean.forwardedFor = "Tester"
+        bean.path = "request-bean"
+
+        when:
+        ClientRequestBean resp = client.getBean(bean)
+
+        then:
+        resp == bean
+    }
+
     void "test @QueryValue is injected to Bean"() {
         expect:
-            client.getQueryValue("Riverside") == "Riverside"
+        client.getQueryValue("Riverside") == "Riverside"
     }
 
     void "test @QueryValue have empty Optional Value"() {
         expect:
-            !client.getOptionalValue()
+        !client.getOptionalValue()
     }
 
     void "test @QueryValue has value in Optional"() {
         expect:
-            client.getOptionalValue("hello value")
+        client.getOptionalValue("hello value")
     }
 
     void "test validated value returns bad request when invalid"() {
         when:
-            client.getValidatedValue("third")
+        client.getValidatedValue("third")
+
         then:
-            def ex = thrown(HttpClientResponseException)
-            ex.message.contains("Field must have value first or second.")
+        def ex = thrown(HttpClientResponseException)
+        ex.response.getBody(Map).get()._embedded.errors[0].message.contains("Field must have value first or second.")
     }
 
     void "test validated value returns ok when valid"() {
         expect:
-            client.getValidatedValue("second") == "second"
+        client.getValidatedValue("second") == "second"
     }
 
     void "test @PathVariable is injected in to Bean"() {
         expect:
-            client.getPathVariable("v1beta") == "v1beta"
+        client.getPathVariable("v1beta") == "v1beta"
     }
 
     void "test @Header is injected in to Bean"() {
         expect:
-            client.getHeader("127.0.0.1") == "127.0.0.1"
+        client.getHeader("127.0.0.1") == "127.0.0.1"
     }
 
     void "test HttpRequest is injected in to Bean"() {
         expect:
-            client.getInjectedHttpRequest() == "/request/bean/httpRequest"
+        client.getInjectedHttpRequest() == "/request/bean/httpRequest"
     }
 
     void "test Typed Value is injected in to Bean"() {
         expect:
-            client.getInjectedTypedValue() == "Test Typed Value"
+        client.getInjectedTypedValue() == "Type Test Value"
     }
 
     void "test Immutable injections works"() {
         expect:
-            client.getImmutableBean("I am immutable! Muahahah") == "I am immutable! Muahahah"
+        client.getImmutableBean("I am immutable! Muahahah") == "I am immutable! Muahahah"
     }
 
     void "test Immutable Bean gets injected HttpRequest"() {
         expect:
-            client.getImmutableBeanInjectedHttpRequest() == "/request/bean/immutable/request/path"
+        client.getImmutableBeanInjectedHttpRequest() == "/request/bean/immutable/request/path"
     }
 
     void "test Immutable validated parameter"() {
         when:
-            client.getImmutableBeanValidatedValue("third")
+        client.getImmutableBeanValidatedValue("third")
+
         then:
-            def ex = thrown(HttpClientResponseException)
-            ex.message.contains("Field must have value first or second.")
+        def ex = thrown(HttpClientResponseException)
+        ex.response.getBody(Map).get()._embedded.errors[0].message.contains("Field must have value first or second.")
     }
 
     void "test Immutable Bean gets injected Typed Value"() {
         expect:
-            client.getImmutableInjectedTypedValue() == "Test Typed Value"
+        client.getImmutableInjectedTypedValue() == "Type Test Value"
     }
 
     void "test Extending Bean has super values"() {
         expect:
-            client.getExtendingBeanValues("I am not super!", "I am super!") == "Extending: 'I am not super!', Super: 'I am super!'"
+        client.getExtendingBeanValues("I am not super!", "I am super!") == "Extending: 'I am not super!', Super: 'I am super!'"
+    }
+
+    /**
+     * Example of such case: Authentication type, where value must be resolved after filters
+     */
+    void "test Filter values are respected"() {
+        expect:
+        client.getFilterValue() == "Filter Test Value"
+    }
+
+    void "test unsatisfied non-nullable value returns bad request"() {
+        when:
+        client.getUnsatisfiedValue()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.response.getBody(Map).get()._embedded.errors[0].message.contains("Required argument [String value] not specified")
     }
 
     @Controller('/request/bean')
     static class RequestBeanController {
+
+        @Get("/client-{path}")
+        ClientRequestBean getBean(@RequestBean ClientRequestBean bean) {
+            return bean
+        }
 
         @Get("/queryValue{?queryValue}")
         String getQueryValue(@RequestBean Bean bean) {
@@ -145,7 +182,7 @@ class RequestBeanSpec extends Specification {
 
         @Get("/typed/value")
         String getInjectedTypedValue(@RequestBean Bean bean) {
-            return bean.principal.name
+            return bean.typeValue.value
         }
 
         @Get("/immutable")
@@ -165,7 +202,7 @@ class RequestBeanSpec extends Specification {
 
         @Get("/immutable/typed/value")
         String getImmutableInjectedTypedValue(@RequestBean ImmutableBean bean) {
-            return bean.principal.name
+            return bean.typeValue.value
         }
 
         @Get("/extended/values")
@@ -173,10 +210,23 @@ class RequestBeanSpec extends Specification {
             return "Extending: '$bean.extendingValue', Super: '$bean.superValue'"
         }
 
+        @Get("/filter/value")
+        String getFilterValue(@RequestBean ImmutableBean bean) {
+            return bean.filterValue.value
+        }
+
+        @Get("/unsatisfied/value")
+        String getUnsatisfiedValue(@RequestBean UnsatisfiedBean bean) {
+            return bean.value
+        }
+
     }
 
     @Client('/request/bean')
     static interface RequestBeanClient {
+
+        @Get("/client-{path}")
+        ClientRequestBean getBean(@RequestBean ClientRequestBean bean)
 
         @Get("/queryValue{?queryValue}")
         String getQueryValue(String queryValue)
@@ -214,6 +264,31 @@ class RequestBeanSpec extends Specification {
         @Get("/extended/values{?extendingValue,superValue}")
         String getExtendingBeanValues(String extendingValue, String superValue)
 
+        @Get("/filter/value")
+        String getFilterValue()
+
+        @Get("/unsatisfied/value")
+        String getUnsatisfiedValue()
+
+    }
+
+    @Introspected
+    @EqualsAndHashCode
+    static class ClientRequestBean {
+        @Nullable
+        @QueryValue
+        String queryValue
+
+        @Nullable
+        @QueryValue
+        List<String> queryValues
+
+        @Nullable
+        @Header("X-Forwarded-For")
+        String forwardedFor
+
+        @PathVariable
+        String path
     }
 
     @Introspected
@@ -242,7 +317,7 @@ class RequestBeanSpec extends Specification {
         String forwardedFor
 
         @Nullable
-        TestPrincipal principal
+        TestTypeValue typeValue
 
     }
 
@@ -252,7 +327,10 @@ class RequestBeanSpec extends Specification {
         final HttpRequest<?> request
 
         @Nullable
-        final TestPrincipal principal
+        final TestTypeValue typeValue
+
+        @Nullable
+        final TestFilterValue filterValue
 
         @Nullable
         @QueryValue
@@ -264,9 +342,10 @@ class RequestBeanSpec extends Specification {
         @Pattern(regexp = "first|second", message = "Field must have value 'first' or 'second'.")
         final String validatedValue
 
-        ImmutableBean(HttpRequest request, TestPrincipal principal, String queryValue, String validatedValue) {
+        ImmutableBean(HttpRequest request, TestTypeValue typeValue, TestFilterValue filterValue, String queryValue, String validatedValue) {
             this.request = request
-            this.principal = principal
+            this.typeValue = typeValue
+            this.filterValue = filterValue
             this.queryValue = queryValue
             this.validatedValue = validatedValue
         }
@@ -290,26 +369,66 @@ class RequestBeanSpec extends Specification {
 
     }
 
-    static class TestPrincipal {
-        String name
+    @Introspected
+    static class UnsatisfiedBean {
+
+        @QueryValue
+        String value
+
+    }
+
+    static class TestTypeValue {
+        String value
     }
 
     @Singleton
-    static class TestPrincipalBinder implements TypedRequestArgumentBinder<TestPrincipal> {
+    static class TestTypeValueBinder implements TypedRequestArgumentBinder<TestTypeValue> {
 
         @Override
-        Argument<TestPrincipal> argumentType() {
-            return Argument.of(TestPrincipal)
+        Argument<TestTypeValue> argumentType() {
+            return Argument.of(TestTypeValue)
         }
 
         @Override
-        BindingResult<TestPrincipal> bind(ArgumentConversionContext<TestPrincipal> context, HttpRequest<?> source) {
-            return new BindingResult<TestPrincipal>() {
+        BindingResult<TestTypeValue> bind(ArgumentConversionContext<TestTypeValue> context, HttpRequest<?> source) {
+            return new BindingResult<TestTypeValue>() {
                 @Override
-                Optional<TestPrincipal> getValue() {
-                    Optional.of(new TestPrincipal(name: "Test Typed Value"))
+                Optional<TestTypeValue> getValue() {
+                    Optional.of(new TestTypeValue(value: "Type Test Value"))
                 }
             }
+        }
+    }
+
+    static class TestFilterValue {
+        String value
+    }
+
+    @Singleton
+    static class TestFilterValueBinder implements TypedRequestArgumentBinder<TestFilterValue> {
+
+        @Override
+        Argument<TestFilterValue> argumentType() {
+            return Argument.of(TestFilterValue)
+        }
+
+        @Override
+        BindingResult<TestFilterValue> bind(ArgumentConversionContext<TestFilterValue> context, HttpRequest<?> source) {
+            return new BindingResult<TestFilterValue>() {
+                @Override
+                Optional<TestFilterValue> getValue() {
+                    Optional.of(new TestFilterValue(value: source.getAttribute("filter.value").orElse(null)))
+                }
+            }
+        }
+    }
+
+    @Filter("/request/bean/**")
+    static class TestFilter extends OncePerRequestHttpServerFilter {
+        @Override
+        protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
+            request.getAttributes().put("filter.value", "Filter Test Value")
+            return chain.proceed(request)
         }
     }
 

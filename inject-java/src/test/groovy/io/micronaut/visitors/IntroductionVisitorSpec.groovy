@@ -1,6 +1,6 @@
 package io.micronaut.visitors
 
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.IgnoreIf
@@ -64,5 +64,4 @@ class Foo {}
         deleteMethod.arguments[0].firstTypeVariable.get().type.name == 'test.Foo'
 
     }
-
 }

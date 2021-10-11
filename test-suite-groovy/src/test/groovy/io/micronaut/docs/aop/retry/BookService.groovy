@@ -17,7 +17,7 @@ package io.micronaut.docs.aop.retry
 
 import io.micronaut.retry.annotation.CircuitBreaker
 import io.micronaut.retry.annotation.Retryable
-import io.reactivex.Flowable
+import reactor.core.publisher.Flux
 
 class BookService {
 
@@ -38,8 +38,8 @@ class BookService {
     }
 
     // tag::attempts[]
-    @Retryable( attempts = "5",
-                delay = "2s" )
+    @Retryable(attempts = "5",
+               delay = "2s")
     Book findBook(String title) {
         // ...
     // end::attempts[]
@@ -47,8 +47,8 @@ class BookService {
     }
 
     // tag::config[]
-    @Retryable( attempts = "\${book.retry.attempts:3}",
-            delay = "\${book.retry.delay:1s}")
+    @Retryable(attempts = '${book.retry.attempts:3}',
+               delay = '${book.retry.delay:1s}')
     Book getBook(String title) {
         // ...
     // end::config[]
@@ -57,9 +57,9 @@ class BookService {
 
     // tag::reactive[]
     @Retryable
-    Flowable<Book> streamBooks() {
+    Flux<Book> streamBooks() {
         // ...
     // end::reactive[]
-        Flowable.just(new Book("The Stand"))
+        Flux.just(new Book("The Stand"))
     }
 }

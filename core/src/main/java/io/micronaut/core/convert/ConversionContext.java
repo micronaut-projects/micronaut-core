@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,7 +21,7 @@ import io.micronaut.core.type.TypeVariableResolver;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -135,6 +135,11 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
             }
 
             @Override
+            public void reject(Object value, Exception exception) {
+                thisContext.reject(value, exception);
+            }
+
+            @Override
             public Iterator<ConversionError> iterator() {
                 return thisContext.iterator();
             }
@@ -145,8 +150,6 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
             }
         };
     }
-
-
 
     /**
      * Create a simple {@link ConversionContext} for the given generic type variables.

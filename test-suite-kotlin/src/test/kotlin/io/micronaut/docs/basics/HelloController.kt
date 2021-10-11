@@ -16,27 +16,32 @@
 package io.micronaut.docs.basics
 
 import io.micronaut.context.annotation.Requires
-
 // tag::imports[]
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.*
-import io.micronaut.http.client.RxHttpClient
-import io.micronaut.http.client.annotation.Client
-import io.reactivex.Maybe
-
 import io.micronaut.http.HttpRequest.GET
+import io.micronaut.http.HttpStatus.CREATED
+import io.micronaut.http.MediaType.TEXT_PLAIN
+import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.Status
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.annotation.Client
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import io.micronaut.core.async.annotation.SingleResult
 // end::imports[]
 
 @Requires(property = "spec.name", value = "HelloControllerSpec")
 @Controller("/")
-class HelloController(@param:Client("/endpoint") private val httpClient: RxHttpClient) {
+class HelloController(@param:Client("/endpoint") private val httpClient: HttpClient) {
 
     // tag::nonblocking[]
     @Get("/hello/{name}")
-    internal fun hello(name: String): Maybe<String> { // <1>
-        return httpClient.retrieve(GET<Any>("/hello/$name"))
-                .firstElement() // <2>
+    @SingleResult
+    internal fun hello(name: String): Publisher<String> { // <1>
+        return Flux.from(httpClient.retrieve(GET<Any>("/hello/$name")))
+                         .next() // <2>
     }
     // end::nonblocking[]
 
@@ -53,15 +58,14 @@ class HelloController(@param:Client("/endpoint") private val httpClient: RxHttpC
     // end::json[]
 
     @Post("/greet")
-    @Status(HttpStatus.CREATED)
+    @Status(CREATED)
     internal fun echo(@Body message: Message): Message {
         return message
     }
 
-    @Post(value = "/hello", consumes = [MediaType.TEXT_PLAIN], produces = [MediaType.TEXT_PLAIN])
-    @Status(HttpStatus.CREATED)
+    @Post(value = "/hello", consumes = [TEXT_PLAIN], produces = [TEXT_PLAIN])
+    @Status(CREATED)
     internal fun echoHello(@Body message: String): String {
         return message
     }
-
 }

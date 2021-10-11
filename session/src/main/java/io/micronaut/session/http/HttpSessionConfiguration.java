@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,6 +20,7 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.cookie.CookieConfiguration;
 import io.micronaut.http.cookie.SameSite;
 import io.micronaut.session.SessionConfiguration;
+
 import java.time.temporal.TemporalAmount;
 import java.util.Optional;
 
@@ -85,6 +86,7 @@ public class HttpSessionConfiguration extends SessionConfiguration implements Co
     /**
      * @return The cookie name to use
      */
+    @Override
     public String getCookieName() {
         return cookieName;
     }
@@ -129,6 +131,7 @@ public class HttpSessionConfiguration extends SessionConfiguration implements Co
     /**
      * @return The cookie path to use
      */
+    @Override
     public Optional<String> getCookiePath() {
         return Optional.ofNullable(cookiePath);
     }
@@ -174,6 +177,7 @@ public class HttpSessionConfiguration extends SessionConfiguration implements Co
     /**
      * @return The max age to use for the cookie
      */
+    @Override
     public Optional<TemporalAmount> getCookieMaxAge() {
         return Optional.ofNullable(cookieMaxAge);
     }
@@ -204,6 +208,7 @@ public class HttpSessionConfiguration extends SessionConfiguration implements Co
     /**
      * @return Is cookie secure
      */
+    @Override
     public Optional<Boolean> isCookieSecure() {
         return Optional.ofNullable(cookieSecure);
     }

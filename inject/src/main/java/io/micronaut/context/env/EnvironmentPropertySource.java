@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,7 @@
  */
 package io.micronaut.context.env;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -66,10 +66,12 @@ public class EnvironmentPropertySource extends MapPropertySource {
         return PropertyConvention.ENVIRONMENT_VARIABLE;
     }
 
-    private static Map getEnv(@Nullable List<String> includes, @Nullable List<String> excludes) {
-        Map<String, String> env;
+    static Map getEnv(@Nullable List<String> includes, @Nullable List<String> excludes) {
+        return getEnv(new HashMap<>(System.getenv()), includes, excludes);
+    }
+
+    static Map getEnv(Map<String, String> env, @Nullable List<String> includes, @Nullable List<String> excludes) {
         if (includes != null || excludes != null) {
-            env = new HashMap<>(System.getenv());
             Iterator<String> it = env.keySet().iterator();
             while (it.hasNext()) {
                 String envVar = it.next();
@@ -80,8 +82,6 @@ public class EnvironmentPropertySource extends MapPropertySource {
                     it.remove();
                 }
             }
-        } else {
-            env = System.getenv();
         }
         return env;
     }

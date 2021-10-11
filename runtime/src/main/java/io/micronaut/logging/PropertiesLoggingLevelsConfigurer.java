@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,11 +25,13 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
+import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Singleton;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Properties logging levels configurer.
@@ -78,18 +80,34 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
     }
 
     private void configureLogLevels() {
-        environment.getProperties(LOGGER_LEVELS_PROPERTY_PREFIX, StringConvention.RAW).forEach((loggerPrefix, levelString) -> {
-            LogLevel newLevel = toLogLevel(levelString.toString());
-            if (newLevel == null) {
-                throw new ConfigurationException("Invalid log level: '" + levelString + "' for logger: '" + loggerPrefix + "'");
-            }
-            if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug("Setting log level '{}' for logger: '{}'", newLevel, loggerPrefix);
-            }
-            for (LoggingSystem loggingSystem : loggingSystems) {
-                loggingSystem.setLogLevel(loggerPrefix, newLevel);
-            }
-        });
+        // Using raw keys here allows configuring log levels for camelCase package names in application.yml
+        final Map<String, Object> rawProperties = environment.getProperties(LOGGER_LEVELS_PROPERTY_PREFIX, StringConvention.RAW);
+        // Adding the generated properties allows environment variables and system properties to override names in application.yaml
+        final Map<String, Object> generatedProperties = environment.getProperties(LOGGER_LEVELS_PROPERTY_PREFIX);
+
+        final Map<String, Object> properties = new HashMap<>(generatedProperties.size() + rawProperties.size(), 1f);
+        properties.putAll(rawProperties);
+        properties.putAll(generatedProperties);
+        properties.forEach(this::configureLogLevelForPrefix);
+    }
+
+    private void configureLogLevelForPrefix(final String loggerPrefix, final Object levelValue) {
+        final LogLevel newLevel;
+        if (levelValue instanceof Boolean && !((boolean) levelValue)) {
+            newLevel = LogLevel.OFF; // SnakeYAML converts OFF (without quotations) to a boolean false value, hence we need to handle that here...
+        } else {
+            newLevel = toLogLevel(levelValue.toString());
+        }
+        if (newLevel == null) {
+            throw new ConfigurationException("Invalid log level: '" + levelValue + "' for logger: '" + loggerPrefix + "'");
+        }
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Setting log level '{}' for logger: '{}'", newLevel, loggerPrefix);
+        }
+        LOGGER.info("Setting log level '{}' for logger: '{}'", newLevel, loggerPrefix);
+        for (LoggingSystem loggingSystem : loggingSystems) {
+            loggingSystem.setLogLevel(loggerPrefix, newLevel);
+        }
     }
 
     private static LogLevel toLogLevel(String logLevel) {

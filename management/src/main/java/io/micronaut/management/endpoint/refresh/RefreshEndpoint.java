@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,11 +17,11 @@ package io.micronaut.management.endpoint.refresh;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Write;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Map;
 import java.util.Set;
 
@@ -38,13 +38,13 @@ import java.util.Set;
 public class RefreshEndpoint {
 
     private final Environment environment;
-    private final ApplicationEventPublisher eventPublisher;
+    private final ApplicationEventPublisher<RefreshEvent> eventPublisher;
 
     /**
      * @param environment    The Environment
-     * @param eventPublisher The Application event publiser
+     * @param eventPublisher The Application event publisher
      */
-    public RefreshEndpoint(Environment environment, ApplicationEventPublisher eventPublisher) {
+    public RefreshEndpoint(Environment environment, ApplicationEventPublisher<RefreshEvent> eventPublisher) {
         this.environment = environment;
         this.eventPublisher = eventPublisher;
     }

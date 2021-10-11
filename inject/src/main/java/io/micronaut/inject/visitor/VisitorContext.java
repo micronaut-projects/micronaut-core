@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,19 +15,21 @@
  */
 package io.micronaut.inject.visitor;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementFactory;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
@@ -45,6 +47,13 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     String MICRONAUT_PROCESSING_PROJECT_DIR = "micronaut.processing.project.dir";
     String MICRONAUT_PROCESSING_GROUP = "micronaut.processing.group";
     String MICRONAUT_PROCESSING_MODULE = "micronaut.processing.module";
+
+    /**
+     * Gets the element factory for this visitor context.
+     * @return The element factory
+     * @since 2.3.0
+     */
+    @NonNull ElementFactory<?, ?, ?, ?> getElementFactory();
 
     /**
      * Allows printing informational messages.
@@ -78,13 +87,35 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     void warn(String message, @Nullable Element element);
 
     /**
+     * @return The visitor configuration
+     */
+    default @NonNull VisitorConfiguration getConfiguration() {
+        return VisitorConfiguration.DEFAULT;
+    }
+
+    /**
+     * Visit a file within the META-INF directory.
+     *
+     * @param path The path to the file
+     * @return An optional file it was possible to create it
+     * @deprecated Visiting a file should supply the originating elements. Use {@link #visitMetaInfFile(String, Element...)} instead
+     */
+    @Override
+    @Experimental
+    @Deprecated
+    default Optional<GeneratedFile> visitMetaInfFile(String path) {
+        return visitMetaInfFile(path, Element.EMPTY_ELEMENT_ARRAY);
+    }
+
+    /**
      * Visit a file within the META-INF directory.
      *
      * @param path The path to the file
      * @return An optional file it was possible to create it
      */
+    @Override
     @Experimental
-    Optional<GeneratedFile> visitMetaInfFile(String path);
+    Optional<GeneratedFile> visitMetaInfFile(String path, Element...originatingElements);
 
     /**
      * Visit a file that will be located within the generated source directory.
@@ -92,8 +123,10 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @param path The path to the file
      * @return An optional file it was possible to create it
      */
+    @Override
     @Experimental
     Optional<GeneratedFile> visitGeneratedFile(String path);
+
 
     /**
      * Obtain a set of resources from the user classpath.
@@ -140,6 +173,30 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     }
 
     /**
+     * Provide the Path to the annotation processing classes output directory, i.e. the parent of META-INF.
+     *
+     * <p>This might, for example, be used as a convenience for {@link TypeElementVisitor} classes to provide
+     * relative path strings to {@link VisitorContext#addGeneratedResource(String)}</p>
+     * <pre>
+     * Path resource = ... // absolute path to the resource
+     * visitorContext.getClassesOutputPath().ifPresent(path ->
+     *     visitorContext.addGeneratedResource(path.relativize(resource).toString()));
+     * </pre>
+     *
+     * @return Path pointing to the classes output directory
+     */
+    @Experimental
+    default Optional<Path> getClassesOutputPath() {
+        Optional<GeneratedFile> dummy = visitMetaInfFile("dummy", Element.EMPTY_ELEMENT_ARRAY);
+        if (dummy.isPresent()) {
+            // we want the parent directory of META-INF/dummy
+            Path classesOutputDir = Paths.get(dummy.get().toURI()).getParent().getParent();
+            return Optional.of(classesOutputDir);
+        }
+        return Optional.empty();
+    }
+
+    /**
      * This method will lookup another class element by name. If it cannot be found an empty optional will be returned.
      *
      * @param name The name
@@ -182,4 +239,28 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     default Map<String, String> getOptions() {
         return Collections.emptyMap();
     }
+
+    /**
+     * Provide a collection of generated classpath resources that other TypeElement visitors might want to consume.
+     * The generated resources are intended to be strings paths relative to the classpath root.
+     *
+     * @return a possibly empty collection of resource paths
+     */
+    @Experimental
+    default Collection<String> getGeneratedResources() {
+        info("EXPERIMENTAL: Compile time resource contribution to the context is experimental", null);
+        return Collections.emptyList();
+    }
+
+    /**
+     * Some TypeElementVisitors generate classpath resources that other visitors might be interested in.
+     * The generated resources are intended to be strings paths relative to the classpath root
+     *
+     * @param resource the relative path to add
+     */
+    @Experimental
+    default void addGeneratedResource(String resource) {
+        info("EXPERIMENTAL: Compile time resource contribution to the context is experimental", null);
+    }
+
 }

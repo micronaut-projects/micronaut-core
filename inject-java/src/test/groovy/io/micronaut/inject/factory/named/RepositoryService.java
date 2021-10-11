@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,29 +16,28 @@
 package io.micronaut.inject.factory.named;
 
 import com.github.benmanes.caffeine.cache.Cache;
-import io.reactivex.Flowable;
-import io.reactivex.Maybe;
-
-import javax.inject.Named;
-import javax.inject.Singleton;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 @Singleton
 public class RepositoryService {
-    private final Cache<String, Flowable<String>> orgRepositoryCache;
-    private final Cache<String, Maybe<String>> repositoryCache;
+    private final Cache<String, Flux<String>> orgRepositoryCache;
+    private final Cache<String, Mono<String>> repositoryCache;
 
     public RepositoryService(
-            @Named("orgRepositoryCache") Cache<String, Flowable<String>> orgRepositoryCache,
-            @Named("repositoryCache") Cache<String, Maybe<String>> repositoryCache) {
+            @Named("orgRepositoryCache") Cache<String, Flux<String>> orgRepositoryCache,
+            @Named("repositoryCache") Cache<String, Mono<String>> repositoryCache) {
         this.orgRepositoryCache = orgRepositoryCache;
         this.repositoryCache = repositoryCache;
     }
 
-    public Cache<String, Flowable<String>> getOrgRepositoryCache() {
+    public Cache<String, Flux<String>> getOrgRepositoryCache() {
         return orgRepositoryCache;
     }
 
-    public Cache<String, Maybe<String>> getRepositoryCache() {
+    public Cache<String, Mono<String>> getRepositoryCache() {
         return repositoryCache;
     }
 }

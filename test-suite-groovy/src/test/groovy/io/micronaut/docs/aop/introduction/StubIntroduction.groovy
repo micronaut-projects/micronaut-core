@@ -16,23 +16,25 @@
 package io.micronaut.docs.aop.introduction
 
 // tag::imports[]
-
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
-
-import javax.inject.Singleton
+import io.micronaut.aop.InterceptorBean
+import io.micronaut.core.annotation.Nullable
+import jakarta.inject.Singleton
 // end::imports[]
 
 // tag::class[]
 @Singleton
-class StubIntroduction implements MethodInterceptor<Object,Object> { // <1>
+@InterceptorBean(Stub) // <1>
+class StubIntroduction implements MethodInterceptor<Object,Object> { // <2>
 
+    @Nullable
     @Override
     Object intercept(MethodInvocationContext<Object, Object> context) {
-        return context.getValue( // <2>
-                Stub.class,
-                context.getReturnType().getType()
-        ).orElse(null) // <3>
+        context.getValue( // <3>
+                Stub,
+                context.returnType.type
+        ).orElse(null) // <4>
     }
 }
 // end::class[]

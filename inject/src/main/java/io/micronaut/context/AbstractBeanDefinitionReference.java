@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,10 +19,13 @@ import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.exceptions.BeanContextException;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Set;
 
 /**
  * An uninitialized and unloaded component definition with basic information available regarding its requirements.
@@ -37,6 +40,7 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
     private final String beanTypeName;
     private final String beanDefinitionTypeName;
     private Boolean present;
+    private Set<Class<?>> exposedTypes;
 
     /**
      * @param beanTypeName           The bean type name
@@ -50,6 +54,15 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
     @Override
     public boolean isPrimary() {
         return getAnnotationMetadata().hasAnnotation(Primary.class);
+    }
+
+    @Override
+    @NonNull
+    public final Set<Class<?>> getExposedTypes() {
+        if (exposedTypes == null) {
+            this.exposedTypes = BeanDefinitionReference.super.getExposedTypes();
+        }
+        return this.exposedTypes;
     }
 
     @Override

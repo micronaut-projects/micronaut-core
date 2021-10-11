@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,7 +19,8 @@ package io.micronaut.docs.server.intro;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.client.annotation.Client;
-import io.reactivex.Single;
+import org.reactivestreams.Publisher;
+import io.micronaut.core.async.annotation.SingleResult;
 // end::imports[]
 
 /**
@@ -31,6 +32,7 @@ import io.reactivex.Single;
 public interface HelloClient {
 
     @Get(consumes = MediaType.TEXT_PLAIN) // <2>
-    Single<String> hello(); // <3>
+    @SingleResult
+    Publisher<String> hello(); // <3>
 }
 // end::class[]

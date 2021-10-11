@@ -15,13 +15,17 @@
  */
 package io.micronaut.test.issue1940
 
-
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Named
+import jakarta.inject.Singleton
+import java.util.function.Supplier
 
 @Singleton
 class TestService {
 
     private final TestApi testApi
+
+    @Inject @Named("my-str-supplier") Supplier<String> myStrSupplier
 
     TestService(TestApi testApi) {
         this.testApi = testApi
@@ -29,5 +33,9 @@ class TestService {
 
     String greeting(String name) {
         return testApi.greeting(name)
+    }
+
+    String greetFromSupplier() {
+        myStrSupplier.get()
     }
 }

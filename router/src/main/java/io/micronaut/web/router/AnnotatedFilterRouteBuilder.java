@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,7 @@
  */
 package io.micronaut.web.router;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.processor.BeanDefinitionProcessor;
@@ -25,12 +25,12 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.context.ServerContextPathProvider;
+import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.inject.BeanDefinition;
-
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 /**
  * An {@link io.micronaut.context.processor.ExecutableMethodProcessor} for the {@link Filter} annotation.
@@ -41,7 +41,6 @@ import javax.inject.Singleton;
 @Singleton
 public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements BeanDefinitionProcessor<Filter> {
 
-    private final BeanContext beanContext;
     private final ServerContextPathProvider contextPathProvider;
 
     /**
@@ -61,7 +60,6 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements 
             ConversionService<?> conversionService,
             @Nullable ServerContextPathProvider contextPathProvider) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
-        this.beanContext = beanContext;
         this.contextPathProvider = contextPathProvider;
     }
 
@@ -74,6 +72,8 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements 
         String[] patterns = getPatterns(beanDefinition);
         if (ArrayUtils.isNotEmpty(patterns)) {
             HttpMethod[] methods = beanDefinition.enumValues(Filter.class, "methods", HttpMethod.class);
+            FilterPatternStyle patternStyle = beanDefinition.enumValue(Filter.class, "patternStyle",
+                FilterPatternStyle.class).orElse(FilterPatternStyle.ANT);
             String first = patterns[0];
             @SuppressWarnings("unchecked")
             FilterRoute filterRoute = addFilter(first, beanContext, (BeanDefinition<? extends HttpFilter>) beanDefinition);
@@ -86,6 +86,7 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements 
             if (ArrayUtils.isNotEmpty(methods)) {
                 filterRoute.methods(methods);
             }
+            filterRoute.patternStyle(patternStyle);
         }
     }
 

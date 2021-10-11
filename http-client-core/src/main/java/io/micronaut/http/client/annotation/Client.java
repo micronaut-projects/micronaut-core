@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,6 @@
  */
 package io.micronaut.http.client.annotation;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Type;
@@ -25,10 +23,12 @@ import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.interceptor.HttpClientIntroductionAdvice;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.retry.annotation.Recoverable;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Allows defining declarative HTTP clients and customizing injection for injecting {@link io.micronaut.http.client.HttpClient} implementations.
@@ -57,6 +57,7 @@ public @interface Client {
     @AliasFor(member = "value") // <2>
     String id() default "";
 // end::value[]
+
     /**
      * The base URI for the client. Only to be used in
      * conjunction with {@link #id()}.
@@ -69,10 +70,12 @@ public @interface Client {
      * @return The type used to decode errors
      */
     Class<?> errorType() default JsonError.class;
+
     /**
      * @return The http client configuration bean to use
      */
     Class<? extends HttpClientConfiguration> configuration() default HttpClientConfiguration.class;
+
     /**
      * The HTTP version.
      *

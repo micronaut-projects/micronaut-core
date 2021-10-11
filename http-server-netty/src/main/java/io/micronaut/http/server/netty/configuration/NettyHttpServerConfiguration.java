@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,9 +15,12 @@
  */
 package io.micronaut.http.server.netty.configuration;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Replaces;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
@@ -27,8 +30,11 @@ import io.micronaut.runtime.ApplicationConfiguration;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.ApplicationProtocolNames;
+import jakarta.inject.Inject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import javax.inject.Inject;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -97,12 +103,22 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_COMPRESSIONLEVEL = 6;
+
+    /**
+     * The default configuration for boolean flag indicating whether to add connection header `keep-alive` to responses with HttpStatus > 499.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR = false;
+
+    private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServerConfiguration.class);
+
     private final List<ChannelPipelineListener> pipelineCustomizers;
 
     private Map<ChannelOption, Object> childOptions = Collections.emptyMap();
     private Map<ChannelOption, Object> options = Collections.emptyMap();
     private Worker worker;
     private Parent parent;
+    private FileTypeHandlerConfiguration fileTypeHandlerConfiguration = new FileTypeHandlerConfiguration();
     private int maxInitialLineLength = DEFAULT_MAXINITIALLINELENGTH;
     private int maxHeaderSize = DEFAULT_MAXHEADERSIZE;
     private int maxChunkSize = DEFAULT_MAXCHUNKSIZE;
@@ -115,19 +131,22 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private boolean useNativeTransport = DEFAULT_USE_NATIVE_TRANSPORT;
     private String fallbackProtocol = ApplicationProtocolNames.HTTP_1_1;
     private AccessLogger accessLogger;
+    private Http2Settings http2Settings = new Http2Settings();
+    private boolean keepAliveOnServerError = DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR;
+    private boolean bindToRouterExposedPorts = true;
 
     /**
      * Default empty constructor.
      */
     public NettyHttpServerConfiguration() {
-        this(null, Collections.EMPTY_LIST);
+        this(null, Collections.emptyList());
     }
 
     /**
      * @param applicationConfiguration The application configuration
      */
     public NettyHttpServerConfiguration(ApplicationConfiguration applicationConfiguration) {
-        this(applicationConfiguration, Collections.EMPTY_LIST);
+        this(applicationConfiguration, Collections.emptyList());
     }
 
     /**
@@ -156,6 +175,24 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setAccessLogger(AccessLogger accessLogger) {
         this.accessLogger = accessLogger;
+    }
+
+    /**
+     * Returns the Http2Settings.
+     * @return The Http2Settings.
+     */
+    public Http2Settings getHttp2() {
+        return http2Settings;
+    }
+
+    /**
+     * Sets the Http2Settings.
+     * @param http2 The Http2Settings.
+     */
+    public void setHttp2(Http2Settings http2) {
+        if (http2 != null) {
+            this.http2Settings = http2;
+        }
     }
 
     /**
@@ -277,7 +314,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
     /**
      * @return The Netty child channel options.
-     * @see io.netty.bootstrap.ServerBootstrap#childOptions()
+     * @see io.netty.bootstrap.ServerBootstrap#childOption(io.netty.channel.ChannelOption, Object)
      */
     public Map<ChannelOption, Object> getChildOptions() {
         return childOptions;
@@ -285,7 +322,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
     /**
      * @return The Netty channel options.
-     * @see io.netty.bootstrap.ServerBootstrap#options()
+     * @see io.netty.bootstrap.ServerBootstrap#childOption(io.netty.channel.ChannelOption, Object)
      */
     public Map<ChannelOption, Object> getOptions() {
         return options;
@@ -299,10 +336,37 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
+     * @return The file type handler configuration.
+     * @since 3.1.0
+     */
+    public @NonNull FileTypeHandlerConfiguration getFileTypeHandlerConfiguration() {
+        return fileTypeHandlerConfiguration;
+    }
+
+    /**
+     * Sets the file type handler configuration.
+     * @param fileTypeHandlerConfiguration The file type handler configuration
+     * @since 3.1.0
+     */
+    @Inject
+    public void setFileTypeHandlerConfiguration(@NonNull FileTypeHandlerConfiguration fileTypeHandlerConfiguration) {
+        if (fileTypeHandlerConfiguration != null) {
+            this.fileTypeHandlerConfiguration = fileTypeHandlerConfiguration;
+        }
+    }
+
+    /**
      * @return Configuration for the parent {@link io.netty.channel.EventLoopGroup}
      */
     public Parent getParent() {
         return parent;
+    }
+
+    /**
+     * @return True if the connection should be kept alive on internal server errors
+     */
+    public boolean isKeepAliveOnServerError() {
+        return keepAliveOnServerError;
     }
 
     /**
@@ -420,6 +484,156 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
+     * Whether to send connection keep alive on internal server errors. Default value ({@value DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR}).
+     * @param keepAliveOnServerError The keep alive on server error flag
+     */
+    public void setKeepAliveOnServerError(boolean keepAliveOnServerError) {
+        this.keepAliveOnServerError = keepAliveOnServerError;
+    }
+
+    /**
+     * Http2 settings.
+     */
+    @ConfigurationProperties("http2")
+    public static class Http2Settings {
+        private final io.netty.handler.codec.http2.Http2Settings settings = io.netty.handler.codec.http2.Http2Settings.defaultSettings();
+
+        /**
+         * Returns netty's http2 settings.
+         *
+         * @return io.netty.handler.codec.http2.Http2Settings.
+         */
+        public io.netty.handler.codec.http2.Http2Settings http2Settings() {
+            return settings;
+        }
+
+        /**
+         * Gets the {@code SETTINGS_HEADER_TABLE_SIZE} value. If unavailable, returns {@code null}.
+         *
+         * @return The header table size or {@code null}.
+         */
+        public Long getHeaderTableSize() {
+            return settings.headerTableSize();
+        }
+
+        /**
+         * Sets the {@code SETTINGS_HEADER_TABLE_SIZE} value.
+         *
+         * @param value The header table size.
+         * @throws IllegalArgumentException if verification of the setting fails.
+         */
+        public void setHeaderTableSize(Long value) {
+            if (value != null) {
+                settings.headerTableSize(value);
+            }
+        }
+
+        /**
+         * Gets the {@code SETTINGS_ENABLE_PUSH} value. If unavailable, returns {@code null}.
+         *
+         * @return The {@code SETTINGS_ENABLE_PUSH} value. If unavailable, returns {@code null}.
+         */
+        public Boolean getPushEnabled() {
+            return settings.pushEnabled();
+        }
+
+        /**
+         * Sets the {@code SETTINGS_ENABLE_PUSH} value.
+         *
+         * @param enabled The {@code SETTINGS_ENABLE_PUSH} value.
+         */
+        public void setPushEnabled(Boolean enabled) {
+            if (enabled != null) {
+                settings.pushEnabled(enabled);
+            }
+        }
+
+        /**
+         * Gets the {@code SETTINGS_MAX_CONCURRENT_STREAMS} value. If unavailable, returns {@code null}.
+         *
+         * @return The {@code SETTINGS_MAX_CONCURRENT_STREAMS} value. If unavailable, returns {@code null}.
+         */
+        public Long getMaxConcurrentStreams() {
+            return settings.maxConcurrentStreams();
+        }
+
+        /**
+         * Sets the {@code SETTINGS_MAX_CONCURRENT_STREAMS} value.
+         *
+         * @param value The {@code SETTINGS_MAX_CONCURRENT_STREAMS} value.
+         * @throws IllegalArgumentException if verification of the setting fails.
+         */
+        public void setMaxConcurrentStreams(Long value) {
+            if (value != null) {
+                settings.maxConcurrentStreams(value);
+            }
+        }
+
+        /**
+         * Gets the {@code SETTINGS_INITIAL_WINDOW_SIZE} value. If unavailable, returns {@code null}.
+         *
+         * @return The {@code SETTINGS_INITIAL_WINDOW_SIZE} value. If unavailable, returns {@code null}.
+         */
+        public Integer getInitialWindowSize() {
+            return settings.initialWindowSize();
+        }
+
+        /**
+         * Sets the {@code SETTINGS_INITIAL_WINDOW_SIZE} value.
+         *
+         * @param value The {@code SETTINGS_INITIAL_WINDOW_SIZE} value.
+         * @throws IllegalArgumentException if verification of the setting fails.
+         */
+        public void setInitialWindowSize(Integer value) {
+            if (value != null) {
+                settings.initialWindowSize(value);
+            }
+        }
+
+        /**
+         * Gets the {@code SETTINGS_MAX_FRAME_SIZE} value. If unavailable, returns {@code null}.
+         *
+         * @return The {@code SETTINGS_MAX_FRAME_SIZE} value. If unavailable, returns {@code null}.
+         */
+        public Integer getMaxFrameSize() {
+            return settings.maxFrameSize();
+        }
+
+        /**
+         * Sets the {@code SETTINGS_MAX_FRAME_SIZE} value.
+         *
+         * @param value The {@code SETTINGS_MAX_FRAME_SIZE} value.
+         * @throws IllegalArgumentException if verification of the setting fails.
+         */
+        public void setMaxFrameSize(Integer value) {
+            if (value != null) {
+                settings.maxFrameSize(value);
+            }
+        }
+
+        /**
+         * Gets the {@code SETTINGS_MAX_HEADER_LIST_SIZE} value. If unavailable, returns {@code null}.
+         *
+         * @return The {@code SETTINGS_MAX_HEADER_LIST_SIZE} value. If unavailable, returns {@code null}.
+         */
+        public Long getMaxHeaderListSize() {
+            return settings.maxHeaderListSize();
+        }
+
+        /**
+         * Sets the {@code SETTINGS_MAX_HEADER_LIST_SIZE} value.
+         *
+         * @param value The {@code SETTINGS_MAX_HEADER_LIST_SIZE} value.
+         * @throws IllegalArgumentException if verification of the setting fails.
+         */
+        public void setMaxHeaderListSize(Long value) {
+            if (value != null) {
+                settings.maxHeaderListSize(value);
+            }
+        }
+    }
+
+    /**
      * Access logger configuration.
      */
     @ConfigurationProperties("access-logger")
@@ -495,6 +709,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * Configuration for Netty parent.
      */
     @ConfigurationProperties(Parent.NAME)
+    @Requires(missingProperty = EventLoopGroupConfiguration.EVENT_LOOPS + ".parent")
     public static class Parent extends EventLoopConfig {
 
         public static final String NAME = "parent";
@@ -508,6 +723,111 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
+     * Allows configuration of properties for the {@link io.micronaut.http.server.netty.types.files.FileTypeHandler}.
+     *
+     * @author James Kleeh
+     * @author graemerocher
+     * @since @since 3.1.0
+     */
+    @ConfigurationProperties("responses.file")
+    public static class FileTypeHandlerConfiguration {
+
+        /**
+         * The default cache seconds.
+         */
+        @SuppressWarnings("WeakerAccess")
+        public static final int DEFAULT_CACHESECONDS = 60;
+
+        private int cacheSeconds = DEFAULT_CACHESECONDS;
+        private CacheControlConfiguration cacheControl = new CacheControlConfiguration();
+
+        /**
+         * Default constructor.
+         */
+        public FileTypeHandlerConfiguration() {
+        }
+
+        /**
+         * Deprecated constructor.
+         *
+         * @param cacheSeconds Deprecated constructor parameter
+         * @param isPublic Deprecated constructor parameter
+         */
+        @Deprecated
+        @Inject
+        public FileTypeHandlerConfiguration(@Nullable @Property(name = "netty.responses.file.cache-seconds") Integer cacheSeconds,
+                                            @Nullable @Property(name = "netty.responses.file.cache-control.public") Boolean isPublic) {
+            if (cacheSeconds != null) {
+                this.cacheSeconds = cacheSeconds;
+                LOG.warn("The configuration `netty.responses.file.cache-seconds` is deprecated and will be removed in a future release. Use `micronaut.server.netty.responses.file.cache-seconds` instead.");
+            }
+            if (isPublic != null) {
+                this.cacheControl.setPublic(isPublic);
+                LOG.warn("The configuration `netty.responses.file.cache-control.public` is deprecated and will be removed in a future release. Use `micronaut.server.netty.responses.file.cache-control.public` instead.");
+            }
+        }
+
+        /**
+         * @return the cache seconds
+         */
+        public int getCacheSeconds() {
+            return cacheSeconds;
+        }
+
+        /**
+         * Cache Seconds. Default value ({@value #DEFAULT_CACHESECONDS}).
+         * @param cacheSeconds cache seconds
+         */
+        public void setCacheSeconds(int cacheSeconds) {
+            this.cacheSeconds = cacheSeconds;
+        }
+
+        /**
+         * @return The cache control configuration
+         */
+        public CacheControlConfiguration getCacheControl() {
+            return cacheControl;
+        }
+
+        /**
+         * Sets the cache control configuration.
+         *
+         * @param cacheControl The cache control configuration
+         */
+        public void setCacheControl(CacheControlConfiguration cacheControl) {
+            this.cacheControl = cacheControl;
+        }
+
+        /**
+         * Configuration for the Cache-Control header.
+         */
+        @ConfigurationProperties("cache-control")
+        public static class CacheControlConfiguration {
+
+            private static final boolean DEFAULT_PUBLIC_CACHE = false;
+
+            private boolean publicCache = DEFAULT_PUBLIC_CACHE;
+
+            /**
+             * Sets whether the cache control is public. Default value ({@value #DEFAULT_PUBLIC_CACHE})
+             *
+             * @param publicCache Public cache value
+             */
+            public void setPublic(boolean publicCache) {
+                this.publicCache = publicCache;
+            }
+
+            /**
+             * @return True if the cache control should be public
+             */
+            @NonNull
+            public boolean getPublic() {
+                return publicCache;
+            }
+        }
+    }
+
+    /**
      * Abstract class for configuring the Netty event loop.
      */
     public abstract static class EventLoopConfig implements EventLoopGroupConfiguration {
@@ -515,6 +835,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private Integer ioRatio;
         private String executor;
         private boolean preferNativeTransport = false;
+        private Duration shutdownQuietPeriod = Duration.ofSeconds(DEFAULT_SHUTDOWN_QUIET_PERIOD);
+        private Duration shutdownTimeout = Duration.ofSeconds(DEFAULT_SHUTDOWN_TIMEOUT);
         private String name;
 
         /**
@@ -572,6 +894,24 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         }
 
         /**
+         * @param shutdownQuietPeriod Set the shutdown quiet period
+         */
+        public void setShutdownQuietPeriod(Duration shutdownQuietPeriod) {
+            if (shutdownQuietPeriod != null) {
+                this.shutdownQuietPeriod = shutdownQuietPeriod;
+            }
+        }
+
+        /**
+         * @param shutdownTimeout Set the shutdown timeout (must be >= shutdownQuietPeriod)
+         */
+        public void setShutdownTimeout(Duration shutdownTimeout) {
+            if (shutdownTimeout != null) {
+                this.shutdownTimeout = shutdownTimeout;
+            }
+        }
+
+        /**
          * @return The number of threads to use
          */
         public int getNumOfThreads() {
@@ -608,6 +948,16 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         @Override
         public boolean isPreferNativeTransport() {
             return preferNativeTransport;
+        }
+
+        @Override
+        public Duration getShutdownQuietPeriod() {
+            return shutdownQuietPeriod;
+        }
+
+        @Override
+        public Duration getShutdownTimeout() {
+            return shutdownTimeout;
         }
     }
 }

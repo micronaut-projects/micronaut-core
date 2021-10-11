@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,19 +15,22 @@
  */
 package io.micronaut.http.server.netty;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.async.SupplierUtil;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.*;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.MutableHttpParameters;
+import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
@@ -47,7 +50,11 @@ import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.handler.codec.http.DefaultLastHttpContent;
+import io.netty.handler.codec.http.EmptyHttpHeaders;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import io.netty.handler.codec.http.multipart.AbstractHttpData;
 import io.netty.handler.ssl.SslHandler;
@@ -58,7 +65,15 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.Charset;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -76,7 +91,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private final NettyHttpHeaders headers;
     private final ChannelHandlerContext channelHandlerContext;
     private final HttpServerConfiguration serverConfiguration;
-    private final Map<Class, Optional> convertedBodies = new LinkedHashMap<>(1);
     private MutableConvertibleValues<Object> attributes;
     private NettyCookies nettyCookies;
     private List<ByteBufHolder> receivedContent = new ArrayList<>();
@@ -85,6 +99,8 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private Supplier<Optional<T>> body;
     private RouteMatch<?> matchedRoute;
     private boolean bodyRequired;
+
+    private final BodyConvertor bodyConvertor = newBodyConvertor();
 
     /**
      * @param nettyRequest        The {@link io.netty.handler.codec.http.HttpRequest}
@@ -261,15 +277,13 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     @SuppressWarnings("unchecked")
     @Override
     public <T1> Optional<T1> getBody(Class<T1> type) {
-        Optional<T> body = getBody();
-        return body.flatMap(t -> convertedBodies.computeIfAbsent(type, aClass -> conversionService.convert(t, aClass)));
+        return getBody(Argument.of(type));
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public <T1> Optional<T1> getBody(Argument<T1> type) {
-        Optional<T> body = getBody();
-        return body.flatMap(t -> convertedBodies.computeIfAbsent(type.getType(), aClass -> conversionService.convert(t, ConversionContext.of(type))));
+        return getBody().flatMap(t -> bodyConvertor.convert(type, t));
     }
 
     /**
@@ -277,22 +291,16 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     public void release() {
-        Object body = getBody().orElse(null);
-        releaseIfNecessary(body);
-        for (ByteBufHolder byteBuf : receivedContent) {
-            releaseIfNecessary(byteBuf);
-        }
-        for (ByteBufHolder byteBuf : receivedData.values()) {
-            releaseIfNecessary(byteBuf);
-        }
-        if (this.body != null && this.body instanceof ReferenceCounted) {
+        Consumer<Object> releaseIfNecessary = this::releaseIfNecessary;
+        getBody().ifPresent(releaseIfNecessary);
+        receivedContent.forEach(releaseIfNecessary);
+        receivedData.values().forEach(releaseIfNecessary);
+        if (this.body instanceof ReferenceCounted) {
             ReferenceCounted referenceCounted = (ReferenceCounted) this.body;
             releaseIfNecessary(referenceCounted);
         }
         if (attributes != null) {
-            for (Object value : attributes.values()) {
-                releaseIfNecessary(value);
-            }
+            attributes.values().forEach(releaseIfNecessary);
         }
         if (nettyRequest instanceof StreamedHttpRequest) {
             ((StreamedHttpRequest) nettyRequest).closeIfNoSubscriber();
@@ -320,7 +328,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     @Internal
     public void setBody(T body) {
         this.body = () -> Optional.ofNullable(body);
-        this.convertedBodies.clear();
+        bodyConvertor.cleanup();
     }
 
     /**
@@ -337,12 +345,12 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     @Internal
     public void addContent(ByteBufHolder httpContent) {
         if (httpContent instanceof AbstractHttpData) {
-            receivedData.computeIfAbsent(System.identityHashCode(httpContent), (key) -> {
+            receivedData.computeIfAbsent(System.identityHashCode(httpContent), key -> {
                 httpContent.retain();
                 return (AbstractHttpData) httpContent;
             });
         } else {
-            receivedContent.add(httpContent);
+            receivedContent.add(httpContent.retain());
         }
     }
 
@@ -376,6 +384,24 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     }
 
     /**
+     * @return Return true if the request is form data.
+     */
+    @Internal
+    final boolean isFormOrMultipartData() {
+        MediaType ct = headers.contentType().orElse(null);
+        return ct != null && (ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) || ct.equals(MediaType.MULTIPART_FORM_DATA_TYPE));
+    }
+
+    /**
+     * @return Return true if the request is form data.
+     */
+    @Internal
+    final boolean isFormData() {
+        MediaType ct = headers.contentType().orElse(null);
+        return ct != null && (ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
+    }
+
+    /**
      * Lookup the current request from the context.
      *
      * @param ctx The context
@@ -398,6 +424,23 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
         io.netty.util.Attribute<NettyHttpRequest> attr = channel.attr(KEY);
         return attr.getAndSet(null);
+    }
+
+    private BodyConvertor newBodyConvertor() {
+        return new BodyConvertor() {
+
+            @Override
+            public Optional convert(Argument valueType, Object value) {
+                if (value == null) {
+                    return Optional.empty();
+                }
+                if (Argument.OBJECT_ARGUMENT.equalsType(valueType)) {
+                    return Optional.of(value);
+                }
+                return convertFromNext(conversionService, valueType, value);
+            }
+
+        };
     }
 
     /**
@@ -542,6 +585,42 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         public boolean isStream() {
             return NettyHttpRequest.this.nettyRequest instanceof StreamedHttpRequest;
         }
+
+        @Override
+        public MutableHttpRequest<T> mutate() {
+            return new NettyMutableHttpRequest();
+        }
+    }
+
+    private abstract static class BodyConvertor<T> {
+
+        private BodyConvertor<T> nextConvertor;
+
+        public abstract Optional<T> convert(Argument<T> valueType, T value);
+
+        protected synchronized Optional<T> convertFromNext(ConversionService conversionService, Argument<T> conversionValueType, T value) {
+            if (nextConvertor == null) {
+                Optional<T> conversion = conversionService.convert(value, ConversionContext.of(conversionValueType));
+                nextConvertor = new BodyConvertor<T>() {
+
+                    @Override
+                    public Optional<T> convert(Argument<T> valueType, T value) {
+                        if (conversionValueType.equalsType(valueType)) {
+                            return conversion;
+                        }
+                        return convertFromNext(conversionService, valueType, value);
+                    }
+
+                };
+                return conversion;
+            }
+            return nextConvertor.convert(conversionValueType, value);
+        }
+
+        public void cleanup() {
+            nextConvertor = null;
+        }
+
     }
 
 }

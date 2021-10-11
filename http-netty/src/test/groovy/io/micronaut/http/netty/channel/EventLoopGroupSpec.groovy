@@ -1,10 +1,15 @@
 package io.micronaut.http.netty.channel
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.context.env.PropertySource
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.netty.channel.EventLoopGroup
 import io.netty.util.NettyRuntime
+import io.netty.util.ResourceLeakDetector
 import spock.lang.Specification
+
+import java.time.Duration
 
 class EventLoopGroupSpec extends Specification {
 
@@ -18,12 +23,29 @@ class EventLoopGroupSpec extends Specification {
         then:
         !eventLoopGroup.isTerminated()
         eventLoopGroup.executorCount() == NettyRuntime.availableProcessors() * 2
+        ResourceLeakDetector.level == ResourceLeakDetector.Level.SIMPLE
 
         when:
         context.close()
 
         then:
         eventLoopGroup.isShuttingDown()
+    }
+
+    void "test configure resource leak detector"() {
+        given:
+        def context = ApplicationContext.run(
+                'netty.resource-leak-detector-level':'PARANOID'
+        )
+
+        when:
+        context.getBean(EventLoopGroup)
+
+        then:
+        ResourceLeakDetector.level == ResourceLeakDetector.Level.PARANOID
+
+        cleanup:
+        context.close()
     }
 
 
@@ -84,5 +106,43 @@ class EventLoopGroupSpec extends Specification {
 
         then:
         eventLoopGroup.isShuttingDown()
+    }
+
+    void "test configure shutdown for default event loop groups"() {
+        given:
+        ApplicationContext context = new DefaultApplicationContext("test")
+        context.environment.addPropertySource(PropertySource.of("test",
+                [
+                    'micronaut.netty.event-loops.default.shutdown-quiet-period' : '1ms',
+                    'micronaut.netty.event-loops.default.shutdown-timeout' : '100ms'
+                ]
+        ))
+        context.start()
+
+        when:
+        DefaultEventLoopGroupConfiguration config = context.getBean(DefaultEventLoopGroupConfiguration)
+
+        then:
+        config.shutdownQuietPeriod == Duration.ofMillis(1)
+        config.shutdownTimeout == Duration.ofMillis(100)
+    }
+
+    void "test configure shutdown for other event loop groups"() {
+        given:
+        ApplicationContext context = new DefaultApplicationContext("test")
+        context.environment.addPropertySource(PropertySource.of("test",
+                [
+                    'micronaut.netty.event-loops.one.shutdown-quiet-period' : '10ms',
+                    'micronaut.netty.event-loops.one.shutdown-timeout' : '500ms'
+                ]
+        ))
+        context.start()
+
+        when:
+        DefaultEventLoopGroupConfiguration config = context.getBean(DefaultEventLoopGroupConfiguration, Qualifiers.byName('one'))
+
+        then:
+        config.shutdownQuietPeriod == Duration.ofMillis(10)
+        config.shutdownTimeout == Duration.ofMillis(500)
     }
 }

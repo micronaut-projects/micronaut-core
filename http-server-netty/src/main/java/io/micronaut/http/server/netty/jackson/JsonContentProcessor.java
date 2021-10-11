@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,9 +15,6 @@
  */
 package io.micronaut.http.server.netty.jackson;
 
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.databind.DeserializationConfig;
-import com.fasterxml.jackson.databind.JsonNode;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
@@ -27,15 +24,16 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.AbstractHttpContentProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
-import io.micronaut.jackson.parser.JacksonProcessor;
+import io.micronaut.json.JsonMapper;
+import io.micronaut.json.tree.JsonNode;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.util.ReferenceCountUtil;
+import org.reactivestreams.Processor;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Optional;
 
 /**
@@ -48,24 +46,20 @@ import java.util.Optional;
 @Internal
 public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode> {
 
-    private final JsonFactory jsonFactory;
-    private final DeserializationConfig deserializationConfig;
-    private JacksonProcessor jacksonProcessor;
+    private final JsonMapper jsonMapper;
+    private Processor<byte[], JsonNode> jacksonProcessor;
 
     /**
      * @param nettyHttpRequest The Netty Http request
      * @param configuration    The Http server configuration
-     * @param jsonFactory      The json factory
-     * @param deserializationConfig The jackson deserialization configuration
+     * @param jsonMapper        The json codec
      */
     public JsonContentProcessor(
             NettyHttpRequest<?> nettyHttpRequest,
             HttpServerConfiguration configuration,
-            @Nullable JsonFactory jsonFactory,
-            DeserializationConfig deserializationConfig) {
+            JsonMapper jsonMapper) {
         super(nettyHttpRequest, configuration);
-        this.jsonFactory = jsonFactory != null ? jsonFactory : new JsonFactory();
-        this.deserializationConfig = deserializationConfig;
+        this.jsonMapper = jsonMapper;
     }
 
     @Override
@@ -94,7 +88,8 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
             }
         }
 
-        this.jacksonProcessor = new JacksonProcessor(jsonFactory, streamArray, deserializationConfig);
+        this.jacksonProcessor = jsonMapper.createReactiveParser(p -> {
+        }, streamArray);
         this.jacksonProcessor.subscribe(new CompletionAwareSubscriber<JsonNode>() {
 
             @Override
@@ -102,6 +97,7 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
 
                 Subscription childSubscription = new Subscription() {
                     boolean first = true;
+
                     @Override
                     public synchronized void request(long n) {
                         // this is a hack. The first item emitted for arrays is already in the buffer

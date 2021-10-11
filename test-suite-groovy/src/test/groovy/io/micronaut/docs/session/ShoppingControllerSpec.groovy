@@ -4,7 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -13,16 +13,16 @@ import spock.lang.Specification
 class ShoppingControllerSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-    @Shared @AutoCleanup RxHttpClient httpClient = embeddedServer
-                                                        .getApplicationContext()
-                                                        .createBean(RxHttpClient, embeddedServer.getURL())
+    @Shared @AutoCleanup HttpClient client = embeddedServer
+            .applicationContext
+            .createBean(HttpClient, embeddedServer.URL)
 
     void "test session value used on return value"() {
 
         // tag::view[]
         when: "The shopping cart is retrieved"
-        HttpResponse<Cart> response = httpClient.exchange(HttpRequest.GET('/shopping/cart'), Cart) // <1>
-                                                .blockingFirst()
+        HttpResponse<Cart> response = client.exchange(HttpRequest.GET('/shopping/cart'), Cart) // <1>
+                                                .blockFirst()
         Cart cart = response.body()
 
         then: "The shopping cart is present as well as a session id header"
@@ -36,10 +36,9 @@ class ShoppingControllerSpec extends Specification {
         // tag::add[]
         String sessionId = response.header(HttpHeaders.AUTHORIZATION_INFO) // <1>
 
-        response = httpClient.exchange(
-                HttpRequest.POST('/shopping/cart/Apple', "")
-                        .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart) // <2>
-                .blockingFirst()
+        response = client.exchange(HttpRequest.POST('/shopping/cart/Apple', "")
+                         .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart) // <2>
+                         .blockFirst()
         cart = response.body()
         // end::add[]
 
@@ -48,9 +47,9 @@ class ShoppingControllerSpec extends Specification {
         cart.items.size() == 1
 
         when: "The session id is used to retrieve the cart"
-        response = httpClient.exchange(HttpRequest.GET('/shopping/cart')
-                                                  .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart)
-                                                  .blockingFirst()
+        response = client.exchange(HttpRequest.GET('/shopping/cart')
+                         .header(HttpHeaders.AUTHORIZATION_INFO, sessionId), Cart)
+                         .blockFirst()
         cart = response.body()
 
         then: "Then the same cart is returned"

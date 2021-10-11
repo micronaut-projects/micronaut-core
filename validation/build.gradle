@@ -1,21 +1,30 @@
 dependencies {
     annotationProcessor project(":inject-java")
-    
-    api project(":inject")
-    api project(":http")
-    api dependencyVersion("validation")
 
-    compileOnly dependencyVersion("gorm")
+    api project(":inject")
+    api project(":core-reactive")
+    api libs.managed.validation
+
+    compileOnly libs.managed.gorm
     compileOnly project(":http-server")
-    
+
+    implementation libs.managed.reactor
+
+    testImplementation libs.managed.spotbugs
     testAnnotationProcessor project(":inject-java")
-    testImplementation project(":inject")
-    testImplementation project(":http-server-netty")
-    testImplementation project(":websocket")
-    testImplementation project(":http-client")
-    testImplementation dependencyModuleVersion("groovy", "groovy-json")
-    testImplementation project(":inject-java-test")
     testCompileOnly project(":inject-groovy")
+    testImplementation project(":inject")
+
+    testImplementation project(":http-client")
+    testImplementation project(":http-server-netty")
+    testImplementation libs.managed.groovy.json
+    testImplementation project(":inject-java-test")
 
 }
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
+
+spotless {
+    java {
+        targetExclude '**/io/micronaut/validation/validator/constraints/EmailValidator.java'
+    }
+}

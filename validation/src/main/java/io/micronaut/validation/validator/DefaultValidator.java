@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,6 +28,8 @@ import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
@@ -52,16 +54,28 @@ import io.micronaut.validation.validator.constraints.ConstraintValidatorContext;
 import io.micronaut.validation.validator.constraints.ConstraintValidatorRegistry;
 import io.micronaut.validation.validator.extractors.SimpleValueReceiver;
 import io.micronaut.validation.validator.extractors.ValueExtractorRegistry;
-import io.reactivex.Flowable;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
-import javax.inject.Inject;
-import javax.inject.Singleton;
-import javax.validation.*;
+import javax.validation.ClockProvider;
+import javax.validation.Constraint;
+import javax.validation.ConstraintViolation;
+import javax.validation.ConstraintViolationException;
+import javax.validation.ElementKind;
+import javax.validation.Path;
+import javax.validation.TraversableResolver;
+import javax.validation.Valid;
+import javax.validation.ValidationException;
 import javax.validation.groups.Default;
-import javax.validation.metadata.*;
+import javax.validation.metadata.BeanDescriptor;
+import javax.validation.metadata.ConstraintDescriptor;
+import javax.validation.metadata.ConstructorDescriptor;
+import javax.validation.metadata.ElementDescriptor;
+import javax.validation.metadata.MethodDescriptor;
+import javax.validation.metadata.MethodType;
+import javax.validation.metadata.PropertyDescriptor;
+import javax.validation.metadata.Scope;
 import javax.validation.valueextraction.ValueExtractor;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
@@ -96,7 +110,6 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
      *
      * @param configuration The validator configuration
      */
-    @Inject
     protected DefaultValidator(
             @NonNull ValidatorConfiguration configuration) {
         ArgumentUtils.requireNonNull("configuration", configuration);
@@ -476,7 +489,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         }
 
         //noinspection unchecked
-        return (Set<ConstraintViolation<T>>) overallViolations;
+        return overallViolations;
     }
 
     private <T> void validateCascadePropertyInternal(DefaultConstraintValidatorContext context,
@@ -745,7 +758,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                                 context,
                                 overallViolations,
                                 argument.getName(),
-                                parameterType,
+                                unwrappedValue == null ? Object.class : unwrappedValue.getClass(),
                                 finalIndex,
                                 annotationMetadata,
                                 unwrappedValue
@@ -854,24 +867,13 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                                 }
                             } else {
                                 context.addParameterNode(argument.getName(), i);
-                                String messageTemplate = "{" + Introspected.class.getName() + ".message}";
-                                overallViolations.add(new DefaultConstraintViolation(
-                                        object,
-                                        rootClass,
-                                        null,
-                                        parameterValue,
-                                        messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(Collections.singletonMap("type", parameterType.getName()))),
-                                        messageTemplate,
-                                        new PathImpl(context.currentPath),
-                                        null,
-                                        parameters));
+                                overallViolations.add(createIntrospectionConstraintViolation(rootClass, object, context,
+                                    parameterType, parameterValue, parameters));
                                 context.removeLast();
                             }
                         }
                     }
                 }
-
-
             }
 
         }
@@ -888,9 +890,9 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             AnnotationMetadata annotationMetadata,
             Object parameterValue,
             boolean isValid) {
-        final Flowable<Object> publisher = Publishers.convertPublisher(parameterValue, Flowable.class);
+        final Publisher<Object> publisher = Publishers.convertPublisher(parameterValue, Publisher.class);
         PathImpl copied = new PathImpl(context.currentPath);
-        final Flowable<Object> finalFlowable = publisher.flatMap(o -> {
+        final Flux<Object> finalFlowable = Flux.from(publisher).flatMap(o -> {
             DefaultConstraintValidatorContext newContext =
                     new DefaultConstraintValidatorContext(
                             object,
@@ -929,12 +931,12 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             }
 
             if (!newViolations.isEmpty()) {
-                return Flowable.error(
+                return Flux.error(
                         new ConstraintViolationException(newViolations)
                 );
             }
 
-            return Flowable.just(o);
+            return Flux.just(o);
         });
         argumentValues[argumentIndex] = Publishers.convertPublisher(finalFlowable, parameterType);
     }
@@ -1023,12 +1025,12 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     final AnnotationValue<? extends Annotation> annotationValue =
                             annotationMetadata.getAnnotation(constraintType);
                     if (annotationValue != null && !constraintValidator.isValid(parameterValue, annotationValue, context)) {
-                        final String messageTemplate = buildMessageTemplate(annotationValue, annotationMetadata);
+                        final String messageTemplate = buildMessageTemplate(context, annotationValue, annotationMetadata);
                         final Map<String, Object> variables = newConstraintVariables(annotationValue, parameterValue, annotationMetadata);
                         overallViolations.add(new DefaultConstraintViolation(
                                 object,
                                 rootClass,
-                                null,
+                                object,
                                 parameterValue,
                                 messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(variables)),
                                 messageTemplate,
@@ -1056,7 +1058,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
     @SuppressWarnings("unchecked")
     private <T> void validatePojoInternal(@NonNull Class<T> rootClass,
                                           @Nullable T object,
-                                          @NonNull Object[] argumentValues,
+                                          @Nullable Object[] argumentValues,
                                           @NonNull DefaultConstraintValidatorContext context,
                                           @NonNull Set overallViolations,
                                           @NonNull Class<?> parameterType,
@@ -1067,8 +1069,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 .findConstraintValidator(pojoConstraint, parameterType).orElse(null);
 
         if (constraintValidator != null) {
-            if (!constraintValidator.isValid((T) parameterValue, constraintAnnotation, context)) {
-                final String propertyValue = "";
+            if (!constraintValidator.isValid(parameterValue, constraintAnnotation, context)) {
                 BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(parameterValue);
                 if (beanIntrospection == null) {
                     throw new ValidationException("Passed object [" + parameterValue + "] cannot be introspected. Please annotate with @Introspected");
@@ -1076,12 +1077,13 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 AnnotationMetadata beanAnnotationMetadata = beanIntrospection.getAnnotationMetadata();
                 AnnotationValue<? extends Annotation> annotationValue = beanAnnotationMetadata.getAnnotation(pojoConstraint);
 
-                final String messageTemplate = buildMessageTemplate(annotationValue, beanAnnotationMetadata);
+                final String propertyValue = "";
+                final String messageTemplate = buildMessageTemplate(context, annotationValue, beanAnnotationMetadata);
                 final Map<String, Object> variables = newConstraintVariables(annotationValue, propertyValue, beanAnnotationMetadata);
                 overallViolations.add(new DefaultConstraintViolation(
                         object,
                         rootClass,
-                        null,
+                        object,
                         parameterValue,
                         messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(variables)),
                         messageTemplate,
@@ -1330,7 +1332,33 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             Object propertyValue,
             @Nullable DefaultPropertyNode container) {
 
-        final BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(propertyValue);
+        Class<?> beanType = Object.class;
+        if (propertyValue != null) {
+            beanType = propertyValue.getClass();
+        } else if (cascadeProperty instanceof BeanProperty) {
+            Argument argument = ((BeanProperty) cascadeProperty).asArgument();
+            if (Map.class.isAssignableFrom(argument.getType())) {
+                Argument[] typeParameters = argument.getTypeParameters();
+                if (typeParameters.length == 2) {
+                    beanType = typeParameters[1].getType();
+                }
+            } else {
+
+                beanType = argument
+                        .getFirstTypeVariable()
+                        .map(Argument::getType)
+                        .orElse(null);
+            }
+        }
+
+        final BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(beanType);
+        AnnotationMetadata annotationMetadata = cascadeProperty.getAnnotationMetadata();
+        if (beanIntrospection == null && !annotationMetadata.hasStereotype(Constraint.class)) {
+            // error: only has @Valid but the propertyValue class is not @Introspected
+            overallViolations.add(createIntrospectionConstraintViolation(
+                rootClass, rootBean, context, beanType, propertyValue));
+            return;
+        }
 
         if (beanIntrospection != null) {
             if (container != null) {
@@ -1373,8 +1401,13 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 beanIntrospection.getIndexedProperties(Constraint.class);
         final Collection<BeanProperty<Object, Object>> cascadeNestedProperties =
                 beanIntrospection.getIndexedProperties(Valid.class);
+        final List<Class<? extends Annotation>> pojoConstraints =
+            beanIntrospection.getAnnotationMetadata().getAnnotationTypesByStereotype(Constraint.class);
 
-        if (CollectionUtils.isNotEmpty(cascadeConstraints) || CollectionUtils.isNotEmpty(cascadeNestedProperties)) {
+        if (CollectionUtils.isNotEmpty(cascadeConstraints) ||
+            CollectionUtils.isNotEmpty(cascadeNestedProperties) ||
+            CollectionUtils.isNotEmpty(pojoConstraints)
+        ) {
             doValidate(
                     beanIntrospection,
                     rootBean,
@@ -1383,7 +1416,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     cascadeNestedProperties,
                     context,
                     overallViolations,
-                    Collections.emptyList()
+                    pojoConstraints
             );
         }
     }
@@ -1504,7 +1537,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 //noinspection unchecked
                 if (!validator.isValid(propertyValue, annotationValue, context)) {
 
-                    final String messageTemplate = buildMessageTemplate(annotationValue, annotationMetadata);
+                    final String messageTemplate = buildMessageTemplate(context, annotationValue, annotationMetadata);
                     Map<String, Object> variables = newConstraintVariables(annotationValue, propertyValue, annotationMetadata);
                     //noinspection unchecked
                     overallViolations.add(
@@ -1545,25 +1578,25 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         return variables;
     }
 
-    private String buildMessageTemplate(AnnotationValue<?> annotationValue, AnnotationMetadata annotationMetadata) {
-        return annotationValue.stringValue("message")
-                .orElseGet(() ->
-                        annotationMetadata.getDefaultValue(annotationValue.getAnnotationName(), "message", String.class)
-                            .orElse("{" + annotationValue.getAnnotationName() + ".message}")
-                        );
+    private String buildMessageTemplate(final DefaultConstraintValidatorContext context, final AnnotationValue<?> annotationValue,
+                                        final AnnotationMetadata annotationMetadata) {
+        return context.getMessageTemplate()
+            .orElseGet(() -> annotationValue.stringValue("message")
+                .orElseGet(() -> annotationMetadata.getDefaultValue(annotationValue.getAnnotationName(), "message", String.class)
+                            .orElse("{" + annotationValue.getAnnotationName() + ".message}")));
     }
 
     @NonNull
     @Override
     public <T> Publisher<T> validatePublisher(@NonNull Publisher<T> publisher, Class<?>... groups) {
         ArgumentUtils.requireNonNull("publisher", publisher);
-        final Flowable<T> flowable = Publishers.convertPublisher(publisher, Flowable.class);
-        return flowable.flatMap(object -> {
+        final Publisher<T> reactiveSequence = Publishers.convertPublisher(publisher, Publisher.class);
+        return Flux.from(reactiveSequence).flatMap(object -> {
             final Set<ConstraintViolation<Object>> constraintViolations = validate(object, groups);
             if (!constraintViolations.isEmpty()) {
-                return Flowable.error(new ConstraintViolationException(constraintViolations));
+                return Flux.error(new ConstraintViolationException(constraintViolations));
             }
-            return Flowable.just(object);
+            return Flux.just(object);
         });
     }
 
@@ -1745,16 +1778,32 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
     private <T> void failOnError(@NonNull BeanResolutionContext resolutionContext, Set<ConstraintViolation<T>> errors, Class<?> beanType) {
         if (!errors.isEmpty()) {
-            StringBuilder builder = new StringBuilder();
-            builder.append("Validation failed for bean definition [");
-            builder.append(beanType.getName());
-            builder.append("]\nList of constraint violations:[\n");
+            StringBuilder builder = new StringBuilder()
+                    .append("Validation failed for bean definition [")
+                    .append(beanType.getName())
+                    .append("]\nList of constraint violations:[\n");
             for (ConstraintViolation<?> violation : errors) {
-                builder.append("\t").append(violation.getPropertyPath()).append(" - ").append(violation.getMessage()).append("\n");
+                builder.append('\t').append(violation.getPropertyPath()).append(" - ").append(violation.getMessage()).append('\n');
             }
-            builder.append("]");
+            builder.append(']');
             throw new BeanInstantiationException(resolutionContext, builder.toString());
         }
+    }
+
+    @NonNull
+    private <T> DefaultConstraintViolation<T> createIntrospectionConstraintViolation(
+        @NonNull Class<T> rootClass,
+        T object,
+        DefaultConstraintValidatorContext context,
+        Class<?> parameterType,
+        Object parameterValue,
+        Object... parameters
+    ) {
+        final String messageTemplate = context.getMessageTemplate()
+            .orElseGet(() -> "{" + Introspected.class.getName() + ".message}");
+        return new DefaultConstraintViolation<>(object, rootClass, object, parameterValue,
+            messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(Collections.singletonMap("type", parameterType.getName()))),
+            messageTemplate, new PathImpl(context.currentPath), null, parameters);
     }
 
     /**
@@ -1764,6 +1813,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         final Set<Object> validatedObjects = new HashSet<>(20);
         final PathImpl currentPath;
         final List<Class> groups;
+        String messageTemplate = null;
 
         private <T> DefaultConstraintValidatorContext(T object, Class<?>... groups) {
             this(object, new PathImpl(), groups);
@@ -1796,6 +1846,15 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         @Override
         public Object getRootBean() {
             return validatedObjects.isEmpty() ? null : validatedObjects.iterator().next();
+        }
+
+        @Override
+        public void messageTemplate(@Nullable final String messageTemplate) {
+            this.messageTemplate = messageTemplate;
+        }
+
+        Optional<String> getMessageTemplate() {
+            return Optional.ofNullable(messageTemplate);
         }
 
         Path.Node addPropertyNode(String name, @Nullable DefaultPropertyNode container) {
@@ -2065,6 +2124,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             return kind;
         }
 
+        @Override
         public boolean isInIterable() {
             return isInIterable;
         }
@@ -2249,6 +2309,15 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         @Override
         public <U> U unwrap(Class<U> type) {
             throw new UnsupportedOperationException("Unwrapping is unsupported by this implementation");
+        }
+
+        @Override
+        public String toString() {
+            return "DefaultConstraintViolation{" +
+                    "rootBean=" + rootBean.getClass() +
+                    ", invalidValue=" + invalidValue +
+                    ", path=" + path +
+                    '}';
         }
     }
 

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,23 +15,19 @@
  */
 package io.micronaut.core.type;
 
-import io.micronaut.core.annotation.AnnotatedElement;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.UsedByGeneratedCode;
-import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.annotation.*;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
-
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
-import java.util.*;
-import java.util.concurrent.CompletionStage;
-import java.util.stream.Collectors;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.Collections;
 
 /**
  * Represents an argument to a method or constructor or type.
@@ -40,7 +36,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Type {
+public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type {
 
     /**
      * Constant for string argument.
@@ -120,26 +116,15 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     Argument<List<String>> LIST_OF_STRING = Argument.listOf(String.class);
 
     /**
-     * @return The name of the argument
+     * Constant for Void object argument.
      */
-    @NonNull String getName();
-
-    @Override
-    @NonNull
-    default String getTypeName() {
-        Argument<?>[] typeParameters = getTypeParameters();
-        if (ArrayUtils.isNotEmpty(typeParameters)) {
-            String typeName = getType().getTypeName();
-            return typeName +  "<" + Arrays.stream(typeParameters).map(Argument::getTypeName).collect(Collectors.joining(",")) + ">";
-        } else {
-            return getType().getTypeName();
-        }
-    }
+    Argument<Void> VOID_OBJECT = Argument.of(Void.class);
 
     /**
-     * @return The type of the argument
+     * @return The name of the argument
      */
-    @NonNull Class<T> getType();
+    @Override
+    @NonNull String getName();
 
     /**
      * Whether the types are equivalent. The regular {@link Object#equals(Object)} implementation includes the argument
@@ -148,7 +133,7 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
      * @param other The type type
      * @return True if they are equal
      */
-    boolean equalsType(Argument<?> other);
+    boolean equalsType(@Nullable Argument<?> other);
 
     /**
      * The hash code including only the types. The regular {@link Object#hashCode()} implementation includes the
@@ -159,37 +144,12 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     int typeHashCode();
 
     /**
-     * Represent this argument as a {@link ParameterizedType}.
-     * @return The {@link ParameterizedType}
-     * @since 2.0.0
+     * Whether this argument is a type variable used in generics.
+     * @return True if it is a variable
+     * @since 3.0.0
      */
-    default @NonNull ParameterizedType asParameterizedType() {
-        return new ParameterizedType() {
-            @Override
-            public Type[] getActualTypeArguments() {
-                return getTypeParameters();
-            }
-
-            @Override
-            public Type getRawType() {
-                return Argument.this.getType();
-            }
-
-            @Override
-            public Type getOwnerType() {
-                return Argument.this;
-            }
-
-            @Override
-            public String getTypeName() {
-                return Argument.this.getTypeName();
-            }
-
-            @Override
-            public String toString() {
-                return getTypeName();
-            }
-        };
+    default boolean isTypeVariable() {
+        return false;
     }
 
     /**
@@ -205,101 +165,49 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     }
 
     /**
-     * Returns the string representation of the argument type, including generics.
-     *
-     * @param simple If true, output the simple name of types
-     * @return The type string representation
+     * Delegates to {@link Class#isAssignableFrom(Class)} for this argument.
+     * @param candidateType The candidate type
+     * @return True if it is assignable from.
+     * @since 3.0.0
      */
-    default String getTypeString(boolean simple) {
-        Class<T> type = getType();
-        StringBuilder returnType = new StringBuilder(simple ? type.getSimpleName() : type.getName());
-        Map<String, Argument<?>> generics = getTypeVariables();
-        if (!generics.isEmpty()) {
-            returnType
-                    .append("<")
-                    .append(generics.values()
-                            .stream()
-                            .map(arg -> arg.getTypeString(simple))
-                            .collect(Collectors.joining(", ")))
-                    .append(">");
+    default boolean isAssignableFrom(@NonNull Class<?> candidateType) {
+        return getType().isAssignableFrom(Objects.requireNonNull(candidateType, "Candidate type cannot be null"));
+    }
+
+    /**
+     * Checks if the argument can be assigned to this argument.
+     * @param candidateArgument The candidate argument
+     * @return True if it is assignable from.
+     * @since 3.0.0
+     */
+    default boolean isAssignableFrom(@NonNull Argument<?> candidateArgument) {
+        Objects.requireNonNull(candidateArgument, "Candidate type cannot be null");
+        if (!isAssignableFrom(candidateArgument.getType())) {
+            return false;
         }
-        return returnType.toString();
-    }
-
-    /**
-     * @return Whether the argument has any type variables
-     */
-    default boolean hasTypeVariables() {
-        return !getTypeVariables().isEmpty();
-    }
-
-    /**
-     * @return Whether this is a container type.
-     */
-    default boolean isContainerType() {
-        return DefaultArgument.CONTAINER_TYPES.contains(getType());
-    }
-
-    /**
-     * @return Is the return type reactive.
-     * @since 2.0.0
-     */
-    default boolean isReactive() {
-        return Publishers.isConvertibleToPublisher(getType());
-    }
-
-    /**
-     * @return Is the return the return type a reactive completable type.
-     * @since 2.0.0
-     */
-    default boolean isCompletable() {
-        return Publishers.isCompletable(getType());
-    }
-
-    /**
-     * @return Is the return type asynchronous.
-     * @since 2.0.0
-     */
-    default boolean isAsync() {
-        Class<T> type = getType();
-        return CompletionStage.class.isAssignableFrom(type);
-    }
-
-    /**
-     * @return Is this type an optional
-     */
-    default boolean isOptional() {
-        return getType() == Optional.class;
-    }
-
-    /**
-     * @return Is the return type either async or reactive.
-     * @since 2.0.0
-     */
-    default boolean isAsyncOrReactive() {
-        return isAsync() || isReactive();
-    }
-
-    /**
-     * Returns whether the return type is logically void. This includes
-     * reactive times that emit nothing (such as {@link io.micronaut.core.async.subscriber.Completable})
-     * and asynchronous types that emit {@link Void}.
-     *
-     * @return Is the return type logically void.
-     * @since 2.0.0
-     */
-    default boolean isVoid() {
-        Class<T> javaReturnType = getType();
-        if (javaReturnType == void.class) {
+        Argument[] typeParameters = getTypeParameters();
+        Argument[] candidateArgumentTypeParameters = candidateArgument.getTypeParameters();
+        if (typeParameters.length == 0) {
+            // Wildcard or no type parameters
+            return candidateArgumentTypeParameters.length >= 0;
+        }
+        if (candidateArgumentTypeParameters.length == 0) {
+            for (Argument typeParameter : typeParameters) {
+                if (typeParameter.getType() != Object.class) {
+                    return false;
+                }
+            }
+            // Wildcard
             return true;
-        } else {
-            if (isReactive() || isAsync()) {
-                return isCompletable() ||
-                        getFirstTypeVariable()
-                                .filter(arg -> arg.getType() == Void.class).isPresent();
+        }
+        for (int i = 0; i < typeParameters.length; i++) {
+            Argument typeParameter = typeParameters[i];
+            Argument candidateArgumentTypeParameter = candidateArgumentTypeParameters[i];
+            if (!typeParameter.isAssignableFrom(candidateArgumentTypeParameter)) {
+                return false;
             }
         }
-        return false;
+        return true;
     }
 
     /**
@@ -308,13 +216,13 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
      * @param arguments The arguments
      * @return The class array
      */
-    static @NonNull Class[] toClassArray(Argument... arguments) {
+    static @NonNull Class<?>[] toClassArray(@Nullable Argument<?>... arguments) {
         if (ArrayUtils.isEmpty(arguments)) {
             return ReflectionUtils.EMPTY_CLASS_ARRAY;
         }
-        Class[] types = new Class[arguments.length];
+        Class<?>[] types = new Class[arguments.length];
         for (int i = 0; i < arguments.length; i++) {
-            Argument argument = arguments[i];
+            Argument<?> argument = arguments[i];
             types[i] = argument.getType();
         }
         return types;
@@ -326,18 +234,20 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
      * @param arguments The arguments
      * @return The String representation
      */
-    static @NonNull String toString(Argument... arguments) {
-        StringBuilder baseString = new StringBuilder();
+    static @NonNull String toString(@Nullable Argument<?>... arguments) {
         if (ArrayUtils.isNotEmpty(arguments)) {
+            StringBuilder baseString = new StringBuilder();
             for (int i = 0; i < arguments.length; i++) {
-                Argument argument = arguments[i];
+                Argument<?> argument = arguments[i];
                 baseString.append(argument.toString());
                 if (i != arguments.length - 1) {
                     baseString.append(',');
                 }
             }
+            return baseString.toString();
+        } else {
+            return "";
         }
-        return baseString.toString();
     }
 
     /**
@@ -352,13 +262,49 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     @UsedByGeneratedCode
     @NonNull
     static <T> Argument<T> of(
-        Class<T> type,
-        String name,
-        @Nullable Argument... typeParameters) {
+        @NonNull Class<T> type,
+        @Nullable String name,
+        @Nullable Argument<?>... typeParameters) {
         return new DefaultArgument<>(type, name, AnnotationMetadata.EMPTY_METADATA, typeParameters);
     }
 
+    /**
+     * Creates a new argument for the given type and name that is at type variable.
+     *
+     * @param type           The type
+     * @param name           The name
+     * @param annotationMetadata The annotation metadata
+     * @param typeParameters the type parameters
+     * @param <T>            The generic type
+     * @return The argument instance
+     * @since 3.0.0
+     */
+    @UsedByGeneratedCode
+    @NonNull
+    static <T> Argument<T> ofTypeVariable(
+            @NonNull Class<T> type,
+            @Nullable String name,
+            @Nullable AnnotationMetadata annotationMetadata,
+            @Nullable Argument<?>... typeParameters) {
+        return new DefaultArgument<>(type, name, annotationMetadata, true, typeParameters);
+    }
 
+    /**
+     * Creates a new argument for the given type and name that is at type variable.
+     *
+     * @param type           The type
+     * @param name           The name
+     * @param <T>            The generic type
+     * @return The argument instance
+     * @since 3.0.0
+     */
+    @UsedByGeneratedCode
+    @NonNull
+    static <T> Argument<T> ofTypeVariable(
+            @NonNull Class<T> type,
+            @Nullable String name) {
+        return new DefaultArgument<>(type, name, AnnotationMetadata.EMPTY_METADATA, true);
+    }
 
     /**
      * Creates a new argument for the given type and name.
@@ -373,10 +319,10 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     @UsedByGeneratedCode
     @NonNull
     static <T> Argument<T> of(
-        Class<T> type,
-        String name,
-        AnnotationMetadata annotationMetadata,
-        @Nullable Argument... typeParameters) {
+        @NonNull Class<T> type,
+        @Nullable String name,
+        @Nullable AnnotationMetadata annotationMetadata,
+        @Nullable Argument<?>... typeParameters) {
         return new DefaultArgument<>(type, name, annotationMetadata, typeParameters);
     }
 
@@ -392,9 +338,9 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     @UsedByGeneratedCode
     @NonNull
     static <T> Argument<T> of(
-            Class<T> type,
-            AnnotationMetadata annotationMetadata,
-            @Nullable Argument... typeParameters) {
+            @NonNull Class<T> type,
+            @Nullable AnnotationMetadata annotationMetadata,
+            @Nullable Argument<?>... typeParameters) {
         return new DefaultArgument<>(type, annotationMetadata, typeParameters);
     }
 
@@ -409,8 +355,8 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     @UsedByGeneratedCode
     @NonNull
     static <T> Argument<T> of(
-        Class<T> type,
-        String name) {
+        @NonNull Class<T> type,
+        @Nullable String name) {
         return new DefaultArgument<>(type, name, AnnotationMetadata.EMPTY_METADATA, Argument.ZERO_ARGUMENTS);
     }
 
@@ -425,11 +371,52 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     @UsedByGeneratedCode
     @NonNull
     static <T> Argument<T> of(
-        Class<T> type, @Nullable Argument... typeParameters) {
+            @NonNull Class<T> type,
+            @Nullable Argument<?>... typeParameters) {
         if (ArrayUtils.isEmpty(typeParameters)) {
             return of(type);
         }
         return new DefaultArgument<>(type, NameUtils.decapitalize(type.getSimpleName()), AnnotationMetadata.EMPTY_METADATA, typeParameters);
+    }
+
+    /**
+     * Allows coercing a {@link Type} instance to an {@link Argument}.
+     * @param type The type
+     * @return The argument
+     * @throws IllegalArgumentException If the type cannot be coerced
+     * @since 3.0.0
+     */
+    static @NonNull Argument<?> of(@NonNull Type type) {
+        Objects.requireNonNull(type, "Type cannot be null");
+        if (type instanceof Class) {
+            return Argument.of((Class<?>) type);
+        } else if (type instanceof ParameterizedType) {
+            ParameterizedType pt = (ParameterizedType) type;
+            final Type rawType = pt.getRawType();
+            if (rawType instanceof Class<?>) {
+                Class<?> rawClass = (Class<?>) rawType;
+                final Type[] actualTypeArguments = pt.getActualTypeArguments();
+                if (ArrayUtils.isNotEmpty(actualTypeArguments)) {
+                    Argument<?>[] typeArguments = new Argument[actualTypeArguments.length];
+                    for (int i = 0; i < actualTypeArguments.length; i++) {
+                        Type typeArgument = actualTypeArguments[i];
+                        if (typeArgument instanceof Class || typeArgument instanceof ParameterizedType) {
+                            typeArguments[i] = of(typeArgument);
+                        } else {
+                            return Argument.of(rawClass);
+                        }
+                    }
+                    return Argument.of(rawClass, typeArguments);
+                } else {
+                    return Argument.of(rawClass);
+                }
+            } else {
+                throw new IllegalArgumentException("A ParameterizedType that has a raw type that is not a class cannot be converted to an argument");
+            }
+
+        } else {
+            throw new IllegalArgumentException("Type [" + type + "] must be a Class or ParameterizedType");
+        }
     }
 
     /**
@@ -442,8 +429,8 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     @UsedByGeneratedCode
     @NonNull
     static <T> Argument<T> of(
-        Class<T> type) {
-        return new DefaultArgument<>(type, AnnotationMetadata.EMPTY_METADATA, Argument.ZERO_ARGUMENTS);
+        @NonNull Class<T> type) {
+        return new DefaultArgument<>(type, null, AnnotationMetadata.EMPTY_METADATA, Collections.emptyMap(), Argument.ZERO_ARGUMENTS);
     }
 
     /**
@@ -456,9 +443,25 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
      */
     @UsedByGeneratedCode
     @NonNull
-    static <T> Argument<T> of(Class<T> type, @Nullable Class<?>... typeParameters) {
+    static <T> Argument<T> of(@NonNull Class<T> type, @Nullable Class<?>... typeParameters) {
+        return of(type, AnnotationMetadata.EMPTY_METADATA, typeParameters);
+    }
+
+    /**
+     * Creates a new argument for the given type and name.
+     *
+     * @param type           The type
+     * @param annotationMetadata The annotation metadata
+     * @param typeParameters The parameters type
+     * @param <T>            The generic type
+     * @return The argument instance
+     * @since 3.0.0
+     */
+    @UsedByGeneratedCode
+    @NonNull
+    static <T> Argument<T> of(@NonNull Class<T> type, @Nullable AnnotationMetadata annotationMetadata, @Nullable Class<?>[] typeParameters) {
         if (ArrayUtils.isEmpty(typeParameters)) {
-            return of(type);
+            return of(type, annotationMetadata);
         }
 
         TypeVariable<Class<T>>[] parameters = type.getTypeParameters();
@@ -466,12 +469,12 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
         if (parameters.length != len) {
             throw new IllegalArgumentException("Type parameter length does not match. Required: " + parameters.length + ", Specified: " + len);
         }
-        Argument[] typeArguments = new Argument[len];
+        Argument<?>[] typeArguments = new Argument[len];
         for (int i = 0; i < parameters.length; i++) {
             TypeVariable<Class<T>> parameter = parameters[i];
             typeArguments[i] = Argument.of(typeParameters[i], parameter.getName());
         }
-        return new DefaultArgument<>(type, AnnotationMetadata.EMPTY_METADATA, typeArguments);
+        return new DefaultArgument<>(type, annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA, typeArguments);
     }
 
     /**
@@ -482,7 +485,21 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
      * @return The argument instance
      */
     @NonNull
-    static <T> Argument<List<T>> listOf(Class<T> type) {
+    static <T> Argument<List<T>> listOf(@NonNull Class<T> type) {
+        //noinspection unchecked
+        return of((Class<List<T>>) ((Class) List.class), type);
+    }
+
+    /**
+     * Creates a new argument representing a generic list.
+     *
+     * @param type list element type
+     * @param <T>  list element type
+     * @since 2.0.1
+     * @return The argument instance
+     */
+    @NonNull
+    static <T> Argument<List<T>> listOf(@NonNull Argument<T> type) {
         //noinspection unchecked
         return of((Class<List<T>>) ((Class) List.class), type);
     }
@@ -495,7 +512,21 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
      * @return The argument instance
      */
     @NonNull
-    static <T> Argument<Set<T>> setOf(Class<T> type) {
+    static <T> Argument<Set<T>> setOf(@NonNull Class<T> type) {
+        //noinspection unchecked
+        return of((Class<Set<T>>) ((Class) Set.class), type);
+    }
+
+    /**
+     * Creates a new argument representing a generic set.
+     *
+     * @param type set element type
+     * @param <T>  set element type
+     * @since 2.0.1
+     * @return The argument instance
+     */
+    @NonNull
+    static <T> Argument<Set<T>> setOf(@NonNull Argument<T> type) {
         //noinspection unchecked
         return of((Class<Set<T>>) ((Class) Set.class), type);
     }
@@ -510,7 +541,23 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
      * @return The argument instance
      */
     @NonNull
-    static <K, V> Argument<Map<K, V>> mapOf(Class<K> keyType, Class<V> valueType) {
+    static <K, V> Argument<Map<K, V>> mapOf(@NonNull Class<K> keyType, @NonNull Class<V> valueType) {
+        //noinspection unchecked
+        return of((Class<Map<K, V>>) ((Class) Map.class), keyType, valueType);
+    }
+
+    /**
+     * Creates a new argument representing a generic map.
+     *
+     * @param keyType The key type
+     * @param valueType The value type
+     * @param <K>  The map key type
+     * @param <V> The map value type
+     * @since 2.0.1
+     * @return The argument instance
+     */
+    @NonNull
+    static <K, V> Argument<Map<K, V>> mapOf(@NonNull Argument<K> keyType, @NonNull Argument<V> valueType) {
         //noinspection unchecked
         return of((Class<Map<K, V>>) ((Class) Map.class), keyType, valueType);
     }

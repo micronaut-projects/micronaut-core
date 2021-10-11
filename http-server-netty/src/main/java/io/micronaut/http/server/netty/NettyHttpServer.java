@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,30 +15,59 @@
  */
 package io.micronaut.http.server.netty;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import java.io.File;
+import java.net.BindException;
+import java.net.InetSocketAddress;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.channels.ClosedChannelException;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
+import java.util.function.Supplier;
+
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.BeanLocator;
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.TypeHint;
-import io.micronaut.core.async.SupplierUtil;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.naming.Named;
-import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.discovery.event.ServiceStoppedEvent;
+import io.micronaut.core.util.SupplierUtil;
+import io.micronaut.discovery.EmbeddedServerInstance;
 import io.micronaut.discovery.event.ServiceReadyEvent;
-import io.micronaut.http.HttpVersion;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.discovery.event.ServiceStoppedEvent;
+import io.micronaut.http.context.event.HttpRequestReceivedEvent;
+import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
-import io.micronaut.http.netty.channel.*;
+import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
+import io.micronaut.http.netty.channel.ChannelPipelineListener;
+import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
+import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
 import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
 import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.HttpServerConfiguration;
-import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.decoders.HttpRequestDecoder;
@@ -48,26 +77,48 @@ import io.micronaut.http.server.netty.ssl.HttpRequestCertificateHandler;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
 import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
+import io.micronaut.http.server.util.DefaultHttpHostResolver;
+import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.ApplicationConfiguration;
-import io.micronaut.runtime.server.EmbeddedServer;
-import io.micronaut.runtime.server.EmbeddedServerInstance;
+import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import io.micronaut.runtime.server.event.ServerShutdownEvent;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
 import io.micronaut.scheduling.TaskExecutors;
-import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.web.router.Router;
-import io.micronaut.web.router.resource.StaticResourceResolver;
-import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.*;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.ChannelOutboundHandler;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.socket.SocketChannel;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpContentDecompressor;
+import io.netty.handler.codec.http.HttpMessage;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpServerCodec;
+import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
+import io.netty.handler.codec.http.HttpServerUpgradeHandler;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
-import io.netty.handler.codec.http2.*;
+import io.netty.handler.codec.http2.CleartextHttp2ServerUpgradeHandler;
+import io.netty.handler.codec.http2.DefaultHttp2Connection;
+import io.netty.handler.codec.http2.Http2CodecUtil;
+import io.netty.handler.codec.http2.Http2Connection;
+import io.netty.handler.codec.http2.Http2FrameListener;
+import io.netty.handler.codec.http2.Http2FrameLogger;
+import io.netty.handler.codec.http2.Http2ServerUpgradeCodec;
+import io.netty.handler.codec.http2.HttpConversionUtil;
+import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
+import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
 import io.netty.handler.flow.FlowControlHandler;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.ApplicationProtocolNames;
@@ -84,169 +135,109 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
-
-import javax.inject.Inject;
-import javax.inject.Provider;
-import javax.inject.Singleton;
-import java.io.File;
-import java.net.*;
-import java.nio.channels.ClosedChannelException;
-import java.time.Duration;
-import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiConsumer;
 
 /**
- * Implements the bootstrap and configuration logic for the Netty implementation of {@link EmbeddedServer}.
+ * Implements the bootstrap and configuration logic for the Netty implementation of {@link io.micronaut.runtime.server.EmbeddedServer}.
  *
  * @author Graeme Rocher
  * @see RoutingInBoundHandler
  * @since 1.0
  */
-@Singleton
 @Internal
 @TypeHint(
         value = ChannelOption.class,
         accessType = {TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS, TypeHint.AccessType.ALL_DECLARED_FIELDS}
 )
-public class NettyHttpServer implements EmbeddedServer, WebSocketSessionRepository, ChannelPipelineCustomizer {
+public class NettyHttpServer implements NettyEmbeddedServer {
 
     @SuppressWarnings("WeakerAccess")
     public static final String OUTBOUND_KEY = "-outbound-";
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
-    private final List<ChannelOutboundHandler> outboundHandlers;
-    private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
+    private final NettyEmbeddedServices nettyEmbeddedServices;
     private final NettyHttpServerConfiguration serverConfiguration;
     private final ServerSslConfiguration sslConfiguration;
-    private final StaticResourceResolver staticResourceResolver;
     private final Environment environment;
-    private final Router router;
-    private final RequestArgumentSatisfier requestArgumentSatisfier;
-    private final BeanLocator beanLocator;
-    private final ThreadFactory threadFactory;
-    private final WebSocketBeanRegistry webSocketBeanRegistry;
     private final int specifiedPort;
-    private final HttpCompressionStrategy httpCompressionStrategy;
-    private final EventLoopGroupRegistry eventLoopGroupRegistry;
-    private final HttpVersion httpVersion;
     private final HttpRequestCertificateHandler requestCertificateHandler;
     private final RoutingInBoundHandler routingHandler;
+    private final HttpContentProcessorResolver httpContentProcessorResolver;
+    private final boolean isDefault;
     private volatile int serverPort;
     private final ApplicationContext applicationContext;
-    private final SslContext sslContext;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final ChannelGroup webSocketSessions = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
-    private final EventLoopGroupFactory eventLoopGroupFactory;
-    private final ChannelOptionFactory channelOptionFactory;
+    private final HttpHostResolver hostResolver;
     private boolean shutdownWorker = false;
     private boolean shutdownParent = false;
     private EventLoopGroup workerGroup;
     private EventLoopGroup parentGroup;
     private EmbeddedServerInstance serviceInstance;
     private final Collection<ChannelPipelineListener> pipelineListeners = new ArrayList<>(2);
+    private final ApplicationEventPublisher<HttpRequestReceivedEvent> httpRequestReceivedEventPublisher;
+    private NettyHttpServerInitializer childHandler;
+    private final Set<Integer> boundPorts = new HashSet<>(2);
 
     /**
      * @param serverConfiguration                     The Netty HTTP server configuration
-     * @param applicationContext                      The application context
-     * @param router                                  The router
-     * @param requestArgumentSatisfier                The request argument satisfier
-     * @param mediaTypeCodecRegistry                  The Media type codec registry
-     * @param customizableResponseTypeHandlerRegistry The Netty customizable response type handler registry
-     * @param resourceResolver                        The static resource resolver
-     * @param ioExecutor                              The IO executor
-     * @param threadFactory                           The thread factory
-     * @param executorSelector                        The executor selector
-     * @param serverSslBuilder                        The Netty Server SSL builder
-     * @param outboundHandlers                        The outbound handlers
-     * @param eventLoopGroupRegistry                  The event loop registry
-     * @param eventLoopGroupFactory                   The EventLoopGroupFactory
-     * @param httpCompressionStrategy                 The http compression strategy
-     * @param httpContentProcessorResolver            The http content processor resolver
-     * @param channelOptionFactory                    The channel option factory
+     * @param nettyEmbeddedServices                   The embedded server context
+     * @param handlerRegistry                         The handler registry
+     * @param isDefault                               Is this the default server
      */
     @SuppressWarnings("ParameterNumber")
-    @Inject
     public NettyHttpServer(
             NettyHttpServerConfiguration serverConfiguration,
-            ApplicationContext applicationContext,
-            Router router,
-            RequestArgumentSatisfier requestArgumentSatisfier,
-            MediaTypeCodecRegistry mediaTypeCodecRegistry,
-            NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry,
-            StaticResourceResolver resourceResolver,
-            @javax.inject.Named(TaskExecutors.IO) Provider<ExecutorService> ioExecutor,
-            @javax.inject.Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
-            ExecutorSelector executorSelector,
-            @Nullable ServerSslBuilder serverSslBuilder,
-            List<ChannelOutboundHandler> outboundHandlers,
-            EventLoopGroupFactory eventLoopGroupFactory,
-            EventLoopGroupRegistry eventLoopGroupRegistry,
-            HttpCompressionStrategy httpCompressionStrategy,
-            HttpContentProcessorResolver httpContentProcessorResolver,
-            ChannelOptionFactory channelOptionFactory
-    ) {
-        this.httpCompressionStrategy = httpCompressionStrategy;
-        Optional<File> location = serverConfiguration.getMultipart().getLocation();
-        location.ifPresent(dir -> DiskFileUpload.baseDirectory = dir.getAbsolutePath());
-        this.applicationContext = applicationContext;
-        this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
-        this.beanLocator = applicationContext;
-        this.environment = applicationContext.getEnvironment();
+            NettyEmbeddedServices nettyEmbeddedServices,
+            NettyCustomizableResponseTypeHandlerRegistry handlerRegistry,
+            boolean isDefault) {
+        this.isDefault = isDefault;
         this.serverConfiguration = serverConfiguration;
-        this.router = router;
-        this.specifiedPort = getHttpPort(serverConfiguration);
+        this.nettyEmbeddedServices = nettyEmbeddedServices;
+        Optional<File> location = this.serverConfiguration.getMultipart().getLocation();
+        location.ifPresent(dir -> DiskFileUpload.baseDirectory = dir.getAbsolutePath());
+        this.applicationContext = nettyEmbeddedServices.getApplicationContext();
+        this.environment = applicationContext.getEnvironment();
 
-        int port = specifiedPort;
+        int port;
+        final ServerSslBuilder serverSslBuilder = nettyEmbeddedServices.getServerSslBuilder();
         if (serverSslBuilder != null) {
             this.sslConfiguration = serverSslBuilder.getSslConfiguration();
-            this.sslContext = serverSslBuilder.build().orElse(null);
             if (this.sslConfiguration.isEnabled()) {
                 port = sslConfiguration.getPort();
+                this.specifiedPort = port;
+            } else {
+                port = getHttpPort(this.serverConfiguration);
+                this.specifiedPort = port;
             }
         } else {
+            port = getHttpPort(this.serverConfiguration);
+            this.specifiedPort = port;
             this.sslConfiguration = null;
-            this.sslContext = null;
         }
 
-        this.httpVersion = serverConfiguration.getHttpVersion();
-        this.serverPort = getPortOrDefault(port);
-        OrderUtil.sort(outboundHandlers);
-        this.outboundHandlers = outboundHandlers;
-        this.requestArgumentSatisfier = requestArgumentSatisfier;
-        this.staticResourceResolver = resourceResolver;
-        this.threadFactory = threadFactory;
-        this.webSocketBeanRegistry = WebSocketBeanRegistry.forServer(applicationContext);
-        this.eventLoopGroupFactory = eventLoopGroupFactory;
-        this.eventLoopGroupRegistry = eventLoopGroupRegistry;
+        this.serverPort = port;
         this.requestCertificateHandler = new HttpRequestCertificateHandler();
-        this.routingHandler = new RoutingInBoundHandler(
-                applicationContext,
-                router,
-                mediaTypeCodecRegistry,
-                customizableResponseTypeHandlerRegistry,
-                staticResourceResolver,
-                serverConfiguration,
-                requestArgumentSatisfier,
-                executorSelector,
-                SupplierUtil.memoized(ioExecutor::get),
-                httpContentProcessorResolver
+        this.httpRequestReceivedEventPublisher = nettyEmbeddedServices
+                .getEventPublisher(HttpRequestReceivedEvent.class);
+        ApplicationEventPublisher<HttpRequestTerminatedEvent> httpRequestTerminatedEventPublisher = nettyEmbeddedServices
+                .getEventPublisher(HttpRequestTerminatedEvent.class);
+        final Supplier<ExecutorService> ioExecutor = SupplierUtil.memoized(() ->
+                 nettyEmbeddedServices.getExecutorSelector()
+                         .select(TaskExecutors.IO).orElse(null)
         );
-        this.channelOptionFactory = channelOptionFactory;
-    }
-
-    /**
-     * Randomizes port if not set.
-     *
-     * @param port current port value
-     * @return random port number if the original value was -1
-     */
-    private int getPortOrDefault(int port) {
-        return port == -1 ? SocketUtils.findAvailableTcpPort() : port;
+        this.httpContentProcessorResolver = new DefaultHttpContentProcessorResolver(
+                nettyEmbeddedServices.getApplicationContext(),
+                () -> serverConfiguration
+        );
+        this.routingHandler = new RoutingInBoundHandler(
+                serverConfiguration,
+                handlerRegistry,
+                nettyEmbeddedServices,
+                ioExecutor,
+                httpContentProcessorResolver,
+                httpRequestTerminatedEventPublisher
+        );
+        this.hostResolver = new DefaultHttpHostResolver(serverConfiguration, () -> NettyHttpServer.this);
     }
 
     /**
@@ -287,54 +278,66 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
     @Override
     public boolean isRunning() {
-        return running.get() && !SocketUtils.isTcpPortAvailable(serverPort);
+        return running.get();
     }
 
     @Override
-    public synchronized EmbeddedServer start() {
+    public synchronized NettyEmbeddedServer start() {
         if (!isRunning()) {
+            //suppress unused
+            //done here to prevent a blocking service loader in the event loop
             EventLoopGroupConfiguration workerConfig = resolveWorkerConfiguration();
             workerGroup = createWorkerEventLoopGroup(workerConfig);
             parentGroup = createParentEventLoopGroup();
             ServerBootstrap serverBootstrap = createServerBootstrap();
+            serverBootstrap.channelFactory(() ->
+               nettyEmbeddedServices.getServerSocketChannelInstance(workerConfig)
+            );
 
             processOptions(serverConfiguration.getOptions(), serverBootstrap::option);
             processOptions(serverConfiguration.getChildOptions(), serverBootstrap::childOption);
+            childHandler = new NettyHttpServerInitializer();
             serverBootstrap = serverBootstrap.group(parentGroup, workerGroup)
-                    .channel(eventLoopGroupFactory.serverSocketChannelClass(workerConfig))
-                    .childHandler(new NettyHttpServerInitializer());
+                    .childHandler(childHandler);
 
             Optional<String> host = serverConfiguration.getHost();
-
-            serverPort = bindServerToHost(serverBootstrap, host.orElse(null), serverPort, new AtomicInteger(0));
-            List<Integer> defaultPorts = new ArrayList<>(2);
-            defaultPorts.add(serverPort);
-            if (serverConfiguration.isDualProtocol()) {
-                // By default we will bind ssl first and then bind http after.
-                int httpPort = getPortOrDefault(getHttpPort(serverConfiguration));
-                defaultPorts.add(httpPort);
-                bindServerToHost(serverBootstrap, host.orElse(null), httpPort, new AtomicInteger(0));
-            }
-            final Set<Integer> exposedPorts = router.getExposedPorts();
-            if (CollectionUtils.isNotEmpty(exposedPorts)) {
-                router.applyDefaultPorts(defaultPorts);
-                for (Integer exposedPort : exposedPorts) {
-                    try {
-                        if (host.isPresent()) {
-                            serverBootstrap.bind(host.get(), exposedPort).sync();
-                        } else {
-                            serverBootstrap.bind(exposedPort).sync();
-                        }
-                    } catch (Throwable e) {
-                        final boolean isBindError = e instanceof BindException;
-                        if (LOG.isErrorEnabled()) {
-                            if (isBindError) {
-                                LOG.error("Unable to start server. Additional specified server port {} already in use.", exposedPort);
-                            } else {
-                                LOG.error("Error starting Micronaut server: " + e.getMessage(), e);
+            final String definedHost = host.orElse(null);
+            serverPort = bindServerToHost(serverBootstrap, definedHost, serverPort);
+            if (isDefault) {
+                List<Integer> defaultPorts = new ArrayList<>(2);
+                defaultPorts.add(serverPort);
+                if (serverConfiguration.isDualProtocol()) {
+                    defaultPorts.add(
+                            bindServerToHost(serverBootstrap, definedHost, getHttpPort(serverConfiguration))
+                    );
+                }
+                final Router router = this.nettyEmbeddedServices.getRouter();
+                final Set<Integer> exposedPorts = router.getExposedPorts();
+                this.boundPorts.addAll(defaultPorts);
+                if (CollectionUtils.isNotEmpty(exposedPorts)) {
+                    router.applyDefaultPorts(defaultPorts);
+                    for (Integer exposedPort : exposedPorts) {
+                        if (!defaultPorts.contains(exposedPort)) {
+                            try {
+                                if (definedHost != null) {
+                                    serverBootstrap.bind(definedHost, exposedPort).sync();
+                                } else {
+                                    serverBootstrap.bind(exposedPort).sync();
+                                }
+                                this.boundPorts.add(exposedPort);
+                            } catch (Throwable e) {
+                                final boolean isBindError = e instanceof BindException;
+                                if (LOG.isErrorEnabled()) {
+                                    if (isBindError) {
+                                        LOG.error("Unable to start server. Additional specified server port {} already in use.",
+                                                  exposedPort);
+                                    } else {
+                                        LOG.error("Error starting Micronaut server: " + e.getMessage(), e);
+                                    }
+                                }
+                                throw new ServerStartupException("Unable to start Micronaut server on port: " + serverPort, e);
                             }
                         }
-                        throw new ServerStartupException("Unable to start Micronaut server on port: " + serverPort, e);
                     }
                 }
             }
@@ -348,18 +351,20 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private EventLoopGroupConfiguration resolveWorkerConfiguration() {
         EventLoopGroupConfiguration workerConfig = serverConfiguration.getWorker();
         if (workerConfig == null) {
-            workerConfig = eventLoopGroupRegistry.getEventLoopGroupConfiguration(EventLoopGroupConfiguration.DEFAULT).orElse(null);
+            workerConfig = nettyEmbeddedServices.getEventLoopGroupRegistry()
+                    .getEventLoopGroupConfiguration(EventLoopGroupConfiguration.DEFAULT).orElse(null);
         } else {
             final String eventLoopGroupName = workerConfig.getName();
             if (!EventLoopGroupConfiguration.DEFAULT.equals(eventLoopGroupName)) {
-                workerConfig = eventLoopGroupRegistry.getEventLoopGroupConfiguration(eventLoopGroupName).orElse(workerConfig);
+                workerConfig = nettyEmbeddedServices.getEventLoopGroupRegistry()
+                        .getEventLoopGroupConfiguration(eventLoopGroupName).orElse(workerConfig);
             }
         }
         return workerConfig;
     }
 
     @Override
-    public synchronized EmbeddedServer stop() {
+    public synchronized NettyEmbeddedServer stop() {
         if (isRunning() && workerGroup != null) {
             if (running.compareAndSet(true, false)) {
                 stopInternal();
@@ -370,6 +375,9 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
     @Override
     public int getPort() {
+        if (!isRunning() && serverPort == -1) {
+            throw new UnsupportedOperationException("Retrieving the port from the server before it has started is not supported when binding to a random port");
+        }
         return serverPort;
     }
 
@@ -381,7 +389,9 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
     @Override
     public String getScheme() {
-        return (sslConfiguration != null && sslConfiguration.isEnabled()) ? io.micronaut.http.HttpRequest.SCHEME_HTTPS : io.micronaut.http.HttpRequest.SCHEME_HTTP;
+        return (sslConfiguration != null && sslConfiguration.isEnabled())
+                ? io.micronaut.http.HttpRequest.SCHEME_HTTPS
+                : io.micronaut.http.HttpRequest.SCHEME_HTTP;
     }
 
     @Override
@@ -412,13 +422,19 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         return serverConfiguration.getApplicationConfiguration();
     }
 
+    @Override
+    public final Set<Integer> getBoundPorts() {
+        return Collections.unmodifiableSet(this.boundPorts);
+    }
+
     /**
      * @return The parent event loop group
      */
     @SuppressWarnings("WeakerAccess")
     protected EventLoopGroup createParentEventLoopGroup() {
         final NettyHttpServerConfiguration.Parent parent = serverConfiguration.getParent();
-        return eventLoopGroupRegistry.getEventLoopGroup(parent != null ? parent.getName() : NettyHttpServerConfiguration.Parent.NAME)
+        return nettyEmbeddedServices.getEventLoopGroupRegistry()
+                .getEventLoopGroup(parent != null ? parent.getName() : NettyHttpServerConfiguration.Parent.NAME)
                 .orElseGet(() -> {
                     final EventLoopGroup newGroup = newEventLoopGroup(parent);
                     shutdownParent = true;
@@ -432,8 +448,11 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      */
     @SuppressWarnings("WeakerAccess")
     protected EventLoopGroup createWorkerEventLoopGroup(@Nullable EventLoopGroupConfiguration workerConfig) {
-        return eventLoopGroupRegistry.getEventLoopGroup(workerConfig != null ? workerConfig.getName() : EventLoopGroupConfiguration.DEFAULT)
+        String configName = workerConfig != null ? workerConfig.getName() : EventLoopGroupConfiguration.DEFAULT;
+        return nettyEmbeddedServices.getEventLoopGroupRegistry().getEventLoopGroup(configName)
                 .orElseGet(() -> {
+                    LOG.warn("The configuration for 'micronaut.server.netty.worker.{}' is deprecated. " +
+                                     "Use 'micronaut.netty.event-loops.default' configuration instead.", configName);
                     final EventLoopGroup newGroup = newEventLoopGroup(workerConfig);
                     shutdownWorker = true;
                     return newGroup;
@@ -449,24 +468,36 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     }
 
     @SuppressWarnings("MagicNumber")
-    private int bindServerToHost(ServerBootstrap serverBootstrap, @Nullable String host, int port, AtomicInteger attempts) {
+    private int bindServerToHost(ServerBootstrap serverBootstrap, @Nullable String host, int port) {
         boolean isRandomPort = specifiedPort == -1;
         Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
         if (applicationName.isPresent()) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Binding {} server to {}:{}", applicationName.get(), host != null ? host : "*", port);
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Binding {} server to {}:{}", applicationName.get(), host != null ? host : "*", port);
             }
         } else {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Binding server to {}:{}", host != null ? host : "*", port);
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Binding server to {}:{}", host != null ? host : "*", port);
             }
         }
 
         try {
-            if (host != null) {
-                serverBootstrap.bind(host, port).sync();
+            if (isRandomPort) {
+                // bind to zero to get a random port
+                final ChannelFuture future;
+                if (host != null) {
+                    future = serverBootstrap.bind(host, 0).sync();
+                } else {
+                    future = serverBootstrap.bind(0).sync();
+                }
+                InetSocketAddress ia = (InetSocketAddress) future.channel().localAddress();
+                return ia.getPort();
             } else {
-                serverBootstrap.bind(port).sync();
+                if (host != null) {
+                    serverBootstrap.bind(host, port).sync();
+                } else {
+                    serverBootstrap.bind(port).sync();
+                }
             }
             return port;
         } catch (Throwable e) {
@@ -478,24 +509,20 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                     LOG.error("Error starting Micronaut server: " + e.getMessage(), e);
                 }
             }
-            int attemptCount = attempts.getAndIncrement();
-
-            if (isRandomPort && attemptCount < 3) {
-                port = SocketUtils.findAvailableTcpPort();
-                return bindServerToHost(serverBootstrap, host, port, attempts);
-            } else {
-                stopInternal();
-                throw new ServerStartupException("Unable to start Micronaut server on port: " + port, e);
-            }
+            stopInternal();
+            throw new ServerStartupException("Unable to start Micronaut server on port: " + port, e);
         }
     }
 
     private void fireStartupEvents() {
         Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
-        applicationContext.publishEvent(new ServerStartupEvent(this));
+        applicationContext.getEventPublisher(ServerStartupEvent.class)
+                .publishEvent(new ServerStartupEvent(this));
         applicationName.ifPresent(id -> {
             this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
-            applicationContext.publishEvent(new ServiceReadyEvent(serviceInstance));
+            applicationContext
+                    .getEventPublisher(ServiceReadyEvent.class)
+                    .publishEvent(new ServiceReadyEvent(serviceInstance));
         });
     }
 
@@ -511,22 +538,36 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private void stopInternal() {
         try {
             if (shutdownParent) {
-                parentGroup.shutdownGracefully()
-                        .addListener(this::logShutdownErrorIfNecessary);
+                EventLoopGroupConfiguration parent = serverConfiguration.getParent();
+                if (parent != null) {
+                    long quietPeriod = parent.getShutdownQuietPeriod().toMillis();
+                    long timeout = parent.getShutdownTimeout().toMillis();
+                    parentGroup.shutdownGracefully(quietPeriod, timeout, TimeUnit.MILLISECONDS)
+                            .addListener(this::logShutdownErrorIfNecessary);
+                } else {
+                    parentGroup.shutdownGracefully()
+                            .addListener(this::logShutdownErrorIfNecessary);
+                }
             }
             if (shutdownWorker) {
                 workerGroup.shutdownGracefully()
                         .addListener(this::logShutdownErrorIfNecessary);
             }
             webSocketSessions.close();
-            applicationContext.publishEvent(new ServerShutdownEvent(this));
+            applicationContext.getEventPublisher(ServerShutdownEvent.class).publishEvent(new ServerShutdownEvent(this));
             if (serviceInstance != null) {
-                applicationContext.publishEvent(new ServiceStoppedEvent(serviceInstance));
+                applicationContext.getEventPublisher(ServiceStoppedEvent.class)
+                        .publishEvent(new ServiceStoppedEvent(serviceInstance));
             }
-            if (applicationContext.isRunning()) {
-                applicationContext.stop();
+            if (isDefault) {
+                if (applicationContext.isRunning()) {
+                    applicationContext.stop();
+                }
+                serverConfiguration.getMultipart().getLocation().ifPresent(dir -> DiskFileUpload.baseDirectory = null);
             }
             serverConfiguration.getMultipart().getLocation().ifPresent(dir -> DiskFileUpload.baseDirectory = null);
+            childHandler = null;
+            this.boundPorts.clear();
         } catch (Throwable e) {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Error stopping Micronaut server: " + e.getMessage(), e);
@@ -537,41 +578,29 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private EventLoopGroup newEventLoopGroup(EventLoopGroupConfiguration config) {
         if (config != null) {
             ExecutorService executorService = config.getExecutorName()
-                    .flatMap(name -> beanLocator.findBean(ExecutorService.class, Qualifiers.byName(name))).orElse(null);
+                    .flatMap(name -> applicationContext.findBean(ExecutorService.class, Qualifiers.byName(name))).orElse(null);
             if (executorService != null) {
-                return eventLoopGroupFactory.createEventLoopGroup(
+                return nettyEmbeddedServices.createEventLoopGroup(
                         config.getNumThreads(),
                         executorService,
                         config.getIoRatio().orElse(null)
                 );
             } else {
-                return eventLoopGroupFactory.createEventLoopGroup(
-                        config,
-                        threadFactory
+                return nettyEmbeddedServices.createEventLoopGroup(
+                        config
                 );
             }
         } else {
-            return eventLoopGroupFactory.createEventLoopGroup(
-                    new DefaultEventLoopGroupConfiguration(), threadFactory
+            return nettyEmbeddedServices.createEventLoopGroup(
+                    new DefaultEventLoopGroupConfiguration()
             );
         }
     }
 
-    private void registerMicronautChannelHandlers(Map<String, ChannelHandler> channelHandlerMap) {
-        int i = 0;
-        for (ChannelHandler outboundHandlerAdapter : outboundHandlers) {
-            String name;
-            if (outboundHandlerAdapter instanceof Named) {
-                name = ((Named) outboundHandlerAdapter).getName();
-            } else {
-                name = ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND + NettyHttpServer.OUTBOUND_KEY + ++i;
-            }
-            channelHandlerMap.put(name, outboundHandlerAdapter);
-        }
-    }
-
     private void processOptions(Map<ChannelOption, Object> options, BiConsumer<ChannelOption, Object> biConsumer) {
-        options.forEach((option, value) -> biConsumer.accept(option, channelOptionFactory.convertValue(option, value, environment)));
+        final ChannelOptionFactory channelOptionFactory = nettyEmbeddedServices.getChannelOptionFactory();
+        options.forEach((option, value) -> biConsumer.accept(option,
+                                                             channelOptionFactory.convertValue(option, value, environment)));
     }
 
     @Override
@@ -605,10 +634,13 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 true
         );
         final HttpToHttp2ConnectionHandlerBuilder builder = new HttpToHttp2ConnectionHandlerBuilder()
-                .frameListener(http2ToHttpAdapter);
+                .frameListener(http2ToHttpAdapter)
+                .validateHeaders(serverConfiguration.isValidateHeaders())
+                .initialSettings(serverConfiguration.getHttp2().http2Settings());
 
         serverConfiguration.getLogLevel().ifPresent(logLevel ->
-                builder.frameLogger(new Http2FrameLogger(logLevel, NettyHttpServer.class))
+                                                            builder.frameLogger(new Http2FrameLogger(logLevel,
+                                                                                                     NettyHttpServer.class))
         );
         return builder.connection(connection).build();
     }
@@ -623,28 +655,57 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         this.pipelineListeners.add(Objects.requireNonNull(listener, "The listener cannot be null"));
     }
 
+    @Override
+    public Set<String> getObservedConfigurationPrefixes() {
+        return Collections.singleton(HttpServerConfiguration.PREFIX);
+    }
+
+    @Override
+    public void onApplicationEvent(RefreshEvent event) {
+        // if anything under HttpServerConfiguration.PREFIX changes re-build
+        // the NettyHttpServerInitializer in the server bootstrap to apply changes
+        // this will ensure re-configuration to HTTPS settings, read-timeouts, logging etc. apply
+        // configuration properties are auto-refreshed so will be visible automatically
+        if (childHandler != null) {
+            final ServerSslBuilder serverSslBuilder = nettyEmbeddedServices.getServerSslBuilder();
+            childHandler.sslContext = serverSslBuilder != null ? serverSslBuilder.build().orElse(null) : null;
+            childHandler.loggingHandler = serverConfiguration.getLogLevel().isPresent() ?
+                    new LoggingHandler(NettyHttpServer.class, serverConfiguration.getLogLevel().get()) : null;
+            childHandler.initHttpCoders();
+        }
+    }
+
     /**
      * Negotiates with the browser if HTTP2 or HTTP is going to be used. Once decided, the Netty
      * pipeline is setup with the correct handlers for the selected protocol.
+     *
+     * @implNote Unfortunately, this handler cannot be {@link io.netty.channel.ChannelHandler.Sharable shared} because
+     * {@link ApplicationProtocolNegotiationHandler} does not support it.
      */
-    @ChannelHandler.Sharable
     private final class Http2OrHttpHandler extends ApplicationProtocolNegotiationHandler {
         private final boolean useSsl;
-        // all are Sharable
-        final HttpAccessLogHandler accessLogHandler = serverConfiguration.getAccessLogger() != null && serverConfiguration.getAccessLogger().isEnabled() ?
-                new HttpAccessLogHandler(serverConfiguration.getAccessLogger().getLoggerName(), serverConfiguration.getAccessLogger().getLogFormat()) : null;
-        final HttpRequestDecoder requestDecoder = new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration);
-        final HttpResponseEncoder responseDecoder = new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration);
+        private final HttpAccessLogHandler accessLogHandler;
+        private final HttpRequestDecoder requestDecoder;
+        private final HttpResponseEncoder responseEncoder;
 
         /**
          * Default constructor.
          *
          * @param useSsl           true when using ssl
          * @param fallbackProtocol The fallback protocol
+         * @param accessLogHandler Handler for writing access logs
+         * @param requestDecoder   Request decoder
+         * @param responseEncoder  Response encoder
          */
-        Http2OrHttpHandler(boolean useSsl, String fallbackProtocol) {
+        Http2OrHttpHandler(boolean useSsl, String fallbackProtocol,
+                           @Nullable HttpAccessLogHandler accessLogHandler,
+                           HttpRequestDecoder requestDecoder,
+                           HttpResponseEncoder responseEncoder) {
             super(fallbackProtocol);
             this.useSsl = useSsl;
+            this.accessLogHandler = accessLogHandler;
+            this.requestDecoder = requestDecoder;
+            this.responseEncoder = responseEncoder;
         }
 
         @Override
@@ -678,8 +739,26 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             }
         }
 
-        @NotNull
+        private void registerMicronautChannelHandlers(Map<String, ChannelHandler> channelHandlerMap) {
+            int i = 0;
+            for (ChannelOutboundHandler outboundHandlerAdapter : nettyEmbeddedServices.getOutboundHandlers()) {
+                String name;
+                if (outboundHandlerAdapter instanceof Named) {
+                    name = ((Named) outboundHandlerAdapter).getName();
+                } else {
+                    name = ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND + NettyHttpServer.OUTBOUND_KEY + ++i;
+                }
+                channelHandlerMap.put(name, outboundHandlerAdapter);
+            }
+        }
+
+        @NonNull
         private Map<String, ChannelHandler> getHandlerForProtocol(@Nullable String protocol) {
+            return getHandlerForProtocol(protocol, null);
+        }
+
+        @NonNull
+        private Map<String, ChannelHandler> getHandlerForProtocol(@Nullable String protocol, @Nullable HttpServerCodec serverCodec) {
             final Duration idleTime = serverConfiguration.getIdleTimeout();
             Map<String, ChannelHandler> handlers = new LinkedHashMap<>(15);
             if (!idleTime.isNegative()) {
@@ -702,39 +781,45 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                     handlers.put(HANDLER_ACCESS_LOGGER, accessLogHandler);
                 }
             } else {
-                handlers.put(HANDLER_HTTP_SERVER_CODEC, new HttpServerCodec(
-                        serverConfiguration.getMaxInitialLineLength(),
-                        serverConfiguration.getMaxHeaderSize(),
-                        serverConfiguration.getMaxChunkSize(),
-                        serverConfiguration.isValidateHeaders(),
-                        serverConfiguration.getInitialBufferSize()
-                ));
+                handlers.put(HANDLER_HTTP_SERVER_CODEC, serverCodec == null ? createServerCodec() : serverCodec);
                 if (accessLogHandler != null) {
                     handlers.put(HANDLER_ACCESS_LOGGER, accessLogHandler);
                 }
                 registerMicronautChannelHandlers(handlers);
                 handlers.put(HANDLER_FLOW_CONTROL, new FlowControlHandler());
                 handlers.put(HANDLER_HTTP_KEEP_ALIVE, new HttpServerKeepAliveHandler());
-                handlers.put(HANDLER_HTTP_COMPRESSOR, new SmartHttpContentCompressor(httpCompressionStrategy));
+                handlers.put(HANDLER_HTTP_COMPRESSOR, new SmartHttpContentCompressor(
+                        nettyEmbeddedServices.getHttpCompressionStrategy()
+                ));
                 handlers.put(HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
             }
             handlers.put(HANDLER_HTTP_STREAM, new HttpStreamsServerHandler());
             handlers.put(HANDLER_HTTP_CHUNK, new ChunkedWriteHandler());
             handlers.put(HttpRequestDecoder.ID, requestDecoder);
+            if (serverConfiguration.isDualProtocol() && serverConfiguration.isHttpToHttpsRedirect() && useSsl) {
+                handlers.put(HANDLER_HTTP_TO_HTTPS_REDIRECT, new HttpToHttpsRedirectHandler(sslConfiguration, hostResolver));
+            }
             if (useSsl) {
                 handlers.put("request-certificate-handler", requestCertificateHandler);
             }
-            handlers.put(HttpResponseEncoder.ID, responseDecoder);
+            handlers.put(HttpResponseEncoder.ID, responseEncoder);
             handlers.put(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
-                    getWebSocketSessionRepository(),
-                    router,
-                    requestArgumentSatisfier.getBinderRegistry(),
-                    webSocketBeanRegistry,
-                    mediaTypeCodecRegistry,
-                    applicationContext
+                    nettyEmbeddedServices,
+                    getWebSocketSessionRepository()
             ));
             handlers.put(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, routingHandler);
             return handlers;
+        }
+
+        @NotNull
+        private HttpServerCodec createServerCodec() {
+            return new HttpServerCodec(
+                    serverConfiguration.getMaxInitialLineLength(),
+                    serverConfiguration.getMaxHeaderSize(),
+                    serverConfiguration.getMaxChunkSize(),
+                    serverConfiguration.isValidateHeaders(),
+                    serverConfiguration.getInitialBufferSize()
+            );
         }
     }
 
@@ -742,9 +827,32 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * An HTTP server initializer for Netty.
      */
     private class NettyHttpServerInitializer extends ChannelInitializer<SocketChannel> {
-        final Http2OrHttpHandler http2OrHttpHandler = new Http2OrHttpHandler(sslContext != null, serverConfiguration.getFallbackProtocol());
-        final LoggingHandler loggingHandler =
+        SslContext sslContext = nettyEmbeddedServices.getServerSslBuilder() != null ? nettyEmbeddedServices.getServerSslBuilder().build().orElse(null) : null;
+        LoggingHandler loggingHandler =
                 serverConfiguration.getLogLevel().isPresent() ? new LoggingHandler(NettyHttpServer.class, serverConfiguration.getLogLevel().get()) : null;
+
+        private HttpAccessLogHandler accessLogHandler;
+        private HttpRequestDecoder requestDecoder;
+        private HttpResponseEncoder responseEncoder;
+
+        {
+            initHttpCoders();
+        }
+
+        void initHttpCoders() {
+            this.accessLogHandler = serverConfiguration.getAccessLogger() != null && serverConfiguration.getAccessLogger()
+                    .isEnabled() ?
+                    new HttpAccessLogHandler(serverConfiguration.getAccessLogger().getLoggerName(),
+                            serverConfiguration.getAccessLogger().getLogFormat()) : null;
+            this.requestDecoder = new HttpRequestDecoder(NettyHttpServer.this,
+                    environment,
+                    serverConfiguration,
+                    httpRequestReceivedEventPublisher);
+            this.responseEncoder = new HttpResponseEncoder(
+                    nettyEmbeddedServices.getMediaTypeCodecRegistry(),
+                    serverConfiguration
+            );
+        }
 
         @Override
         protected void initChannel(SocketChannel ch) {
@@ -753,14 +861,16 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             int port = ch.localAddress().getPort();
             boolean ssl = sslContext != null && sslConfiguration != null && port == serverPort;
             if (ssl) {
-                pipeline.addLast(sslContext.newHandler(ch.alloc()));
+                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslContext.newHandler(ch.alloc()));
             }
 
             if (loggingHandler != null) {
                 pipeline.addLast(loggingHandler);
             }
 
-            if (httpVersion != io.micronaut.http.HttpVersion.HTTP_2_0) {
+            Http2OrHttpHandler http2OrHttpHandler = new Http2OrHttpHandler(sslContext != null, serverConfiguration.getFallbackProtocol(), accessLogHandler, requestDecoder, responseEncoder);
+
+            if (serverConfiguration.getHttpVersion() != io.micronaut.http.HttpVersion.HTTP_2_0) {
                 http2OrHttpHandler.configurePipeline(ApplicationProtocolNames.HTTP_1_1, pipeline);
             } else {
                 if (ssl) {
@@ -782,13 +892,16 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                                         pipelineListener.onConnect(p);
                                     }
                                     super.upgradeTo(ctx, upgradeRequest);
+                                    // HTTP1 request is on the implicit stream 1
+                                    upgradeRequest.headers().set(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), 1);
+                                    ctx.fireChannelRead(ReferenceCountUtil.retain(upgradeRequest));
                                 }
                             };
                         } else {
                             return null;
                         }
                     };
-                    final HttpServerCodec sourceCodec = new HttpServerCodec();
+                    final HttpServerCodec sourceCodec = http2OrHttpHandler.createServerCodec();
                     final HttpServerUpgradeHandler upgradeHandler = new HttpServerUpgradeHandler(
                             sourceCodec,
                             upgradeCodecFactory
@@ -811,13 +924,34 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                                 }
                             }
                             ChannelPipeline pipeline = ctx.pipeline();
-                            final HttpServerCodec upgradeCodec = pipeline.get(HttpServerCodec.class);
-                            pipeline.remove(upgradeCodec);
+
+                            // remove the handlers we don't need anymore
                             pipeline.remove(upgradeHandler);
                             pipeline.remove(this);
+
                             // reconfigure for http1
-                            http2OrHttpHandler.getHandlerForProtocol(ApplicationProtocolNames.HTTP_1_1)
-                                    .forEach(pipeline::addLast);
+                            // note: we have to reuse the serverCodec in case it still has some data buffered
+                            ChannelHandlerContext serverCodecContext = pipeline.context(HttpServerCodec.class);
+                            Iterator<Map.Entry<String, ChannelHandler>> newHandlers = http2OrHttpHandler
+                                    .getHandlerForProtocol(ApplicationProtocolNames.HTTP_1_1, (HttpServerCodec) serverCodecContext.handler())
+                                    .entrySet().iterator();
+                            // first, add the handlers before the serverCodec
+                            while (true) {
+                                if (!newHandlers.hasNext()) {
+                                    throw new AssertionError("getHandlerForProtocol(HTTP_1_1) should return the HttpServerCodec passed to it");
+                                }
+                                Map.Entry<String, ChannelHandler> entry = newHandlers.next();
+                                if (entry.getValue() == serverCodecContext.handler()) {
+                                    break;
+                                }
+                                pipeline.addBefore(serverCodecContext.name(), entry.getKey(), entry.getValue());
+                            }
+                            // now, the final handlers
+                            while (newHandlers.hasNext()) {
+                                Map.Entry<String, ChannelHandler> entry = newHandlers.next();
+                                pipeline.addLast(entry.getKey(), entry.getValue());
+                            }
+
                             for (ChannelPipelineListener pipelineListener : pipelineListeners) {
                                 pipelineListener.onConnect(pipeline);
                             }

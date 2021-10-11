@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,7 @@
  */
 package io.micronaut.web.router;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.HttpRequest;
@@ -34,13 +34,6 @@ import java.util.function.Predicate;
  * @since 1.0
  */
 public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, RouteInfo<R> {
-
-    /**
-     * The declaring type of the route.
-     *
-     * @return The declaring type
-     */
-    Class<?> getDeclaringType();
 
     /**
      * @return The variable values following a successful match.
@@ -105,6 +98,7 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Rout
     /**
      * @return The return type
      */
+    @Override
     ReturnType<? extends R> getReturnType();
 
     /**
@@ -133,7 +127,7 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Rout
      * {@link #execute()}
      */
     default boolean isExecutable() {
-        return getRequiredArguments().size() == 0;
+        return getRequiredArguments().isEmpty();
     }
 
     /**
@@ -181,14 +175,13 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Rout
     }
 
     /**
-     * Whether the specified content type is explicitly an accepted type.
+     * Whether the specified content type is explicitly a producing type.
      *
      * @param contentType The content type
      * @return True if it is
-     * @deprecated Use {@link #explicitlyConsumes(MediaType)} instead
+     * @since 2.5.0
      */
-    @Deprecated
-    default boolean explicitAccept(@Nullable MediaType contentType) {
+    default boolean explicitlyProduces(@Nullable MediaType contentType) {
         return false;
     }
 
@@ -203,15 +196,4 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Rout
         return val != null && !(val instanceof UnresolvedArgument);
     }
 
-    /**
-     * Whether the specified content type is an accepted type.
-     *
-     * @param contentType The content type
-     * @return True if it is
-     * @deprecated Use {@link #doesConsume(MediaType)} instead.
-     */
-    @Deprecated
-    default boolean accept(@Nullable MediaType contentType) {
-        return doesConsume(contentType);
-    }
 }

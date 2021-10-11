@@ -26,15 +26,14 @@ import io.micronaut.management.endpoint.annotation.Read
 //tag::mediaTypeImport[]
 import io.micronaut.http.MediaType
 import io.micronaut.management.endpoint.annotation.Selector
-
 //end::mediaTypeImport[]
 
 //tag::writeImport[]
 import io.micronaut.management.endpoint.annotation.Write
 //end::writeImport[]
 
-import javax.annotation.PostConstruct
-import java.util.*
+import jakarta.annotation.PostConstruct
+import java.util.Date
 
 //tag::endpointClassBegin[]
 @Endpoint(id = "date", prefix = "custom", defaultEnabled = true, defaultSensitive = false)

@@ -47,6 +47,13 @@ class UriBuilderSpec extends Specification {
         result.toString() == '/person/Fred%20Flintstone/features/age?q=hello+world#val'
 
         when:
+        builder.queryParam("a", "b")
+        result = builder.expand(name:"Fred Flintstone", feature:"age", hash: "val")
+
+        then:
+        result.toString() == '/person/Fred%20Flintstone/features/age?q=hello+world&a=b#val'
+
+        when:
         builder.host("myhost")
         builder.scheme("http")
         builder.port(9090)
@@ -54,8 +61,25 @@ class UriBuilderSpec extends Specification {
         result = builder.expand(name:"Fred Flintstone", feature:"age", hash: "val")
 
         then:
-        result.toString() == 'http://username:p%40s%24w0rd@myhost:9090/person/Fred%20Flintstone/features/age?q=hello+world#val'
+        result.toString() == 'http://username:p%40s%24w0rd@myhost:9090/person/Fred%20Flintstone/features/age?q=hello+world&a=b#val'
     }
+
+    void "test query param order"() {
+        Map<String, String> params = new LinkedHashMap<>()
+        params.put("t_param", "t_value")
+        params.put("s_param", "s_value")
+        params.put("a_param", "a_value")
+
+        UriBuilder uriBuilder = UriBuilder.of("/api").path("v1").path("secretendpoint");
+        for (String paramKey : params.keySet()) {
+            System.out.println(paramKey)
+            uriBuilder = uriBuilder.queryParam(paramKey, params.get(paramKey));
+        }
+
+        expect:
+        uriBuilder.build().toString() == "/api/v1/secretendpoint?t_param=t_value&s_param=s_value&a_param=a_value"
+    }
+
     void "test uri builder toString()"() {
         given:
         def builder = UriBuilder.of("")

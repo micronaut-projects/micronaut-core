@@ -15,12 +15,13 @@
  */
 package io.micronaut.docs.config.mapFormat
 
-import javax.inject.Inject
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 
 // tag::class[]
 @Singleton
 class EngineImpl : Engine {
+
     override val sensors: Map<*, *>?
         get() = config!!.sensors
 

@@ -37,6 +37,7 @@ class EngineImpl implements Engine {
         return cylinders
     }
 
+    @Override
     String start() {
         "${manufacturer} Engine Starting V${cylinders} [rodLength=${crankShaft.rodLength.orElse(6.0d)}, sparkPlug=${sparkPlug}]"
     }

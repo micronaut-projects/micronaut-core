@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,7 +21,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ConstructorInjectionPoint;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 
 /**
  * A {@link ConstructorInjectionPoint} that invokes a method without relying on reflection.
@@ -41,10 +41,10 @@ class DefaultMethodConstructorInjectionPoint<T> extends DefaultMethodInjectionPo
      * @param annotationMetadata The annotation metadata
      */
     DefaultMethodConstructorInjectionPoint(
-        BeanDefinition declaringBean,
+        BeanDefinition<T> declaringBean,
         Class<?> declaringType,
         String methodName,
-        @Nullable Argument[] arguments,
+        @Nullable Argument<?>[] arguments,
         @Nullable AnnotationMetadata annotationMetadata) {
         super(declaringBean, declaringType, methodName, arguments, annotationMetadata);
     }

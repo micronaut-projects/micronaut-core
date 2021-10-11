@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,10 +16,10 @@
 package io.micronaut.http.annotation;
 
 import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.context.annotation.Executable;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.filter.FilterPatternStyle;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -40,7 +40,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @Target(ElementType.TYPE)
-@Executable
 public @interface Filter {
 
     /**
@@ -52,6 +51,11 @@ public @interface Filter {
      * @return The patterns this filter should match
      */
     String[] value() default {};
+
+    /**
+     * @return The style of pattern this filter uses
+     */
+    FilterPatternStyle patternStyle() default FilterPatternStyle.ANT;
 
     /**
      * Same as {@link #value()}.

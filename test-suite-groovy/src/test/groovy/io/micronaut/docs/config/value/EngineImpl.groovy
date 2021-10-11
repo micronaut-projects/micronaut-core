@@ -15,10 +15,10 @@
  */
 package io.micronaut.docs.config.value
 
+// tag::imports[]
 import io.micronaut.context.annotation.Value
 
-// tag::imports[]
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 // end::imports[]
 
 // tag::class[]
@@ -30,11 +30,12 @@ class EngineImpl implements Engine {
 
     @Override
     int getCylinders() {
-        this.cylinders
+        cylinders
     }
 
+    @Override
     String start() { // <2>
-        "Starting V${cylinders} Engine"
+        "Starting V$cylinders Engine"
     }
 }
 // end::class[]

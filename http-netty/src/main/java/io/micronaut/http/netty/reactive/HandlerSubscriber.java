@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,24 +15,18 @@
  */
 package io.micronaut.http.netty.reactive;
 
-import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.CANCELLED;
-import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.COMPLETE;
-import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.INACTIVE;
-import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.NO_CONTEXT;
-import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.NO_SUBSCRIPTION;
-import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.NO_SUBSCRIPTION_OR_CONTEXT;
-import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.RUNNING;
-
 import io.micronaut.core.annotation.Internal;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPromise;
 import io.netty.util.concurrent.EventExecutor;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.*;
 
 /**
  * Subscriber that publishes received messages to the handler pipeline.
@@ -45,6 +39,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Internal
 public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscriber<T> {
 
+    protected ChannelFuture lastWriteFuture;
+
     private final EventExecutor executor;
     private final AtomicBoolean hasSubscription = new AtomicBoolean();
 
@@ -52,7 +48,6 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
     private volatile ChannelHandlerContext ctx;
 
     private State state = NO_SUBSCRIPTION_OR_CONTEXT;
-    private ChannelFuture lastWriteFuture;
 
     /**
      * Create a new handler subscriber with the default low and high watermarks.
@@ -173,10 +168,21 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
     @Override
     public void onNext(T t) {
         // Publish straight to the context.
-        lastWriteFuture = ctx.writeAndFlush(t);
-        lastWriteFuture.addListener((ChannelFutureListener) future -> {
-            maybeRequestMore();
-        });
+        onNext(t, ctx.newPromise());
+    }
+
+    /**
+     * Write the message with the supplied promise.
+     *
+     * @param t The message
+     * @param promise The promise
+     */
+    protected void onNext(T t, ChannelPromise promise) {
+        // Publish straight to the context.
+        lastWriteFuture = ctx.writeAndFlush(t, promise);
+        lastWriteFuture.addListener(future ->
+                maybeRequestMore()
+        );
     }
 
     @Override
@@ -192,7 +198,7 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
         if (lastWriteFuture == null) {
             complete();
         } else {
-            lastWriteFuture.addListener((ChannelFutureListener) channelFuture -> complete());
+            lastWriteFuture.addListener(channelFuture -> complete());
         }
     }
 

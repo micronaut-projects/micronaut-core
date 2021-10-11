@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,7 @@
 package io.micronaut.management.health.indicator.jdbc;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.health.HealthStatus;
@@ -25,14 +26,13 @@ import io.micronaut.management.health.aggregator.HealthAggregator;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
 import io.micronaut.scheduling.TaskExecutors;
-import io.reactivex.Flowable;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
-import javax.annotation.Nullable;
-import javax.inject.Inject;
-import javax.inject.Named;
-import javax.inject.Singleton;
 import javax.sql.DataSource;
+import java.net.URI;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.SQLException;
@@ -71,7 +71,6 @@ public class JdbcIndicator implements HealthIndicator {
      * @param dataSourceResolver The data source resolver
      * @param healthAggregator   The health aggregator
      */
-    @Inject
     public JdbcIndicator(@Named(TaskExecutors.IO) ExecutorService executorService,
                          DataSource[] dataSources,
                          @Nullable DataSourceResolver dataSourceResolver,
@@ -103,7 +102,14 @@ public class JdbcIndicator implements HealthIndicator {
             } catch (SQLException e) {
                 throwable = Optional.of(e);
                 try {
-                    key = dataSource.getClass().getMethod("getUrl").invoke(dataSource).toString();
+                    String url = dataSource.getClass().getMethod("getUrl").invoke(dataSource).toString();
+                    if (url.startsWith("jdbc:")) {
+                        url = url.substring(5);
+                    }
+                    url = url.replaceFirst(";", "?");
+                    url = url.replaceAll(";", "&");
+                    URI uri = new URI(url);
+                    key = uri.getHost() + ":" + uri.getPort() + uri.getPath();
                 } catch (Exception n) {
                     key = dataSource.getClass().getName() + "@" + Integer.toHexString(dataSource.hashCode());
                 }
@@ -124,9 +130,9 @@ public class JdbcIndicator implements HealthIndicator {
     @Override
     public Publisher<HealthResult> getResult() {
         if (dataSources.length == 0) {
-            return Flowable.empty();
+            return Flux.empty();
         }
-        return healthAggregator.aggregate(NAME, Flowable.merge(
+        return healthAggregator.aggregate(NAME, Flux.merge(
             Arrays.stream(dataSources)
                     .map(dataSourceResolver::resolve)
                     .map(this::getResult).collect(Collectors.toList())

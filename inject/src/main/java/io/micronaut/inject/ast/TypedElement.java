@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.ast;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * An element that has an underlying type.
@@ -60,6 +60,15 @@ public interface TypedElement extends Element {
      * @return True if it is.
      */
     default boolean isArray() {
-        return false;
+        return getArrayDimensions() != 0;
+    }
+
+    /**
+     * If the type is an array, the number of dimensions.
+     * String[] should return 1, String[][] should return 2
+     * @return The number of dimensions
+     */
+    default int getArrayDimensions() {
+        return 0;
     }
 }

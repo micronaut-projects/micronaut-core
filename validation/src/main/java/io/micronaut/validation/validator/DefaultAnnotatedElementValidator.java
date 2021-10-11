@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,7 @@
 package io.micronaut.validation.validator;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.reflect.GenericTypeUtils;
@@ -25,7 +26,6 @@ import io.micronaut.inject.qualifiers.TypeArgumentQualifier;
 import io.micronaut.validation.validator.constraints.ConstraintValidator;
 import io.micronaut.validation.validator.constraints.DefaultConstraintValidators;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -42,7 +42,6 @@ import java.util.Optional;
 @Internal
 public class DefaultAnnotatedElementValidator extends DefaultValidator implements AnnotatedElementValidator {
 
-
     /**
      * Default constructor.
      */
@@ -54,7 +53,7 @@ public class DefaultAnnotatedElementValidator extends DefaultValidator implement
     /**
      * Local constraint validator lookup using service loader.
      */
-    private static class LocalConstraintValidators extends DefaultConstraintValidators {
+    private static final class LocalConstraintValidators extends DefaultConstraintValidators {
 
         private Map<ValidatorKey, ConstraintValidator> validatorMap;
 

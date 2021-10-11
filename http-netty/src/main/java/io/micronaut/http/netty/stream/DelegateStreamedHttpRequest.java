@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,19 +32,26 @@ import org.reactivestreams.Subscriber;
 @Internal
 final class DelegateStreamedHttpRequest extends DelegateHttpRequest implements StreamedHttpRequest {
 
-    private final Publisher<HttpContent> stream;
+    private final Publisher<? extends HttpContent> stream;
+    private boolean consumed;
 
     /**
      * @param request The Http request
      * @param stream  The publisher
      */
-    DelegateStreamedHttpRequest(HttpRequest request, Publisher<HttpContent> stream) {
+    DelegateStreamedHttpRequest(HttpRequest request, Publisher<? extends HttpContent> stream) {
         super(request);
         this.stream = stream;
     }
 
     @Override
+    public boolean isConsumed() {
+        return this.consumed;
+    }
+
+    @Override
     public void subscribe(Subscriber<? super HttpContent> subscriber) {
+        consumed = true;
         stream.subscribe(subscriber);
     }
 

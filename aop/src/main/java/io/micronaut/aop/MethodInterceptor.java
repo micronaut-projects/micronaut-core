@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 package io.micronaut.aop;
+
+import io.micronaut.core.annotation.Nullable;
 
 /**
  * A MethodInterceptor extends the generic {@link Interceptor} and provides an interface more specific to method interception.
@@ -32,8 +34,10 @@ public interface MethodInterceptor<T, R> extends Interceptor<T, R> {
      * @param context The context
      * @return The result
      */
+    @Nullable
     R intercept(MethodInvocationContext<T, R> context);
 
+    @Nullable
     @Override
     default R intercept(InvocationContext<T, R> context) {
         if (context instanceof MethodInvocationContext) {

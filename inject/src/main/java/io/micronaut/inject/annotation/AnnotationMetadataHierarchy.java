@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,18 +16,17 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.value.OptionalValues;
-import org.jetbrains.annotations.NotNull;
-
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -84,20 +83,30 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     }
 
     @Override
-    public Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name) {
-        for (AnnotationMetadata metadata : hierarchy) {
-            final Optional<Class<? extends Annotation>> annotationType = metadata.getAnnotationType(name);
-            if (annotationType.isPresent()) {
-                return annotationType;
+    public boolean hasPropertyExpressions() {
+        for (AnnotationMetadata annotationMetadata : hierarchy) {
+            if (annotationMetadata.hasPropertyExpressions()) {
+                return true;
             }
         }
-        return Optional.empty();
+        return false;
+    }
+
+    @Override
+    public Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name) {
+        return getAnnotationType((metadata) -> metadata.getAnnotationType(name));
+    }
+
+    @Override
+    public Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name, @NonNull ClassLoader classLoader) {
+        return getAnnotationType((metadata) -> metadata.getAnnotationType(name, classLoader));
     }
 
     /**
      * @return The metadata that is actually declared in the element
      */
     @NonNull
+    @Override
     public AnnotationMetadata getDeclaredMetadata() {
         return hierarchy[0];
     }
@@ -122,6 +131,59 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         } else {
             return child;
         }
+    }
+
+    @Nullable
+    @Override
+    public <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+        for (AnnotationMetadata annotationMetadata : hierarchy) {
+            final T a = annotationMetadata.synthesize(annotationClass, sourceAnnotation);
+            if (a != null) {
+                return a;
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public Annotation[] synthesizeAll() {
+        return Stream.of(hierarchy).flatMap(am -> Arrays.stream(am.synthesizeAll())).toArray(Annotation[]::new);
+    }
+
+    @Override
+    public Annotation[] synthesizeDeclared() {
+        return Stream.of(hierarchy).flatMap(am -> Arrays.stream(am.synthesizeDeclared())).toArray(Annotation[]::new);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T extends Annotation> T[] synthesizeAnnotationsByType(Class<T> annotationClass) {
+        if (annotationClass == null) {
+            return (T[]) AnnotationUtil.ZERO_ANNOTATIONS;
+        }
+        return Stream.of(hierarchy)
+                .flatMap(am -> am.getAnnotationValuesByType(annotationClass).stream())
+                .distinct()
+                .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, entries))
+                        .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(Class<T> annotationClass) {
+        if (annotationClass == null) {
+            return (T[]) AnnotationUtil.ZERO_ANNOTATIONS;
+        }
+        return Stream.of(hierarchy)
+                .flatMap(am -> am.getAnnotationValuesByType(annotationClass).stream())
+                .distinct()
+                .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, entries))
+                .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
+    }
+
+    @Nullable
+    @Override
+    public <T extends Annotation> T synthesizeDeclared(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+        return hierarchy[0].synthesize(annotationClass, sourceAnnotation);
     }
 
     @Nullable
@@ -159,7 +221,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
                     for (Map.Entry<CharSequence, Object> entry : values.entrySet()) {
                         newValues.putIfAbsent(entry.getKey(), entry.getValue());
                     }
-                    ann = new AnnotationValue<>(annotation, newValues);
+                    ann = new AnnotationValue<>(annotation, newValues, AnnotationMetadataSupport.getDefaultValues(annotation));
                 }
             }
         }
@@ -187,6 +249,12 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @NonNull
     @Override
     public String[] stringValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
+        return stringValues(annotation.getName(), member);
+    }
+
+    @NonNull
+    @Override
+    public String[] stringValues(@NonNull String annotation, @NonNull String member) {
         String[] values = hierarchy[0].stringValues(annotation, member);
         for (int i = 1; i < hierarchy.length; i++) {
             AnnotationMetadata annotationMetadata = hierarchy[i];
@@ -211,7 +279,12 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     @Override
     public boolean isTrue(@NonNull String annotation, @NonNull String member) {
-        return Arrays.stream(hierarchy).anyMatch(am -> am.isTrue(annotation, member));
+        for (AnnotationMetadata am : hierarchy) {
+            if (am.isTrue(annotation, member)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -274,10 +347,11 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @NonNull
     @Override
     public <T> Class<T>[] classValues(@NonNull String annotation, @NonNull String member) {
-        final Class[] classes = Arrays.stream(hierarchy)
-                .flatMap(am -> Stream.of(am.classValues(annotation, member)))
-                .toArray(Class[]::new);
-        return (Class<T>[]) classes;
+        List<Class<T>> list = new ArrayList<>();
+        for (AnnotationMetadata am : hierarchy) {
+            list.addAll(Arrays.asList(am.classValues(annotation, member)));
+        }
+        return ArrayUtils.toArray(list, Class[]::new);
     }
 
     @Override
@@ -294,9 +368,11 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @NonNull
     @Override
     public List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
-        return Arrays.stream(hierarchy)
-                .flatMap(am -> am.getAnnotationNamesByStereotype(stereotype).stream())
-                .collect(Collectors.toList());
+        List<String> list = new ArrayList<>();
+        for (AnnotationMetadata am : hierarchy) {
+            list.addAll(am.getAnnotationNamesByStereotype(stereotype));
+        }
+        return list;
     }
 
     @NonNull
@@ -308,9 +384,11 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @NonNull
     @Override
     public Set<String> getAnnotationNames() {
-        return Arrays.stream(hierarchy)
-                .flatMap(am -> am.getAnnotationNames().stream())
-                .collect(Collectors.toSet());
+        Set<String> set = new HashSet<>();
+        for (AnnotationMetadata am : hierarchy) {
+            set.addAll(am.getAnnotationNames());
+        }
+        return set;
     }
 
     @NonNull
@@ -339,10 +417,16 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @NonNull
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(@NonNull Class<T> annotationType) {
-        return Arrays.stream(hierarchy)
-                .flatMap(am -> am.getDeclaredAnnotationValuesByType(annotationType).stream())
-                .distinct()
-                .collect(Collectors.toList());
+        List<AnnotationValue<T>> list = new ArrayList<>();
+        Set<AnnotationValue<T>> uniqueValues = new HashSet<>();
+        for (AnnotationMetadata am : hierarchy) {
+            for (AnnotationValue<T> tAnnotationValue : am.getAnnotationValuesByType(annotationType)) {
+                if (uniqueValues.add(tAnnotationValue)) {
+                    list.add(tAnnotationValue);
+                }
+            }
+        }
+        return list;
     }
 
     @NonNull
@@ -379,6 +463,26 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @Override
     public boolean hasDeclaredStereotype(@Nullable String annotation) {
         return hierarchy[0].hasDeclaredStereotype(annotation);
+    }
+
+    @Override
+    public <E extends Enum> Optional<E> enumValue(String annotation, String member, Class<E> enumType) {
+        return enumValue(annotation, member, enumType, null);
+    }
+
+    @Override
+    public <E extends Enum> E[] enumValues(String annotation, String member, Class<E> enumType) {
+        return enumValues(annotation, member, enumType, null);
+    }
+
+    @Override
+    public OptionalInt intValue(Class<? extends Annotation> annotation, String member) {
+        return intValue(annotation, member, null);
+    }
+
+    @Override
+    public boolean isFalse(Class<? extends Annotation> annotation, String member) {
+        return !booleanValue(annotation, member, null).orElse(false);
     }
 
     @NonNull
@@ -585,6 +689,55 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     }
 
     @Override
+    public OptionalLong longValue(Class<? extends Annotation> annotation, String member) {
+        return longValue(annotation, member, null);
+    }
+
+    @Override
+    public <E extends Enum> E[] enumValues(Class<? extends Annotation> annotation, String member, Class<E> enumType) {
+        return enumValues(annotation, member, enumType, null);
+    }
+
+    @Override
+    public <T> Class<T>[] classValues(Class<? extends Annotation> annotation, String member) {
+        List<Class<T>> list = new ArrayList<>();
+        for (AnnotationMetadata am : hierarchy) {
+            list.addAll(Arrays.asList(am.classValues(annotation, member)));
+        }
+        return ArrayUtils.toArray(list, Class[]::new);
+    }
+
+    @Override
+    public Optional<Class> classValue(Class<? extends Annotation> annotation, String member) {
+        return classValue(annotation, member, null);
+    }
+
+    @Override
+    public Optional<String> stringValue(Class<? extends Annotation> annotation, String member) {
+        return stringValue(annotation, member, null);
+    }
+
+    @Override
+    public Optional<Boolean> booleanValue(Class<? extends Annotation> annotation, String member) {
+        return booleanValue(annotation, member, null);
+    }
+
+    @Override
+    public boolean isTrue(Class<? extends Annotation> annotation, String member) {
+        return isTrue(annotation, member, null);
+    }
+
+    @Override
+    public boolean isPresent(Class<? extends Annotation> annotation, String member) {
+        for (AnnotationMetadata annotationMetadata : hierarchy) {
+            if (annotationMetadata.isPresent(annotation, member)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
     public Optional<String> stringValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Function<Object, Object> valueMapper) {
         for (AnnotationMetadata annotationMetadata : hierarchy) {
             final Optional<String> o;
@@ -603,14 +756,28 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @NonNull
     @Override
     public String[] stringValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Function<Object, Object> valueMapper) {
-        return Arrays.stream(hierarchy)
-                .flatMap(am -> {
-                    if (am instanceof EnvironmentAnnotationMetadata) {
-                        return Stream.of(((EnvironmentAnnotationMetadata) am).stringValues(annotation, member, valueMapper));
-                    }
-                    return Stream.of(am.stringValues(annotation, member));
-                })
-                .toArray(String[]::new);
+        List<String> strings = new ArrayList<>();
+        for (AnnotationMetadata am : hierarchy) {
+            if (am instanceof EnvironmentAnnotationMetadata) {
+                strings.addAll(Arrays.asList(((EnvironmentAnnotationMetadata) am).stringValues(annotation, member, valueMapper)));
+            } else {
+                strings.addAll(Arrays.asList(am.stringValues(annotation, member)));
+            }
+        }
+        return ArrayUtils.toArray(strings, String[]::new);
+    }
+
+    @Override
+    public String[] stringValues(String annotation, String member, Function<Object, Object> valueMapper) {
+        List<String> strings = new ArrayList<>();
+        for (AnnotationMetadata am : hierarchy) {
+            if (am instanceof EnvironmentAnnotationMetadata) {
+                strings.addAll(Arrays.asList(((EnvironmentAnnotationMetadata) am).stringValues(annotation, member, valueMapper)));
+            } else {
+                strings.addAll(Arrays.asList(am.stringValues(annotation, member)));
+            }
+        }
+        return ArrayUtils.toArray(strings, String[]::new);
     }
 
     @NonNull
@@ -690,9 +857,71 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         return Optional.empty();
     }
 
-    @NotNull
+    @NonNull
     @Override
     public Iterator<AnnotationMetadata> iterator() {
         return ArrayUtils.reverseIterator(hierarchy);
+    }
+
+    private Optional<Class<? extends Annotation>> getAnnotationType(Function<AnnotationMetadata, Optional<Class<? extends Annotation>>> annotationTypeSupplier) {
+        for (AnnotationMetadata metadata : hierarchy) {
+            final Optional<Class<? extends Annotation>> annotationType = annotationTypeSupplier.apply(metadata);
+            if (annotationType.isPresent()) {
+                return annotationType;
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public boolean isEmpty() {
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (!metadata.isEmpty()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public boolean isRepeatableAnnotation(Class<? extends Annotation> annotation) {
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (metadata.isRepeatableAnnotation(annotation)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isRepeatableAnnotation(String annotation) {
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (metadata.isRepeatableAnnotation(annotation)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public Optional<String> findRepeatableAnnotation(Class<? extends Annotation> annotation) {
+        for (AnnotationMetadata metadata : hierarchy) {
+            Optional<String> repeatable = metadata.findRepeatableAnnotation(annotation);
+            if (repeatable.isPresent()) {
+                return repeatable;
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<String> findRepeatableAnnotation(String annotation) {
+        for (AnnotationMetadata metadata : hierarchy) {
+            Optional<String> repeatable = metadata.findRepeatableAnnotation(annotation);
+            if (repeatable.isPresent()) {
+                return repeatable;
+            }
+        }
+        return Optional.empty();
     }
 }

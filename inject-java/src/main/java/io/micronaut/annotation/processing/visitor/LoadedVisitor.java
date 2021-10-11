@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,10 +20,9 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.GenericTypeUtils;
-import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.*;
 import javax.lang.model.type.TypeMirror;
@@ -40,36 +39,60 @@ import java.util.List;
 @Internal
 public class LoadedVisitor implements Ordered {
 
+    private static final String OBJECT_CLASS = Object.class.getName();
+
     private final TypeElementVisitor visitor;
     private final String classAnnotation;
     private final String elementAnnotation;
     private final JavaVisitorContext visitorContext;
+    private final JavaElementFactory elementFactory;
     private JavaClassElement rootClassElement;
 
     /**
      * @param visitor               The {@link TypeElementVisitor}
      * @param visitorContext        The visitor context
      * @param genericUtils          The generic utils
-     * @param processingEnvironment The {@link ProcessEnvironment}
+     * @param processingEnvironment The {@link ProcessingEnvironment}
      */
     public LoadedVisitor(TypeElementVisitor visitor,
                          JavaVisitorContext visitorContext,
                          GenericUtils genericUtils,
                          ProcessingEnvironment processingEnvironment) {
         this.visitorContext = visitorContext;
+        this.elementFactory = visitorContext.getElementFactory();
         this.visitor = visitor;
         Class<? extends TypeElementVisitor> aClass = visitor.getClass();
 
         TypeElement typeElement = processingEnvironment.getElementUtils().getTypeElement(aClass.getName());
         if (typeElement != null) {
             List<? extends TypeMirror> generics = genericUtils.interfaceGenericTypesFor(typeElement, TypeElementVisitor.class.getName());
-            classAnnotation = generics.get(0).toString();
-            elementAnnotation = generics.get(1).toString();
+            String typeName = generics.get(0).toString();
+            if (typeName.equals(OBJECT_CLASS)) {
+                classAnnotation = visitor.getClassType();
+            } else {
+                classAnnotation = typeName;
+            }
+            String elementName = generics.get(1).toString();
+            if (elementName.equals(OBJECT_CLASS)) {
+                elementAnnotation = visitor.getElementType();
+            } else {
+                elementAnnotation = elementName;
+            }
         } else {
             Class[] classes = GenericTypeUtils.resolveInterfaceTypeArguments(aClass, TypeElementVisitor.class);
             if (classes != null && classes.length == 2) {
-                classAnnotation = classes[0].getName();
-                elementAnnotation = classes[1].getName();
+                Class classGeneric = classes[0];
+                if (classGeneric == Object.class) {
+                    classAnnotation = visitor.getClassType();
+                } else {
+                    classAnnotation = classGeneric.getName();
+                }
+                Class elementGeneric = classes[1];
+                if (elementGeneric == Object.class) {
+                    elementAnnotation = visitor.getElementType();
+                } else {
+                    elementAnnotation = elementGeneric.getName();
+                }
             } else {
                 classAnnotation = Object.class.getName();
                 elementAnnotation = Object.class.getName();
@@ -124,10 +147,7 @@ public class LoadedVisitor implements Ordered {
     public @Nullable io.micronaut.inject.ast.Element visit(
             Element element, AnnotationMetadata annotationMetadata) {
         if (element instanceof VariableElement) {
-            final JavaFieldElement e = new JavaFieldElement(
-                    (VariableElement) element,
-                    annotationMetadata,
-                    visitorContext);
+            final JavaFieldElement e = elementFactory.newFieldElement(rootClassElement, (VariableElement) element, annotationMetadata);
             visitor.visitField(
                     e,
                     visitorContext
@@ -138,21 +158,14 @@ public class LoadedVisitor implements Ordered {
             if (rootClassElement != null) {
 
                 if (executableElement.getSimpleName().toString().equals("<init>")) {
-                    final JavaConstructorElement e = new JavaConstructorElement(
-                            rootClassElement,
-                            executableElement,
-                            annotationMetadata,
-                            visitorContext);
+                    final JavaConstructorElement e = elementFactory.newConstructorElement(rootClassElement, executableElement, annotationMetadata);
                     visitor.visitConstructor(
                             e,
                             visitorContext
                     );
                     return e;
                 } else {
-                    final JavaMethodElement e = new JavaMethodElement(
-                            rootClassElement,
-                            executableElement,
-                            annotationMetadata, visitorContext);
+                    final JavaMethodElement e = elementFactory.newSourceMethodElement(rootClassElement, executableElement, annotationMetadata);
                     visitor.visitMethod(
                             e,
                             visitorContext
@@ -162,28 +175,12 @@ public class LoadedVisitor implements Ordered {
             }
         } else if (element instanceof TypeElement) {
             TypeElement typeElement = (TypeElement) element;
-            boolean isEnum = JavaModelUtils.resolveKind(typeElement, ElementKind.ENUM).isPresent();
-            if (isEnum) {
-                this.rootClassElement = new JavaEnumElement(
-                        typeElement,
-                        annotationMetadata,
-                        visitorContext);
-                visitor.visitClass(
-                        rootClassElement,
-                        visitorContext
-                );
-                return rootClassElement;
-            } else {
-                this.rootClassElement =  new JavaClassElement(
-                        typeElement,
-                        annotationMetadata,
-                        visitorContext);
-                visitor.visitClass(
-                        rootClassElement,
-                        visitorContext
-                );
-                return rootClassElement;
-            }
+            this.rootClassElement = elementFactory.newSourceClassElement(typeElement, annotationMetadata);
+            visitor.visitClass(
+                    rootClassElement,
+                    visitorContext
+            );
+            return rootClassElement;
         }
         return null;
     }

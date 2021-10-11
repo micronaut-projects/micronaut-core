@@ -16,32 +16,59 @@
 package io.micronaut.docs.server.upload
 
 // tag::class[]
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.MediaType
+import io.micronaut.http.HttpStatus.CONFLICT
+import io.micronaut.http.MediaType.MULTIPART_FORM_DATA
+import io.micronaut.http.MediaType.TEXT_PLAIN
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.multipart.StreamingFileUpload
-import io.reactivex.Single
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Mono
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.OutputStream
 
 @Controller("/upload")
 class UploadController {
 
-    @Post(value = "/", consumes = [MediaType.MULTIPART_FORM_DATA], produces = [MediaType.TEXT_PLAIN]) // <1>
-    fun upload(file: StreamingFileUpload): Single<HttpResponse<String>> { // <2>
+    // tag::file[]
+    @Post(value = "/", consumes = [MULTIPART_FORM_DATA], produces = [TEXT_PLAIN]) // <1>
+    fun upload(file: StreamingFileUpload): Mono<HttpResponse<String>> { // <2>
+
         val tempFile = File.createTempFile(file.filename, "temp")
         val uploadPublisher = file.transferTo(tempFile) // <3>
-        return Single.fromPublisher(uploadPublisher)  // <4>
-                .map { success ->
-                    if (success) {
-                        HttpResponse.ok("Uploaded")
-                    } else {
-                        HttpResponse.status<String>(HttpStatus.CONFLICT)
-                                .body("Upload Failed")
-                    }
-                }
-    }
 
+        return Mono.from(uploadPublisher)  // <4>
+            .map { success ->
+                if (success) {
+                    HttpResponse.ok("Uploaded")
+                } else {
+                    HttpResponse.status<String>(CONFLICT)
+                        .body("Upload Failed")
+                }
+            }
+    }
+    // end::file[]
+
+    // tag::outputStream[]
+    @Post(value = "/outputStream", consumes = [MULTIPART_FORM_DATA], produces = [TEXT_PLAIN]) // <1>
+    @SingleResult
+    fun uploadOutputStream(file: StreamingFileUpload): Mono<HttpResponse<String>> { // <2>
+        val outputStream  = ByteArrayOutputStream() // <3>
+        val uploadPublisher = file.transferTo(outputStream) // <4>
+
+        return Mono.from(uploadPublisher) // <5>
+            .map { success: Boolean ->
+                return@map if (success) {
+                    HttpResponse.ok("Uploaded")
+                } else {
+                    HttpResponse.status<String>(CONFLICT)
+                        .body("Upload Failed")
+                }
+            }
+    }
+    // end::outputStream[]
 }
 // end::class[]

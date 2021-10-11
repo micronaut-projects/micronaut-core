@@ -1,7 +1,18 @@
+plugins {
+    id "org.jetbrains.kotlin.jvm"
+}
+
 ext {
     shadowJarEnabled = true
 }
 dependencies {
     api project(':inject')
     api project(':core')
+    compileOnly project(':core-reactive')
+    compileOnly libs.kotlinx.coroutines.core
+}
+
+compileKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+    kotlinOptions.languageVersion = "1.3"
 }

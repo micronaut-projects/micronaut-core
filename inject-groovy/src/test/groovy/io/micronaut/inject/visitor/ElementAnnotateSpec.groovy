@@ -1,8 +1,7 @@
 package io.micronaut.inject.visitor
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.TypeElementVisitorStart
-import io.micronaut.ast.groovy.TypeElementVisitorTransform
 import io.micronaut.core.annotation.AnnotationValueBuilder
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.inject.BeanDefinition
@@ -25,8 +24,8 @@ class ElementAnnotateSpec extends AbstractBeanDefinitionSpec{
 
     void "test annotate introduction advice"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyInterface' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
-package test;
+        BeanDefinition beanDefinition = buildBeanDefinition('elemann1.MyInterface' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package elemann1;
 
 import io.micronaut.context.annotation.*;
 import java.net.*;
@@ -51,10 +50,10 @@ interface MyInterface{
 
     void "test that elements can be dynamically annotated at compilation time"() {
         given:
-        def definition = buildBeanDefinition('test.TestListener', '''
-package test;
+        def definition = buildBeanDefinition('elemann2.TestListener', '''
+package elemann2;
 import io.micronaut.context.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 class TestListener {
@@ -74,8 +73,8 @@ class TestListener {
 
     void "test annotation bean introspection properties"() {
         given:
-        def introspection = buildBeanIntrospection('test.Test', '''
-package test;
+        def introspection = buildBeanIntrospection('elemann3.Test', '''
+package elemann3;
 
 import io.micronaut.core.annotation.Introspected;
 
@@ -100,8 +99,8 @@ class Test {
 
     void "test annotation groovy bean introspection properties"() {
         given:
-        def introspection = buildBeanIntrospection('test.Test', '''
-package test;
+        def introspection = buildBeanIntrospection('elemann4.Test', '''
+package elemann4;
 
 import io.micronaut.core.annotation.Introspected;
 

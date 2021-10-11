@@ -18,11 +18,8 @@ package io.micronaut.docs.requires
 import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import javax.sql.DataSource
-import java.sql.Connection
-import java.sql.PreparedStatement
-import java.sql.ResultSet
 import java.sql.SQLException
 
 // tag::requires[]
@@ -41,7 +38,7 @@ class JdbcBookService(internal var dataSource: DataSource) : BookService {
                     return Book(rs.getString("title"))
                 }
             }
-        } catch (ex: SQLException) {
+        } catch (ignored: SQLException) {
             return null
         }
 

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,14 +20,13 @@ import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.ApplicationContextProvider;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.inject.ExecutableMethod;
+import jakarta.annotation.PreDestroy;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
-
-import javax.annotation.PreDestroy;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Optional;
@@ -40,7 +39,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-class AbstractExecutor<C> implements ApplicationContextProvider, Closeable, AutoCloseable  {
+public class AbstractExecutor<C> implements ApplicationContextProvider, Closeable, AutoCloseable  {
 
     /**
      * The current {@link ApplicationContext}.
@@ -107,7 +106,7 @@ class AbstractExecutor<C> implements ApplicationContextProvider, Closeable, Auto
      * @return The {@link ApplicationContextBuilder}
      */
     protected @NonNull ApplicationContextBuilder newApplicationContextBuilder() {
-        return ApplicationContext.build(Environment.FUNCTION);
+        return ApplicationContext.builder(Environment.FUNCTION);
     }
 
     /**

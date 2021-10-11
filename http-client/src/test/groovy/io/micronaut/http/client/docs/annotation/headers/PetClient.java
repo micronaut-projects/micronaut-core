@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,12 +15,14 @@
  */
 package io.micronaut.http.client.docs.annotation.headers;
 
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Header;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.docs.annotation.Pet;
 import io.micronaut.http.client.docs.annotation.PetOperations;
-import io.reactivex.Single;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
 
 /**
  * @author graemerocher
@@ -32,9 +34,10 @@ import io.reactivex.Single;
 public interface PetClient extends PetOperations {
 
     @Override
-    Single<Pet> save(String name, int age);
+    Publisher<Pet> save(String name, int age);
 
     @Get("/{name}")
-    Single<Pet> get(String name);
+    @SingleResult
+    Publisher<Pet> get(String name);
 }
 // end::class[]

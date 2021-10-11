@@ -15,10 +15,11 @@
  */
 package io.micronaut.aop.factory
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.reflect.ReflectionUtils
-import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
+import io.micronaut.inject.writer.BeanDefinitionWriter
 import org.hibernate.Session
 import org.hibernate.SessionFactory
 
@@ -26,7 +27,7 @@ class SessionProxySpec extends AbstractTypeElementSpec {
 
     void "test create session proxy"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.$AbstractBean$CurrentSession0Definition' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+        BeanDefinition beanDefinition = buildBeanDefinition('test.$AbstractBean$CurrentSession0' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.introduction.*;
@@ -67,7 +68,7 @@ class AbstractBean {
 
     void "test create session factory proxy"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.$AbstractBean$SessionFactory0Definition' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+        BeanDefinition beanDefinition = buildBeanDefinition('test.$AbstractBean$SessionFactory0' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.introduction.*;

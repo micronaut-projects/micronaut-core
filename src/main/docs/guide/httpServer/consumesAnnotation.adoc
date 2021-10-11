@@ -1,23 +1,23 @@
-A Micronaut's controller action consumes `application/json` by default. Consuming other content types is supported with the `@Consumes` annotation, or the `consumes` member of any HTTP method annotation.
+A Micronaut controller action consumes `application/json` by default. Consuming other content types is supported with the `@Consumes` annotation, or the `consumes` member of any HTTP method annotation.
 
 snippet::io.micronaut.docs.server.consumes.ConsumesController[tags="imports,clazz", indent=0]
 
-<1> By default, a controller's action consumes request with `Content-Type` of type `application/json`.
-<2> `@Consumes` annotation takes a `String[]` of supported media types for an incoming request.
-<3> The consumes can also be specified with the `consumes` member of the method annotation.
+<1> By default, a controller action consumes request with `Content-Type` of type `application/json`.
+<2> The `@Consumes` annotation takes a `String[]` of supported media types for an incoming request.
+<3> Content types can also be specified with the `consumes` member of the method annotation.
 
 === Customizing Processed Content Types
 
-Normally the JSON parsing only happens if the content type is `application/json`. The other api:io.micronaut.http.codec.MediaTypeCodec[] classes behave in a similar manner that they have pre-defined content types they can process. To extend the list of media types that a given codec should process, you can provide configuration that will be stored in api:io.micronaut.http.codec.CodecConfiguration[]:
+Normally JSON parsing only happens if the content type is `application/json`. The other api:io.micronaut.http.codec.MediaTypeCodec[] classes behave similarly in that they have predefined content types they can process. To extend the list of media types that a given codec processes, provide configuration that will be stored in api:io.micronaut.http.codec.CodecConfiguration[]:
 
 [source,yaml]
 ----
 micronaut:
-    codec:
-        json:
-            additionalTypes:
-              - text/javascript
-              - ...
+  codec:
+    json:
+      additionalTypes:
+        - text/javascript
+        - ...
 ----
 
-Currently supported configuration prefixes are `json`, `json-stream`, `text`, and `text-stream`.
+The currently supported configuration prefixes are `json`, `json-stream`, `text`, and `text-stream`.

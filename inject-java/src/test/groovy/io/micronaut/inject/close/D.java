@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,15 +17,16 @@ package io.micronaut.inject.close;
 
 import io.micronaut.context.annotation.Requires;
 
-import javax.annotation.PreDestroy;
-import javax.inject.Singleton;
+import jakarta.annotation.PreDestroy;
+import jakarta.inject.Singleton;
 import java.io.IOException;
+import java.util.List;
 
 @Requires(property = "spec.name", value = "BeanCloseOrderSpec")
 @Singleton
 public class D implements AutoCloseable {
 
-    public D() {}
+    public D(List<E> eList) {}
 
     @PreDestroy
     @Override

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.writer;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.Element;
 
@@ -40,11 +40,17 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
      * @param targetDir The target directory
      */
     public DirectoryClassWriterOutputVisitor(File targetDir) {
+        super(true);
         this.targetDir = targetDir;
     }
 
     @Override
     public OutputStream visitClass(String classname, @Nullable Element originatingElement) throws IOException {
+        return visitClass(classname, new Element[]{ originatingElement });
+    }
+
+    @Override
+    public OutputStream visitClass(String classname, Element... originatingElements) throws IOException {
         File targetFile = new File(targetDir, getClassFileName(classname)).getCanonicalFile();
         File parentDir = targetFile.getParentFile();
         if (!parentDir.exists() && !parentDir.mkdirs()) {
@@ -54,7 +60,7 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
     }
 
     @Override
-    public Optional<GeneratedFile> visitMetaInfFile(String path) {
+    public Optional<GeneratedFile> visitMetaInfFile(String path, Element... originatingElements) {
         return Optional.ofNullable(targetDir).map(root ->
             new FileBackedGeneratedFile(
                 new File(root, "META-INF" + File.separator + path)

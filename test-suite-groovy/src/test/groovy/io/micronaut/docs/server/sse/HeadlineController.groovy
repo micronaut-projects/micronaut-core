@@ -15,19 +15,15 @@
  */
 package io.micronaut.docs.server.sse
 
-import io.micronaut.http.MediaType
-
 // tag::imports[]
+import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.sse.Event
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
-import io.reactivex.Emitter
-import io.reactivex.Flowable
-import io.reactivex.functions.BiFunction
 import org.reactivestreams.Publisher
-
+import reactor.core.publisher.Flux
 // end::imports[]
 
 /**
@@ -42,20 +38,16 @@ class HeadlineController {
     @Get(produces = MediaType.TEXT_EVENT_STREAM)
     Publisher<Event<Headline>> index() { // <1>
         String[] versions = ["1.0", "2.0"] // <2>
-
-        def initialState = { -> 0 }
-        def emitterFunction = { Integer i, Emitter emitter ->  // <3>
+        Flux.generate(() -> 0, (i, emitter) -> {
             if (i < versions.length) {
-                emitter.onNext( // <4>
-                        Event.of(new Headline("Micronaut " + versions[i] + " Released", "Come and get it"))
+                emitter.next( // <4>
+                        Event.of(new Headline("Micronaut ${versions[i]} Released", "Come and get it"))
                 )
             } else {
-                emitter.onComplete() // <5>
+                emitter.complete() // <5>
             }
-            return ++i
-        }
-
-        return Flowable.generate(initialState, emitterFunction as BiFunction<Integer,Emitter<Event<Headline>>,Integer>)
+            return i + 1
+        })
     }
 }
 // end::class[]

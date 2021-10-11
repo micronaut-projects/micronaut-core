@@ -16,11 +16,7 @@
 package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Delete
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Patch
-import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
@@ -82,16 +78,25 @@ class CompletableFutureCrudSpec extends Specification {
         book.id == 1
 
         when:
-        book = client.delete(book.id).get()
+        Optional<Book> optionalBook = client.getOptional(book.id).get()
+        book = optionalBook.get()
+        then:
+        noExceptionThrown()
 
+        when:
+        book = client.delete(book.id).get()
         then:
         book != null
 
         when:
-        book = client.get(book.id)
-                .get()
+        book = client.get(book.id).get()
         then:
         book == null
+
+        when:
+        optionalBook = client.getOptional(111).get()
+        then:
+        !optionalBook.isPresent()
     }
 
 
@@ -104,6 +109,11 @@ class CompletableFutureCrudSpec extends Specification {
 
         Map<Long, Book> books = new LinkedHashMap<>()
         AtomicLong currentId = new AtomicLong(0)
+
+        @Override
+        CompletionStage<Optional<Book>> getOptional(Long id) {
+            return CompletableFuture.completedFuture(Optional.ofNullable(books.get(id)))
+        }
 
         @Override
         CompletionStage<Book> get(Long id) {
@@ -140,6 +150,9 @@ class CompletableFutureCrudSpec extends Specification {
     }
 
     static interface BookApi {
+
+        @Get("/optional/{id}")
+        CompletionStage<Optional<Book>> getOptional(Long id)
 
         @Get("/{id}")
         CompletionStage<Book> get(Long id)

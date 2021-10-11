@@ -15,7 +15,7 @@
  */
 package io.micronaut.docs.config.properties
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 // tag::class[]
 @Singleton
@@ -31,8 +31,9 @@ class EngineImpl implements Engine {
         config.cylinders
     }
 
+    @Override
     String start() { // <2>
-        "${config.manufacturer} Engine Starting V${config.cylinders} [rodLength=${config.crankShaft.rodLength.orElse(6.0d)}]"
+        "$config.manufacturer Engine Starting V$config.cylinders [rodLength=${config.crankShaft.rodLength.orElse(6.0d)}]"
     }
 }
 // end::class[]

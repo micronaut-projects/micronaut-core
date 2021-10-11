@@ -18,17 +18,15 @@ package io.micronaut.docs.annotation.retry
 import io.micronaut.docs.annotation.Pet
 import io.micronaut.docs.annotation.PetOperations
 import io.micronaut.retry.annotation.Fallback
-import io.reactivex.Single
+import reactor.core.publisher.Mono
 
 // tag::class[]
 @Fallback
 class PetFallback implements PetOperations {
     @Override
-    public Single<Pet> save(String name, int age) {
-        Pet pet = new Pet()
-        pet.setAge(age)
-        pet.setName(name)
-        return Single.just(pet)
+    Mono<Pet> save(String name, int age) {
+        Pet pet = new Pet(age: age, name: name)
+        return Mono.just(pet)
     }
 }
 // end::class[]

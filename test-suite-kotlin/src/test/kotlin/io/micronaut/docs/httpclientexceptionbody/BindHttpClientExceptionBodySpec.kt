@@ -1,8 +1,8 @@
 package io.micronaut.docs.httpclientexceptionbody
 
-import io.kotlintest.shouldBe
-import io.kotlintest.shouldNotBe
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
@@ -14,12 +14,17 @@ import io.micronaut.runtime.server.EmbeddedServer
 class BindHttpClientExceptionBodySpec: StringSpec() {
 
     val embeddedServer = autoClose(
-            ApplicationContext.run(EmbeddedServer::class.java,
-                    mapOf("spec.name" to BindHttpClientExceptionBodySpec::class.java.simpleName, "spec.lang" to "java"))
+        ApplicationContext.run(
+            EmbeddedServer::class.java,
+            mapOf(
+                "spec.name" to BindHttpClientExceptionBodySpec::class.java.simpleName,
+                "spec.lang" to "java"
+            )
+        )
     )
 
     val client = autoClose(
-            embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
+        embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
     )
 
     init {

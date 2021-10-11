@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,8 +18,9 @@ package io.micronaut.docs.http.server.netty.websocket;
 import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
-import io.reactivex.Single;
-
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
+import io.micronaut.core.async.annotation.SingleResult;
 import java.util.Collection;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Future;
@@ -60,5 +61,6 @@ public abstract class PojoChatClientWebSocket implements AutoCloseable {
 
     public abstract Future<Message> sendAsync(Message message);
 
-    public abstract Single<Message> sendRx(Message message);
+    @SingleResult
+    public abstract Publisher<Message> sendRx(Message message);
 }

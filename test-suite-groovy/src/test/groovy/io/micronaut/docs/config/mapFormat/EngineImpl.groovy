@@ -15,8 +15,8 @@
  */
 package io.micronaut.docs.config.mapFormat
 
-import javax.inject.Inject
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 
 // tag::class[]
 @Singleton
@@ -29,8 +29,9 @@ class EngineImpl implements Engine {
         config.sensors
     }
 
+    @Override
     String start() {
-        "Engine Starting V${config.cylinders} [sensors=${sensors.size()}]"
+        "Engine Starting V$config.cylinders [sensors=${sensors.size()}]"
     }
 }
 // end::class[]

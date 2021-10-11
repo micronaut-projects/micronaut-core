@@ -18,13 +18,13 @@ package io.micronaut.docs.requires
 import groovy.sql.Sql
 import io.micronaut.context.annotation.Requires
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import javax.sql.DataSource
 import java.sql.SQLException
 
 // tag::requires[]
 @Singleton
-@Requires(beans = DataSource.class)
+@Requires(beans = DataSource)
 @Requires(property = "datasource.url")
 class JdbcBookService implements BookService {
 
@@ -37,11 +37,11 @@ class JdbcBookService implements BookService {
         try {
             def sql = new Sql(dataSource)
             def result = sql.firstRow("select * from books where title =  $title")
-            if(result) {
+            if (result) {
                 return new Book(result.get('title'))
             }
         }
-        catch (SQLException ex) {
+        catch (SQLException ignored) {
             return null
         }
         return null

@@ -16,7 +16,7 @@
 package io.micronaut.docs.factories
 
 // tag::class[]
-internal interface Engine {
+interface Engine {
     fun start(): String
 }
 // end::class[]

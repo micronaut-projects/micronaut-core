@@ -22,14 +22,15 @@ import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
 import org.reactivestreams.Publisher
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 @BasicAuth // <1>
 @Singleton // <2>
 class BasicAuthClientFilter implements HttpClientFilter {
 
     @Override
-    Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
+    Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request,
+                                                  ClientFilterChain chain) {
         chain.proceed(request.basicAuth("user", "pass"))
     }
 }

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,6 @@
  */
 package io.micronaut.core.annotation;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 
 import java.lang.annotation.Annotation;
@@ -52,6 +50,44 @@ public interface AnnotationSource {
      */
     default @Nullable <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        return null;
+    }
+
+    /**
+     * Synthesizes a new annotation for the given annotation type using the member values of the given source annotation.
+     *
+     * <p>This method allows supporting synthesizing annotations that have been renamed, for example a {@code jakarta.inject.Named} annotation an be synthesized from the metadata of the a {@code javax.inject.Named} annotation.</p>
+     *
+     * @param annotationClass The annotation class
+     * @param sourceAnnotation The source annotation that provides the member values
+     * @param <T>             The annotation generic type
+     * @return The annotation or null if it doesn't exist
+     * @since 3.0.0
+     */
+    default @Nullable <T extends Annotation> T synthesize(
+            @NonNull Class<T> annotationClass,
+            @NonNull String sourceAnnotation) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        ArgumentUtils.requireNonNull("sourceAnnotation", sourceAnnotation);
+        return null;
+    }
+
+    /**
+     * Synthesizes a new annotation declared for the given annotation type using the member values of the given source annotation.
+     *
+     * <p>This method allows supporting synthesizing annotations that have been renamed, for example a {@code jakarta.inject.Named} annotation an be synthesized from the metadata of the a {@code javax.inject.Named} annotation.</p>
+     *
+     * @param annotationClass The annotation class
+     * @param sourceAnnotation The source annotation that provides the member values
+     * @param <T>             The annotation generic type
+     * @return The annotation or null if it doesn't exist
+     * @since 3.0.0
+     */
+    default @Nullable <T extends Annotation> T synthesizeDeclared(
+            @NonNull Class<T> annotationClass,
+            @NonNull String sourceAnnotation) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        ArgumentUtils.requireNonNull("sourceAnnotation", sourceAnnotation);
         return null;
     }
 
@@ -239,6 +275,28 @@ public interface AnnotationSource {
      */
     default boolean isDeclaredAnnotationPresent(@NonNull Class<? extends Annotation> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        return false;
+    }
+
+    /**
+     * Return whether an annotation is present.
+     *
+     * @param annotationName The annotation name
+     * @return True if it is
+     */
+    default boolean isAnnotationPresent(@NonNull String annotationName) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationName);
+        return false;
+    }
+
+    /**
+     * Variation of {@link #isAnnotationPresent(String)} for declared annotations.
+     *
+     * @param annotationName The annotation name
+     * @return True if it is
+     */
+    default boolean isDeclaredAnnotationPresent(@NonNull String annotationName) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationName);
         return false;
     }
 }

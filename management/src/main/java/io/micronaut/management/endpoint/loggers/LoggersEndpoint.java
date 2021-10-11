@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,16 +15,19 @@
  */
 package io.micronaut.management.endpoint.loggers;
 
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.type.Argument;
-import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.EndpointConfiguration;
+import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
 import io.micronaut.management.endpoint.annotation.Selector;
+import io.micronaut.management.endpoint.annotation.Sensitive;
 import io.micronaut.management.endpoint.annotation.Write;
-import io.reactivex.Single;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.validation.constraints.NotBlank;
 import java.util.Map;
 
@@ -35,8 +38,8 @@ import java.util.Map;
  * @since 1.0
  */
 @Endpoint(id = LoggersEndpoint.NAME,
-        defaultEnabled = LoggersEndpoint.DEFAULT_ENABLED,
-        defaultSensitive = LoggersEndpoint.DEFAULT_SENSITIVE)
+        defaultSensitive = LoggersEndpoint.DEFAULT_SENSITIVE,
+        defaultEnabled = LoggersEndpoint.DEFAULT_ENABLED)
 public class LoggersEndpoint {
 
     /**
@@ -52,32 +55,34 @@ public class LoggersEndpoint {
     /**
      * Endpoint default enabled.
      */
-    public static final boolean DEFAULT_ENABLED = true;
+    public static final boolean DEFAULT_ENABLED = false;
 
     /**
      * Endpoint default sensitivity.
      */
     public static final boolean DEFAULT_SENSITIVE = false;
 
-    private final LoggingSystem loggingSystem;
+    private final ManagedLoggingSystem loggingSystem;
     private final LoggersManager<Map<String, Object>> loggersManager;
+    private boolean writeSensitive = true;
 
     /**
-     * @param loggingSystem the {@link LoggingSystem}
+     * @param loggingSystem the {@link io.micronaut.logging.LoggingSystem}
      * @param loggersManager the {@link LoggersManager}
      */
-    public LoggersEndpoint(LoggingSystem loggingSystem,
+    public LoggersEndpoint(ManagedLoggingSystem loggingSystem,
                            LoggersManager<Map<String, Object>> loggersManager) {
         this.loggingSystem = loggingSystem;
         this.loggersManager = loggersManager;
     }
 
     /**
-     * @return the loggers as a {@link Single}
+     * @return the loggers as a {@link Mono}
      */
     @Read
-    public Single<Map<String, Object>> loggers() {
-        return Single.fromPublisher(loggersManager.getLoggers(loggingSystem));
+    @SingleResult
+    public Publisher<Map<String, Object>> loggers() {
+        return Mono.from(loggersManager.getLoggers(loggingSystem));
     }
 
     /**
@@ -85,8 +90,9 @@ public class LoggersEndpoint {
      * @return the {@link io.micronaut.logging.LogLevel} (both configured and effective) of the named logger
      */
     @Read
-    public Single<Map<String, Object>> logger(@NotBlank @Selector String name) {
-        return Single.fromPublisher(loggersManager.getLogger(loggingSystem, name));
+    @SingleResult
+    public Publisher<Map<String, Object>> logger(@NotBlank @Selector String name) {
+        return Mono.from(loggersManager.getLogger(loggingSystem, name));
     }
 
     /**
@@ -94,6 +100,7 @@ public class LoggersEndpoint {
      * @param configuredLevel The {@link io.micronaut.logging.LogLevel} to set on the named logger
      */
     @Write
+    @Sensitive(property = "write-sensitive")
     public void setLogLevel(@NotBlank @Selector String name,
                             @Nullable io.micronaut.logging.LogLevel configuredLevel) {
         try {
@@ -107,4 +114,20 @@ public class LoggersEndpoint {
         }
     }
 
+    /**
+     * @return True if modifications require authentication
+     */
+    public boolean isWriteSensitive() {
+        return writeSensitive;
+    }
+
+    /**
+     * Determines whether modifications to the log level should
+     * require authentication. Default value (true).
+     *
+     * @param writeSensitive The write sensitivity option.
+     */
+    public void setWriteSensitive(boolean writeSensitive) {
+        this.writeSensitive = writeSensitive;
+    }
 }

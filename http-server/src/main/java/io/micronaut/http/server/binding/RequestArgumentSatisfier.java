@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,11 +26,12 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.BodyArgumentBinder;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
+import io.micronaut.http.bind.binders.RequestBeanAnnotationBinder;
 import io.micronaut.web.router.NullArgument;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UnresolvedArgument;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -82,7 +83,7 @@ public class RequestArgumentSatisfier {
             argumentValues = new LinkedHashMap<>(requiredArguments.size());
             // Begin try fulfilling the argument requirements
             for (Argument argument : requiredArguments) {
-                getValueForArgument(argument, request, satisfyOptionals).ifPresent((value) ->
+                getValueForArgument(argument, request, satisfyOptionals).ifPresent(value ->
                     argumentValues.put(argument.getName(), value));
             }
         }
@@ -116,14 +117,17 @@ public class RequestArgumentSatisfier {
 
                     if (bindingResult.isPresentAndSatisfied()) {
                         value = bindingResult.get();
+                    } else if (bindingResult.isSatisfied() && argument.isNullable()) {
+                        value = NullArgument.INSTANCE;
                     }
-
                 } else {
                     value = getValueForBlockingBodyArgumentBinder(request, argumentBinder, conversionContext);
                 }
+            } else if (argumentBinder instanceof RequestBeanAnnotationBinder) {
+                // Resolve RequestBean after filters since some field types may depend on filters, i.e. Authentication
+                value = (UnresolvedArgument<?>) () -> argumentBinder.bind(conversionContext, request);
             } else {
-                ArgumentBinder.BindingResult bindingResult = argumentBinder
-                    .bind(conversionContext, request);
+                ArgumentBinder.BindingResult bindingResult = argumentBinder.bind(conversionContext, request);
 
                 if (argument.getType() == Optional.class) {
                     if (bindingResult.isSatisfied() || satisfyOptionals) {

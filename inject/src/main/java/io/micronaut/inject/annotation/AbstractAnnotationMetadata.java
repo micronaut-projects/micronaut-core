@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,8 +23,8 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -82,6 +82,46 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
     }
 
     @SuppressWarnings("unchecked")
+    @Nullable
+    @Override
+    public <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        ArgumentUtils.requireNonNull("sourceAnnotation", sourceAnnotation);
+        if (annotationMap == null) {
+            return null;
+        }
+        if (hasAnnotation(sourceAnnotation) || hasStereotype(sourceAnnotation)) {
+            String annotationName = annotationClass.getName();
+            return (T) annotationMap.computeIfAbsent(annotationName, s -> {
+                final AnnotationValue<T> annotationValue = (AnnotationValue<T>) findAnnotation(sourceAnnotation).orElse(null);
+                return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValue);
+
+            });
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Nullable
+    @Override
+    public <T extends Annotation> T synthesizeDeclared(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        ArgumentUtils.requireNonNull("sourceAnnotation", sourceAnnotation);
+        if (declaredAnnotationMap == null) {
+            return null;
+        }
+        String annotationName = annotationClass.getName();
+        if (hasDeclaredAnnotation(sourceAnnotation) || hasDeclaredStereotype(sourceAnnotation)) {
+            return (T) declaredAnnotationMap.computeIfAbsent(annotationName, s -> {
+                final AnnotationValue<T> annotationValue = (AnnotationValue<T>) findDeclaredAnnotation(sourceAnnotation).orElse(null);
+                return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValue);
+
+            });
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
     @Override
     public @Nullable <T extends Annotation> T synthesizeDeclared(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
@@ -89,9 +129,9 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
             return null;
         }
         String annotationName = annotationClass.getName();
-        if (hasAnnotation(annotationName) || hasStereotype(annotationName)) {
+        if (hasDeclaredAnnotation(annotationName) || hasDeclaredStereotype(annotationName)) {
             return (T) declaredAnnotationMap.computeIfAbsent(annotationName, s -> {
-                final AnnotationValue<T> annotationValue = findAnnotation(annotationClass).orElse(null);
+                final AnnotationValue<T> annotationValue = findDeclaredAnnotation(annotationClass).orElse(null);
                 return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValue);
 
             });

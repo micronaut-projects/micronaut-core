@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,16 +15,16 @@
  */
 package io.micronaut.inject.generics.missing;
 
-import io.reactivex.Flowable;
+import jakarta.inject.Singleton;
+import reactor.core.publisher.Flux;
 
-import javax.inject.Singleton;
 import java.util.List;
 
 @Singleton
 public class TestServiceImpl implements TestService {
 
     @Override
-    public <T extends ListArguments> Flowable<List<String>> findAll(T args) {
-        return Flowable.empty();
+    public <T extends ListArguments> Flux<List<String>> findAll(T args) {
+        return Flux.empty();
     }
 }

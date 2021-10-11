@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,18 +14,21 @@
  * limitations under the License.
  */
 package io.micronaut.docs.server.routes;
+
 // tag::imports[]
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.web.router.DefaultRouteBuilder;
-import javax.inject.Inject;
-import javax.inject.Singleton;
+
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 // end::imports[]
 
 // tag::class[]
 @Singleton
 public class MyRoutes extends DefaultRouteBuilder { // <1>
 
-    public MyRoutes(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy) {
+    public MyRoutes(ExecutionHandleLocator executionHandleLocator,
+                    UriNamingStrategy uriNamingStrategy) {
         super(executionHandleLocator, uriNamingStrategy);
     }
 

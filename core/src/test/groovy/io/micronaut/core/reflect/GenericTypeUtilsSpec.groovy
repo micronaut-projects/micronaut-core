@@ -29,5 +29,23 @@ class GenericTypeUtilsSpec extends Specification {
     static class Bar<T> extends Foo<T> {}
 
     static class Baz extends Bar<String> {}
+
+    // =======================
+
+    // https://github.com/micronaut-projects/micronaut-openapi/issues/238
+    void "test resolveInterfaceTypeArguments"() {
+        when:
+        Class[] classes = GenericTypeUtils.resolveInterfaceTypeArguments(B, Iface)
+
+        then:
+        classes.length == 1
+        classes[0] == [String] as Class[]
+    }
+
+    static interface Iface<T> {}
+
+    static abstract class A<T> implements Iface<T> {}
+
+    static class B extends A<String> implements Iface<String> {}
 }
 

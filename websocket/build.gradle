@@ -1,9 +1,17 @@
+import java.time.Duration
+
 dependencies {
 	annotationProcessor project(":inject-java")
     api project(":http")
+    api project(":http-client-core")
     api project(":inject")
     api project(':aop')
-    api dependencyVersion("rxjava2")
+
+    implementation libs.managed.reactor
 
     testImplementation project(":inject-groovy")
+}
+
+test {
+    timeout = Duration.ofMinutes(5)
 }

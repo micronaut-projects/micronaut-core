@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,22 +16,22 @@
 package io.micronaut.runtime.http.codec;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
-import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.IOUtils;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
-import javax.inject.Inject;
-import javax.inject.Named;
-import javax.inject.Singleton;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,7 +39,11 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * A codec that handles {@link MediaType#TEXT_PLAIN}.
@@ -81,7 +85,7 @@ public class TextPlainCodec implements MediaTypeCodec {
 
     @Override
     public Collection<MediaType> getMediaTypes() {
-        List<MediaType> mediaTypes = new ArrayList<>();
+        List<MediaType> mediaTypes = new ArrayList<>(additionalTypes.size() + 1);
         mediaTypes.add(MediaType.TEXT_PLAIN_TYPE);
         mediaTypes.addAll(additionalTypes);
         return mediaTypes;
@@ -90,9 +94,23 @@ public class TextPlainCodec implements MediaTypeCodec {
     @Override
     public <T> T decode(Argument<T> type, ByteBuffer<?> buffer) throws CodecException {
         String text = buffer.toString(defaultCharset);
+        if (CharSequence.class.isAssignableFrom(type.getType())) {
+            return (T) text;
+        }
         return ConversionService.SHARED
             .convert(text, type)
             .orElseThrow(() -> new CodecException("Cannot decode byte buffer with value [" + text + "] to type: " + type));
+    }
+
+    @Override
+    public <T> T decode(Argument<T> type, byte[] bytes) throws CodecException {
+        String text = new String(bytes, defaultCharset);
+        if (CharSequence.class.isAssignableFrom(type.getType())) {
+            return (T) text;
+        }
+        return ConversionService.SHARED
+            .convert(text, type)
+            .orElseThrow(() -> new CodecException("Cannot decode bytes with value [" + text + "] to type: " + type));
     }
 
     @Override

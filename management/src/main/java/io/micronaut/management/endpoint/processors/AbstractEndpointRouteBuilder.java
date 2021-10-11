@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,10 +16,12 @@
 package io.micronaut.management.endpoint.processors;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.LifeCycle;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.async.subscriber.Completable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
@@ -32,7 +34,6 @@ import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Selector;
 import io.micronaut.web.router.DefaultRouteBuilder;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.Map;
 import java.util.Optional;
@@ -46,7 +47,7 @@ import java.util.regex.Pattern;
  * @since 1.0
  */
 @Internal
-abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Endpoint>, Completable {
+abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Endpoint>, LifeCycle<AbstractEndpointRouteBuilder> {
 
     private static final Pattern ENDPOINT_ID_PATTERN = Pattern.compile("\\w+");
 
@@ -85,12 +86,25 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
      */
     protected abstract void registerRoute(ExecutableMethod<?, ?> method, String id, @Nullable Integer port);
 
+    @NonNull
+    @Override
+    public AbstractEndpointRouteBuilder start() {
+        return this;
+    }
+
     /**
      * Clears endpoint ids information.
      */
+    @NonNull
     @Override
-    public final void onComplete() {
+    public AbstractEndpointRouteBuilder stop() {
         endpointIds.clear();
+        return this;
+    }
+
+    @Override
+    public boolean isRunning() {
+        return true;
     }
 
     /**

@@ -12,17 +12,7 @@ import spock.lang.Shared
 import spock.lang.Unroll
 
 import javax.annotation.processing.SupportedAnnotationTypes
-import javax.validation.constraints.AssertFalse
-import javax.validation.constraints.AssertTrue
-import javax.validation.constraints.Digits
-import javax.validation.constraints.Email
-import javax.validation.constraints.Max
-import javax.validation.constraints.Min
-import javax.validation.constraints.NotBlank
-import javax.validation.constraints.NotEmpty
-import javax.validation.constraints.NotNull
-import javax.validation.constraints.Null
-import javax.validation.constraints.Size
+import javax.validation.constraints.*
 
 class ConstraintMessagesSpec extends AbstractTypeElementSpec {
 
@@ -71,6 +61,9 @@ class Test {
         AssertFalse | null                                                              | Boolean | true     | "must be false"
         AssertFalse | [message: "should be false!!"]                                    | Boolean | true     | "should be false!!"
         AssertTrue  | null                                                              | Boolean | false    | "must be true"
+        DecimalMax  | [value: '1.0']                                                    | String  | '1.1'    | "must be less than or equal to 1.0"
+        DecimalMax  | [value: '1.0', message: "{validatedValue} exceeds max: {value}"]  | String  | '1.1'    | "1.1 exceeds max: 1.0"
+        DecimalMin  | [value: '1.0']                                                    | String  | '0.9'    | "must be greater than or equal to 1.0"
         Digits      | [integer: 2, fraction: 2]                                         | String  | '110.20' | "numeric value out of bounds (<2 digits>.<2 digits> expected)"
         Email       | null                                                              | String  | 'junk'   | "must be a well-formed email address"
         Max         | [value: 10]                                                       | Integer | 20       | "must be less than or equal to 10"

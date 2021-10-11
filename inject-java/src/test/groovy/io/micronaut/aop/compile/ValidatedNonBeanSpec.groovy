@@ -1,6 +1,6 @@
 package io.micronaut.aop.compile
 
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 
 class ValidatedNonBeanSpec extends AbstractTypeElementSpec {
@@ -12,7 +12,7 @@ package test;
 
 import javax.validation.constraints.NotNull;
 import io.micronaut.context.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 class DefaultContract implements Contract {
 

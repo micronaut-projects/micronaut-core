@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,11 +15,11 @@
  */
 package io.micronaut.http.netty.channel;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.kqueue.KQueue;
 import io.netty.channel.kqueue.KQueueEventLoopGroup;
@@ -27,9 +27,8 @@ import io.netty.channel.kqueue.KQueueServerSocketChannel;
 import io.netty.channel.kqueue.KQueueSocketChannel;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
-
-import javax.inject.Named;
-import javax.inject.Singleton;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
@@ -44,19 +43,7 @@ import java.util.concurrent.ThreadFactory;
 @Requires(classes = KQueue.class, condition = KQueueAvailabilityCondition.class)
 @Named(EventLoopGroupFactory.NATIVE)
 @BootstrapContextCompatible
-class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
-
-    /**
-     * Creates a KQueueEventLoopGroup.
-     *
-     * @param threads The number of threads to use.
-     * @param ioRatio The io ratio.
-     * @return A KQueueEventLoopGroup.
-     */
-    @Override
-    public EventLoopGroup createEventLoopGroup(int threads, @Nullable Integer ioRatio) {
-        return withIoRatio(new KQueueEventLoopGroup(threads), ioRatio);
-    }
+public class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**
      * Creates a KQueueEventLoopGroup.
@@ -84,17 +71,6 @@ class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
         return withIoRatio(new KQueueEventLoopGroup(threads, executor), ioRatio);
     }
 
-    /**
-     * Creates a default KQueueEventLoopGroup.
-     *
-     * @param ioRatio The io ratio.
-     * @return A KQueueEventLoopGroup.
-     */
-    @Override
-    public EventLoopGroup createEventLoopGroup(@Nullable Integer ioRatio) {
-        return withIoRatio(new KQueueEventLoopGroup(), ioRatio);
-    }
-
     @Override
     public boolean isNative() {
         return true;
@@ -110,10 +86,20 @@ class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
         return KQueueServerSocketChannel.class;
     }
 
+    @Override
+    public KQueueServerSocketChannel serverSocketChannelInstance(EventLoopGroupConfiguration configuration) {
+        return new KQueueServerSocketChannel();
+    }
+
     @NonNull
     @Override
     public Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
         return KQueueSocketChannel.class;
+    }
+
+    @Override
+    public SocketChannel clientSocketChannelInstance(EventLoopGroupConfiguration configuration) {
+        return new KQueueSocketChannel();
     }
 
     private static KQueueEventLoopGroup withIoRatio(KQueueEventLoopGroup group, @Nullable Integer ioRatio) {

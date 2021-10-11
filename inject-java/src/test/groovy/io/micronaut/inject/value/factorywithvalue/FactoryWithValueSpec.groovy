@@ -19,7 +19,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.annotation.Factory
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import spock.lang.Specification
 /**
@@ -59,6 +59,7 @@ class MyBean {
 ''')
         then:"the default scope is singleton"
         beanDefinition.hasAnnotation(Factory)
+        beanDefinition
     }
 
     void "test configuration injection with @Value"() {

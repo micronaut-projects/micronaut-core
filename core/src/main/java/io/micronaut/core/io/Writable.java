@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.io;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -46,8 +46,9 @@ public interface Writable extends Streamable {
      * @param outputStream The output stream
      * @throws IOException if an error occurred while outputting data to the writer
      */
+    @Override
     default void writeTo(OutputStream outputStream) throws IOException {
-        writeTo(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
+        writeTo(outputStream, null);
     }
 
     /**
@@ -56,6 +57,7 @@ public interface Writable extends Streamable {
      * @param file The file
      * @throws IOException if an error occurred while outputting data to the writer
      */
+    @Override
     default void writeTo(File file) throws IOException {
         try (OutputStream outputStream = Files.newOutputStream(file.toPath())) {
             writeTo(outputStream);
@@ -69,6 +71,7 @@ public interface Writable extends Streamable {
      * @param charset      The charset to use. Defaults to {@link StandardCharsets#UTF_8}
      * @throws IOException if an error occurred while outputting data to the writer
      */
+    @Override
     default void writeTo(OutputStream outputStream, @Nullable Charset charset) throws IOException {
         OutputStreamWriter writer = new OutputStreamWriter(outputStream, charset == null ? StandardCharsets.UTF_8 : charset);
         writeTo(writer);

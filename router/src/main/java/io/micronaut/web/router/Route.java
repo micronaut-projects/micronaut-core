@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -111,14 +111,4 @@ public interface Route {
         return Collections.emptyList();
     }
 
-    /**
-     * Accept all {@link MediaType} references.
-     *
-     * @return A new route with the media type applied
-     * @deprecated Use {@link #consumesAll()} instead.
-     */
-    @Deprecated
-    default Route acceptAll() {
-        return consumesAll();
-    }
 }

@@ -1,13 +1,18 @@
 package io.micronaut.inject.annotation
 
 
-import edu.umd.cs.findbugs.annotations.NonNull
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.context.annotation.ConfigurationInject
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.Creator
 import io.micronaut.core.bind.annotation.Bindable
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Header
+import io.micronaut.http.annotation.HttpMethodMapping
 import io.micronaut.http.annotation.QueryValue
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.visitor.VisitorContext
 
 import java.lang.annotation.Annotation
@@ -22,7 +27,7 @@ class AnnotationMapperSpec extends AbstractTypeElementSpec {
         def metadata = buildMethodAnnotationMetadata('''
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @io.micronaut.inject.annotation.CustomCreator
@@ -48,6 +53,55 @@ class Test {
         metadata.stringValue(Bindable).get() == 'test'
     }
 
+    void "test annotation mapper with repeated annotation values"() {
+        given:
+        def definition = buildBeanDefinition('test.Test', '''
+package test;
+
+@jakarta.inject.Singleton
+class Test {
+
+
+    @io.micronaut.context.annotation.Executable
+    Test create(@io.micronaut.inject.annotation.CustomHeader String query) {
+        return new Test();
+    }
+    
+}
+
+''')
+
+        expect:
+        definition != null
+        def method = definition.getRequiredMethod('create', String)
+        def header = method.arguments[0].synthesize(Header)
+        header != null
+        header.name() == 'test'
+        header.value() == 'test'
+    }
+
+    void "test stereotypes are not applied to the mapped from annotation"() {
+        given:
+        def metadata = buildMethodAnnotationMetadata('''
+package test;
+
+@jakarta.inject.Singleton
+class Test {
+
+    @io.micronaut.inject.annotation.CustomGet
+    void test() {
+    }   
+}
+
+''', 'test')
+
+        expect:
+        metadata != null
+        def annotations = metadata.getAnnotationTypesByStereotype(HttpMethodMapping)
+        annotations.size() == 1
+        annotations[0] == Get
+    }
+
     @Override
     protected List<AnnotationMapper<? extends Annotation>> getLocalAnnotationMappers(@NonNull String annotationName) {
         if (annotationName == CustomCreator.name) {
@@ -60,6 +114,12 @@ class Test {
 
             return [
                     new CustomQueryMapper()
+            ]
+        }
+        if (annotationName == CustomGet.name) {
+
+            return [
+                    new CustomGetMapper()
             ]
         }
         return Collections.emptyList()
@@ -85,6 +145,8 @@ class Test {
         }
     }
 
+
+
 }
 
 @Target(ElementType.METHOD)
@@ -94,3 +156,41 @@ class Test {
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 @interface CustomQuery {}
+
+@Target(ElementType.PARAMETER)
+@Retention(RetentionPolicy.RUNTIME)
+@interface CustomHeader {}
+
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+@interface CustomGet {}
+
+class CustomHeaderMapper implements TypedAnnotationMapper<CustomHeader> {
+
+    @Override
+    List<AnnotationValue<?>> map(AnnotationValue<CustomHeader> annotation, VisitorContext visitorContext) {
+        return Collections.singletonList(
+                AnnotationValue.builder(Header).member("name", "test").value("test").build()
+        )
+    }
+
+    @Override
+    Class<CustomHeader> annotationType() {
+        return CustomHeader
+    }
+}
+
+class CustomGetMapper implements TypedAnnotationMapper<CustomGet> {
+
+    @Override
+    List<AnnotationValue<?>> map(AnnotationValue<CustomGet> annotation, VisitorContext visitorContext) {
+        return Collections.singletonList(
+                AnnotationValue.builder(Get).value("/test").build()
+        )
+    }
+
+    @Override
+    Class<CustomGet> annotationType() {
+        return CustomGet
+    }
+}

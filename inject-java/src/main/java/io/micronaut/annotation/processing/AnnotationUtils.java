@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,7 +27,9 @@ import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.inject.annotation.AnnotatedElementValidator;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.inject.visitor.TypeElementVisitor;
+
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -99,7 +101,11 @@ public class AnnotationUtils {
         while (i.hasNext()) {
             final ServiceDefinition<AnnotatedElementValidator> validator = i.next();
             if (validator.isPresent()) {
-                elementValidator = validator.load();
+                try {
+                    elementValidator = validator.load();
+                } catch (Throwable e) {
+                    // probably missing required dependencies to load the validator
+                }
                 break;
             }
         }
@@ -191,7 +197,7 @@ public class AnnotationUtils {
     public AnnotationMetadata getAnnotationMetadata(Element element) {
         AnnotationMetadata metadata = annotationMetadataCache.get(element);
         if (metadata == null) {
-            metadata = newAnnotationBuilder().buildOverridden(element);
+            metadata = javaAnnotationMetadataBuilder.buildOverridden(element);
             annotationMetadataCache.put(element, metadata);
         }
         return metadata;
@@ -271,7 +277,8 @@ public class AnnotationUtils {
                 modelUtils,
                 genericUtils,
                 filer,
-                visitorAttributes
+                visitorAttributes,
+                TypeElementVisitor.VisitorKind.ISOLATING
         );
     }
 
@@ -289,7 +296,7 @@ public class AnnotationUtils {
      * @param element The element
      */
     @Internal
-    public void invalidateMetadata(Element element) {
+    public static void invalidateMetadata(Element element) {
         if (element != null) {
             annotationMetadataCache.remove(element);
         }

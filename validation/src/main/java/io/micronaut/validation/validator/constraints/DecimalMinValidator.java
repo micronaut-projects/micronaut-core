@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,10 +16,10 @@
 package io.micronaut.validation.validator.constraints;
 
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.validation.ValidationException;
 import javax.validation.constraints.DecimalMin;
 import java.math.BigDecimal;
@@ -47,8 +47,6 @@ public interface DecimalMinValidator<T> extends ConstraintValidator<DecimalMin, 
                                 .orElseThrow(() -> new ValidationException(s + " does not represent a valid BigDecimal format.")))
                 .orElseThrow(() -> new ValidationException("null does not represent a valid BigDecimal format."));
 
-        final boolean inclusive = annotationMetadata.get("inclusive", boolean.class).orElse(true);
-
 
         int result;
         try {
@@ -56,6 +54,7 @@ public interface DecimalMinValidator<T> extends ConstraintValidator<DecimalMin, 
         } catch (NumberFormatException nfe) {
             return false;
         }
+        final boolean inclusive = annotationMetadata.get("inclusive", boolean.class).orElse(true);
         return inclusive ? result >= 0 : result > 0;
     }
 

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,18 +15,21 @@
  */
 package io.micronaut.http.server.util;
 
-import io.micronaut.core.annotation.Experimental;
+import io.micronaut.context.BeanProvider;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.HttpServerConfiguration.HostResolutionConfiguration;
 import io.micronaut.runtime.server.EmbeddedServer;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
-import javax.inject.Provider;
-import javax.inject.Singleton;
 import java.net.URI;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Default implementation of {@link HttpHostResolver}.
@@ -35,18 +38,19 @@ import java.net.URI;
  * @since 1.2.0
  */
 @Singleton
-@Experimental
 public class DefaultHttpHostResolver implements HttpHostResolver {
 
-    private final Provider<EmbeddedServer> embeddedServer;
+    private static final String DEFAULT_HOST = "http://localhost";
+    private final BeanProvider<EmbeddedServer> embeddedServer;
     private final HttpServerConfiguration serverConfiguration;
 
     /**
      * @param serverConfiguration The server configuration
      * @param embeddedServer The embedded server provider
      */
+    @Inject
     public DefaultHttpHostResolver(HttpServerConfiguration serverConfiguration,
-                                   Provider<EmbeddedServer> embeddedServer) {
+                                   @Nullable BeanProvider<EmbeddedServer> embeddedServer) {
         this.serverConfiguration = serverConfiguration;
         this.embeddedServer = embeddedServer;
     }
@@ -54,28 +58,49 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
     @NonNull
     @Override
     public String resolve(@Nullable HttpRequest request) {
+        String host;
         if (request != null) {
             HostResolutionConfiguration configuration = serverConfiguration.getHostResolution();
-            if (configuration != null) {
-                return getConfiguredHost(request, configuration);
+            if (configuration != null && configuration.headersConfigured()) {
+                host = getConfiguredHost(request, configuration);
             } else {
-                return getDefaultHost(request);
+                host = getDefaultHost(request);
             }
         } else {
-            return getEmbeddedHost();
+            host = getEmbeddedHost();
         }
+        return validateHost(host);
+    }
+
+    /**
+     * Validates the host transforming the host value if necessary.
+     * @param host The host
+     * @return The transformed host
+     */
+    protected @NonNull String validateHost(@NonNull String host) {
+        if (!host.equals(DEFAULT_HOST)) {
+            HostResolutionConfiguration configuration = serverConfiguration.getHostResolution();
+            if (configuration != null) {
+                List<Pattern> allowedHosts = configuration.getAllowedHosts();
+                if (!allowedHosts.isEmpty() && allowedHosts.stream()
+                        .map(pattern -> pattern.matcher(host))
+                        .noneMatch(Matcher::matches)) {
+                    return DEFAULT_HOST;
+                }
+            }
+        }
+        return host;
     }
 
     /**
      * @return The host resolved from the embedded server
      */
     protected String getEmbeddedHost() {
-        EmbeddedServer server = embeddedServer.get();
-        int port = server.getPort();
-        if (port > -1 && port != 80 && port != 443) {
-            return server.getScheme() + "://" + server.getHost() + ":" + port;
+        if (embeddedServer != null) {
+            EmbeddedServer server = embeddedServer.get();
+            return createHost(server.getScheme(), server.getHost(), server.getPort());
         } else {
-            return server.getScheme() + "://" + server.getHost();
+            return DEFAULT_HOST;
         }
     }
 
@@ -96,7 +121,11 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
 
         URI uri = request.getUri();
         if (uri.getHost() != null) {
-            return createHost(uri.getScheme(), uri.getHost(), uri.getPort());
+            Integer port = uri.getPort();
+            if (port < 0) {
+                port = null;
+            }
+            return createHost(uri.getScheme(), uri.getHost(), port);
         }
 
         return getEmbeddedHost();
@@ -128,7 +157,7 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         if (scheme == null) {
             scheme = request.getUri().getScheme();
         }
-        if (scheme == null) {
+        if (scheme == null && embeddedServer != null) {
             scheme = embeddedServer.get().getScheme();
         }
 
@@ -139,7 +168,7 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         if (host == null) {
             host = request.getUri().getHost();
         }
-        if (host == null) {
+        if (host == null && embeddedServer != null) {
             host = embeddedServer.get().getHost();
         }
 
@@ -160,7 +189,9 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         return createHost(scheme, host, port);
     }
 
-    private String createHost(String scheme, String host, @Nullable Integer port) {
+    private String createHost(@Nullable String scheme, @Nullable String host, @Nullable Integer port) {
+        scheme = scheme == null ? "http" : scheme;
+        host = host == null ? "localhost" : host;
         if (port != null && port != 80 && port != 443) {
             return scheme + "://" + host + ":" + port;
         } else {

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,9 +15,10 @@
  */
 package io.micronaut.aop;
 
+import io.micronaut.core.type.Executable;
 import io.micronaut.inject.ExecutableMethod;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * Extended version of {@link InvocationContext} for {@link MethodInterceptor} instances.
@@ -28,7 +29,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, ExecutableMethod<T, R> {
+public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, Executable<T, R>, ExecutableMethod<T, R> {
 
     /**
      * The underlying {@link ExecutableMethod} reference.
@@ -36,4 +37,19 @@ public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, 
      * @return The underlying method reference.
      */
     @NonNull ExecutableMethod<T, R> getExecutableMethod();
+
+    @Override
+    default boolean isSuspend() {
+        return getExecutableMethod().isSuspend();
+    }
+
+    @Override
+    default boolean isAbstract() {
+        return getExecutableMethod().isAbstract();
+    }
+
+    @Override
+    default Class<T> getDeclaringType() {
+        return getExecutableMethod().getDeclaringType();
+    }
 }

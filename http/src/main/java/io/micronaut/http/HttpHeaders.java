@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@ package io.micronaut.http;
 
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.type.Headers;
+import io.micronaut.core.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -507,7 +508,7 @@ public interface HttpHeaders extends Headers {
      */
     default Optional<ZonedDateTime> findDate(CharSequence name) {
         try {
-            return findFirst(name).map((str) -> {
+            return findFirst(name).map(str -> {
                     LocalDateTime localDateTime = LocalDateTime.parse(str, DateTimeFormatter.RFC_1123_DATE_TIME);
                     return ZonedDateTime.of(localDateTime, ZoneId.of("GMT"));
                 }
@@ -591,10 +592,9 @@ public interface HttpHeaders extends Headers {
         if (!values.isEmpty()) {
             List<MediaType> mediaTypes = new ArrayList<>(10);
             for (String value : values) {
-                final String[] tokens = value.split(",");
-                for (String token : tokens) {
+                for (String token : StringUtils.splitOmitEmptyStrings(value, ',')) {
                     try {
-                        mediaTypes.add(new MediaType(token));
+                        mediaTypes.add(MediaType.of(token));
                     } catch (IllegalArgumentException e) {
                         // ignore
                     }

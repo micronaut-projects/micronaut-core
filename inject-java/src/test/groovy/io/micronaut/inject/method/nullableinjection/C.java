@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,9 +15,12 @@
  */
 package io.micronaut.inject.method.nullableinjection;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import io.micronaut.context.annotation.Requires;
 
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+
+@Requires(property = "spec.name", value = "SetterWithNullableSpec")
 @Singleton
 public class C {
 

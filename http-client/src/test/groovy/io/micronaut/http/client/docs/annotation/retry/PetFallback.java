@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,7 +18,7 @@ package io.micronaut.http.client.docs.annotation.retry;
 import io.micronaut.http.client.docs.annotation.Pet;
 import io.micronaut.http.client.docs.annotation.PetOperations;
 import io.micronaut.retry.annotation.Fallback;
-import io.reactivex.Single;
+import reactor.core.publisher.Mono;
 
 /**
  * @author graemerocher
@@ -28,11 +28,11 @@ import io.reactivex.Single;
 @Fallback
 public class PetFallback implements PetOperations {
     @Override
-    public Single<Pet> save(String name, int age) {
+    public Mono<Pet> save(String name, int age) {
         Pet pet = new Pet();
         pet.setAge(age);
         pet.setName(name);
-        return Single.just(pet);
+        return Mono.just(pet);
     }
 }
 // end::class[]

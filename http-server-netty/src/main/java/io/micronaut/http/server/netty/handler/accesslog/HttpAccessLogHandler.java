@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,11 +15,8 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import io.micronaut.http.server.netty.handler.accesslog.element.AccessLogFormatParser;
 import io.micronaut.http.server.netty.handler.accesslog.element.AccessLog;
+import io.micronaut.http.server.netty.handler.accesslog.element.AccessLogFormatParser;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.channel.ChannelDuplexHandler;
@@ -36,6 +33,8 @@ import io.netty.handler.codec.http2.Http2Exception;
 import io.netty.handler.codec.http2.HttpConversionUtil.ExtensionHeaderNames;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Logging handler for HTTP access logs.

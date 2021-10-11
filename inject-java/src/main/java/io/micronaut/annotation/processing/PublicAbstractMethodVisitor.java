@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 package io.micronaut.annotation.processing;
+
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 
 import javax.lang.model.element.*;
 import javax.lang.model.util.Elements;
@@ -41,15 +43,15 @@ public abstract class PublicAbstractMethodVisitor<R, P> extends PublicMethodVisi
     private Map<String, List<ExecutableElement>> declaredMethods = new HashMap<>();
 
     /**
-     * @param classElement The {@link TypeElement}
-     * @param modelUtils   The {@link ModelUtils}
-     * @param elementUtils The {@link Elements}
+     * @param classElement The class element
+     * @param visitorContext The visitor context
      */
-    PublicAbstractMethodVisitor(TypeElement classElement, ModelUtils modelUtils, Elements elementUtils) {
-        super(modelUtils.getTypeUtils());
+    PublicAbstractMethodVisitor(TypeElement classElement,
+                                JavaVisitorContext visitorContext) {
+        super(visitorContext);
         this.classElement = classElement;
-        this.modelUtils = modelUtils;
-        this.elementUtils = elementUtils;
+        this.modelUtils = visitorContext.getModelUtils();
+        this.elementUtils = visitorContext.getElements();
     }
 
     @Override

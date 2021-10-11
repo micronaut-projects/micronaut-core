@@ -15,7 +15,7 @@
  */
 package io.micronaut.docs.config.mapFormat
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 // tag::class[]
 @Singleton

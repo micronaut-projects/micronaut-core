@@ -16,7 +16,6 @@
 package io.micronaut.docs.http.server.netty.websocket
 
 //tag::clazz[]
-
 import io.micronaut.websocket.WebSocketBroadcaster
 import io.micronaut.websocket.WebSocketSession
 import io.micronaut.websocket.annotation.OnClose
@@ -36,26 +35,22 @@ class ChatServerWebSocket(private val broadcaster: WebSocketBroadcaster) {
     }
 
     @OnMessage // <3>
-    fun onMessage(
-            topic: String,
-            username: String,
-            message: String,
-            session: WebSocketSession) {
+    fun onMessage(topic: String, username: String,
+                  message: String, session: WebSocketSession) {
         val msg = "[$username] $message"
         broadcaster.broadcastSync(msg, isValid(topic, session)) // <4>
     }
 
     @OnClose // <5>
-    fun onClose(
-            topic: String,
-            username: String,
-            session: WebSocketSession) {
+    fun onClose(topic: String, username: String, session: WebSocketSession) {
         val msg = "[$username] Disconnected!"
         broadcaster.broadcastSync(msg, isValid(topic, session))
     }
 
     private fun isValid(topic: String, session: WebSocketSession): Predicate<WebSocketSession> {
-        return Predicate<WebSocketSession>{ s -> (s !== session && topic.equals(s.getUriVariables().get("topic", String::class.java, null), ignoreCase = true)) }
+        return Predicate<WebSocketSession> {
+            (it !== session && topic.equals(it.uriVariables.get("topic", String::class.java, null), ignoreCase = true))
+        }
     }
 }
 //end::clazz[]

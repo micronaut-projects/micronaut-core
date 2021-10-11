@@ -1,27 +1,26 @@
 introduction:
   title: Introduction
   whatsNew: What's New?
-  upgrading: Upgrading to Micronaut 2.x
+  upgrading: Upgrading to Micronaut 3.x
 quickStart:
   title: Quick Start
-  buildCLI:
-    title: Build/Install the CLI
-    installSdkman: Install with Sdkman
-    installHomebrew: Install with Homebrew
-    installMacPorts: Install with MacPorts
-    installWindows: Install through Binary on Windows
-    buildSource: Building from Source
+  buildCLI: Build/Install the CLI
   creatingServer: Creating a Server Application
-  ideSetup: Setting up an IDE
+  ideSetup:
+    title: Setting up an IDE
+    ideaSetup: IntelliJ IDEA
+    eclipseSetup: Eclipse
+    vsCodeSetup: Visual Studio Code
   creatingClient: Creating a Client
   deployingApp: Deploying the Application
 ioc:
   title: Inversion of Control
   beans: Defining Beans
   how: How Does it Work?
-  beanContext: The BeanContext 
+  beanContext: The BeanContext
   types: Injectable Container Types
   qualifiers: Bean Qualifiers
+  typed: Limiting Injectable Types
   scopes:
     title: Scopes
     builtInScopes:
@@ -39,6 +38,7 @@ ioc:
   introspection: Bean Introspection
   beanValidation: Bean Validation
   annotationMetadata: Bean Annotation Metadata
+  beanImport: Importing Beans from Libraries
   springBeans: Micronaut Beans And Spring
   android: Android Support
 config:
@@ -52,6 +52,7 @@ config:
   eachBean: Using @EachBean to Drive Configuration
   immutableConfig: Immutable Configuration
   # validation: Validating Configuration
+  bootstrap: Bootstrap Configuration
   jmx:
     title: JMX Support
 aop:
@@ -59,9 +60,10 @@ aop:
   aroundAdvice: Around Advice
   introductionAdvice: Introduction Advice
   adapterAdvice: Method Adapter Advice
+  lifecycleAdvice: Bean Life Cycle Advice
   validation:
     title: Validation Advice
-  caching: 
+  caching:
     title: Cache Advice
   retry:
     title: Retry Advice
@@ -75,7 +77,9 @@ httpServer:
   runningSpecificPort: Running Server on a Specific Port
   routing: HTTP Routing
   binding: Simple Request Binding
+  customArgumentBinding: Custom Argument Binding
   hostResolution: Host Resolution
+  localeResolution: Locale Resolution
   clientIpAddress: Client IP Address
   requestResponse: The HttpRequest and HttpResponse
   statusAnnotation: Response Status
@@ -88,7 +92,16 @@ httpServer:
   jsonBinding: JSON Binding with Jackson
   datavalidation: Data Validation
   staticResources: Serving Static Resources
-  errorHandling: Error Handling
+  errorHandling:
+    title: Error Handling
+    statusHandlers: Status Handlers
+    localErrorHandling: Local Error Handling
+    globalErrorHandling: Global Error Handling
+    exceptionHandler:
+      title: ExceptionHandler
+      builtInExceptionHandlers: Built-In Exception Handlers
+      customExceptionHandler: Custom Exception Handler
+    errorFormatting: Error Formatting
   apiVersioning: API Versioning
   formData: Handling Form Data
   serverIO: Writing Response Data
@@ -111,6 +124,7 @@ httpServer:
     https: Securing the Server with HTTPS
     dualProtocol: Enabling HTTP and HTTPS
     accessLogger: Enabling Access Logger
+    secondaryServers: Starting Secondary Servers
   views:
     title: Server Side View Rendering
   openapi: OpenAPI / Swagger Support
@@ -149,6 +163,8 @@ cloud:
     distributedConfigurationSpringCloud: Spring Cloud Config Support
     distributedConfigurationAwsParameterStore: AWS Parameter Store Support
     distributedConfigurationOracleCloudVault: Oracle Cloud Vault Support
+    distributedConfigurationPubSub: Google Cloud Pub/Sub Support
+    distributedConfigurationKubernetes: Kubernetes Support
   serviceDiscovery:
     title: Service Discovery
     serviceDiscoveryConsul: Consul Support
@@ -167,9 +183,8 @@ serverlessFunctions:
   title: Serverless Functions
   awsLambda: AWS Lambda
   gcpFunction: Google Cloud Function
-  gcpCloudRun: Google CLoud Run
+  gcpCloudRun: Google Cloud Run
   azureFunction: Azure Function
-  callingFunctions: Calling Functions with FunctionClient
 messaging:
   title: Message-Driven Microservices
   kafka: Kafka Support
@@ -183,8 +198,9 @@ configurations:
   title: Configurations
   reactiveConfigs:
     title: Configurations for Reactive Programming
-    rxjava3: RxJava 3 Support
     reactor: Reactor Support
+    rxjava3: RxJava 3 Support
+    rxjava2: RxJava 2 Support
     rxjava1: RxJava 1 Support
   dataAccess:
     title: Configurations for Data Access
@@ -197,6 +213,12 @@ configurations:
     cassandraSupport: Configuring Cassandra
     liquibaseSupport: Configuring Liquibase
     flywaySupport: Configuring Flyway
+logging:
+  title: Logging
+  loggingMessages: Logging Messages
+  loggingConfiguration: Configuration
+  logback: Logback
+  loggingSystem: Logging System
 languageSupport:
   title: Language Support
   java:
@@ -214,6 +236,7 @@ languageSupport:
     openandaop: Kotlin and AOP Advice
     kotlinretainparamnames: Kotlin and Retaining Parameter Names
     coroutines: Coroutines Support
+    kotlinContextPropagation: Reactive Context Propagation
   graal:
     title: Micronaut for GraalVM
     graalServices: Microservices as GraalVM native images
@@ -224,6 +247,7 @@ management:
     title: Creating Endpoints
     endpointAnnotation: The Endpoint Annotation
     endpointMethod: Endpoint Methods
+    endpointSensitivity: Endpoint Sensitivity
     endpointConfiguration: Endpoint Configuration
   providedEndpoints:
     title: Built-In Endpoints
@@ -237,16 +261,15 @@ management:
     cachesEndpoint: The Caches Endpoint
     stopEndpoint: The Server Stop Endpoint
     environmentEndpoint: The Environment Endpoint
+    threadDumpEndpoint: The ThreadDump Endpoint
 security:
   title: Security
 multitenancy:
   title: Multi-Tenancy
-  multitenancyGorm: Multi-Tenancy GORM
 cli:
   title: Micronaut CLI
-  createProject: Creating a Project
-  profiles:
-    title: Profiles
+  createProject:
+    title: Creating a Project
     comparingVersions: Comparing Versions
   features: Features
   commands: Commands
@@ -257,6 +280,9 @@ cli:
     gradleReload: Recompiling with Gradle
     ideReload: Recompiling with an IDE
   proxy: Proxy Configuration
+i18n:
+  title: Internationalization
+  bundle: Resource Bundles
 appendix:
   title: Appendices
   faq: Frequently Asked Questions (FAQ)

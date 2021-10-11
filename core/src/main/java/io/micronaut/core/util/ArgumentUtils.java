@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,10 @@
  */
 package io.micronaut.core.util;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.naming.Described;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.Executable;
 
 /**
  * Utility methods for checking method argument values.
@@ -90,6 +93,33 @@ public class ArgumentUtils {
      */
     public static <T> ArgumentCheck check(String name, T value) {
         return new ArgumentCheck<>(name, value);
+    }
+
+    /**
+     * Validates the given values are appropriate for the given arguments.
+     * @param described The described instance
+     * @param arguments The arguments
+     * @param values The values
+     */
+    public static void validateArguments(
+            @NonNull Described described,
+            @NonNull Argument<?>[] arguments,
+            @NonNull Object[] values) {
+        int requiredCount = arguments.length;
+        @SuppressWarnings("ConstantConditions") int actualCount = values == null ? 0 : values.length;
+        if (requiredCount != actualCount) {
+            throw new IllegalArgumentException("Wrong number of arguments to " + (described instanceof Executable ? "method" : "constructor") + ": " + described.getDescription());
+        }
+        if (requiredCount > 0) {
+            for (int i = 0; i < arguments.length; i++) {
+                Argument<?> argument = arguments[i];
+                Class<?> type = argument.getWrapperType();
+                Object value = values[i];
+                if (value != null && !type.isInstance(value)) {
+                    throw new IllegalArgumentException("Invalid type [" + values[i].getClass().getName() + "] for argument [" + argument + "] of " + (described instanceof Executable ? "method" : "constructor") + ": " + described.getDescription());
+                }
+            }
+        }
     }
 
     /**

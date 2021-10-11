@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,8 +18,8 @@ package io.micronaut.http.ssl;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
-import edu.umd.cs.findbugs.annotations.Nullable;
-import javax.inject.Inject;
+import io.micronaut.core.annotation.Nullable;
+import jakarta.inject.Inject;
 
 /**
  * The default {@link SslConfiguration} used for HTTP clients.
@@ -49,7 +49,7 @@ public class ClientSslConfiguration extends SslConfiguration {
             DefaultSslConfiguration defaultSslConfiguration,
             DefaultSslConfiguration.DefaultKeyConfiguration defaultKeyConfiguration,
             DefaultSslConfiguration.DefaultKeyStoreConfiguration defaultKeyStoreConfiguration,
-            DefaultSslConfiguration.TrustStoreConfiguration defaultTrustStoreConfiguration) {
+            SslConfiguration.TrustStoreConfiguration defaultTrustStoreConfiguration) {
         readExisting(defaultSslConfiguration, defaultKeyConfiguration, defaultKeyStoreConfiguration, defaultTrustStoreConfiguration);
         setEnabled(true);
         setBuildSelfSigned(true);

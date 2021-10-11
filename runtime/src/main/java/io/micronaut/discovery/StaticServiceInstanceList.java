@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,7 @@
  */
 package io.micronaut.discovery;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.health.HealthStatus;
 
 import java.net.URI;
@@ -43,7 +43,6 @@ public class StaticServiceInstanceList implements ServiceInstanceList {
     public StaticServiceInstanceList(String id, Collection<URI> loadBalancedURIs) {
         this(id, loadBalancedURIs, null);
     }
-
 
     /**
      * Default constructor.

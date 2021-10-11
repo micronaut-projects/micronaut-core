@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,9 +15,8 @@
  */
 package io.micronaut.http.client;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.Toggleable;
@@ -27,12 +26,19 @@ import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.runtime.ApplicationConfiguration;
 
-import java.net.*;
+import java.net.Proxy;
+import java.net.ProxySelector;
+import java.net.SocketAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.concurrent.ThreadFactory;
 
 /**
@@ -54,6 +60,18 @@ public abstract class HttpClientConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     public static final long DEFAULT_READ_IDLE_TIMEOUT_MINUTES = 5;
+
+    /**
+     * The default pool idle timeout in seconds.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final long DEFAULT_CONNECTION_POOL_IDLE_TIMEOUT_SECONDS = 0;
+
+    /**
+     * The default shutdown timeout in millis.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final long DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS = 1;
 
     /**
      * The default shutdown timeout in millis.
@@ -79,8 +97,6 @@ public abstract class HttpClientConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_EXCEPTION_ON_ERROR_STATUS = true;
 
-    private static RxHttpClientFactory clientFactory = null;
-
     private Map<String, Object> channelOptions = Collections.emptyMap();
 
     private Integer numOfThreads = null;
@@ -97,6 +113,10 @@ public abstract class HttpClientConfiguration {
     private Duration readTimeout = Duration.ofSeconds(DEFAULT_READ_TIMEOUT_SECONDS);
 
     private Duration readIdleTimeout = Duration.of(DEFAULT_READ_IDLE_TIMEOUT_MINUTES, ChronoUnit.MINUTES);
+
+    private Duration connectionPoolIdleTimeout = Duration.ofSeconds(DEFAULT_CONNECTION_POOL_IDLE_TIMEOUT_SECONDS);
+
+    private Duration shutdownQuietPeriod = Duration.ofMillis(DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS);
 
     private Duration shutdownTimeout = Duration.ofMillis(DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS);
 
@@ -158,6 +178,7 @@ public abstract class HttpClientConfiguration {
             this.exceptionOnErrorStatus = copy.exceptionOnErrorStatus;
             this.eventLoopGroup = copy.eventLoopGroup;
             this.followRedirects = copy.followRedirects;
+            this.logLevel = copy.logLevel;
             this.loggerName = copy.loggerName;
             this.maxContentLength = copy.maxContentLength;
             this.proxyAddress = copy.proxyAddress;
@@ -166,8 +187,10 @@ public abstract class HttpClientConfiguration {
             this.proxyType = copy.proxyType;
             this.proxyUsername = copy.proxyUsername;
             this.readIdleTimeout = copy.readIdleTimeout;
+            this.connectionPoolIdleTimeout = copy.connectionPoolIdleTimeout;
             this.readTimeout = copy.readTimeout;
             this.shutdownTimeout = copy.shutdownTimeout;
+            this.shutdownQuietPeriod = copy.shutdownQuietPeriod;
             this.sslConfiguration = copy.sslConfiguration;
             this.threadFactory = copy.threadFactory;
             this.httpVersion = copy.httpVersion;
@@ -331,7 +354,6 @@ public abstract class HttpClientConfiguration {
         return Optional.ofNullable(readTimeout);
     }
 
-
     /**
      * For streaming requests and WebSockets, the {@link #getReadTimeout()} method does not apply instead a configurable
      * idle timeout is applied.
@@ -340,6 +362,13 @@ public abstract class HttpClientConfiguration {
      */
     public Optional<Duration> getReadIdleTimeout() {
         return Optional.ofNullable(readIdleTimeout);
+    }
+
+    /**
+     * @return The idle timeout for connection in the client connection pool. Defaults to 0.
+     */
+    public Optional<Duration> getConnectionPoolIdleTimeout() {
+        return Optional.ofNullable(connectionPoolIdleTimeout);
     }
 
     /**
@@ -357,12 +386,32 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * The amount of quiet period for shutdown.
+     *
+     * @return The shutdown timeout
+     */
+    public Optional<Duration> getShutdownQuietPeriod() {
+        return Optional.ofNullable(shutdownQuietPeriod);
+    }
+
+    /**
      * The amount of time to wait for shutdown.
      *
      * @return The shutdown timeout
      */
     public Optional<Duration> getShutdownTimeout() {
         return Optional.ofNullable(shutdownTimeout);
+    }
+
+    /**
+     * Sets the amount of quiet period for shutdown of client thread pools. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS} milliseconds).
+     *
+     * If a task is submitted during the quiet period, it will be accepted and the quiet period will start over.
+     *
+     * @param shutdownQuietPeriod The shutdown quiet period
+     */
+    public void setShutdownQuietPeriod(@Nullable Duration shutdownQuietPeriod) {
+        this.shutdownQuietPeriod = shutdownQuietPeriod;
     }
 
     /**
@@ -384,12 +433,21 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Sets the max read idle time for streaming requests. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_READ_IDLE_TIMEOUT_MINUTES} seconds).
+     * Sets the max read idle time for streaming requests. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_READ_IDLE_TIMEOUT_MINUTES} minutes).
      *
      * @param readIdleTimeout The read idle time
      */
     public void setReadIdleTimeout(@Nullable Duration readIdleTimeout) {
         this.readIdleTimeout = readIdleTimeout;
+    }
+
+    /**
+     * Sets the idle timeout for connection in the client connection pool. Defaults to 0.
+     *
+     * @param connectionPoolIdleTimeout The connection pool idle timeout
+     */
+    public void setConnectionPoolIdleTimeout(@Nullable Duration connectionPoolIdleTimeout) {
+        this.connectionPoolIdleTimeout = connectionPoolIdleTimeout;
     }
 
     /**
@@ -579,60 +637,6 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
-     * {@link javax.inject.Inject} to inject a client instead
-     *
-     * @param url The base URL
-     * @return The client
-     */
-    @Internal
-    static RxHttpClient createClient(@NonNull URL url) {
-        ArgumentUtils.requireNonNull("url", url);
-        RxHttpClientFactory clientFactory = HttpClientConfiguration.clientFactory;
-        if (clientFactory == null) {
-            synchronized (HttpClientConfiguration.class) { // double check
-                clientFactory = HttpClientConfiguration.clientFactory;
-                if (clientFactory == null) {
-                    clientFactory = resolveClientFactory();
-                    HttpClientConfiguration.clientFactory = clientFactory;
-                }
-            }
-        }
-        return clientFactory.createClient(url);
-    }
-
-    /**
-     * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
-     * {@link javax.inject.Inject} to inject a client instead
-     *
-     * @param url The base URL
-     * @return The client
-     */
-    @Internal
-    static RxStreamingHttpClient createStreamingClient(@NonNull URL url) {
-        ArgumentUtils.requireNonNull("url", url);
-        RxHttpClientFactory clientFactory = HttpClientConfiguration.clientFactory;
-        if (clientFactory == null) {
-            synchronized (HttpClientConfiguration.class) { // double check
-                clientFactory = HttpClientConfiguration.clientFactory;
-                if (clientFactory == null) {
-                    clientFactory = resolveClientFactory();
-                    HttpClientConfiguration.clientFactory = clientFactory;
-                }
-            }
-        }
-        return clientFactory.createStreamingClient(url);
-    }
-
-    private static RxHttpClientFactory resolveClientFactory() {
-        final Iterator<RxHttpClientFactory> i = ServiceLoader.load(RxHttpClientFactory.class).iterator();
-        if (i.hasNext()) {
-            return i.next();
-        }
-        throw new IllegalStateException("No RxHttpClientFactory present on classpath, cannot create HTTP client");
-    }
-
-    /**
      * Configuration for the HTTP client connnection pool.
      */
     public static class ConnectionPoolConfiguration implements Toggleable {
@@ -689,7 +693,6 @@ public abstract class HttpClientConfiguration {
             return maxConnections;
         }
 
-
         /**
          * Sets the maximum number of connections. Defaults to no maximum.
          *
@@ -735,6 +738,4 @@ public abstract class HttpClientConfiguration {
             this.acquireTimeout = acquireTimeout;
         }
     }
-
-
 }

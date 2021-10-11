@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 @Configuration
-@Requires(condition = { ConditionContext context -> System.getenv('TRAVIS') })
+@Requires(condition = { ConditionContext context -> System.getenv('GITHUB_ACTIONS') })
 package io.micronaut.inject.configurations.requirescondition
 
 import io.micronaut.context.annotation.Configuration

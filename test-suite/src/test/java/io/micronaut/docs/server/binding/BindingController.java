@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,7 +21,7 @@ import io.micronaut.http.annotation.CookieValue;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Header;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.List;
@@ -51,7 +51,8 @@ public class BindingController {
 
     // tag::cookieMultiple[]
     @Get("/cookieMultiple")
-    public List<String> cookieMultiple(@CookieValue("myCookieA") String myCookieA, @CookieValue("myCookieB") String myCookieB) {
+    public List<String> cookieMultiple(@CookieValue("myCookieA") String myCookieA,
+                                       @CookieValue("myCookieB") String myCookieB) {
         // ...
         // end::cookieMultiple[]
         return Arrays.asList(myCookieA, myCookieB);

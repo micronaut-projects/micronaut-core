@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,7 +17,6 @@ package io.micronaut.core.reflect;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.exception.InvocationException;
 import io.micronaut.core.util.StringUtils;
@@ -80,19 +79,6 @@ public class ReflectionUtils {
                 put(Long.class, long.class);
                 put(Short.class, short.class);
                 put(Void.class, void.class);
-            }
-        });
-
-    private static final Map<Class<?>, Integer> PRIMITIVE_BYTE_SIZES =
-        Collections.unmodifiableMap(new LinkedHashMap<Class<?>, Integer>() {
-            {
-                put(Byte.class, Byte.BYTES);
-                put(Character.class, Character.BYTES);
-                put(Double.class, Double.BYTES);
-                put(Float.class, Float.BYTES);
-                put(Integer.class, Integer.BYTES);
-                put(Long.class, Long.BYTES);
-                put(Short.class, Short.BYTES);
             }
         });
 
@@ -324,38 +310,6 @@ public class ReflectionUtils {
             }
         }
         return declaredField;
-    }
-
-    /**
-     * Finds a field in the type or super type.
-     *
-     * @param type  The type
-     * @param name  The field name
-     * @param value The value
-     * @deprecated This method uses reflection. Do not use.
-     */
-    @Deprecated
-    public static void setFieldIfPossible(Class type, String name, Object value) {
-        Optional<Field> declaredField = findDeclaredField(type, name);
-        if (declaredField.isPresent()) {
-            Field field = declaredField.get();
-            Optional<?> converted = ConversionService.SHARED.convert(value, field.getType());
-            if (converted.isPresent()) {
-                field.setAccessible(true);
-                try {
-                    field.set(type, converted.get());
-                } catch (IllegalAccessException e) {
-                    // ignore
-                }
-            } else {
-                field.setAccessible(true);
-                try {
-                    field.set(type, null);
-                } catch (IllegalAccessException e) {
-                    // ignore
-                }
-            }
-        }
     }
 
     /**

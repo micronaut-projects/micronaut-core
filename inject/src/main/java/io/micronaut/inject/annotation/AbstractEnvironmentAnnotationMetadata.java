@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,8 @@
  */
 package io.micronaut.inject.annotation;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -221,7 +221,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
         if (environment != null) {
 
             PropertyPlaceholderResolver resolver = environment.getPlaceholderResolver();
-            Function<Object, Object> valueMapper = (val) -> {
+            Function<Object, Object> valueMapper = val -> {
                 String[] values;
                 if (val instanceof CharSequence) {
                     values = new String[] { val.toString() };
@@ -322,6 +322,12 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
     public @NonNull Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name) {
         ArgumentUtils.requireNonNull("name", name);
         return environmentAnnotationMetadata.getAnnotationType(name);
+    }
+
+    @Override
+    public @NonNull Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name, @NonNull ClassLoader classLoader) {
+        ArgumentUtils.requireNonNull("name", name);
+        return environmentAnnotationMetadata.getAnnotationType(name, classLoader);
     }
 
     @Override

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,9 +24,11 @@ import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.MediaType;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.net.InetSocketAddress;
+import java.net.MalformedURLException;
+import java.net.ProxySelector;
 import java.net.SocketAddress;
 import java.net.URL;
 import java.util.Optional;
@@ -113,10 +115,41 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
                 CharSequence.class,
                 SocketAddress.class,
                 (object, targetType, context) -> {
-                    String[] parts = object.toString().split(":");
-                    if (parts.length == 2) {
-                        int port = Integer.valueOf(parts[1]);
-                        return Optional.of(new InetSocketAddress(parts[0], port));
+                    String address = object.toString();
+                    try {
+                        URL url = new URL(address);
+                        int port = url.getPort();
+                        if (port == -1) {
+                            port = url.getDefaultPort();
+                        }
+                        if (port == -1) {
+                            context.reject(object, new ConfigurationException("Failed to find a port in the given value"));
+                            return Optional.empty();
+                        }
+                        return Optional.of(InetSocketAddress.createUnresolved(url.getHost(), port));
+                    } catch (MalformedURLException malformedURLException) {
+                        String[] parts = object.toString().split(":");
+                        if (parts.length == 2) {
+                            try {
+                                int port = Integer.parseInt(parts[1]);
+                                return Optional.of(InetSocketAddress.createUnresolved(parts[0], port));
+                            } catch (IllegalArgumentException illegalArgumentException) {
+                                context.reject(object, illegalArgumentException);
+                                return Optional.empty();
+                            }
+                        } else {
+                            context.reject(object, new ConfigurationException("The address is not in a proper format of IP:PORT or a standard URL"));
+                            return Optional.empty();
+                        }
+                    }
+                }
+        );
+        conversionService.addConverter(
+                CharSequence.class,
+                ProxySelector.class,
+                (object, targetType, context) -> {
+                    if (object.toString().equals("default")) {
+                        return Optional.of(ProxySelector.getDefault());
                     } else {
                         return Optional.empty();
                     }

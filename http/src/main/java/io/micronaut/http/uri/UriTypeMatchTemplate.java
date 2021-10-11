@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -38,7 +38,7 @@ public class UriTypeMatchTemplate extends UriMatchTemplate {
      * @param variableTypes  The variable types
      */
     public UriTypeMatchTemplate(CharSequence templateString, Class... variableTypes) {
-        super(templateString, new Object[]{variableTypes});
+        super(templateString, new Object[] {variableTypes});
         this.variableTypes = variableTypes == null ? new Class[0] : variableTypes;
     }
 
@@ -65,7 +65,7 @@ public class UriTypeMatchTemplate extends UriMatchTemplate {
      * @return The new URI template
      */
     public UriTypeMatchTemplate nest(CharSequence uriTemplate, Class... variableTypes) {
-        return (UriTypeMatchTemplate) super.nest(uriTemplate, new Object[]{variableTypes});
+        return (UriTypeMatchTemplate) super.nest(uriTemplate, new Object[] {variableTypes});
     }
 
     @Override

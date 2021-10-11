@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,10 @@
  */
 package io.micronaut.http.server.context;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.context.ServerRequestContext;
+import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 
 /**
@@ -28,40 +30,35 @@ import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 class ServerRequestContextInvocationInstrumenter implements InvocationInstrumenter {
 
     private final HttpRequest<?> invocationRequest;
-    private HttpRequest<?> currentRequest;
-    private boolean isSet;
 
     /**
      * @param invocationRequest current request
      */
     public ServerRequestContextInvocationInstrumenter(HttpRequest<?> invocationRequest) {
         this.invocationRequest = invocationRequest;
-        isSet = false;
     }
 
     /**
-     * Before call.
+     * Server context instrumentation.
+     * @return new instance
      */
+    @NonNull
     @Override
-    public void beforeInvocation() {
-        currentRequest = ServerRequestContext.currentRequest().orElse(null);
+    public Instrumentation newInstrumentation() {
+        HttpRequest<?> currentRequest = ServerRequestContext.currentRequest().orElse(null);
+        boolean isSet;
         if (invocationRequest != currentRequest) {
             isSet = true;
             ServerRequestContext.set(invocationRequest);
-        }
-    }
-
-    /**
-     * After call.
-     *
-     * @param cleanup Whether to enforce cleanup
-     */
-    @Override
-    public void afterInvocation(boolean cleanup) {
-        if (isSet || cleanup) {
-            ServerRequestContext.set(cleanup ? null : currentRequest);
+        } else {
             isSet = false;
         }
+        return cleanup -> {
+            if (cleanup) {
+                ServerRequestContext.set(null);
+            } else if (isSet) {
+                ServerRequestContext.set(currentRequest);
+            }
+        };
     }
-
 }

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 package io.micronaut.core.order;
+
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Order;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -99,14 +103,51 @@ public class OrderUtil {
         Arrays.sort(objects, COMPARATOR);
     }
 
-    private static int getOrder(Object o) {
+    /**
+     * Get the order for the given object.
+     *
+     * @param o The object
+     * @return {@link Ordered#getOrder} when object is instance of Ordered otherwise {@link Ordered#LOWEST_PRECEDENCE}
+     */
+    public static int getOrder(Object o) {
         if (o instanceof Ordered) {
             return getOrder((Ordered) o);
         }
         return Ordered.LOWEST_PRECEDENCE;
     }
 
-    private static int getOrder(Ordered o) {
+    /**
+     * Get the order of the given object. Objects implementing {@link Ordered} have precedence
+     * over annotation metadata with {@link Order}.
+     *
+     * @param annotationMetadata The annotation metadata
+     * @param o The object
+     * @return The order of the object. If no order is found, {@link Ordered#LOWEST_PRECEDENCE} is returned.
+     */
+    public static int getOrder(AnnotationMetadata annotationMetadata, Object o) {
+        if (o instanceof Ordered) {
+            return getOrder((Ordered) o);
+        }
+        return getOrder(annotationMetadata);
+    }
+
+    /**
+     * Get the order for the given annotation metadata.
+     * @param annotationMetadata The metadata
+     * @return The order
+     * @since 3.0.0
+     */
+    public static int getOrder(@NonNull AnnotationMetadata annotationMetadata) {
+        return annotationMetadata.intValue(Order.class).orElse(0);
+    }
+
+    /**
+     * Get the order for the given Ordered object.
+     *
+     * @param o The ordered object
+     * @return the order
+     */
+    public static int getOrder(Ordered o) {
         return o.getOrder();
     }
 }

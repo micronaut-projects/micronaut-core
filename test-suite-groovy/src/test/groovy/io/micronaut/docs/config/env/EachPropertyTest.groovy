@@ -2,9 +2,7 @@ package io.micronaut.docs.config.env
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
-import io.micronaut.core.util.CollectionUtils
 import io.micronaut.inject.qualifiers.Qualifiers
-import org.junit.Test
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -44,7 +42,10 @@ class EachPropertyTest extends Specification{
     }
 
     void "test each property list"() {
-        ApplicationContext applicationContext = ApplicationContext.run(["ratelimits": [[period: "10s", limit: "1000"], [period: "1m", limit: "5000"]]])
+        ApplicationContext applicationContext = ApplicationContext.run(
+                ["ratelimits": [
+                        [period: "10s", limit: "1000"],
+                        [period: "1m", limit: "5000"]]])
 
         List<RateLimitsConfiguration> beansOfType = applicationContext.streamOfType(RateLimitsConfiguration.class).collect(Collectors.toList());
 

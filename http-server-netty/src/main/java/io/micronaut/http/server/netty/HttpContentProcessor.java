@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,9 +15,9 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.util.Toggleable;
 import io.netty.buffer.ByteBufHolder;
-import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 
 /**
@@ -28,5 +28,5 @@ import org.reactivestreams.Subscriber;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface HttpContentProcessor<T> extends Publisher<T>, Subscriber<ByteBufHolder>, Toggleable {
+public interface HttpContentProcessor<T> extends Publishers.MicronautPublisher<T>, Subscriber<ByteBufHolder>, Toggleable {
 }

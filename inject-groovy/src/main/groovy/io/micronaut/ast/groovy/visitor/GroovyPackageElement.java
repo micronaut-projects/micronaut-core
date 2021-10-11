@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,12 +15,11 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.ast.PackageElement;
 import org.codehaus.groovy.ast.PackageNode;
-import org.codehaus.groovy.control.CompilationUnit;
-import org.codehaus.groovy.control.SourceUnit;
 
 /**
  * A class element returning data from a {@link PackageNode}.
@@ -29,26 +28,29 @@ import org.codehaus.groovy.control.SourceUnit;
  * @since 2.0
  */
 @Internal
-public class GroovyPackageElement extends AbstractGroovyElement {
+public class GroovyPackageElement extends AbstractGroovyElement implements PackageElement {
     private final PackageNode packageNode;
 
     /**
      * Default constructor.
      *
-     * @param sourceUnit         The source unit
-     * @param compilationUnit    The compilation unit
+     * @param visitorContext The visitor context
      * @param packageNode      The annotated node
      * @param annotationMetadata The annotation metadata
      */
-    public GroovyPackageElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, PackageNode packageNode, AnnotationMetadata annotationMetadata) {
-        super(sourceUnit, compilationUnit, packageNode, annotationMetadata);
+    public GroovyPackageElement(GroovyVisitorContext visitorContext, PackageNode packageNode, AnnotationMetadata annotationMetadata) {
+        super(visitorContext, packageNode, annotationMetadata);
         this.packageNode = packageNode;
     }
 
     @NonNull
     @Override
     public String getName() {
-        return packageNode.getName();
+        final String n = packageNode.getName();
+        if (n.endsWith(".")) {
+            return n.substring(0, n.length() - 1);
+        }
+        return n;
     }
 
     @Override

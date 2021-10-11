@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.factory.inject
 
-import io.micronaut.context.BeanContext
+import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -23,10 +23,9 @@ class InjectExistingFactorySpec extends Specification {
 
     @Unroll
     void "test that it is possible inject an existing factory instance without a circular dependency issue"() {
-
         given:
         MyFactory myFactory = new MyFactory()
-        BeanContext ctx = BeanContext.run()
+        ApplicationContext ctx = ApplicationContext.run(["spec.name": getClass().simpleName])
         ctx.inject(myFactory)
 
         expect:
@@ -37,7 +36,5 @@ class InjectExistingFactorySpec extends Specification {
 
         where:
         times << [1,2,3,4,5,6,7,9,10]
-
-
     }
 }

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,10 +15,8 @@
  */
 package io.micronaut.http.server.netty.types;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
-
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -31,11 +29,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author James Kleeh
  * @since 1.0
  */
-@Singleton
+@Internal
 public class DefaultCustomizableResponseTypeHandlerRegistry implements NettyCustomizableResponseTypeHandlerRegistry {
 
     private List<NettyCustomizableResponseTypeHandler> handlers;
-    private ConcurrentHashMap<Class<?>, NettyCustomizableResponseTypeHandler> handlerCache = new ConcurrentHashMap<>(5);
+    private ConcurrentHashMap<Class<?>, Optional<NettyCustomizableResponseTypeHandler>> handlerCache = new ConcurrentHashMap<>(5);
 
     /**
      * @param typeHandlers The Netty customizable response type handlers
@@ -44,22 +42,27 @@ public class DefaultCustomizableResponseTypeHandlerRegistry implements NettyCust
         this.handlers = Arrays.asList(typeHandlers);
     }
 
-
     /**
      * @param typeHandlers The Netty customizable response type handlers
      */
-    @Inject public DefaultCustomizableResponseTypeHandlerRegistry(List<NettyCustomizableResponseTypeHandler> typeHandlers) {
+    public DefaultCustomizableResponseTypeHandlerRegistry(List<NettyCustomizableResponseTypeHandler> typeHandlers) {
         this.handlers = CollectionUtils.isNotEmpty(typeHandlers) ? typeHandlers : Collections.emptyList();
     }
 
     @Override
     public Optional<NettyCustomizableResponseTypeHandler> findTypeHandler(Class<?> type) {
-        return Optional
-            .ofNullable(handlerCache.computeIfAbsent(type, (clazz) ->
-                handlers.stream()
-                    .filter(handler -> handler.supports(clazz))
-                    .findFirst()
-                    .orElse(null))
-            );
+        Optional<NettyCustomizableResponseTypeHandler> foundHandler = handlerCache.get(type);
+        if (foundHandler != null) {
+            return foundHandler;
+        }
+        Optional<NettyCustomizableResponseTypeHandler> optionalHandler = Optional.empty();
+        for (NettyCustomizableResponseTypeHandler handler : handlers) {
+            if (handler.supports(type)) {
+                optionalHandler = Optional.of(handler);
+                break;
+            }
+        }
+        handlerCache.put(type, optionalHandler);
+        return optionalHandler;
     }
 }

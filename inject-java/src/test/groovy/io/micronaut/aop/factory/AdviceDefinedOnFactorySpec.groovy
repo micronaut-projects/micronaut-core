@@ -15,18 +15,15 @@
  */
 package io.micronaut.aop.factory
 
-import io.micronaut.context.BeanContext
-import io.micronaut.core.reflect.ReflectionUtils
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
-import org.hibernate.Session
-import spock.lang.Specification
+import io.micronaut.inject.writer.BeanDefinitionWriter
 
 class AdviceDefinedOnFactorySpec extends AbstractTypeElementSpec {
     void "test advice defined at the class level of a  factory"() {
         when:"Advice is defined at the class level of the factory"
-        BeanDefinition beanDefinition = buildBeanDefinition('test.$MyFactoryDefinition' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+        BeanDefinition beanDefinition = buildBeanDefinition('test.$MyFactory' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.introduction.*;

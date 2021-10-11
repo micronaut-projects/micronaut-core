@@ -16,14 +16,14 @@
 package io.micronaut.inject.configuration
 
 import groovy.json.JsonSlurper
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.config.GroovyConfigurationMetadataBuilder
 import org.codehaus.groovy.ast.ClassNode
 /**
  * @author graemerocher
  * @since 1.0
  */
-class GroovyConfigurationMetadataBuilderSpec extends AbstractBeanDefinitionSpec{
+class GroovyConfigurationMetadataBuilderSpec extends AbstractBeanDefinitionSpec {
 
     void "test build configuration metadata with annotation aliases"() {
         given:

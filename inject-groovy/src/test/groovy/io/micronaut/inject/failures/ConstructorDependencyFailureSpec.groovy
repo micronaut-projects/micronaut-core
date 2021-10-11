@@ -20,7 +20,7 @@ import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.exceptions.DependencyInjectionException
 import spock.lang.Specification
 
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 /**
  * Created by graemerocher on 12/05/2017.
@@ -43,7 +43,7 @@ Failed to inject value for parameter [a] of class: io.micronaut.inject.failures.
 
 Message: No bean of type [io.micronaut.inject.failures.ConstructorDependencyFailureSpec$A] exists.''')
 
-        e.message.normalize().contains('Path Taken: new B([A a])')
+        e.message.normalize().contains('Path Taken: new B(A a) --> new B([A a])')
     }
 
     static interface A {

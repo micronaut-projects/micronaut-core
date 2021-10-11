@@ -1,6 +1,6 @@
 package io.micronaut.inject.lifecycle
 
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 
 class PostConstructCompileSpec extends AbstractTypeElementSpec {
@@ -10,7 +10,7 @@ class PostConstructCompileSpec extends AbstractTypeElementSpec {
         BeanDefinition definition = buildBeanDefinition('test.Test', '''
 package test;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 
 class Test {
 
@@ -31,8 +31,8 @@ class Test {
         def definition = buildBeanDefinition('test.Test', '''
 package test;
 
-import javax.annotation.PostConstruct;
-import javax.inject.Inject;
+import jakarta.annotation.PostConstruct;
+import jakarta.inject.Inject;
 
 class Test {
 
@@ -55,8 +55,8 @@ class Test {
         def definition = buildBeanDefinition('test.Test', '''
 package test;
 
-import javax.annotation.PostConstruct;
-import javax.inject.Inject;
+import jakarta.annotation.PostConstruct;
+import jakarta.inject.Inject;
 
 class Test {
 

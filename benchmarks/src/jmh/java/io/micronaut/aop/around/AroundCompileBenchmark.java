@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,6 +20,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.writer.BeanDefinitionWriter;
 import org.codehaus.groovy.runtime.IOGroovyMethods;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Scope;
@@ -70,7 +71,7 @@ public class AroundCompileBenchmark {
     }
 
     BeanDefinition buildBeanDefinition(String className, String cls) {
-        String beanDefName= '$' + NameUtils.getSimpleName(className) + "Definition";
+        String beanDefName= '$' + NameUtils.getSimpleName(className) + BeanDefinitionWriter.CLASS_SUFFIX;
         String packageName = NameUtils.getPackageName(className);
         String beanFullName = packageName + "." + beanDefName;
 

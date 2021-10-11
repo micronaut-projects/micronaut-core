@@ -8,26 +8,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Unroll
 
-import javax.validation.constraints.AssertFalse
-import javax.validation.constraints.AssertTrue
-import javax.validation.constraints.DecimalMax
-import javax.validation.constraints.DecimalMin
-import javax.validation.constraints.Digits
-import javax.validation.constraints.Email
-import javax.validation.constraints.Future
-import javax.validation.constraints.Max
-import javax.validation.constraints.Min
-import javax.validation.constraints.Negative
-import javax.validation.constraints.NegativeOrZero
-import javax.validation.constraints.NotBlank
-import javax.validation.constraints.NotEmpty
-import javax.validation.constraints.NotNull
-import javax.validation.constraints.Null
-import javax.validation.constraints.Past
-import javax.validation.constraints.Pattern
-import javax.validation.constraints.Positive
-import javax.validation.constraints.PositiveOrZero
-import javax.validation.constraints.Size
+import javax.validation.constraints.*
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
@@ -180,12 +161,14 @@ class ConstraintsSpec extends AbstractTypeElementSpec {
         PositiveOrZero | -100 as short                                 | false   | new AnnotationValue<>(constraint.getName())
         PositiveOrZero | -100 as byte                                  | false   | new AnnotationValue<>(constraint.getName())
         // Max
-        Max            | 10                                            | false   | constraintMetadata(constraint, "@Max(5)")
+        Max            | 10                                            | false  | constraintMetadata(constraint, "@Max(5)")
         Max            | 5                                             | true   | constraintMetadata(constraint, "@Max(5)")
-        Max            | new BigInteger("10")                          | false   | constraintMetadata(constraint, "@Max(5)")
-        Max            | new BigDecimal("10")                          | false   | constraintMetadata(constraint, "@Max(5)")
-        Max            | 0                                             | true    | constraintMetadata(constraint, "@Max(5)")
-        Max            | null                                          | true    | constraintMetadata(constraint, "@Max(5)")
+        Max            | new BigInteger("6")                           | false  | constraintMetadata(constraint, "@Max(5)")
+        Max            | new BigDecimal("6")                           | false  | constraintMetadata(constraint, "@Max(5)")
+        Max            | new BigInteger("5")                           | true   | constraintMetadata(constraint, "@Max(5)")
+        Max            | new BigDecimal("5")                           | true   | constraintMetadata(constraint, "@Max(5)")
+        Max            | 0                                             | true   | constraintMetadata(constraint, "@Max(5)")
+        Max            | null                                          | true   | constraintMetadata(constraint, "@Max(5)")
         // Min
         Min            | 10                                            | true    | constraintMetadata(constraint, "@Min(5)")
         Min            | 5                                             | true    | constraintMetadata(constraint, "@Min(5)")

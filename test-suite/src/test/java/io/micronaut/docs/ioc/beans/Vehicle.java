@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,17 +27,17 @@ public class Vehicle {
 
     private final String make;
     private final String model;
-    private final int axels;
+    private final int axles;
 
     public Vehicle(String make, String model) {
         this(make, model, 2);
     }
 
     @Creator // <1>
-    public Vehicle(String make, String model, int axels) {
+    public Vehicle(String make, String model, int axles) {
         this.make = make;
         this.model = model;
-        this.axels = axels;
+        this.axles = axles;
     }
 
     public String getMake() {
@@ -48,8 +48,8 @@ public class Vehicle {
         return model;
     }
 
-    public int getAxels() {
-        return axels;
+    public int getAxles() {
+        return axles;
     }
 }
 // end::class[]

@@ -17,7 +17,7 @@ package io.micronaut.inject.method.arrayinjection
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 
 class SetterArrayInjectionSpec extends AbstractTypeElementSpec {
@@ -33,12 +33,12 @@ import io.micronaut.context.annotation.*;
 @Executable
 class MyBean {
     
-    @javax.inject.Inject
+    @jakarta.inject.Inject
     public void setFoo(Foo foo) {}
 }
 
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Foo {}
 
 ''')

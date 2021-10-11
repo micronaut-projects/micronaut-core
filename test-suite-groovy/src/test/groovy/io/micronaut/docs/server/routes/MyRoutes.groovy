@@ -15,22 +15,22 @@
  */
 package io.micronaut.docs.server.routes
 
+// tag::imports[]
 import io.micronaut.context.ExecutionHandleLocator
 import io.micronaut.core.convert.ConversionService
-
-
-// tag::imports[]
 import io.micronaut.web.router.GroovyRouteBuilder
 
-import javax.inject.Inject
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 // end::imports[]
 
 // tag::class[]
 @Singleton
 class MyRoutes extends GroovyRouteBuilder { // <1>
 
-    MyRoutes(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
+    MyRoutes(ExecutionHandleLocator executionHandleLocator,
+             UriNamingStrategy uriNamingStrategy,
+             ConversionService conversionService) {
         super(executionHandleLocator, uriNamingStrategy, conversionService)
     }
 

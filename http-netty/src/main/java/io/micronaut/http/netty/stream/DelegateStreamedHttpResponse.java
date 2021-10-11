@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,13 +31,13 @@ import org.reactivestreams.Subscriber;
 @Internal
 final class DelegateStreamedHttpResponse extends DelegateHttpResponse implements StreamedHttpResponse {
 
-    private final Publisher<HttpContent> stream;
+    private final Publisher<? extends HttpContent> stream;
 
     /**
      * @param response The {@link HttpResponse}
      * @param stream   The {@link Publisher} for {@link HttpContent}
      */
-    DelegateStreamedHttpResponse(HttpResponse response, Publisher<HttpContent> stream) {
+    DelegateStreamedHttpResponse(HttpResponse response, Publisher<? extends HttpContent> stream) {
         super(response);
         this.stream = stream;
     }

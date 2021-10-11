@@ -1,11 +1,17 @@
 dependencies {
     annotationProcessor project(":inject-java")
-    
+
     api project(":inject")
     api project(":http")
-    compileOnly dependencyVersion("groovy")
-    
+    compileOnly libs.managed.groovy
+
+    testImplementation project(":context")
     testImplementation project(":inject-groovy")
     testImplementation project(":inject-java")
     testAnnotationProcessor project(":inject-java")
+    testImplementation project(":inject-groovy-test")
 }
+
+
+//compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
+//compileTestGroovy.groovyOptions.fork = true

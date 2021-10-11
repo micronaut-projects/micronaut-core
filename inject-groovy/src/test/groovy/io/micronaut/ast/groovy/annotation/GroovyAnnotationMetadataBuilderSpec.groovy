@@ -15,15 +15,12 @@
  */
 package io.micronaut.ast.groovy.annotation
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.core.annotation.AnnotationClassValue
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.inject.annotation.MultipleAlias
-import org.codehaus.groovy.ast.ASTNode
-import org.codehaus.groovy.ast.ClassNode
-import org.codehaus.groovy.ast.MethodNode
-import org.codehaus.groovy.ast.builder.AstBuilder
 import io.micronaut.aop.Around
 import io.micronaut.context.annotation.Primary
 import io.micronaut.context.annotation.Requirements
@@ -32,7 +29,6 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.context.scope.ScopedProxy
 import spock.lang.Ignore
-import spock.lang.Specification
 
 import javax.inject.Qualifier
 import javax.inject.Scope
@@ -46,8 +42,8 @@ class GroovyAnnotationMetadataBuilderSpec extends AbstractBeanDefinitionSpec {
 
     void "test multiple alias definitions with value"() {
         given:
-        AnnotationMetadata metadata = buildTypeAnnotationMetadata('test.Multi', '''\
-package test;
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('annbuild1.Multi', '''\
+package annbuild1;
 
 import io.micronaut.inject.annotation.*;
 
@@ -65,8 +61,8 @@ class Multi {
     }
     void "test annotation names by stereotype"() {
         given:
-        AnnotationMetadata metadata = buildTypeAnnotationMetadata('test.Test','''\
-package test;
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('annbuild2.Test','''\
+package annbuild2;
 
 import io.micronaut.runtime.context.scope.*;
 @Refreshable
@@ -76,15 +72,14 @@ class Test {
 
         expect:
         metadata != null
-        metadata.getAnnotationNamesByStereotype(Around).contains(Refreshable.name)
         metadata.getAnnotationNamesByStereotype(Around).contains(ScopedProxy.name)
     }
 
 
     void "test read external constants"() {
         given:
-        AnnotationMetadata metadata = buildTypeAnnotationMetadata('test.Test','''\
-package test;
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('annbuild3.Test','''\
+package annbuild3;
 
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -102,8 +97,8 @@ class Test {
 
     void "test read lists simple"() {
         given:
-        AnnotationMetadata metadata = buildTypeAnnotationMetadata('test.Test','''\
-package test;
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('annbuild4.Test','''\
+package annbuild4;
 import io.micronaut.context.annotation.*;
 
 @Requires(env=['foo'])
@@ -120,8 +115,8 @@ class Test {
 
     void "test read constants"() {
         given:
-        AnnotationMetadata metadata = buildTypeAnnotationMetadata('test.Test', '''\
-package test;
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('annbuild5.Test', '''\
+package annbuild5;
 
 import io.micronaut.context.annotation.*;
 
@@ -143,8 +138,8 @@ class Test {
     @Ignore // Support for closure values not yet supported
     void "test build annotation with closure value"() {
         given:
-        AnnotationMetadata metadata = buildTypeAnnotationMetadata('test.Test','''\
-package test;
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('annbuild6.Test','''\
+package annbuild6;
 
 import io.micronaut.context.annotation.*;
 
@@ -162,8 +157,8 @@ class Test {
 
     void "test build repeatable annotations"() {
         given:
-        AnnotationMetadata metadata = buildTypeAnnotationMetadata('test.Test','''\
-package test;
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('annbuild7.Test','''\
+package annbuild7;
 
 import io.micronaut.context.annotation.*;
 
@@ -181,14 +176,14 @@ class Test {
         metadata.getValue(Requirements).get()[0] instanceof AnnotationValue
         metadata.getValue(Requirements).get()[0].values.get('property') == 'blah'
         metadata.getValue(Requirements).get()[1] instanceof AnnotationValue
-        metadata.getValue(Requirements).get()[1].values.get('classes') == [new AnnotationClassValue('test.Test')] as AnnotationClassValue[]
+        metadata.getValue(Requirements).get()[1].values.get('classes') == [new AnnotationClassValue('annbuild7.Test')] as AnnotationClassValue[]
     }
 
     void "test parse first level stereotype data"() {
 
         given:
-        AnnotationMetadata metadata = buildTypeAnnotationMetadata("test.Test",'''\
-package test;
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata("annbuild8.Test",'''\
+package annbuild8;
 
 @io.micronaut.context.annotation.Primary
 class Test {
@@ -207,8 +202,8 @@ class Test {
     void "test parse inherited stereotype data attributes default values"() {
 
         given:
-        AnnotationMetadata metadata = buildTypeAnnotationMetadata("test.Test",'''\
-package test;
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata("annbuild9.Test",'''\
+package annbuild9;
 
 @io.micronaut.ast.groovy.annotation.Trace(type = Test.class, types = [Test.class])
 class Test {
@@ -227,8 +222,8 @@ class Test {
     void "test parse inherited stereotype data attributes"() {
 
         given:
-        AnnotationMetadata metadata = buildTypeAnnotationMetadata("test.Test",'''\
-package test;
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata("annbuild10.Test",'''\
+package annbuild10;
 
 @io.micronaut.ast.groovy.annotation.Trace(type = Test.class, types = [Test.class], something = true)
 class Test {
@@ -239,8 +234,8 @@ class Test {
         metadata != null
         metadata.hasAnnotation(Trace)
         metadata.getValue(Trace, "type").isPresent()
-        metadata.getValue(Trace, "type").get() == new AnnotationClassValue('test.Test')
-        metadata.getValue(Trace, "types").get() == [new AnnotationClassValue('test.Test')] as AnnotationClassValue[]
+        metadata.getValue(Trace, "type").get() == new AnnotationClassValue('annbuild10.Test')
+        metadata.getValue(Trace, "types").get() == [new AnnotationClassValue('annbuild10.Test')] as AnnotationClassValue[]
         metadata.hasStereotype(Trace)
         metadata.hasDeclaredAnnotation(Trace)
         metadata.hasStereotype(Around)
@@ -259,8 +254,8 @@ class Test {
     void "test parse interface inherited stereotype data attributes"() {
 
         given:
-        AnnotationMetadata metadata = buildTypeAnnotationMetadata( "test.Test",'''\
-package test;
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata( "annbuild11.Test",'''\
+package annbuild11;
 
 
 class Test implements ITest{
@@ -276,8 +271,8 @@ interface ITest {
         metadata != null
         metadata.hasAnnotation(Trace)
         metadata.getValue(Trace, "type").isPresent()
-        metadata.getValue(Trace, "type").get() == new AnnotationClassValue('test.Test')
-        metadata.getValue(Trace, "types").get() == [new AnnotationClassValue('test.Test')] as AnnotationClassValue[]
+        metadata.getValue(Trace, "type").get() == new AnnotationClassValue('annbuild11.Test')
+        metadata.getValue(Trace, "types").get() == [new AnnotationClassValue('annbuild11.Test')] as AnnotationClassValue[]
         metadata.hasStereotype(Trace)
         !metadata.hasDeclaredAnnotation(Trace)
         !metadata.hasDeclaredStereotype(Trace)
@@ -298,8 +293,8 @@ interface ITest {
     void "test parse super class inherited stereotype data attributes"() {
 
         given:
-        AnnotationMetadata metadata = buildTypeAnnotationMetadata("test.Test",'''\
-package test;
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata("annbuild12.Test",'''\
+package annbuild12;
 
 
 class Test extends SuperTest{
@@ -315,8 +310,8 @@ class SuperTest {
         metadata != null
         metadata.hasAnnotation(Trace)
         metadata.getValue(Trace, "type").isPresent()
-        metadata.getValue(Trace, "type").get() == new AnnotationClassValue('test.SuperTest')
-        metadata.getValue(Trace, "types").get() == [new AnnotationClassValue('test.SuperTest')] as AnnotationClassValue[]
+        metadata.getValue(Trace, "type").get() == new AnnotationClassValue('annbuild12.SuperTest')
+        metadata.getValue(Trace, "types").get() == [new AnnotationClassValue('annbuild12.SuperTest')] as AnnotationClassValue[]
         metadata.hasStereotype(Trace)
         !metadata.hasDeclaredAnnotation(Trace)
         !metadata.hasDeclaredStereotype(Trace)
@@ -337,8 +332,8 @@ class SuperTest {
     void "test override super class inherited stereotype data attributes"() {
 
         given:
-        AnnotationMetadata metadata = buildTypeAnnotationMetadata("test.Test",'''\
-package test;
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata("annbuild13.Test",'''\
+package annbuild13;
 
 @io.micronaut.ast.groovy.annotation.Trace(type = Test.class, types = [Test.class], something = false)
 class Test extends SuperTest{
@@ -354,8 +349,8 @@ class SuperTest {
         metadata != null
         metadata.hasAnnotation(Trace)
         metadata.getValue(Trace, "type").isPresent()
-        metadata.getValue(Trace, "type").get() == new AnnotationClassValue('test.Test')
-        metadata.getValue(Trace, "types").get() == [new AnnotationClassValue('test.Test')] as AnnotationClassValue[]
+        metadata.getValue(Trace, "type").get() == new AnnotationClassValue('annbuild13.Test')
+        metadata.getValue(Trace, "types").get() == [new AnnotationClassValue('annbuild13.Test')] as AnnotationClassValue[]
         metadata.hasStereotype(Trace)
         metadata.hasDeclaredStereotype(Trace)
         metadata.hasDeclaredAnnotation(Trace)
@@ -374,8 +369,8 @@ class SuperTest {
 
     void "test parse super class inherited interface stereotype data attributes"() {
         given:
-        AnnotationMetadata metadata = buildTypeAnnotationMetadata("test.Test",'''\
-package test;
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata("annbuild14.Test",'''\
+package annbuild14;
 
 
 class Test extends SuperTest{
@@ -393,8 +388,8 @@ interface ITest {
         metadata != null
         metadata.hasAnnotation(Trace)
         metadata.getValue(Trace, "type").isPresent()
-        metadata.getValue(Trace, "type").get() == new AnnotationClassValue('test.Test')
-        metadata.getValue(Trace, "types").get() == [new AnnotationClassValue('test.Test')] as AnnotationClassValue[]
+        metadata.getValue(Trace, "type").get() == new AnnotationClassValue('annbuild14.Test')
+        metadata.getValue(Trace, "types").get() == [new AnnotationClassValue('annbuild14.Test')] as AnnotationClassValue[]
         metadata.hasStereotype(Trace)
         !metadata.hasDeclaredStereotype(Trace)
         !metadata.hasDeclaredAnnotation(Trace)
@@ -415,8 +410,8 @@ interface ITest {
     void "test parse first level method stereotype data"() {
 
         given:
-        AnnotationMetadata metadata = buildMethodAnnotationMetadata("test.Test",'''\
-package test;
+        AnnotationMetadata metadata = buildMethodAnnotationMetadata("annbuild15.Test",'''\
+package annbuild15;
 
 
 class Test {
@@ -437,15 +432,17 @@ class Test {
     void "test parse inherited from class method stereotype data"() {
 
         given:
-        AnnotationMetadata metadata = buildMethodAnnotationMetadata("test.Test",'''\
-package test;
+        AnnotationMetadata metadata = buildBeanDefinition("annbuild16.Test",'''\
+package annbuild16;
 
 
 @io.micronaut.context.annotation.Primary
+@io.micronaut.context.annotation.Bean
 class Test {
+    @io.micronaut.context.annotation.Executable
     void testMethod() {}
 }
-''', 'testMethod')
+''').getRequiredMethod("testMethod").getAnnotationMetadata()
 
         expect:
         metadata != null
@@ -459,8 +456,10 @@ class Test {
     void "test parse inherited from interface method stereotype data"() {
 
         given:
-        AnnotationMetadata metadata = buildMethodAnnotationMetadata("test.Test",'''\
-package test;
+        AnnotationMetadata metadata = buildMethodAnnotationMetadata("annbuild17.Test",'''\
+package annbuild17;
+
+import java.lang.annotation.*;
 
 class Test implements ITest {
     @Override
@@ -468,27 +467,30 @@ class Test implements ITest {
 }
 
 interface ITest {
-    @io.micronaut.context.annotation.Primary
+    @MyAnn
     void testMethod(); 
 }
+
+@io.micronaut.context.annotation.Primary
+@Retention(RetentionPolicy.RUNTIME)
+@Inherited
+@interface MyAnn {}
 ''', 'testMethod')
 
         expect:
         metadata != null
         !metadata.hasDeclaredAnnotation(Primary)
-        !metadata.hasDeclaredAnnotation(Singleton)
-        metadata.hasAnnotation(Primary)
-        metadata.hasStereotype(Qualifier)
+        !metadata.hasDeclaredAnnotation(AnnotationUtil.SINGLETON)
+        !metadata.hasAnnotation(Primary)
         metadata.hasStereotype(Primary)
-        !metadata.hasDeclaredStereotype(Primary)
-        !metadata.hasDeclaredStereotype(Qualifier)
-        !metadata.hasStereotype(Singleton)
+        metadata.hasStereotype(AnnotationUtil.QUALIFIER)
+        !metadata.hasStereotype(AnnotationUtil.SINGLETON)
     }
 
     void "test array annotation value"() {
         given:
-        AnnotationMetadata metadata = buildMethodAnnotationMetadata('test.Test', '''\
-package test;
+        AnnotationMetadata metadata = buildMethodAnnotationMetadata('annbuild18.Test', '''\
+package annbuild18;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.ast.groovy.annotation.*;

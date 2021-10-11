@@ -15,13 +15,14 @@
  */
 package io.micronaut.docs.qualifiers.annotation
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 // tag::class[]
 @Singleton
 class V6Engine implements Engine { // <2>
     int cylinders = 6
 
+    @Override
     String start() {
         "Starting V6"
     }

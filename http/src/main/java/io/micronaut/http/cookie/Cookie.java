@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,8 +16,8 @@
 package io.micronaut.http.cookie;
 
 import io.micronaut.core.util.ArgumentUtils;
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import java.io.Serializable;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAmount;
@@ -62,7 +62,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * If this returns true, the {@link Cookie} cannot be accessed through client side script - But only if the
      * browser supports it.
      * <p>
-     * See <a href="http://www.owasp.org/index.php/HTTPOnly">here</a> for reference
+     * See <a href="https://www.owasp.org/index.php/HTTPOnly">here</a> for reference
      *
      * @return True if this {@link Cookie} is HTTP-only or false if it isn't
      */
@@ -171,8 +171,11 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
         configuration.getCookieDomain().ifPresent(this::domain);
         configuration.getCookieMaxAge().ifPresent(this::maxAge);
         configuration.isCookieHttpOnly().ifPresent(this::httpOnly);
-        if (isSecure) {
-            configuration.isCookieSecure().ifPresent(this::secure);
+        final Optional<Boolean> secureConfiguration = configuration.isCookieSecure();
+        if (secureConfiguration.isPresent()) {
+            secure(secureConfiguration.get());
+        } else {
+            secure(isSecure);
         }
         configuration.getCookieSameSite().ifPresent(this::sameSite);
         return this;

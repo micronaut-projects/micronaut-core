@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,13 +18,16 @@ package io.micronaut.tracing.brave;
 import brave.Tracing;
 import brave.propagation.CurrentTraceContext;
 import brave.propagation.TraceContext;
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
 import io.micronaut.tracing.instrument.util.TracingInvocationInstrumenterFactory;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
+import java.util.function.Supplier;
 
 /**
  * Tracing invocation instrument for Brave.
@@ -37,15 +40,15 @@ import javax.inject.Singleton;
 @Internal
 public final class BraveTracingInvocationInstrumenter implements ReactiveInvocationInstrumenterFactory, TracingInvocationInstrumenterFactory {
 
-    private final CurrentTraceContext currentTraceContext;
+    private final Supplier<CurrentTraceContext> currentTraceContext;
 
     /**
      * Create a tracing invocation instrumenter.
      *
      * @param tracing invocation tracer
      */
-    public BraveTracingInvocationInstrumenter(Tracing tracing) {
-        this.currentTraceContext = tracing.currentTraceContext();
+    public BraveTracingInvocationInstrumenter(BeanProvider<Tracing> tracing) {
+        this.currentTraceContext = SupplierUtil.memoized(() -> tracing.get().currentTraceContext());
     }
 
     @Override
@@ -55,22 +58,12 @@ public final class BraveTracingInvocationInstrumenter implements ReactiveInvocat
 
     @Override
     public InvocationInstrumenter newTracingInvocationInstrumenter() {
+        final CurrentTraceContext currentTraceContext = this.currentTraceContext.get();
         final TraceContext invocationContext = currentTraceContext.get();
         if (invocationContext != null) {
-            return new InvocationInstrumenter() {
-
-                CurrentTraceContext.Scope activeScope;
-
-                @Override
-                public void beforeInvocation() {
-                    activeScope = currentTraceContext.maybeScope(invocationContext);
-                }
-
-                @Override
-                public void afterInvocation(boolean cleanup) {
-                    activeScope.close();
-                }
-
+            return () -> {
+                CurrentTraceContext.Scope activeScope = currentTraceContext.maybeScope(invocationContext);
+                return cleanup -> activeScope.close();
             };
         }
         return null;

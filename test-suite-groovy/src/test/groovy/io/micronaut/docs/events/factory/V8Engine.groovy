@@ -20,8 +20,9 @@ class V8Engine implements Engine {
     final int cylinders = 8
     double rodLength // <1>
 
+    @Override
     String start() {
-        return "Starting V${cylinders} [rodLength=$rodLength]"
+        return "Starting V$cylinders [rodLength=$rodLength]"
     }
 }
 // end::class[]

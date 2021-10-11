@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,7 +17,8 @@ package io.micronaut.docs.aop.retry;
 
 import io.micronaut.retry.annotation.CircuitBreaker;
 import io.micronaut.retry.annotation.Retryable;
-import io.reactivex.Flowable;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 import java.util.Collections;
 import java.util.List;
@@ -45,8 +46,8 @@ public class BookService {
     }
 
     // tag::attempts[]
-    @Retryable( attempts = "5",
-                delay = "2s" )
+    @Retryable(attempts = "5",
+               delay = "2s")
     public Book findBook(String title) {
         // ...
     // end::attempts[]
@@ -55,8 +56,8 @@ public class BookService {
 
 
     // tag::config[]
-    @Retryable( attempts = "${book.retry.attempts:3}",
-                delay = "${book.retry.delay:1s}" )
+    @Retryable(attempts = "${book.retry.attempts:3}",
+               delay = "${book.retry.delay:1s}")
     public Book getBook(String title) {
         // ...
     // end::config[]
@@ -65,10 +66,10 @@ public class BookService {
 
     // tag::reactive[]
     @Retryable
-    public Flowable<Book> streamBooks() {
+    public Publisher<Book> streamBooks() {
         // ...
     // end::reactive[]
-        return Flowable.just(
+        return Flux.just(
                 new Book("The Stand")
         );
     }

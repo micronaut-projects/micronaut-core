@@ -3,13 +3,12 @@ package io.micronaut.http.server.netty.converters
 import io.micronaut.context.annotation.Property
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.test.annotation.MicronautTest
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.netty.bootstrap.ServerBootstrap
 import io.netty.channel.ChannelOption
 import io.netty.channel.WriteBufferWaterMark
+import jakarta.inject.Inject
 import spock.lang.Specification
-
-import javax.inject.Inject
 
 @MicronautTest
 @Property(name = 'micronaut.server.netty.childOptions.write_buffer_water_mark.high', value = '262143')

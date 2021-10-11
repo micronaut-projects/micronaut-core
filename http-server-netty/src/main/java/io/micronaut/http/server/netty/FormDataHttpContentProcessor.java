@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,6 +22,7 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.multipart.*;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -43,7 +44,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @Internal
 public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<HttpData> {
 
-    private final HttpPostRequestDecoder decoder;
+    private final InterfaceHttpPostRequestDecoder decoder;
     private final boolean enabled;
     private AtomicLong extraMessages = new AtomicLong(0);
     private final long partMaxSize;
@@ -65,7 +66,12 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
             factory = new DefaultHttpDataFactory(false, characterEncoding);
         }
         factory.setMaxLimit(multipart.getMaxFileSize());
-        this.decoder = new HttpPostRequestDecoder(factory, nettyHttpRequest.getNativeRequest(), characterEncoding);
+        final HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
+        if (HttpPostRequestDecoder.isMultipart(nativeRequest)) {
+            this.decoder = new MicronautHttpPostMultipartRequestDecoder(factory, nativeRequest, characterEncoding);
+        } else {
+            this.decoder = new HttpPostStandardRequestDecoder(factory, nativeRequest, characterEncoding);
+        }
         this.enabled = nettyHttpRequest.getContentType().map(type -> type.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)).orElse(false) ||
             multipart.isEnabled();
         this.partMaxSize = multipart.getMaxFileSize();
@@ -82,7 +88,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
 
             @Override
             public void request(long n) {
-                extraMessages.updateAndGet((p) -> {
+                extraMessages.updateAndGet(p -> {
                     long newVal = p - n;
                     if (newVal < 0) {
                         subscription.request(n - p);
@@ -109,7 +115,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
             List<InterfaceHttpData> messages = new ArrayList<>(1);
 
             try {
-                HttpPostRequestDecoder postRequestDecoder = this.decoder;
+                InterfaceHttpPostRequestDecoder postRequestDecoder = this.decoder;
                 postRequestDecoder.offer(httpContent);
 
                 while (postRequestDecoder.hasNext()) {
@@ -155,7 +161,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
                 if (messages.isEmpty()) {
                     subscription.request(1);
                 } else {
-                    extraMessages.updateAndGet((p) -> p + messages.size() - 1);
+                    extraMessages.updateAndGet(p -> p + messages.size() - 1);
                     messages.stream().map(HttpData.class::cast).forEach(subscriber::onNext);
                 }
 

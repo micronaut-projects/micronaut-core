@@ -21,4 +21,15 @@ class ClosestTypeArgumentsSpec extends Specification {
         then:
         bean instanceof CustomErrorExceptionHandler
     }
+
+    void "test @Singleton created once"() {
+        ApplicationContext ctx = ApplicationContext.run(["spec.name": ClosestTypeArgumentsSpec.simpleName])
+
+        when:
+        CustomErrorExceptionHandler bean1 = ctx.getBean(CustomErrorExceptionHandler)
+        ExceptionHandler bean2 = ctx.getBean(ExceptionHandler, Qualifiers.byTypeArgumentsClosest(CustomError.class, Object.class))
+
+        then:
+        bean1.is(bean2)
+    }
 }

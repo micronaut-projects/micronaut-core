@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,12 +24,11 @@ import com.netflix.hystrix.strategy.concurrency.HystrixRequestVariableLifecycle;
 import com.netflix.hystrix.strategy.properties.HystrixProperty;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.tracing.instrument.util.TracingInvocationInstrumenterFactory;
+import jakarta.inject.Singleton;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -56,7 +55,6 @@ public class TracingHystrixConcurrentStrategy extends HystrixConcurrencyStrategy
      * @param tracingInvocationInstrumenterFactory For instrumenting callable
      * @param hystrixConcurrencyStrategy           Different behavior or implementations for concurrency related aspects of the system with default implementations
      */
-    @Inject
     public TracingHystrixConcurrentStrategy(TracingInvocationInstrumenterFactory tracingInvocationInstrumenterFactory,
                                             @Nullable HystrixConcurrencyStrategy hystrixConcurrencyStrategy) {
         this.delegate = hystrixConcurrencyStrategy != null ? hystrixConcurrencyStrategy : HystrixConcurrencyStrategyDefault.getInstance();

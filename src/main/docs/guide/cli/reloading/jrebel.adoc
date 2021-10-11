@@ -1,9 +1,9 @@
-https://zeroturnaround.com/software/jrebel/[JRebel] is a proprietary reloading solution that involves an agent library, as well as sophisticated IDE support. The JRebel documentation includes detailed steps for IDE integration and usage of the tool. In this section, we will simply show how to install and configure the agent for Maven and Gradle projects.
+https://www.jrebel.com/products/jrebel[JRebel] is a proprietary reloading solution that involves an agent library, as well as sophisticated IDE support. The JRebel documentation includes detailed steps for IDE integration and usage. In this section, we show how to install and configure the agent for Maven and Gradle projects.
 
 [TIP]
 .Using the CLI
 ====
-If you are creating your project using the Micronaut CLI, supply the `jrebel` feature to preconfigure JRebel reloading in your project. Please note that you will still need to install JRebel and supply the correct path to the agent in the `gradle.properties` file (for Gradle) or `pom.xml` (for Maven). The steps necessary are described below.
+If you create your project using the Micronaut CLI, supply the `jrebel` feature to preconfigure JRebel reloading in your project. Note that you need to install JRebel and supply the correct path to the agent in the `gradle.properties` file (for Gradle) or `pom.xml` (for Maven). The necessary steps are described below.
 
 ----
 $ mn create-app my-app --features jrebel
@@ -12,9 +12,9 @@ $ mn create-app my-app --features jrebel
 
 == Install/configure JRebel Agent
 
-The simplest way to install JRebel is to download the "standalone" installation package from the https://zeroturnaround.com/software/jrebel/download[JRebel download page]. Unzip the downloaded file to a convenient location within your user's directory - for example, `~/bin/jrebel`
+The simplest way to install JRebel is to download the "standalone" installation package from the https://www.jrebel.com/products/jrebel/download[JRebel download page]. Unzip the downloaded file to a convenient location, for example `~/bin/jrebel`
 
-The installation directory will contain a `lib` directory containing the agent files. The appropriate agent based on your operating system, following the table below:
+The installation directory contains a `lib` directory with the agent files. For the appropriate agent based on your operating system, see the table below:
 
 .JRebel Agent
 |===
@@ -61,38 +61,41 @@ You can start the application with `./gradlew run`, and it will include the agen
 
 === Maven
 
-
-Add the path to `pom.xml` as a build profile (if using the CLI feature, the profile `jrebel` is already provided - simply update the path to the agent JAR).
+Configure the Micronaut Maven Plugin accordingly:
 
 [source,xml]
 ----
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-<!-- ... -->
-    <profiles>
-        <profile>
-            <id>jrebel</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>exec-maven-plugin</artifactId>
-                        <version>1.6.0</version>
-                        <configuration>
-                            <executable>java</executable>
-                            <arguments>
-                                <argument>-noverify</argument>
-                                <argument>-XX:TieredStopAtLevel=1</argument>
-                                <argument>-agentpath:~/bin/jrebel/lib/jrebel6/lib/libjrebel64.dylib</argument>
-                                <argument>-classpath</argument>
-                                <classpath/>
-                                <argument>${exec.mainClass}</argument>
-                            </arguments>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
+  <!-- ... -->
+  <build>
+    <plugins>
+      <!-- ... -->
+      <plugin>
+        <groupId>io.micronaut.build</groupId>
+        <artifactId>micronaut-maven-plugin</artifactId>
+          <configuration>
+            <jvmArguments>
+              <jvmArgument>-agentpath:~/bin/jrebel/lib/jrebel6/lib/libjrebel64.dylib</jvmArgument>
+            </jvmArguments>
+          </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.zeroturnaround</groupId>
+        <artifactId>jrebel-maven-plugin</artifactId>
+        <version>1.1.10</version>
+        <executions>
+          <execution>
+            <id>generate-rebel-xml</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>generate</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- ... -->
+    </plugins>
+  </build>
 </project>
 ----

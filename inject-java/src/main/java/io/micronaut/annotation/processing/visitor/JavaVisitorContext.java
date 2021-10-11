@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,9 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.annotation.processing.JavaConfigurationMetadataBuilder;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.annotation.processing.AnnotationProcessingOutputVisitor;
 import io.micronaut.annotation.processing.AnnotationUtils;
 import io.micronaut.annotation.processing.GenericUtils;
@@ -28,12 +31,15 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.beans.BeanElement;
+import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.util.VisitorContextUtils;
+import io.micronaut.inject.visitor.BeanElementVisitorContext;
+import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.GeneratedFile;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -60,7 +66,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-public class JavaVisitorContext implements VisitorContext {
+public class JavaVisitorContext implements VisitorContext, BeanElementVisitorContext {
 
     private final Messager messager;
     private final Elements elements;
@@ -71,6 +77,10 @@ public class JavaVisitorContext implements VisitorContext {
     private final MutableConvertibleValues<Object> visitorAttributes;
     private final GenericUtils genericUtils;
     private final ProcessingEnvironment processingEnv;
+    private final List<String> generatedResources = new ArrayList<>();
+    private final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = new ArrayList<>();
+    private final JavaElementFactory elementFactory;
+    private final TypeElementVisitor.VisitorKind visitorKind;
     private @Nullable
     JavaFileManager standardFileManager;
 
@@ -86,6 +96,7 @@ public class JavaVisitorContext implements VisitorContext {
      * @param genericUtils      The generic type utils
      * @param filer             The filer
      * @param visitorAttributes The attributes
+     * @param visitorKind       The visitor kind
      */
     public JavaVisitorContext(
             ProcessingEnvironment processingEnv,
@@ -96,7 +107,8 @@ public class JavaVisitorContext implements VisitorContext {
             ModelUtils modelUtils,
             GenericUtils genericUtils,
             Filer filer,
-            MutableConvertibleValues<Object> visitorAttributes) {
+            MutableConvertibleValues<Object> visitorAttributes,
+            TypeElementVisitor.VisitorKind visitorKind) {
         this.messager = messager;
         this.elements = elements;
         this.annotationUtils = annotationUtils;
@@ -106,6 +118,22 @@ public class JavaVisitorContext implements VisitorContext {
         this.outputVisitor = new AnnotationProcessingOutputVisitor(filer);
         this.visitorAttributes = visitorAttributes;
         this.processingEnv = processingEnv;
+        this.elementFactory = new JavaElementFactory(this);
+        this.visitorKind = visitorKind;
+    }
+
+    /**
+     * @return The visitor kind
+     */
+    public TypeElementVisitor.VisitorKind getVisitorKind() {
+        return visitorKind;
+    }
+
+    /**
+     * @return The processing environment
+     */
+    public ProcessingEnvironment getProcessingEnv() {
+        return processingEnv;
     }
 
     @NonNull
@@ -134,8 +162,12 @@ public class JavaVisitorContext implements VisitorContext {
     @Override
     public Optional<ClassElement> getClassElement(String name) {
         TypeElement typeElement = elements.getTypeElement(name);
+        if (typeElement == null) {
+            // maybe inner class?
+            typeElement = elements.getTypeElement(name.replace('$', '.'));
+        }
         return Optional.ofNullable(typeElement).map(typeElement1 ->
-                new JavaClassElement(typeElement1, annotationUtils.getAnnotationMetadata(typeElement1), this, Collections.emptyMap())
+                elementFactory.newClassElement(typeElement1, annotationUtils.getAnnotationMetadata(typeElement1))
         );
     }
 
@@ -152,6 +184,12 @@ public class JavaVisitorContext implements VisitorContext {
             return classElements.toArray(new ClassElement[0]);
         }
         return new ClassElement[0];
+    }
+
+    @NonNull
+    @Override
+    public JavaElementFactory getElementFactory() {
+        return elementFactory;
     }
 
     @Override
@@ -178,7 +216,10 @@ public class JavaVisitorContext implements VisitorContext {
 
     private void printMessage(String message, Diagnostic.Kind kind, @Nullable io.micronaut.inject.ast.Element element) {
         if (StringUtils.isNotEmpty(message)) {
-            if (element != null) {
+            if (element instanceof BeanElement) {
+                element = ((BeanElement) element).getDeclaringClass();
+            }
+            if (element instanceof AbstractJavaElement) {
                 Element el = (Element) element.getNativeType();
                 messager.printMessage(kind, message, el);
             } else {
@@ -189,7 +230,12 @@ public class JavaVisitorContext implements VisitorContext {
 
     @Override
     public OutputStream visitClass(String classname, @Nullable io.micronaut.inject.ast.Element originatingElement) throws IOException {
-        return outputVisitor.visitClass(classname, originatingElement);
+        return outputVisitor.visitClass(classname, new io.micronaut.inject.ast.Element[]{ originatingElement });
+    }
+
+    @Override
+    public OutputStream visitClass(String classname, io.micronaut.inject.ast.Element... originatingElements) throws IOException {
+        return outputVisitor.visitClass(classname, originatingElements);
     }
 
     @Override
@@ -198,8 +244,8 @@ public class JavaVisitorContext implements VisitorContext {
     }
 
     @Override
-    public Optional<GeneratedFile> visitMetaInfFile(String path) {
-        return outputVisitor.visitMetaInfFile(path);
+    public Optional<GeneratedFile> visitMetaInfFile(String path, io.micronaut.inject.ast.Element... originatingElements) {
+        return outputVisitor.visitMetaInfFile(path, originatingElements);
     }
 
     @Override
@@ -322,16 +368,12 @@ public class JavaVisitorContext implements VisitorContext {
 
     private void populateClassElements(@NonNull String[] stereotypes, PackageElement packageElement, List<ClassElement> classElements) {
         final List<? extends Element> enclosedElements = packageElement.getEnclosedElements();
-
+        boolean includeAll = Arrays.equals(stereotypes, new String[] { "*" });
         for (Element enclosedElement : enclosedElements) {
             if (enclosedElement instanceof TypeElement) {
                 final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(enclosedElement);
-                if (Arrays.stream(stereotypes).anyMatch(annotationMetadata::hasStereotype)) {
-                    JavaClassElement classElement = new JavaClassElement(
-                            (TypeElement) enclosedElement,
-                            annotationMetadata,
-                            this
-                    );
+                if (includeAll || Arrays.stream(stereotypes).anyMatch(annotationMetadata::hasStereotype)) {
+                    JavaClassElement classElement = elementFactory.newClassElement((TypeElement) enclosedElement, annotationMetadata);
 
                     if (!classElement.isAbstract()) {
                         classElements.add(classElement);
@@ -362,5 +404,45 @@ public class JavaVisitorContext implements VisitorContext {
             }
         }
         return Optional.ofNullable(this.standardFileManager);
+    }
+
+    @Override
+    public Collection<String> getGeneratedResources() {
+        return Collections.unmodifiableCollection(generatedResources);
+    }
+
+    @Override
+    public void addGeneratedResource(@NonNull String resource) {
+        generatedResources.add(resource);
+    }
+
+    /**
+     * @return Gets the produced bean definition builders.
+     */
+    @Internal
+    public List<AbstractBeanDefinitionBuilder> getBeanElementBuilders() {
+        final ArrayList<AbstractBeanDefinitionBuilder> current = new ArrayList<>(beanDefinitionBuilders);
+        beanDefinitionBuilders.clear();
+        return current;
+    }
+
+    /**
+     * Adds a java bean definition builder.
+     * @param javaBeanDefinitionBuilder The bean builder
+     */
+    @Internal
+    void addBeanDefinitionBuilder(JavaBeanDefinitionBuilder javaBeanDefinitionBuilder) {
+        this.beanDefinitionBuilders.add(javaBeanDefinitionBuilder);
+    }
+
+    @Override
+    public BeanElementBuilder addAssociatedBean(io.micronaut.inject.ast.Element originatingElement, ClassElement type) {
+        JavaBeanDefinitionBuilder javaBeanDefinitionBuilder = new JavaBeanDefinitionBuilder(
+                originatingElement,
+                type,
+                new JavaConfigurationMetadataBuilder(elements, types, annotationUtils),
+                this
+        );
+        return javaBeanDefinitionBuilder;
     }
 }

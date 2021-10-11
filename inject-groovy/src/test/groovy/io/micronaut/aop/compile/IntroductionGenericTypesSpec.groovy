@@ -15,7 +15,7 @@
  */
 package io.micronaut.aop.compile
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.core.type.ReturnType
 import io.micronaut.inject.BeanDefinition
@@ -48,7 +48,7 @@ interface MyInterface<T extends URL> {
 
 
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 interface MyBean extends MyInterface<URL> {
 }
 
@@ -77,14 +77,14 @@ import java.net.*;
 
 interface MyInterface<T extends Person> {
     @Executable
+    reactor.core.publisher.Mono<java.util.List<T>> getPeopleSingle();
+    
+    @Executable
     T[] getPeopleArray();
 
     @Executable
     def <V extends java.net.URL> java.util.Map<T,V> getPeopleMap();
 
-    @Executable
-    io.reactivex.Single<java.util.List<T>> getPeopleSingle();
-    
     @Executable
     T getPerson();
     
@@ -106,7 +106,7 @@ interface MyInterface<T extends Person> {
 
 
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 interface MyBean extends MyInterface<SubPerson> {
 
 }
@@ -118,12 +118,12 @@ class SubPerson extends Person {}
         then:
         !beanDefinition.isAbstract()
         beanDefinition != null
+        returnType(beanDefinition, "getPeopleSingle").typeVariables['T'].type== List
+        returnType(beanDefinition, "getPeopleSingle").typeVariables['T'].typeVariables['E'].type.name == 'test.SubPerson'
         returnType(beanDefinition, "getPerson").type.name == 'test.SubPerson'
         returnType(beanDefinition, "getPeopleArray").type.name.contains('test.SubPerson')
         returnType(beanDefinition, "getPeopleMap").typeVariables['K'].type.name == 'test.SubPerson'
         returnType(beanDefinition, "getPeopleMap").typeVariables['V'].type == URL
-        returnType(beanDefinition, "getPeopleSingle").typeVariables['T'].type== List
-        returnType(beanDefinition, "getPeopleSingle").typeVariables['T'].typeVariables['E'].type.name == 'test.SubPerson'
         returnType(beanDefinition, "getPeople").type == List
         returnType(beanDefinition, "getPeople").asArgument().hasTypeVariables()
         returnType(beanDefinition, "getPeople").asArgument().typeVariables['E'].type.name == 'test.SubPerson'
@@ -168,7 +168,7 @@ interface MyInterface<T extends Person> {
     def <V extends java.net.URL> java.util.Map<T,V> getPeopleMap();
 
     @Executable
-    io.reactivex.Single<java.util.List<T>> getPeopleSingle();
+    reactor.core.publisher.Mono<java.util.List<T>> getPeopleSingle();
     
     @Executable
     T getPerson();
@@ -215,9 +215,6 @@ class SubPerson extends Person {}
         returnType(beanDefinition, "getPeopleArray").type.isArray()
         returnType(beanDefinition, "getPeopleListArray").type == List
         returnType(beanDefinition, "getPeopleListArray").typeVariables['E'].type.isArray()
-
-
-
 
         when:
         def context = new DefaultBeanContext()

@@ -42,6 +42,7 @@ class DefaultConversionServiceSpec extends Specification {
         10                      | Float       | 10.0f
         10                      | String      | "10"
         "1,2"                   | int[]       | [1, 2] as int[]
+        "str"                   | char[]      | ['s', 't', 'r'] as char[]
         "10"                    | Byte        | 10
         "10"                    | Integer     | 10
         "${5 + 5}"              | Integer     | 10

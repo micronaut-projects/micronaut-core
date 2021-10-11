@@ -29,7 +29,7 @@ class Test {
     }
 }
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyListener implements io.micronaut.context.event.ApplicationEventListener<StartupEvent> {
     public void onApplicationEvent(StartupEvent event) {}
 

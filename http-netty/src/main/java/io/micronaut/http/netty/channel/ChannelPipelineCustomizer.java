@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.netty.channel;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * Interface that allows customizations to the {@link io.netty.channel.ChannelPipeline}.
@@ -36,6 +36,7 @@ public interface ChannelPipelineCustomizer {
     String HANDLER_HTTP_CLIENT_CODEC = "http-client-codec";
     String HANDLER_HTTP_SERVER_CODEC = "http-server-codec";
     String HANDLER_HTTP_CLIENT_INIT = "http-client-init";
+    String HANDLER_HTTP_TO_HTTPS_REDIRECT = "http-to-https-redirect";
     String HANDLER_FLOW_CONTROL = "flow-control-handler";
     String HANDLER_CONNECT_TTL = "connect-ttl";
     String HANDLER_IDLE_STATE = "idle-state";
@@ -47,6 +48,7 @@ public interface ChannelPipelineCustomizer {
     String HANDLER_MICRONAUT_SSE_EVENT_STREAM = "micronaut-sse-event-stream";
     String HANDLER_MICRONAUT_SSE_CONTENT = "micronaut-sse-content";
     String HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM = "micronaut-http-response-stream";
+    String HANDLER_MICRONAUT_HTTP_RESPONSE_FULL = "micronaut-http-response-full";
     String HANDLER_HTTP2_CONNECTION = "http2-connection";
     String HANDLER_HTTP2_SETTINGS = "http2-settings";
     String HANDLER_HTTP2_UPGRADE_REQUEST = "http2-upgrade-request";

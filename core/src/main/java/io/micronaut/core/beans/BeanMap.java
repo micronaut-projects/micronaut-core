@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,7 +17,7 @@ package io.micronaut.core.beans;
 
 import io.micronaut.core.util.ArgumentUtils;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import java.util.Map;
 
 /**
@@ -44,8 +44,7 @@ public interface BeanMap<T> extends Map<String, Object> {
     @SuppressWarnings({"unchecked", "deprecation"})
     static @NonNull <B> BeanMap<B> of(@NonNull B bean) {
         ArgumentUtils.requireNonNull("bean", bean);
-        return BeanIntrospector.SHARED.findIntrospection(bean.getClass())
-                .map(i -> (BeanMap<B>) new BeanIntrospectionMap<>((BeanIntrospection<B>) i, bean))
-                .orElseGet(() -> new ReflectionBeanMap<>(bean));
+        BeanIntrospection<B> introspection = (BeanIntrospection<B>) BeanIntrospector.SHARED.getIntrospection(bean.getClass());
+        return new BeanIntrospectionMap<>(introspection, bean);
     }
 }

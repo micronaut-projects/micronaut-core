@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,28 +32,28 @@ public interface LoggersManager<T> {
     /**
      * Collect all existing loggers in the system.
      *
-     * @param loggingSystem The {@link LoggingSystem} in use
+     * @param loggingSystem The {@link ManagedLoggingSystem} in use
      * @return A {@link Publisher} of <code>T</code>
      */
-    Publisher<T> getLoggers(LoggingSystem loggingSystem);
+    Publisher<T> getLoggers(ManagedLoggingSystem loggingSystem);
 
     /**
      * Find (or create if not found) the named logger in the system.
      *
-     * @param loggingSystem The {@link LoggingSystem} in use
+     * @param loggingSystem The {@link ManagedLoggingSystem} in use
      * @param name The name of the logger to find or create
      * @return A {@link Publisher} of <code>T</code>
      */
-    Publisher<T> getLogger(LoggingSystem loggingSystem, @NotBlank String name);
+    Publisher<T> getLogger(ManagedLoggingSystem loggingSystem, @NotBlank String name);
 
 
     /**
      * Set the log level for the named logger in the system.
      *
-     * @param loggingSystem The {@link LoggingSystem} in use
+     * @param loggingSystem The {@link ManagedLoggingSystem} in use
      * @param name The name of the logger to find or create
      * @param level The log level to configure
      */
-    void setLogLevel(LoggingSystem loggingSystem, @NotBlank String name,
+    void setLogLevel(ManagedLoggingSystem loggingSystem, @NotBlank String name,
                              @NotNull io.micronaut.logging.LogLevel level);
 }

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,8 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.env.CommandLinePropertySource;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
@@ -22,9 +24,6 @@ import io.micronaut.context.env.SystemPropertiesPropertySource;
 import io.micronaut.core.cli.CommandLine;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.util.StringUtils;
-
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.*;
@@ -38,6 +37,7 @@ import java.util.*;
 public class DefaultApplicationContextBuilder implements ApplicationContextBuilder, ApplicationContextConfiguration {
     private List<Object> singletons = new ArrayList<>();
     private List<String> environments = new ArrayList<>();
+    private List<String> defaultEnvironments = new ArrayList<>();
     private List<String> packages = new ArrayList<>();
     private Map<String, Object> properties = new LinkedHashMap<>();
     private List<PropertySource> propertySources = new ArrayList<>();
@@ -50,11 +50,21 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private List<String> envVarExcludes = new ArrayList<>();
     private String[] args = new String[0];
     private Set<Class<? extends Annotation>> eagerInitAnnotated = new HashSet<>(3);
+    private String[] overrideConfigLocations;
+    private boolean banner = true;
+    private ClassPathResourceLoader classPathResourceLoader;
+    private boolean allowEmptyProviders = false;
+    private Boolean bootstrapEnvironment = null;
 
     /**
      * Default constructor.
      */
     protected DefaultApplicationContextBuilder() {
+    }
+
+    @Override
+    public boolean isAllowEmptyProviders() {
+        return allowEmptyProviders;
     }
 
     @NonNull
@@ -64,6 +74,29 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
             eagerInitAnnotated.addAll(Arrays.asList(annotations));
         }
         return this;
+    }
+
+    @NonNull
+    @Override
+    public ApplicationContextBuilder overrideConfigLocations(String... configLocations) {
+        overrideConfigLocations = configLocations;
+        return this;
+    }
+
+    @Override
+    public @Nullable  List<String> getOverrideConfigLocations() {
+        return overrideConfigLocations == null ? null : Arrays.asList(overrideConfigLocations);
+    }
+
+    @Override
+    public boolean isBannerEnabled() {
+        return banner;
+    }
+
+    @Nullable
+    @Override
+    public Boolean isBootstrapEnvironmentEnabled() {
+        return bootstrapEnvironment;
     }
 
     @Override
@@ -81,11 +114,14 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
 
     @Override
     public @NonNull ClassPathResourceLoader getResourceLoader() {
-        if (classLoader != null) {
-            return ClassPathResourceLoader.defaultLoader(classLoader);
-        } else {
-            return ClassPathResourceLoader.defaultLoader(getClass().getClassLoader());
+        if (classPathResourceLoader == null) {
+            if (classLoader != null) {
+                classPathResourceLoader = ClassPathResourceLoader.defaultLoader(classLoader);
+            } else {
+                classPathResourceLoader = ClassPathResourceLoader.defaultLoader(getClass().getClassLoader());
+            }
         }
+        return classPathResourceLoader;
     }
 
     @NonNull
@@ -104,6 +140,14 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     public @NonNull ApplicationContextBuilder environments(@Nullable String... environments) {
         if (environments != null) {
             this.environments.addAll(Arrays.asList(environments));
+        }
+        return this;
+    }
+
+    @Override
+    public @NonNull ApplicationContextBuilder defaultEnvironments(@Nullable String... environments) {
+        if (environments != null) {
+            this.defaultEnvironments.addAll(Arrays.asList(environments));
         }
         return this;
     }
@@ -165,6 +209,11 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
+    public @NonNull List<String> getDefaultEnvironments() {
+        return defaultEnvironments;
+    }
+
+    @Override
     public boolean isEnvironmentPropertySource() {
         return envPropertySource;
     }
@@ -206,6 +255,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         if (args != null) {
             this.args = args;
         }
+        return this;
+    }
+
+    @Override
+    public @NonNull ApplicationContextBuilder bootstrapEnvironment(boolean bootstrapEnv) {
+        this.bootstrapEnvironment = bootstrapEnv;
         return this;
     }
 
@@ -256,7 +311,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @NonNull
     protected ApplicationContext newApplicationContext() {
         return new DefaultApplicationContext(
-            this
+                this
         );
     }
 
@@ -285,6 +340,18 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         if (configurations != null) {
             this.configurationExcludes.addAll(Arrays.asList(configurations));
         }
+        return this;
+    }
+
+    @Override
+    public @NonNull ApplicationContextBuilder banner(boolean isEnabled) {
+        this.banner = isEnabled;
+        return this;
+    }
+
+    @Override
+    public @NonNull ApplicationContextBuilder allowEmptyProviders(boolean shouldAllow) {
+        this.allowEmptyProviders = shouldAllow;
         return this;
     }
 }

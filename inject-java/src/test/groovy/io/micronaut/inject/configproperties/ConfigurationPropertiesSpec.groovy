@@ -19,7 +19,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.core.util.CollectionUtils
-import spock.lang.Ignore
 import spock.lang.Specification
 
 class ConfigurationPropertiesSpec extends Specification {
@@ -143,5 +142,20 @@ class ConfigurationPropertiesSpec extends Specification {
 
         cleanup:
         context.close()
+    }
+
+    void "test camelCase vs kebab_case"() {
+        ApplicationContext context1 = ApplicationContext.run("rec1")
+        ApplicationContext context2 = ApplicationContext.run("rec2")
+
+        RecConf config1 = context1.getBean(RecConf.class)
+        RecConf config2 = context2.getBean(RecConf.class)
+
+        expect:
+            config1 == config2
+
+        cleanup:
+            context1.close()
+            context2.close()
     }
 }

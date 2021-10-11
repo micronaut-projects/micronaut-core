@@ -16,17 +16,19 @@
 package io.micronaut.docs.sse
 
 import io.micronaut.docs.streaming.Headline
-import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.sse.Event
-import io.reactivex.Flowable
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+
+import static io.micronaut.http.MediaType.TEXT_EVENT_STREAM
 
 // tag::class[]
 @Client("/streaming/sse")
 interface HeadlineClient {
 
-    @Get(value = "/headlines", processes = MediaType.TEXT_EVENT_STREAM)
-    Flowable<Event<Headline>> streamHeadlines()
+    @Get(value = "/headlines", processes = TEXT_EVENT_STREAM)
+    Publisher<Event<Headline>> streamHeadlines()
 }
 // end::class[]

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,7 +22,6 @@ import io.micronaut.context.exceptions.BeanContextException;
 import io.micronaut.context.processor.AnnotationProcessor;
 import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
-import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
@@ -50,6 +49,13 @@ class AnnotationProcessorListener implements BeanCreatedEventListener<Annotation
         AnnotationProcessor processor = event.getBean();
         BeanDefinition<AnnotationProcessor> processorDefinition = event.getBeanDefinition();
         BeanContext beanContext = event.getSource();
+        if (processor instanceof LifeCycle) {
+            try {
+                ((LifeCycle<?>) processor).start();
+            } catch (Exception e) {
+                throw new BeanContextException("Error starting bean processing: " + e.getMessage(), e);
+            }
+        }
         if (processor instanceof ExecutableMethodProcessor) {
 
             List<Argument<?>> typeArguments = processorDefinition.getTypeArguments(ExecutableMethodProcessor.class);
@@ -117,9 +123,9 @@ class AnnotationProcessorListener implements BeanCreatedEventListener<Annotation
             }
         }
 
-        if (processor instanceof Completable) {
+        if (processor instanceof LifeCycle) {
             try {
-                ((Completable) processor).onComplete();
+                ((LifeCycle<?>) processor).stop();
             } catch (Exception e) {
                 throw new BeanContextException("Error finalizing bean processing: " + e.getMessage(), e);
             }

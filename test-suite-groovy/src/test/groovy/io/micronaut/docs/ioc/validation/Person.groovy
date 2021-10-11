@@ -23,9 +23,11 @@ import javax.validation.constraints.NotBlank
 
 @Introspected
 class Person {
+
     @NotBlank
     String name
-    @Min(18l)
+
+    @Min(18L)
     int age
 }
 // end::class[]

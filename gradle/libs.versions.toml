@@ -1,0 +1,552 @@
+[versions]
+asm = "9.2"
+awaitility = "4.0.3"
+aws-java-sdk-lambda = "1.11.920"
+bcpkix = "1.69"
+blaze = "1.6.0-Alpha1"
+caffeine = "2.9.1"
+compile-testing = "0.19"
+geb = "3.4"
+hibernate = "5.4.29.Final"
+hibernate-validator = "6.1.6.Final"
+htmlSanityCheck = "1.1.6"
+htmlunit = "2.47.1"
+jakarta-inject-api = "2.0.0"
+jakarta-inject-tck = "2.0.1"
+javax-inject = "1"
+javax-persistence = "2.2"
+jetty = "9.4.38.v20210224"
+jmh = "1.29"
+jsr107 = "1.1.1"
+junit4 = "4.13.2"
+javax-el = "3.0.1-b12"
+javax-el-impl = "2.2.1-b05"
+kotest-junit5 = "4.6.0"
+logbook-netty = "2.4.1"
+log4j = "2.14.1"
+mongo-javadriver = "3.12.10"
+mysql-driver = "8.0.22"
+netty-tcnative = "2.0.42.Final"
+powermock = "2.0.9"
+rxjava3 = "3.0.13"
+selenium = "3.141.59"
+smallrye = "5.1.0"
+systemlambda = "1.2.0"
+vertx = "3.9.4"
+wiremock = "2.27.2"
+
+#
+# Versions which start with managed- are managed by Micronaut in the sense
+# that they will appear in the Micronaut BOM as <properties>
+#
+managed-azure-function = "1.4.2"
+managed-brave-instrumentation = "5.13.3"
+managed-brave-opentracing = "1.0.0"
+managed-commons-dbcp = "2.8.0"
+managed-dekorate = "1.0.3"
+managed-elasticsearch = "7.12.1"
+managed-flyway = "7.15.0"
+managed-grpc = "1.38.0"
+managed-ignite = "2.8.1"
+managed-junit5 = "5.7.2"
+managed-kotlin = "1.5.21"
+managed-kotlin-coroutines = "1.5.1"
+managed-google-function-framework = "1.0.2"
+managed-google-function-invoker = "1.0.0"
+managed-gorm = "7.1.0.M6"
+managed-gorm-hibernate = "7.1.0.M3"
+managed-graal = "21.2.0"
+managed-graal-sdk = "21.2.0"
+managed-groovy = "3.0.9"
+managed-h2 = "1.4.200"
+managed-hystrix = "1.5.18"
+managed-jaeger = "1.6.0"
+managed-jakarta-annotation-api = "2.0.0"
+managed-jackson = "2.12.4"
+managed-javax-annotation-api = "1.3.2"
+managed-jcache = "1.1.0"
+managed-jna = "5.3.1"
+managed-jsr305 = "3.0.2"
+managed-kafka = "2.8.0"
+managed-ktor = "1.6.1"
+managed-lettuce = "6.1.1.RELEASE"
+managed-liquibase = "4.4.3"
+managed-logback = "1.2.3"
+managed-lombok = "1.18.20"
+managed-methvin-directory-watcher = "0.9.6"
+managed-micrometer = "1.7.1"
+managed-micronaut-acme = "3.0.0"
+managed-micronaut-aws = "3.0.1"
+managed-micronaut-azure = "3.0.0"
+managed-micronaut-cache = "3.0.0"
+managed-micronaut-cassandra = "4.0.0"
+managed-micronaut-coherence = "3.0.0"
+managed-micronaut-data = "3.1.0"
+managed-micronaut-discovery = "3.0.0"
+managed-micronaut-elasticsearch = "3.0.1"
+managed-micronaut-flyway = "4.2.0"
+managed-micronaut-gcp = "4.0.0"
+managed-micronaut-graphql = "3.0.0"
+managed-micronaut-groovy = "3.0.0"
+managed-micronaut-grpc = "3.0.0"
+managed-micronaut-hibernate-validator = "3.0.0"
+managed-micronaut-ignite = "1.0.0.RC1"
+managed-micronaut-jaxrs = "3.1.0"
+managed-micronaut-jms = "2.0.0-M1"
+managed-micronaut-jmx = "3.0.0"
+managed-micronaut-kafka = "4.0.0"
+managed-micronaut-kotlin = "3.0.0"
+managed-micronaut-kubernetes = "3.1.0"
+managed-micronaut-liquibase = "4.0.2"
+managed-micronaut-micrometer = "4.0.0"
+managed-micronaut-mongo = "4.0.0"
+managed-micronaut-mqtt = "2.0.0"
+managed-micronaut-multitenancy = "4.0.0"
+managed-micronaut-neo4j = "5.0.0"
+managed-micronaut-nats = "3.0.0"
+managed-micronaut-netflix = "2.1.0"
+managed-micronaut-openapi = "3.1.0"
+managed-micronaut-oraclecloud = "2.0.1"
+managed-micronaut-picocli = "4.0.0"
+managed-micronaut-problem = "2.0.0"
+managed-micronaut-rabbitmq = "3.1.0"
+managed-micronaut-r2dbc = "2.0.0"
+managed-micronaut-reactor = "2.0.0"
+managed-micronaut-redis = "5.0.0"
+managed-micronaut-rss = "3.0.0"
+managed-micronaut-rxjava1 = "1.0.0"
+managed-micronaut-rxjava2 = "1.0.0"
+managed-micronaut-rxjava3 = "2.0.0"
+managed-micronaut-security = "3.1.0"
+managed-micronaut-servlet = "3.0.0"
+managed-micronaut-spring = "4.0.0"
+managed-micronaut-sql = "4.0.0"
+managed-micronaut-test = "3.0.2"
+managed-micronaut-views = "3.0.1"
+managed-micronaut-xml = "3.0.0"
+managed-mongo = "4.3.0"
+managed-mongo-reactive = "4.3.0"
+managed-neo4j = "3.5.29"
+managed-neo4j-java-driver = "4.2.7"
+managed-netty = "4.1.68.Final"
+managed-opentracing = "0.33.0"
+managed-paho-v3 = "1.2.5"
+managed-paho-v5 = "1.2.5"
+managed-picocli = "4.6.1"
+managed-protobuf = "3.17.2"
+managed-reactive-pg-client = "0.11.4"
+managed-reactive-streams = "1.0.3"
+managed-reactor = "3.4.8"
+managed-rxjava1 = "1.3.8"
+managed-rxjava1-interop = "0.13.7"
+managed-rxjava2 = "2.2.10"
+managed-slf4j = "1.7.29"
+managed-spock = "2.0-groovy-3.0"
+managed-spotbugs = "4.0.3"
+managed-spring = "5.3.9"
+managed-springboot = "2.5.3"
+managed-swagger = "2.1.10"
+managed-validation = "2.0.1.Final"
+managed-testcontainers = "1.15.3"
+managed-snakeyaml = "1.29"
+managed-zipkin-reporter = "2.16.3"
+
+micronaut-docs = "2.0.0.RC1"
+
+[libraries]
+# Libraries prefixed with bom- are BOM files
+boms-micronaut-aws = { module = "io.micronaut.aws:micronaut-aws-bom", version.ref = "managed-micronaut-aws" }
+boms-micronaut-cache = { module = "io.micronaut.cache:micronaut-cache-bom", version.ref = "managed-micronaut-cache" }
+boms-micronaut-coherence = { module = "io.micronaut.coherence:micronaut-coherence-bom", version.ref = "managed-micronaut-coherence" }
+boms-micronaut-data = { module = "io.micronaut.data:micronaut-data-bom", version.ref = "managed-micronaut-data" }
+boms-micronaut-groovy = { module = "io.micronaut.groovy:micronaut-groovy-bom", version.ref = "managed-micronaut-groovy" }
+boms-micronaut-oraclecloud = { module = "io.micronaut.oraclecloud:micronaut-oraclecloud-bom", version.ref = "managed-micronaut-oraclecloud" }
+boms-micronaut-sql = { module = "io.micronaut.sql:micronaut-sql-bom", version.ref = "managed-micronaut-sql" }
+boms-micronaut-test = { module = "io.micronaut.test:micronaut-test-bom", version.ref = "managed-micronaut-test" }
+boms-micronaut-views = { module = "io.micronaut.views:micronaut-views-bom", version.ref = "managed-micronaut-views" }
+boms-micronaut-r2dbc = { module = "io.micronaut.r2dbc:micronaut-r2dbc-bom", version.ref = "managed-micronaut-r2dbc" }
+
+boms-groovy = { module = "org.codehaus.groovy:groovy-bom", version.ref = "managed-groovy" }
+boms-grpc = { module = "io.grpc:grpc-bom", version.ref = "managed-grpc" }
+boms-jackson = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "managed-jackson" }
+boms-junit5 = { module = "org.junit:junit-bom", version.ref = "managed-junit5" }
+boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "managed-kotlin" }
+boms-kotlin-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-bom", version.ref = "managed-kotlin-coroutines" }
+boms-ktor = { module = "io.ktor:ktor-bom", version.ref = "managed-ktor" }
+boms-micrometer = { module = "io.micrometer:micrometer-bom", version.ref = "managed-micrometer" }
+boms-netty = { module = "io.netty:netty-bom", version.ref = "managed-netty" }
+boms-protobuf = { module = "com.google.protobuf:protobuf-bom", version.ref = "managed-protobuf" }
+boms-testcontainers = { module = "org.testcontainers:testcontainers-bom", version.ref = "managed-testcontainers" }
+
+#
+# Libraries which start with managed- are managed by Micronaut in the sense
+# that they will appear in the Micronaut BOM
+#
+
+managed-azure-functions = { module = "com.microsoft.azure.functions:azure-functions-java-library", version.ref = "managed-azure-function" }
+
+managed-brave-opentracing = { module = "io.opentracing.brave:brave-opentracing", version.ref = "managed-brave-opentracing" }
+
+managed-commons-dbcp = { module = "org.apache.commons:commons-dbcp2", version.ref = "managed-commons-dbcp" }
+
+managed-dekorate = { module = "io.dekorate:dekorate-project", version.ref = "managed-dekorate" }
+managed-dekorate-jaeger-annotations = { module = "io.dekorate:jaeger-annotations", version.ref = "managed-dekorate" }
+managed-dekorate-knative-annotations = { module = "io.dekorate:knative-annotations", version.ref = "managed-dekorate" }
+managed-dekorate-kubernetes-annotations = { module = "io.dekorate:kubernetes-annotations", version.ref = "managed-dekorate" }
+managed-dekorate-openshift-annotations = { module = "io.dekorate:openshift-annotations", version.ref = "managed-dekorate" }
+managed-dekorate-prometheus-annotations = { module = "io.dekorate:prometheus-annotations", version.ref = "managed-dekorate" }
+managed-dekorate-servicecatalog-annotations = { module = "io.dekorate:servicecatalog-annotations", version.ref = "managed-dekorate" }
+managed-dekorate-halkyon-annotations = { module = "io.dekorate:halkyon-annotations", version.ref = "managed-dekorate" }
+
+managed-elasticsearch = { module = "org.elasticsearch.client:elasticsearch-rest-high-level-client", version.ref = "managed-elasticsearch" }
+
+managed-flyway = { module = "org.flywaydb:flyway-core", version.ref = "managed-flyway" }
+
+managed-google-function-framework = { module = "com.google.cloud.functions:functions-framework-api", version.ref = "managed-google-function-framework" }
+managed-google-function-invoker = { module = "com.google.cloud.functions.invoker:java-function-invoker", version.ref = "managed-google-function-invoker" }
+
+managed-gorm = { module = "org.grails:grails-datastore-core", version.ref = "managed-gorm" }
+managed-gorm-datastore-async = { module = "org.grails:grails-datastore-async", version.ref = "managed-gorm" }
+managed-gorm-datastore-gorm = { module = "org.grails:grails-datastore-gorm", version.ref = "managed-gorm" }
+managed-gorm-datastore-gorm-async = { module = "org.grails:grails-datastore-gorm-async", version.ref = "managed-gorm" }
+managed-gorm-datastore-gorm-support = { module = "org.grails:grails-datastore-gorm-support", version.ref = "managed-gorm" }
+managed-gorm-datastore-gorm-test = { module = "org.grails:grails-datastore-gorm-test", version.ref = "managed-gorm" }
+managed-gorm-datastore-gorm-validation = { module = "org.grails:grails-datastore-gorm-validation", version.ref = "managed-gorm" }
+managed-gorm-datastore-web = { module = "org.grails:grails-datastore-web", version.ref = "managed-gorm" }
+managed-gorm-hibernate = { module = "org.grails:grails-datastore-gorm-hibernate5", version.ref = "managed-gorm-hibernate" }
+
+managed-graal = { module = "org.graalvm.nativeimage:svm", version.ref = "managed-graal" }
+managed-graal-sdk = { module = "org.graalvm.sdk:graal-sdk", version.ref = "managed-graal-sdk" }
+
+managed-groovy = { module = "org.codehaus.groovy:groovy", version.ref = "managed-groovy" }
+managed-groovy-json = { module = "org.codehaus.groovy:groovy-json", version.ref = "managed-groovy" }
+managed-groovy-sql = { module = "org.codehaus.groovy:groovy-sql", version.ref = "managed-groovy" }
+managed-groovy-templates = { module = "org.codehaus.groovy:groovy-templates", version.ref = "managed-groovy" }
+
+managed-h2 = { module = "com.h2database:h2", version.ref = "managed-h2" }
+
+managed-hystrix = { module = "com.netflix.hystrix:hystrix-core", version.ref = "managed-hystrix" }
+managed-hystrix-serialization = { module = "com.netflix.hystrix:hystrix-serialization", version.ref = "managed-hystrix" }
+
+managed-ignite = { module = "org.apache.ignite:ignite-core", version.ref = "managed-ignite" }
+managed-ignite-kubernetes = { module = "org.apache.ignite:ignite-kubernetes", version.ref = "managed-ignite" }
+
+managed-jaeger = { module = "io.jaegertracing:jaeger-thrift", version.ref = "managed-jaeger" }
+
+managed-jakarta-annotation-api = { module = "jakarta.annotation:jakarta.annotation-api", version.ref = "managed-jakarta-annotation-api" }
+
+managed-jackson-annotations = { module = "com.fasterxml.jackson.core:jackson-annotations", version.ref = "managed-jackson" }
+managed-jackson-core = { module = "com.fasterxml.jackson.core:jackson-core", version.ref = "managed-jackson" }
+managed-jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "managed-jackson" }
+managed-jackson-datatype-jdk8 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jdk8", version.ref = "managed-jackson" }
+managed-jackson-datatype-jsr310 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310", version.ref = "managed-jackson" }
+managed-jackson-module-afterburner = { module = "com.fasterxml.jackson.module:jackson-module-afterburner", version.ref = "managed-jackson" }
+managed-jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "managed-jackson" }
+managed-jackson-module-parameterNames = { module = "com.fasterxml.jackson.module:jackson-module-parameter-names", version.ref = "managed-jackson" }
+
+managed-javax-annotation-api = { module = "javax.annotation:javax.annotation-api", version.ref = "managed-javax-annotation-api" }
+
+managed-jcache = { module = "javax.cache:cache-api", version.ref = "managed-jcache" }
+
+managed-jna = { module = "net.java.dev.jna:jna", version.ref = "managed-jna" }
+
+managed-jsr305 = { module = "com.google.code.findbugs:jsr305", version.ref = "managed-jsr305" }
+
+managed-kafka = { module = "org.apache.kafka:kafka-clients", version.ref = "managed-kafka" }
+managed-kafka212 = { module = "org.apache.kafka:kafka_2.12", version.ref = "managed-kafka" }
+managed-kafka-streams = { module = "org.apache.kafka:kafka-streams", version.ref = "managed-kafka" }
+
+managed-lettuce = { module = "io.lettuce:lettuce-core", version.ref = "managed-lettuce" }
+
+managed-liquibase = { module = "org.liquibase:liquibase-core", version.ref = "managed-liquibase" }
+
+managed-logback = { module = "ch.qos.logback:logback-classic", version.ref = "managed-logback" }
+
+managed-lombok = { module = "org.projectlombok:lombok", version.ref = "managed-lombok" }
+
+managed-methvin-directoryWatcher = { module = "io.methvin:directory-watcher", version.ref = "managed-methvin-directory-watcher" }
+
+managed-micrometer-core = { module = "io.micrometer:micrometer-core", version.ref = "managed-micrometer" }
+
+managed-mongodb-driver-sync = { module = "org.mongodb:mongodb-driver-sync", version.ref = "managed-mongo" }
+managed-mongodb-driver-core = { module = "org.mongodb:mongodb-driver-core", version.ref = "managed-mongo" }
+managed-mongo-reactive = { module = "org.mongodb:mongodb-driver-reactivestreams", version.ref = "managed-mongo-reactive" }
+
+managed-neo4j = { module = "org.neo4j.test:neo4j-harness", version.ref = "managed-neo4j" }
+managed-neo4j-bolt = { module = "org.neo4j.driver:neo4j-java-driver", version.ref = "managed-neo4j-java-driver" }
+
+managed-netty = { module = "io.netty:netty", version.ref = "managed-netty" }
+managed-netty-buffer = { module = "io.netty:netty-buffer", version.ref = "managed-netty" }
+managed-netty-codec-http = { module = "io.netty:netty-codec-http", version.ref = "managed-netty" }
+managed-netty-codec-http2 = { module = "io.netty:netty-codec-http2", version.ref = "managed-netty" }
+managed-netty-handler = { module = "io.netty:netty-handler", version.ref = "managed-netty" }
+managed-netty-handler-proxy = { module = "io.netty:netty-handler-proxy", version.ref = "managed-netty" }
+managed-netty-transport-native-epoll = { module = "io.netty:netty-transport-native-epoll", version.ref = "managed-netty" }
+managed-netty-transport-native-kqueue = { module = "io.netty:netty-transport-native-kqueue", version.ref = "managed-netty" }
+
+managed-micronaut-acme = { module = "io.micronaut.acme:micronaut-acme", version.ref = "managed-micronaut-acme" }
+managed-micronaut-azure-function = { module = "io.micronaut.azure:micronaut-azure-function", version.ref = "managed-micronaut-azure" }
+managed-micronaut-azure-function-http = { module = "io.micronaut.azure:micronaut-azure-function-http", version.ref = "managed-micronaut-azure" }
+managed-micronaut-azure-function-http-test = { module = "io.micronaut.azure:micronaut-azure-function-http-test", version.ref = "managed-micronaut-azure" }
+managed-micronaut-cassandra = { module = "io.micronaut.cassandra:micronaut-cassandra", version.ref = "managed-micronaut-cassandra" }
+managed-micronaut-discovery = { module = "io.micronaut.discovery:micronaut-discovery-client", version.ref = "managed-micronaut-discovery" }
+managed-micronaut-elasticsearch = { module = "io.micronaut.elasticsearch:micronaut-elasticsearch", version.ref = "managed-micronaut-elasticsearch" }
+managed-micronaut-flyway = { module = "io.micronaut.flyway:micronaut-flyway", version.ref = "managed-micronaut-flyway" }
+managed-micronaut-gcp = { module = "io.micronaut.gcp:micronaut-gcp-common", version.ref = "managed-micronaut-gcp" }
+managed-micronaut-gcp-tracing = { module = "io.micronaut.gcp:micronaut-gcp-tracing", version.ref = "managed-micronaut-gcp" }
+managed-micronaut-gcp-function = { module = "io.micronaut.gcp:micronaut-gcp-function", version.ref = "managed-micronaut-gcp" }
+managed-micronaut-gcp-function-http = { module = "io.micronaut.gcp:micronaut-gcp-function-http", version.ref = "managed-micronaut-gcp" }
+managed-micronaut-gcp-function-http-test = { module = "io.micronaut.gcp:micronaut-gcp-function-http-test", version.ref = "managed-micronaut-gcp" }
+managed-micronaut-gcp-http-client = { module = "io.micronaut.gcp:micronaut-gcp-http-client", version.ref = "managed-micronaut-gcp" }
+managed-micronaut-gcp-logging = { module = "io.micronaut.gcp:micronaut-gcp-logging", version.ref = "managed-micronaut-gcp" }
+managed-micronaut-gcp-pubsub = { module = "io.micronaut.gcp:micronaut-gcp-pubsub", version.ref = "managed-micronaut-gcp" }
+managed-micronaut-gcp-secret-manager = { module = "io.micronaut.gcp:micronaut-gcp-secret-manager", version.ref = "managed-micronaut-gcp" }
+managed-micronaut-graphql = { module = "io.micronaut.graphql:micronaut-graphql", version.ref = "managed-micronaut-graphql" }
+managed-micronaut-grpc = { module = "io.micronaut.grpc:micronaut-grpc-runtime", version.ref = "managed-micronaut-grpc" }
+managed-micronaut-grpc-annotation = { module = "io.micronaut.grpc:micronaut-grpc-annotation", version.ref = "managed-micronaut-grpc" }
+managed-micronaut-grpc-client-runtime = { module = "io.micronaut.grpc:micronaut-grpc-client-runtime", version.ref = "managed-micronaut-grpc" }
+managed-micronaut-grpc-server-runtime = { module = "io.micronaut.grpc:micronaut-grpc-server-runtime", version.ref = "managed-micronaut-grpc" }
+managed-micronaut-grpc-protobuf-support = { module = "io.micronaut.grpc:micronaut-protobuff-support", version.ref = "managed-micronaut-grpc" }
+managed-micronaut-hibernate-validator = { module = "io.micronaut.beanvalidation:micronaut-hibernate-validator", version.ref = "managed-micronaut-hibernate-validator" }
+managed-micronaut-ignite-core = { module = "io.micronaut.ignite:micronaut-ignite-core", version.ref = "managed-micronaut-ignite" }
+managed-micronaut-ignite-cache = { module = "io.micronaut.ignite:micronaut-ignite-cache", version.ref = "managed-micronaut-ignite" }
+managed-micronaut-jaxrs-server = { module = "io.micronaut.jaxrs:micronaut-jaxrs-server", version.ref = "managed-micronaut-jaxrs" }
+managed-micronaut-jaxrs-processor = { module = "io.micronaut.jaxrs:micronaut-jaxrs-processor", version.ref = "managed-micronaut-jaxrs" }
+managed-micronaut-jms = { module = "io.micronaut.jms:micronaut-jms-core", version.ref = "managed-micronaut-jms" }
+managed-micronaut-jms-activemq-classic = { module = "io.micronaut.jms:micronaut-jms-activemq-classic", version.ref = "managed-micronaut-jms" }
+managed-micronaut-jms-activemq-artemis = { module = "io.micronaut.jms:micronaut-jms-activemq-artemis", version.ref = "managed-micronaut-jms" }
+managed-micronaut-jms-sqs = { module = "io.micronaut.jms:micronaut-jms-sqs", version.ref = "managed-micronaut-jms" }
+managed-micronaut-jmx = { module = "io.micronaut.jmx:micronaut-jmx", version.ref = "managed-micronaut-jmx" }
+managed-micronaut-kafka = { module = "io.micronaut.kafka:micronaut-kafka", version.ref = "managed-micronaut-kafka" }
+managed-micronaut-kafka-streams = { module = "io.micronaut.kafka:micronaut-kafka-streams", version.ref = "managed-micronaut-kafka" }
+managed-micronaut-kotlin = { module = "io.micronaut.kotlin:micronaut-kotlin-runtime", version.ref = "managed-micronaut-kotlin" }
+managed-micronaut-kotlin-ktor = { module = "io.micronaut.kotlin:micronaut-ktor", version.ref = "managed-micronaut-kotlin" }
+managed-micronaut-kotlin-extension-functions = { module = "io.micronaut.kotlin:micronaut-kotlin-extension-functions", version.ref = "managed-micronaut-kotlin" }
+managed-micronaut-kubernetes-discovery-client = { module = "io.micronaut.kubernetes:micronaut-kubernetes-discovery-client", version.ref = "managed-micronaut-kubernetes" }
+managed-micronaut-kubernetes-client = { module = "io.micronaut.kubernetes:micronaut-kubernetes-client", version.ref = "managed-micronaut-kubernetes" }
+managed-micronaut-kubernetes-client-processor = { module = "io.micronaut.kubernetes:micronaut-kubernetes-client-processor", version.ref = "managed-micronaut-kubernetes" }
+managed-micronaut-kubernetes-client-rxjava2 = { module = "io.micronaut.kubernetes:micronaut-kubernetes-client-rxjava2", version.ref = "managed-micronaut-kubernetes" }
+managed-micronaut-kubernetes-client-reactor = { module = "io.micronaut.kubernetes:micronaut-kubernetes-client-reactor", version.ref = "managed-micronaut-kubernetes" }
+managed-micronaut-kubernetes-informer = { module = "io.micronaut.kubernetes:micronaut-kubernetes-informer", version.ref = "managed-micronaut-kubernetes" }
+managed-micronaut-liquibase = { module = "io.micronaut.liquibase:micronaut-liquibase", version.ref = "managed-micronaut-liquibase" }
+managed-micronaut-micrometer = { module = "io.micronaut.micrometer:micronaut-micrometer-core", version.ref = "managed-micronaut-micrometer" }
+managed-micronaut-micrometer-registry-appoptics = { module = "io.micronaut.micrometer:micronaut-micrometer-registry-appoptics", version.ref = "managed-micronaut-micrometer" }
+managed-micronaut-micrometer-registry-atlas = { module = "io.micronaut.micrometer:micronaut-micrometer-registry-atlas", version.ref = "managed-micronaut-micrometer" }
+managed-micronaut-micrometer-registry-azure-monitor = { module = "io.micronaut.micrometer:micronaut-micrometer-registry-azure-monitor", version.ref = "managed-micronaut-micrometer" }
+managed-micronaut-micrometer-registry-cloudwatch = { module = "io.micronaut.micrometer:micronaut-micrometer-registry-cloudwatch", version.ref = "managed-micronaut-micrometer" }
+managed-micronaut-micrometer-registry-datadog = { module = "io.micronaut.micrometer:micronaut-micrometer-registry-datadog", version.ref = "managed-micronaut-micrometer" }
+managed-micronaut-micrometer-registry-dynatrace = { module = "io.micronaut.micrometer:micronaut-micrometer-registry-dynatrace", version.ref = "managed-micronaut-micrometer" }
+managed-micronaut-micrometer-registry-elastic = { module = "io.micronaut.micrometer:micronaut-micrometer-registry-elastic", version.ref = "managed-micronaut-micrometer" }
+managed-micronaut-micrometer-registry-ganglia = { module = "io.micronaut.micrometer:micronaut-micrometer-registry-ganglia", version.ref = "managed-micronaut-micrometer" }
+managed-micronaut-micrometer-registry-graphite = { module = "io.micronaut.micrometer:micronaut-micrometer-registry-graphite", version.ref = "managed-micronaut-micrometer" }
+managed-micronaut-micrometer-registry-humio = { module = "io.micronaut.micrometer:micronaut-micrometer-registry-humio", version.ref = "managed-micronaut-micrometer" }
+managed-micronaut-micrometer-registry-influx = { module = "io.micronaut.micrometer:micronaut-micrometer-registry-influx", version.ref = "managed-micronaut-micrometer" }
+managed-micronaut-micrometer-registry-jmx = { module = "io.micronaut.micrometer:micronaut-micrometer-registry-jmx", version.ref = "managed-micronaut-micrometer" }
+managed-micronaut-micrometer-registry-kairos = { module = "io.micronaut.micrometer:micronaut-micrometer-registry-kairos", version.ref = "managed-micronaut-micrometer" }
+managed-micronaut-micrometer-registry-new-relic = { module = "io.micronaut.micrometer:micronaut-micrometer-registry-new-relic", version.ref = "managed-micronaut-micrometer" }
+managed-micronaut-micrometer-registry-new-relic-telemetry = { module = "io.micronaut.micrometer:micronaut-micrometer-registry-new-relic-telemetry", version.ref = "managed-micronaut-micrometer" }
+managed-micronaut-micrometer-registry-prometheus = { module = "io.micronaut.micrometer:micronaut-micrometer-registry-prometheus", version.ref = "managed-micronaut-micrometer" }
+managed-micronaut-micrometer-registry-signalfx = { module = "io.micronaut.micrometer:micronaut-micrometer-registry-signalfx", version.ref = "managed-micronaut-micrometer" }
+managed-micronaut-micrometer-registry-stackdriver = { module = "io.micronaut.micrometer:micronaut-micrometer-registry-stackdriver", version.ref = "managed-micronaut-micrometer" }
+managed-micronaut-micrometer-registry-statsd = { module = "io.micronaut.micrometer:micronaut-micrometer-registry-statsd", version.ref = "managed-micronaut-micrometer" }
+managed-micronaut-micrometer-registry-wavefront = { module = "io.micronaut.micrometer:micronaut-micrometer-registry-wavefront", version.ref = "managed-micronaut-micrometer" }
+managed-micronaut-mongo = { module = "io.micronaut.mongodb:micronaut-mongo-reactive", version.ref = "managed-micronaut-mongo" }
+managed-micronaut-mongo-core = { module = "io.micronaut.mongodb:micronaut-mongo-core", version.ref = "managed-micronaut-mongo" }
+managed-micronaut-mongo-sync = { module = "io.micronaut.mongodb:micronaut-mongo-sync", version.ref = "managed-micronaut-mongo" }
+managed-micronaut-mqtt-core = { module = "io.micronaut.mqtt:micronaut-mqtt-core", version.ref = "managed-micronaut-mqtt" }
+managed-micronaut-mqtt-ssl = { module = "io.micronaut.mqtt:micronaut-mqtt-ssl", version.ref = "managed-micronaut-mqtt" }
+managed-micronaut-mqttv3 = { module = "io.micronaut.mqtt:micronaut-mqttv3", version.ref = "managed-micronaut-mqtt" }
+managed-micronaut-mqttv5 = { module = "io.micronaut.mqtt:micronaut-mqttv5", version.ref = "managed-micronaut-mqtt" }
+managed-micronaut-multitenancy = { module = "io.micronaut.multitenancy:micronaut-multitenancy", version.ref = "managed-micronaut-multitenancy" }
+managed-micronaut-nats = { module = "io.micronaut.nats:micronaut-nats", version.ref = "managed-micronaut-nats" }
+managed-micronaut-neo4j = { module = "io.micronaut.neo4j:micronaut-neo4j-bolt", version.ref = "managed-micronaut-neo4j" }
+managed-micronaut-netflix = { module = "io.micronaut.netflix:micronaut-netflix-archaius", version.ref = "managed-micronaut-netflix" }
+managed-micronaut-netflix-hystrix = { module = "io.micronaut.netflix:micronaut-netflix-hystrix", version.ref = "managed-micronaut-netflix" }
+managed-micronaut-netflix-ribbon = { module = "io.micronaut.netflix:micronaut-netflix-ribbon", version.ref = "managed-micronaut-netflix" }
+managed-micronaut-openapi = { module = "io.micronaut.openapi:micronaut-openapi", version.ref = "managed-micronaut-openapi" }
+managed-micronaut-picocli = { module = "io.micronaut.picocli:micronaut-picocli", version.ref = "managed-micronaut-picocli" }
+managed-micronaut-problem = { module = "io.micronaut.problem:micronaut-problem-json", version.ref = "managed-micronaut-problem" }
+managed-micronaut-rabbitmq = { module = "io.micronaut.rabbitmq:micronaut-rabbitmq", version.ref = "managed-micronaut-rabbitmq" }
+managed-micronaut-reactor = { module = "io.micronaut.reactor:micronaut-reactor", version.ref = "managed-micronaut-reactor" }
+managed-micronaut-reactor-http-client = { module = "io.micronaut.reactor:micronaut-reactor-http-client", version.ref = "managed-micronaut-reactor" }
+managed-micronaut-redis = { module = "io.micronaut.redis:micronaut-redis-lettuce", version.ref = "managed-micronaut-redis" }
+managed-micronaut-rss = { module = "io.micronaut.rss:micronaut-rss", version.ref = "managed-micronaut-rss" }
+managed-micronaut-rss-core = { module = "io.micronaut.rss:micronaut-rss-core", version.ref = "managed-micronaut-rss" }
+managed-micronaut-rss-language = { module = "io.micronaut.rss:micronaut-rss-language", version.ref = "managed-micronaut-rss" }
+managed-micronaut-rss-itunespodcast = { module = "io.micronaut.rss:micronaut-itunespodcast", version.ref = "managed-micronaut-rss" }
+managed-micronaut-rss-jsonfeed-core = { module = "io.micronaut.rss:micronaut-jsonfeed-core", version.ref = "managed-micronaut-rss" }
+managed-micronaut-rss-jsonfeed = { module = "io.micronaut.rss:micronaut-jsonfeed", version.ref = "managed-micronaut-rss" }
+managed-micronaut-rxjava1 = { module = "io.micronaut.rxjava1:micronaut-rxjava1", version.ref = "managed-micronaut-rxjava1" }
+managed-micronaut-rxjava2 = { module = "io.micronaut.rxjava2:micronaut-rxjava2", version.ref = "managed-micronaut-rxjava2" }
+managed-micronaut-rxjava2-http-client = { module = "io.micronaut.rxjava2:micronaut-rxjava2-http-client", version.ref = "managed-micronaut-rxjava2" }
+managed-micronaut-rxjava2-http-server-netty = { module = "io.micronaut.rxjava2:micronaut-rxjava2-http-server-netty", version.ref = "managed-micronaut-rxjava2" }
+managed-micronaut-rxjava3 = { module = "io.micronaut.rxjava3:micronaut-rxjava3", version.ref = "managed-micronaut-rxjava3" }
+managed-micronaut-rxjava3-http-client = { module = "io.micronaut.rxjava3:micronaut-rxjava3-http-client", version.ref = "managed-micronaut-rxjava3" }
+managed-micronaut-security = { module = "io.micronaut.security:micronaut-security", version.ref = "managed-micronaut-security" }
+managed-micronaut-security-annotations = { module = "io.micronaut.security:micronaut-security-annotations", version.ref = "managed-micronaut-security" }
+managed-micronaut-security-jwt = { module = "io.micronaut.security:micronaut-security-jwt", version.ref = "managed-micronaut-security" }
+managed-micronaut-security-oauth2 = { module = "io.micronaut.security:micronaut-security-oauth2", version.ref = "managed-micronaut-security" }
+managed-micronaut-security-ldap = { module = "io.micronaut.security:micronaut-security-ldap", version.ref = "managed-micronaut-security" }
+managed-micronaut-security-session = { module = "io.micronaut.security:micronaut-security-session", version.ref = "managed-micronaut-security" }
+managed-micronaut-servlet = { module = "io.micronaut.servlet:micronaut-servlet-core", version.ref = "managed-micronaut-servlet" }
+managed-micronaut-servlet-http-server-tomcat = { module = "io.micronaut.servlet:micronaut-http-server-tomcat", version.ref = "managed-micronaut-servlet" }
+managed-micronaut-servlet-http-server-jetty = { module = "io.micronaut.servlet:micronaut-http-server-jetty", version.ref = "managed-micronaut-servlet" }
+managed-micronaut-servlet-http-server-undertow = { module = "io.micronaut.servlet:micronaut-http-server-undertow", version.ref = "managed-micronaut-servlet" }
+managed-micronaut-spring = { module = "io.micronaut.spring:micronaut-spring", version.ref = "managed-micronaut-spring" }
+managed-micronaut-spring-annotation = { module = "io.micronaut.spring:micronaut-spring-annotation", version.ref = "managed-micronaut-spring" }
+managed-micronaut-spring-boot = { module = "io.micronaut.spring:micronaut-spring-boot", version.ref = "managed-micronaut-spring" }
+managed-micronaut-spring-boot-annotation = { module = "io.micronaut.spring:micronaut-spring-boot-annotation", version.ref = "managed-micronaut-spring" }
+managed-micronaut-spring-context = { module = "io.micronaut.spring:micronaut-spring-context", version.ref = "managed-micronaut-spring" }
+managed-micronaut-spring-web = { module = "io.micronaut.spring:micronaut-spring-web", version.ref = "managed-micronaut-spring" }
+managed-micronaut-spring-web-annotation = { module = "io.micronaut.spring:micronaut-spring-web-annotation", version.ref = "managed-micronaut-spring" }
+managed-micronaut-sql-jdbc = { module = "io.micronaut.sql:micronaut-jdbc", version.ref = "managed-micronaut-sql" }
+managed-micronaut-sql-jdbc-tomcat = { module = "io.micronaut.sql:micronaut-jdbc-tomcat", version.ref = "managed-micronaut-sql" }
+managed-micronaut-test-bom = { module = "io.micronaut.test:micronaut-test-bom", version.ref = "managed-micronaut-test" }
+managed-micronaut-test-core = { module = "io.micronaut.test:micronaut-test-core", version.ref = "managed-micronaut-test" }
+managed-micronaut-test-junit5 = { module = "io.micronaut.test:micronaut-test-junit5", version.ref = "managed-micronaut-test" }
+managed-micronaut-test-kotest = { module = "io.micronaut.test:micronaut-test-kotest", version.ref = "managed-micronaut-test" }
+managed-micronaut-test-spock = { module = "io.micronaut.test:micronaut-test-spock", version.ref = "managed-micronaut-test" }
+managed-micronaut-xml = { module = "io.micronaut.xml:micronaut-jackson-xml", version.ref = "managed-micronaut-xml" }
+
+managed-opentracing = { module = "io.opentracing:opentracing-api", version.ref = "managed-opentracing" }
+managed-opentracing-util = { module = "io.opentracing:opentracing-util", version.ref = "managed-opentracing" }
+
+managed-paho-v3 = { module = "org.eclipse.paho:org.eclipse.paho.client.mqttv3", version.ref = "managed-paho-v3" }
+managed-paho-v5 = { module = "org.eclipse.paho:org.eclipse.paho.mqttv5.client", version.ref = "managed-paho-v5" }
+
+managed-picocli = { module = "info.picocli:picocli", version.ref = "managed-picocli" }
+managed-picocli-codegen = { module = "info.picocli:picocli-codegen", version.ref = "managed-picocli" }
+
+managed-reactive-pg-client = { module = "io.reactiverse:reactive-pg-client", version.ref = "managed-reactive-pg-client" }
+managed-reactive-streams = { module = "org.reactivestreams:reactive-streams", version.ref = "managed-reactive-streams" }
+
+managed-reactor = { module = "io.projectreactor:reactor-core", version.ref = "managed-reactor" }
+
+managed-rxjava1 = { module = "io.reactivex:rxjava", version.ref = "managed-rxjava1" }
+managed-rxjava1-interop = { module = "com.github.akarnokd:rxjava2-interop", version.ref = "managed-rxjava1-interop" }
+managed-rxjava2 = { module = "io.reactivex.rxjava2:rxjava", version.ref = "managed-rxjava2" }
+
+managed-slf4j = { module = "org.slf4j:slf4j-api", version.ref = "managed-slf4j" }
+managed-slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "managed-slf4j" }
+
+managed-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "managed-snakeyaml" }
+
+managed-spock = { module = "org.spockframework:spock-core", version.ref = "managed-spock" }
+managed-spotbugs = { module = "com.github.spotbugs:spotbugs-annotations", version.ref = "managed-spotbugs" }
+
+managed-spring = { module = "org.springframework:spring-core", version.ref = "managed-spring" }
+managed-spring-context = { module = "org.springframework:spring-context", version.ref = "managed-spring" }
+managed-spring-tx = { module = "org.springframework:spring-tx", version.ref = "managed-spring" }
+managed-spring-orm = { module = "org.springframework:spring-orm", version.ref = "managed-spring" }
+managed-spring-jdbc = { module = "org.springframework:spring-jdbc", version.ref = "managed-spring" }
+managed-spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter", version.ref = "managed-springboot" }
+managed-spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web", version.ref = "managed-springboot" }
+
+managed-swagger = { module = "io.swagger.core.v3:swagger-core", version.ref = "managed-swagger" }
+managed-swagger-models = { module = "io.swagger.core.v3:swagger-models", version.ref = "managed-swagger" }
+managed-swagger-annotations = { module = "io.swagger.core.v3:swagger-annotations", version.ref = "managed-swagger" }
+
+managed-validation = { module = "javax.validation:validation-api", version.ref = "managed-validation" }
+
+managed-zipkin-brave-instrumentation = { module = "io.zipkin.brave:brave-instrumentation-http", version.ref = "managed-brave-instrumentation" }
+managed-zipkin-reporter = { module = "io.zipkin.reporter2:zipkin-reporter", version.ref = "managed-zipkin-reporter" }
+
+#
+# Other libraries are used by Micronaut but will not appear in the BOM
+#
+asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
+asm-commons = { module = "org.ow2.asm:asm-commons", version.ref = "asm" }
+asm-tree = { module = "org.ow2.asm:asm-tree", version.ref = "asm" }
+
+awaitility = { module = "org.awaitility:awaitility", version.ref = "awaitility" }
+
+aws-java-sdk-lambda = { module = "com.amazonaws:aws-java-sdk-lambda", version.ref = "aws-java-sdk-lambda" }
+
+bcpkix = { module = "org.bouncycastle:bcpkix-jdk15on", version.ref = "bcpkix" }
+
+blaze-persistence-core = { module = "com.blazebit:blaze-persistence-core-impl", version.ref = "blaze" }
+
+caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "caffeine" }
+
+compile-testing = { module = "com.google.testing.compile:compile-testing", version.ref = "compile-testing" }
+
+geb-spock = { module = "org.gebish:geb-spock", version.ref = "geb" }
+
+groovy-test-junit5 = { module = "org.codehaus.groovy:groovy-test-junit5", version.ref = "managed-groovy" }
+
+hibernate = { module = "org.hibernate:hibernate-core", version.ref = "hibernate" }
+hibernate-validator = { module = "org.hibernate:hibernate-validator", version.ref = "hibernate-validator" }
+
+htmlunit = { module = "net.sourceforge.htmlunit:htmlunit", version.ref = "htmlunit" }
+
+jakarta-inject-api = { module = "jakarta.inject:jakarta.inject-api", version.ref = "jakarta-inject-api" }
+jakarta-inject-tck = { module = "jakarta.inject:jakarta.inject-tck", version.ref = "jakarta-inject-tck" }
+
+javax-el = { module = "org.glassfish:javax.el", version.ref = "javax-el" }
+javax-el-impl = { module = "org.glassfish:javax.el", version.ref = "javax-el" }
+javax-inject = { module = "javax.inject:javax.inject", version.ref = "javax-inject" }
+javax-persistence = { module = "javax.persistence:javax.persistence-api", version.ref = "javax-persistence" }
+
+jetty-alpn-openjdk8-client = { module = "org.eclipse.jetty:jetty-alpn-openjdk8-client", version.ref = "jetty" }
+
+jmh = { module = "org.openjdk.jmh:jmh-core", version.ref = "jmh" }
+jmh-generator-annprocess = { module = "org.openjdk.jmh:jmh-core", version.ref = "jmh" }
+
+jsr107 = { module = "org.jsr107.ri:cache-ri-impl", version.ref = "jsr107" }
+
+junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "managed-junit5" }
+junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "managed-junit5" }
+junit-vintage = { module = "org.junit.vintage:junit-vintage-engine", version.ref = "managed-junit5" }
+junit4 = { module = "junit:junit", version.ref = "junit4" }
+
+kotlin-annotation-processing-embeddable = { module = "org.jetbrains.kotlin:kotlin-annotation-processing-embeddable", version.ref = "managed-kotlin" }
+kotlin-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "managed-kotlin" }
+kotlin-kotest-junit5 = { module = "io.kotest:kotest-runner-junit5-jvm", version.ref = "kotest-junit5"}
+kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "managed-kotlin" }
+kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "managed-kotlin" }
+kotlin-stdlib-jdk8 = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "managed-kotlin" }
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "managed-kotlin" }
+
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "managed-kotlin-coroutines" }
+kotlinx-coroutines-jdk8 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8", version.ref = "managed-kotlin-coroutines" }
+kotlinx-coroutines-reactive = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactive", version.ref = "managed-kotlin-coroutines" }
+kotlinx-coroutines-rx2 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-rx2", version.ref = "managed-kotlin-coroutines" }
+kotlinx-coroutines-slf4j = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-slf4j", version.ref = "managed-kotlin-coroutines" }
+kotlinx-coroutines-reactor = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactor", version.ref = "managed-kotlin-coroutines" }
+
+log4j = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" }
+
+logbook-netty = { module = "org.zalando:logbook-netty", version.ref = "logbook-netty" }
+
+micronaut-docs = { module = "io.micronaut.docs:micronaut-docs-asciidoc-config-props", version.ref = "micronaut-docs" }
+
+mongo-javadriver = { module = "org.mongodb:mongo-java-driver", version.ref = "mongo-javadriver" }
+
+mysql-driver = { module = "mysql:mysql-connector-java", version.ref = "mysql-driver" }
+
+netty-tcnative = { module = 'io.netty:netty-tcnative', version.ref = "netty-tcnative" }
+netty-tcnative-boringssl = { module = 'io.netty:netty-tcnative-boringssl-static', version.ref = "netty-tcnative" }
+
+powermock-junit4 = { module = "org.powermock:powermock-module-junit4", version.ref = "powermock" }
+powermock-mockito2 = { module = "org.powermock:powermock-api-mockito2", version.ref = "powermock" }
+
+selenium-remote-driver = { module = "org.seleniumhq.selenium:selenium-remote-driver", version.ref = "selenium" }
+selenium-api = { module = "org.seleniumhq.selenium:selenium-api", version.ref = "selenium" }
+selenium-support = { module = "org.seleniumhq.selenium:selenium-support", version.ref = "selenium" }
+selenium-driver-chrome = { module = "org.seleniumhq.selenium:selenium-chrome-driver", version.ref = "selenium" }
+selenium-driver-firefox = { module = "org.seleniumhq.selenium:selenium-firefox-driver", version.ref = "selenium" }
+selenium-driver-htmlunit = { module = "org.seleniumhq.selenium:htmlunit-driver", version.ref = "htmlunit" }
+
+smallrye = { module = "io.smallrye:smallrye-fault-tolerance", version.ref = "smallrye" }
+
+systemlambda = { module = "com.github.stefanbirkner:system-lambda", version.ref = "systemlambda" }
+
+testcontainers-spock = { module = "org.testcontainers:spock", version.ref = "managed-testcontainers" }
+
+vertx = { module = "io.vertx:vertx-core", version.ref = "vertx" }
+vertx-webclient = { module = "io.vertx:vertx-web-client", version.ref = "vertx" }
+
+wiremock = { module = "com.github.tomakehurst:wiremock-jre8", version.ref = "wiremock" }
+
+[bundles]
+asm = ["asm", "asm-commons"]

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,13 +27,14 @@ import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.filter.ServerFilterPhase;
-import io.micronaut.jackson.JacksonConfiguration;
+import io.micronaut.json.JsonConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
-import io.reactivex.Flowable;
-import io.reactivex.schedulers.Schedulers;
+import jakarta.inject.Named;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
-import javax.inject.Named;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 
@@ -44,7 +45,7 @@ import java.util.concurrent.ExecutorService;
  * @author mmindenhall
  * @author graemerocher
  */
-@Requires(beans = JacksonConfiguration.class)
+@Requires(beans = JsonConfiguration.class)
 @Requires(property = JsonViewServerFilter.PROPERTY_JSON_VIEW_ENABLED)
 @Filter("/**")
 public class JsonViewServerFilter implements HttpServerFilter {
@@ -73,24 +74,25 @@ public class JsonViewServerFilter implements HttpServerFilter {
         Optional<Class> viewClass = request.getAttribute(HttpAttributes.ROUTE_MATCH, AnnotationMetadata.class)                                                          .flatMap(ann -> ann.classValue(JsonView.class));
         final Publisher<MutableHttpResponse<?>> responsePublisher = chain.proceed(request);
         if (viewClass.isPresent()) {
-            return Flowable.fromPublisher(responsePublisher).switchMap(response -> {
+            return Flux.from(responsePublisher).switchMap(response -> {
                 final Optional<?> optionalBody = response.getBody();
                 if (optionalBody.isPresent()) {
                     Object body = optionalBody.get();
                     MediaTypeCodec codec = codecFactory.resolveJsonViewCodec(viewClass.get());
                     if (Publishers.isConvertibleToPublisher(body)) {
-                        response.body(Publishers.convertPublisher(body, Flowable.class)
-                                .map(item -> codec.encode(item))
-                                .subscribeOn(Schedulers.from(executorService)));
+                        Publisher<?> pub = Publishers.convertPublisher(body, Publisher.class);
+                        response.body(Flux.from(pub)
+                                .map(codec::encode)
+                                .subscribeOn(Schedulers.fromExecutorService(executorService)));
                     } else {
-                        return Flowable.fromCallable(() -> {
+                        return Mono.fromCallable(() -> {
                             final byte[] encoded = codec.encode(body);
                             response.body(encoded);
                             return response;
-                        }).subscribeOn(Schedulers.from(executorService));
+                        }).subscribeOn(Schedulers.fromExecutorService(executorService));
                     }
                 }
-                return Flowable.just(response);
+                return Flux.just(response);
             });
         } else {
             return responsePublisher;

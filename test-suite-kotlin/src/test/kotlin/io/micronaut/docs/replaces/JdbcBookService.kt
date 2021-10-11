@@ -18,11 +18,8 @@ package io.micronaut.docs.replaces
 import io.micronaut.context.annotation.Requires
 import io.micronaut.docs.requires.Book
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import javax.sql.DataSource
-import java.sql.Connection
-import java.sql.PreparedStatement
-import java.sql.ResultSet
 import java.sql.SQLException
 
 // tag::replaces[]

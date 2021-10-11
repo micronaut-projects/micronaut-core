@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,8 +21,8 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.exceptions.UriSyntaxException;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -71,7 +71,7 @@ class DefaultUriBuilder implements UriBuilder {
         final String query = uri.getQuery();
         if (query != null) {
             final Map parameters = new QueryStringDecoder(uri).parameters();
-            this.queryParams = new MutableConvertibleMultiValuesMap<String>(parameters);
+            this.queryParams = new MutableConvertibleMultiValuesMap<>(parameters);
         } else {
             this.queryParams = new MutableConvertibleMultiValuesMap<>();
         }
@@ -115,7 +115,7 @@ class DefaultUriBuilder implements UriBuilder {
                 }
                 if (query != null) {
                     final Map parameters = new QueryStringDecoder(query).parameters();
-                    this.queryParams = new MutableConvertibleMultiValuesMap<String>(parameters);
+                    this.queryParams = new MutableConvertibleMultiValuesMap<>(parameters);
                 } else {
                     this.queryParams = new MutableConvertibleMultiValuesMap<>();
                 }
@@ -133,7 +133,7 @@ class DefaultUriBuilder implements UriBuilder {
                 this.path = new StringBuilder(path);
                 if (query != null) {
                     final Map parameters = new QueryStringDecoder(uri.toString()).parameters();
-                    this.queryParams = new MutableConvertibleMultiValuesMap<String>(parameters);
+                    this.queryParams = new MutableConvertibleMultiValuesMap<>(parameters);
                 } else {
                     this.queryParams = new MutableConvertibleMultiValuesMap<>();
                 }
@@ -359,12 +359,13 @@ class DefaultUriBuilder implements UriBuilder {
     private String buildQueryParams(Map<String, ? super Object> values) {
         if (!queryParams.isEmpty()) {
             StringBuilder builder = new StringBuilder();
-            final Iterator<String> nameIterator = queryParams.names().iterator();
+            final Iterator<Map.Entry<String, List<String>>> nameIterator = queryParams.iterator();
             while (nameIterator.hasNext()) {
-                String rawName = nameIterator.next();
+                Map.Entry<String, List<String>> entry = nameIterator.next();
+                String rawName = entry.getKey();
                 String name = expandOrEncode(rawName, values);
 
-                final Iterator<String> i = queryParams.getAll(rawName).iterator();
+                final Iterator<String> i = entry.getValue().iterator();
                 while (i.hasNext()) {
                     String v = expandOrEncode(i.next(), values);
                     builder.append(name).append('=').append(v);

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.decoders;
 
+import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.order.Ordered;
@@ -54,36 +55,45 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
     private final EmbeddedServer embeddedServer;
     private final ConversionService<?> conversionService;
     private final HttpServerConfiguration configuration;
+    private final ApplicationEventPublisher<HttpRequestReceivedEvent> httpRequestReceivedEventPublisher;
 
     /**
      * @param embeddedServer    The embedded service
      * @param conversionService The conversion service
      * @param configuration     The Http server configuration
+     * @param httpRequestReceivedEventPublisher The publisher of {@link HttpRequestReceivedEvent}
      */
-    public HttpRequestDecoder(EmbeddedServer embeddedServer, ConversionService<?> conversionService, HttpServerConfiguration configuration) {
+    public HttpRequestDecoder(EmbeddedServer embeddedServer, ConversionService<?> conversionService, HttpServerConfiguration configuration, ApplicationEventPublisher<HttpRequestReceivedEvent> httpRequestReceivedEventPublisher) {
         this.embeddedServer = embeddedServer;
         this.conversionService = conversionService;
         this.configuration = configuration;
+        this.httpRequestReceivedEventPublisher = httpRequestReceivedEventPublisher;
     }
 
     @Override
     protected void decode(ChannelHandlerContext ctx, HttpRequest msg, List<Object> out) {
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Server {}:{} Received Request: {} {}", embeddedServer.getHost(), embeddedServer.getPort(), msg.method(), msg.uri());
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("Server {}:{} Received Request: {} {}", embeddedServer.getHost(), embeddedServer.getPort(), msg.method(), msg.uri());
         }
         try {
             NettyHttpRequest<Object> request = new NettyHttpRequest<>(msg, ctx, conversionService, configuration);
-            ctx.executor().execute(() -> {
+            if (httpRequestReceivedEventPublisher != ApplicationEventPublisher.NO_OP) {
                 try {
-                    embeddedServer.getApplicationContext().publishEvent(
-                            new HttpRequestReceivedEvent(request)
-                    );
+                    ctx.executor().execute(() -> {
+                        try {
+                            httpRequestReceivedEventPublisher.publishEvent(new HttpRequestReceivedEvent(request));
+                        } catch (Exception e) {
+                            if (LOG.isErrorEnabled()) {
+                                LOG.error("Error publishing Http request received event: " + e.getMessage(), e);
+                            }
+                        }
+                    });
                 } catch (Exception e) {
                     if (LOG.isErrorEnabled()) {
                         LOG.error("Error publishing Http request received event: " + e.getMessage(), e);
                     }
                 }
-            });
+            }
             out.add(request);
         } catch (IllegalArgumentException e) {
             // this configured the request in the channel as an attribute

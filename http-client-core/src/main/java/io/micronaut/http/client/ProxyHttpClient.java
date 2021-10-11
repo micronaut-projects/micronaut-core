@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,9 +15,13 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import org.reactivestreams.Publisher;
+
+import java.net.URL;
 
 /**
  * Interface that allows proxying of HTTP requests in controllers and filters.
@@ -34,5 +38,32 @@ public interface ProxyHttpClient {
      * @param request The request
      * @return A publisher that emits the response.
      */
-    Publisher<MutableHttpResponse<?>> proxy(HttpRequest<?> request);
+    Publisher<MutableHttpResponse<?>> proxy(@NonNull HttpRequest<?> request);
+
+    /**
+     * Create a new {@link ProxyHttpClient}.
+     * Note that this method should only be used outside of the context of a Micronaut application.
+     * The returned {@link ProxyHttpClient} is not subject to dependency injection.
+     * The creator is responsible for closing the client to avoid leaking connections.
+     * Within a Micronaut application use {@link jakarta.inject.Inject} to inject a client instead.
+     *
+     * @param url The base URL
+     * @return The client
+     */
+    static ProxyHttpClient create(@Nullable URL url) {
+        return ProxyHttpClientFactoryResolver.getFactory().createProxyClient(url);
+    }
+
+    /**
+     * Create a new {@link ProxyHttpClient} with the specified configuration. Note that this method should only be used
+     * outside of the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @param configuration the client configuration
+     * @return The client
+     * @since 2.2.0
+     */
+    static ProxyHttpClient create(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
+        return ProxyHttpClientFactoryResolver.getFactory().createProxyClient(url, configuration);
+    }
 }

@@ -1,46 +1,61 @@
-Profiles can include commands for generating common code artifacts. Not all commands are supported by all profiles; the available commands for a given profile can be viewed using the `profile-info` command.
+You can view a full list of available commands using the help flag, for example:
 
 [source,bash]
 ----
-$ mn profile-info service
-Profile: service
-------------------
-The service profile
+$ mn -h
+Usage: mn [-hvVx] [COMMAND]
+Micronaut CLI command line interface for generating projects and services.
+Application generation commands are: # <1>
 
-Provided Commands:
---------------------
+*  create-app NAME
+*  create-cli-app NAME
+*  create-function-app NAME
+*  create-grpc-app NAME
+*  create-messaging-app NAME
+
+Options:
+  -h, --help         Show this help message and exit.
+  -v, --verbose      Create verbose output.
+  -V, --version      Print version information and exit.
+  -x, --stacktrace   Show full stack trace when exceptions occur.
+
+Commands: # <2>
+  create-app               Creates an application
+  create-cli-app           Creates a CLI application
+  create-function-app      Creates a Cloud Function
+  create-grpc-app          Creates a gRPC application
+  create-messaging-app     Creates a messaging application
+  create-job               Creates a job with scheduled method
   create-bean              Creates a singleton bean
+  create-websocket-client  Creates a Websocket client
   create-client            Creates a client interface
   create-controller        Creates a controller and associated test
-  create-job               Creates a job with scheduled method
-  create-test              Creates a simple test for the project's testing framework
-  create-websocket-client  Creates a Websocket client
+  feature-diff             Produces the diff of an original project with an original project with
+                             additional features.
   create-websocket-server  Creates a Websocket server
-  help                     Prints help information for a specific command
-
-
-Provided Features:
-------------------
-...
+  create-test              Creates a simple test for the project's testing framework
 ----
 
-All of the code-generation commands will honor the values written in `micronaut-cli.yml`. For example, assume the following `micronaut-cli.yml` file.
+<1> Here you can see the project generation commands lists
+<2> All commands available in the current directory are listed here
+<3> **Note:** the things listed after the project creation commands (always available) depend on the current directory context
+
+All the code-generation commands honor the values written in `micronaut-cli.yml`. For example, assume the following `micronaut-cli.yml` file.
 
 .micronaut-cli.yml
 [source,yaml]
 ----
-profile: service
 defaultPackage: example
 ---
 testFramework: spock
 sourceLanguage: java
 ----
 
-With the above settings, the `create-controller` command will (by default) generate Java controllers with an associated Spock test, under the `example` package. Commands accept arguments and these defaults can be overriden on a per-command basis.
+With the above settings, the `create-bean` command (by default) generates a Java class with an associated Spock test, in the `example` package. Commands accept arguments and these defaults can be overridden on a per-command basis.
 
-== Base Profile Commands
+== Base Commands
 
-Commands in the base profile are inherited by all other profiles and are always available.
+These commands are always available within the context of a micronaut project.
 
 === Create-Bean
 
@@ -92,9 +107,7 @@ $ mn create-job UpdateFeeds --lang groovy
 | Rendered template Job.groovy to destination src/main/groovy/example/UpdateFeedsJob.groovy
 ----
 
-== Service Profile Commands
-
-The service profile includes commands that are dependent upon the HTTP server and client dependencies (which are not included in the base profile).
+== HTTP-Related Commands
 
 === Create-Controller
 
@@ -113,7 +126,7 @@ The service profile includes commands that are dependent upon the HTTP server an
 |
 |===
 
-The `create-controller` command generates a link:{api}/io/micronaut/http/annotation/Controller.html[Controller] class. It follows a `*Controller` convention for generating the class name. It creates an associated test that will run the application and instantiate an HTTP client, which can make requests against the controller.
+The `create-controller` command generates a link:{api}/io/micronaut/http/annotation/Controller.html[Controller] class. It follows a `*Controller` convention for generating the class name. It creates an associated test that runs the application and instantiates an HTTP client, which can make requests against the controller.
 
 [source,bash]
 ----
@@ -164,14 +177,13 @@ $ mn create-client Book
 |
 |===
 
-The `create-websocket-server` command generates a simple api:websocket.WebSocketServer[] class. It follows a `*Server` convention for generating the class name. It does not create an associated test.
+The `create-websocket-server` command generates a simple api:websocket.annotation.ServerWebSocket[] class. It follows a `*Server` convention for generating the class name. It does not create an associated test.
 
 [source,bash]
 ----
 $ mn create-websocket-server MyChat
 | Rendered template WebsocketServer.java to destination src/main/java/example/MyChatServer.java
 ----
-
 
 === Create-Websocket-Client
 
@@ -198,9 +210,7 @@ $ mn create-websocket-client MyChat
 | Rendered template WebsocketClient.java to destination src/main/java/example/MyChatClient.java
 ----
 
-== CLI Profile Commands
-
-The cli profile lets you generate CLI commands to control your application.
+== CLI Project Commands
 
 === Create-Command
 
@@ -220,9 +230,7 @@ The cli profile lets you generate CLI commands to control your application.
 |===
 
 The `create-command` command generates a standalone application that can be executed as a
-http://picocli.info[picocli] link:http://picocli.info/apidocs/picocli/CommandLine.Command.html[Command].
-It follows a `*Command` convention for generating the class name.
-It creates an associated test that will run the application and verify that a command line option was set.
+http://picocli.info[picocli] link:http://picocli.info/apidocs/picocli/CommandLine.Command.html[Command]. It follows a `*Command` convention for generating the class name. It creates an associated test that runs the application and verifies that a command line option was set.
 
 [source,bash]
 ----
@@ -230,3 +238,5 @@ $ mn create-command print
 | Rendered template Command.java to destination src/main/java/example/PrintCommand.java
 | Rendered template CommandTest.java to destination src/test/java/example/PrintCommandTest.java
 ----
+
+This list is just a small subset of the code generation commands in the Micronaut CLI. To see all context-sensitive commands the CLI has available (and under what circumstances they apply), check out the https://github.com/micronaut-projects/micronaut-starter[micronaut-starter] project and find the classes that extend `CodeGenCommand`. The `applies` method dictates whether a command is available or not.

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,8 +17,8 @@ package io.micronaut.http;
 
 import io.micronaut.http.cookie.Cookies;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.security.Principal;
@@ -127,10 +127,10 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
-     * @return Get the path without any parameters
+     * @return Get the raw, percent-encoded path without any parameters
      */
     default @NonNull String getPath() {
-        return getUri().getPath();
+        return getUri().getRawPath();
     }
 
     /**
@@ -173,7 +173,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     @Override
     default Optional<Locale> getLocale() {
         return getHeaders().findFirst(HttpHeaders.ACCEPT_LANGUAGE)
-            .map((text) -> {
+            .map(text -> {
                 int len = text.length();
                 if (len == 0 || (len == 1 && text.charAt(0) == '*')) {
                     return Locale.getDefault().toLanguageTag();
@@ -292,7 +292,6 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpRequest<T> POST(String uri, T body) {
         Objects.requireNonNull(uri, "Argument [uri] is required");
-        Objects.requireNonNull(body, "Argument [body] cannot be null");
         return HttpRequestFactory.INSTANCE.post(uri, body);
     }
 
@@ -320,8 +319,6 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpRequest<T> PUT(String uri, T body) {
         Objects.requireNonNull(uri, "Argument [uri] is required");
-        Objects.requireNonNull(body, "Argument [body] cannot be null");
-
         return HttpRequestFactory.INSTANCE.put(uri, body);
     }
 
@@ -349,7 +346,6 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpRequest<T> PATCH(String uri, T body) {
         Objects.requireNonNull(uri, "Argument [uri] is required");
-        Objects.requireNonNull(body, "Argument [body] cannot be null");
         return HttpRequestFactory.INSTANCE.patch(uri, body);
     }
 

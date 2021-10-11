@@ -1,8 +1,11 @@
 dependencies {
     annotationProcessor project(":inject-java")
-    api dependencyVersion("rxjava2")
+
+    implementation libs.managed.reactor
+
     api project(":runtime")
-    api project(":websocket")
+
+    compileOnly libs.kotlin.stdlib
 }
 
 //tasks.withType(Test) {

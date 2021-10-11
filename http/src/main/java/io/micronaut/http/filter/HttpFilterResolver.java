@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,8 @@
  */
 package io.micronaut.http.filter;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.util.ArrayUtils;
@@ -40,7 +40,7 @@ import java.util.Set;
 public interface HttpFilterResolver<F extends HttpFilter, T extends AnnotationMetadataProvider> {
 
     /**
-     * Resolves the initial list of filters
+     * Resolves the initial list of filters.
      * @param context The context
      * @return The filters
      * @since 2.0
@@ -78,6 +78,13 @@ public interface HttpFilterResolver<F extends HttpFilter, T extends AnnotationMe
         @NonNull String[] getPatterns();
 
         /**
+         * @return The filter patterns
+         */
+        default FilterPatternStyle getPatternStyle() {
+            return FilterPatternStyle.defaultStyle();
+        }
+
+        /**
          * @return Does the entry define any methods.
          */
         default boolean hasMethods() {
@@ -103,12 +110,38 @@ public interface HttpFilterResolver<F extends HttpFilter, T extends AnnotationMe
         static <FT extends HttpFilter> FilterEntry<FT> of(
                 @NonNull FT filter,
                 @Nullable AnnotationMetadata annotationMetadata,
-                @Nullable Set<HttpMethod> methods, String...patterns) {
+                @Nullable Set<HttpMethod> methods,
+                String...patterns) {
             return new DefaultFilterEntry<>(
                     Objects.requireNonNull(filter, "Filter cannot be null"),
                     annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA,
                     methods,
+                    null,
                     patterns
+            );
+        }
+
+        /**
+         * Creates a filter entry for the given arguments.
+         * @param filter The filter
+         * @param annotationMetadata The annotation metadata
+         * @param methods The methods
+         * @param patternStyle the pattern style
+         * @param patterns The patterns
+         * @return The filter entry
+         * @param <FT> the filter type
+         */
+        static <FT extends HttpFilter> FilterEntry<FT> of(
+            @NonNull FT filter,
+            @Nullable AnnotationMetadata annotationMetadata,
+            @Nullable Set<HttpMethod> methods,
+            @NonNull FilterPatternStyle patternStyle, String...patterns) {
+            return new DefaultFilterEntry<>(
+                Objects.requireNonNull(filter, "Filter cannot be null"),
+                annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA,
+                methods,
+                patternStyle,
+                patterns
             );
         }
     }

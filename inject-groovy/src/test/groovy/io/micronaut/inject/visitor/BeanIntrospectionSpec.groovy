@@ -1,10 +1,14 @@
 package io.micronaut.inject.visitor
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import com.blazebit.persistence.impl.function.entity.ValuesEntity
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.TypeElementVisitorStart
+import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
+import io.micronaut.core.beans.BeanIntrospector
+import io.micronaut.core.beans.BeanMethod
 import io.micronaut.core.beans.BeanProperty
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
@@ -18,6 +22,280 @@ class BeanIntrospectionSpec extends AbstractBeanDefinitionSpec {
 
     def setup() {
         System.setProperty(TypeElementVisitorStart.ELEMENT_VISITORS_PROPERTY, IntrospectedTypeElementVisitor.name)
+    }
+
+    void 'test favor method access'() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
+package fieldaccess
+
+import io.micronaut.core.annotation.*
+
+@Introspected(accessKind=[Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD])
+class Test {
+    public String one
+    public boolean invoked = false
+    public String getOne() {
+        invoked = true
+        one
+    } 
+}
+''');
+        when:
+        def properties = introspection.getBeanProperties()
+        def instance = introspection.instantiate()
+
+        then:
+        properties.size() == 2
+
+        when:'a primitive is changed with copy constructor'
+        def one = introspection.getRequiredProperty("one", String)
+        instance.one = 'test'
+
+
+        then:'the new value is reflected'
+        one.get(instance) == 'test'
+        instance.invoked
+    }
+
+    void 'test favor field access'() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
+package fieldaccess
+
+import io.micronaut.core.annotation.*
+
+@Introspected(accessKind=[Introspected.AccessKind.FIELD, Introspected.AccessKind.METHOD])
+class Test {
+    public String one
+    public boolean invoked = false
+    public String getOne() {
+        invoked = true
+        one
+    } 
+}
+''');
+        when:
+        def properties = introspection.getBeanProperties()
+        def instance = introspection.instantiate()
+        then:
+        properties.size() == 2
+
+
+        when:'a primitive is changed with copy constructor'
+        def one = introspection.getRequiredProperty("one", String)
+        one.set(instance, "test")
+
+
+        then:'the new value is reflected'
+        one.get(instance) == 'test'
+        !instance.invoked
+    }
+
+    // @PackageScope is commented out because type element visitors are run before it
+    // is processed because they visitors and the package scope transformation run in
+    // the same phase and there is no way to set the order
+    void 'test field access only'() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
+package fieldaccess
+
+import io.micronaut.core.annotation.*
+
+@Introspected(accessKind=Introspected.AccessKind.FIELD)
+class Test {
+    public String one // read/write
+    public final int two // read-only
+    @groovy.transform.PackageScope String three // package protected
+    protected String four // not included since protected
+    private String five // not included since private
+    
+    Test(int two) {
+        this.two = two
+    }
+}
+''');
+        when:
+        def properties = introspection.getBeanProperties()
+
+        then:
+//        properties.size() == 3
+        properties.size() == 2
+
+        def one = introspection.getRequiredProperty("one", String)
+        one.isReadWrite()
+
+        def two = introspection.getRequiredProperty("two", int.class)
+        two.isReadOnly()
+
+//        def three = introspection.getRequiredProperty("three", String)
+//        three.isReadWrite()
+
+        when:'a field is set'
+        def instance = introspection.instantiate(10)
+        one.set(instance, "test")
+
+        then:'the value is set'
+        one.get(instance) == 'test'
+
+        when:'a primitive is changed with copy constructor'
+        instance = two.withValue(instance, 20)
+
+        then:'the new value is reflected'
+        two.get(instance) == 20
+    }
+
+    // @PackageScope is commented out because type element visitors are run before it
+    // is processed because they visitors and the package scope transformation run in
+    // the same phase and there is no way to set the order
+    void "test copy constructor via mutate method"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.CopyMe','''\
+package test
+
+import java.net.URL
+
+@io.micronaut.core.annotation.Introspected
+class CopyMe {
+
+    //@groovy.transform.PackageScope 
+    URL url
+    //@groovy.transform.PackageScope 
+    boolean enabled = false
+    private final String name
+    private final String another
+    
+    CopyMe(String name, String another) {
+        this.name = name;
+        this.another = another;
+    }
+    
+    //@groovy.transform.PackageScope
+    String getName() {
+        return name
+    }
+    
+    //@groovy.transform.PackageScope
+    String getAnother() {
+        return another
+    }
+    
+    CopyMe withAnother(String a) {
+        return this.another.is(a) ? this : new CopyMe(this.name, a.toUpperCase())
+    }
+}
+''')
+        when:
+        def copyMe = introspection.instantiate("Test", "Another")
+        def expectUrl = new URL("http://test.com")
+        copyMe.url = expectUrl
+
+        then:
+        copyMe.name == 'Test'
+        copyMe.another == "Another"
+        copyMe.url == expectUrl
+
+        when:
+        def enabled = introspection.getRequiredProperty("enabled", boolean.class)
+        def urlProperty = introspection.getRequiredProperty("url", URL)
+        def property = introspection.getRequiredProperty("name", String)
+        def another = introspection.getRequiredProperty("another", String)
+        def newInstance = property.withValue(copyMe, "Changed")
+
+        then:
+        !newInstance.is(copyMe)
+        enabled.get(newInstance) == false
+        newInstance.name == 'Changed'
+        newInstance.url == expectUrl
+        newInstance.another == "Another"
+
+        when:"the instance is changed with the same value"
+        def result = property.withValue(newInstance, "Changed")
+
+        then:"The existing instance is returned"
+        newInstance.is(result)
+
+        when:"An explicit with method is used"
+        result = another.withValue(newInstance, "changed")
+
+        then:"It was invoked"
+        !result.is(newInstance)
+        result.another == 'CHANGED'
+
+        when:"a mutable property is used"
+        def anotherUrl = new URL("http://another.com")
+        urlProperty.withValue(result, anotherUrl)
+        enabled.withValue(result, true)
+        then:"it is correct"
+        result.url == anotherUrl
+        result.enabled == true
+    }
+
+    void "test generate bean method for introspected class"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.MethodTest', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected
+public class MethodTest extends SuperType implements SomeInt {
+    public boolean nonAnnotated() {
+        return true;
+    }
+    
+    @Executable
+    public String invokeMe(String str) {
+        return str;
+    }
+    
+    @Executable
+    int invokePrim(int i) {
+        return i;
+    }
+}
+
+class SuperType {
+    @Executable
+    String superMethod(String str) {
+        return str;
+    }
+    
+    @Executable
+    public String invokeMe(String str) {
+        return str;
+    }
+}
+
+interface SomeInt {
+    @Executable
+    default boolean ok() {
+        return true;
+    }
+    
+    default String getName() {
+        return "ok";
+    }
+}
+''')
+        when:
+        Collection<BeanMethod> beanMethods = introspection.getBeanMethods()
+
+        then:
+        // bizarrely Groovy doesn't support resolving default interface methods
+        beanMethods*.name as Set == ['invokeMe', 'invokePrim', 'superMethod'] as Set
+        beanMethods.every({it.annotationMetadata.hasAnnotation(Executable)})
+        beanMethods.every { it.declaringBean == introspection}
+
+        when:
+        def invokeMe = beanMethods.find { it.name == 'invokeMe' }
+        def invokePrim = beanMethods.find { it.name == 'invokePrim' }
+        def bean = introspection.instantiate()
+
+        then:
+        invokeMe.invoke(bean, "test") == 'test'
+        invokePrim.invoke(bean, 10) == 10
     }
 
     void "test generate bean introspection for interface"() {
@@ -765,6 +1043,15 @@ enum Test {
         introspection.getProperty("name", String).get().get(new Person(name: "Sally")) == "Sally"
     }
 
+    void "test introspection class member configuration works 2"() {
+        when:
+        BeanIntrospection introspection = BeanIntrospection.getIntrospection(ValuesEntity)
+
+        then:
+        noExceptionThrown()
+        introspection != null
+    }
+
     void "test generate bean introspection for @ConfigurationProperties with validation rules on getters"() {
         BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig','''\
 package test;
@@ -776,7 +1063,7 @@ import javax.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
-public class ValidatedConfig {
+class ValidatedConfig {
 
     private URL url
     private String name
@@ -817,12 +1104,12 @@ import javax.validation.constraints.NotBlank
 import java.net.URL
 
 @ConfigurationProperties("foo.bar")
-public class ValidatedConfig {
+class ValidatedConfig {
 
     @NotNull
     URL url
     
-    public static class Inner {
+    static class Inner {
     
     }
     
@@ -919,5 +1206,205 @@ class ValidatedConfig {
 ''')
         expect:
         introspection != null
+    }
+
+    void "test multi-dimensional arrays"() {
+        when:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Test {
+    int[] oneDimension
+    int[][] twoDimensions
+    int[][][] threeDimensions
+}
+''')
+
+        then:
+        noExceptionThrown()
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate()
+        def property = introspection.getRequiredProperty("oneDimension", int[].class)
+        int[] level1 = [1, 2, 3] as int[]
+        property.set(instance, level1)
+
+        then:
+        property.get(instance) == level1
+
+        when:
+        property = introspection.getRequiredProperty("twoDimensions", int[][].class)
+        int[] level2 = [4, 5, 6] as int[]
+        int[][] twoDimensions = [level1, level2] as int[][]
+        property.set(instance, twoDimensions)
+
+        then:
+        property.get(instance) == twoDimensions
+
+        when:
+        property = introspection.getRequiredProperty("threeDimensions", int[][][].class)
+        int[][][] threeDimensions = [[level1], [level2]] as int[][][]
+        property.set(instance, threeDimensions)
+
+        then:
+        property.get(instance) == threeDimensions
+    }
+
+    void "test class multi-dimensional arrays"() {
+        when:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Test {
+    String[] oneDimension
+    String[][] twoDimensions
+    String[][][] threeDimensions
+}
+''')
+
+        then:
+        noExceptionThrown()
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate()
+        def property = introspection.getRequiredProperty("oneDimension", String[].class)
+        String[] level1 = ["1", "2", "3"] as String[]
+        property.set(instance, level1)
+
+        then:
+        property.get(instance) == level1
+
+        when:
+        property = introspection.getRequiredProperty("twoDimensions", String[][].class)
+        String[] level2 = ["4", "5", "6"] as String[]
+        String[][] twoDimensions = [level1, level2] as String[][]
+        property.set(instance, twoDimensions)
+
+        then:
+        property.get(instance) == twoDimensions
+
+        when:
+        property = introspection.getRequiredProperty("threeDimensions", String[][][].class)
+        String[][][] threeDimensions = [[level1], [level2]] as String[][][]
+        property.set(instance, threeDimensions)
+
+        then:
+        property.get(instance) == threeDimensions
+    }
+
+    void "test enum multi-dimensional arrays"() {
+        when:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.inject.visitor.SomeEnum
+
+@Introspected
+class Test {
+    SomeEnum[] oneDimension
+    SomeEnum[][] twoDimensions
+    SomeEnum[][][] threeDimensions
+}
+''')
+
+        then:
+        noExceptionThrown()
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate()
+        def property = introspection.getRequiredProperty("oneDimension", SomeEnum[].class)
+        SomeEnum[] level1 = [SomeEnum.A, SomeEnum.B, SomeEnum.A] as SomeEnum[]
+        property.set(instance, level1)
+
+        then:
+        property.get(instance) == level1
+
+        when:
+        property = introspection.getRequiredProperty("twoDimensions", SomeEnum[][].class)
+        SomeEnum[] level2 = [SomeEnum.B, SomeEnum.A, SomeEnum.B] as SomeEnum[]
+        SomeEnum[][] twoDimensions = [level1, level2] as SomeEnum[][]
+        property.set(instance, twoDimensions)
+
+        then:
+        property.get(instance) == twoDimensions
+
+        when:
+        property = introspection.getRequiredProperty("threeDimensions", SomeEnum[][][].class)
+        SomeEnum[][][] threeDimensions = [[level1], [level2]] as SomeEnum[][][]
+        property.set(instance, threeDimensions)
+
+        then:
+        property.get(instance) == threeDimensions
+    }
+
+    void "test introspection on abstract class"() {
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+abstract class Test {
+    String name
+    String author
+}
+""")
+
+        expect:
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 2
+    }
+
+    void "test targeting abstract class with @Introspected(classes = "() {
+        ClassLoader classLoader = buildClassLoader("""
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected(classes = [io.micronaut.inject.visitor.TestClass])
+class MyConfig {
+
+}
+""")
+
+        when:
+        BeanIntrospector beanIntrospector = BeanIntrospector.forClassLoader(classLoader)
+
+        then:
+        BeanIntrospection beanIntrospection = beanIntrospector.getIntrospection(TestClass)
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 2
+    }
+
+    void "test introspection on abstract class with extra getter"() {
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+abstract class Test {
+    String name
+    String author
+    
+    int getAge() {
+        0
+    }
+}
+""")
+
+        expect:
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 3
     }
 }

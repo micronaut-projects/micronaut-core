@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,16 +15,15 @@
  */
 package io.micronaut.http.netty.channel;
 
-import java.util.concurrent.Executor;
-import java.util.concurrent.ThreadFactory;
-
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
-
-import edu.umd.cs.findbugs.annotations.Nullable;
 import io.netty.channel.socket.SocketChannel;
+
+import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * Factory for EventLoopGroup.
@@ -97,23 +96,9 @@ public interface EventLoopGroupFactory {
      * @param threads The number of threads to use.
      * @param ioRatio The io ratio.
      * @return An EventLoopGroup.
-     * @deprecated Use {@link #createEventLoopGroup(EventLoopGroupConfiguration, ThreadFactory)} instead
      */
-    @Deprecated
     default EventLoopGroup createEventLoopGroup(int threads, @Nullable Integer ioRatio) {
         return createEventLoopGroup(threads, (ThreadFactory) null, ioRatio);
-    }
-
-    /**
-     * Creates a default EventLoopGroup.
-     *
-     * @param ioRatio The io ratio.
-     * @return An EventLoopGroup.
-     * @deprecated Use {@link #createEventLoopGroup(EventLoopGroupConfiguration, ThreadFactory)} instead
-     */
-    @Deprecated
-    default EventLoopGroup createEventLoopGroup(@Nullable Integer ioRatio) {
-        return createEventLoopGroup(0, (ThreadFactory) null, ioRatio);
     }
 
     /**
@@ -127,18 +112,46 @@ public interface EventLoopGroupFactory {
      * Returns the server channel class.
      *
      * @param configuration The configuration
-     * @return A ServerChannelClass.
+     * @return A ServerSocketChannel class.
      */
     default @NonNull Class<? extends ServerSocketChannel> serverSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
         return serverSocketChannelClass();
     }
 
     /**
+     * Returns the server channel class instance.
+     *
+     * @param configuration The configuration
+     * @return A ServerSocketChannel instance.
+     */
+    default @NonNull ServerSocketChannel serverSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
+        try {
+            return serverSocketChannelClass(configuration).getDeclaredConstructor().newInstance();
+        } catch (Exception e) {
+            throw new RuntimeException("Cannot instantiate server socket channel instance");
+        }
+    }
+
+    /**
      * Returns the client channel class.
      *
      * @param configuration The configuration
-     * @return A SocketChannel.
+     * @return A SocketChannel class.
      */
     @NonNull Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration);
+
+    /**
+     * Returns the client channel class instance.
+     *
+     * @param configuration The configuration
+     * @return A SocketChannel instance.
+     */
+    default @NonNull SocketChannel clientSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
+        try {
+            return clientSocketChannelClass(configuration).getDeclaredConstructor().newInstance();
+        } catch (Exception e) {
+            throw new RuntimeException("Cannot instantiate server socket channel instance");
+        }
+    }
 
 }

@@ -17,7 +17,7 @@ package io.micronaut.inject.constructor.arrayinjection
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import spock.lang.Specification
 
@@ -45,7 +45,7 @@ class ConstructorArrayInjectionSpec extends AbstractTypeElementSpec {
 package test;
 
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 class B {
     private A[] all;
 

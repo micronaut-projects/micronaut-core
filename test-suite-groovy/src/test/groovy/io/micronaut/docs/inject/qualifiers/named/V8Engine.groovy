@@ -15,7 +15,7 @@
  */
 package io.micronaut.docs.inject.qualifiers.named
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 /**
  * @author Graeme Rocher
@@ -26,6 +26,7 @@ import javax.inject.Singleton
 class V8Engine implements Engine { // <3>
     int cylinders = 8
 
+    @Override
     String start() {
         "Starting V8"
     }

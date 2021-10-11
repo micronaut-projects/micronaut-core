@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,6 +20,7 @@ import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ExecutionHandle;
@@ -46,18 +47,18 @@ final class AdapterIntroduction implements MethodInterceptor<Object, Object> {
      */
     AdapterIntroduction(BeanContext beanContext, ExecutableMethod<?, ?> method) {
         Class<?> beanType = method.classValue(Adapter.class, ADAPTED_BEAN).orElse(null);
-        String beanMethod  = method.stringValue(Adapter.class, ADAPTED_METHOD).orElse(null);
-        String beanQualifier  = method.stringValue(Adapter.class, ADAPTED_QUALIFIER).orElse(null);
-        Class[] argumentTypes = method.classValues(Adapter.class, ADAPTED_ARGUMENT_TYPES);
 
         if (beanType == null) {
             throw new IllegalStateException("No bean type to adapt found in Adapter configuration for method: " + method);
         }
 
+        String beanMethod  = method.stringValue(Adapter.class, ADAPTED_METHOD).orElse(null);
         if (StringUtils.isEmpty(beanMethod)) {
             throw new IllegalStateException("No bean method to adapt found in Adapter configuration for method: " + method);
         }
 
+        String beanQualifier  = method.stringValue(Adapter.class, ADAPTED_QUALIFIER).orElse(null);
+        Class[] argumentTypes = method.classValues(Adapter.class, ADAPTED_ARGUMENT_TYPES);
         Class[] methodArgumentTypes = method.getArgumentTypes();
         if (StringUtils.isNotEmpty(beanQualifier)) {
             this.executionHandle = beanContext.findExecutionHandle(
@@ -76,6 +77,7 @@ final class AdapterIntroduction implements MethodInterceptor<Object, Object> {
         }
     }
 
+    @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         return executionHandle.invoke(context.getParameterValues());

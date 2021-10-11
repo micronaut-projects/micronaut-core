@@ -1,16 +1,16 @@
-There are various ways to achieve reloading of classes on the JVM, all have their advantages and disadvantages. The following are possible ways to achieve reloading without restarting the JVM:
+There are various ways to achieve reloading of classes on the JVM, and all have their advantages and disadvantages. The following are possible ways to achieve reloading without restarting the JVM:
 
-* *JVM Agents* - A JVM agent like JRebel can be used, however these can produce unusual errors, may not support all JDK versions and can result in cached / stale classes.
-* *ClassLoader Reloading* - Class Loader based reloading is a popular solution used by most JVM frameworks, however it once again can lead to cached / stale classes, memory leaks and weird errors if the incorrect classloader is used at any moment.
+* *JVM Agents* - A JVM agent like JRebel can be used, however these can produce unusual errors, may not support all JDK versions, and can result in cached or stale classes.
+* *ClassLoader Reloading* - ClassLoader-based reloading is a popular solution used by most JVM frameworks; however it once again can lead to cached or stale classes, memory leaks, and weird errors if the incorrect classloader is used.
 * *Debugger HotSwap* - The Java debugger supports hotswapping of changes at runtime, but only supports a few use cases.
 
-Given the problems with existing solutions and a lack of a way built into the JVM to reload changes, the safest and best solution to reloading, and the one recommended by the Micronaut team, is to use automatic application restart via third-party tool.
+Given the problems with existing solutions and a lack of a way built into the JVM to reload changes, the safest and best solution to reloading, and the one recommended by the Micronaut team, is to use automatic application restart via a third-party tool.
 
-Micronaut's startup time is fast and automatic restart leads to a clean slate without potential hard to debug problems cropping up or memory leaks.
+Micronaut's startup time is fast and automatic restart leads to a clean slate without potential hard to debug problems or memory leaks  cropping up.
 
 === Maven Restart
 
-To have automatic application restarts with Maven use the Micronaut Maven plugin (including by default when creating new Maven projects) and run the following command:
+To have automatic application restarts with Maven, use the Micronaut Maven plugin (included by default when creating new Maven projects) and run the following command:
 
 .Using the Micronaut Maven Plugin
 [source,bash]
@@ -18,79 +18,16 @@ To have automatic application restarts with Maven use the Micronaut Maven plugin
 $ ./mvnw mn:run
 ----
 
-Every time you change a class Micronaut's plugin will automatically restart the server.
-
+Every time you change a class, the plugin automatically restarts the server.
 
 === Gradle Restart
 
-For Gradle restart yoou can create a new application with the `file-watch` feature already configured using the CLI with the command `mn create-app myapp --features file-watch`
-
-This essentially introduces the following configuration to `application.yml`:
-
-.File Watch Configuration
-[source,yaml]
-----
-micronaut:
-    io:
-        watch:
-            paths: src/main
-            restart: true
-----
-
-By setting `micronaut.io.watch.paths` what happens is that Micronaut will fire a api:scheduling.io.watch.event.FileChangedEvent[] if any file is changed. Setting `micronaut.io.watch.restart` tells Micronaut to stop the server if a file is changed.
-
-TIP: The `micronaut.io.watch.paths` setting can be used for more than just automatic restart, you can use this setting to monitor for file changes within your production application.
-
-Once this is in place to have Gradle automatically restart on any change add run the following command:
+Gradle automatic restart can be activated when using the Micronaut Gradle plugin by activating Gradle's support for continuous builds via the `-t` flag:
 
 .Using Gradle for Automatic Restart
 [source,bash]
 ----
-./gradlew run --continuous
+./gradlew run -t
 ----
 
-Every time you make a change to class or resources Gradle will recompile and restart the application.
-
-=== File Watch and Mac OS X
-
-The native JVM implementation of the `WatchService` interface for Mac OS X using polling which is slow. To improve file watch performance add the following dependencies to your build if you are using OS X:
-
-.Gradle - Configuring Native File Watch on Mac OS X
-[source,gradle]
-----
-configurations {
-    developmentOnly
-}
-dependencies {
-    // Automatically added with the 'file-watch' feature in the CLi
-    developmentOnly "io.micronaut:micronaut-runtime-osx"
-    ...
-    developmentOnly "net.java.dev.jna:jna"
-    developmentOnly "io.methvin:directory-watcher"
-
-}
-run.classpath += configurations.developmentOnly
-----
-
-NOTE: A custom `developmentOnly` configuration is used to ensure the dependencies don't go into the production JAR.
-
-Or with Maven:
-
-[source,xml]
-----
-<dependency>
-  <groupId>io.methvin</groupId>
-  <artifactId>directory-watcher</artifactId>
-  <scope>provided</scope>
-</dependency>
-<dependency>
-  <groupId>net.java.dev.jna</groupId>
-  <artifactId>jna</artifactId>
-  <scope>provided</scope>
-</dependency>
-----
-
-NOTE: The `provided` scope is used to ensure the dependencies don't go into the production JAR.
-
-
-
+Every time you make a change to class or resources, Gradle recompiles and restarts the application.

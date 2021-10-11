@@ -15,11 +15,42 @@
  */
 package io.micronaut.aop.compile
 
-import io.micronaut.aop.simple.Mutating
-import io.micronaut.inject.AbstractTypeElementSpec
+import com.fasterxml.jackson.databind.ObjectMapper
+import io.micronaut.aop.Intercepted
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.inject.qualifiers.Qualifiers
+import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Issue
 
 class FinalModifierSpec extends AbstractTypeElementSpec {
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2530')
+    void 'test final modifier on external class produced by factory'() {
+        when:
+        def context = buildContext('test.MyBeanFactory', '''
+package test;
+
+import io.micronaut.aop.simple.*;
+import io.micronaut.context.annotation.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+@Factory
+class MyBeanFactory {
+    @Mutating("someVal")
+    @jakarta.inject.Singleton
+    @jakarta.inject.Named("myMapper")
+    ObjectMapper myMapper() {
+        return new ObjectMapper();
+    }
+
+}
+
+''')
+        then:
+        context.getBean(ObjectMapper, Qualifiers.byName("myMapper")) instanceof Intercepted
+
+        cleanup:
+        context.close()
+    }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2479')
     void "test final modifier on inherited public method"() {
@@ -40,7 +71,7 @@ abstract class BaseRepositoryImpl {
 interface CountryRepository {    
 }
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Mutating("someVal")
 class CountryRepositoryImpl extends BaseRepositoryImpl implements CountryRepository {
     
@@ -72,7 +103,7 @@ abstract class BaseRepositoryImpl {
 interface CountryRepository {    
 }
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Mutating("someVal")
 class CountryRepositoryImpl extends BaseRepositoryImpl implements CountryRepository {
     
@@ -106,7 +137,7 @@ interface CountryRepository {
     public String someMethod();  
 }
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class CountryRepositoryImpl extends BaseRepositoryImpl implements CountryRepository {
     
     @Override
@@ -130,7 +161,7 @@ import io.micronaut.context.annotation.*;
 @Factory
 class MyBeanFactory {
     @Mutating("someVal")
-    @javax.inject.Singleton
+    @jakarta.inject.Singleton
     MyBean myBean() {
         return new MyBean();
     }
@@ -150,14 +181,14 @@ final class MyBean {
 
     void "test final modifier on class with AOP advice doesn't compile"() {
         when:
-        buildBeanDefinition('test.$MyBeanDefinition$Intercepted', '''
+        buildBeanDefinition('test.$MyBean' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.simple.*;
 import io.micronaut.context.annotation.*;
 
 @Mutating("someVal")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 final class MyBean {
 
     private String myValue;
@@ -179,14 +210,14 @@ final class MyBean {
 
     void "test final modifier on method with AOP advice doesn't compile"() {
         when:
-        buildBeanDefinition('test.$MyBeanDefinition$Intercepted', '''
+        buildBeanDefinition('test.$MyBean' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.simple.*;
 import io.micronaut.context.annotation.*;
 
 @Mutating("someVal")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 
     private String myValue;
@@ -208,13 +239,13 @@ class MyBean {
 
     void "test final modifier on method with AOP advice on method doesn't compile"() {
         when:
-        buildBeanDefinition('test.$MyBeanDefinition$Intercepted', '''
+        buildBeanDefinition('test.$MyBean' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.simple.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 
     private String myValue;

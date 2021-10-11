@@ -1,58 +1,50 @@
 ext {
     shadowJarEnabled = true
 }
+
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")
     api project(":http")
     api project(':inject')
     api project(':aop')
-    api dependencyVersion("validation")
-    api dependencyVersion("jackson.databind")
-    api dependencyVersion("rxjava2")
-    api([
-            dependencyVersion('jackson.datatype'),
-            dependencyModuleVersion('jackson.datatype', 'jackson-datatype-jsr310')
-    ])
+    api project(':context')
+    api project(":core-reactive")
+    api project(":jackson-databind")
+    api libs.managed.validation
 
-    compileOnly "org.graalvm.nativeimage:svm:$graalVersion"
-    compileOnly dependencyVersion("jcache")
+    implementation libs.managed.reactor
 
-    compileOnly(
-        dependencyModuleVersion('jackson.modules', 'jackson-module-kotlin')
-    ) {
-        transitive = false
-    }
-    compileOnly(
-            dependencyVersion('jackson.modules')
-    ) {
-        transitive = false
-    }
-    compileOnly(
-        dependencyModuleVersion('jackson.modules', 'jackson-module-parameter-names')
-    ) {
-        transitive = false
-    }
+    compileOnly libs.managed.graal
+    compileOnly libs.managed.jcache
 
-    compileOnly 'org.glassfish:javax.el:3.0.1-b11'
-    compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
-    compileOnly 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.3.7'
-    compileOnly 'org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.3.7'
-    compileOnly "ch.qos.logback:logback-classic:1.2.3"
-    testImplementation "ch.qos.logback:logback-classic:1.2.3"
+    compileOnly libs.log4j
+    compileOnly libs.javax.el
+    compileOnly libs.caffeine
+    compileOnly libs.kotlinx.coroutines.core
+    compileOnly libs.kotlinx.coroutines.reactive
+    compileOnly libs.managed.logback
+    testImplementation libs.managed.logback
 
-    testAnnotationProcessor project(":inject-java") 
-    testImplementation 'org.jsr107.ri:cache-ri-impl:1.1.1'
-    testImplementation dependencyVersion("jcache")
+    testAnnotationProcessor project(":inject-java")
+    testImplementation libs.jsr107
+    testImplementation libs.managed.jcache
     testImplementation project(":inject-java")
     testImplementation project(":inject-java-test")
     testImplementation project(":inject-groovy")
     if (!JavaVersion.current().isJava9Compatible()) {
         testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
+    testImplementation libs.systemlambda
 }
 
 //compileJava.options.fork = true
 //compileJava.options.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
+
+spotless {
+    java {
+        targetExclude '**/io/micronaut/scheduling/cron/CronExpression.java'
+    }
+}

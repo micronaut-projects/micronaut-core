@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,18 +15,18 @@
  */
 package io.micronaut.context;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
-import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -79,6 +79,22 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
                                        String methodName,
                                        Argument genericReturnType) {
         this(declaringType, methodName, genericReturnType, Argument.ZERO_ARGUMENTS);
+    }
+
+    /**
+     * @param declaringType     The declaring type
+     * @param methodName        The method name
+     */
+    @SuppressWarnings("WeakerAccess")
+    @UsedByGeneratedCode
+    protected AbstractExecutableMethod(Class<?> declaringType,
+                                       String methodName) {
+        this(declaringType, methodName, Argument.OBJECT_ARGUMENT, Argument.ZERO_ARGUMENTS);
+    }
+
+    @Override
+    public boolean hasPropertyExpressions() {
+        return getAnnotationMetadata().hasPropertyExpressions();
     }
 
     @Override
@@ -142,7 +158,7 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
 
     @Override
     public final Object invoke(Object instance, Object... arguments) {
-        validateArguments(arguments);
+        ArgumentUtils.validateArguments(this, getArguments(), arguments);
         return invokeInternal(instance, arguments);
     }
 
@@ -167,30 +183,15 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
     private AnnotationMetadata initializeAnnotationMetadata() {
         AnnotationMetadata annotationMetadata = resolveAnnotationMetadata();
         if (annotationMetadata != AnnotationMetadata.EMPTY_METADATA) {
-            // we make a copy of the result of annotation metadata which is normally a reference
-            // to the class metadata
-            return new MethodAnnotationMetadata(annotationMetadata);
+            if (annotationMetadata.hasPropertyExpressions()) {
+                // we make a copy of the result of annotation metadata which is normally a reference
+                // to the class metadata
+                return new MethodAnnotationMetadata(annotationMetadata);
+            } else {
+                return annotationMetadata;
+            }
         } else {
             return AnnotationMetadata.EMPTY_METADATA;
-        }
-    }
-
-    private void validateArguments(Object[] argArray) {
-        Argument[] arguments = getArguments();
-        int requiredCount = arguments.length;
-        int actualCount = argArray == null ? 0 : argArray.length;
-        if (requiredCount != actualCount) {
-            throw new IllegalArgumentException("Wrong number of arguments to method: " + getMethodName());
-        }
-        if (requiredCount > 0) {
-            for (int i = 0; i < arguments.length; i++) {
-                Argument argument = arguments[i];
-                Class type = ReflectionUtils.getWrapperType(argument.getType());
-                Object value = argArray[i];
-                if (value != null && !type.isInstance(value)) {
-                    throw new IllegalArgumentException("Invalid type [" + argArray[i].getClass().getName() + "] for argument [" + argument + "] of method: " + getMethodName());
-                }
-            }
         }
     }
 
@@ -236,8 +237,10 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
         }
 
         @Override
+        @NonNull
         public Argument asArgument() {
-            Collection<Argument<?>> values = getTypeVariables().values();
+            Map<String, Argument<?>> typeVariables = getTypeVariables();
+            Collection<Argument<?>> values = typeVariables.values();
             final AnnotationMetadata annotationMetadata = getAnnotationMetadata();
             return Argument.of(getType(), annotationMetadata, values.toArray(Argument.ZERO_ARGUMENTS));
         }

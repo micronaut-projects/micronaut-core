@@ -5,10 +5,9 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
 class GraalTypeElementVisitorSpec extends AbstractTypeElementSpec {
 
-    void "test write reflect.json for @Introspected"() {
-
-        given:
-        Reader reader = readGenerated("native-image/test/test/reflection-config.json", 'test.Test', '''
+    void "an @Introspected class doesn't add anything to reflect.json"() {
+        when:
+        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.Introspected;
@@ -20,58 +19,14 @@ class Test {
 
 ''')
 
-        when:
-        def json = new JsonSlurper().parse(reader)
-        def entry = json?.find { it.name == 'test.Test'}
-
         then:
-        entry
-        entry.name == 'test.Test'
-        entry.allPublicMethods
-        entry.allDeclaredConstructors
-
-        cleanup:
-        reader.close()
-    }
-
-
-
-    void "test write reflect.json for @Introspected with classes"() {
-
-        given:
-        Reader reader = readGenerated("native-image/test/test/reflection-config.json", 'test.Test', '''
-package test;
-
-import io.micronaut.core.annotation.Introspected;
-
-@Introspected(classes = Bar.class)
-class Test {
-    
-}
-
-class Bar {}
-
-''')
-
-        when:
-        def json = new JsonSlurper().parse(reader)
-        json = json.sort { it.name }
-        def entry = json?.find { it.name == 'test.Bar'}
-        then:
-        entry
-        entry.name == 'test.Bar'
-        entry.allPublicMethods
-        entry.allDeclaredConstructors
-        json?.find { it.name == 'test.Test'}
-
-        cleanup:
-        reader.close()
+        !reader
     }
 
     void "test write reflect.json for @TypeHint with classes"() {
 
         given:
-        Reader reader = readGenerated("native-image/test/test/reflection-config.json", 'test.Test', '''
+        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.*;
@@ -93,6 +48,7 @@ class Bar {}
         entry
         entry.name == 'test.Bar'
         !entry.allPublicMethods
+        !entry.allDeclaredFields
         entry.allDeclaredConstructors
 
         cleanup:
@@ -102,7 +58,7 @@ class Bar {}
     void "test write reflect.json for @TypeHint with classes and type names"() {
 
         given:
-        Reader reader = readGenerated("native-image/test/test/reflection-config.json", 'test.Test', '''
+        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.*;
@@ -124,6 +80,7 @@ class Bar {}
         entry
         entry.name == 'test.Bar'
         !entry.allPublicMethods
+        !entry.allDeclaredFields
         entry.allDeclaredConstructors
         json?.find { it.name == 'java.lang.String'}
 
@@ -134,7 +91,7 @@ class Bar {}
     void "test write reflect.json for @TypeHint with access type"() {
 
         given:
-        Reader reader = readGenerated("native-image/test/test/reflection-config.json", 'test.Test', '''
+        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.*;
@@ -156,6 +113,8 @@ class Bar {}
         entry
         entry.name == 'test.Bar'
         entry.allPublicMethods
+        !entry.allDeclaredFields
+        !entry.allDeclaredConstructors
 
         cleanup:
         reader.close()
@@ -164,7 +123,7 @@ class Bar {}
     void "test write reflect.json for @ReflectiveAccess with access type"() {
 
         given:
-        Reader reader = readGenerated("native-image/test/test/reflection-config.json", 'test.Test', '''
+        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.*;
@@ -199,10 +158,48 @@ class Test {
         reader.close()
     }
 
+    void "test write reflect.json for @Inject on private fields or methods"() {
+
+        given:
+        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@jakarta.inject.Singleton
+class Test {
+    
+    @jakarta.inject.Inject
+    private String name;
+    
+    @jakarta.inject.Inject
+    private void setFoo(Other other) {
+    }
+}
+
+class Other {}
+''')
+
+        when:
+        def json = new JsonSlurper().parse(reader)
+        json = json.sort { it.name }
+        def entry = json?.find { it.name == 'test.Test'}
+        then:
+        entry
+        entry.name == 'test.Test'
+        entry.fields
+        entry.fields[0].name == 'name'
+        entry.methods
+        entry.methods[0].name == 'setFoo'
+
+        cleanup:
+        reader.close()
+    }
+
     void "test write reflect.json for @ReflectiveAccess with inheritance"() {
 
         given:
-        Reader reader = readGenerated("native-image/test/test/reflection-config.json", 'test.HTTPCheck', '''
+        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.HTTPCheck', '''
 package test;
 
 import io.micronaut.core.annotation.*;
@@ -239,6 +236,105 @@ abstract class NewCheck {
         entry.name == 'test.HTTPCheck'
         entry.methods.size() == 1
         entry.methods[0].name == 'setInterval'
+        entry.methods[0].parameterTypes == ['java.lang.String']
+
+        cleanup:
+        reader.close()
+    }
+
+    void "test write reflect.json for @ReflectiveAccess with classes"() {
+        given:
+        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.ReflectiveAccess;
+
+@ReflectiveAccess
+class Test {
+
+}
+''')
+
+        when:
+        def json = new JsonSlurper().parse(reader)
+        json = json.sort { it.name }
+        def entry = json?.find { it.name == 'test.Test'}
+
+        then:
+        entry
+        entry.name == 'test.Test'
+        entry.allDeclaredFields
+        entry.allPublicMethods
+        entry.allDeclaredConstructors
+        entry.methods
+        entry.methods[0].name == '<init>'
+        entry.methods[0].parameterTypes == []
+
+        cleanup:
+        reader.close()
+    }
+
+    void "test write reflect.json for @Entity with classes"() {
+        given:
+        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
+package test;
+
+
+@javax.persistence.Entity
+class Test {
+
+
+    enum InnerEnum {
+        ONE, TWO;
+    }
+}
+''')
+
+        when:
+        def json = new JsonSlurper().parse(reader)
+        json = json.sort { it.name }
+        def entry = json?.find { it.name == 'test.Test'}
+
+        then:
+        entry
+        entry.name == 'test.Test'
+        entry.allDeclaredFields
+        entry.allPublicMethods
+        entry.allDeclaredConstructors
+        entry.methods
+        entry.methods[0].name == '<init>'
+        entry.methods[0].parameterTypes == []
+        json?.find { it.name == 'test.Test$InnerEnum'}
+
+        cleanup:
+        reader.close()
+    }
+
+    void "test write reflect.json for @ReflectiveAccess with enums"() {
+        given:
+        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.ReflectiveAccess;
+
+@ReflectiveAccess
+enum Test {
+    A, B
+}
+''')
+
+        when:
+        def json = new JsonSlurper().parse(reader)
+        json = json.sort { it.name }
+        def entry = json?.find { it.name == 'test.Test'}
+
+        then:
+        entry
+        entry.name == 'test.Test'
+        entry.allDeclaredFields
+        entry.allPublicMethods
+        entry.allDeclaredConstructors
+        !entry.methods
 
         cleanup:
         reader.close()

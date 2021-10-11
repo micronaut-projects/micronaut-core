@@ -1,12 +1,12 @@
-The methods provided by Java's link:{jdkapi}/java/lang/reflect/AnnotatedElement.html[AnnotatedElement] API in general don't provide the ability to introspect annotations without loading the annotations themselves, nor do they provide any ability to introspect annotation stereotypes (Often called meta-annotations, an annotation stereotype is where an annotation is annotated with another annotation, essentially inheriting its behaviour).
+The methods provided by Java's link:{jdkapi}/java/lang/reflect/AnnotatedElement.html[AnnotatedElement] API in general don't provide the ability to introspect annotations without loading the annotations themselves. Nor do they provide any ability to introspect annotation stereotypes (often called meta-annotations; an annotation stereotype is where an annotation is annotated with another annotation, essentially inheriting its behaviour).
 
 To solve this problem many frameworks produce runtime metadata or perform expensive reflection to analyze the annotations of a class.
 
-Micronaut instead produces this annotation metadata at compile time, avoiding expensive reflection and saving on memory.
+Micronaut instead produces this annotation metadata at compile time, avoiding expensive reflection and saving memory.
 
 The link:{api}/io/micronaut/context/BeanContext.html[BeanContext] API can be used to obtain a reference to a link:{api}/io/micronaut/inject/BeanDefinition.html[BeanDefinition] which implements the link:{api}/io/micronaut/core/annotation/AnnotationMetadata.html[AnnotationMetadata] interface.
 
-For example the following code will obtain all bean definitions annotated with a particular stereotype:
+For example the following code obtains all bean definitions annotated with a particular stereotype:
 
 .Lookup Bean Definitions by Stereotype
 [source,java]
@@ -15,17 +15,17 @@ BeanContext beanContext = ... // obtain the bean context
 Collection<BeanDefinition> definitions =
     beanContext.getBeanDefinitions(Qualifiers.byStereotype(Controller.class))
 
-for(BeanDefinition definition : definitions) {
+for (BeanDefinition definition : definitions) {
     AnnotationValue<Controller> controllerAnn = definition.getAnnotation(Controller.class);
     // do something with the annotation
 }
 ----
 
-The above example will find all api:inject.BeanDefinition[] 's annotated with `@Controller` regardless whether `@Controller` is used directly or inherited via an annotation stereotype.
+The above example finds all api:inject.BeanDefinition[] instances annotated with `@Controller` whether `@Controller` is used directly or inherited via an annotation stereotype.
 
-Note that the `getAnnotation` method and the variations of the method return an api:core.annotation.AnnotationValue[] type and not a Java annotation. This is by design, and you should generally try to work with this API when reading annotation values, the reason being that synthesizing a proxy implementation is worse from a performance and memory consumption perspective.
+Note that the `getAnnotation` method and the variations of the method return an api:core.annotation.AnnotationValue[] type and not a Java annotation. This is by design, and you should generally try to work with this API when reading annotation values, since synthesizing a proxy implementation is worse from a performance and memory consumption perspective.
 
-If you absolutely require a reference to an annotation instance you can use the `synthesize` method, which will create a runtime proxy that implements the annotation interface:
+If you require a reference to an annotation instance you can use the `synthesize` method, which creates a runtime proxy that implements the annotation interface:
 
 .Synthesizing Annotation Instances
 [source,java]
@@ -33,13 +33,47 @@ If you absolutely require a reference to an annotation instance you can use the 
 Controller controllerAnn = definition.synthesize(Controller.class);
 ----
 
-This approach is not recommended however, as it requires reflection and increases memory consumption due to the use of runtime created proxies and should be used as a last resort (for example if you need an instance of the annotation to integrate with a third party library).
+This approach is not recommended however, as it requires reflection and increases memory consumption due to the use of runtime generated proxies, and should be used as a last resort, for example if you need an instance of the annotation to integrate with a third-party library.
+
+=== Annotation Inheritance
+
+Micronaut will respect the rules defined in Java's jdk:java.lang.reflect.AnnotatedElement[] API with regards to annotation inheritance:
+
+* Annotations meta-annotated with jdk:java.lang.annotation.Inherited[] will be available via the `getAnnotation*` methods of the api:core.annotation.AnnotationMetadata[] API whilst those directly declared are available via the `getDeclaredAnnotation*` methods.
+* Annotations not meta-annotated with jdk:java.lang.annotation.Inherited[] will not be included in the metadata
+
+Micronaut differs from the jdk:java.lang.reflect.AnnotatedElement[] API in that it extends these rules to methods and method parameters such that:
+
+* Any annotations annotated with jdk:java.lang.annotation.Inherited[] and present on a method of interface or super class `A` that is overridden by child interface or class `B` will be inherited into the api:core.annotation.AnnotationMetadata[] retrievable via the api:inject.ExecutableMethod[] API from a api:inject.BeanDefinition[] or an <<aop, AOP interceptor>>.
+* Any annotations annotated with jdk:java.lang.annotation.Inherited[] and present on a method parameter of interface or super class `A` that is overridden by child interface or class `B` will be inherited into the api:core.annotation.AnnotationMetadata[] retrievable via the api:core.type.Argument[] interface from the `getArguments` method of the api:inject.ExecutableMethod[] API.
+
+In general behaviour which you may wish to override is not inherited by default including <<scopes, Bean Scopes>>, <<qualifiers, Bean Qualifiers>>, <<conditionalBeans, Bean Conditions>>, <<validation, Validation Rules>> and so on.
+
+If you wish a particular scope, qualifier, or set of requirements to be inherited when subclassing then you can define a meta-annotation that is annotated with `@Inherited`. For example:
+
+snippet::io.micronaut.docs.inject.anninheritance.SqlRepository[tags="imports, class", indent=0, title="Defining Inherited Meta Annotations"]
+
+<1> The annotation is declared as `@Inherited`
+<2> <<conditionalBeans, Bean Conditions>> will be inherited by child classes
+<3> <<qualifiers, Bean Qualifiers>> will be inherited by child classes
+<4> <<scopes, Bean Scopes>> will be inherited by child classes
+<5> You can also alias annotations and they will be inherited
+
+With this meta-annotation in place you can add the annotation to a super class:
+
+snippet::io.micronaut.docs.inject.anninheritance.BaseSqlRepository[tags="imports, class", indent=0, title="Using Inherited Meta Annotations on a Super Class"]
+
+And then a subclass will inherit all the annotations:
+
+snippet::io.micronaut.docs.inject.anninheritance.BookRepository[tags="imports, class", indent=0, title="Inherting Annotations in a Child Class"]
+
+NOTE: A child class must at least have one bean definition annotation such as a scope or qualifier.
 
 === Aliasing / Mapping Annotations
 
-There are times when you may want to alias the value of an annotation member to the value of another annotation member. To do this you can use the ann:io.micronaut.context.annotation.AliasFor[] annotation to alias the value of one member to the value of another.
+There are times when you may want to alias the value of an annotation member to the value of another annotation member. To do this, use the ann:io.micronaut.context.annotation.AliasFor[] annotation.
 
-A common use case is for example when an annotation defines the `value()` member, but also supports other members. For example the ann:io.micronaut.http.client.annotation.Client[] annotation:
+A common use case is for example when an annotation defines the `value()` member, but also supports other members. for example the ann:io.micronaut.http.client.annotation.Client[] annotation:
 
 .The @Client Annotation
 [source,java]
@@ -51,17 +85,17 @@ include::http-client-core/src/main/java/io/micronaut/http/client/annotation/Clie
 <1> The `value` member also sets the `id` member
 <2> The `id` member also sets the `value` member
 
-With these aliases in place, regardless whether you define `@Client("foo")` or `@Client(id="foo")` both the `value` and `id` members are always set, making it much easier to parse and deal with the annotation.
+With these aliases in place, whether you define `@Client("foo")` or `@Client(id="foo")`, both the `value` and `id` members will be set, making it easier to parse and work with the annotation.
 
-If you do not have control over the annotation then another approach is to use an api:io.micronaut.inject.annotation.AnnotationMapper[]. To create an `AnnotationMapper` you must perform the following steps:
+If you do not have control over the annotation, another approach is to use an api:io.micronaut.inject.annotation.AnnotationMapper[]. To create an `AnnotationMapper`, do the following:
 
 * Implement the api:io.micronaut.inject.annotation.AnnotationMapper[] interface
 * Define a `META-INF/services/io.micronaut.inject.annotation.AnnotationMapper` file referencing the implementation class
 * Add the JAR file containing the implementation to the `annotationProcessor` classpath (`kapt` for Kotlin)
 
-NOTE: Because `AnnotationMapper` implementations need to be on the annotation processor classpath they should generally be in a project that includes few external dependencies to avoid polluting the annotation processor classpath.
+NOTE: Because `AnnotationMapper` implementations must be on the annotation processor classpath, they should generally be in a project that includes few external dependencies to avoid polluting the annotation processor classpath.
 
-The following is an example the  `AnnotationMapper` that improves the introspection capabilities of JPA entities
+The following is an example `AnnotationMapper` that improves the introspection capabilities of JPA entities.
 
 .EntityIntrospectedAnnotationMapper Mapper Example
 [source,java]
@@ -72,4 +106,4 @@ include::inject/src/main/java/io/micronaut/inject/beans/visitor/EntityIntrospect
 <1> The `map` method receives a api:io.micronaut.core.annotation.AnnotationValue[] with the values for the annotation.
 <2> One or more annotations can be returned, in this case `@Transient`.
 
-NOTE: The example above implements the api:io.micronaut.inject.annotation.NamedAnnotationMapper[] interface which allows for annotations to be mixed with runtime code. If you want to operate against a concrete annotation type then you should use api:io.micronaut.inject.annotation.TypedAnnotationMapper[] instead, though note it requires the annotation class itself to be on the annotation processor classpath.
+NOTE: The example above implements the api:io.micronaut.inject.annotation.NamedAnnotationMapper[] interface which allows for annotations to be mixed with runtime code. To operate against a concrete annotation type, use api:io.micronaut.inject.annotation.TypedAnnotationMapper[] instead, although note it requires the annotation class itself to be on the annotation processor classpath.

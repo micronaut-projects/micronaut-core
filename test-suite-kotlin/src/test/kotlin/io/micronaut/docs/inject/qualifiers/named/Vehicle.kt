@@ -15,18 +15,17 @@
  */
 package io.micronaut.docs.inject.qualifiers.named
 
-import javax.inject.Inject
-import javax.inject.Named
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Named
+import jakarta.inject.Singleton
 
 // tag::class[]
 @Singleton
 class Vehicle @Inject
-constructor(@param:Named("v8") private val engine: Engine)// <4>
-{
+constructor(@param:Named("v8") private val engine: Engine) { // <4>
 
     fun start(): String {
-        return engine.start()// <5>
+        return engine.start() // <5>
     }
 }
 // end::class[]

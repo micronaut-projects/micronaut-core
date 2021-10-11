@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.netty.binders;
 
-import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.core.async.subscriber.TypedSubscriber;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
@@ -25,11 +24,16 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
-import io.micronaut.http.server.netty.*;
+import io.micronaut.http.netty.stream.StreamedHttpRequest;
+import io.micronaut.http.server.netty.HttpContentProcessor;
+import io.micronaut.http.server.netty.HttpContentProcessorResolver;
+import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.EmptyByteBuf;
 import io.netty.util.ReferenceCounted;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -43,6 +47,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Singleton
 public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> implements NonBlockingBodyArgumentBinder<Publisher> {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
@@ -58,11 +63,6 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                                HttpContentProcessorResolver httpContentProcessorResolver) {
         super(conversionService);
         this.httpContentProcessorResolver = httpContentProcessorResolver;
-    }
-
-    @Override
-    public boolean supportsSuperTypes() {
-        return false;
     }
 
     @Override
@@ -96,7 +96,6 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                         if (LOG.isTraceEnabled()) {
                             LOG.trace("Server received streaming message for argument [{}]: {}", context.getArgument(), message);
                         }
-                        ArgumentConversionContext<?> conversionContext = context.with(targetType);
                         if (message instanceof ByteBufHolder) {
                             message = ((ByteBufHolder) message).content();
                             if (message instanceof EmptyByteBuf) {
@@ -104,6 +103,7 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                             }
                         }
 
+                        ArgumentConversionContext<?> conversionContext = context.with(targetType);
                         Optional<?> converted = conversionService.convert(message, conversionContext);
 
                         if (converted.isPresent()) {

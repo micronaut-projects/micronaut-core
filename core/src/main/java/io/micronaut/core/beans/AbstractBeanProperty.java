@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,8 +22,9 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+
 import java.util.Objects;
 
 /**
@@ -82,6 +83,7 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
     }
 
     @Override
+    @NonNull
     public Argument<P> asArgument() {
         if (typeArguments != null) {
             return Argument.of(type, name, getAnnotationMetadata(), typeArguments);
@@ -92,7 +94,7 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
 
     @NonNull
     @Override
-    public BeanIntrospection<B> getDeclaringBean() {
+    public final BeanIntrospection<B> getDeclaringBean() {
         return introspection;
     }
 
@@ -116,6 +118,20 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
     }
 
     @Override
+    public B withValue(@NonNull B bean, @Nullable P value) {
+        ArgumentUtils.requireNonNull("bean", bean);
+
+        if (!beanType.isInstance(bean)) {
+            throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + introspection.getBeanType());
+        }
+        if (value == get(bean)) {
+            return bean;
+        } else {
+            return withValueInternal(bean, value);
+        }
+    }
+
+    @Override
     public final void set(@NonNull B bean, @Nullable P value) {
         ArgumentUtils.requireNonNull("bean", bean);
 
@@ -128,8 +144,27 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
         if (value != null && !ReflectionUtils.getWrapperType(getType()).isInstance(value)) {
             throw new IllegalArgumentException("Specified value [" + value + "] is not of the correct type: " + getType());
         }
-
+        /*
+        if (value == null && isNonNull()) {
+            throw new IllegalArgumentException("Null values not supported by property: " + getName());
+        }
+         */
         writeInternal(bean, value);
+    }
+
+
+    /**
+     * Mutates a property value.
+     * @param bean The bean
+     * @param value The value
+     * @see BeanProperty#withValue(Object, Object)
+     * @return Either a copy of the bean with the copy constructor invoked or the mutated instance if it mutable
+     */
+    @SuppressWarnings("WeakerAccess")
+    @UsedByGeneratedCode
+    @Internal
+    protected B withValueInternal(B bean, P value) {
+        return BeanProperty.super.withValue(bean, value);
     }
 
     /**

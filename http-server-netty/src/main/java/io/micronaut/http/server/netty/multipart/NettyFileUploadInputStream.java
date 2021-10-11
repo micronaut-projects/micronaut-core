@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,11 +17,12 @@ package io.micronaut.http.server.netty.multipart;
 
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.netty.handler.codec.http.multipart.FileUpload;
 
-import javax.annotation.Nonnull;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * An input stream for a netty file upload that allows
@@ -33,16 +34,17 @@ import java.io.IOException;
 @Internal
 class NettyFileUploadInputStream extends FileInputStream {
 
-    @Nonnull
+    @NonNull
     private final FileUpload file;
     private final boolean releaseOnClose;
+    private final AtomicBoolean closed = new AtomicBoolean();
 
     /**
      * @param file The netty file upload
      * @param releaseOnClose Whether to release the file after the stream is closed
      * @throws IOException If an error occurred getting the underlying {@link java.io.File}
      */
-    NettyFileUploadInputStream(@Nonnull FileUpload file, boolean releaseOnClose) throws IOException {
+    NettyFileUploadInputStream(@NonNull FileUpload file, boolean releaseOnClose) throws IOException {
         super(file.getFile());
         this.file = file;
         this.releaseOnClose = releaseOnClose;
@@ -50,9 +52,12 @@ class NettyFileUploadInputStream extends FileInputStream {
 
     @Override
     public void close() throws IOException {
-        super.close();
-        if (releaseOnClose) {
-            file.release();
+        try {
+            super.close();
+        } finally {
+            if (releaseOnClose && closed.compareAndSet(false, true)) {
+                file.release();
+            }
         }
     }
 }

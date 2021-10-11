@@ -17,21 +17,21 @@ package io.micronaut.docs.annotation
 
 // tag::imports[]
 import io.micronaut.http.annotation.Controller
-import io.reactivex.Single
+import org.reactivestreams.Publisher
+import io.micronaut.core.async.annotation.SingleResult
+import reactor.core.publisher.Mono
 // end::imports[]
-
 
 // tag::class[]
 @Controller("/pets")
 class PetController implements PetOperations {
 
     @Override
-    Single<Pet> save(String name, int age) {
-        Pet pet = new Pet()
-        pet.setName(name)
-        pet.setAge(age)
+    @SingleResult
+    Publisher<Pet> save(String name, int age) {
+        Pet pet = new Pet(name: name, age: age)
         // save to database or something
-        return Single.just(pet)
+        return Mono.just(pet)
     }
 }
 // end::class[]

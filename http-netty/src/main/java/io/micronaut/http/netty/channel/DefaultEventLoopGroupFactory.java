@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,19 +15,19 @@
  */
 package io.micronaut.http.netty.channel;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Property;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.http.netty.configuration.NettyGlobalConfiguration;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
-
-import javax.inject.Inject;
-import javax.inject.Named;
-import javax.inject.Singleton;
+import io.netty.util.ResourceLeakDetector;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
@@ -43,7 +43,6 @@ import java.util.concurrent.ThreadFactory;
 @BootstrapContextCompatible
 public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
 
-    private boolean useNativeTransport = false;
     private final EventLoopGroupFactory nativeFactory;
     private final EventLoopGroupFactory defaultFactory;
 
@@ -55,20 +54,24 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
     public DefaultEventLoopGroupFactory(
             NioEventLoopGroupFactory nioEventLoopGroupFactory,
             @Nullable @Named(EventLoopGroupFactory.NATIVE) EventLoopGroupFactory nativeFactory) {
-        this.defaultFactory = nioEventLoopGroupFactory;
-        this.nativeFactory = nativeFactory != null ? nativeFactory : defaultFactory;
+        this(nioEventLoopGroupFactory, nativeFactory, null);
     }
 
     /**
-     * @deprecated Use {@link DefaultEventLoopGroupConfiguration} instead and {@code micronaut.netty.event-loops.default.prefer-native-transport}
-     *
-     * @param useNativeTransport Whether to use native transport
+     * Default constructor.
+     * @param nioEventLoopGroupFactory The NIO factory
+     * @param nativeFactory The native factory if available
+     * @param nettyGlobalConfiguration The netty global configuration
      */
-    @Deprecated
     @Inject
-    protected void setUseNativeTransport(@Property(name = "micronaut.server.netty.use-native-transport") @Nullable Boolean useNativeTransport) {
-        if (useNativeTransport != null) {
-            this.useNativeTransport = useNativeTransport;
+    public DefaultEventLoopGroupFactory(
+            NioEventLoopGroupFactory nioEventLoopGroupFactory,
+            @Nullable @Named(EventLoopGroupFactory.NATIVE) EventLoopGroupFactory nativeFactory,
+            @Nullable NettyGlobalConfiguration nettyGlobalConfiguration) {
+        this.defaultFactory = nioEventLoopGroupFactory;
+        this.nativeFactory = nativeFactory != null ? nativeFactory : defaultFactory;
+        if (nettyGlobalConfiguration != null && nettyGlobalConfiguration.getResourceLeakDetectorLevel() != null) {
+            ResourceLeakDetector.setLevel(nettyGlobalConfiguration.getResourceLeakDetectorLevel());
         }
     }
 
@@ -77,11 +80,7 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
         ArgumentUtils.requireNonNull("configuration", configuration);
         ArgumentUtils.requireNonNull("threadFactory", threadFactory);
 
-        if (useNativeTransport || configuration.isPreferNativeTransport()) {
-            return this.nativeFactory.createEventLoopGroup(configuration, threadFactory);
-        } else {
-            return this.defaultFactory.createEventLoopGroup(configuration, threadFactory);
-        }
+        return getFactory(configuration).createEventLoopGroup(configuration, threadFactory);
     }
 
     @Override
@@ -102,21 +101,32 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
     @NonNull
     @Override
     public Class<? extends ServerSocketChannel> serverSocketChannelClass(EventLoopGroupConfiguration configuration) {
-        if (useNativeTransport || configuration != null && configuration.isPreferNativeTransport()) {
-            return this.nativeFactory.serverSocketChannelClass(configuration);
-        } else {
-            return this.defaultFactory.serverSocketChannelClass(configuration);
-        }
+        return getFactory(configuration).serverSocketChannelClass(configuration);
+    }
+
+    @Override
+    public ServerSocketChannel serverSocketChannelInstance(EventLoopGroupConfiguration configuration) {
+        return getFactory(configuration).serverSocketChannelInstance(configuration);
     }
 
     @NonNull
     @Override
     public Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
-        if (useNativeTransport || configuration != null && configuration.isPreferNativeTransport()) {
-            return this.nativeFactory.clientSocketChannelClass(configuration);
+        return getFactory(configuration).clientSocketChannelClass(configuration);
+    }
+
+    private EventLoopGroupFactory getFactory(@Nullable EventLoopGroupConfiguration configuration) {
+        if (configuration != null && configuration.isPreferNativeTransport()) {
+            return this.nativeFactory;
         } else {
-            return this.defaultFactory.clientSocketChannelClass(configuration);
+            return this.defaultFactory;
         }
+    }
+
+    @NonNull
+    @Override
+    public SocketChannel clientSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
+        return getFactory(configuration).clientSocketChannelInstance(configuration);
     }
 
 }

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,8 @@
  */
 package io.micronaut.inject.ast;
 
+import io.micronaut.core.annotation.NonNull;
+
 /**
  * Stores data about an element that references a field.
  *
@@ -22,4 +24,21 @@ package io.micronaut.inject.ast;
  * @since 1.0
  */
 public interface FieldElement extends TypedElement, MemberElement {
+    /**
+     * Obtain the generic type with the associated annotation metadata for the field.
+     * @return The generic field
+     */
+    default ClassElement getGenericField() {
+        return getGenericType();
+    }
+
+    @NonNull
+    @Override
+    default String getDescription(boolean simple) {
+        if (simple) {
+            return getType().getSimpleName() + " " + getName();
+        } else {
+            return getType().getName() + " " + getName();
+        }
+    }
 }

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,13 +20,11 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
-import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.Parameter;
-import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 
 /**
  * Implementation of {@link ParameterElement} for Groovy.
@@ -40,28 +38,47 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     private final SourceUnit sourceUnit;
     private final Parameter parameter;
     private final GroovyMethodElement methodElement;
+    private ClassElement typeElement;
+    private ClassElement genericType;
 
     /**
      * Default constructor.
      *
      * @param methodElement      The parent method element
-     * @param sourceUnit         The source unit
-     * @param compilationUnit    The compilation unit
+     * @param visitorContext     The visitor context
      * @param parameter          The parameter
      * @param annotationMetadata The annotation metadata
      */
-    GroovyParameterElement(GroovyMethodElement methodElement, SourceUnit sourceUnit, CompilationUnit compilationUnit, Parameter parameter, AnnotationMetadata annotationMetadata) {
-        super(sourceUnit, compilationUnit, parameter, annotationMetadata);
+    GroovyParameterElement(GroovyMethodElement methodElement, GroovyVisitorContext visitorContext, Parameter parameter, AnnotationMetadata annotationMetadata) {
+        super(visitorContext, parameter, annotationMetadata);
         this.parameter = parameter;
-        this.sourceUnit = sourceUnit;
+        this.sourceUnit = visitorContext.getSourceUnit();
         this.methodElement = methodElement;
+    }
+
+    @Override
+    public boolean isPrimitive() {
+        return getType().isPrimitive();
+    }
+
+    @Override
+    public boolean isArray() {
+        return getType().isArray();
+    }
+
+    @Override
+    public int getArrayDimensions() {
+        return getType().getArrayDimensions();
     }
 
     @Nullable
     @Override
     public ClassElement getGenericType() {
-        ClassElement type = getType();
-        return methodElement.getGenericElement(parameter.getType(), type);
+        if (this.genericType == null) {
+            ClassElement type = getType();
+            this.genericType = methodElement.getGenericElement(parameter.getType(), type);
+        }
+        return this.genericType;
     }
 
     @Override
@@ -87,11 +104,9 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     @NonNull
     @Override
     public ClassElement getType() {
-        ClassNode t = parameter.getType();
-        if (t.isEnum()) {
-            return new GroovyEnumElement(sourceUnit, compilationUnit, t, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, t));
-        } else {
-            return new GroovyClassElement(sourceUnit, compilationUnit, t, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, t));
+        if (this.typeElement == null) {
+            this.typeElement = visitorContext.getElementFactory().newClassElement(parameter.getType(), AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, parameter.getType()));
         }
+        return this.typeElement;
     }
 }

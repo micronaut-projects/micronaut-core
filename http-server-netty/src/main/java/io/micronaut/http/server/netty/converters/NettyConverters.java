@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.converters;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
@@ -25,18 +26,23 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.multipart.CompletedFileUpload;
+import io.micronaut.http.multipart.CompletedPart;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
+import io.micronaut.http.server.netty.multipart.NettyCompletedAttribute;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
-import io.netty.buffer.*;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufInputStream;
+import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.WriteBufferWaterMark;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
+import jakarta.inject.Singleton;
 
-import javax.inject.Provider;
-import javax.inject.Singleton;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -55,7 +61,7 @@ import java.util.Optional;
 public class NettyConverters implements TypeConverterRegistrar {
 
     private final ConversionService<?> conversionService;
-    private final Provider<MediaTypeCodecRegistry> decoderRegistryProvider;
+    private final BeanProvider<MediaTypeCodecRegistry> decoderRegistryProvider;
     private final ChannelOptionFactory channelOptionFactory;
 
     /**
@@ -66,7 +72,7 @@ public class NettyConverters implements TypeConverterRegistrar {
      */
     public NettyConverters(ConversionService<?> conversionService,
                            //Prevent early initialization of the codecs
-                           Provider<MediaTypeCodecRegistry> decoderRegistryProvider,
+                           BeanProvider<MediaTypeCodecRegistry> decoderRegistryProvider,
                            ChannelOptionFactory channelOptionFactory) {
         this.conversionService = conversionService;
         this.decoderRegistryProvider = decoderRegistryProvider;
@@ -78,7 +84,7 @@ public class NettyConverters implements TypeConverterRegistrar {
         conversionService.addConverter(
                 CharSequence.class,
                 ChannelOption.class,
-                (TypeConverter<CharSequence, ChannelOption>) (object, targetType, context) -> {
+                (object, targetType, context) -> {
                     String str = object.toString();
                     String name = NameUtils.underscoreSeparate(str).toUpperCase(Locale.ENGLISH);
                     return Optional.of(channelOptionFactory.channelOption(name));
@@ -118,6 +124,12 @@ public class NettyConverters implements TypeConverterRegistrar {
                 FileUpload.class,
                 CompletedFileUpload.class,
                 fileUploadToCompletedFileUploadConverter()
+        );
+
+        conversionService.addConverter(
+                Attribute.class,
+                CompletedPart.class,
+                attributeToCompletedPartConverter()
         );
 
         conversionService.addConverter(
@@ -268,7 +280,6 @@ public class NettyConverters implements TypeConverterRegistrar {
         };
     }
 
-
     /**
      * @return A FileUpload to CompletedFileUpload converter
      */
@@ -280,6 +291,24 @@ public class NettyConverters implements TypeConverterRegistrar {
                 }
 
                 return Optional.of(new NettyCompletedFileUpload(object));
+            } catch (Exception e) {
+                context.reject(e);
+                return Optional.empty();
+            }
+        };
+    }
+
+    /**
+     * @return An Attribute to CompletedPart converter
+     */
+    protected TypeConverter<Attribute, CompletedPart> attributeToCompletedPartConverter() {
+        return (object, targetType, context) -> {
+            try {
+                if (!object.isCompleted()) {
+                    return Optional.empty();
+                }
+
+                return Optional.of(new NettyCompletedAttribute(object));
             } catch (Exception e) {
                 context.reject(e);
                 return Optional.empty();
@@ -300,7 +329,7 @@ public class NettyConverters implements TypeConverterRegistrar {
                 String contentType = object.getContentType();
                 ByteBuf byteBuf = object.getByteBuf();
                 if (StringUtils.isNotEmpty(contentType)) {
-                    MediaType mediaType = new MediaType(contentType);
+                    MediaType mediaType = MediaType.of(contentType);
                     Optional<MediaTypeCodec> registered = decoderRegistryProvider.get().findCodec(mediaType);
                     if (registered.isPresent()) {
                         MediaTypeCodec decoder = registered.get();

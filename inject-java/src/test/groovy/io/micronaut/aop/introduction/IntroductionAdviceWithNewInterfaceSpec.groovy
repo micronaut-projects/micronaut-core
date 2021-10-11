@@ -15,9 +15,10 @@
  */
 package io.micronaut.aop.introduction
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.event.ApplicationEventListener
-import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.writer.BeanDefinitionVisitor
@@ -38,7 +39,7 @@ import io.micronaut.context.annotation.*;
 
 @ListenerAdvice
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean  {
 
     @Executable
@@ -79,7 +80,7 @@ import io.micronaut.context.annotation.*;
 
 @ListenerAdvice
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 abstract class MyBean  {
 
     @Executable
@@ -122,7 +123,7 @@ import io.micronaut.context.annotation.*;
 
 @ListenerAdvice
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 interface MyBean  {
 
     @Executable
@@ -143,8 +144,7 @@ interface MyBean  {
         beanDefinition.findMethod("onApplicationEvent", Object).isPresent()
 
         when:
-        def context = new DefaultBeanContext()
-        context.start()
+        def context = BeanContext.run()
         def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
         ListenerAdviceInterceptor listenerAdviceInterceptor= context.getBean(ListenerAdviceInterceptor)
         listenerAdviceInterceptor.recievedMessages.clear()
@@ -157,5 +157,48 @@ interface MyBean  {
         !listenerAdviceInterceptor.recievedMessages.isEmpty()
         listenerAdviceInterceptor.recievedMessages.size() == 1
 
+        cleanup:
+        context.close()
+    }
+
+    void "test an interface with non overriding but subclass return type method"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package test;
+
+import io.micronaut.aop.introduction.*;
+import io.micronaut.context.annotation.*;
+
+@Stub
+@jakarta.inject.Singleton
+interface MyBean extends GenericInterface, SpecificInterface {
+
+}
+
+class Generic {
+}
+class Specific extends Generic {
+}
+interface GenericInterface {   
+    Generic getObject();
+}
+interface SpecificInterface {    
+    Specific getObject();
+}
+''')
+
+        then:
+        noExceptionThrown()
+        beanDefinition != null
+
+        when:
+        def context = new DefaultBeanContext()
+        context.start()
+        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+
+        then:
+        //I ended up going this route because actually calling the methods here would be relying on
+        //having the target interface in the bytecode of the test
+        instance.$proxyMethods.length == 2
     }
 }

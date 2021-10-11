@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,6 +14,14 @@
  * limitations under the License.
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
+
+import io.micronaut.core.io.service.ServiceDefinition;
+import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.order.OrderUtil;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.socket.SocketChannel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
@@ -24,18 +32,10 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import io.micronaut.core.io.service.ServiceDefinition;
-import io.micronaut.core.io.service.SoftServiceLoader;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.socket.SocketChannel;
-
 /**
  * The access log format parser.
  *
- * The syntax is based on <a href="http://httpd.apache.org/docs/current/mod/mod_log_config.html">Apache httpd log format</a>.
+ * The syntax is based on <a href="https://httpd.apache.org/docs/current/mod/mod_log_config.html">Apache httpd log format</a>.
  * Here are the supported directives:
  * <ul>
  * <li><b>%a</b> - Remote IP address</li>
@@ -54,7 +54,7 @@ import io.netty.channel.socket.SocketChannel;
  * <li><b>%q</b> - Query string (excluding the '?' character)</li>
  * <li><b>%r</b> - First line of the request</li>
  * <li><b>%s</b> - HTTP status code of the response</li>
- * <li><b>%{<format>}t</b> - Date and time. If the argument is ommitted the Common Log Format format is used ("'['dd/MMM/yyyy:HH:mm:ss Z']'").
+ * <li><b>%{<format>}t</b> - Date and time. If the argument is omitted the Common Log Format format is used ("'['dd/MMM/yyyy:HH:mm:ss Z']'").
  * If the format starts with begin: (default) the time is taken at the beginning of the request processing. If it starts with end: it is the time when the log entry gets written, close to the end of the request processing.
  * The format should follow the DateTimeFormatter syntax.</li>
  * <li><b>%u</b> - Remote user that was authenticated. Not implemented. Prints '-'.</li>
@@ -102,6 +102,7 @@ public class AccessLogFormatParser {
                 LOG_ELEMENT_BUILDERS.add(definition.load());
             }
         }
+        OrderUtil.sort(LOG_ELEMENT_BUILDERS);
         trimToSize(LOG_ELEMENT_BUILDERS);
     }
 

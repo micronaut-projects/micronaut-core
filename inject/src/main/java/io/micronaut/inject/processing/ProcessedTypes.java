@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,21 +15,25 @@
  */
 package io.micronaut.inject.processing;
 
+import io.micronaut.core.annotation.AnnotationUtil;
+
 /**
  * Constants for processed type names.
  *
  * @author graemerocher
  * @since 1.0
+ * @deprecated Use {@link io.micronaut.core.annotation.AnnotationUtil} instead
  */
+@Deprecated
 public interface ProcessedTypes {
 
     /**
-     * Constant for {@link javax.annotation.PostConstruct} annotation.
+     * Constant for {@link jakarta.annotation.PostConstruct} annotation.
      */
-    String POST_CONSTRUCT = "javax.annotation.PostConstruct";
+    String POST_CONSTRUCT = AnnotationUtil.POST_CONSTRUCT;
 
     /**
-     * Constant for {@link javax.annotation.PreDestroy}} annotation.
+     * Constant for {@link jakarta.annotation.PreDestroy}} annotation.
      */
-    String PRE_DESTROY = "javax.annotation.PreDestroy";
+    String PRE_DESTROY = AnnotationUtil.POST_CONSTRUCT;
 }

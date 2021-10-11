@@ -1,4 +1,4 @@
-The HTTP server features a number of configuration options you may wish to tweak. They are defined in the api:http.server.netty.configuration.NettyHttpServerConfiguration[] configuration class, which extends api:http.server.HttpServerConfiguration[].
+The HTTP server features a number of configuration options. They are defined in the api:http.server.netty.configuration.NettyHttpServerConfiguration[] configuration class, which extends api:http.server.HttpServerConfiguration[].
 
 The following example shows how to tweak configuration options for the server via `application.yml`:
 
@@ -6,37 +6,40 @@ The following example shows how to tweak configuration options for the server vi
 [source,yaml]
 ----
 micronaut:
-    server:
-        maxRequestSize: 1MB
-        host: localhost # <1>
-        netty:
-           maxHeaderSize: 500KB # <2>
-           worker:
-              threads: 8 # <3>
-           childOptions:
-              autoRead: true # <4>
+  server:
+    maxRequestSize: 1MB
+    host: localhost # <1>
+    netty:
+      maxHeaderSize: 500KB # <2>
+      worker:
+        threads: 8 # <3>
+      childOptions:
+        autoRead: true # <4>
 ----
-<1> By default Micronaut will bind to all the network interfaces. Use `localhost` to bind only to loopback network interface
+<1> By default Micronaut binds to all network interfaces. Use `localhost` to bind only to loopback network interface
 <2> Maximum size for headers
-<3> Number of netty worker threads
+<3> Number of Netty worker threads
 <4> Auto read request body
 
 include::{includedir}configurationProperties/io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration.adoc[]
 
 === Using Native Transports
 
+The native Netty transports add features specific to a particular platform, generate less garbage, and generally improve performance when compared to the NIO-based transport.
 
-The native Netty transports add features specific to a particular platform, generate less garbage, and generally improve performance when compared to the NIO based transport.
-
-To enable native transports first add a necessarily dependency:
+To enable native transports, first add a dependency:
 
 For macOS:
 
 dependency:netty-transport-native-kqueue[groupId="io.netty",scope="runtime",classifier="osx-x86_64"]
 
-For Linux:
+For Linux on x86:
 
 dependency:netty-transport-native-epoll[groupId="io.netty",scope="runtime",classifier="linux-x86_64"]
+
+For Linux on ARM64:
+
+dependency:netty-transport-native-epoll[groupId="io.netty",scope="runtime",classifier="linux-aarch_64"]
 
 Then configure the default event loop group to prefer native transports:
 
@@ -44,8 +47,10 @@ Then configure the default event loop group to prefer native transports:
 [source,yaml]
 ----
 micronaut:
-    netty:
-        event-loops:
-            default:
-                prefer-native-transport: true
+  netty:
+    event-loops:
+      default:
+        prefer-native-transport: true
 ----
+
+NOTE: Netty enables simplistic sampling resource leak detection which reports there is a leak or not, at the cost of small overhead. You can disable it or enable more advanced detection by setting property `netty.resource-leak-detector-level` to one of: `SIMPLE` (default), `DISABLED`, `PARANOID` or `ADVANCED`.

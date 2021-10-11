@@ -7,7 +7,7 @@ micronaut:
     port: 8086
 ----
 
-TIP: This is also possible to be configured from an environment variable: `MICRONAUT_SERVER_PORT=8086`
+TIP: This is also configurable from an environment variable, e.g. `MICRONAUT_SERVER_PORT=8086`
 
 To run on a random port:
 
@@ -17,3 +17,5 @@ micronaut:
   server:
     port: -1
 ----
+
+TIP: Setting an explicit port may cause tests to fail if multiple servers start simultaneously on the same port. To prevent that, specify a random port in the test environment configuration.

@@ -18,8 +18,8 @@ package io.micronaut.docs.context.events.application
 // tag::imports[]
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.docs.context.events.SampleEvent
+import jakarta.inject.Singleton
 // end::imports[]
-import javax.inject.Singleton
 
 // tag::class[]
 @Singleton

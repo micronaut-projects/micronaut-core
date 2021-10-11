@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,25 +15,25 @@
  */
 package io.micronaut.web.router;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
+import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
-import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.Consumes;
-import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.annotation.Status;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
@@ -423,12 +423,19 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         protected List<MediaType> producesMediaTypes;
         protected String bodyArgumentName;
         protected Argument<?> bodyArgument;
+        protected final Map<String, Argument> requiredInputs;
+        protected final Class<?> declaringType;
+        protected boolean consumesMediaTypesContainsAll;
+        protected boolean producesMediaTypesContainsAll;
+        protected final HttpStatus definedStatus;
+        protected final boolean isWebSocketRoute;
         private final boolean isVoid;
         private final boolean suspended;
         private final boolean reactive;
         private final boolean single;
         private final boolean async;
         private final boolean specifiedSingle;
+        private final boolean isAsyncOrReactive;
 
         /**
          * @param targetMethod The target method execution handle
@@ -439,26 +446,63 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             this.targetMethod = targetMethod;
             this.conversionService = conversionService;
             this.consumesMediaTypes = mediaTypes;
-
-            MediaType[] types = MediaType.of(targetMethod.stringValues(Produces.class));
-            if (ArrayUtils.isNotEmpty(types)) {
-                this.producesMediaTypes = Arrays.asList(types);
-            }
-            types = MediaType.of(targetMethod.stringValues(Consumes.class));
-            if (ArrayUtils.isNotEmpty(types)) {
-                this.consumesMediaTypes = Arrays.asList(types);
-            }
+            this.declaringType = targetMethod.getDeclaringType();
+            this.producesMediaTypes = RouteInfo.super.getProduces();
+            this.consumesMediaTypes = RouteInfo.super.getConsumes();
             suspended = targetMethod.getExecutableMethod().isSuspend();
             reactive = RouteInfo.super.isReactive();
             async = RouteInfo.super.isAsync();
             single = RouteInfo.super.isSingleResult();
             isVoid = RouteInfo.super.isVoid();
             specifiedSingle = RouteInfo.super.isSpecifiedSingle();
+            isAsyncOrReactive = RouteInfo.super.isAsyncOrReactive();
             for (Argument argument : targetMethod.getArguments()) {
                 if (argument.getAnnotationMetadata().hasAnnotation(Body.class)) {
                     this.bodyArgument = argument;
                 }
             }
+            Argument[] requiredArguments = targetMethod.getArguments();
+            if (requiredArguments.length > 0) {
+                Map<String, Argument> requiredInputs = new LinkedHashMap<>(requiredArguments.length);
+                for (Argument requiredArgument : requiredArguments) {
+                    String inputName = resolveInputName(requiredArgument);
+                    requiredInputs.put(inputName, requiredArgument);
+                }
+                this.requiredInputs = Collections.unmodifiableMap(requiredInputs);
+            } else {
+                this.requiredInputs = Collections.emptyMap();
+            }
+            setConsumesMediaTypesContainsAll();
+            setProducesMediaTypesContainsAll();
+            this.definedStatus = targetMethod.enumValue(Status.class, HttpStatus.class).orElse(null);
+            this.isWebSocketRoute = targetMethod.hasAnnotation("io.micronaut.websocket.annotation.OnMessage");
+        }
+
+        @Override
+        public Class<?> getDeclaringType() {
+            return declaringType;
+        }
+
+        private void setConsumesMediaTypesContainsAll() {
+            this.consumesMediaTypesContainsAll = consumesMediaTypes == null || consumesMediaTypes.isEmpty() || consumesMediaTypes.contains(MediaType.ALL_TYPE);
+        }
+
+        private void setProducesMediaTypesContainsAll() {
+            this.producesMediaTypesContainsAll = producesMediaTypes == null || producesMediaTypes.isEmpty() || producesMediaTypes.contains(MediaType.ALL_TYPE);
+        }
+
+        /**
+         * Resolves the name for an argument.
+         *
+         * @param argument the argument
+         * @return the name
+         */
+        protected @NonNull String resolveInputName(@NonNull Argument argument) {
+            String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(null);
+            if (StringUtils.isEmpty(inputName)) {
+                inputName = argument.getName();
+            }
+            return inputName;
         }
 
         @NonNull
@@ -498,6 +542,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
+        public boolean isAsyncOrReactive() {
+            return isAsyncOrReactive;
+        }
+
+        @Override
         public boolean isVoid() {
             return isVoid;
         }
@@ -506,22 +555,20 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         public Route consumes(MediaType... mediaTypes) {
             if (mediaTypes != null) {
                 this.consumesMediaTypes = Collections.unmodifiableList(Arrays.asList(mediaTypes));
+                setConsumesMediaTypesContainsAll();
             }
             return this;
         }
 
         @Override
         public List<MediaType> getConsumes() {
-            if (consumesMediaTypes != null) {
-                return consumesMediaTypes;
-            } else {
-                return Collections.emptyList();
-            }
+            return consumesMediaTypes;
         }
 
         @Override
         public Route consumesAll() {
             this.consumesMediaTypes = Collections.emptyList();
+            setConsumesMediaTypesContainsAll();
             return this;
         }
 
@@ -548,18 +595,15 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public Route produces(MediaType... mediaType) {
             if (mediaType != null) {
-                this.producesMediaTypes = Arrays.asList(mediaType);
+                this.producesMediaTypes = Collections.unmodifiableList(Arrays.asList(mediaType));
+                setProducesMediaTypesContainsAll();
             }
             return this;
         }
 
         @Override
         public List<MediaType> getProduces() {
-            if (producesMediaTypes != null) {
-                return Collections.unmodifiableList(producesMediaTypes);
-            } else {
-                return DEFAULT_PRODUCES;
-            }
+            return producesMediaTypes;
         }
 
         @Override
@@ -928,10 +972,10 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 .append(" -> ")
                 .append(targetMethod.getDeclaringType().getSimpleName())
                 .append('#')
-                .append(targetMethod)
+                .append(targetMethod.getName())
                 .append(" (")
                 .append(String.join(",", consumesMediaTypes))
-                .append(" )")
+                .append(")")
                 .toString();
         }
 
@@ -994,7 +1038,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public Optional<UriRouteMatch> match(String uri) {
             Optional<UriMatchInfo> matchInfo = uriMatchTemplate.match(uri);
-            return matchInfo.map((info) -> new DefaultUriRouteMatch(info, this, defaultCharset, conversionService));
+            return matchInfo.map(info -> new DefaultUriRouteMatch(info, this, defaultCharset, conversionService));
         }
 
         @Override

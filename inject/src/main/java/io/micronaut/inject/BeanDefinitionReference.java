@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,9 +19,9 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
-
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 /**
  * <p>A bean definition reference provides a reference to a {@link BeanDefinition} thus
@@ -66,12 +66,16 @@ public interface BeanDefinitionReference<T> extends BeanType<T> {
      * @param context The bean context
      * @return The loaded bean definition or null if it shouldn't be loaded
      */
-    BeanDefinition<T> load(BeanContext context);
+    default BeanDefinition<T> load(BeanContext context) {
+        return load();
+    }
 
     /**
      * @return Is this class context scope
      */
-    boolean isContextScope();
+    default boolean isContextScope() {
+        return false;
+    }
 
     /**
      * @return Is the underlying bean type present on the classpath
@@ -84,15 +88,25 @@ public interface BeanDefinitionReference<T> extends BeanType<T> {
      */
     default boolean isSingleton() {
         AnnotationMetadata am = getAnnotationMetadata();
-        return am.hasDeclaredStereotype(Singleton.class) ||
-               am.classValue(DefaultScope.class).map(t -> t == Singleton.class).orElse(false);
+        if (am.hasDeclaredStereotype(AnnotationUtil.SINGLETON)) {
+            return true;
+        } else {
+            if (!am.hasDeclaredStereotype(AnnotationUtil.SCOPE) &&
+                    am.hasDeclaredStereotype(DefaultScope.class)) {
+                return am.stringValue(DefaultScope.class)
+                        .map(t -> t.equals(Singleton.class.getName()) || t.equals(AnnotationUtil.SINGLETON))
+                        .orElse(false);
+            } else {
+                return false;
+            }
+        }
     }
 
     /**
      * @return Is this bean a configuration properties.
      * @since 2.0
      */
-    default  boolean isConfigurationProperties() {
+    default boolean isConfigurationProperties() {
         return getAnnotationMetadata().hasDeclaredStereotype(ConfigurationReader.class);
     }
 }

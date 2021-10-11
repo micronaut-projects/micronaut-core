@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,8 +16,7 @@
 package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * Allows configuration of properties for the {@link FileTypeHandler}.
@@ -26,6 +25,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
  * @since 1.0
  */
 @ConfigurationProperties("netty.responses.file")
+@Deprecated
 public class FileTypeHandlerConfiguration {
 
     /**
@@ -72,6 +72,7 @@ public class FileTypeHandlerConfiguration {
      * Configuration for the Cache-Control header.
      */
     @ConfigurationProperties("cache-control")
+    @Deprecated
     public static class CacheControlConfiguration {
 
         private static final boolean DEFAULT_PUBLIC_CACHE = false;

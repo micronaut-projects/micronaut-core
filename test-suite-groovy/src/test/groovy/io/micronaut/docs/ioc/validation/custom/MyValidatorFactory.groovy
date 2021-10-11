@@ -18,8 +18,10 @@ package io.micronaut.docs.ioc.validation.custom
 // tag::imports[]
 import io.micronaut.context.annotation.Factory
 import io.micronaut.core.annotation.AnnotationValue
-import io.micronaut.validation.validator.constraints.*
-import javax.inject.Singleton
+import io.micronaut.validation.validator.constraints.ConstraintValidator
+import io.micronaut.validation.validator.constraints.ConstraintValidatorContext
+
+import jakarta.inject.Singleton
 // end::imports[]
 
 // tag::class[]
@@ -31,9 +33,9 @@ class MyValidatorFactory {
         return { CharSequence value,
                  AnnotationValue<DurationPattern> annotation,
                  ConstraintValidatorContext context ->
+            context.messageTemplate("invalid duration ({validatedValue}), additional custom message") // <1>
             return value == null || value.toString() ==~ /^PT?[\d]+[SMHD]{1}$/
         } as ConstraintValidator<DurationPattern, CharSequence>
     }
 }
 // end::class[]
-

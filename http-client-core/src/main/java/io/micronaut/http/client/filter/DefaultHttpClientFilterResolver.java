@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,17 +20,23 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.PathMatcher;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.annotation.FilterMatcher;
+import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpClientFilterResolver;
-import javax.inject.Singleton;
-import java.util.*;
+import jakarta.inject.Singleton;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -67,6 +73,8 @@ public class DefaultHttpClientFilterResolver implements HttpClientFilterResolver
                 .map(httpClientFilter -> {
                     AnnotationMetadata annotationMetadata = annotationMetadataResolver.resolveMetadata(httpClientFilter);
                     HttpMethod[] methods = annotationMetadata.enumValues(Filter.class, "methods", HttpMethod.class);
+                    FilterPatternStyle patternStyle = annotationMetadata.enumValue(Filter.class,
+                        "patternStyle", FilterPatternStyle.class).orElse(FilterPatternStyle.ANT);
                     final Set<HttpMethod> httpMethods = new HashSet<>(Arrays.asList(methods));
                     if (annotationMetadata.hasStereotype(FilterMatcher.class)) {
                         httpMethods.addAll(
@@ -78,6 +86,7 @@ public class DefaultHttpClientFilterResolver implements HttpClientFilterResolver
                             httpClientFilter,
                             annotationMetadata,
                             httpMethods,
+                            patternStyle,
                             annotationMetadata.stringValues(Filter.class)
                     );
                 }).filter(entry -> {
@@ -85,7 +94,7 @@ public class DefaultHttpClientFilterResolver implements HttpClientFilterResolver
                     boolean matches = !annotationMetadata.hasStereotype(FilterMatcher.class);
                     String filterAnnotation = annotationMetadata.getAnnotationNameByStereotype(FilterMatcher.class).orElse(null);
                     if (filterAnnotation != null && !matches) {
-                        matches = context.getAnnotationMetadata().hasAnnotation(filterAnnotation);
+                        matches = context.getAnnotationMetadata().hasStereotype(filterAnnotation);
                     }
 
                     if (matches) {
@@ -114,7 +123,7 @@ public class DefaultHttpClientFilterResolver implements HttpClientFilterResolver
                 matches = anyMethodMatches(method, filterEntry.getFilterMethods());
             }
             if (filterEntry.hasPatterns()) {
-                matches = matches && anyPatternMatches(requestPath, filterEntry.getPatterns());
+                matches = matches && anyPatternMatches(requestPath, filterEntry.getPatterns(), filterEntry.getPatternStyle());
             }
 
             if (matches) {
@@ -128,8 +137,8 @@ public class DefaultHttpClientFilterResolver implements HttpClientFilterResolver
         return Arrays.stream(clients).anyMatch(clientIdentifiers::contains);
     }
 
-    private boolean anyPatternMatches(String requestPath, String[] patterns) {
-        return Arrays.stream(patterns).anyMatch(pattern -> PathMatcher.ANT.matches(pattern, requestPath));
+    private boolean anyPatternMatches(String requestPath, String[] patterns, FilterPatternStyle patternStyle) {
+        return Arrays.stream(patterns).anyMatch(pattern -> patternStyle.getPathMatcher().matches(pattern, requestPath));
     }
 
     private boolean anyMethodMatches(HttpMethod requestMethod, Collection<HttpMethod> methods) {

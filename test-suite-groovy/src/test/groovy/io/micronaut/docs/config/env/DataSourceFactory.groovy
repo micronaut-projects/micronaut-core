@@ -24,13 +24,13 @@ import java.sql.Connection
 @Factory // <1>
 class DataSourceFactory {
 
-    @EachBean(DataSourceConfiguration.class) // <2>
+    @EachBean(DataSourceConfiguration) // <2>
     DataSource dataSource(DataSourceConfiguration configuration) { // <3>
-        URI url = configuration.getUrl()
+        URI url = configuration.url
         return new DataSource(url)
     }
-
 // end::eachBean[]
+
     static class DataSource {
         private final URI uri
 

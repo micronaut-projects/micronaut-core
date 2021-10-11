@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,11 +17,15 @@ package io.micronaut.docs.ioc.validation;
 
 // tag::class[]
 import io.micronaut.core.annotation.Introspected;
-import javax.validation.constraints.*;
+
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotBlank;
 
 @Introspected
 public class Person {
+
     private String name;
+
     @Min(18)
     private int age;
 

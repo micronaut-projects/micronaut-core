@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,6 +20,7 @@ import brave.http.HttpClientHandler;
 import brave.http.HttpClientRequest;
 import brave.http.HttpClientResponse;
 import brave.http.HttpTracing;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
@@ -38,7 +39,7 @@ import org.reactivestreams.Subscription;
  * @since 1.0
  */
 @SuppressWarnings("PublisherImplementation")
-class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
+class HttpClientTracingPublisher implements Publishers.MicronautPublisher<HttpResponse<?>> {
 
     private final Publisher<HttpResponse<?>> publisher;
     private final HttpClientHandler<HttpClientRequest, HttpClientResponse> clientHandler;
@@ -84,7 +85,7 @@ class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
                 @Override
                 public void onNext(HttpResponse<?> response) {
                     try (Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
-                        clientHandler.handleReceive(mapResponse(request, response), null, span);
+                        clientHandler.handleReceive(mapResponse(request, response, null), span);
                         actual.onNext(response);
                     }
                 }
@@ -94,7 +95,7 @@ class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
                     try (Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
                         if (error instanceof HttpClientResponseException) {
                             HttpClientResponseException e = (HttpClientResponseException) error;
-                            clientHandler.handleReceive(mapResponse(request, e.getResponse()), e, span);
+                            clientHandler.handleReceive(mapResponse(request, e.getResponse(), error), span);
                         } else {
                             span.error(error);
                             span.finish();
@@ -147,11 +148,16 @@ class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
         };
     }
 
-    private HttpClientResponse mapResponse(HttpRequest<?> request, HttpResponse<?> response) {
+    private HttpClientResponse mapResponse(HttpRequest<?> request, HttpResponse<?> response, Throwable error) {
         return new HttpClientResponse() {
             @Override
             public Object unwrap() {
                 return response;
+            }
+
+            @Override
+            public Throwable error() {
+                return error;
             }
 
             @Override

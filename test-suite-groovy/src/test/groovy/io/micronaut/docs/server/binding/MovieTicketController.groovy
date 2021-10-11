@@ -15,9 +15,8 @@
  */
 package io.micronaut.docs.server.binding
 
-import io.micronaut.http.HttpStatus
-
 // tag::imports[]
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.RequestBean
@@ -33,8 +32,7 @@ class MovieTicketController {
     // @Get("/movie/ticket/{movieId}
     @Get("/movie/ticket/{movieId}{?minPrice,maxPrice}")
     HttpStatus list(@Valid @RequestBean MovieTicketBean bean) {
-        return HttpStatus.OK
+        HttpStatus.OK
     }
 }
 // end::class[]
-

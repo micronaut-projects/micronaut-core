@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 package io.micronaut.inject.ast;
+
+import java.util.Locale;
 
 /**
  * An enum of modifier names now tied to the reflection API.
@@ -33,5 +35,14 @@ public enum ElementModifier {
     VOLATILE,
     SYNCHRONIZED,
     NATIVE,
-    STRICTFP
+    STRICTFP;
+
+    /**
+     * @return The name of the modifier as presented in source code.
+     * @since 3.0.0
+     */
+    @Override
+    public String toString() {
+        return name().toLowerCase(Locale.ENGLISH);
+    }
 }

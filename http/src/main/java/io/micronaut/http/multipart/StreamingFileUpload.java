@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +18,7 @@ package io.micronaut.http.multipart;
 import org.reactivestreams.Publisher;
 
 import java.io.File;
+import java.io.OutputStream;
 
 /**
  * <p>Represents a part of a {@link io.micronaut.http.MediaType#MULTIPART_FORM_DATA} request.</p>
@@ -57,6 +58,17 @@ public interface StreamingFileUpload extends FileUpload, Publisher<PartData> {
      * @return A {@link Publisher} that outputs whether the transfer was successful
      */
     Publisher<Boolean> transferTo(File destination);
+
+    /**
+     * <p>A convenience method to write this uploaded item the provided output stream.</p>
+     *
+     * @param outputStream the destination to which the stream will be written.
+     * @return A {@link Publisher} that outputs whether the transfer was successful
+     * @since 3.1.0
+     */
+    default Publisher<Boolean> transferTo(OutputStream outputStream) {
+        throw new UnsupportedOperationException("StreamingFileUpload doesn't support transferTo OutputStream");
+    }
 
     /**
      * Deletes the underlying storage for a file item, including deleting any associated temporary disk file.

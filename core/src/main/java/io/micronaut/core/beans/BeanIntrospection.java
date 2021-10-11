@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,10 +21,11 @@ import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import javax.annotation.concurrent.Immutable;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Optional;
 
 /**
@@ -109,6 +110,20 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate {
             @NonNull String annotationValue);
 
     /**
+     * Returns the {@link BeanMethod} instances for this introspection.
+     *
+     * <p>The {@link BeanMethod} instances are only those methods annotated with {@code io.micronaut.context.annotation.Executable} and hence represent a subset
+     * of the actual methods of the class and do not include any methods that are exposed as {@link BeanProperty} instances.</p>
+     *
+     * @return A immutable collection of methods.
+     *
+     * @since 2.3.0
+     */
+    @NonNull default Collection<BeanMethod<T, Object>> getBeanMethods() {
+        return Collections.emptyList();
+    }
+
+    /**
      * Get all the bean properties annotated for the given type.
      *
      * @param annotationType The annotation type
@@ -135,6 +150,24 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate {
      */
     default @NonNull Optional<BeanProperty<T, Object>> getProperty(@NonNull String name) {
         return Optional.empty();
+    }
+
+    /**
+     * Obtain the property index position.
+     *
+     * @param name The name of the property
+     * @return A property index or -1 of not found.
+     * @since 3.1
+     */
+    default int propertyIndexOf(@NonNull String name) {
+        int index = 0;
+        for (BeanProperty<T, Object> property : getBeanProperties()) {
+            if (property.getName().equals(name)) {
+                return index;
+            }
+            index++;
+        }
+        return -1;
     }
 
     /**
@@ -175,6 +208,29 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate {
      */
     default @NonNull String[] getPropertyNames() {
         return getBeanProperties().stream().map(BeanProperty::getName).toArray(String[]::new);
+    }
+
+    /**
+     * @return The bean constructor.
+     * @since 3.0.0
+     */
+    default @NonNull BeanConstructor<T> getConstructor() {
+        return new BeanConstructor<T>() {
+            @Override
+            public @NonNull Class<T> getDeclaringBeanType() {
+                return getBeanType();
+            }
+
+            @Override
+            public @NonNull Argument<?>[] getArguments() {
+                return getConstructorArguments();
+            }
+
+            @Override
+            public @NonNull T instantiate(Object... parameterValues) {
+                return BeanIntrospection.this.instantiate(parameterValues);
+            }
+        };
     }
 
     /**

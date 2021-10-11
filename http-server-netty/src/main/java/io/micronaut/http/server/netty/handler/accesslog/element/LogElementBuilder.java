@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,13 +15,15 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
+import io.micronaut.core.order.Ordered;
+
 /**
  * Builder for LogElement.
  *
  * @author croudet
  * @since 2.0
  */
-public interface LogElementBuilder {
+public interface LogElementBuilder extends Ordered {
 
     /**
      * Builds the log element for the specified token. It should return null it the token is not supported.

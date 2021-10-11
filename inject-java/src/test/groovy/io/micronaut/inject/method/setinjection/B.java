@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,20 +15,37 @@
  */
 package io.micronaut.inject.method.setinjection;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import io.micronaut.context.BeanContext;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+
 import java.util.Set;
 
 @Singleton
 public class B {
     private Set<A> all;
+    private Set<A> allPrivate;
+    private BeanContext beanContext;
 
     @Inject
     void setA(Set<A> a) {
         this.all = a;
     }
 
+    @Inject
+    private void setPrivate(Set<A> a, BeanContext beanContext) {
+        this.all = a;
+    }
+
     Set<A> getAll() {
         return this.all;
+    }
+
+    public Set<A> getAllPrivate() {
+        return allPrivate;
+    }
+
+    public BeanContext getBeanContext() {
+        return beanContext;
     }
 }

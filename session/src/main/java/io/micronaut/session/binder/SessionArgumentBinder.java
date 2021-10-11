@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,14 +21,13 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.session.Session;
 import io.micronaut.session.SessionStore;
 import io.micronaut.session.http.HttpSessionFilter;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
@@ -61,13 +60,8 @@ public class SessionArgumentBinder implements TypedRequestArgumentBinder<Session
     }
 
     @Override
-    public boolean supportsSuperTypes() {
-        return false;
-    }
-
-    @Override
     public ArgumentBinder.BindingResult<Session> bind(ArgumentConversionContext<Session> context, HttpRequest<?> source) {
-        if (!source.getAttributes().contains(OncePerRequestHttpServerFilter.getKey(HttpSessionFilter.class))) {
+        if (!source.getAttributes().contains(HttpSessionFilter.class.getName())) {
             // the filter hasn't been executed
             //noinspection unchecked
             return ArgumentBinder.BindingResult.EMPTY;

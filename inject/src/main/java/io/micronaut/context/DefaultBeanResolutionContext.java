@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -31,7 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Internal
 public final class DefaultBeanResolutionContext extends AbstractBeanResolutionContext {
-    private final Map<BeanIdentifier, Object> singlesInCreation = new ConcurrentHashMap<>(5);
+    private final Map<BeanIdentifier, Object> beansInCreation = new ConcurrentHashMap<>(5);
 
     /**
      * @param context        The bean context
@@ -41,25 +41,44 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
         super(context, rootDefinition);
     }
 
+    /**
+     * @param context        The bean context
+     * @param rootDefinition The bean root definition
+     * @param beansInCreation the beans in creation
+     */
+    public DefaultBeanResolutionContext(BeanContext context, BeanDefinition rootDefinition, Map<BeanIdentifier, Object> beansInCreation) {
+        super(context, rootDefinition);
+        if (beansInCreation != null) {
+            this.beansInCreation.putAll(beansInCreation);
+        }
+    }
+
+    @Override
+    public BeanResolutionContext copy() {
+        DefaultBeanResolutionContext copy = new DefaultBeanResolutionContext(context, rootDefinition);
+        copy.copyStateFrom(this);
+        return copy;
+    }
+
     @Override
     public void close() {
-        singlesInCreation.clear();
+        beansInCreation.clear();
     }
 
     @Override
     public <T> void addInFlightBean(BeanIdentifier beanIdentifier, T instance) {
-        singlesInCreation.put(beanIdentifier, instance);
+        beansInCreation.put(beanIdentifier, instance);
     }
 
     @Override
-    public <T> void removeInFlightBean(BeanIdentifier beanIdentifier) {
-        singlesInCreation.remove(beanIdentifier);
+    public void removeInFlightBean(BeanIdentifier beanIdentifier) {
+        beansInCreation.remove(beanIdentifier);
     }
 
     @Nullable
     @Override
     public <T> T getInFlightBean(BeanIdentifier beanIdentifier) {
         //noinspection unchecked
-        return (T) singlesInCreation.get(beanIdentifier);
+        return (T) beansInCreation.get(beanIdentifier);
     }
 }

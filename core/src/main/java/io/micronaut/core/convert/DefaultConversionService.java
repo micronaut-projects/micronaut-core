@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@ package io.micronaut.core.convert;
 
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.convert.converters.MultiValuesConverterFactory;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.format.FormattingTypeConverter;
@@ -91,13 +92,13 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         if (targetType == Object.class) {
             return Optional.of((T) object);
         }
-        Class<?> sourceType = object.getClass();
         targetType = targetType.isPrimitive() ? ReflectionUtils.getWrapperType(targetType) : targetType;
 
         if (targetType.isInstance(object) && !Iterable.class.isInstance(object) && !Map.class.isInstance(object)) {
             return Optional.of((T) object);
         }
 
+        Class<?> sourceType = object.getClass();
         final AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
         if (annotationMetadata.hasStereotype(Format.class)) {
             Optional<String> formattingAnn = annotationMetadata.getAnnotationNameByStereotype(Format.class);
@@ -180,28 +181,23 @@ public class DefaultConversionService implements ConversionService<DefaultConver
      */
     @SuppressWarnings({"OptionalIsPresent", "unchecked"})
     protected void registerDefaultConverters() {
-
+        // primitive array to wrapper array
+        @SuppressWarnings("rawtypes")
+        Function primitiveArrayToWrapperArray = ArrayUtils::toWrapperArray;
+        addConverter(double[].class, Double[].class, primitiveArrayToWrapperArray);
+        addConverter(byte[].class, Byte[].class, primitiveArrayToWrapperArray);
+        addConverter(short[].class, Short[].class, primitiveArrayToWrapperArray);
+        addConverter(boolean[].class, Boolean[].class, primitiveArrayToWrapperArray);
+        addConverter(int[].class, Integer[].class, primitiveArrayToWrapperArray);
+        addConverter(float[].class, Float[].class, primitiveArrayToWrapperArray);
+        addConverter(double[].class, Double[].class, primitiveArrayToWrapperArray);
+        addConverter(char[].class, Character[].class, primitiveArrayToWrapperArray);
         // wrapper to primitive array converters
-        addConverter(Double[].class, double[].class, (object, targetType, context) -> {
-            double[] doubles = new double[object.length];
-            for (int i = 0; i < object.length; i++) {
-                Double aDouble = object[i];
-                if (aDouble != null) {
-                    doubles[i] = aDouble;
-                }
-            }
-            return Optional.of(doubles);
-        });
-        addConverter(Integer[].class, int[].class, (object, targetType, context) -> {
-            int[] integers = new int[object.length];
-            for (int i = 0; i < object.length; i++) {
-                Integer o = object[i];
-                if (o != null) {
-                    integers[i] = o;
-                }
-            }
-            return Optional.of(integers);
-        });
+        Function<Object[], Object> wrapperArrayToPrimitiveArray = ArrayUtils::toPrimitiveArray;
+        //noinspection rawtypes
+        addConverter(Double[].class, double[].class, (Function) wrapperArrayToPrimitiveArray);
+        //noinspection rawtypes
+        addConverter(Integer[].class, int[].class, (Function) wrapperArrayToPrimitiveArray);
 
         // Object -> List
         addConverter(Object.class, List.class, (object, targetType, context) -> {
@@ -548,17 +544,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> Locale
-        addConverter(CharSequence.class, Locale.class, (CharSequence object, Class<Locale> targetType, ConversionContext context) -> {
-            if (StringUtils.isEmpty(object)) {
-                return Optional.empty();
-            }
-            try {
-                return Optional.of(Locale.forLanguageTag(object.toString().replace('_', '-')));
-            } catch (IllegalArgumentException e) {
-                context.reject(object, e);
-                return Optional.empty();
-            }
-        });
+        addConverter(CharSequence.class, Locale.class, (object) -> StringUtils.parseLocale(object.toString()));
 
         // String -> UUID
         addConverter(CharSequence.class, UUID.class, (CharSequence object, Class<UUID> targetType, ConversionContext context) -> {
@@ -654,6 +640,11 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of((int[]) newArray);
         });
 
+        // String -> Char Array
+        addConverter(String.class, char[].class, (String object, Class<char[]> targetType, ConversionContext context) -> {
+            return Optional.of(object.toCharArray());
+        });
+
         // Object[] -> String[]
         addConverter(Object[].class, String[].class, (Object[] object, Class<String[]> targetType, ConversionContext context) -> {
             String[] strings = new String[object.length];
@@ -718,7 +709,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             }
             if (targetNumberType == Double.class) {
                 return Optional.of(object.doubleValue());
-            } 
+            }
             if (targetNumberType == BigInteger.class) {
                 if (object instanceof BigDecimal) {
                     return Optional.of(((BigDecimal) object).toBigInteger());
@@ -809,11 +800,11 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             Argument<?> componentType = typeVariable.orElse(Argument.OBJECT_ARGUMENT);
             Class<?> targetComponentType = ReflectionUtils.getWrapperType(componentType.getType());
 
-            ConversionContext newContext = context.with(componentType);
             if (targetType.isInstance(object) && targetComponentType == Object.class) {
                 return Optional.of(object);
             }
             List list = new ArrayList();
+            ConversionContext newContext = context.with(componentType);
             for (Object o : object) {
                 Optional<?> converted = convert(o, targetComponentType, newContext);
                 if (converted.isPresent()) {
@@ -920,6 +911,21 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of(result);
         });
 
+        // ConvertibleMultiValues -> [?]
+        addConverter(io.micronaut.core.convert.value.ConvertibleMultiValues.class, Iterable.class,
+                new MultiValuesConverterFactory.MultiValuesToIterableConverter(this));
+        addConverter(io.micronaut.core.convert.value.ConvertibleMultiValues.class, Map.class,
+                new MultiValuesConverterFactory.MultiValuesToMapConverter(this));
+        addConverter(io.micronaut.core.convert.value.ConvertibleMultiValues.class, Object.class,
+                new MultiValuesConverterFactory.MultiValuesToObjectConverter(this));
+
+        // [?] -> ConvertibleMultiValues
+        addConverter(Iterable.class, io.micronaut.core.convert.value.ConvertibleMultiValues.class,
+                new MultiValuesConverterFactory.IterableToMultiValuesConverter(this));
+        addConverter(Map.class, io.micronaut.core.convert.value.ConvertibleMultiValues.class,
+                new MultiValuesConverterFactory.MapToMultiValuesConverter(this));
+        addConverter(Object.class, io.micronaut.core.convert.value.ConvertibleMultiValues.class,
+                new MultiValuesConverterFactory.ObjectToMultiValuesConverter(this));
     }
 
     /**
@@ -934,7 +940,6 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         TypeConverter typeConverter = UNCONVERTIBLE;
         List<Class> sourceHierarchy = ClassUtils.resolveHierarchy(sourceType);
         List<Class> targetHierarchy = ClassUtils.resolveHierarchy(targetType);
-        boolean hasFormatting = formattingAnnotation != null;
         for (Class sourceSuperType : sourceHierarchy) {
             for (Class targetSuperType : targetHierarchy) {
                 ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType, formattingAnnotation);
@@ -945,6 +950,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 }
             }
         }
+        boolean hasFormatting = formattingAnnotation != null;
         if (hasFormatting) {
             for (Class sourceSuperType : sourceHierarchy) {
                 for (Class targetSuperType : targetHierarchy) {
@@ -964,8 +970,8 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
         Optional<String> format = annotationMetadata.stringValue(Format.class);
         return format
-            .map((pattern) -> new SimpleDateFormat(pattern, context.getLocale()))
-            .orElse(new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", context.getLocale()));
+            .map(pattern -> new SimpleDateFormat(pattern, context.getLocale()))
+            .orElseGet(() -> new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", context.getLocale()));
     }
 
     private <S, T> ConvertiblePair newPair(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {

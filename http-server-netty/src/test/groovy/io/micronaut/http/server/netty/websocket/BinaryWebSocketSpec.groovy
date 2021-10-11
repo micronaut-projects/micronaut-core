@@ -17,9 +17,10 @@ package io.micronaut.http.server.netty.websocket
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.websocket.RxWebSocketClient
-import io.netty.buffer.ByteBuf
+import io.micronaut.websocket.WebSocketClient
 import io.netty.buffer.Unpooled
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -28,7 +29,7 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
 @Retry
-class BinaryWebSocketSpec extends Specification{
+class BinaryWebSocketSpec extends Specification {
 
     @Retry
     void "test binary websocket exchange"() {
@@ -37,15 +38,13 @@ class BinaryWebSocketSpec extends Specification{
         PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
 
         when: "a websocket connection is established"
-        RxWebSocketClient wsClient = embeddedServer.applicationContext.createBean(RxWebSocketClient, embeddedServer.getURI())
-        BinaryChatClientWebSocket fred = wsClient.connect(BinaryChatClientWebSocket, "/binary/chat/stuff/fred").blockingFirst()
-        BinaryChatClientWebSocket bob = wsClient.connect(BinaryChatClientWebSocket, [topic:"stuff",username:"bob"]).blockingFirst()
+        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
+        BinaryChatClientWebSocket fred = Flux.from(wsClient.connect(BinaryChatClientWebSocket, "/binary/chat/stuff/fred")).blockFirst()
+        BinaryChatClientWebSocket bob = Flux.from(wsClient.connect(BinaryChatClientWebSocket, [topic:"stuff",username:"bob"])).blockFirst()
 
         then:"The connection is valid"
         fred.session != null
         fred.session.id != null
-
-
 
         then:"A session is established"
         fred.session != null
@@ -85,7 +84,7 @@ class BinaryWebSocketSpec extends Specification{
         def buffer = Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)
         buffer.retain()
         fred.sendAsync(buffer).get().toString(StandardCharsets.UTF_8) == 'foo'
-        new String(fred.sendRx(ByteBuffer.wrap("bar".bytes)).blockingGet().array()) == 'bar'
+        new String(Mono.from(fred.sendRx(ByteBuffer.wrap("bar".bytes))).block().array()) == 'bar'
 
         when:
         bob.close()
@@ -107,6 +106,74 @@ class BinaryWebSocketSpec extends Specification{
         }
 
         cleanup:
+        wsClient.close()
+        embeddedServer.close()
+    }
+
+    void "test sending multiple frames for a single message"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.builder('micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
+        PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
+
+        when: "a websocket connection is established"
+        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
+        BinaryChatClientWebSocket fred = wsClient.connect(BinaryChatClientWebSocket, "/binary/chat/stuff/fred").blockFirst()
+        BinaryChatClientWebSocket bob = wsClient.connect(BinaryChatClientWebSocket, [topic:"stuff",username:"bob"]).blockFirst()
+
+
+        then:"The connection is valid"
+        fred.session != null
+        fred.session.id != null
+        conditions.eventually {
+            fred.replies.contains("[bob] Joined!")
+            fred.replies.size() == 1
+        }
+
+        when:"A message is sent"
+        fred.sendMultiple()
+
+        then:
+        conditions.eventually {
+            bob.replies.contains("[fred] hello world")
+        }
+
+        cleanup:
+        fred.close()
+        bob.close()
+        wsClient.close()
+        embeddedServer.close()
+    }
+
+    void "test sending many continuation frames"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.builder('micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
+        PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
+
+        when: "a websocket connection is established"
+        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
+        BinaryChatClientWebSocket fred = wsClient.connect(BinaryChatClientWebSocket, "/binary/chat/stuff/fred").blockFirst()
+        BinaryChatClientWebSocket bob = wsClient.connect(BinaryChatClientWebSocket, [topic:"stuff",username:"bob"]).blockFirst()
+
+
+        then:"The connection is valid"
+        fred.session != null
+        fred.session.id != null
+        conditions.eventually {
+            fred.replies.contains("[bob] Joined!")
+            fred.replies.size() == 1
+        }
+
+        when:"A message is sent"
+        fred.sendMany()
+
+        then:
+        conditions.eventually {
+            bob.replies.contains("[fred] abcdef")
+        }
+
+        cleanup:
+        fred.close()
+        bob.close()
         wsClient.close()
         embeddedServer.close()
     }

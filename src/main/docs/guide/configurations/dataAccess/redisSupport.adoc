@@ -4,32 +4,31 @@ Micronaut features automatic configuration of the https://lettuce.io[Lettuce] dr
 [TIP]
 .Using the CLI
 ====
-If you are creating your project using the Micronaut CLI, supply the `redis-lettuce` feature to configure the Lettuce driver in your project:
+If you create your project using the Micronaut CLI, supply the `redis-lettuce` feature to configure the Lettuce driver in your project:
 ----
 $ mn create-app my-app --features redis-lettuce
 ----
 ====
 
-
-To configure the Lettuce driver you should first add the `redis-lettuce` module to your classpath:
+To configure the Lettuce driver, first add the `redis-lettuce` module to your build:
 
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut.configuration:micronaut-redis-lettuce"
+compile "io.micronaut.redis:micronaut-redis-lettuce"
 ----
 
-You should then configure the URI of the Redis server you wish to communicate with in `application.yml`:
+Then configure the URI of the Redis server in `application.yml`:
 
 .Configuring `redis.uri`
 [source,yaml]
 ----
 redis:
-    uri: redis://localhost
+  uri: redis://localhost
 ----
 
-TIP: The `redis.uri` setting should be in the format as described in the https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-details[Connection URIs] section of the Lettuce wiki
+TIP: The `redis.uri` setting must be in the format as described in the https://github.com/lettuce-io/lettuce-core/wiki/Redis-URI-and-connection-details[Connection URIs] section of the Lettuce wiki
 
-You can also specify multiple Redis URIs using `redis.uris` in which case a `RedisClusterClient` is created instead.
+You can also specify multiple Redis URIs using `redis.uris`, in which case a `RedisClusterClient` is created instead.
 
 For more information and further documentation see the https://micronaut-projects.github.io/micronaut-redis/latest/guide[Micronaut Redis] documentation.

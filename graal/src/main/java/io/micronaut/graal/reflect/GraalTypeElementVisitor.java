@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,7 +19,14 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
-import io.micronaut.core.annotation.*;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Import;
+import io.micronaut.context.visitor.BeanImportVisitor;
+import io.micronaut.core.annotation.Creator;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.ReflectiveAccess;
+import io.micronaut.core.annotation.TypeHint;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -27,10 +34,10 @@ import io.micronaut.inject.ast.*;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.GeneratedFile;
+import jakarta.inject.Inject;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.io.Writer;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -66,24 +73,17 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
      */
     protected static Set<String> arrays = new HashSet<>();
 
-    private static final TypeHint.AccessType[] DEFAULT_ACCESS_TYPE = {TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS};
-    private static final String REFLECTION_CONFIG_JSON = "reflection-config.json";
-    private static final String NATIVE_IMAGE_PROPERTIES = "native-image.properties";
+    /**
+     * Elements that the config originates from.
+     */
+    protected static Set<ClassElement> originatingElements = new HashSet<>();
 
-    private static final String BASE_RESOURCE_CONFIG_JSON = "src/main/graal/resource-config.json";
-    private static final String RESOURCE_CONFIG_JSON = "resource-config.json";
-    private static final String RESOURCES_DIR = "src/main/resources";
-    private static final String RESOURCES = "resources";
-    private static final String BUNDLES = "bundles";
-    private static final String PATTERN = "pattern";
-    private static final String META_INF = "META-INF";
-    private static final List<String> EXCLUDED_META_INF_DIRECTORIES = Arrays.asList("native-image", "services");
+    private static final TypeHint.AccessType[] DEFAULT_ACCESS_TYPE = {TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS};
+    private static final String REFLECTION_CONFIG_JSON = "reflect-config.json";
 
     private static final String BASE_REFLECT_JSON = "src/main/graal/reflect.json";
 
     private static final String ALL_PUBLIC_METHODS = "allPublicMethods";
-
-    private static final String ALL_PUBLIC_FIELDS = "allPublicFields";
 
     private static final String ALL_DECLARED_FIELDS = "allDeclaredFields";
 
@@ -103,17 +103,37 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     }
 
     @Override
+    public Set<String> getSupportedAnnotationNames() {
+        return CollectionUtils.setOf(
+                ReflectiveAccess.class.getName(),
+                TypeHint.class.getName(),
+                Import.class.getName(),
+                "javax.persistence.Entity",
+                "jakarta.persistence.Entity",
+                AnnotationUtil.INJECT,
+                Inject.class.getName()
+        );
+    }
+
+    @NonNull
+    @Override
+    public VisitorKind getVisitorKind() {
+        return VisitorKind.AGGREGATING;
+    }
+
+    @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         if (!isSubclass && !element.hasStereotype(Deprecated.class)) {
-            if (element.hasAnnotation(Introspected.class)) {
+            if (element.hasAnnotation(ReflectiveAccess.class)) {
+                originatingElements.add(element);
                 packages.add(element.getPackageName());
                 final String beanName = element.getName();
                 addBean(beanName);
-                final String[] introspectedClasses = element.getValue(Introspected.class, "classes", String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
-                for (String introspectedClass : introspectedClasses) {
-                    addBean(introspectedClass);
-                }
-            } else if (element.hasAnnotation(TypeHint.class)) {
+                resolveClassData(beanName + "[]");
+            }
+
+            if (element.hasAnnotation(TypeHint.class)) {
+                originatingElements.add(element);
                 packages.add(element.getPackageName());
                 final String[] introspectedClasses = element.stringValues(TypeHint.class);
                 final TypeHint typeHint = element.synthesize(TypeHint.class);
@@ -127,8 +147,48 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                         TypeHint.class,
                         "typeNames",
                         String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY
-                    )
+                        )
                 );
+            }
+
+            if (element.hasAnnotation(Import.class)) {
+                final List<ClassElement> beanElements = BeanImportVisitor.collectInjectableElements(element, context);
+                for (ClassElement beanElement : beanElements) {
+                    final MethodElement constructor = beanElement.getPrimaryConstructor().orElse(null);
+                    if (constructor != null && !constructor.isPublic()) {
+                        processMethodElement(constructor);
+                    }
+
+                    final ElementQuery<MethodElement> reflectiveMethodQuery = ElementQuery.ALL_METHODS
+                            .onlyInstance()
+                            .onlyConcrete()
+                            .onlyInjected()
+                            .modifiers((elementModifiers -> !elementModifiers.contains(ElementModifier.PUBLIC)));
+                    final List<MethodElement> reflectiveMethods = beanElement.getEnclosedElements(reflectiveMethodQuery);
+                    reflectiveMethods.forEach(this::processMethodElement);
+                    final ElementQuery<FieldElement> reflectiveFieldQuery = ElementQuery.ALL_FIELDS
+                            .onlyInstance()
+                            .onlyInjected()
+                            .modifiers((elementModifiers -> !elementModifiers.contains(ElementModifier.PUBLIC)));
+                    final List<FieldElement> reflectiveFields = beanElement.getEnclosedElements(reflectiveFieldQuery);
+                    reflectiveFields.forEach(this::processFieldElement);
+                }
+            } else if (element.hasStereotype(Bean.class) || element.hasStereotype(AnnotationUtil.SCOPE) || element.hasStereotype(AnnotationUtil.QUALIFIER)) {
+                MethodElement me = element.getPrimaryConstructor().orElse(null);
+                if (me != null && me.isPrivate() && !me.hasAnnotation(ReflectiveAccess.class)) {
+                    processMethodElement(me);
+                }
+            }
+
+            if (element.isInner()) {
+                ClassElement enclosingType = element.getEnclosingType().orElse(null);
+                if (enclosingType != null && enclosingType.hasAnnotation(ReflectiveAccess.class)) {
+                    originatingElements.add(enclosingType);
+                    packages.add(enclosingType.getPackageName());
+                    final String beanName = element.getName();
+                    addBean(beanName);
+                    resolveClassData(beanName + "[]");
+                }
             }
         }
     }
@@ -144,16 +204,23 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     @Override
     public void visitField(FieldElement element, VisitorContext context) {
         if (element.hasStereotype(ReflectiveAccess.class)) {
-            final ClassElement dt = element.getDeclaringType();
-            packages.add(dt.getPackageName());
-            final Map<String, Object> json = resolveClassData(resolveName(dt));
-            final List<Map<String, Object>> fields = (List<Map<String, Object>>)
-                    json.computeIfAbsent("fields", (Function<String, List<Map<String, Object>>>) s -> new ArrayList<>());
-
-            fields.add(Collections.singletonMap(
-                    "name", element.getName()
-            ));
+            processFieldElement(element);
+        } else if (element.hasDeclaredAnnotation(AnnotationUtil.INJECT) && element.isPrivate()) {
+            processFieldElement(element);
         }
+    }
+
+    private void processFieldElement(FieldElement element) {
+        final ClassElement dt = element.getDeclaringType();
+        originatingElements.add(dt);
+        packages.add(dt.getPackageName());
+        final Map<String, Object> json = resolveClassData(resolveName(dt));
+        final List<Map<String, Object>> fields = (List<Map<String, Object>>)
+                json.computeIfAbsent("fields", (Function<String, List<Map<String, Object>>>) s -> new ArrayList<>());
+
+        fields.add(Collections.singletonMap(
+                "name", element.getName()
+        ));
     }
 
     private String resolveName(ClassElement classElement) {
@@ -166,21 +233,22 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     @SuppressWarnings("unchecked")
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {
-        if (!isSubclass) {
-            if (element.hasDeclaredStereotype(ReflectiveAccess.class)) {
-                processMethodElement(element);
-            }
+        if (!isSubclass && element.hasDeclaredStereotype(ReflectiveAccess.class)) {
+            processMethodElement(element);
+        } else if (element.hasDeclaredAnnotation(AnnotationUtil.INJECT) && element.isPrivate()) {
+            processMethodElement(element);
         }
     }
 
     @Override
     public void visitConstructor(ConstructorElement element, VisitorContext context) {
         if (!isSubclass) {
-            if (element.hasAnnotation(Creator.class)) {
+            if (element.hasAnnotation(Creator.class) && element.isPrivate()) {
                 final ClassElement declaringType = element.getDeclaringType();
+                originatingElements.add(declaringType);
                 packages.add(declaringType.getPackageName());
                 addBean(declaringType.getName());
-            } else if (element.hasAnnotation(ReflectiveAccess.class)) {
+            } else if (element.hasAnnotation(ReflectiveAccess.class) && !element.getDeclaringType().isEnum()) {
                 processMethodElement(element);
             }
         }
@@ -188,8 +256,10 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
     private void processMethodElement(MethodElement element) {
         final String methodName = element.getName();
-        packages.add(element.getDeclaringType().getPackageName());
-        final Map<String, Object> json = resolveClassData(element.getDeclaringType().getName());
+        final ClassElement declaringType = element.getDeclaringType();
+        originatingElements.add(declaringType);
+        packages.add(declaringType.getPackageName());
+        final Map<String, Object> json = resolveClassData(declaringType.getName());
         final List<Map<String, Object>> methods = (List<Map<String, Object>>)
                 json.computeIfAbsent("methods", (Function<String, List<Map<String, Object>>>) s -> new ArrayList<>());
         final List<String> params = Arrays.stream(element.getParameters())
@@ -226,17 +296,13 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
         // Execute only once and never for subclasses
         if (!executed && !isSubclass) {
-
             executed = true;
-
             generateNativeImageProperties(visitorContext);
-            generateResourceConfig(visitorContext);
         }
     }
 
     private void generateNativeImageProperties(VisitorContext visitorContext) {
         List<Map> json;
-        ObjectWriter writer = MAPPER.writer(new DefaultPrettyPrinter());
 
         Optional<Path> projectDir = visitorContext.getProjectDir();
 
@@ -263,17 +329,10 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         try {
             String path = buildNativeImagePath(visitorContext);
             String reflectFile = path + REFLECTION_CONFIG_JSON;
-            String propsFile = path + NATIVE_IMAGE_PROPERTIES;
-
-            visitorContext.visitMetaInfFile(propsFile).ifPresent(gf -> {
-                visitorContext.info("Writing " + NATIVE_IMAGE_PROPERTIES + " file to destination: " + gf.getName());
-                try (PrintWriter w = new PrintWriter(gf.openWriter())) {
-                    w.println("Args = -H:ReflectionConfigurationResources=${.}/reflection-config.json");
-                } catch (IOException e) {
-                    visitorContext.fail("Error writing " + NATIVE_IMAGE_PROPERTIES + ": " + e.getMessage(), null);
-                }
-            });
-            final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(reflectFile);
+            final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(
+                    reflectFile,
+                    originatingElements.toArray(Element.EMPTY_ELEMENT_ARRAY)
+            );
             generatedFile.ifPresent(gf -> {
                 for (Map<String, Object> value : classes.values()) {
                     json.add(value);
@@ -286,6 +345,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                     ));
                 }
 
+                ObjectWriter writer = MAPPER.writer(new DefaultPrettyPrinter());
                 try (Writer w = gf.openWriter()) {
                     visitorContext.info("Writing " + REFLECTION_CONFIG_JSON + " file to destination: " + gf.getName());
 
@@ -295,100 +355,11 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 }
             });
         } finally {
+            packages.clear();
             classes.clear();
             arrays.clear();
+            originatingElements.clear();
         }
-    }
-
-    private void generateResourceConfig(VisitorContext visitorContext) {
-        ObjectWriter writer = MAPPER.writer(new DefaultPrettyPrinter());
-        Map json;
-
-        Optional<Path> projectDir = visitorContext.getProjectDir();
-
-        if (projectDir.isPresent()) {
-            File f = Paths.get(projectDir.get().toString(), BASE_RESOURCE_CONFIG_JSON).toFile();
-            if (f.exists()) {
-                try {
-                    json = MAPPER.readValue(f, new TypeReference<Map>() {
-                    });
-                } catch (Throwable e) {
-                    visitorContext.fail("Error parsing base resource-config.json: " + BASE_RESOURCE_CONFIG_JSON, null);
-                    return;
-                }
-            } else {
-                json = new HashMap();
-            }
-
-            try {
-                Set<String> resourceFiles = findResourceFiles(Paths.get(projectDir.get().toString(), RESOURCES_DIR).toFile(), new ArrayList<>());
-
-                if (!resourceFiles.isEmpty()) {
-                    String path = buildNativeImagePath(visitorContext);
-                    String resourcesFile = path + RESOURCE_CONFIG_JSON;
-
-                    final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(resourcesFile);
-                    generatedFile.ifPresent(gf -> {
-                        List<Map> resourceList = resourceFiles.stream()
-                                .map(resourceFile -> CollectionUtils.mapOf(PATTERN, "\\Q" + resourceFile + "\\E"))
-                                .collect(Collectors.toList());
-
-                        // add any existing resource defined by the user in it's own file in src/main/graal
-                        resourceList.addAll((List) json.getOrDefault(RESOURCES, Collections.EMPTY_LIST));
-
-                        json.put(RESOURCES, resourceList);
-                        json.put(BUNDLES, Collections.emptyList());
-
-                        try (Writer w = gf.openWriter()) {
-                            visitorContext.info("Writing " + RESOURCE_CONFIG_JSON + " file to destination: " + gf.getName());
-                            writer.writeValue(w, json);
-                        } catch (IOException e) {
-                            visitorContext.fail("Error writing " + RESOURCE_CONFIG_JSON + ": " + e.getMessage(), null);
-                        }
-                    });
-                }
-            } catch (Exception e) {
-                // skip processing resources
-                visitorContext.fail("There was an error generating " + RESOURCE_CONFIG_JSON + ": " + e.getMessage(), null);
-            }
-        }
-    }
-
-    private Set<String> findResourceFiles(File folder, List<String> filePath) {
-        Set<String> resourceFiles = new HashSet<>();
-
-        if (filePath == null) {
-            filePath = new ArrayList<>();
-        }
-
-        if (folder.exists()) {
-            File[] files = folder.listFiles();
-
-            if (files != null) {
-                boolean isMetaInfDirectory = folder.getName().equals(META_INF);
-
-                for (File element : files) {
-                    boolean isExcludedDirectory = EXCLUDED_META_INF_DIRECTORIES.contains(element.getName());
-                    // Exclude some directories in 'META-INF' like 'native-image' and 'services' but process other
-                    // 'META-INF' files and directories, for example, to include swagger-ui.
-                    if (!isMetaInfDirectory || !isExcludedDirectory) {
-                        if (element.isDirectory()) {
-                            List<String> paths = new ArrayList<>(filePath);
-                            paths.add(element.getName());
-
-                            resourceFiles.addAll(findResourceFiles(element, paths));
-                        } else {
-                            String joinedDirectories = String.join("/", filePath);
-                            String elementName = joinedDirectories.isEmpty() ? element.getName() : joinedDirectories + "/" + element.getName();
-
-                            resourceFiles.add(elementName);
-                        }
-                    }
-                }
-            }
-        }
-
-        return resourceFiles;
     }
 
     private String buildNativeImagePath(VisitorContext visitorContext) {

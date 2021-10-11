@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,10 +19,10 @@ import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.util.ArgumentUtils;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.Map;
 
@@ -70,6 +70,15 @@ public interface ApplicationContextBuilder {
     @NonNull ApplicationContextBuilder eagerInitAnnotated(Class<? extends Annotation>... annotations);
 
     /**
+     * Override default config locations.
+     *
+     * @param configLocations The config locations
+     * @return This environment
+     * @since 2.0
+     */
+    @NonNull ApplicationContextBuilder overrideConfigLocations(String... configLocations);
+
+    /**
      * Additional singletons to register prior to startup.
      *
      * @param beans The beans
@@ -92,6 +101,14 @@ public interface ApplicationContextBuilder {
      * @return This builder
      */
     @NonNull ApplicationContextBuilder environments(@Nullable String... environments);
+
+    /**
+     * The environments to use if no other environments are specified.
+     *
+     * @param environments The environments
+     * @return This builder
+     */
+    @NonNull ApplicationContextBuilder defaultEnvironments(@Nullable String... environments);
 
     /**
      * The packages to include for package scanning.
@@ -181,12 +198,40 @@ public interface ApplicationContextBuilder {
     @NonNull ApplicationContextBuilder exclude(@Nullable String... configurations);
 
     /**
+     * Whether the banner is enabled or not.
+     *
+     * @param isEnabled Whether the banner is enabled or not
+     * @return This application
+     */
+    @NonNull ApplicationContextBuilder banner(boolean isEnabled);
+
+    /**
+     * Whether to error on an empty bean provider. Defaults to {@code false}.
+     *
+     * @param shouldAllow True if empty {@link jakarta.inject.Provider} instances are allowed
+     * @return This application
+     * @since 3.0.0
+     */
+    @NonNull ApplicationContextBuilder allowEmptyProviders(boolean shouldAllow);
+
+    /**
      * Set the command line arguments.
      *
      * @param args The arguments
      * @return This application
      */
-    default  @NonNull ApplicationContextBuilder args(@Nullable String... args) {
+    default @NonNull ApplicationContextBuilder args(@Nullable String... args) {
+        return this;
+    }
+
+    /**
+     * Sets whether the bootstrap environment should be initialized.
+     *
+     * @param bootstrapEnv True if it should be initialized. Default true
+     * @return This application
+     * @since 3.1.0
+     */
+    default @NonNull ApplicationContextBuilder bootstrapEnvironment(boolean bootstrapEnv) {
         return this;
     }
 
@@ -198,7 +243,6 @@ public interface ApplicationContextBuilder {
     default @NonNull ApplicationContext start() {
         return build().start();
     }
-
 
     /**
      * Run the {@link ApplicationContext} with the given type. Returning an instance of the type.

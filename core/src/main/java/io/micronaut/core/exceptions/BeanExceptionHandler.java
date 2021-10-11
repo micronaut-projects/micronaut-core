@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,8 @@
  */
 package io.micronaut.core.exceptions;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import java.util.function.BiConsumer;
 
 /**
@@ -42,6 +42,7 @@ public interface BeanExceptionHandler<T, E extends Throwable> extends BiConsumer
      * @param bean The bean
      * @param throwable The error
      */
+    @Override
     default void accept(@Nullable T bean, @NonNull E throwable) {
         handle(bean, throwable);
     }

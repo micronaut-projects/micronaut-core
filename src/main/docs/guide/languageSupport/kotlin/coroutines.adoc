@@ -1,5 +1,4 @@
-Kotlin coroutines allow you to create asynchronous applications with imperative style code. A Micronaut's controller
-action can be a `suspend` function:
+Kotlin coroutines allow you to create asynchronous applications with imperative style code. A Micronaut controller action can be a `suspend` function:
 
 snippet::io.micronaut.docs.server.suspend.SuspendController[tags="suspend", indent=0, title="Controller suspend function example"]
 
@@ -22,13 +21,13 @@ snippet::io.micronaut.docs.streaming.HeadlineFlowController[tags="streamingWithF
 
 <1> A method `streamHeadlinesWithFlow` is defined that produces `application/x-json-stream`
 <2> A `Flow` is created using `flow`
-<3> This `Flow` will emit 100 messages
-<4> Emitting will happend with `emit` `suspend` function
-<5> There will be a 1 second _delay_ between messages
+<3> This `Flow` emits 100 messages
+<4> Emitting happens with `emit` `suspend` function
+<5> There is a one second _delay_ between messages
 
 A streaming client can simply return a `Flow`, for example:
 
 snippet::io.micronaut.docs.streaming.HeadlineFlowClient[tags="imports, class, streamingWithFlow", indent=0, title="Streaming client with Flow"]
 
 <1> The `@Get` method is defined as processing responses of type `APPLICATION_JSON_STREAM`
-<2> A `Flow` is used as the return type
+<2> The return type is `Flow`

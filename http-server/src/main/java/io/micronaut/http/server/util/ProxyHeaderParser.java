@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,15 +15,16 @@
  */
 package io.micronaut.http.server.util;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Responsible for parsing and returning the information
@@ -60,34 +61,39 @@ public class ProxyHeaderParser {
     public ProxyHeaderParser(HttpRequest request) {
         HttpHeaders headers = request.getHeaders();
         if (headers.contains(HttpHeaders.FORWARDED)) {
-            for (String header: headers.getAll(HttpHeaders.FORWARDED)) {
-                header = StringUtils.trimToNull(header);
-
-                while (StringUtils.isNotEmpty(header)) {
-                    int parameterEnd = header.indexOf(PARAM_DELIMITER);
-                    String parameter;
-                    if (parameterEnd > -1) {
-                        parameter = header.substring(0, parameterEnd);
-                        header = header.substring(parameterEnd + 1);
-                    } else {
-                        parameter = header;
-                        header = "";
-                    }
-
-                    int firstPair = parameter.indexOf(PAIR_DELIMITER);
-                    String pairName = parameter.substring(0, firstPair);
-
-                    if (pairName.equalsIgnoreCase(FOR)) {
-                        processFor(parameter);
-                    } else if (pairName.equalsIgnoreCase(BY)) {
-                        processBy(parameter);
-                    } else if (pairName.equalsIgnoreCase(PROTO)) {
-                        processProto(parameter);
-                    } else if (pairName.equalsIgnoreCase(HOST)) {
-                        processHost(parameter);
-                    }
-                }
-            }
+            headers.getAll(HttpHeaders.FORWARDED)
+                    .stream()
+                    .flatMap(header -> {
+                        if (header.contains(ELEMENT_DELIMITER)) {
+                            return Arrays.stream(header.split(ELEMENT_DELIMITER));
+                        } else {
+                            return Stream.of(header);
+                        }
+                    }).forEach(forwarded -> {
+                        String[] params = forwarded.split(PARAM_DELIMITER);
+                        for (String param: params) {
+                            String[] parts = param.split(PAIR_DELIMITER);
+                            if (parts.length == 2) {
+                                String key = parts[0].trim();
+                                String value = trimQuotes(parts[1].trim());
+                                if (key.equalsIgnoreCase(FOR)) {
+                                    forwardedFor.add(value);
+                                } else if (key.equalsIgnoreCase(BY) && forwardedBy == null) {
+                                    forwardedBy = value;
+                                } else if (key.equalsIgnoreCase(PROTO) && forwardedProto == null) {
+                                    forwardedProto = value;
+                                } else if (key.equalsIgnoreCase(HOST) && forwardedHost == null) {
+                                    if (value.contains(":")) {
+                                        String[] host = value.split(":");
+                                        forwardedHost = host[0];
+                                        forwardedPort = Integer.valueOf(host[1]);
+                                    } else {
+                                        forwardedHost = value;
+                                    }
+                                }
+                            }
+                        }
+                    });
         } else {
             forwardedProto = StringUtils.trimToNull(headers.get(X_FORWARDED_PROTO));
             forwardedHost = headers.get(X_FORWARDED_HOST);
@@ -148,45 +154,11 @@ public class ProxyHeaderParser {
         return forwardedPort;
     }
 
-    private void processFor(String parameter) {
-        forwardedFor.addAll(Arrays.stream(parameter.split(ELEMENT_DELIMITER))
-                .map(pair -> pair.split(PAIR_DELIMITER))
-                .filter(pair -> pair.length == 2)
-                .map(pair -> pair[1])
-                .map(String::trim)
-                .map(value -> {
-                    if (value.startsWith("\"")) {
-                        return value.substring(1, value.length() - 1);
-                    } else {
-                        return value;
-                    }
-                })
-                .collect(Collectors.toList()));
-    }
-
-    private void processBy(String parameter) {
-        forwardedBy = processSimpleParameter(parameter);
-    }
-
-    private void processProto(String parameter) {
-        forwardedProto = processSimpleParameter(parameter);
-    }
-
-    private void processHost(String parameter) {
-        forwardedHost = processSimpleParameter(parameter);
-    }
-
-    private String processSimpleParameter(String parameter) {
-        String[] pair = parameter.split(PAIR_DELIMITER);
-        if (pair.length == 2) {
-            String value =  pair[1];
-            if (value.startsWith("\"")) {
-                return value.substring(1, value.length() - 1);
-            } else {
-                return value;
-            }
+    private String trimQuotes(String value) {
+        if (value != null && value.startsWith("\"")) {
+            return value.substring(1, value.length() - 1);
         } else {
-            return null;
+            return value;
         }
     }
 

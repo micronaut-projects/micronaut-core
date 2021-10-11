@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 package io.micronaut.inject.ast;
+
+import java.util.Collections;
+import java.util.Set;
 
 /**
  * A member element is an element that is contained within a {@link ClassElement}.
@@ -38,5 +41,13 @@ public interface MemberElement extends Element {
      */
     default ClassElement getOwningType() {
         return getDeclaringType();
+    }
+
+    /**
+     * @return The {@link ElementModifier} types for this class element
+     * @since 3.0.0
+     */
+    default Set<ElementModifier> getModifiers() {
+        return Collections.emptySet();
     }
 }

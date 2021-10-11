@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,12 +17,13 @@ package io.micronaut.docs.server.sse;
 
 // tag::imports[]
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
 import io.micronaut.http.sse.Event;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
-import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 // end::imports[]
 
 // tag::class[]
@@ -32,15 +33,14 @@ public class HeadlineController {
     @ExecuteOn(TaskExecutors.IO)
     @Get(produces = MediaType.TEXT_EVENT_STREAM)
     public Publisher<Event<Headline>> index() { // <1>
-        String[] versions = new String[]{"1.0", "2.0"}; // <2>
-
-        return Flowable.generate(() -> 0, (i, emitter) -> { // <3>
+        String[] versions = {"1.0", "2.0"}; // <2>
+        return Flux.generate(() -> 0, (i, emitter) -> { // <3>
             if (i < versions.length) {
-                emitter.onNext( // <4>
+                emitter.next( // <4>
                     Event.of(new Headline("Micronaut " + versions[i] + " Released", "Come and get it"))
                 );
             } else {
-                emitter.onComplete(); // <5>
+                emitter.complete(); // <5>
             }
             return ++i;
         });

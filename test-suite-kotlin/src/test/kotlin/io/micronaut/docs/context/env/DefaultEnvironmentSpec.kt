@@ -1,12 +1,8 @@
 package io.micronaut.docs.context.env
 
-import io.kotlintest.specs.StringSpec
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.env.DefaultEnvironment
 import io.micronaut.context.env.Environment
-import org.junit.Test
-
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 
 class DefaultEnvironmentSpec : StringSpec({

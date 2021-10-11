@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,25 +15,23 @@
  */
 package io.micronaut.http.netty.channel;
 
-import java.util.concurrent.Executor;
-import java.util.concurrent.ThreadFactory;
-
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
-
-import javax.inject.Named;
-import javax.inject.Singleton;
-
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.epoll.EpollSocketChannel;
-import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.epoll.Epoll;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollServerSocketChannel;
+import io.netty.channel.epoll.EpollSocketChannel;
+import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
+
+import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * Factory for EpollEventLoopGroup.
@@ -46,18 +44,6 @@ import io.netty.channel.socket.SocketChannel;
 @Named(EventLoopGroupFactory.NATIVE)
 @BootstrapContextCompatible
 public class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
-
-    /**
-     * Creates an EpollEventLoopGroup.
-     *
-     * @param threads The number of threads to use.
-     * @param ioRatio The io ratio.
-     * @return An EpollEventLoopGroup.
-     */
-    @Override
-    public EventLoopGroup createEventLoopGroup(int threads, @Nullable Integer ioRatio) {
-        return new EpollEventLoopGroup(threads);
-    }
 
     /**
      * Creates an EpollEventLoopGroup.
@@ -86,17 +72,6 @@ public class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
     }
 
     /**
-     * Creates a default EpollEventLoopGroup.
-     *
-     * @param ioRatio The io ratio.
-     * @return An EpollEventLoopGroup.
-     */
-    @Override
-    public EventLoopGroup createEventLoopGroup(@Nullable Integer ioRatio) {
-        return new EpollEventLoopGroup();
-    }
-
-    /**
      * Returns the server channel class.
      *
      * @return EpollServerSocketChannel.
@@ -108,8 +83,19 @@ public class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
 
     @NonNull
     @Override
+    public EpollServerSocketChannel serverSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
+        return new EpollServerSocketChannel();
+    }
+
+    @NonNull
+    @Override
     public Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
         return EpollSocketChannel.class;
+    }
+
+    @Override
+    public SocketChannel clientSocketChannelInstance(EventLoopGroupConfiguration configuration) {
+        return new EpollSocketChannel();
     }
 
     @Override

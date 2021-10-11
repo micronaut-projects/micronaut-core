@@ -15,12 +15,14 @@
  */
 package io.micronaut.docs.injectionpoint
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 // tag::class[]
 @Singleton
 class Vehicle {
+
     private final Engine engine
+
     Vehicle(@Cylinders(6) Engine engine) {
         this.engine = engine
     }

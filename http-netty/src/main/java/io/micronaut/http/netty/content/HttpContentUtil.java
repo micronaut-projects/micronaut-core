@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -37,13 +37,6 @@ public class HttpContentUtil {
     public static final byte[] COMMA = ",".getBytes(StandardCharsets.UTF_8);
 
     /**
-     * @return Produces HTTP content for {@code [}
-     */
-    public static HttpContent openBracket() {
-        return new DefaultHttpContent(Unpooled.wrappedBuffer(OPEN_BRACKET));
-    }
-
-    /**
      * @return Produces HTTP content for {@code ]}
      */
     public static HttpContent closeBracket() {
@@ -61,5 +54,16 @@ public class HttpContentUtil {
         return httpContent.replace(
             compositeByteBuf
         );
+    }
+
+    /**
+     * @param httpContent The http content to prefix
+     * @return Produces HTTP content prefixed by an open bracket
+     */
+    public static HttpContent prefixOpenBracket(HttpContent httpContent) {
+        CompositeByteBuf compositeByteBuf = Unpooled.compositeBuffer(2);
+        compositeByteBuf.addComponent(true, Unpooled.wrappedBuffer(OPEN_BRACKET));
+        compositeByteBuf.addComponent(true, httpContent.content());
+        return httpContent.replace(compositeByteBuf);
     }
 }

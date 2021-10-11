@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,7 +20,9 @@ import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.inject.visitor.TypeElementVisitor;
+
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
@@ -30,6 +32,7 @@ import javax.lang.model.element.Element;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
+
 import java.util.*;
 
 /**
@@ -70,18 +73,20 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     protected JavaVisitorContext javaVisitorContext;
     private boolean incremental = false;
     private final Set<String> supportedAnnotationTypes = new HashSet<>(5);
+    private final Map<String, Boolean> isProcessedCache = new HashMap<>(30);
+    private Set<String> processedTypes;
 
     @Override
     public SourceVersion getSupportedSourceVersion() {
         SourceVersion sourceVersion = SourceVersion.latest();
-        if (sourceVersion.ordinal() <= 11) {
+        if (sourceVersion.ordinal() <= 17) {
             if (sourceVersion.ordinal() >= 8) {
                 return sourceVersion;
             } else {
                 return SourceVersion.RELEASE_8;
             }
         } else {
-            return (SourceVersion.values())[11];
+            return (SourceVersion.values())[17];
         }
     }
 
@@ -110,8 +115,47 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     @Override
     public Set<String> getSupportedAnnotationTypes() {
         if (incremental) {
+            return getProcessedAnnotationTypePatterns();
+        } else {
+            return Collections.singleton("*");
+        }
+    }
+
+    /**
+     * Return whether the given annotation is processed.
+     * @param annotationName The annotation name
+     * @return True if it is
+     */
+    protected boolean isProcessedAnnotation(String annotationName) {
+        return isProcessedCache.computeIfAbsent(annotationName, (key) -> {
+            final Set<String> patterns = getProcessedAnnotationTypePatterns();
+            for (String pattern : patterns) {
+                if (pattern.endsWith(".*")) {
+                    final String prefix = pattern.substring(0, pattern.length() - 1);
+                    if (annotationName.startsWith(prefix)) {
+                        return true;
+                    }
+                } else {
+                    if (pattern.equals(annotationName)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        });
+    }
+
+    /**
+     * The list of patterns that represent the processed annotation types.
+     * @return A set of patterns
+     */
+    @NonNull
+    private Set<String> getProcessedAnnotationTypePatterns() {
+        if (processedTypes == null) {
+
             final Set<String> types = CollectionUtils.setOf(
                     "javax.inject.*",
+                    "jakarta.inject.*",
                     "io.micronaut.*"
             );
             types.addAll(supportedAnnotationTypes);
@@ -121,10 +165,19 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
                     types.add(mappedAnnotationName);
                 }
             }
-            return types;
-        } else {
-            return Collections.singleton("*");
+            final Set<String> annotationPackages = AbstractAnnotationMetadataBuilder.getMappedAnnotationPackages();
+            for (String annotationPackage : annotationPackages) {
+                types.add(annotationPackage + ".*");
+            }
+            Set<String> visitedAnnotationNames = TypeElementVisitorProcessor.getVisitedAnnotationNames();
+            for (String visitedAnnotationName : visitedAnnotationNames) {
+                if (!"*".equals(visitedAnnotationName)) {
+                    types.add(visitedAnnotationName);
+                }
+            }
+            this.processedTypes = types;
         }
+        return this.processedTypes;
     }
 
     @Override
@@ -153,17 +206,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
                 visitorAttributes
         );
 
-        this.javaVisitorContext = new JavaVisitorContext(
-                processingEnv,
-                messager,
-                elementUtils,
-                annotationUtils,
-                typeUtils,
-                modelUtils,
-                genericUtils,
-                filer,
-                visitorAttributes
-        );
+        this.javaVisitorContext = newVisitorContext(processingEnv);
 
         this.incremental = isIncremental(processingEnv);
         if (incremental) {
@@ -173,6 +216,37 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
                 supportedAnnotationTypes.addAll(Arrays.asList(tokens));
             }
         }
+    }
+
+    /**
+     * Creates the visitor context.
+     *
+     * @param processingEnv The processing env
+     * @return The context
+     */
+    @NonNull
+    protected JavaVisitorContext newVisitorContext(@NonNull ProcessingEnvironment processingEnv) {
+        return new JavaVisitorContext(
+                processingEnv,
+                messager,
+                elementUtils,
+                annotationUtils,
+                typeUtils,
+                modelUtils,
+                genericUtils,
+                filer,
+                visitorAttributes,
+                getVisitorKind()
+        );
+    }
+
+    /**
+     * obtains the visitor kind.
+     * @return The visitor kind
+     */
+    @NonNull
+    protected TypeElementVisitor.VisitorKind getVisitorKind() {
+        return getIncrementalProcessorType().equals(GRADLE_PROCESSING_ISOLATING) ? TypeElementVisitor.VisitorKind.ISOLATING : TypeElementVisitor.VisitorKind.AGGREGATING;
     }
 
     /**
@@ -259,7 +333,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     }
 
     private void illegalState() {
-        throw new IllegalStateException("No messager set. Ensure processing enviroment is initialized");
+        throw new IllegalStateException("No messager set. Ensure processing environment is initialized");
     }
 
     /**
@@ -271,8 +345,9 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
         final Map<String, String> options = processingEnv.getOptions();
         final String v = options.get(MICRONAUT_PROCESSING_INCREMENTAL);
         if (v != null) {
-            return Boolean.valueOf(v);
+            return Boolean.parseBoolean(v);
         }
         return false;
     }
+
 }

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,11 +17,10 @@ package io.micronaut.validation.validator;
 
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.MessageSource;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.validation.validator.constraints.ConstraintValidatorRegistry;
 import io.micronaut.validation.validator.extractors.ValueExtractorRegistry;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import javax.annotation.concurrent.Immutable;
 import javax.validation.ClockProvider;
 import javax.validation.TraversableResolver;
 
@@ -31,7 +30,6 @@ import javax.validation.TraversableResolver;
  * @author graemerocher
  * @since 1.2
  */
-@Immutable
 public interface ValidatorConfiguration {
 
     /**

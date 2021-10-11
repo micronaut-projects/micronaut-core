@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,11 +18,13 @@ package io.micronaut.aop.introduction;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 
-import javax.inject.Singleton;
+import io.micronaut.core.annotation.Nullable;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class NotImplementedAdvice implements MethodInterceptor<Object, Object> {
     public static boolean invoked = false;
+    @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         invoked = true;

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.hateoas;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.ReflectiveAccess;
@@ -24,7 +25,7 @@ import io.micronaut.core.value.OptionalMultiValues;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -121,11 +122,13 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
         return (Impl) this;
     }
 
+    @JsonProperty(LINKS)
     @Override
     public OptionalMultiValues<Link> getLinks() {
         return OptionalMultiValues.of(linkMap);
     }
 
+    @JsonProperty(EMBEDDED)
     @Override
     public OptionalMultiValues<Resource> getEmbedded() {
         return OptionalMultiValues.of(embeddedMap);
@@ -139,7 +142,8 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
     @SuppressWarnings("unchecked")
     @Internal
     @ReflectiveAccess
-    protected final void setLinks(Map<String, Object> links) {
+    @JsonProperty(LINKS)
+    public final void setLinks(Map<String, Object> links) {
         for (Map.Entry<String, Object> entry : links.entrySet()) {
             String name = entry.getKey();
             Object value = entry.getValue();
@@ -148,6 +152,19 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
                 link(name, linkMap);
             }
         }
+    }
+
+
+    /**
+     * Allows de-serializing of embedded with Jackson.
+     *
+     * @param embedded The links
+     */
+    @SuppressWarnings("unchecked")
+    @Internal
+    @ReflectiveAccess
+    @JsonProperty(EMBEDDED)
+    public final void setEmbedded(Map<String, Object> embedded) {
     }
 
     private void link(String name, Map<String, Object> linkMap) {

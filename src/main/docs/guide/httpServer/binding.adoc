@@ -1,10 +1,10 @@
-The examples in the previous section demonstrates how Micronaut allows you to bind method parameters from URI path variables. This section will discuss how to bind arguments from other parts of the request.
+The examples in the previous section demonstrate how Micronaut lets you bind method parameters from URI path variables. This section shows how to bind arguments from other parts of the request.
 
 == Binding Annotations
 
-All of the binding annotations support customization of the name of the variable being bound from with their `name` member.
+All binding annotations support customization of the name of the variable being bound from with their `name` member.
 
-The following table summarizes the annotations, their purpose and provides an example:
+The following table summarizes the annotations and their purpose, and provides examples:
 
 .Parameter Binding Annotations
 |===
@@ -20,7 +20,7 @@ The following table summarizes the annotations, their purpose and provides an ex
 
 |link:{api}/io/micronaut/http/annotation/Header.html[@Header]
 |Binds a parameter from an HTTP header
-|`@Header String contentType`
+|`@Header String requestId`
 
 |link:{api}/io/micronaut/http/annotation/QueryValue.html[@QueryValue]
 |Binds from a request query parameter
@@ -43,13 +43,23 @@ The following table summarizes the annotations, their purpose and provides an ex
 |`@RequestBean MyBean bean`
 |===
 
-When a value is not specified to any binding annotation then the parameter name is used. In other words the following two methods are equivalent and both bind from a cookie called `myCookie`:
+The method parameter name is used when a value is not specified in a binding annotation. In other words the following two methods are equivalent and both bind from a cookie named `myCookie`:
 
 snippet::io.micronaut.docs.server.binding.BindingController[tags="cookie1,cookie2",indent=0]
 
-Because hyphens are not allowed in variable names it may be necessary to set the name in the annotation. The following two definitions are equivalent:
+Because hyphens are not allowed in variable names, it may be necessary to set the name in the annotation. The following definitions are equivalent:
 
 snippet::io.micronaut.docs.server.binding.BindingController[tags="header1,header2",indent=0]
+
+== Stream Support
+
+Micronaut also supports binding the body to an `InputStream`. If the method is reading the stream, the method execution must be offloaded to another thread pool to avoid blocking the event loop.
+
+snippet::io.micronaut.docs.http.server.stream.StreamController[tags="read", indent=0, title="Performing Blocking I/O With InputStream"]
+
+<1> The controller method is executed on the IO thread pool
+<2> The body is passed to the method as an input stream
+<3> The stream is read
 
 == Binding from Multiple Query values
 
@@ -59,48 +69,48 @@ snippet::io.micronaut.docs.server.binding.BookmarkController[tags="imports,class
 
 == Binding from Multiple Bindable values
 
-Instead of binding just Query values, it is also possible to bind any Bindable value to POJO  (e.g. when you want to bind `HttpRequest`, `@PathVariable`, `@QueryValue` and `@Header` to single POJO).
-This can be achieved with `@RequestBean` annotation and custom Bean class that has fields with Bindable annotations or fields that can be bound by type (e.g. HttpRequest, BasicAuth, Authentication etc.).
+Instead of binding just query values, it is also possible to bind any Bindable value to a POJO (e.g. to bind `HttpRequest`, `@PathVariable`, `@QueryValue` and `@Header` to a single POJO). This can be achieved with the `@RequestBean` annotation and a custom Bean class with fields with Bindable annotations, or fields that can be bound by type (e.g. `HttpRequest`, `BasicAuth`, `Authentication`, etc.).
+
 For example:
 
 snippet::io.micronaut.docs.server.binding.MovieTicketController[tags="class", indent=0, title="Binding Bindable values to POJO"]
 
+which uses this bean class:
+
 snippet::io.micronaut.docs.server.binding.MovieTicketBean[tags="class", indent=0, title="Bean definition"]
 
-Bean class has to be introspected with `@Introspected`. It can be one of:
+The bean class has to be introspected with `@Introspected`. It can be one of:
 
-1. Mutable Bean class with setters and getters
-2. Immutable Bean class with getters and all argument constructor (or `@Creator` annotation on a constructor or static method).
-Arguments of constructor have to match field names so object can be constructed without reflection.
+. Mutable Bean class with setters and getters
+. Immutable Bean class with getters and an all-argument constructor (or `@Creator` annotation on a constructor or static method). Arguments of the constructor must match field names so the object can be instantiated without reflection.
 
-WARNING: Since Java does not retain argument names in the byte code, you have to compile code with `-parameters` in case you want to use Immutable Bean class from another Jar.
-Another option is to extend Bean class in your source.
+WARNING: Since Java does not retain argument names in bytecode, you must compile code with `-parameters` to use an immutable bean class from another jar. Another option is to extend Bean class in your source.
 
 == Bindable Types
 
 Generally any type that can be converted from a String representation to a Java type via the link:{api}/io/micronaut/core/convert/ConversionService.html[ConversionService] API can be bound to.
 
-This includes most common Java types, however additional link:{api}/io/micronaut/core/convert/TypeConverter.html[TypeConverter] instances can be registered simply be creating `@Singleton` beans of type `TypeConverter`.
+This includes most common Java types, however additional link:{api}/io/micronaut/core/convert/TypeConverter.html[TypeConverter] instances can be registered by creating `@Singleton` beans of type `TypeConverter`.
 
 The handling of nullability deserves special mention. Consider for example the following example:
 
 snippet::io.micronaut.docs.server.binding.BindingController[tags="header2",indent=0]
 
-In this case if the HTTP header `Content-Type` is not present in the request the route is considered invalid, since it cannot be satisfied and a HTTP 400 `BAD REQUEST` is returned.
+In this case, if the HTTP header `Content-Type` is not present in the request, the route is considered invalid, since it cannot be satisfied, and a HTTP 400 `BAD REQUEST` is returned.
 
-If you wish for the `Content-Type` header to be optional, you can instead write:
+To make the `Content-Type` header optional, you can instead write:
 
 snippet::io.micronaut.docs.server.binding.BindingController[tags="header3",indent=0]
 
-An null string will be passed if the header is absent from the request.
+A `null` string is passed if the header is absent from the request.
 
-NOTE: `java.util.Optional` can also be used, however that is discouraged for method parameters.
+NOTE: `java.util.Optional` can also be used, but that is discouraged for method parameters.
 
-Additionally, any `DateTime` that conforms to link:{jdkapi}/java/time/format/DateTimeFormatter.html#RFC_1123_DATE_TIME[RFC-1123] can be bound to a parameter, alternatively the format can be customized with the link:{api}/io/micronaut/core/convert/format/Format.html[Format] annotation:
+Additionally, any `DateTime` that conforms to link:{jdkapi}/java/time/format/DateTimeFormatter.html#RFC_1123_DATE_TIME[RFC-1123] can be bound to a parameter. Alternatively the format can be customized with the link:{api}/io/micronaut/core/convert/format/Format.html[Format] annotation:
 
 snippet::io.micronaut.docs.server.binding.BindingController[tags="format1,format2",indent=0]
 
-== Type Based Binding Parameters
+== Type-Based Binding Parameters
 
 Some parameters are recognized by their type instead of their annotation. The following table summarizes the parameter types, their purpose, and provides an example:
 
@@ -113,14 +123,12 @@ Some parameters are recognized by their type instead of their annotation. The fo
 
 |===
 
-== Variables resolution
+== Variable resolution
 
-Micronaut will try to populate method arguments in the following order:
+Micronaut tries to populate method arguments in the following order:
 
-1. URI variables like `/{id}`.
-2. If the request is a `GET` request from query parameters (ie. `?foo=bar`).
-3. If there is a `@Body` and request allows the body, bind the body to it.
-4. if the request can have a body and no `@Body` is defined then try parse the body (either JSON or form data) and
-bind the method arguments from the body.
-5. Finally, if the method arguments cannot be populated return `400 BAD REQUEST`.
-
+. URI variables like `/{id}`.
+. From query parameters if the request is a `GET` request (e.g. `?foo=bar`).
+. If there is a `@Body` and request allows the body, bind the body to it.
+. If the request can have a body and no `@Body` is defined then try to parse the body (either JSON or form data) and bind the method arguments from the body.
+. Finally, if the method arguments cannot be populated return `400 BAD REQUEST`.

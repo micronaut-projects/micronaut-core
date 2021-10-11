@@ -16,22 +16,21 @@
 package io.micronaut.docs.streaming
 
 // tag::imports[]
-import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
-import io.reactivex.Flowable
+import org.reactivestreams.Publisher
+
+import static io.micronaut.http.MediaType.APPLICATION_JSON_STREAM
 // end::imports[]
 
 // tag::class[]
 @Client("/streaming")
 interface HeadlineClient {
 
-    @Get(value = "/headlines", processes = MediaType.APPLICATION_JSON_STREAM) // <1>
-    Flowable<Headline> streamHeadlines() // <2>
+    @Get(value = "/headlines", processes = APPLICATION_JSON_STREAM) // <1>
+    Publisher<Headline> streamHeadlines() // <2>
 // end::class[]
-
-    @Get(value = "/headlines", processes = MediaType.APPLICATION_JSON_STREAM) // <1>
-    Flowable<Headline> streamFlux()
+    
 // tag::endclass[]
 }
 // end::endclass[]

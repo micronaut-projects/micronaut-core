@@ -1,23 +1,23 @@
-Endpoints respond to `GET` ("read"), `POST` ("write") and `DELETE` ("delete") requests. To return a response from an endpoint, annotate its public method/s with one of following annotations:
+Endpoints respond to `GET` ("read"), `POST` ("write") and `DELETE` ("delete") requests. To return a response from an endpoint, annotate its public method(s) with one of the following annotations:
 
 .Endpoint Method Annotations
 |===
 |Annotation|Description
 
-|api:management.endpoint.Read[]
+|api:management.endpoint.annotation.Read[]
 |Responds to `GET` requests
 
-|api:management.endpoint.Write[]
+|api:management.endpoint.annotation.Write[]
 |Responds to `POST` requests
 
-|api:management.endpoint.Delete[]
+|api:management.endpoint.annotation.Delete[]
 |Responds to `DELETE` requests
 
 |===
 
 == Read Methods
 
-Annotating a method with the api:management.endpoint.annotation.Read[] annotation will cause it to respond to `GET` requests.
+Annotating a method with the api:management.endpoint.annotation.Read[] annotation causes it to respond to `GET` requests.
 
 snippet::io.micronaut.docs.server.endpoint.CurrentDateEndpoint[tags="endpointImport, readImport, endpointClassBegin, currentDate, simpleRead, endpointClassEnd", indent=0, title="CurrentDateEndpoint"]
 
@@ -30,7 +30,7 @@ $ curl -X GET localhost:55838/date
 1526085903689
 ----
 
-The api:management.endpoint.Read[] annotation accepts an optional `produces` argument, which sets the media type returned from the method (default is `application/json`):
+The api:management.endpoint.annotation.Read[] annotation accepts an optional `produces` argument, which sets the media type returned from the method (default is `application/json`):
 
 snippet::io.micronaut.docs.server.endpoint.CurrentDateEndpoint[tags="endpointImport, readImport, mediaTypeImport, endpointClassBegin, currentDate, readArg, endpointClassEnd", indent=0, title="CurrentDateEndpoint"]
 
@@ -45,10 +45,9 @@ $ curl -X GET localhost:8080/date/the_date_is
 the_date_is: Fri May 11 19:24:21 CDT
 ----
 
-
 == Write Methods
 
-Annotating a method with the api:management.endpoint.Write[] annotation will cause it to respond to `POST` requests.
+Annotating a method with the api:management.endpoint.annotation.Write[] annotation causes it to respond to `POST` requests.
 
 snippet::io.micronaut.docs.server.endpoint.CurrentDateEndpoint[tags="endpointImport, writeImport, mediaTypeImport, endpointClassBegin, currentDate, simpleWrite, endpointClassEnd", indent=0, title="CurrentDateEndpoint"]
 
@@ -61,7 +60,7 @@ $ curl -X POST http://localhost:39357/date
 Current date reset
 ----
 
-The api:management.endpoint.Write[] annotation accepts an optional `consumes` argument, which sets the media type accepted by the method (default is `application/json`):
+The api:management.endpoint.annotation.Write[] annotation accepts an optional `consumes` argument, which sets the media type accepted by the method (default is `application/json`):
 
 snippet::io.micronaut.docs.server.endpoint.MessageEndpoint[tags="endpointImport, writeImport, mediaTypeImport, endpointClassBegin, message, writeArg, endpointClassEnd", indent=0, title="MessageEndpoint"]
 
@@ -74,10 +73,9 @@ $ curl -X POST http://localhost:65013/message -H 'Content-Type: application/x-ww
 Message updated
 ----
 
-
 == Delete Methods
 
-Annotating a method with the api:management.endpoint.Delete[] annotation will cause it to respond to `DELETE` requests.
+Annotating a method with the api:management.endpoint.annotation.Delete[] annotation causes it to respond to `DELETE` requests.
 
 snippet::io.micronaut.docs.server.endpoint.MessageEndpoint[tags="endpointImport, deleteImport, endpointClassBegin, message, simpleDelete, endpointClassEnd", indent=0, title="MessageEndpoint"]
 

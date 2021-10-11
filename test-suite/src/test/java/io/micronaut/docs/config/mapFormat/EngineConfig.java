@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,14 +17,22 @@ package io.micronaut.docs.config.mapFormat;
 
 // tag::imports[]
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.convert.format.MapFormat;
+
 import javax.validation.constraints.Min;
 import java.util.Map;
-import io.micronaut.core.convert.format.MapFormat;
 // end::imports[]
 
 // tag::class[]
 @ConfigurationProperties("my.engine")
 public class EngineConfig {
+
+    @Min(1L)
+    private int cylinders;
+
+    @MapFormat(transformation = MapFormat.MapTransformation.FLAT) //<1>
+    private Map<Integer, String> sensors;
+
     public int getCylinders() {
         return cylinders;
     }
@@ -40,10 +48,5 @@ public class EngineConfig {
     public void setSensors(Map<Integer, String> sensors) {
         this.sensors = sensors;
     }
-
-    @Min(1L)
-    private int cylinders;
-    @MapFormat(transformation = MapFormat.MapTransformation.FLAT) //<1>
-    private Map<Integer, String> sensors;
 }
 // end::class[]

@@ -15,16 +15,21 @@
  */
 package io.micronaut.http.server.netty.configuration
 
-import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.AppenderBase
-import java.util.ArrayList
-import java.util.List
-
-import org.slf4j.LoggerFactory
-
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.context.env.PropertySource
+import io.micronaut.http.HttpMethod
+import io.micronaut.http.netty.channel.EventLoopGroupFactory
+import io.micronaut.http.netty.channel.converters.ChannelOptionFactory
+import io.micronaut.http.netty.channel.converters.DefaultChannelOptionFactory
+import io.micronaut.http.netty.channel.converters.EpollChannelOptionFactory
+import io.micronaut.http.netty.channel.converters.KQueueChannelOptionFactory
 import io.micronaut.http.server.HttpServerConfiguration
+import io.micronaut.http.server.cors.CorsOriginConfiguration
+import io.micronaut.http.server.netty.NettyEmbeddedServer
 import io.netty.bootstrap.ServerBootstrap
 import io.netty.channel.ChannelOption
 import io.netty.channel.epoll.Epoll
@@ -34,26 +39,12 @@ import io.netty.channel.kqueue.KQueueChannelOption
 import io.netty.channel.unix.UnixChannelOption
 import io.netty.util.internal.logging.InternalLogger
 import io.netty.util.internal.logging.InternalLoggerFactory
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.env.PropertySource
-import io.micronaut.http.HttpMethod
-import io.micronaut.http.netty.channel.EpollEventLoopGroupFactory
-import io.micronaut.http.netty.channel.EventLoopGroupFactory
-import io.micronaut.http.netty.channel.converters.ChannelOptionFactory
-import io.micronaut.http.netty.channel.converters.DefaultChannelOptionFactory
-import io.micronaut.http.netty.channel.converters.EpollChannelOptionFactory
-import io.micronaut.http.netty.channel.converters.KQueueChannelOptionFactory
-import io.micronaut.http.server.cors.CorsOriginConfiguration
-import io.micronaut.http.server.netty.NettyHttpServer
-import io.micronaut.http.server.types.files.SystemFile
+import org.slf4j.LoggerFactory
 import spock.lang.IgnoreIf
 import spock.lang.Specification
 import spock.lang.Unroll
 
 import java.time.Duration
-import java.util.AbstractMap.SimpleEntry
-
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -81,6 +72,26 @@ class NettyHttpServerConfigurationSpec extends Specification {
         'read-idle-timeout'  | 'readIdleTimeout'  | '15s' | Duration.ofSeconds(15)
         'write-idle-timeout' | 'writeIdleTimeout' | '15s' | Duration.ofSeconds(15)
         'idle-timeout'       | 'idleTimeout'      | '-1s' | Duration.ofSeconds(-1)
+    }
+
+    @Unroll
+    void "test config for worker #key"() {
+        given:
+        def ctx = ApplicationContext.run(
+                ("micronaut.server.netty.worker.$key".toString()): value
+        )
+        NettyHttpServerConfiguration config = ctx.getBean(NettyHttpServerConfiguration)
+
+        expect:
+        config.worker[property] == expected
+
+        cleanup:
+        ctx.close()
+
+        where:
+        key                     | property              | value     | expected
+        'shutdown-quiet-period' | 'shutdownQuietPeriod' | '500ms'   | Duration.ofMillis(500)
+        'shutdown-timeout'      | 'shutdownTimeout'     | '2s'      | Duration.ofSeconds(2)
     }
 
     void "test netty server epoll native channel option conversion"() {
@@ -221,8 +232,8 @@ class NettyHttpServerConfigurationSpec extends Specification {
         given:
         InternalLogger logger = InternalLoggerFactory.getInstance(ServerBootstrap.class)
         MemoryAppender appender = new MemoryAppender()
-        Logger l = (Logger) LoggerFactory.getLogger(ServerBootstrap.class);
-        l.addAppender(appender);
+        Logger l = (Logger) LoggerFactory.getLogger(ServerBootstrap.class)
+        l.addAppender(appender)
         appender.start()
         ApplicationContext beanContext = new DefaultApplicationContext("test")
         beanContext.environment.addPropertySource(PropertySource.of("test",
@@ -248,7 +259,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
         eventLoopGroupFactory.serverSocketChannelClass() == EpollServerSocketChannel.class
 
         when:
-        NettyHttpServer server = beanContext.getBean(NettyHttpServer)
+        NettyEmbeddedServer server = beanContext.getBean(NettyEmbeddedServer)
         server.start()
 
         then:
@@ -277,11 +288,13 @@ class NettyHttpServerConfigurationSpec extends Specification {
         given:
         ApplicationContext beanContext = new DefaultApplicationContext("test")
         beanContext.environment.addPropertySource(PropertySource.of("test",
-                ['micronaut.server.netty.childOptions.autoRead': 'true',
-                 'micronaut.server.netty.worker.threads'       : 8,
-                 'micronaut.server.netty.parent.threads'       : 8,
-                 'micronaut.server.multipart.maxFileSize'      : 2048,
-                 'micronaut.server.maxRequestSize'             : '2MB',
+                ['micronaut.server.netty.childOptions.autoRead'         : 'true',
+                 'micronaut.server.netty.worker.threads'                : 8,
+                 'micronaut.server.netty.worker.shutdown-quiet-period'  : '500ms',
+                 'micronaut.server.netty.worker.shutdown-timeout'       : '2s',
+                 'micronaut.server.netty.parent.threads'                : 8,
+                 'micronaut.server.multipart.maxFileSize'               : 2048,
+                 'micronaut.server.maxRequestSize'                      : '2MB',
                  'micronaut.server.netty.childOptions.write_buffer_water_mark.high': 262143,
                  'micronaut.server.netty.childOptions.write_buffer_water_mark.low' : 65535
                 ]
@@ -302,11 +315,13 @@ class NettyHttpServerConfigurationSpec extends Specification {
         config.childOptions.get(ChannelOption.WRITE_BUFFER_WATER_MARK).high == 262143
         config.childOptions.get(ChannelOption.WRITE_BUFFER_WATER_MARK).low == 65535
         !config.host.isPresent()
-        config.parent.numOfThreads == 8
-        config.worker.numOfThreads == 8
+        config.parent.numThreads == 8
+        config.worker.numThreads == 8
+        config.worker.shutdownQuietPeriod == Duration.ofMillis(500)
+        config.worker.shutdownTimeout == Duration.ofSeconds(2)
 
         then:
-        NettyHttpServer server = beanContext.getBean(NettyHttpServer)
+        NettyEmbeddedServer server = beanContext.getBean(NettyEmbeddedServer)
         server.start()
 
         then:
@@ -335,7 +350,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
 
         when:
         NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
-        NettyHttpServer server = beanContext.getBean(NettyHttpServer)
+        NettyEmbeddedServer server = beanContext.getBean(NettyEmbeddedServer)
         server.start()
 
         then:
@@ -390,20 +405,110 @@ class NettyHttpServerConfigurationSpec extends Specification {
         cleanup:
         beanContext.close()
     }
+
+    void "test netty server http2 configuration"() {
+        given:
+        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        beanContext.environment.addPropertySource(PropertySource.of("test",
+              ['micronaut.server.netty.http2.max-frame-size': 20000,
+               'micronaut.server.netty.http2.max-concurrent-streams': 100,
+               'micronaut.server.netty.http2.push-enabled': false,
+               'micronaut.server.netty.http2.header-table-size': 200,
+               'micronaut.server.netty.http2.initial-window-size': 50,
+               'micronaut.server.netty.http2.max-header-list-size': 150]
+        ))
+        beanContext.start()
+
+        when:
+        NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
+
+        then:
+        config.http2
+
+        when:
+        def http2 = config.http2
+
+        then:
+        http2.maxFrameSize == 20000
+        http2.maxConcurrentStreams == 100
+        !http2.pushEnabled
+        http2.headerTableSize == 200
+        http2.initialWindowSize == 50
+        http2.maxHeaderListSize == 150
+
+        cleanup:
+        beanContext.close()
+    }
+
+    void "test configuring the parent through event-loops"() {
+        given:
+        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        beanContext.environment.addPropertySource(PropertySource.of("test",
+                [
+                 'micronaut.netty.event-loops.parent.shutdown-quiet-period'  : '500ms'
+                ]
+
+        ))
+        beanContext.start()
+
+        when:
+        NettyEmbeddedServer server = beanContext.getBean(NettyEmbeddedServer)
+        server.start()
+
+        then:
+        noExceptionThrown()
+        server != null
+
+        cleanup:
+        beanContext.close()
+    }
+
+    void "test default keepAlive configuration"() {
+        given:
+        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        beanContext.start()
+
+        when:
+        NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
+
+        then:
+        !config.keepAliveOnServerError
+
+        cleanup:
+        beanContext.close()
+    }
+
+    void "test keepAlive configuration set to true"() {
+        given:
+        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        beanContext.environment.addPropertySource(PropertySource.of("test",
+          ['micronaut.server.netty.keepAliveOnServerError': true]
+        ))
+        beanContext.start()
+
+        when:
+        NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
+
+        then:
+        config.keepAliveOnServerError
+
+        cleanup:
+        beanContext.close()
+    }
 }
 
 class MemoryAppender extends AppenderBase<ILoggingEvent> {
-    private final List<String> events = new ArrayList<>();
+    private final List<String> events = new ArrayList<>()
 
     @Override
     protected void append(ILoggingEvent e) {
         synchronized (events) {
-            events.add(e.toString());
+            events.add(e.toString())
         }
     }
 
-    public List<String> getEvents() {
-        return events;
+    List<String> getEvents() {
+        return events
     }
 
 }

@@ -22,7 +22,6 @@ import io.micronaut.core.type.Argument
 import io.micronaut.core.type.Executable
 import spock.lang.Specification
 
-import javax.annotation.Nullable
 
 class ExecutableBinderSpec extends Specification {
 
@@ -37,6 +36,11 @@ class ExecutableBinderSpec extends Specification {
             @Override
             Object invoke(Object instance, Object... arguments) {
                 return arguments[0]
+            }
+
+            @Override
+            Class getDeclaringType() {
+                return null
             }
         }
 
@@ -76,6 +80,11 @@ class ExecutableBinderSpec extends Specification {
             Object invoke(Object instance, Object... arguments) {
                 return arguments[0]
             }
+
+            @Override
+            Class getDeclaringType() {
+                return null
+            }
         }
 
         ExecutableBinder binder = new DefaultExecutableBinder()
@@ -108,6 +117,11 @@ class ExecutableBinderSpec extends Specification {
             @Override
             Object invoke(Object instance, Object... arguments) {
                 return arguments[0]
+            }
+
+            @Override
+            Class getDeclaringType() {
+                return null
             }
         }
 

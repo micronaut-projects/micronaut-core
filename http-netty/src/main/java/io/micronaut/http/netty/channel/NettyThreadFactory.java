@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,9 +24,9 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.NettyRuntime;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.internal.SystemPropertyUtil;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 
-import javax.inject.Named;
-import javax.inject.Singleton;
 import java.util.concurrent.ThreadFactory;
 
 /**
@@ -42,7 +42,7 @@ import java.util.concurrent.ThreadFactory;
         NioServerSocketChannel.class,
         NioSocketChannel.class
 }, typeNames = {"sun.security.ssl.SSLContextImpl$TLSContext"},
-   accessType = {TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS, TypeHint.AccessType.ALL_DECLARED_FIELDS}
+   accessType = {TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS, TypeHint.AccessType.ALL_DECLARED_FIELDS, TypeHint.AccessType.ALL_PUBLIC_CONSTRUCTORS}
 )
 @BootstrapContextCompatible
 public class NettyThreadFactory {
@@ -66,6 +66,6 @@ public class NettyThreadFactory {
     @Named(NAME)
     @BootstrapContextCompatible
     protected ThreadFactory nettyThreadFactory() {
-        return new DefaultThreadFactory(NioEventLoopGroup.class);
+        return new DefaultThreadFactory("default-" + DefaultThreadFactory.toPoolName(NioEventLoopGroup.class));
     }
 }

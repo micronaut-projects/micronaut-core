@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,17 +15,21 @@
  */
 package io.micronaut.http.client.netty;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.http.*;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.cookies.NettyCookie;
+import io.micronaut.http.netty.cookies.NettyCookies;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
@@ -47,6 +51,7 @@ class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpR
     private final StreamedHttpResponse nettyResponse;
     private HttpStatus status;
     private final NettyHttpHeaders headers;
+    private final NettyCookies nettyCookies;
     private B body;
     private MutableConvertibleValues<Object> attributes;
 
@@ -58,6 +63,7 @@ class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpR
         this.nettyResponse = response;
         this.status = httpStatus;
         this.headers = new NettyHttpHeaders(response.headers(), ConversionService.SHARED);
+        this.nettyCookies = new NettyCookies(response.headers(), ConversionService.SHARED);
     }
 
     /**
@@ -144,6 +150,16 @@ class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpR
             throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
         }
         return this;
+    }
+
+    @Override
+    public Cookies getCookies() {
+        return nettyCookies;
+    }
+
+    @Override
+    public Optional<Cookie> getCookie(String name) {
+        return nettyCookies.findCookie(name);
     }
 
     @Override

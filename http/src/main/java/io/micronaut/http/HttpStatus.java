@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,9 +15,6 @@
  */
 package io.micronaut.http;
 
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -95,18 +92,6 @@ public enum HttpStatus implements CharSequence {
     NETWORK_AUTHENTICATION_REQUIRED(511, "Network Authentication Required"),
     CONNECTION_TIMED_OUT(522, "Connection Timed Out");
 
-    private static final Map<Integer, HttpStatus> BY_CODE;
-
-    static {
-        HttpStatus[] statuses = values();
-        Map<Integer, HttpStatus> byCode = new LinkedHashMap<>();
-        for (HttpStatus status : statuses) {
-            byCode.put(status.code, status);
-        }
-
-        BY_CODE = Collections.unmodifiableMap(byCode);
-    }
-
     private final int code;
     private final String reason;
 
@@ -141,11 +126,144 @@ public enum HttpStatus implements CharSequence {
      * @return The value
      */
     public static HttpStatus valueOf(int code) {
-        HttpStatus status = BY_CODE.get(code);
-        if (status == null) {
-            throw new IllegalArgumentException("Invalid HTTP status code: " + code);
+        switch (code) {
+            case 100:
+                return CONTINUE;
+            case 101:
+                return SWITCHING_PROTOCOLS;
+            case 102:
+                return PROCESSING;
+            case 200:
+                return OK;
+            case 201:
+                return CREATED;
+            case 202:
+                return ACCEPTED;
+            case 203:
+                return NON_AUTHORITATIVE_INFORMATION;
+            case 204:
+                return NO_CONTENT;
+            case 205:
+                return RESET_CONTENT;
+            case 206:
+                return PARTIAL_CONTENT;
+            case 207:
+                return MULTI_STATUS;
+            case 208:
+                return ALREADY_IMPORTED;
+            case 226:
+                return IM_USED;
+            case 300:
+                return MULTIPLE_CHOICES;
+            case 301:
+                return MOVED_PERMANENTLY;
+            case 302:
+                return FOUND;
+            case 303:
+                return SEE_OTHER;
+            case 304:
+                return NOT_MODIFIED;
+            case 305:
+                return USE_PROXY;
+            case 306:
+                return SWITCH_PROXY;
+            case 307:
+                return TEMPORARY_REDIRECT;
+            case 308:
+                return PERMANENT_REDIRECT;
+            case 400:
+                return BAD_REQUEST;
+            case 401:
+                return UNAUTHORIZED;
+            case 402:
+                return PAYMENT_REQUIRED;
+            case 403:
+                return FORBIDDEN;
+            case 404:
+                return NOT_FOUND;
+            case 405:
+                return METHOD_NOT_ALLOWED;
+            case 406:
+                return NOT_ACCEPTABLE;
+            case 407:
+                return PROXY_AUTHENTICATION_REQUIRED;
+            case 408:
+                return REQUEST_TIMEOUT;
+            case 409:
+                return CONFLICT;
+            case 410:
+                return GONE;
+            case 411:
+                return LENGTH_REQUIRED;
+            case 412:
+                return PRECONDITION_FAILED;
+            case 413:
+                return REQUEST_ENTITY_TOO_LARGE;
+            case 414:
+                return REQUEST_URI_TOO_LONG;
+            case 415:
+                return UNSUPPORTED_MEDIA_TYPE;
+            case 416:
+                return REQUESTED_RANGE_NOT_SATISFIABLE;
+            case 417:
+                return EXPECTATION_FAILED;
+            case 418:
+                return I_AM_A_TEAPOT;
+            case 420:
+                return ENHANCE_YOUR_CALM;
+            case 422:
+                return UNPROCESSABLE_ENTITY;
+            case 423:
+                return LOCKED;
+            case 424:
+                return FAILED_DEPENDENCY;
+            case 425:
+                return UNORDERED_COLLECTION;
+            case 426:
+                return UPGRADE_REQUIRED;
+            case 428:
+                return PRECONDITION_REQUIRED;
+            case 429:
+                return TOO_MANY_REQUESTS;
+            case 431:
+                return REQUEST_HEADER_FIELDS_TOO_LARGE;
+            case 444:
+                return NO_RESPONSE;
+            case 450:
+                return BLOCKED_BY_WINDOWS_PARENTAL_CONTROLS;
+            case 451:
+                return UNAVAILABLE_FOR_LEGAL_REASONS;
+            case 494:
+                return REQUEST_HEADER_TOO_LARGE;
+            case 500:
+                return INTERNAL_SERVER_ERROR;
+            case 501:
+                return NOT_IMPLEMENTED;
+            case 502:
+                return BAD_GATEWAY;
+            case 503:
+                return SERVICE_UNAVAILABLE;
+            case 504:
+                return GATEWAY_TIMEOUT;
+            case 505:
+                return HTTP_VERSION_NOT_SUPPORTED;
+            case 506:
+                return VARIANT_ALSO_NEGOTIATES;
+            case 507:
+                return INSUFFICIENT_STORAGE;
+            case 508:
+                return LOOP_DETECTED;
+            case 509:
+                return BANDWIDTH_LIMIT_EXCEEDED;
+            case 510:
+                return NOT_EXTENDED;
+            case 511:
+                return NETWORK_AUTHENTICATION_REQUIRED;
+            case 522:
+                return CONNECTION_TIMED_OUT;
+            default:
+                throw new IllegalArgumentException("Invalid HTTP status code: " + code);
         }
-        return status;
     }
 
     @Override

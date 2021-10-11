@@ -1,327 +1,302 @@
-Micronaut {version} includes the following changes:
+//Micronaut {version} includes the following changes:
+== 3.1.0
 
 === Core Features
 
-==== Support for JDK 14
+==== Primitive Beans
 
-Micronaut has been updated to support JDK 14.
+<<factories, Factory Beans>> can now create beans that are primitive types or primitive array types.
 
-==== Groovy 3
+See the section on <<factories, Primitive Beans and Arrays>> in the documentation for more information.
 
-Micronaut now supports applications written in Groovy 3.
+==== Repeatable Qualifiers
 
-==== Startup Performance Improvements
+<<qualifiers, Qualifiers>> can now be repeatable (an annotation annotated with `java.lang.annotation.Repeatable`) allowing narrowing bean resolution by a complete or partial match of the qualifiers declared on the injection point.
 
-Startup time has been further improved in this release with typical startup time for a new application around 20% faster.
+==== InjectScope
 
-==== Improvements to Bean Introspections
+A new ann:context.annotation.InjectScope[] annotation has been added which destroys any beans with no defined scope and injected into a method or constructor annotated with `@Inject` after the method or constructor completes.
 
-Bean introspections have been improved to support static creator methods, interfaces and enums. This means you can define a bean introspection on an interface with a private implementation such as:
+==== More Build Time Optimizations
 
-.Introspections on interfaces
-[source,java]
-----
-import io.micronaut.core.annotation.Creator;
+Further build time metadata optimizations have been added included reducing the number and size of the classes generated to support <<introspection, Bean Introspection>> and including knowledge of repeatable annotations in generated metadata avoiding further reflective calls and optimizing Micronaut's memory usage, in particular with GraalVM.
 
-@io.micronaut.core.annotation.Introspected
-interface Example {
-    String getName();
+==== Improvements to Context Propagation
 
-    @Creator
-    static Example create(String name) {
-        return () -> name;
-    }
-}
-----
+Support for <<context,Reactive context propagation>> has been further improved by inclusion of request context information in the https://projectreactor.io/docs/core/release/reference/#context[Reactor context] and <<kotlinContextPropagation, documentation on how to effectively propagate the context across reactive flows>> when using Kotlin coroutines.
 
-==== Support for Analyzing the Injection Point
+==== Improvements to the Element API
 
-Micronaut's Dependency Injection implementation has been improved such that you can now receive an api:inject.InjectionPoint[] instance to any ann:context.annotation.Factory[] method. This makes it possible to customize how the bean is created based on the annotation metadata at the point at which the bean is injected.
+The build-time api:inject.ast.Element[] API has been improved in a number of ways:
 
-For example consider the following definition:
-
-[source,java]
-----
-@Inject @Client("http://foo.com") RxHttpClient client;
-----
-
-A factory method can receive the injection point and create a client based off of the value:
-
-[source,java]
-----
-@Bean
-protected DefaultHttpClient httpClient(InjectionPoint<?> injectionPoint) {
-    String url = metadata.stringValue(Client.class).orElse(null);
-    if (url != null) {
-        return new DefaultHttpClient(url);
-    } else {
-        return new DefaultHttpClient();
-    }
-}
-----
-
-==== Support for Eager Initialization of Beans
-
-Eager initialization of beans is useful in certain cases, such as on AWS Lambda where more CPU resources are assigned to Lamdba construction than execution. Therefore as for Micronaut 2.0, you can specify whether you want to eager initialization configuration or all singletons using the api:context.ApplicationContextBuilder[] interface:
-
-.Enabling Eager Initialization
-[source,java]
-----
-public class Application {
-
-    public static void main(String[] args) {
-        Micronaut.build(args)
-            .eagerInitSingletons(true) // <1>
-            .mainClass(Application.class)
-            .start();
-    }
-}
-----
-
-<1> Setting eager init to true initializes all singletons
-
-It is also possible to just eager init configuration using `eagerInitConfiguration` which will initialize all ann:context.annotation.ConfigurationProperties[] beans.
-
-==== Spot Bugs Instead of JSR-305 Nullable/NonNull Annotations
-
-In Micronaut 1.x the Google distributed JSR-305 annotations library (`com.google.code.findbugs:jsr305`) was used to specify `@Nullable` and `@NonNull` on interfaces of the Micronaut API using the annotations contained within the `javax.annotation` package.
-
-Due to the fact that JSR-305 has been cancelled and that this dependency has potential licensing issues (by using the `javax` namespace) as well as problems with the cross packages on Java 9+ with the module system Micronaut 2.x switches to the `spotbugs-annotations` module provided by the https://spotbugs.github.io/[SpotBugs project].
-
-It is recommended users of Micronaut use this API instead (although the `javax.annotation.Nullable` and `javax.annotation.NotNull` annotations continue to be supported).
-
-=== CLI Features
-
-==== New Native CLI
-
-Micronaut's `mn` command for the CLI has been rewritten in Micronaut itself and is now compiled into a native image https://github.com/micronaut-projects/micronaut-starter/releases/tag/v{version}[available on Linux, MacOS X and Windows].
-
-==== Micronaut Launch
-
-Create Micronaut 2.0 applications without having the CLI installed using `curl`:
-
-[source,bash]
-----
-$ curl https://launch.micronaut.io/demo.zip -o demo.zip
-$ unzip demo.zip -d demo
-----
-
-Or by visiting https://launch.micronaut.io in your browser.
-
-Run `curl https://launch.micronaut.io` for more instructions on how to use the API or visit the https://launch.micronaut.io/swagger/views/swagger-ui/index.html[OpenAPI documentation].
-
-==== Diff Command
-
-Run `mn feature-diff --features=[FEATURE NAME]` from the root of another Micronaut project to create a diff of the changes that need to be applied to enable the feature. For example:
-
-.Using `feature-diff`
-[source,bash]
-----
-$ mn feature-diff --features=azure-function
---- micronaut-cli.yml
-+++ micronaut-cli.yml
-@@ -3,4 +3,4 @@
- testFramework: junit
- sourceLanguage: java
- buildTool: gradle
--features: [app-name, application, gradle, http-client, java, junit, logback, netty-server, shade, yaml]
-+features: [app-name, application, azure-function, azure-function-http, gradle, java, junit, logback, yaml]
-
-
---- host.json
-+++ host.json
-@@ -1,0 +1,7 @@
-+{
-+  "version": "2.0",
-+  "extensionBundle": {
-+    "id": "Microsoft.Azure.Functions.ExtensionBundle",
-+    "version": "[1.*, 2.0.0)"
-+  }
-+}
-
-----
-
-=== Build Improvements
-
-==== New Maven Parent POM
-
-Micronaut now provides a new parent POM that can be used in Maven projects to get setup quickly:
-
-.Using the Maven Parent POM
-[source,xml]
-----
-<parent>
-    <groupId>io.micronaut</groupId>
-    <artifactId>micronaut-parent</artifactId>
-    <version>${micronaut.version}</version>
-</parent>
-----
-
-==== New Maven Plugin
-
-The parent POM mentioned above includes a new Micronaut Maven Plugin that enables automatic application restart during development. Just run the following:
-
-[source,bash]
-----
-$ ./mvnw mn:run
-----
-
-Whenever you make a change to a class file the server will restart automatically.
-
-==== Gradle 6.3 Update
-
-For Gradle users who create new applications Gradle 6.3 is used which is compatible with JDK 14.
+* New methods were added to the api:inject.ast.MethodElement[] API to resolve the retriever type and throws declaration
+* A new experimental API has been added to the api:inject.ast.ClassElement[] API  to resolve generic placeholders and resolve the generic bound to the element
 
 === HTTP Features
 
-==== Support for HTTP/2
+==== Filter By Regex
 
-Micronaut's Netty-based HTTP client and server have been updated to support HTTP/2.
+HTTP filters now support matching URLs by a regular expression. Set the `patternStyle` member of the annotation to `REGEX` and the value will be treated as a regular expression.
 
-See the <<http2Server, HTTP/2 documentation>> for more information on how to enable support for HTTP/2.
+==== Random Port Binding
 
+The way the server binds to random ports has improved and should result in fewer port binding exceptions in tests.
 
-==== Threading Model and Event Loop Group Improvements
+==== Client Data Formatting
 
-Micronaut 2.0 uses a new shared default Netty `EventLoopGroup` for server worker threads and client request threads. This reduces context switching and improves resource utilization.
+The ann:core.convert.format.Format[] annotation now supports several new values that can be used in conjunction with the declarative HTTP client to support formatting data in several new ways. See the <<clientParameters, client parameters>> documentation for more information.
 
-See the <<clientConfiguration, HTTP Client Configuration>> section for information on how to configure the default `EventLoopGroup` and add additional `EventLoopGroup`'s that are configured per client.
+==== StreamingFileUpload
 
-In addition, as of Micronaut 2.0 all operations are by default executed on the `EventLoop` and users can optionally use the new ann:scheduling.annotation.ExecuteOn[] annotation to specify a named executor to execute an operation on if required (for example to offload blocking operations such as interactions with JPA/JDBC to a specific thread pool).
+The api:http.multipart.StreamingFileUpload[] API has been improved to support streaming directly to an output stream. As with the other `transferTo` methods, the write to the stream is offloaded to the IO pool automatically.
 
-==== Support for `@RequestBean`
+==== Server SSL Configuration
 
-It is now possible to bind the properties of a POJO argument to a `@Controller` to request parameters, headers and so on using the ann:http.annotation.RequestBean[] annotation.
+The SSL configuration for the Netty server now responds to refresh events. This allows for swapping out certificates without having to restart the server. See the <<https, https documentation>> for information on how to trigger the refresh.
 
-Thanks to Github user https://github.com/asodja[asodja] for this contribution.
+==== New Netty Server API
 
-==== Micronaut Servlet
+If you wish to programmatically start additional Netty servers on different ports with potentially different configurations, new APIs have been added to do so including a new api:http.server.netty.NettyEmbeddedServerFactory[] interface.
 
-Micronaut now includes support for creating https://github.com/micronaut-projects/micronaut-servlet[Servlet applications] and users can use the command line to create an application that targets popular Servlet containers:
+See the documentation on <<secondaryServers, Starting Secondary Servers>> for more information.
 
-[source,bash]
-----
-$ mn create-app myapp --features jetty-server    # for Jetty
-$ mn create-app myapp --features tomcat-server   # for Tomcat
-$ mn create-app myapp --features undertow-server # for Undertow
-----
+=== Deprecations
 
-==== Improved Support for Server-Side Content Negotiation
+The `netty.responses.file.\*` configuration is deprecated in favor of `micronaut.server.netty.responses.file.*`. The old configuration key will be removed in the next major version of the framework.
 
-Micronaut will now correctly handle the HTTP `Accept` header and pick the most appropriate route for the specified accepted media types using https://developer.mozilla.org/en-US/docs/Web/HTTP/Content_negotiation[Server-Side Content Negotiation].
+=== Module Upgrades
 
-NOTE: This also applies to `@Error` routes making it possible to send different error responses for different content types
+==== Micronaut Data 3.1.0
 
-TIP: To add XML support use the https://github.com/micronaut-projects/micronaut-jackson-xml[Jackson XML] module
+- Kotlin's coroutines support. New repository interface `CoroutineCrudRepository`.
+- Support for `AttributeConverter`
+- R2DBC upgraded to `Arabba-SR11`
+- JPA Criteria specifications
 
-==== Improved Support for Cloud Foundry
+==== Micronaut JAX-RS 3.1
 
-Micronaut will now process the `VCAP_APPLICATION` and `VCAP_SERVICES` environment variables and treat them as property sources.
+The https://micronaut-projects.github.io/micronaut-jaxrs/latest/guide/[JAX-RS module] now integrated with Micronaut Security allowing binding of the JAX-RS `SecurityContext`
 
-Thanks to https://github.com/fnonnenmacher[Fabian Nonnenmacher] for this contribution.
+==== Micronaut Kubernetes 3.1.0
 
+Micronaut Kubernetes 3.1 introduces new annotation https://micronaut-projects.github.io/micronaut-kubernetes/latest/api/io/micronaut/kubernetes/client/informer/Informer.html[@Informer]. By using the annotation on the https://javadoc.io/doc/io.kubernetes/client-java/latest/io/kubernetes/client/informer/ResourceEventHandler.html[ResourceEventHandler] the Micronaut will instantiate the https://javadoc.io/doc/io.kubernetes/client-java/latest/io/kubernetes/client/informer/SharedIndexInformer.html[SharedInformer] from the official https://github.com/kubernetes-client/java[Kubernetes Java SDK]. Then you only need to take care of handling the changes of the watched Kubernetes resource. See more on https://micronaut-projects.github.io/micronaut-kubernetes/latest/guide/#kubernetes-informer[Kubernetes Informer].
 
-==== HTTP Client Improvements
+==== Micronaut Oracle Coherence 3.0.0
 
-It is no longer necessary to use `@Client(..)` to inject a default api:http.client.RxHttpClient[] instance. You can now inject the default client simply with:
+The https://micronaut-projects.github.io/micronaut-coherence/latest/guide/[Micronaut Oracle Coherence] module is now out of preview status and includes broad integration with Oracle Coherence including support for caching, messaging and Micronaut Data.
 
-[source,java]
-----
-@Inject RxHttpClient client;
-----
+== 3.0.0
 
-If no host is provided at the time of a request, a api:http.client.exceptions.NoHostException[] will be thrown.
+=== Core Features
 
-==== API for Proxying Requests
+==== Optimized Build-Time Metadata
 
-A new API for writing API gateways and proxying requests has been added. See the documentation on the <<proxyClient, ProxyHttpClient>> for more information.
+Micronaut 3.0 introduces a new build time metadata format that is more efficient in terms of startup and code size.
 
-=== Serverless Improvements
+The result is significant improvements to startup and native image sizes when building native images with GraalVM Native Image.
 
-==== Support for Google Cloud Function
+It is recommended that users re-compile their applications and libraries with Micronaut 3.0 to benefit from these changes.
 
-You can now write Serverless functions that target Google Cloud Function using Micronaut. See the https://micronaut-projects.github.io/micronaut-gcp/2.0.x/guide/[Micronaut GCP] documentation and https://github.com/micronaut-projects/micronaut-gcp/tree/master/examples/hello-world-cloud-function[example application] for more information.
+==== Support for GraalVM 21.2
 
-==== Support for Microsoft Azure Function
+Micronaut has been updated to support the latest GraalVM 21.2 release.
 
-You can now write Serverless functions that target Microsoft Azure using Micronaut. See the https://micronaut-projects.github.io/micronaut-azure/1.0.x/guide/[Micronaut Azure] documentation and https://github.com/micronaut-projects/micronaut-azure/tree/master/examples/azure-functions-example[example application] for more information.
+==== Jakarta Inject
 
-==== Improvements to Micronaut AWS
+The `jakarta.inject` annotations are now the default injection annotations for Micronaut 3
 
-https://micronaut-projects.github.io/micronaut-aws/2.0.x/guide/#whatsNew[Micronaut AWS 2.0.0] includes a number of improvements to support for AWS Lambda and AWS in general including new client modules for AWS SDK 2.0, cold start improvements on Lambda and improvements to the support for Amazon Alexa.
+==== Support for JSR-330 Bean Import
 
-=== Module Improvements
+Using the ann:context.annotation.Import[] annotation it is now possible to import bean definitions into your application where JSR-330 (either `javax.inject` or `jakarta.inject` annotations) are used in an external library.
 
-Micronaut is more modular than ever, with several components now available in separate modules and upgrades to those modules.
+See the documentation on <<beanImport, Bean Import>> for more information.
 
-==== Micronaut Cache 2.0.0 Upgrade
+==== Support for Controlling Annotation Inheritance
 
-Caching has been moved into a separate module and out of `micronaut-runtime`. If you need caching (including the annotations within `io.micronaut.cache.annotation`) you just need to add the individual module for the cache provider you are interested (for example Caffeine, Redis, Hazelcast etc.).
+api:core.annotation.AnnotationMetadata[] inheritance can now be controlled via Java's `@Inherited` annotation. If an annotation is not explicitly annotated with `@Inherited` it will not be included in the metadata. See the <<annotationMetadata, Annotation Inheritance>> section of the documentation for more information.
 
-See the documentation for the https://micronaut-projects.github.io/micronaut-cache/2.0.x/guide/[Cache module] for more information.
+NOTE: This is an important behavioural change from Micronaut 2.x, see the <<breaks, Breaking Changes>> section for information on how to upgrade.
 
-==== Micronaut SQL 2.1.0 Upgrade
+==== Support Narrowing Injection by Generic Type Arguments
 
-Micronaut SQL has been improved to default to Micronaut transaction management (making Spring management optional) and includes https://micronaut-projects.github.io/micronaut-sql/2.0.x/guide/#jdbi[support for Jdbi] (Thanks to https://github.com/drmaas[Dan Maas] for this contribution).
+Micronaut can now resolve the correct bean to inject based on the generic type arguments specified on the injection point:
 
-In addition, support has been added for https://micronaut-projects.github.io/micronaut-sql/latest/guide/#jdbc[Oracle Universal Connection Pool]. Thanks to https://github.com/recursivecodes[Todd Sharp] for this contribution.
+snippet::io.micronaut.docs.inject.generics.Vehicle[tags="constructor",indent=0]
 
-==== Micronaut Security 2.0.0 Upgrade
+For more information see the section on <<qualifiers, Qualifying by Generic Type Arguments>>.
 
-The security module has seen many changes to improve the API and introduce new features to support a wider array of use cases.
+==== Support for using Annotation Members in Qualifiers
 
-See the https://micronaut-projects.github.io/micronaut-security/2.0.x/guide[Security module] for more information.
+You can now use annotation members in qualifiers and specify which members should be excluded with the new ann:context.annotation.NonBinding[] annotation.
 
-==== New Reactive Modules
+For more information see the section on <<qualifiers, Qualifying By Annotation Members>>.
 
-Whilst RxJava 2 remains the default, individual modules for other reactive libraries have been added.
+==== Support for Limiting the Injectable Types
 
-For RxJava 3:
+You can now limit the exposed types of a bean using the `typed` member of the ann:context.annotation.Bean[] annotation:
 
-dependency:io.micronaut.rxjava3:micronaut-rxjava3[scope="compile"]
+snippet::io.micronaut.docs.inject.typed.V8Engine[tags="class",indent=0]
 
-For Reactor:
+For more information see the section on <<typed, Limiting Injectable Types>>.
 
-dependency:io.micronaut.reactor:micronaut-reactor[scope="compile"]
+==== Factories can produce bean from fields
 
-And legacy support for RxJava 1:
+Beans defined with the ann:context.annotation.Factory[] annotation can now produce beans from public or package protected fields, for example:
 
-dependency:io.micronaut.rxjava1:micronaut-rxjava1[scope="compile"]
+snippet::io.micronaut.docs.factories.VehicleMockSpec[tags="class",indent=0]
 
-Included within the new RxJava 3 and Reactor modules are variants of api:http.client.RxHttpClient[] called `Rx3HttpClient` and `ReactorHttpClient` respectively.
+For more information see the <<factories, Bean Factories>> section of the documentation.
 
-To use the RxJava 3 HTTP client add the following dependency:
+==== Enhanced `BeanProvider` Interface
 
-dependency:io.micronaut.rxjava3:micronaut-rxjava3-http-client[scope="compile"]
+The api:context.BeanProvider[] interface has been enhanced with new methods such as `iterator()` and `stream()` as well as methods to check for bean existence and uniqueness.
 
-To use the Reactor HTTP client add:
+==== New `@Any` Qualifier for use in Bean Factories
 
-dependency:io.micronaut.rxjava3:micronaut-reactor-http-client[scope="compile"]
+A new ann:context.annotation.Any[] qualifier has been introduced to allow injecting any available instance into an injection point and can be used in combination with the new `BeanProvider` interface mentioned above to allow more dynamic behaviour.
 
-==== New Micronaut NATS module
+snippet::io.micronaut.docs.qualifiers.any.Vehicle[tags="imports,clazz", indent=0, title="Using BeanProvider with Any"]
 
-A new messaging module for https://nats.io[Nats.io] has been included in Micronaut core.
+The annotation can also be used on ann:context.annotation.Factory[] methods to allow customization of how objects are injected via the api:inject.InjectionPoint[] API.
 
-See the documentation for https://micronaut-projects.github.io/micronaut-nats/latest/guide/[Micronaut Nats] for more information.
+==== Support for Fields in Bean Introspections
 
-Thanks to https://github.com/grimmjo[Joachim Grimm] for this contribution.
+Bean introspections on public or package protected fields are now supported:
 
-==== Module Upgrades
+snippet::io.micronaut.docs.ioc.beans.User[tags="class", indent=0]
 
-* Micronaut Neo4j - `1.3.0` -> `2.0.0`
-* Micronaut Mongo - `1.3.0` -> `2.0.0`
-* Micronaut SQL - `1.3.0` -> `2.2.1`
-* Micronaut Cache - `1.2.0` -> `2.0.0.RC1`
-* Micronaut AWS - `1.3.9` -> `2.0.0.RC1`
-* Micronaut Security - `1.4.0` -> `2.0.0.RC1`
-* Micronaut Micrometer - `1.3.1` -> `2.0.0.RC2`
-* Micronaut GCP - `1.1.0` -> `2.0.0.RC1`
+For more information see the "Bean Fields" section of the <<introspection, Bean Introspections>> documentation.
 
-==== Dependency Upgrades
+==== `ApplicationEventPublisher` has now a generic event type
 
-* Hibernate `5.4.10.Final` -> `5.4.16.Final`
-* Groovy `2.5.8` -> `3.0.3`
-* Mongo Reactive Streams `1.13.0` -> `4.0.2`
-* Mongo Java Driver `3.12.0` -> `4.0.2`
-* Jaeger `1.0.0` -> `1.2.0`
-* Jackson `2.10.3` -> `2.11.0`
+For the performance reasons it's advised to inject an instance of `ApplicationEventPublisher` with a generic type parameter - `ApplicationEventPublisher<MyEvent>`.
+
+=== AOP Features
+
+==== Support for Constructor Interception
+
+It is now possible to intercept bean construction invocations through the api:aop.ConstructorInterceptor[] interface and ann:aop.AroundConstruct[] annotation.
+
+See the section on <<lifecycleAdvise, Bean Life Cycle Advice>> for more information.
+
+==== Support for `@PostConstruct` & `@PreDestroy` Interception
+
+It is now possible to intercept `@PostConstruct` and `@PreDestroy` method invocations through the api:aop.MethodInterceptor[] interface and ann:aop.InterceptorBinding[] annotation.
+
+See the section on <<lifecycleAdvise, Bean Life Cycle Advice>> for more information.
+
+
+==== Random Configuration Values
+
+It is now possible to set a max and a range for random numbers in configuration. For example to set an integer between 0 and 9, `${random.int(10)}` can be used as the configuration value. See the <<propertySource, documentation>> under "Using Random Properties" for more information.
+
+==== Project Reactor used internally instead of RxJava2
+
+Micronaut 3 uses internally https://projectreactor.io[Project Reactor] instead https://github.com/ReactiveX/RxJava[RxJava 2]. Project Reactor allows
+Micronaut 3 to simplify instrumentation, thanks to https://projectreactor.io/docs/core/release/api/reactor/util/context/Context.html[Reactor's Context],  simplifies conversion login and eases the integration with R2DBC drivers. We recommend users to migrate to Reactor. However, it is possible to continue to use RxJava. See <<reactiveConfigs, Reactive Programming section>>.
+
+=== Module Upgrades
+
+==== Micronaut Data 3.1.0
+
+- Kotlin's coroutines support. New repository interface `CoroutineCrudRepository`.
+- Support for `AttributeConverter`
+- R2DBC upgraded to `Arabba-SR11`
+- JPA Criteria specifications
+
+==== Micronaut Micrometer 4.0.0
+
+The https://micronaut-projects.github.io/micronaut-micrometer/latest/guide/[Micrometer module] has been upgraded and now supports repeated definitions of the https://micrometer.io/docs/concepts#_the_timed_annotation[@Timed] annotation as well as also supporting the `@Counted` annotation for counters when you add the `micronaut-micrometer-annotation` dependency to your annotation processor classpath.
+
+==== Micronaut Oracle Cloud 2.0.0
+
+Micronaut's https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/guide/[Oracle Cloud Integration] has been updated with support for Cloud Monitoring and Tracing.
+
+
+==== Micronaut Cassandra 4.0.0
+
+The https://micronaut-projects.github.io/micronaut-cassandra/latest/guide/[Micronaut Cassandra] integration now includes support for GraalVM out of the box.
+
+==== Other Modules
+
+- Micronaut Acme 3.0.0
+- Micronaut Aws 3.0.0
+- Micronaut Azure 3.0.0
+- Micronaut Cache 3.0.0
+- Micronaut Discovery Client 3.0.0
+- Micronaut ElasticSearch 3.0.0
+- Micronaut Flyway 4.1.0
+- Micronaut GCP 4.0.0
+- Micronaut GraphQL 3.0.0
+- Micronaut Groovy 3.0.0
+- Micronaut Grpc 3.0.0
+- Micronaut Jackson XML 3.0.0
+- Micronaut Jaxrs 3.0.0
+- Micronaut JMX 3.0.0
+- Micronaut Kafka 4.0.0
+- Micronaut Kotlin 3.0.0
+- Micronaut Kubernetes 3.0.0
+- Micronaut Liquibase 4.0.2
+- Micronaut Mongo 4.0.0
+- Micronaut MQTT 2.0.0
+- Micronaut Multitenancy 4.0.0
+- Micronaut Nats Io 3.0.0
+- Micronaut Neo4j 5.0.0
+- Micronaut OpenApi 3.0.1
+- Micronaut Picocli 4.0.0
+- Micronaut Problem Json 2.0.0
+- Micronaut R2DBC 2.0.0
+- Micronaut RabbitMQ 3.0.0
+- Micronaut Reactor 2.0.0
+- Micronaut Redis 5.0.0
+- Micronaut RSS 3.0.0
+- Micronaut RxJava2 1.0.0 (new)
+- Micronaut RxJava3 2.0.0
+- Micronaut Security 3.0.0
+- Micronaut Servlet 3.0.0
+- Micronaut Spring 4.0.0
+- Micronaut SQL 4.0.0
+- Micronaut Test 3.0.0
+- Micronaut Views 3.0.0
+
+=== Dependency Upgrades
+
+- Caffeine 2.9.1
+- Cassandra 4.11.1
+- Elasticsearch 7.12.0
+- Flyway 7.12.1
+- GraalVM 21.2.0
+- H2 Database 1.4.200
+- Hazelcast 4.2.1
+- Hibernate 5.5.3.Final
+- Hikari 4.0.3
+- Infinispan 12.1.6.Final
+- Jackson 2.12.4
+- Jaeger 1.6.0
+- Jakarta Annotation API 2.0.0
+- JAsync 1.2.2
+- JDBI 3.20.1
+- JOOQ 3.14.12
+- JUnit 5.7.2
+- Kafka 2.8.0
+- Kotlin 1.5.21
+- Kotlin Coroutines 1.5.1
+- Ktor 1.6.1
+- Liquibase 4.4.3
+- MariaDB Driver 2.7.3
+- Micrometer 1.7.1
+- MongoDB 4.3.0
+- MS SQL Driver 9.2.1.jre8
+- MySQL Driver 8.0.25
+- Neo4j Driver 4.2.7
+- Postgres Driver 42.2.23
+- Reactor 3.4.8
+- RxJava3 3.0.13
+- SLF4J 1.7.29
+- Snake YAML 1.29
+- Spock 2.0-groovy-3.0
+- Spring 5.3.9
+- Spring Boot 2.5.3
+- Testcontainers 1.15.3
+- Tomcat JDBC 10.0.8
+- Vertx SQL Drivers 4.1.1

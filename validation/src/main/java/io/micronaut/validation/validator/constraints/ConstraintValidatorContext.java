@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,8 @@
  */
 package io.micronaut.validation.validator.constraints;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 
 import javax.validation.ClockProvider;
 
@@ -48,5 +48,15 @@ public interface ConstraintValidatorContext {
      * @return The root bean under validation.
      */
     @Nullable Object getRootBean();
+
+    /**
+     * Sets a message template to be used for the validation error message.
+     *
+     * @param messageTemplate the message template
+     * @since 2.5.0
+     */
+    default void messageTemplate(@Nullable final String messageTemplate) {
+        throw new UnsupportedOperationException("not implemented");
+    }
     
 }

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,12 +20,11 @@ import io.jaegertracing.spi.MetricsFactory;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.runtime.ApplicationConfiguration;
-
-import edu.umd.cs.findbugs.annotations.Nullable;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 import static io.jaegertracing.Configuration.JAEGER_SERVICE_NAME;
 import static io.micronaut.tracing.jaeger.JaegerConfiguration.PREFIX;
@@ -61,9 +60,9 @@ public class JaegerConfiguration implements Toggleable  {
      *
      * @param applicationConfiguration The common application configurations
      */
-    public JaegerConfiguration(
-            ApplicationConfiguration applicationConfiguration) {
-        if (StringUtils.isEmpty(System.getProperty(JAEGER_SERVICE_NAME))) {
+    public JaegerConfiguration(ApplicationConfiguration applicationConfiguration) {
+        if (StringUtils.isEmpty(System.getProperty(JAEGER_SERVICE_NAME))
+                && StringUtils.isEmpty(System.getenv(JAEGER_SERVICE_NAME))) {
             System.setProperty(JAEGER_SERVICE_NAME, applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME));
         }
         configuration = Configuration.fromEnv();

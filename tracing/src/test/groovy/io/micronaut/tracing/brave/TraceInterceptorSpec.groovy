@@ -20,12 +20,13 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.tracing.annotation.ContinueSpan
 import io.micronaut.tracing.annotation.NewSpan
 import io.micronaut.tracing.annotation.SpanTag
-import io.reactivex.Single
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Mono
 import spock.lang.Specification
-
-import javax.inject.Inject
-import javax.inject.Singleton
 import java.util.concurrent.CompletableFuture
+import io.micronaut.core.async.annotation.SingleResult
 
 /**
  * @author graemerocher
@@ -98,12 +99,13 @@ class TraceInterceptorSpec extends Specification {
 
         @ContinueSpan
         String methodTwo(@SpanTag("foo.baz") String another) {
-            methodThree(another).blockingGet()
+            Mono.from(methodThree(another)).block()
         }
 
         @NewSpan("trace-rx")
-        Single<String> methodThree(@SpanTag("more.stuff") String name) {
-            return Single.just(name)
+        @SingleResult
+        Publisher<String> methodThree(@SpanTag("more.stuff") String name) {
+            return Mono.just(name)
         }
 
         @NewSpan("trace-cs")

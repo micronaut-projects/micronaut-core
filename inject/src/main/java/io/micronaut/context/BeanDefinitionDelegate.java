@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,11 +15,11 @@
  */
 package io.micronaut.context;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameResolver;
@@ -29,7 +29,6 @@ import io.micronaut.core.value.ValueResolver;
 import io.micronaut.inject.*;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
-import javax.inject.Provider;
 import java.util.*;
 
 /**
@@ -114,25 +113,19 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                 if (named != null) {
                     Map<String, Object> fulfilled = new LinkedHashMap<>(requiredArguments.length);
                     for (Argument argument : requiredArguments) {
-                        Class argumentType = argument.getType();
                         Optional result = ConversionService.SHARED.convert(named, argument);
                         String argumentName = argument.getName();
                         if (result.isPresent()) {
                             fulfilled.put(argumentName, result.get());
                         } else {
                             Qualifier qualifier = Qualifiers.byName(named.toString());
-                            // attempt bean lookup to full argument
-                            if (Provider.class.isAssignableFrom(argumentType)) {
-                                Optional<Argument<?>> genericType = argument.getFirstTypeVariable();
-                                if (genericType.isPresent()) {
-                                    Class beanType = genericType.get().getType();
-                                    fulfilled.put(argumentName, ((DefaultBeanContext) context).getBeanProvider(resolutionContext, beanType, qualifier));
-                                }
-                            } else {
-                                Optional bean = context.findBean(argumentType, qualifier);
-                                if (bean.isPresent()) {
-                                    fulfilled.put(argumentName, bean.get());
-                                }
+                            Optional bean;
+                            try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+                                    .pushConstructorResolve(definition, argument)) {
+                                bean = ((DefaultBeanContext) context).findBean(resolutionContext, argument, qualifier);
+                            }
+                            if (bean.isPresent()) {
+                                fulfilled.put(argumentName, bean.get());
                             }
                         }
                     }
@@ -175,6 +168,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     /**
      * @return The bean definition type
      */
+    @Override
     public BeanDefinition<T> getTarget() {
         return definition;
     }
@@ -227,6 +221,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     }
 
     @Override
+    @NonNull
     public String getName() {
         return definition.getName();
     }

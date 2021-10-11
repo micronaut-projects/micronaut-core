@@ -15,10 +15,10 @@
  */
 package io.micronaut.docs.config.value
 
+// tag::imports[]
 import io.micronaut.context.annotation.Value
 
-// tag::imports[]
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 // end::imports[]
 
 // tag::class[]
@@ -29,7 +29,7 @@ class EngineImpl : Engine {
     override var cylinders: Int = 0
         protected set
 
-    override fun start(): String {// <2>
+    override fun start(): String { // <2>
         return "Starting V$cylinders Engine"
     }
 }

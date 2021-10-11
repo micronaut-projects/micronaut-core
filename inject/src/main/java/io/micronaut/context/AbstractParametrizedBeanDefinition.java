@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,7 +18,9 @@ package io.micronaut.context;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -26,7 +28,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ParametrizedBeanFactory;
 
-import javax.inject.Qualifier;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.Collections;
@@ -98,7 +99,7 @@ public abstract class AbstractParametrizedBeanDefinition<T> extends AbstractBean
                 String argumentName = requiredArgument.getName();
                 if (!requiredArgumentValues.containsKey(argumentName) && !requiredArgument.isNullable()) {
                     if (eachBeanType.filter(type -> type == requiredArgument.getType()).isPresent()) {
-                        return null;
+                        throw new DisabledBeanException("@EachBean parameter disabled for argument: " + requiredArgument.getName());
                     }
                     throw new BeanInstantiationException(resolutionContext, "Missing bean argument value: " + argumentName);
                 }
@@ -129,7 +130,7 @@ public abstract class AbstractParametrizedBeanDefinition<T> extends AbstractBean
     private Argument[] resolveRequiredArguments() {
         return Arrays.stream(getConstructor().getArguments())
             .filter(arg -> {
-                Optional<Class<? extends Annotation>> qualifierType = arg.getAnnotationMetadata().getAnnotationTypeByStereotype(Qualifier.class);
+                Optional<Class<? extends Annotation>> qualifierType = arg.getAnnotationMetadata().getAnnotationTypeByStereotype(AnnotationUtil.QUALIFIER);
                 return qualifierType.isPresent() && qualifierType.get() == Parameter.class;
             })
             .toArray(Argument[]::new);

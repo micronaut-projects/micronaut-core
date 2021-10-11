@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,12 +18,13 @@ package io.micronaut.inject.beans.visitor;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.inject.annotation.NamedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -45,8 +46,9 @@ public class EntityIntrospectedAnnotationMapper implements NamedAnnotationMapper
         final AnnotationValueBuilder<Introspected> builder = AnnotationValue.builder(Introspected.class)
                 // don't bother with transients properties
                 .member("excludedAnnotations", "javax.persistence.Transient"); // <2>
-        return Collections.singletonList(
-                builder.build()
+        return Arrays.asList(
+                builder.build(),
+                AnnotationValue.builder(ReflectiveAccess.class).build()
         );
     }
 }

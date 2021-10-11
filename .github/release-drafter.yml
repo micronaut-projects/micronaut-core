@@ -1,0 +1,21 @@
+name-template: Micronaut $NEXT_PATCH_VERSION
+tag-template: v$NEXT_PATCH_VERSION
+categories:
+  - title: 🚀 Features
+    label: "type: enhancement"
+  - title: 🐛 Bug Fixes
+    label: "type: bug"
+  - title: 🛠 Dependency upgrades
+    label: "type: dependencies"
+change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
+branches:
+  - master
+  - "2.0.x"
+template: |
+  ## Changes
+
+  $CHANGES
+
+  ## Contributors
+
+  $CONTRIBUTORS

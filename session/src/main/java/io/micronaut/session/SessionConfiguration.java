@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,13 +15,13 @@
  */
 package io.micronaut.session;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.scheduling.TaskExecutors;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
-import javax.inject.Inject;
-import javax.inject.Named;
-import javax.inject.Provider;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -46,7 +46,7 @@ public class SessionConfiguration {
     private Duration maxInactiveInterval = Duration.ofMinutes(DEFAULT_MAXINACTIVEINTERVAL_MINUTES);
     private Integer maxActiveSessions;
     private boolean promptExpiration = false;
-    private Provider<ExecutorService> executorService;
+    private BeanProvider<ExecutorService> executorService;
 
     /**
      * @return The maximum number of active sessions
@@ -103,7 +103,7 @@ public class SessionConfiguration {
      */
     public Optional<ScheduledExecutorService> getExecutorService() {
         return Optional.ofNullable(executorService)
-                .map(Provider::get)
+                .map(BeanProvider::get)
                 .filter(ScheduledExecutorService.class::isInstance)
                 .map(ScheduledExecutorService.class::cast);
     }
@@ -114,7 +114,7 @@ public class SessionConfiguration {
      * @param executorService The executorService
      */
     @Inject
-    public void setExecutorService(@Nullable @Named(TaskExecutors.SCHEDULED) Provider<ExecutorService> executorService) {
+    public void setExecutorService(@Nullable @Named(TaskExecutors.SCHEDULED) BeanProvider<ExecutorService> executorService) {
         this.executorService = executorService;
     }
 }

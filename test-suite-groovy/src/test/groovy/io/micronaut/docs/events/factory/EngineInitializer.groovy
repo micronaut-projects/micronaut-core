@@ -19,7 +19,7 @@ package io.micronaut.docs.events.factory
 import io.micronaut.context.event.BeanInitializedEventListener
 import io.micronaut.context.event.BeanInitializingEvent
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 // end::imports[]
 
 // tag::class[]
@@ -29,7 +29,7 @@ class EngineInitializer implements BeanInitializedEventListener<EngineFactory> {
     EngineFactory onInitialized(BeanInitializingEvent<EngineFactory> event) {
         EngineFactory engineFactory = event.bean
         engineFactory.rodLength = 6.6 // <5>
-        return event.bean
+        return engineFactory
     }
 }
 // end::class[]

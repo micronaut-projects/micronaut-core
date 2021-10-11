@@ -1,4 +1,4 @@
-The previous example presented a trivial example that uses the parameters of a method to represent the body of a `POST` request:
+The previous example presented a simple example using method parameters to represent the body of a `POST` request:
 
 .PetOperations.java
 [source,java]
@@ -18,7 +18,7 @@ Execution failed for task ':publishGuide'.
 I found a closed issue on github that sounds similar https://github.com/asciidoctor/asciidoctorj/issues/267 but not really certain
 ////
 
-The `save` method when called will perform an HTTP `POST` with the following JSON by default:
+The `save` method performs an HTTP `POST` with the following JSON by default:
 
 .Example Produced JSON
 [source,json]
@@ -26,15 +26,15 @@ The `save` method when called will perform an HTTP `POST` with the following JSO
 {"name":"Dino", "age":10}
 ----
 
-You may however want to customize what is sent as the body, the parameters, URI variables and so on. The ann:http.client.annotation.Client[] annotation is very flexible in this regard and supports the same pkg:http.annotation[HTTP Annotations] as Micronaut's HTTP server.
+You may however want to customize what is sent as the body, the parameters, URI variables, etc. The ann:http.client.annotation.Client[] annotation is very flexible in this regard and supports the same pkg:http.annotation[HTTP Annotations] as Micronaut's HTTP server.
 
-For example, the following defines a URI template and the `name` parameter is used as part of the URI template, whilst ann:http.annotation.Body[] is used declare that the contents to send to the server are represented by the `Pet` POJO:
+For example, the following defines a URI template, and the `name` parameter is used as part of the URI template, whilst ann:http.annotation.Body[] declares that the contents to send to the server are represented by the `Pet` POJO:
 
 .PetOperations.java
 [source,java]
 ----
 @Post("/{name}")
-Single<Pet> save(
+Mono<Pet> save(
     @NotBlank String name, // <1>
     @Body @Valid Pet pet) // <2>
 ----
@@ -42,47 +42,147 @@ Single<Pet> save(
 <1> The name parameter, included as part of the URI, and declared `@NotBlank`
 <2> The `pet` parameter, used to encode the body and declared `@Valid`
 
-The following table summarizes the parameter annotations, their purpose, and provides an example:
+The following table summarizes the parameter annotations and their purpose, and provides an example:
 
 .Parameter Binding Annotations
 |===
 |Annotation|Description |Example
 
 |ann:http.annotation.Body[]
-|Allows to specify the parameter that is the body of the request
+|Specifies the parameter for the body of the request
 |`@Body String body`
 
 |ann:http.annotation.CookieValue[]
-|Allows specifying parameters that should be sent as cookies
+|Specifies parameters to be sent as cookies
 |`@CookieValue String myCookie`
 
 |ann:http.annotation.Header[]
-|Allows specifying parameters that should be sent as HTTP headers
-|`@Header String contentType`
+|Specifies parameters to be sent as HTTP headers
+|`@Header String requestId`
 
 |ann:http.annotation.QueryValue[]
-|Allows customizing the name of the URI parameter to bind from
+|Customizes the name of the URI parameter to bind from
 |`@QueryValue("userAge") Integer age`
 
 |ann:http.annotation.PathVariable[]
-|Used to bind a parameter exclusively from a <<routing, Path Variable>>.
+|Binds a parameter exclusively from a <<routing, Path Variable>>.
 |`@PathVariable Long id`
 
 |ann:http.annotation.RequestAttribute[]
-|Allows specifying parameters that should be set as request attributes
+|Specifies parameters to be set as request attributes
 |`@RequestAttribute Integer locationId`
 
 |===
 
-==== Type Based Binding Parameters
+IMPORTANT: Always use ann:http.annotation.Produces[] or ann:http.annotation.Consumes[] instead of supplying a header for `Content-Type` or `Accept`.
 
-Some parameters are recognized by their type instead of their annotation. The following table summarizes the parameter types, their purpose, and provides an example:
+== Query values formatting
+
+The link:{api}/io/micronaut/core/convert/format/Format.html[Format] annotation can be used together with `@QueryValue` annotation to format query values.
+
+The supported values are: `"csv"`, `"ssv"`, `"pipes"`, `"multi"` and `"deep-object"`, where the meaning is similar to https://swagger.io/docs/specification/serialization/[Open API v3] query parameter's `style` attribute.
+
+The format can only be applied to `java.lang.Iterable`, `java.util.Map` or POJO with link:{api}/io/micronaut/core/annotation/Introspected.html[Introspected] annotation. Examples of how different values will be formatted are given in the table below:
+
+|===
+| Format | Iterable example | Map or POJO example
+
+| Original value
+| `["Mike", "Adam", "Kate"]`
+| `{"name": "Mike", "age": 30"}`
+
+| `"CSV"`
+| `"param=Mike,Adam,Kate"`
+| `"param=name,Mike,age,30"`
+
+| `"SSV"`
+| `"param=Mike Adam Kate"`
+| `"param=name Mike age 30"`
+
+| `"PIPES"`
+| `"param=Mike\|Adam\|Kate"`
+| `"param=name\|Mike\|age\|30"`
+
+| `"MULTI"`
+| `"param=Mike&param=Adam&param=Kate"`
+| `"name=Mike&age=30"`
+
+| `"DEEP_OBJECT"`
+| `"param[0]=Mike&param[1]=Adam&param[2]=Kate"`
+| `"param[name]=Mike&param[age]=30"`
+
+|===
+
+==== Type-Based Binding Parameters
+
+Some parameters are recognized by their type instead of their annotation. The following table summarizes these parameter types and their purpose, and provides an example:
 
 |===
 |Type |Description |Example
 
 |api:http.BasicAuth[]
-|Allows binding of basic authorization credentials
+|Binds Basic Authorization credentials
 |`BasicAuth basicAuth`
 
 |===
+
+==== Custom Binding
+
+The api:http.client.bind.ClientArgumentRequestBinder[] API binds client arguments to the request. Custom binder classes registered as beans are automatically used during the binding process. Annotation-based binders are searched for first, with type-based binders being searched if a binder was not found.
+
+IMPORTANT: This is an experimental feature in 2.1 and subject to change! One limitation of binding is that binders may not manipulate or set the request URI because it can be a combination of many arguments.
+
+===== Binding By Annotation
+
+To control how an argument is bound to the request based on an annotation on the argument, create a bean of type api:http.client.bind.AnnotatedClientArgumentRequestBinder[]. Any custom annotations must be annotated with ann:core.bind.annotation.Bindable[].
+
+In this example, see the following client:
+
+snippet::io.micronaut.docs.http.client.bind.annotation.MetadataClient[tags="clazz", indent=0, title="Client With @Metadata Argument"]
+
+The argument is annotated with the following annotation:
+
+snippet::io.micronaut.docs.http.client.bind.annotation.Metadata[tags="clazz", indent=0, title="@Metadata Annotation"]
+
+Without any additional code, the client attempts to convert the metadata to a string and append it as a query parameter. In this case that isn't the desired effect, so a custom binder is needed.
+
+The following binder handles arguments passed to clients that are annotated with the `@Metadata` annotation, and mutate the request to contain the desired headers. The implementation could be modified to accept more types of data other than `Map`.
+
+snippet::io.micronaut.docs.http.client.bind.annotation.MetadataClientArgumentBinder[tags="clazz", indent=0, title="Annotation Argument Binder"]
+
+===== Binding By Type
+
+To bind to the request based on the type of the argument, create a bean of type api:http.client.bind.TypedClientArgumentRequestBinder[].
+
+In this example, see the following client:
+
+snippet::io.micronaut.docs.http.client.bind.type.MetadataClient[tags="clazz", indent=0, title="Client With Metadata Argument"]
+
+Without any additional code, the client attempts to convert the metadata to a string and append it as a query parameter. In this case that isn't the desired effect, so a custom binder is needed.
+
+The following binder handles arguments passed to clients of type `Metadata` and mutate the request to contain the desired headers.
+
+snippet::io.micronaut.docs.http.client.bind.type.MetadataClientArgumentBinder[tags="clazz", indent=0, title="Typed Argument Binder"]
+
+=== Binding On Method
+
+It is also possible to create a binder, that would change the request with an annotation on the method. For example:
+
+snippet::io.micronaut.docs.http.client.bind.method.NameAuthorizedClient[tags="clazz", indent=0, title="Client With Annotated Method"]
+
+<1> The `@NameAuthorization` is annotating a method
+
+The annotation is defined as:
+
+snippet::io.micronaut.docs.http.client.bind.method.NameAuthorization[tags="clazz", indent=0, title="Annotation Definition"]
+
+<1> It is defined to be used on methods
+
+The following binder specifies the behaviour:
+
+snippet::io.micronaut.docs.http.client.bind.method.NameAuthorizationBinder[tags="clazz", indent=0, title="Annotation Definition"]
+
+<1> The `@Singleton` annotation registers it in Micronaut context
+<2> It implements the `AnnotatedClientRequestBinder<NameAuthorization>`
+<3> The custom `bind` method is used to implement the behaviour of the binder
+

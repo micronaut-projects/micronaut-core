@@ -19,11 +19,10 @@ package io.micronaut.docs.config.converters
 import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.convert.TypeConverter
-
-import javax.inject.Singleton
 import java.time.DateTimeException
 import java.time.LocalDate
 import java.util.Optional
+import jakarta.inject.Singleton
 // end::imports[]
 
 // tag::class[]
@@ -40,7 +39,6 @@ class MapToLocalDateConverter : TypeConverter<Map<*, *>, LocalDate> { // <1>
                 context.reject(propertyMap, e) // <3>
                 return Optional.empty()
             }
-
         }
 
         return Optional.empty()

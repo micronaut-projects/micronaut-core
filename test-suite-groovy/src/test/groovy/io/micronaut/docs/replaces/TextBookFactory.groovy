@@ -18,14 +18,14 @@ package io.micronaut.docs.replaces
 import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Replaces
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 // tag::class[]
 @Factory
 class TextBookFactory {
 
     @Singleton
-    @Replaces(value = TextBook.class, factory = BookFactory.class)
+    @Replaces(value = TextBook, factory = BookFactory)
     TextBook textBook() {
         new TextBook('Learning 305')
     }
