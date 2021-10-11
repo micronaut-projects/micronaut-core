@@ -44,7 +44,7 @@ The way the server binds to random ports has improved and should result in fewer
 
 ==== Client Data Formatting
 
-The ann:core.convert.Format[] annotation now supports several new values that can be used in conjunction with the declarative HTTP client to support formatting data in several new ways. See the <<clientParameters, client parameters>> documentation for more information.
+The ann:core.convert.format.Format[] annotation now supports several new values that can be used in conjunction with the declarative HTTP client to support formatting data in several new ways. See the <<clientParameters, client parameters>> documentation for more information.
 
 ==== StreamingFileUpload
 
