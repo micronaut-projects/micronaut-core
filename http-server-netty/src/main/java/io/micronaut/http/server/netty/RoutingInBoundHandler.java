@@ -572,7 +572,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 encodeHttpResponse(
                         context,
                         request,
-                        toNettyResponse(message),
+                        toMutableResponse(message),
                         message.body()
                 );
                 subscription.request(1);
@@ -585,7 +585,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 encodeHttpResponse(
                         context,
                         request,
-                        toNettyResponse(defaultErrorResponse),
+                        defaultErrorResponse,
                         defaultErrorResponse.body()
                 );
             }
@@ -931,7 +931,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             } else if (body instanceof Publisher) {
                 response.body(null);
                 DelegateStreamedHttpResponse streamedResponse = new DelegateStreamedHttpResponse(
-                        toNettyResponse(response).toHttpResponse(),
+                        toNettyResponse(response),
                         mapToHttpContent(nettyRequest, response, body, context)
                 );
                 context.writeAndFlush(streamedResponse);
@@ -1212,23 +1212,35 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     @NonNull
-    private NettyMutableHttpResponse<?> toNettyResponse(HttpResponse<?> message) {
-        NettyMutableHttpResponse<?> nettyHttpResponse;
-        if (message instanceof NettyMutableHttpResponse) {
-            nettyHttpResponse = (NettyMutableHttpResponse<?>) message;
+    private io.netty.handler.codec.http.HttpResponse toNettyResponse(HttpResponse<?> message) {
+        if (message instanceof NettyHttpResponseBuilder) {
+            return ((NettyHttpResponseBuilder) message).toHttpResponse();
         } else {
-            HttpStatus httpStatus = message.status();
-            Object body = message.body();
-            io.netty.handler.codec.http.HttpHeaders nettyHeaders = new DefaultHttpHeaders(serverConfiguration.isValidateHeaders());
-            message.getHeaders().forEach((BiConsumer<String, List<String>>) nettyHeaders::set);
-            nettyHttpResponse = new NettyMutableHttpResponse<>(
-                    HttpVersion.HTTP_1_1,
-                    HttpResponseStatus.valueOf(httpStatus.getCode(), httpStatus.getReason()),
-                    body instanceof ByteBuf ? body : null,
-                    ConversionService.SHARED
-            );
+            return createNettyResponse(message).toHttpResponse();
         }
-        return nettyHttpResponse;
+    }
+
+    @NonNull
+    private MutableHttpResponse<?> toMutableResponse(HttpResponse<?> message) {
+        if (message instanceof MutableHttpResponse) {
+            return (MutableHttpResponse<?>) message;
+        } else {
+            return createNettyResponse(message);
+        }
+    }
+
+    @NonNull
+    private NettyMutableHttpResponse<?> createNettyResponse(HttpResponse<?> message) {
+        HttpStatus httpStatus = message.status();
+        Object body = message.body();
+        io.netty.handler.codec.http.HttpHeaders nettyHeaders = new DefaultHttpHeaders(serverConfiguration.isValidateHeaders());
+        message.getHeaders().forEach((BiConsumer<String, List<String>>) nettyHeaders::set);
+        return new NettyMutableHttpResponse<>(
+                HttpVersion.HTTP_1_1,
+                HttpResponseStatus.valueOf(httpStatus.getCode(), httpStatus.getReason()),
+                body instanceof ByteBuf ? body : null,
+                ConversionService.SHARED
+        );
     }
 
     private MutableHttpResponse<?> encodeBodyWithCodec(MutableHttpResponse<?> response,
