@@ -90,7 +90,18 @@ class SimpleClassMethodLevelAopSpec extends Specification {
         // should not be a reflection based method
         !beanContext.findExecutableMethod(SimpleClass, "test", String).get().getClass().getName().contains("Reflection")
         foo.test("test") == "Name is changed"
+    }
 
+    void "test modifying the interceptor parameters is not supported"() {
+        given:
+        BeanContext beanContext = new DefaultBeanContext().start()
+        SimpleClass foo = beanContext.getBean(SimpleClass)
+
+        when: "the interceptor is called"
+        foo.invalidInterceptor()
+
+        then:
+        thrown(UnsupportedOperationException)
     }
 
 }

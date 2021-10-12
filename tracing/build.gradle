@@ -1,40 +1,30 @@
 dependencies {
+    annotationProcessor project(":inject-java")
+    api libs.managed.opentracing
+    api libs.managed.opentracing.util
+    api project(":runtime")
+    api project(":http-client")
+    implementation project(":core")
 
-    compile dependencyVersion("opentracing")
-    compile dependencyModuleVersion('opentracing', 'opentracing-util')
-    compile project(":runtime")
-    compile project(":http-client")
+    implementation libs.managed.reactor
 
     // the following are Tracing implementations and instrumentations which
     // are optionally loaded and not required
-    compileOnly project(":inject-java")
-    compileOnly dependencyModuleVersion('micronaut.netflix', 'micronaut-netflix-hystrix'), {
-        exclude group:"io.micronaut", module:'micronaut-runtime'
-        exclude group:"io.micronaut.configuration", module:'micronaut-netflix-archaius'
-    }
-    compileOnly dependencyVersion("brave.instrumentation")
-    compileOnly dependencyVersion("zipkin.reporter")
-    compileOnly 'io.zipkin.reporter:zipkin-reporter:1.1.2'
-    compileOnly dependencyVersion("brave.opentracing")
+    compileOnly libs.managed.hystrix
+    compileOnly libs.managed.zipkin.brave.instrumentation
+    compileOnly libs.managed.zipkin.reporter
+    compileOnly libs.managed.brave.opentracing
 
-    compileOnly dependencyVersion("jaeger")
-    compileOnly dependencyVersion("reactor")
-    compileOnly dependencyVersion("rxjava1.interop")
+    compileOnly libs.managed.jaeger
 
+    testImplementation project(":inject-groovy")
+    testImplementation project(":inject-java")
+    testAnnotationProcessor project(":inject-java")
+    testImplementation project(":http-server-netty")
 
-    testCompile dependencyModuleVersion('micronaut.netflix', 'micronaut-netflix-hystrix'), {
-        exclude group:"io.micronaut", module:'micronaut-runtime'
-        exclude group:"io.micronaut.configuration", module:'micronaut-netflix-archaius'
-    }
-    testCompile project(":inject-groovy")
-    testCompile project(":discovery-client")
-    testCompile project(":inject-java")
-    testCompile project(":http-server-netty")
-
-    testCompile dependencyVersion("reactor")
-    testCompile dependencyVersion("zipkin.reporter")
-    testCompile dependencyVersion("brave.instrumentation")
-    testCompile dependencyVersion("brave.opentracing")
+    testImplementation libs.managed.zipkin.reporter
+    testImplementation libs.managed.zipkin.brave.instrumentation
+    testImplementation libs.managed.brave.opentracing
 
 }
 

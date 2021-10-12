@@ -1,9 +1,9 @@
 By default Micronaut is a stateless HTTP server, however depending on your application requirements you may need the notion of HTTP sessions.
 
-Micronaut comes with a `session` module inspired by https://projects.spring.io/spring-session/[Spring Session] that enables this that currently features two implementations:
+Micronaut includes a `session` module inspired by https://projects.spring.io/spring-session/[Spring Session] that enables this which currently has two implementations:
 
-* In-Memory sessions - which you should combine with an a sticky sessions proxy if you plan to run multiple instances.
-* Redis sessions - In this case https://redis.io[Redis] is used to store sessions and non-blocking I/O is used to read/write sessions to Redis.
+* In-Memory sessions - which you should combine with an a sticky session proxy if you plan to run multiple instances.
+* Redis sessions - In this case https://redis.io[Redis] stores sessions, and non-blocking I/O is used to read/write sessions to Redis.
 
 == Enabling Sessions
 
@@ -13,16 +13,15 @@ dependency:micronaut-session[]
 
 === Redis Sessions
 
-If you wish to store api:session.Session[] instances in Redis you can do so with the https://micronaut-projects.github.io/micronaut-redis/latest/guide/#sessions[Micronaut Redis] module which includes detailed instructions.
+To store api:session.Session[] instances in Redis, use the https://micronaut-projects.github.io/micronaut-redis/latest/guide/#sessions[Micronaut Redis] module which includes detailed instructions.
 
-To quickly get up and running with Redis sessions you must also have the `redis-lettuce` configuration on your classpath:
-
+To quickly get up and running with Redis sessions you must also have the `redis-lettuce` dependency in your build:
 
 .build.gradle
 [source,groovy]
 ----
 compile "io.micronaut:micronaut-session"
-compile "io.micronaut.configuration:micronaut-redis-lettuce"
+compile "io.micronaut.redis:micronaut-redis-lettuce"
 ----
 
 And enable Redis sessions via configuration in `application.yml`:
@@ -31,58 +30,58 @@ And enable Redis sessions via configuration in `application.yml`:
 [source,yaml]
 ----
 redis:
-    uri: redis://localhost:6379
+  uri: redis://localhost:6379
 micronaut:
-    session:
-        http:
-            redis:
-                enabled: true
+  session:
+    http:
+      redis:
+        enabled: true
 ----
 
 == Configuring Session Resolution
 
-How the api:session.Session[] is resolved can be configured with api:session.http.HttpSessionConfiguration[].
+api:session.Session[] resolution can be configured with api:session.http.HttpSessionConfiguration[].
 
-By default sessions are resolved using an api:session.http.HttpSessionFilter[] that looks up session identifiers via either an HTTP header (using the `Authorization-Info` or `X-Auth-Token` header values) or via a Cookie called `SESSION`.
+By default, sessions are resolved using an api:session.http.HttpSessionFilter[] that looks for session identifiers via either an HTTP header (using the `Authorization-Info` or `X-Auth-Token` headers) or via a Cookie named `SESSION`.
 
-If you wish to disable either header resolution or cookie resolution you can via configuration in `application.yml`:
+You can disable either header resolution or cookie resolution via configuration in `application.yml`:
 
 .Disabling Cookie Resolution
 [source,yaml]
 ----
 micronaut:
-    session:
-        http:
-            cookie: false
-            header: true
+  session:
+    http:
+      cookie: false
+      header: true
 ----
 
-The above configuration enables header resolution, but disables cookie resolution. You can also configure the header or cookie names as necessary.
+The above configuration enables header resolution, but disables cookie resolution. You can also configure header and cookie names.
 
 == Working with Sessions
 
-A api:session.Session[] object can be retrieved simply by declaring the api:session.Session[] in a controller method signature. For example consider the following controller:
+A api:session.Session[] can be retrieved with a parameter of type api:session.Session[] in a controller method. For example consider the following controller:
 
 snippet::io.micronaut.docs.session.ShoppingController[tags="imports,class,add,endclass", indent=0]
 
-<1> The `ShoppingController` declares a api:session.Session[] attribute called `cart`
-<2> The api:session.Session[] is declared as a parameter to the method
+<1> `ShoppingController` declares a api:session.Session[] attribute named `cart`
+<2> The api:session.Session[] is declared as a method parameter
 <3> The `cart` attribute is retrieved
 <4> Otherwise a new `Cart` instance is created and stored in the session
 
-Note that because the api:session.Session[] is declared as a required parameter to the execute the controller action, the api:session.Session[] will be created and saved to the api:session.SessionStore[].
+Note that because the api:session.Session[] is declared as a required parameter, to execute the controller action a api:session.Session[] will be created and saved to the api:session.SessionStore[].
 
-If you don't want to create unnecessary sessions then you can declare the api:session.Session[] as `@Nullable` in which case a session will not be created and saved unnecessarily. For example:
+If you don't want to create unnecessary sessions, declare the api:session.Session[] as `@Nullable` in which case a session will not be created and saved unnecessarily. For example:
 
 snippet::io.micronaut.docs.session.ShoppingController[tags="clear", indent=0,title="Using @Nullable with Sessions"]
 
-The above method will only create and inject a new api:session.Session[] if one already exists.
+The above method only injects a new api:session.Session[] if one already exists.
 
 == Session Clients
 
-If the client is a web browser then sessions should just work if you have cookies is enabled. However for programmatic HTTP clients you need to make sure you propagate the session id between HTTP calls.
+If the client is a web browser, sessions should work if cookies are enabled. However, for programmatic HTTP clients you need to propagate the session ID between HTTP calls.
 
-For example, when invoking the `viewCart` method of the `StoreController` in the previous example the HTTP client will receive by default a `AUTHORIZATION_INFO` header. The following example, using a Spock test, demonstrates this:
+For example, when invoking the `viewCart` method of the `StoreController` in the previous example, the HTTP client receives by default a `AUTHORIZATION_INFO` header. The following example, using a Spock test, demonstrates this:
 
 .Retrieving the AUTHORIZATION_INFO header
 snippet::io.micronaut.docs.session.ShoppingControllerSpec[tags="view", indent=0]
@@ -90,7 +89,7 @@ snippet::io.micronaut.docs.session.ShoppingControllerSpec[tags="view", indent=0]
 <1> A request is made to `/shopping/cart`
 <2> The `AUTHORIZATION_INFO` header is present in the response
 
-You can then pass this `AUTHORIZATION_INFO` in subsequent requests to re-use the existing api:session.Session[]:
+You can then pass this `AUTHORIZATION_INFO` in subsequent requests to reuse the existing api:session.Session[]:
 
 .Sending the AUTHORIZATION_INFO header
 snippet::io.micronaut.docs.session.ShoppingControllerSpec[tags="add", indent=0]
@@ -100,7 +99,7 @@ snippet::io.micronaut.docs.session.ShoppingControllerSpec[tags="add", indent=0]
 
 == Using @SessionValue
 
-Rather than explicitly injecting the api:session.Session[] into a controller method you can instead use ann:session.annotation.SessionValue[]. For example:
+Rather than explicitly injecting the api:session.Session[] into a controller method, you can instead use ann:session.annotation.SessionValue[]. For example:
 
 snippet::io.micronaut.docs.session.ShoppingController[tags="view", indent=0,title="Using @SessionValue"]
 

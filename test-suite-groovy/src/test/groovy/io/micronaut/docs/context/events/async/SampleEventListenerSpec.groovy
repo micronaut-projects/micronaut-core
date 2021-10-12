@@ -12,18 +12,23 @@ class SampleEventListenerSpec extends Specification {
 
     void "test event listener is notified"() {
         given:
-        ApplicationContext context = ApplicationContext.run()
-        SampleEventEmitterBean emitter = context.getBean(SampleEventEmitterBean)
-        SampleEventListener listener = context.getBean(SampleEventListener)
-        assert listener.invocationCounter.get() == 0
+        def context = ApplicationContext.run()
+        def emitter = context.getBean(SampleEventEmitterBean)
+        def listener = context.getBean(SampleEventListener)
+
+        expect:
+        listener.invocationCounter.get() == 0
 
         when:
         emitter.publishSampleEvent()
 
         then:
-        new PollingConditions().eventually {
+        new PollingConditions(timeout: 5).eventually {
             listener.invocationCounter.get() == 1
         }
+
+        cleanup:
+        context.close()
     }
 }
 // end::class[]

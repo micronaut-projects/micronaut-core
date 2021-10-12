@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,13 @@
  */
 package io.micronaut.docs.context.annotation.primary
 
+import io.micronaut.context.annotation.Primary
+
 //tag::imports[]
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Requires;
-import javax.inject.Singleton;
+
+import io.micronaut.context.annotation.Requires
+import jakarta.inject.Singleton
+
 //end::imports[]
 
 @Requires(property = 'spec.name', value = 'primaryspec')

@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.beans;
 
 import io.micronaut.core.beans.exceptions.IntrospectionException;
@@ -23,7 +22,7 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import org.slf4j.Logger;
 
-import javax.annotation.Nonnull;
+import io.micronaut.core.annotation.NonNull;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -45,10 +44,19 @@ class DefaultBeanIntrospector implements BeanIntrospector {
     private static final Logger LOG = ClassUtils.getLogger(DefaultBeanIntrospector.class);
 
     private Map<String, BeanIntrospectionReference<Object>> introspectionMap;
+    private final ClassLoader classLoader;
 
-    @Nonnull
+    DefaultBeanIntrospector() {
+        this.classLoader = DefaultBeanIntrospector.class.getClassLoader();
+    }
+
+    DefaultBeanIntrospector(ClassLoader classLoader) {
+        this.classLoader = classLoader;
+    }
+
+    @NonNull
     @Override
-    public Collection<BeanIntrospection<Object>> findIntrospections(@Nonnull Predicate<? super BeanIntrospectionReference> filter) {
+    public Collection<BeanIntrospection<Object>> findIntrospections(@NonNull Predicate<? super BeanIntrospectionReference<?>> filter) {
         ArgumentUtils.requireNonNull("filter", filter);
         return getIntrospections()
                 .values()
@@ -58,9 +66,21 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                 .collect(Collectors.toList());
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    public <T> Optional<BeanIntrospection<T>> findIntrospection(@Nonnull Class<T> beanType) {
+    public Collection<Class<?>> findIntrospectedTypes(@NonNull Predicate<? super BeanIntrospectionReference<?>> filter) {
+        ArgumentUtils.requireNonNull("filter", filter);
+        return getIntrospections()
+                .values()
+                .stream()
+                .filter(filter)
+                .map(BeanIntrospectionReference::getBeanType)
+                .collect(Collectors.toSet());
+    }
+
+    @NonNull
+    @Override
+    public <T> Optional<BeanIntrospection<T>> findIntrospection(@NonNull Class<T> beanType) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         final BeanIntrospectionReference reference = getIntrospections().get(beanType.getName());
         try {
@@ -89,7 +109,7 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                 introspectionMap = this.introspectionMap;
                 if (introspectionMap == null) {
                     introspectionMap = new HashMap<>(30);
-                    final SoftServiceLoader<BeanIntrospectionReference> services = SoftServiceLoader.load(BeanIntrospectionReference.class);
+                    final SoftServiceLoader<BeanIntrospectionReference> services = SoftServiceLoader.load(BeanIntrospectionReference.class, classLoader);
 
                     for (ServiceDefinition<BeanIntrospectionReference> definition : services) {
                         if (definition.isPresent()) {

@@ -18,24 +18,27 @@ package io.micronaut.docs.http.server.netty.websocket
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.websocket.RxWebSocketClient
+import io.micronaut.websocket.WebSocketClient
+import reactor.core.publisher.Mono
+import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
-import javax.inject.Inject
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 
 class SimpleTextWebSocketSpec extends Specification {
 
+    @Retry
     void "test simple text websocket exchange"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.build('micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
+        EmbeddedServer embeddedServer = ApplicationContext.builder('micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
         PollingConditions conditions = new PollingConditions(timeout: 15    , delay: 0.5)
 
         when: "a websocket connection is established"
-        RxWebSocketClient wsClient = embeddedServer.applicationContext.createBean(RxWebSocketClient, embeddedServer.getURI())
-        ChatClientWebSocket fred = wsClient.connect(ChatClientWebSocket, "/chat/stuff/fred").blockingFirst()
-        ChatClientWebSocket bob = wsClient.connect(ChatClientWebSocket, [topic:"stuff", username:"bob"]).blockingFirst()
+        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
+        ChatClientWebSocket fred = wsClient.connect(ChatClientWebSocket, "/chat/stuff/fred").blockFirst()
+        ChatClientWebSocket bob = wsClient.connect(ChatClientWebSocket, [topic:"stuff", username:"bob"]).blockFirst()
 
         then:"The connection is valid"
         fred.session != null
@@ -77,7 +80,7 @@ class SimpleTextWebSocketSpec extends Specification {
             bob.replies.size() == 1
         }
         fred.sendAsync("foo").get() == 'foo'
-        fred.sendRx("bar").blockingGet() == 'bar'
+        Mono.from(fred.sendRx("bar")).block() == 'bar'
 
         when:
         bob.close()
@@ -104,6 +107,6 @@ class SimpleTextWebSocketSpec extends Specification {
     static class MyBean {
         @Inject
         @Client("http://localhost:8080")
-        RxWebSocketClient myClient
+        WebSocketClient myClient
     }
 }

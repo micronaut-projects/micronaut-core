@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,9 +18,8 @@ package io.micronaut.web.router.version.resolution;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.version.RoutesVersioningConfiguration;
+import jakarta.inject.Singleton;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -42,7 +41,6 @@ public class HeaderVersionResolver implements RequestVersionResolver {
      *
      * @param configuration A configuration to pick correct request header names.
      */
-    @Inject
     public HeaderVersionResolver(HeaderVersionResolverConfiguration configuration) {
         this.headerNames = configuration.getNames();
     }

@@ -20,9 +20,10 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 /**
@@ -36,16 +37,16 @@ class MaxHeaderSizeSpec extends Specification {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'micronaut.server.netty.maxHeaderSize':10
         ])
-        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        client.exchange(
+        Flux.from(client.exchange(
                 HttpRequest.GET('/max-header')
                 .header("X-Foo", "Foo" * 100)
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
-        def e = thrown(HttpClientResponseException)
+        HttpClientResponseException e = thrown()
         e.status == HttpStatus.REQUEST_ENTITY_TOO_LARGE
 
         cleanup:

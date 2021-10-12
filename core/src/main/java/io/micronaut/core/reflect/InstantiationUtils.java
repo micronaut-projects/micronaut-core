@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,7 +27,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
+import io.micronaut.core.annotation.NonNull;
 import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.function.Function;
@@ -40,7 +40,6 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 public class InstantiationUtils {
-
 
     /**
      * Try to instantiate the given class.
@@ -72,7 +71,7 @@ public class InstantiationUtils {
      * @return The instantiated instance or {@link Optional#empty()}
      * @throws InstantiationException When an error occurs
      */
-    public static @Nonnull <T> Optional<T> tryInstantiate(@Nonnull Class<T> type, Map propertiesMap, ConversionContext context) {
+    public static @NonNull <T> Optional<T> tryInstantiate(@NonNull Class<T> type, Map propertiesMap, ConversionContext context) {
         ArgumentUtils.requireNonNull("type", type);
         if (propertiesMap.isEmpty()) {
             return tryInstantiate(type);
@@ -135,7 +134,7 @@ public class InstantiationUtils {
      * @param <T>  The generic type
      * @return The instantiated instance or {@link Optional#empty()}
      */
-    public static @Nonnull <T> Optional<T> tryInstantiate(@Nonnull Class<T> type) {
+    public static @NonNull <T> Optional<T> tryInstantiate(@NonNull Class<T> type) {
         ArgumentUtils.requireNonNull("type", type);
         final Supplier<T> reflectionFallback = () -> {
             final Logger logger = ClassUtils.REFLECTION_LOGGER;
@@ -143,7 +142,7 @@ public class InstantiationUtils {
                 logger.debug("Cannot instantiate type [{}] without reflection. Attempting reflective instantiation", type);
             }
             try {
-                T bean = type.newInstance();
+                T bean = type.getDeclaredConstructor().newInstance();
                 if (type.isInstance(bean)) {
                     return bean;
                 }
@@ -181,7 +180,7 @@ public class InstantiationUtils {
      * @param <T>  The generic type
      * @return The instantiated instance or {@link Optional#empty()}
      */
-    public static @Nonnull <T> Optional<T> tryInstantiate(@Nonnull Constructor<T> type, Object... args) {
+    public static @NonNull <T> Optional<T> tryInstantiate(@NonNull Constructor<T> type, Object... args) {
         try {
             return Optional.of(type.newInstance(args));
         } catch (Throwable e) {
@@ -209,7 +208,38 @@ public class InstantiationUtils {
                     if (log.isDebugEnabled()) {
                         log.debug("Reflectively instantiating type: " + type);
                     }
-                    return type.newInstance();
+                    return type.getDeclaredConstructor().newInstance();
+                } catch (Throwable e) {
+                    throw new InstantiationException("Could not instantiate type [" + type.getName() + "]: " + e.getMessage(), e);
+                }
+            });
+        } catch (Throwable e) {
+            throw new InstantiationException("Could not instantiate type [" + type.getName() + "]: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Instantiate the given class rethrowing any exceptions as {@link InstantiationException}.
+     *
+     * @param type     The type
+     * @param argTypes The argument types
+     * @param args     The values of arguments
+     * @param <T>      The generic type
+     * @return The instantiated instance
+     * @throws InstantiationException When an error occurs
+     * @since 3.0.0
+     */
+    public static <T> T instantiate(Class<T> type, Class<?>[] argTypes, Object...args) {
+        try {
+            return BeanIntrospector.SHARED.findIntrospection(type).map(bi -> bi.instantiate(args)).orElseGet(() -> {
+                try {
+                    Logger log = ClassUtils.REFLECTION_LOGGER;
+                    if (log.isDebugEnabled()) {
+                        log.debug("Reflectively instantiating type: " + type);
+                    }
+                    final Constructor<T> declaredConstructor = type.getDeclaredConstructor(argTypes);
+                    declaredConstructor.setAccessible(true);
+                    return declaredConstructor.newInstance(args);
                 } catch (Throwable e) {
                     throw new InstantiationException("Could not instantiate type [" + type.getName() + "]: " + e.getMessage(), e);
                 }

@@ -1,0 +1,21 @@
+By default when you annotate a bean with a scope such as `@Singleton` the bean class and all interfaces it implements and super classes it extends from become injectable via `@Inject`.
+
+Consider the following example from the previous section on defining beans:
+
+snippet::io.micronaut.docs.inject.qualifiers.named.V8Engine[tags="class",indent=0]
+
+In the above case other classes in your application can choose to either inject the interface `Engine` or the concrete implementation `V8Engine`.
+
+If this is undesirable you can use the `typed` member of the ann:context.annotation.Bean[] annotation to limit the exposed types. For example:
+
+snippet::io.micronaut.docs.inject.typed.V8Engine[tags="class",indent=0]
+
+<1> `@Bean(typed=..)` is used to only allow injection the interface `Engine` and not the concrete type
+<2> The class must implement the class or interface defined by `typed` otherwise a compilation error will occur
+
+The following test demonstrates the behaviour of `typed` using programmatic lookup and the api:context.BeanContext[] API:
+
+snippet::io.micronaut.docs.inject.typed.EngineSpec[tags="class",indent=0]
+
+<1> Trying to lookup `V8Engine` throws a api:context.exceptions.NoSuchBeanException[]
+<2> Whilst looking up the `Engine` interface succeeds

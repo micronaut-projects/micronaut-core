@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,7 +17,6 @@ package io.micronaut.core.reflect;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.exception.InvocationException;
 import io.micronaut.core.util.StringUtils;
@@ -80,19 +79,6 @@ public class ReflectionUtils {
                 put(Long.class, long.class);
                 put(Short.class, short.class);
                 put(Void.class, void.class);
-            }
-        });
-
-    private static final Map<Class<?>, Integer> PRIMITIVE_BYTE_SIZES =
-        Collections.unmodifiableMap(new LinkedHashMap<Class<?>, Integer>() {
-            {
-                put(Byte.class, Byte.BYTES);
-                put(Character.class, Character.BYTES);
-                put(Double.class, Double.BYTES);
-                put(Float.class, Float.BYTES);
-                put(Integer.class, Integer.BYTES);
-                put(Long.class, Long.BYTES);
-                put(Short.class, Short.BYTES);
             }
         });
 
@@ -217,6 +203,7 @@ public class ReflectionUtils {
      * @param argumentTypes The argument types
      * @return An {@link Optional} contains the method or empty
      */
+    @Internal
     public static Optional<Method> findMethod(Class type, String name, Class... argumentTypes) {
         Class currentType = type;
         while (currentType != null) {
@@ -240,6 +227,7 @@ public class ReflectionUtils {
      * @return An {@link Optional} contains the method or empty
      */
     @UsedByGeneratedCode
+    @Internal
     public static Method getRequiredMethod(Class type, String name, Class... argumentTypes) {
         try {
             return type.getDeclaredMethod(name, argumentTypes);
@@ -293,6 +281,7 @@ public class ReflectionUtils {
      * @param name The name
      * @return An {@link Optional} contains the method or empty
      */
+    @Internal
     public static Field getRequiredField(Class type, String name) {
         try {
             return type.getDeclaredField(name);
@@ -309,6 +298,7 @@ public class ReflectionUtils {
      * @param name The field name
      * @return An {@link Optional} of field
      */
+    @Internal
     public static Optional<Field> findField(Class type, String name) {
         Optional<Field> declaredField = findDeclaredField(type, name);
         if (!declaredField.isPresent()) {
@@ -320,36 +310,6 @@ public class ReflectionUtils {
             }
         }
         return declaredField;
-    }
-
-    /**
-     * Finds a field in the type or super type.
-     *
-     * @param type  The type
-     * @param name  The field name
-     * @param value The value
-     */
-    public static void setFieldIfPossible(Class type, String name, Object value) {
-        Optional<Field> declaredField = findDeclaredField(type, name);
-        if (declaredField.isPresent()) {
-            Field field = declaredField.get();
-            Optional<?> converted = ConversionService.SHARED.convert(value, field.getType());
-            if (converted.isPresent()) {
-                field.setAccessible(true);
-                try {
-                    field.set(type, converted.get());
-                } catch (IllegalAccessException e) {
-                    // ignore
-                }
-            } else {
-                field.setAccessible(true);
-                try {
-                    field.set(type, null);
-                } catch (IllegalAccessException e) {
-                    // ignore
-                }
-            }
-        }
     }
 
     /**
@@ -429,7 +389,7 @@ public class ReflectionUtils {
         Stream<String> stringStream = Arrays.stream(argumentTypes).map(Class::getSimpleName);
         String argsAsText = stringStream.collect(Collectors.joining(","));
 
-        return new NoSuchMethodError("Required method " + name + "(" + argsAsText + ") not found for class: " + declaringType.getName() + ". Most likely cause of this error is that an unsupported or older version of a dependency is present on the classpath. Check your classpath, and ensure the incompatible classes are not present and/or recompile classes as necessary.");
+        return new NoSuchMethodError("Required method " + name + "(" + argsAsText + ") not found for class: " + declaringType.getName() + ". Most likely cause of this error is the method declaration is not annotated with @Executable. Alternatively check that there is not an unsupported or older version of a dependency present on the classpath. Check your classpath, and ensure the incompatible classes are not present and/or recompile classes as necessary.");
     }
 
     private static NoSuchMethodError newNoSuchMethodInternalError(Class declaringType, String name, Class[] argumentTypes) {

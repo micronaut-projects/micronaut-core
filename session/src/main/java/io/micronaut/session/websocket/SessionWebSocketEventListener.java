@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,10 +24,9 @@ import io.micronaut.session.SessionStore;
 import io.micronaut.websocket.event.WebSocketEvent;
 import io.micronaut.websocket.event.WebSocketMessageProcessedEvent;
 import io.micronaut.websocket.event.WebSocketSessionClosedEvent;
+import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.inject.Singleton;
 
 /**
  * Persists the session in the background on web socket events.
@@ -61,10 +60,8 @@ public class SessionWebSocketEventListener implements ApplicationEventListener<W
                 Session session = (Session) attributes;
                 if (session.isModified()) {
                     sessionStore.save(session).whenComplete((entries, throwable) -> {
-                        if (throwable != null) {
-                            if (LOG.isErrorEnabled()) {
-                                LOG.error("Error persisting session following WebSocket event: " + throwable.getMessage(), throwable);
-                            }
+                        if (throwable != null && LOG.isErrorEnabled()) {
+                            LOG.error("Error persisting session following WebSocket event: " + throwable.getMessage(), throwable);
                         }
                     });
                 }

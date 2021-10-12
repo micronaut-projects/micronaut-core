@@ -34,7 +34,7 @@ class YamlPropertySourceLoaderSpec extends Specification {
         serviceDefinition.isPresent() >> true
         serviceDefinition.load() >> new YamlPropertySourceLoader()
 
-        Environment env = new DefaultEnvironment(["test"] as String[]) {
+        Environment env = new DefaultEnvironment({ ["test"] }) {
             @Override
             protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
                 GroovyClassLoader gcl = new GroovyClassLoader()
@@ -82,12 +82,12 @@ dataSource:
         env.get("data-source.jmx-export", boolean).get() == true
     }
 
-    void "test datasources.default: {}"() {
+    void "test datasources default"() {
         def serviceDefinition = Mock(ServiceDefinition)
         serviceDefinition.isPresent() >> true
         serviceDefinition.load() >> new YamlPropertySourceLoader()
 
-        Environment env = new DefaultEnvironment(["test"] as String[]) {
+        Environment env = new DefaultEnvironment({ ["test"] }) {
             @Override
             protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
                 GroovyClassLoader gcl = new GroovyClassLoader()
@@ -129,5 +129,14 @@ datasources.default: {}
 
         expect:
         ctx.containsProperty("other-config")
+    }
+
+    void "test properties with spaces"() {
+        ApplicationContext ctx = ApplicationContext.run("spaces")
+
+        expect:
+        ctx.containsProperties("test")
+        ctx.containsProperty("test.Key with space")
+        ctx.containsProperty("test.key-with-space")
     }
 }

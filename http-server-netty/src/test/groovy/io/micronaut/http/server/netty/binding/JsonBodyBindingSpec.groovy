@@ -1,123 +1,132 @@
-/*
- * Copyright 2017-2019 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.micronaut.http.server.netty.binding
 
+import io.micronaut.core.async.annotation.SingleResult
+import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.core.JsonParseException
 import groovy.json.JsonSlurper
-import io.reactivex.Flowable
-import io.reactivex.Single
-import io.reactivex.schedulers.Schedulers
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
-import io.micronaut.http.annotation.Error
-import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.http.hateoas.Link
-import io.micronaut.http.hateoas.JsonError
-import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.http.hateoas.JsonError
+import io.micronaut.http.hateoas.Link
+import io.micronaut.http.server.netty.AbstractMicronautSpec
 import org.reactivestreams.Publisher
-import reactor.core.publisher.Mono
+import reactor.core.publisher.Flux
+import reactor.core.scheduler.Schedulers
+import spock.lang.Issue
 
 import java.util.concurrent.CompletableFuture
 
-/**
- * Created by graemerocher on 25/08/2017.
- */
 class JsonBodyBindingSpec extends AbstractMicronautSpec {
-    void "test simple string-based body parsing with incomplete JSON"() {
+
+    void "test JSON is not parsed when the body is a raw body type"() {
         when:
-        def json = '{"title":"The Stand"'
-        rxClient.exchange(
+        String json = '{"title":"The Stand"'
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.POST('/json/string', json), String
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
-        def e = thrown(HttpClientResponseException)
-        e.message == """Invalid JSON: Unexpected end-of-input
- at [Source: UNKNOWN; line: 1, column: 21]"""
-        e.response.status == HttpStatus.BAD_REQUEST
+        response.code() == HttpStatus.OK.code
+        response.body() == 'Body: {"title":"The Stand"'
+    }
 
+    void "test JSON is not parsed when the body is a raw body type in a request argument"() {
         when:
-        def body = e.response.getBody(String).orElse(null)
-        def result = new JsonSlurper().parseText(body)
+        String json = '{"title":"The Stand"'
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
+                HttpRequest.POST('/json/request-string', json), String
+        )).blockFirst()
 
         then:
-        result['_links'].self.href == '/json/string'
-        result.message.startsWith('Invalid JSON')
+        response.code() == HttpStatus.OK.code
+        response.body() == 'Body: {"title":"The Stand"'
     }
 
     void "test parse body into parameters if no @Body specified"() {
         when:
-        def json = '{"name":"Fred", "age":10}'
-        def response = rxClient.exchange(
+        String json = '{"name":"Fred", "age":10}'
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.POST('/json/params', json), String
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
         response.body() == "Body: Foo(Fred, 10)"
     }
 
-    void "test simple string-based body parsing with invalid JSON"() {
+    void "test map-based body parsing with invalid JSON"() {
 
         when:
-        def json = '{"title":The Stand}'
-        rxClient.exchange(
-                HttpRequest.POST('/json/string', json), String
-        ).blockingFirst()
+        String json = '{"title":The Stand}'
+        Flux.from(rxClient.exchange(
+                HttpRequest.POST('/json/map', json), String
+        )).blockFirst()
 
         then:
-        def e = thrown(HttpClientResponseException)
+        HttpClientResponseException e = thrown()
         e.message == """Invalid JSON: Unexpected character ('T' (code 84)): expected a valid value (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
  at [Source: UNKNOWN; line: 1, column: 11]"""
         e.response.status == HttpStatus.BAD_REQUEST
 
         when:
-        def response = e.response
-        def body = e.response.getBody(String).orElse(null)
+        HttpResponse<?> response = e.response
+        String body = e.response.getBody(String).orElse(null)
         def result = new JsonSlurper().parseText(body)
 
         then:
         response.code() == HttpStatus.BAD_REQUEST.code
         response.headers.get(HttpHeaders.CONTENT_TYPE) == io.micronaut.http.MediaType.APPLICATION_JSON
-        result['_links'].self.href == '/json/string'
+        result['_links'].self.href == '/json/map'
         result.message.startsWith('Invalid JSON')
     }
 
     void "test simple map body parsing"() {
         when:
-        def json = '{"title":"The Stand"}'
-        def response = rxClient.exchange(
+        String json = '{"title":"The Stand"}'
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.POST('/json/map', json), String
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
         response.body() == "Body: [title:The Stand]"
     }
 
-    void  "test simple string-based body parsing"() {
+    void "test simple string-based body parsing"() {
         when:
-        def json = '{"title":"The Stand"}'
-        def response = rxClient.exchange(
+        String json = '{"title":"The Stand"}'
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.POST('/json/string', json), String
-        ).blockingFirst()
+        )).blockFirst()
+
+        then:
+        response.body() == "Body: $json"
+    }
+
+    void "test binding to part of body with @Body(name)"() {
+        when:
+        String json = '{"title":"The Stand"}'
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
+                HttpRequest.POST('/json/body-title', json), String
+        )).blockFirst()
+
+        then:
+        response.body() == "Body Title: The Stand"
+    }
+
+    void  "test simple string-based body parsing with request argument"() {
+        when:
+        String json = '{"title":"The Stand"}'
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
+                HttpRequest.POST('/json/request-string', json), String
+        )).blockFirst()
 
         then:
         response.body() == "Body: $json"
@@ -125,22 +134,22 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
     void "test simple string-based body parsing with invalid mime type"() {
         when:
-        def json = '{"title":"The Stand"}'
-        rxClient.exchange(
+        String json = '{"title":"The Stand"}'
+        Flux.from(rxClient.exchange(
                 HttpRequest.POST('/json/map', json).contentType(io.micronaut.http.MediaType.APPLICATION_ATOM_XML_TYPE), String
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
-        def e = thrown(HttpClientResponseException)
+        HttpClientResponseException e = thrown()
         e.status == HttpStatus.UNSUPPORTED_MEDIA_TYPE
     }
 
     void "test simple POGO body parsing"() {
         when:
-        def json = '{"name":"Fred", "age":10}'
-        def response = rxClient.exchange(
+        String json = '{"name":"Fred", "age":10}'
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.POST('/json/object', json), String
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
         response.body() == "Body: Foo(Fred, 10)"
@@ -148,10 +157,10 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
     void "test simple POGO body parse and return"() {
         when:
-        def json = '{"name":"Fred","age":10}'
-        def response = rxClient.exchange(
+        String json = '{"name":"Fred","age":10}'
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.POST('/json/object-to-object', json), String
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
         response.body() == json
@@ -159,10 +168,10 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
     void "test array POGO body parsing"() {
         when:
-        def json = '[{"name":"Fred", "age":10},{"name":"Barney", "age":11}]'
-        def response = rxClient.exchange(
+        String json = '[{"name":"Fred", "age":10},{"name":"Barney", "age":11}]'
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.POST('/json/array', json), String
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
         response.body() == "Body: Foo(Fred, 10),Foo(Barney, 11)"
@@ -170,10 +179,10 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
     void "test array POGO body parsing and return"() {
         when:
-        def json = '[{"name":"Fred","age":10},{"name":"Barney","age":11}]'
-        def response = rxClient.exchange(
+        String json = '[{"name":"Fred","age":10},{"name":"Barney","age":11}]'
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.POST('/json/array-to-array', json), String
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
         response.body() == json
@@ -181,10 +190,10 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
     void "test list POGO body parsing"() {
         when:
-        def json = '[{"name":"Fred", "age":10},{"name":"Barney", "age":11}]'
-        def response = rxClient.exchange(
+        String json = '[{"name":"Fred", "age":10},{"name":"Barney", "age":11}]'
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.POST('/json/list', json), String
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
         response.body() == "Body: Foo(Fred, 10),Foo(Barney, 11)"
@@ -192,10 +201,10 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
     void "test future argument handling with string"() {
         when:
-        def json = '{"name":"Fred","age":10}'
-        def response = rxClient.exchange(
+        String json = '{"name":"Fred","age":10}'
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.POST('/json/future', json), String
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
         response.body() == "Body: $json".toString()
@@ -203,10 +212,10 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
     void "test future argument handling with map"() {
         when:
-        def json = '{"name":"Fred","age":10}'
-        def response = rxClient.exchange(
+        String json = '{"name":"Fred","age":10}'
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.POST('/json/future-map', json), String
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
         response.body() == "Body: [name:Fred, age:10]".toString()
@@ -214,10 +223,10 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
     void "test future argument handling with POGO"() {
         when:
-        def json = '{"name":"Fred","age":10}'
-        def response = rxClient.exchange(
+        String json = '{"name":"Fred","age":10}'
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.POST('/json/future-object', json), String
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
         response.body() == "Body: Foo(Fred, 10)".toString()
@@ -225,33 +234,21 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
     void "test publisher argument handling with POGO"() {
         when:
-        def json = '{"name":"Fred","age":10}'
-        def response = rxClient.exchange(
+        String json = '{"name":"Fred","age":10}'
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.POST('/json/publisher-object', json), String
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
         response.body() == "[Foo(Fred, 10)]".toString()
     }
 
-    void "test mono argument handling"() {
-        when:
-        def json = '{"message":"foo"}'
-        def response = rxClient.exchange(
-                HttpRequest.POST('/json/mono', json), String
-        ).blockingFirst()
-
-        then:
-        response.body() == "$json".toString()
-    }
-
-
     void "test singe argument handling"() {
         when:
-        def json = '{"message":"foo"}'
-        def response = rxClient.exchange(
+        String json = '{"message":"foo"}'
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.POST('/json/single', json), String
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
         response.body() == "$json".toString()
@@ -259,10 +256,10 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
     void "test request generic type binding"() {
         when:
-        def json = '{"name":"Fred","age":10}'
-        def response = rxClient.exchange(
+        String json = '{"name":"Fred","age":10}'
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.POST('/json/request-generic', json), String
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
         response.body() == "Foo(Fred, 10)".toString()
@@ -270,26 +267,38 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
     void "test request generic type no body"() {
         when:
-        def json = ''
-        def response = rxClient.exchange(
+        String json = ''
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.POST('/json/request-generic', json), String
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
-        def ex = thrown(HttpClientResponseException)
+        HttpClientResponseException ex = thrown()
         ex.response.code() == HttpStatus.BAD_REQUEST.code
-        ex.message.contains("Required argument [HttpRequest request] not specified")
+        ex.response.getBody(Map).get()._embedded.errors[0].message.contains("Required argument [HttpRequest request] not specified")
     }
 
     void "test request generic type conversion error"() {
         when:
-        def json = '[1,2,3]'
-        def response = rxClient.exchange(
+        String json = '[1,2,3]'
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
                 HttpRequest.POST('/json/request-generic', json), String
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
         response.body() == "not found"
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/5088")
+    void "test deserializing a wrapper of list of pojos"() {
+        when:
+        String json = '[{"name":"Joe"},{"name":"Sally"}]'
+        HttpResponse<String> response = Flux.from(rxClient.exchange(
+                HttpRequest.POST('/json/deserialize-listwrapper', json), String
+        )).blockFirst()
+
+        then:
+        response.body() == '["Joe","Sally"]'
     }
 
     @Controller(value = "/json", produces = io.micronaut.http.MediaType.APPLICATION_JSON)
@@ -303,6 +312,16 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         @Post("/string")
         String string(@Body String text) {
             "Body: ${text}"
+        }
+
+        @Post("/body-title")
+        String bodyNamed(@Body("title") String text) {
+            "Body Title: ${text}"
+        }
+
+        @Post("/request-string")
+        String requestString(HttpRequest<String> req) {
+            "Body: ${req.body.orElse("empty")}"
         }
 
         @Post("/map")
@@ -337,15 +356,10 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
             "Body: $foo"
         }
 
-        @Post("/mono")
-        Mono<String> mono(@Body Mono<String> message) {
-            message
-        }
-
         @Post("/single")
-        Single<String> single(@Body Single<String> message) {
+        @SingleResult
+        Publisher<String> single(@Body Publisher<String> message) {
             message
-
         }
 
         @Post("/future")
@@ -371,9 +385,9 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         }
 
         @Post("/publisher-object")
-        Publisher<String> publisherObject(@Body Flowable<Foo> publisher) {
-            return publisher
-                    .subscribeOn(Schedulers.io())
+        Publisher<String> publisherObject(@Body Publisher<Foo> publisher) {
+            return Flux.from(publisher)
+                    .subscribeOn(Schedulers.boundedElastic())
                     .map({ Foo foo ->
                         foo.toString()
             })
@@ -382,6 +396,11 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         @Post("/request-generic")
         String requestGeneric(HttpRequest<Foo> request) {
             return request.getBody().map({ foo -> foo.toString()}).orElse("not found")
+        }
+
+        @Post("/deserialize-listwrapper")
+        List<String> requestListWrapper(@Body MyReqBody myReqBody) {
+            return myReqBody.items*.name
         }
 
         @Error(JsonParseException)
@@ -402,5 +421,25 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         String toString() {
             "Foo($name, $age)"
         }
+    }
+
+    @Introspected
+    static class MyReqBody {
+
+        private final List<MyItem> items
+
+        @JsonCreator
+        MyReqBody(final List<MyItem> items) {
+            this.items = items
+        }
+
+        List<MyItem> getItems() {
+            items
+        }
+    }
+
+    @Introspected
+    static class MyItem {
+        String name
     }
 }

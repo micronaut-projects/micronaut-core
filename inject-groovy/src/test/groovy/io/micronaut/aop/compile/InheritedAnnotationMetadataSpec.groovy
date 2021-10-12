@@ -15,11 +15,12 @@
  */
 package io.micronaut.aop.compile
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Blocking
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
+import io.micronaut.inject.writer.BeanDefinitionWriter
 
 /**
  * @author graemerocher
@@ -28,15 +29,15 @@ import io.micronaut.inject.writer.BeanDefinitionVisitor
 class InheritedAnnotationMetadataSpec extends AbstractBeanDefinitionSpec {
     void "test that annotation metadata is inherited from overridden methods for introduction advice"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
-package test;
+        BeanDefinition beanDefinition = buildBeanDefinition('inheritmetadatatest1.MyBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package inheritmetadatatest1;
 
 import io.micronaut.aop.introduction.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
 
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 interface MyBean extends MyInterface {
     @Override
     public String someMethod();
@@ -59,15 +60,15 @@ interface MyInterface {
 
     void "test that annotation metadata is inherited from overridden methods for around advice"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.$MyBean2Definition$Intercepted', '''
-package test;
+        BeanDefinition beanDefinition = buildBeanDefinition('inheritmetadatatest2.$MyBean2' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
+package inheritmetadatatest2;
 
 import io.micronaut.aop.interceptors.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
 
 @Mutating("someVal")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean2 implements MyInterface2 {
 
     private String myValue;
@@ -99,15 +100,15 @@ interface MyInterface2 {
 
     void "test that a bean definition is not created for an abstract class"() {
         when:
-        ApplicationContext ctx = buildContext('test.$BaseServiceDefinition$Intercepted', '''
-package test;
+        ApplicationContext ctx = buildContext('''
+package inheritmetadatatest3;
 
 import io.micronaut.aop.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
 import io.micronaut.core.order.Ordered;
 import java.lang.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 interface ContractService {
 
@@ -118,7 +119,12 @@ interface ContractService {
 abstract class BaseService {
 
     @SomeAnnot
-    public void baseServiceMethod() {}
+    void baseServiceMethod() {}
+}
+
+@SomeAnnot
+abstract class BaseAnnotatedService {
+
 }
 
 @Singleton
@@ -132,7 +138,7 @@ class Service extends BaseService implements ContractService {
 
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
-@Target([ElementType.METHOD, ElementType.PARAMETER])
+@Target([ElementType.TYPE, ElementType.METHOD, ElementType.PARAMETER])
 @Around
 @Type(SomeInterceptor.class)
 @interface SomeAnnot {}
@@ -148,11 +154,23 @@ class SomeInterceptor implements MethodInterceptor<Object, Object>, Ordered {
 
 ''')
         then:
-        Class clazz = ctx.classLoader.loadClass("test.ContractService")
+        Class clazz = ctx.classLoader.loadClass("inheritmetadatatest3.ContractService")
         ctx.getBean(clazz)
 
         when:
-        ctx.classLoader.loadClass("test.\$BaseServiceDefinition\$Intercepted")
+        ctx.classLoader.loadClass("inheritmetadatatest3.\$BaseService" + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX)
+
+        then:
+        thrown(ClassNotFoundException)
+
+        when:
+        ctx.classLoader.loadClass("inheritmetadatatest3.\$BaseService" + BeanDefinitionWriter.CLASS_SUFFIX)
+
+        then:
+        thrown(ClassNotFoundException)
+
+        when:
+        ctx.classLoader.loadClass("inheritmetadatatest3.\$BaseAnnotatedService" + BeanDefinitionWriter.CLASS_SUFFIX)
 
         then:
         thrown(ClassNotFoundException)

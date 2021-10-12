@@ -15,15 +15,15 @@
  */
 package io.micronaut.http.server.netty.binding
 
-import io.netty.handler.codec.http.DefaultFullHttpResponse
-import io.netty.handler.codec.http.HttpResponseStatus
-import io.netty.handler.codec.http.HttpVersion
 import io.micronaut.core.convert.DefaultConversionService
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.cookie.Cookie
 import io.micronaut.http.netty.NettyMutableHttpResponse
+import io.netty.handler.codec.http.DefaultFullHttpResponse
+import io.netty.handler.codec.http.HttpResponseStatus
+import io.netty.handler.codec.http.HttpVersion
 import spock.lang.Specification
 
 import java.time.Duration
@@ -84,5 +84,16 @@ class NettyHttpResponseSpec extends Specification {
         where:
         status        | header
         HttpStatus.OK | HttpHeaders.SET_COOKIE
+    }
+
+    void "test multiple cookies"() {
+        given:
+        DefaultFullHttpResponse nettyResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        MutableHttpResponse response = new NettyMutableHttpResponse(nettyResponse, new DefaultConversionService())
+
+        response.cookies([Cookie.of("a", "b"), Cookie.of("c", "d")] as Set)
+
+        expect:
+        response.headers.getAll("Set-Cookie").size() == 2
     }
 }

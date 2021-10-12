@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@ import com.fasterxml.jackson.annotation.JsonView
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 
 @Controller("/jsonview")
 class JsonViewController {
@@ -48,4 +50,21 @@ class JsonViewController {
         return HttpResponse.ok(TEST_MODEL)
     }
 
+    @JsonView(Views.Public)
+    @Get("/reactive")
+    Flux<TestModel> publicReactiveView() {
+        return Flux.just(TEST_MODEL)
+    }
+
+    @JsonView(Views.Public)
+    @Get("/reactive/single")
+    Mono<TestModel> publicSingleView() {
+        return Mono.just(TEST_MODEL)
+    }
+
+    @JsonView(Views.Public)
+    @Get("/reactive/multiple")
+    Flux<TestModel> publicReactiveViewMultiple() {
+        return Flux.just(TEST_MODEL, TEST_MODEL)
+    }
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,18 +15,15 @@
  */
 package io.micronaut.retry.annotation;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
-import io.micronaut.aop.Around;
 import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.context.annotation.Type;
-import io.micronaut.retry.intercept.DefaultRetryInterceptor;
 
 import javax.validation.constraints.Digits;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Variation of {@link Retryable} that implements the Circuit Breaker pattern. Has higher overhead than
@@ -38,8 +35,7 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE, ElementType.ANNOTATION_TYPE})
-@Around
-@Type(DefaultRetryInterceptor.class)
+@Retryable
 public @interface CircuitBreaker {
 
     int MAX_RETRY_ATTEMPTS = 4;
@@ -92,4 +88,11 @@ public @interface CircuitBreaker {
      * @return The {@link java.time.Duration} of time before reset
      */
     String reset() default "20s";
+
+    /**
+     * @return The retry predicate class to use instead of {@link Retryable#includes} and {@link Retryable#excludes}
+     * (defaults to none)
+     */
+    @AliasFor(annotation = Retryable.class, member = "predicate")
+    Class<? extends RetryPredicate> predicate() default DefaultRetryPredicate.class;
 }

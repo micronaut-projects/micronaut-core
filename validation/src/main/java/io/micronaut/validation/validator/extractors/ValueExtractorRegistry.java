@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,8 @@
  */
 package io.micronaut.validation.validator.extractors;
 
-import javax.annotation.Nonnull;
+import io.micronaut.core.annotation.NonNull;
+
 import javax.validation.ValidationException;
 import javax.validation.valueextraction.ValueExtractor;
 import java.util.Optional;
@@ -33,9 +34,9 @@ public interface ValueExtractorRegistry {
      * @param <T> The target type
      * @return The extractor
      */
-    @Nonnull
+    @NonNull
     <T> Optional<ValueExtractor<T>> findValueExtractor(
-            @Nonnull Class<T> targetType);
+            @NonNull Class<T> targetType);
 
     /**
      * Finds a concrete {@link ValueExtractor} without searching the hierarchy.
@@ -43,9 +44,9 @@ public interface ValueExtractorRegistry {
      * @param <T> The target type
      * @return The extractor
      */
-    @Nonnull
+    @NonNull
     <T> Optional<ValueExtractor<T>> findUnwrapValueExtractor(
-            @Nonnull Class<T> targetType);
+            @NonNull Class<T> targetType);
 
     /**
      * Gets a a {@link ValueExtractor} for the given type.
@@ -54,9 +55,9 @@ public interface ValueExtractorRegistry {
      * @return The extractor
      * @throws ValidationException if no extractor is present
      */
-    @Nonnull
+    @NonNull
     default <T> ValueExtractor<T> getValueExtractor(
-            @Nonnull Class<T> targetType) {
+            @NonNull Class<T> targetType) {
         return findValueExtractor(targetType)
                 .orElseThrow(() -> new ValidationException("No value extractor for target type [" + targetType + "]"));
     }

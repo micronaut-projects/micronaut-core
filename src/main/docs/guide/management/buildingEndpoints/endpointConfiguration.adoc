@@ -11,18 +11,18 @@ class FooEndpoint {
 }
 ----
 
-By default the endpoint will be enabled. To disable the endpoint, set `endpoints.foo.enabled` to false. If `endpoints.foo.enabled` is not set at all and `endpoints.all.enabled` is set to false, the endpoint will be disabled.
+By default the endpoint is enabled. To disable it, set `endpoints.foo.enabled` to false. If `endpoints.foo.enabled` is not set and `endpoints.all.enabled` is `false`, the endpoint will be disabled.
 
-The configuration values for the endpoint override the ones for `all`. If `endpoints.foo.enabled` is explicitly set to `true` and `endpoints.all.enabled` is explicitly set to `false`, the endpoint will be enabled.
+The configuration values for the endpoint override those for `all`. If `endpoints.foo.enabled` is `true` and `endpoints.all.enabled` is `false`, the endpoint will be enabled.
 
 For all endpoints, the following configuration values can be set.
 
 [source,yaml]
 ----
 endpoints:
-    <any endpoint id>:
-        enabled: Boolean
-        sensitive: Boolean
+  <any endpoint id>:
+    enabled: Boolean
+    sensitive: Boolean
 ----
 
 NOTE: The base path for all endpoints is `/` by default. If you prefer the endpoints to be available under a different base path, configure `endpoints.all.path`. For example, if the value is set to `/endpoints`, the foo endpoint will be accessible at `/endpoints/foo`.

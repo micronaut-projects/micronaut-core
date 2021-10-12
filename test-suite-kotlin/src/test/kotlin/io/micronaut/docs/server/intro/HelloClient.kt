@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,11 @@
 package io.micronaut.docs.server.intro
 
 // tag::imports[]
+import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
-import io.reactivex.Single
+import io.micronaut.core.async.annotation.SingleResult
+import org.reactivestreams.Publisher
 // end::imports[]
 
 /**
@@ -29,7 +31,8 @@ import io.reactivex.Single
 @Client("/hello") // <1>
 interface HelloClient {
 
-    @Get // <2>
-    fun hello(): Single<String>  // <3>
+    @Get(consumes = [MediaType.TEXT_PLAIN]) // <2>
+    @SingleResult
+    fun hello(): Publisher<String>  // <3>
 }
 // end::class[]

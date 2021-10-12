@@ -16,14 +16,40 @@
 package io.micronaut.visitors
 
 import io.micronaut.http.annotation.Get
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.PropertyElement
+import spock.lang.IgnoreIf
 import spock.lang.Specification
+import spock.util.environment.Jvm
 
 import javax.annotation.Nullable
 import javax.validation.constraints.NotBlank
 
 class PropertyElementSpec extends AbstractTypeElementSpec {
+    @IgnoreIf({ !jvm.isJava14Compatible() })
+    void 'test bean properties work for records'() {
+        given:
+        ClassElement classElement = buildClassElement('''
+package test;
 
+record Book( @javax.validation.constraints.NotBlank String title, int pages) {}
+''')
+        def beanProperties = classElement.getBeanProperties()
+        def titleProp = beanProperties.find { it.name == 'title' }
+        expect:
+        classElement.isRecord()
+        beanProperties.size() == 2
+        titleProp != null
+        titleProp.type.name == String.name
+        titleProp.hasAnnotation(NotBlank)
+        beanProperties.every { it.readOnly }
+    }
+
+
+    // Java 9+ doesn't allow resolving elements was the compiler
+    // is finished being used so this test cannot be made to work beyond Java 8 the way it is currently written
+    @IgnoreIf({ Jvm.current.isJava9Compatible() })
     void "test simple bean properties"() {
         buildBeanDefinition('test.TestController', '''
 package test;
@@ -51,7 +77,7 @@ public class TestController {
     /**
      * The age
      */
-    @Get("/getMethod/{person}")
+    @Get("/getMethod/{age}")
     public int getAge( @javax.validation.constraints.NotBlank int age) {
         return age;
     }
@@ -100,7 +126,7 @@ public class TestController {
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController<T extends CharSequence> {
@@ -138,7 +164,7 @@ public class TestController<T extends CharSequence> {
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController {

@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,12 +16,14 @@
 package io.micronaut.management.endpoint.processors;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.LifeCycle;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.async.subscriber.Completable;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.uri.UriTemplate;
@@ -44,7 +46,8 @@ import java.util.regex.Pattern;
  * @author Graeme Rocher
  * @since 1.0
  */
-abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Endpoint>, Completable {
+@Internal
+abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Endpoint>, LifeCycle<AbstractEndpointRouteBuilder> {
 
     private static final Pattern ENDPOINT_ID_PATTERN = Pattern.compile("\\w+");
 
@@ -55,9 +58,9 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
     private final EndpointDefaultConfiguration endpointDefaultConfiguration;
 
     /**
-     * @param applicationContext The application context
-     * @param uriNamingStrategy  The URI naming strategy
-     * @param conversionService  The conversion service
+     * @param applicationContext           The application context
+     * @param uriNamingStrategy            The URI naming strategy
+     * @param conversionService            The conversion service
      * @param endpointDefaultConfiguration Endpoints default Configuration
      */
     AbstractEndpointRouteBuilder(ApplicationContext applicationContext,
@@ -79,15 +82,29 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
      *
      * @param method The {@link ExecutableMethod}
      * @param id     The route id
+     * @param port   The port
      */
-    protected abstract void registerRoute(ExecutableMethod<?, ?> method, String id);
+    protected abstract void registerRoute(ExecutableMethod<?, ?> method, String id, @Nullable Integer port);
+
+    @NonNull
+    @Override
+    public AbstractEndpointRouteBuilder start() {
+        return this;
+    }
 
     /**
      * Clears endpoint ids information.
      */
+    @NonNull
     @Override
-    public final void onComplete() {
+    public AbstractEndpointRouteBuilder stop() {
         endpointIds.clear();
+        return this;
+    }
+
+    @Override
+    public boolean isRunning() {
+        return true;
     }
 
     /**
@@ -99,13 +116,8 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
         Class<?> declaringType = method.getDeclaringType();
         if (method.hasStereotype(getSupportedAnnotation())) {
             Optional<String> endPointId = resolveActiveEndPointId(declaringType);
-            endPointId.ifPresent(id -> {
-                ClassLoadingReporter.reportBeanPresent(method.getReturnType().getType());
-                for (Class argumentType : method.getArgumentTypes()) {
-                    ClassLoadingReporter.reportBeanPresent(argumentType);
-                }
-                registerRoute(method, id);
-            });
+            final Integer port = endpointDefaultConfiguration.getPort().orElse(null);
+            endPointId.ifPresent(id -> registerRoute(method, id, port));
         }
     }
 

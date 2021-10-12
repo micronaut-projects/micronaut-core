@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,11 +16,12 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.netty.stream.StreamedHttpMessage;
 import io.micronaut.core.async.processor.SingleSubscriberProcessor;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
+import io.micronaut.http.netty.stream.StreamedHttpMessage;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.buffer.ByteBufHolder;
+import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Subscriber;
 
 import java.util.concurrent.atomic.AtomicLong;
@@ -40,7 +41,6 @@ public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberPr
     protected final long requestMaxSize;
     protected final AtomicLong receivedLength = new AtomicLong();
     protected final HttpServerConfiguration configuration;
-
 
     /**
      * @param nettyHttpRequest The {@link NettyHttpRequest}
@@ -71,9 +71,9 @@ public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberPr
         long receivedLength = this.receivedLength.addAndGet(message.content().readableBytes());
 
         if (advertisedLength > requestMaxSize) {
-            fireExceedsLength(advertisedLength, requestMaxSize);
+            fireExceedsLength(advertisedLength, requestMaxSize, message);
         } else if (receivedLength > requestMaxSize) {
-            fireExceedsLength(receivedLength, requestMaxSize);
+            fireExceedsLength(receivedLength, requestMaxSize, message);
         } else {
             onData(message);
         }
@@ -82,11 +82,13 @@ public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberPr
     /**
      * @param receivedLength The length of the content received
      * @param expected The expected length of the content
+     * @param message The message to release
      */
-    protected void fireExceedsLength(long receivedLength, long expected) {
+    protected void fireExceedsLength(long receivedLength, long expected, ByteBufHolder message) {
         try {
             onError(new ContentLengthExceededException(expected, receivedLength));
         } finally {
+            ReferenceCountUtil.safeRelease(message);
             parentSubscription.cancel();
         }
     }

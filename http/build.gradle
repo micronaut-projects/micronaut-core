@@ -1,10 +1,33 @@
-dependencies {
-    compile project(":inject")
-    compileOnly project(":inject-java")
-    compileOnly project(":graal")
+plugins {
+    id "org.jetbrains.kotlin.jvm"
+}
 
-    testCompile project(":inject-groovy")
+dependencies {
+    annotationProcessor project(":inject-java")
+    annotationProcessor project(":graal")
+    api project(":inject")
+    api project(":core-reactive")
+    implementation libs.managed.reactor
+    compileOnly libs.kotlinx.coroutines.core
+    compileOnly libs.kotlinx.coroutines.reactor
+
+    compileOnly libs.managed.jackson.annotations
+
+    testCompileOnly project(":inject-groovy")
+    testAnnotationProcessor project(":inject-java")
+    testImplementation project(":inject")
+    testImplementation project(":runtime")
+}
+
+compileKotlin {
+    kotlinOptions.jvmTarget = "1.8"
 }
 
 //compileJava.options.fork = true
 //compileJava.options.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
+
+spotless {
+    java {
+        targetExclude '**/io/micronaut/http/uri/QueryStringDecoder.java'
+    }
+}

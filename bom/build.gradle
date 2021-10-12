@@ -1,83 +1,133 @@
+import io.micronaut.build.internal.pom.VersionCatalogConverter
+import org.gradle.api.plugins.catalog.CatalogPluginExtension
+import org.gradle.api.plugins.catalog.VersionCatalogPlugin
+
+plugins {
+    id 'java-platform'
+    id 'version-catalog'
+    id 'maven-publish'
+    id 'io.micronaut.build.internal.publishing'
+}
+
+group projectGroupId
+version projectVersion
+
+def excludedProjects = [
+        "benchmarks",
+        "inject-test-utils",
+        "test-suite",
+        "test-suite-groovy",
+        "test-suite-helper",
+        "test-suite-kotlin",
+        "test-utils"
+]
+
+def libsCatalog = project.extensions.findByType(VersionCatalogsExtension).named("libs")
+
+// This map defines the names of the properties found in the POM file
+// which cannot be directly inferred from the version name in the catalog.
+// This is a backwards compatibility fix.
+def legacyVersionNames = [
+        'jakarta.annotation.api': 'jakarta.annotation-api',
+        'javax.annotation.api': 'javax.annotation-api',
+        'methvin.directory.watcher': 'methvin.directory-watcher',
+        'paho.v3': 'pahov3',
+        'paho.v5': 'pahov5',
+        'graal.sdk': 'graalSdk',
+        'neo4j.java.driver': 'neo4j.bolt',
+]
+
+String toPropertyName(String alias) {
+    alias.split("(?=[A-Z])").collect { it.toLowerCase(Locale.US) }.join("-").replace((char)'-', (char)'.')
+}
+
+components.javaPlatform.addVariantsFromConfiguration(
+        configurations.getByName(VersionCatalogPlugin.VERSION_CATALOG_ELEMENTS)
+) { details ->
+    details.mapToMavenScope("compile")
+    details.mapToOptional()
+}
+
+def modelConverter = new VersionCatalogConverter(
+        file("../gradle/libs.versions.toml"),
+        project.extensions.findByType(CatalogPluginExtension)
+)
+
+tasks.named("generateCatalogAsToml") {
+    modelConverter.populateModel()
+}
+
 publishing {
     publications {
         maven(MavenPublication) {
-            pom.withXml {
-                def xml = asNode()
-
-                def profiles = new Properties()
-                profiles.load(new StringReader(new File("$projectDir/profiles.properties").text))
-
-                boolean micronautSnapshot = rootProject.version.toString().endsWith("-SNAPSHOT")
-                
-                xml.children().last() + {
-                    def mkp = delegate
-
-                    mkp.properties {
-                        for(dep in dependencyVersions) {
-                            def v = dep.value.version
-                            if(!v.toString().endsWith("-SNAPSHOT") || micronautSnapshot) {
-                                mkp."${dep.key}.version"(v)
-                            }
-                        }
-                    }
-
-                    mkp.dependencyManagement {
-                        mkp.dependencies {
-
-                            for (profile in profiles) {
-                                mkp.dependency {
-                                    mkp.groupId 'io.micronaut.profiles'
-                                    mkp.artifactId profile.key
-                                    def version = profile.value
-                                    if (!isBuildSnapshot && version.toString().endsWith("-SNAPSHOT")) {
-                                        throw new RuntimeException("Cannot have a snapshot dependency on a profile [$profile.key] for a release!")
-                                    }
-                                    mkp.version(version)
-                                }
-                            }
-
-                            for (Project p : rootProject.subprojects) {
-                                if (!p.subprojects.empty) continue
-                                if (p.name == "bom") continue
-                                if (p.hasProperty("bomExclude") && p.property("bomExclude") == true) continue
-                                
-                                mkp.dependency {
-                                    mkp.groupId p.group
-                                    mkp.artifactId "micronaut-$p.name"
-                                    mkp.version p.version
-                                }
-                            }
-
-                            for (dep in dependencyVersions) {
-                                def info = dep.value
-                                // don't include snapshots
-                                if(info.version.toString().endsWith("-SNAPSHOT") && !micronautSnapshot) {
-                                    continue
-                                }
-
-                                def versionExpr = "\${${dep.key}.version}"
-
-                                if (info.name) {
-                                    mkp.dependency {
-                                        mkp.groupId info.group
-                                        mkp.artifactId info.name
-                                        mkp.version versionExpr
-                                    }
-                                }
-                                if(info.modules) {
-                                   for(m in info.modules) {
-                                       mkp.dependency {
-                                           mkp.groupId info.group
-                                           mkp.artifactId m
-                                           mkp.version versionExpr
-                                       }
-                                   }
-                                }
-                            }
-                        }
+            artifactId("micronaut-bom")
+            from components.javaPlatform
+            pom {
+                packaging 'pom'
+                withXml {
+                    def xml = asNode()
+                    xml.children().find {
+                        it.name().localPart == 'packaging'
+                    } + project.ext.pomInfo
+                }
+            }
+            libsCatalog.versionAliases.each { alias ->
+                if (alias.startsWith('managed.')) {
+                    libsCatalog.findVersion(alias).ifPresent { version ->
+                        alias = alias - 'managed.'
+                        String baseName = legacyVersionNames[alias] ?: toPropertyName(alias)
+                        String propertyName = "${baseName}.version"
+                        pom.properties.put(propertyName, version.requiredVersion)
                     }
                 }
             }
         }
+    }
+}
+
+javaPlatform {
+    allowDependencies()
+}
+
+dependencies {
+    libsCatalog.dependencyAliases.each { alias ->
+        if (alias.startsWith("boms.")) {
+            api platform(libsCatalog.findDependency(alias).map {
+                it.get()
+            }.orElseThrow { new RuntimeException("Unexpected missing alias in catalog") })
+        }
+    }
+
+    constraints {
+        for (Project p : rootProject.subprojects) {
+            if (!p.subprojects.empty) {
+                continue
+            }
+            if (p.name.contains("bom")) {
+                continue
+            }
+            if (excludedProjects.contains(p.name)) {
+                continue
+            }
+
+            String moduleGroup = p.group
+            String moduleName = "micronaut-${p.name}"
+            String moduleVersion = p.version
+
+            api "$moduleGroup:$moduleName:$moduleVersion"
+
+            modelConverter.extraVersions.put(moduleName, moduleVersion)
+            modelConverter.extraLibraries.put(moduleName, VersionCatalogConverter.library(moduleGroup, moduleName, moduleName))
+
+        }
+
+        libsCatalog.dependencyAliases.each { alias ->
+            if (alias.startsWith("managed.")) {
+                api libsCatalog.findDependency(alias).map {
+                    it.get()
+                }.orElseThrow { new RuntimeException("Unexpected missing alias in catalog") }
+            }
+        }
+
     }
 }

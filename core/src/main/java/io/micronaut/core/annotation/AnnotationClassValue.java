@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,8 +17,6 @@ package io.micronaut.core.annotation;
 
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.util.ArgumentUtils;
-
-import javax.annotation.Nonnull;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -32,6 +30,11 @@ import java.util.Optional;
  */
 @UsedByGeneratedCode
 public final class AnnotationClassValue<T> implements CharSequence, Named {
+
+    /**
+     * An empty array of class values.
+     */
+    public static final AnnotationClassValue<?>[] EMPTY_ARRAY = new AnnotationClassValue[0];
 
     private final String name;
     private final Class<T> theClass;
@@ -70,7 +73,7 @@ public final class AnnotationClassValue<T> implements CharSequence, Named {
      */
     @UsedByGeneratedCode
     @Internal
-    public AnnotationClassValue(@Nonnull String name, boolean instantiated) {
+    public AnnotationClassValue(@NonNull String name, boolean instantiated) {
         ArgumentUtils.requireNonNull("name", name);
         this.name = name;
         this.theClass = null;
@@ -86,7 +89,7 @@ public final class AnnotationClassValue<T> implements CharSequence, Named {
      */
     @SuppressWarnings("unchecked")
     @UsedByGeneratedCode
-    public AnnotationClassValue(@Nonnull T instance) {
+    public AnnotationClassValue(@NonNull T instance) {
         ArgumentUtils.requireNonNull("instance", instance);
         this.theClass = (Class<T>) instance.getClass();
         this.name = theClass.getName();
@@ -102,7 +105,7 @@ public final class AnnotationClassValue<T> implements CharSequence, Named {
      * @return The instance
      * @since 1.1
      */
-    public @Nonnull Optional<T> getInstance() {
+    public @NonNull Optional<T> getInstance() {
         return Optional.ofNullable(instance);
     }
 

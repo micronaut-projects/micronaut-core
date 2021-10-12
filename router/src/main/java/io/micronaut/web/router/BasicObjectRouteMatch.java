@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,11 +20,8 @@ import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 
-import javax.annotation.Nullable;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import io.micronaut.core.annotation.Nullable;
+import java.util.*;
 import java.util.function.Function;
 
 /**
@@ -90,7 +87,17 @@ public class BasicObjectRouteMatch implements RouteMatch<Object> {
     }
 
     @Override
-    public boolean accept(@Nullable MediaType contentType) {
+    public boolean doesConsume(@Nullable MediaType contentType) {
+        return true;
+    }
+
+    @Override
+    public boolean doesProduce(@Nullable Collection<MediaType> acceptableTypes) {
+        return true;
+    }
+
+    @Override
+    public boolean doesProduce(@Nullable MediaType acceptableType) {
         return true;
     }
 

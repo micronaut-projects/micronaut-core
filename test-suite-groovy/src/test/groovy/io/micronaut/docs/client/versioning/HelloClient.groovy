@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package io.micronaut.docs.client.versioning
 import io.micronaut.core.version.annotation.Version
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
-import io.reactivex.Single
+import reactor.core.publisher.Mono
 
 // end::imports[]
 
@@ -33,6 +33,6 @@ interface HelloClient {
 
     @Version("2")
     @Get("/greeting/{name}")
-    Single<String> sayHelloTwo(String name) // <2>
+    Mono<String> sayHelloTwo(String name) // <2>
 }
 // end::clazz[]

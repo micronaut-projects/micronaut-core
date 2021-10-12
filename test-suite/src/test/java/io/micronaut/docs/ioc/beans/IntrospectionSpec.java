@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2020 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.docs.ioc.beans;
 
 import io.micronaut.core.beans.BeanIntrospection;
@@ -45,5 +60,29 @@ public class IntrospectionSpec extends TestCase {
         String name = property.get(manufacturer);
 
         assertEquals("Fred", name);
+    }
+
+    public void testVehicle() {
+        final BeanIntrospection<Vehicle> introspection = BeanIntrospection.getIntrospection(Vehicle.class);
+        Vehicle vehicle = introspection.instantiate("Subaru", "WRX", 2);
+        assertEquals("Subaru", vehicle.getMake());
+        assertEquals("WRX", vehicle.getModel());
+        assertEquals(2, vehicle.getAxles());
+    }
+
+    public void testBusiness() {
+        final BeanIntrospection<Business> introspection = BeanIntrospection.getIntrospection(Business.class);
+        Business business = introspection.instantiate("Apple");
+        assertEquals("Apple", business.getName());
+    }
+
+    public void testUser() {
+        final BeanIntrospection<User> introspection = BeanIntrospection.getIntrospection(User.class);
+        User user = introspection.instantiate("Apple");
+        assertEquals("Apple", user.name);
+        assertEquals(18, user.age);
+        assertEquals(2, introspection.getBeanProperties().size());
+        introspection.getRequiredProperty("age", int.class).set(user, 23);
+        assertEquals(23, user.age);
     }
 }

@@ -1,12 +1,8 @@
 package io.micronaut.docs.sse
 
-import io.kotlintest.specs.StringSpec
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.docs.streaming.Headline
-import io.micronaut.http.client.RxHttpClient
-import io.micronaut.http.sse.Event
 import io.micronaut.runtime.server.EmbeddedServer
-import org.junit.Test
 
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue

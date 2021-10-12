@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,9 @@ package io.micronaut.aop.introduction
 
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.type.MutableArgumentValue
-
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 /**
  * @author Graeme Rocher
@@ -27,6 +27,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class StubIntroducer implements MethodInterceptor<Object,Object> {
+    @Nullable
     @Override
     Object intercept(MethodInvocationContext<Object, Object> context) {
         Iterator<MutableArgumentValue<?>> iterator = context.getParameters().values().iterator()

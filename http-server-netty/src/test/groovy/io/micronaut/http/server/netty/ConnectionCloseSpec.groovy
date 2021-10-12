@@ -1,7 +1,6 @@
 package io.micronaut.http.server.netty
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpHeaderValues
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse

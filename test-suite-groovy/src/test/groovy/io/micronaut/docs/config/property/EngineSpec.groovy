@@ -13,5 +13,8 @@ class EngineSpec extends Specification {
          expect:
          engine.manufacturer == "Honda"
          engine.cylinders == 8
+
+         cleanup:
+         ctx.close()
     }
 }

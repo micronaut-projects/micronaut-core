@@ -1,56 +1,52 @@
-Micronaut supports configuration sharing via AWS System Manager Parameter Store. You will need the following dependencies configured:
+Micronaut supports configuration sharing via AWS System Manager Parameter Store. You need the following dependencies configured:
 
-.Example `build.gradle` for AWS System Manager Parameter Store
-[source,groovy]
-----
-compile "io.micronaut:micronaut-discovery-client"
-compile "io.micronaut.configuration:micronaut-aws-common"
-compile group: 'com.amazonaws', name: 'aws-java-sdk-ssm', version: '1.11.308'
-----
+dependency:io.micronaut.aws:micronaut-aws-parameter-store[]
 
-To enable distributed configuration a `src/main/resources/bootstrap.yml` configuration file must be created and configured to use Parameter Store:
+To enable distributed configuration, create a `src/main/resources/bootstrap.yml` configuration file and add Parameter Store configuration:
 
 .bootstrap.yml
 [source,yaml]
 ----
 micronaut:
-    application:
-        name: hello-world
-    config-client:
+  application:
+    name: hello-world
+  config-client:
+    enabled: true
+aws:
+  client:
+    system-manager:
+      parameterstore:
         enabled: true
 ----
 
-include::{includedir}configurationProperties/io.micronaut.discovery.aws.parameterstore.AWSParameterStoreConfiguration.adoc[]
+See the https://micronaut-projects.github.io/micronaut-aws/latest/guide/configurationreference.html#io.micronaut.discovery.aws.parameterstore.AWSParameterStoreConfiguration[configuration reference] for all configuration options.
 
-You can configure shared properties by going into the AWS Console -> System Manager -> Parameter Store
+You can configure shared properties from the AWS Console -> System Manager -> Parameter Store.
 
-Micronaut will use a hierarchy to read the configuration values, and supports `String`, `StringList`, and `SecureString` types.
+Micronaut uses a hierarchy to read configuration values, and supports `String`, `StringList`, and `SecureString` types.
 
-You can make environment specific configurations as well by including the environment name after an underscore `_`. For example if your `micronaut.application.name` setting is set to `helloworld` then providing configuration values under `helloworld_test` will be applied only to the `test` environment.
+You can create environment-specific configurations as well by including the environment name after an underscore `_`. For example if `micronaut.application.name` is set to `helloworld`, specifying configuration values under `helloworld_test` will be applied only to the `test` environment.
 
 .Configuration Resolution Precedence
 |===
-|Folder|Description
+|Directory|Description
 
 |`/config/application`
 |Configuration shared by all applications
 
 |`/config/[APPLICATION_NAME]`
-|Application specific configuration, example `/config/hello-world`
+|Application-specific configuration, example `/config/hello-world`
 
 |`/config/application_prod`
 |Configuration shared by all applications for the `prod` api:context.env.Environment[]
 
 |`/config/[APPLICATION_NAME]_prod`
-|Application specific configuration for an active api:context.env.Environment[]
+|Application-specific configuration for an active api:context.env.Environment[]
 
 |===
 
-For example, if the configuration name `/config/application_test/server.url` is configured in AWS Parameter Store, then any application connecting to that parameter store can retrieve the value using `server.url`. If the application has `micronaut.application.name` configured to be `myapp`, then a value with the name `/config/myapp_test/server.url` will override the value just for that application.
+For example, if the configuration name `/config/application_test/server.url` is configured in AWS Parameter Store, any application connecting to that parameter store can retrieve the value using `server.url`. If the application has `micronaut.application.name` configured to be `myapp`, a value with the name `/config/myapp_test/server.url` overrides the value just for that application.
 
-Each level of the tree can be composed of key=value pairs. If you want multiple key value pairs, set the type to 'StringList'.
+Each level of the tree can be composed of key=value pairs. For multiple key/value pairs, set the type to `StringList`.
 
-For special secure information, like keys or passwords, use the type "SecureString". KMS will be automatically invoked when you
-add and retrieve values and decrypt them with the default key store for your account. If you set the configuration to not use secure strings, they will be returned to you encrypted and you must manually decrypt them.
-
-The https://github.com/micronaut-projects/micronaut-examples/aws repository showcases a sample application using this feature.
+For special secure information, such as keys or passwords, use the type `SecureString`. KMS will be automatically invoked when you add and retrieve values, and will decrypt them with the default key store for your account. If you set the configuration to not use secure strings, they will be returned to you encrypted and you must manually decrypt them.

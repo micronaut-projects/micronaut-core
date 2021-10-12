@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,14 +17,13 @@ package io.micronaut.validation.validator.constraints;
 
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Indexed;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import javax.annotation.concurrent.Immutable;
-import javax.annotation.concurrent.ThreadSafe;
 import javax.validation.ClockProvider;
 import javax.validation.Constraint;
 import java.lang.annotation.Annotation;
+import java.util.Optional;
 
 /**
  * Constraint validator that can be used at either runtime or compilation time and
@@ -35,8 +34,6 @@ import java.lang.annotation.Annotation;
  * @param <A> The annotation type
  * @param <T> The supported validation types
  */
-@Immutable
-@ThreadSafe
 @Indexed(ConstraintValidator.class)
 @FunctionalInterface
 public interface ConstraintValidator<A extends Annotation, T> extends javax.validation.ConstraintValidator<A, T> {
@@ -59,18 +56,37 @@ public interface ConstraintValidator<A extends Annotation, T> extends javax.vali
      */
     boolean isValid(
             @Nullable T value,
-            @Nonnull AnnotationValue<A> annotationMetadata,
-            @Nonnull ConstraintValidatorContext context);
+            @NonNull AnnotationValue<A> annotationMetadata,
+            @NonNull ConstraintValidatorContext context);
 
     @Override
     default boolean isValid(T value, javax.validation.ConstraintValidatorContext context) {
         // simply adapt the interfaces for now.
-        return isValid(value, new AnnotationValue(Constraint.class.getName()), new ConstraintValidatorContext() {
-            @Nonnull
+        return isValid(value, new AnnotationValue<>(Constraint.class.getName()), new ConstraintValidatorContext() {
+
+            private String messageTemplate = context.getDefaultConstraintMessageTemplate();
+
+            @NonNull
             @Override
             public ClockProvider getClockProvider() {
                 return context.getClockProvider();
             }
+
+            @Nullable
+            @Override
+            public Object getRootBean() {
+                return null;
+            }
+
+            @Override
+            public void messageTemplate(@Nullable final String messageTemplate) {
+                this.messageTemplate = messageTemplate;
+            }
+
+            public Optional<String> getMessageTemplate() {
+                return Optional.ofNullable(messageTemplate);
+            }
+
         });
     }
 }

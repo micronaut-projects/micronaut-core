@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,8 +22,8 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
 import io.micronaut.management.endpoint.annotation.Read;
 import io.micronaut.web.router.UriRoute;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 
 /**
@@ -55,14 +55,20 @@ public class ReadEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
     }
 
     @Override
-    protected void registerRoute(ExecutableMethod<?, ?> method, String id) {
+    protected void registerRoute(ExecutableMethod<?, ?> method, String id, Integer port) {
         Class<?> declaringType = method.getDeclaringType();
         UriTemplate template = buildUriTemplate(method, id);
         UriRoute uriRoute = GET(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes());
+        if (port != null) {
+            uriRoute = uriRoute.exposedPort(port);
+        }
         if (LOG.isDebugEnabled()) {
             LOG.debug("Created Route to @Endpoint {}: {}", method.getDeclaringType().getName(), uriRoute);
         }
         uriRoute = HEAD(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes());
+        if (port != null) {
+            uriRoute = uriRoute.exposedPort(port);
+        }
         if (LOG.isDebugEnabled()) {
             LOG.debug("Created Route to @Endpoint {}: {}", method.getDeclaringType().getName(), uriRoute);
         }

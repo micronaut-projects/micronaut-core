@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,7 @@
 package io.micronaut.web.router.naming;
 
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.TypeConvention;
 import io.micronaut.core.util.StringUtils;
@@ -23,9 +24,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.UriMapping;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.web.router.RouteBuilder;
-
-import javax.annotation.Nonnull;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 /**
  * The default {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy} if none is provided by the application.
@@ -42,7 +41,7 @@ public class HyphenatedUriNamingStrategy implements RouteBuilder.UriNamingStrate
     }
 
     @Override
-    public @Nonnull String resolveUri(BeanDefinition<?> beanDefinition) {
+    public @NonNull String resolveUri(BeanDefinition<?> beanDefinition) {
         String uri = beanDefinition.stringValue(UriMapping.class).orElseGet(() ->
                 beanDefinition.stringValue(Controller.class).orElse(UriMapping.DEFAULT_URI)
         );
@@ -50,7 +49,7 @@ public class HyphenatedUriNamingStrategy implements RouteBuilder.UriNamingStrate
     }
 
     @Override
-    public @Nonnull String resolveUri(String property) {
+    public @NonNull String resolveUri(String property) {
         if (StringUtils.isEmpty(property)) {
             return "/";
         }

@@ -10,19 +10,16 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
-import io.netty.channel.ChannelDuplexHandler
-import io.netty.channel.ChannelHandlerContext
+import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
 import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
-
-import javax.inject.Singleton
 
 @Retry
 // Retry added because we need to use java.net.URL to test not the Micronaut HTTP client and URL.text from Groovy is unreliable
@@ -32,7 +29,7 @@ class MalformedUriSpec extends Specification {
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name': 'MalformedUriSpec'
     ])
-    @Shared @AutoCleanup RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+    @Shared @AutoCleanup HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
     void "test malformed URI exceptions"() {
         when:
@@ -42,18 +39,18 @@ class MalformedUriSpec extends Specification {
         result == 'Exception: Illegal character in path at index 11: /malformed/[]'
     }
 
-    void "test the once per filter is ignored"() {
+    void "test filters are called in case of error"() {
         given:
         OncePerFilter filter = embeddedServer.applicationContext.getBean(OncePerFilter)
 
         expect:
-        !filter.filterCalled
+        filter.filterCalled
 
         when:
         def result = new URL("$embeddedServer.URL/malformed/[]").text
 
         then:
-        !filter.filterCalled
+        filter.filterCalled
         result == 'Exception: Illegal character in path at index 11: /malformed/[]'
     }
 

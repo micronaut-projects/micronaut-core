@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,10 +15,18 @@
  */
 package io.micronaut.session;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.scheduling.TaskExecutors;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
 
 import java.time.Duration;
+import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * <p>Base configuration properties for session handling.</p>
@@ -30,12 +38,6 @@ import java.util.OptionalInt;
 public class SessionConfiguration {
 
     /**
-     * @deprecated Use {@link #DEFAULT_MAXINACTIVEINTERVAL_MINUTES} instead.
-     */
-    @Deprecated
-    public static final int DEFAULT_MAXINACTIVEINTERVAL_SECONDS = 30;
-
-    /**
      * The default max inactive interval in minutes.
      */
     @SuppressWarnings("WeakerAccess")
@@ -43,6 +45,8 @@ public class SessionConfiguration {
 
     private Duration maxInactiveInterval = Duration.ofMinutes(DEFAULT_MAXINACTIVEINTERVAL_MINUTES);
     private Integer maxActiveSessions;
+    private boolean promptExpiration = false;
+    private BeanProvider<ExecutorService> executorService;
 
     /**
      * @return The maximum number of active sessions
@@ -76,5 +80,41 @@ public class SessionConfiguration {
         if (maxInactiveInterval != null) {
             this.maxInactiveInterval = maxInactiveInterval;
         }
+    }
+
+    /**
+     * @return if prompt expiration is enabled.
+     */
+    public boolean isPromptExpiration() {
+        return promptExpiration;
+    }
+
+    /**
+     * Set if prompt expiration is enabled.
+     *
+     * @param promptExpiration if prompt expiration is enabled / disabled
+     */
+    public void setPromptExpiration(boolean promptExpiration) {
+        this.promptExpiration = promptExpiration;
+    }
+
+    /**
+     * @return The injected executor service
+     */
+    public Optional<ScheduledExecutorService> getExecutorService() {
+        return Optional.ofNullable(executorService)
+                .map(BeanProvider::get)
+                .filter(ScheduledExecutorService.class::isInstance)
+                .map(ScheduledExecutorService.class::cast);
+    }
+
+    /**
+     * Set the executor service.
+     *
+     * @param executorService The executorService
+     */
+    @Inject
+    public void setExecutorService(@Nullable @Named(TaskExecutors.SCHEDULED) BeanProvider<ExecutorService> executorService) {
+        this.executorService = executorService;
     }
 }

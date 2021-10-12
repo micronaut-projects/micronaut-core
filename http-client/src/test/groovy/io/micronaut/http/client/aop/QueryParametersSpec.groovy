@@ -17,20 +17,23 @@ package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.beans.exceptions.IntrospectionException
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.QueryValue
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import javax.annotation.Nullable
 
 class QueryParametersSpec extends Specification {
 
@@ -93,11 +96,11 @@ class QueryParametersSpec extends Specification {
 
     @Unroll
     void "test client mappping URL parameters appended through a POJO with a list (served through #flavour)"() {
-        expect:
-        client.searchExplodedPojo(flavour, new SearchParamsAsList(term: ["Tool", "Agnes Obel"])).albums.size() == 4
+        when:
+        client.searchExplodedPojo("list", new SearchParamsAsList(term: ["Tool", "Agnes Obel"]))
 
-        where:
-        flavour << [ "pojo", "list", "map" ]
+        then:
+        thrown(IntrospectionException)
     }
 
     @Unroll
@@ -109,31 +112,47 @@ class QueryParametersSpec extends Specification {
         flavour << [ "pojo", "list", "map" ]
     }
 
+    void "test client mapping URL parameters appended through multiple POJOs"() {
+        expect: ""
+            client.searchExplodedMultiplePojos(new SearchParams(term: "Agnes Obel"), new SearchParams2(song: 'Citizen of Glass')).albums.size() == 1
+    }
+
+    void "test client mapping URL parameters appended through multiple optional POJOs"() {
+        expect: ""
+            client.searchExplodedMultipleOptionalPojos(null, null).albums.size() == 6
+        and:
+            client.searchExplodedMultipleOptionalPojos(new SearchParams(term: "Agnes Obel"), null).albums.size() == 3
+        and:
+            client.searchExplodedMultipleOptionalPojos(new SearchParams(term: "Agnes Obel"), new SearchParams2(song: 'Citizen of Glass')).albums.size() == 1
+        and:
+            client.searchExplodedMultipleOptionalPojos(null, new SearchParams2(song: 'Citizen of Glass')).albums.size() == 1
+    }
+
     void "test query value with default value"() {
         given:
-        RxHttpClient lowLevelClient = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL())
+        HttpClient lowLevelClient = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL())
 
         expect:
         client.searchDefault("Riverside").albums.size() == 2
         client.searchDefault(null).albums.size() == 1
-        lowLevelClient.retrieve(HttpRequest.GET('/itunes/search-default'), SearchResult).blockingFirst().albums.size() == 1
+        lowLevelClient.toBlocking().retrieve(HttpRequest.GET('/itunes/search-default'), SearchResult).albums.size() == 1
 
         when:
-        lowLevelClient.retrieve(HttpRequest.GET('/itunes/search-exploded/list'), SearchResult).blockingFirst()
+        lowLevelClient.toBlocking().retrieve(HttpRequest.GET('/itunes/search-exploded/list'), SearchResult)
 
         then:
         def ex = thrown(HttpClientResponseException)
         ex.status == HttpStatus.NOT_FOUND // because null is returned
 
         when:
-        lowLevelClient.retrieve(HttpRequest.GET('/itunes/search-exploded/map'), SearchResult).blockingFirst()
+        lowLevelClient.toBlocking().retrieve(HttpRequest.GET('/itunes/search-exploded/map'), SearchResult)
 
         then:
         ex = thrown(HttpClientResponseException)
         ex.status == HttpStatus.NOT_FOUND // because null is returned
 
         when:
-        lowLevelClient.retrieve(HttpRequest.GET('/itunes/search-exploded/pojo'), SearchResult).blockingFirst()
+        lowLevelClient.toBlocking().retrieve(HttpRequest.GET('/itunes/search-exploded/pojo'), SearchResult)
 
         then:
         ex = thrown(HttpClientResponseException)
@@ -152,8 +171,14 @@ class QueryParametersSpec extends Specification {
         List<String> term // POJO parameters can bind request params to list fields
     }
 
+    @Introspected
     static class SearchParams {
         String term // Now, POJO parameters can bind request params to simple fields, too.
+    }
+
+    @Introspected
+    static class SearchParams2 {
+        String song // Now, POJO parameters can bind request params to multiple POJOs, too.
     }
 
     @Controller('/itunes')
@@ -209,6 +234,23 @@ class QueryParametersSpec extends Specification {
             }
         }
 
+        @Get("/search-exploded/multipleExplodedPojos{?term*}{&song*}")
+        SearchResult searchMultipleExplodedPojos(@QueryValue SearchParams term, @QueryValue SearchParams2 song) {
+            // We get a POJO with terms and song
+            def albums = term.term?.with { artists.get(it) }
+            return new SearchResult(albums: albums.findAll { it.matches(song.song)})
+        }
+
+        @Get("/search-exploded/multipleOptionalExplodedPojos{?term*}{?song*}")
+        SearchResult searchMultipleOptionalExplodedPojos(@QueryValue SearchParams term, @QueryValue SearchParams2 song) {
+            // We get a POJO with terms and/or song
+            def albums = term.term?.with { artists.get(it) } ?: artists.values().flatten()
+            if (song?.song) {
+                albums = albums.findAll { it.matches(song.song)}
+            }
+            return new SearchResult(albums: albums)
+        }
+
         @Get("/search-default")
         SearchResult searchDefault(@QueryValue(defaultValue = "Tool") String term) {
             def albums = artists.get(term)
@@ -236,6 +278,12 @@ class QueryParametersSpec extends Specification {
 
         @Get("/search-exploded/{flavour}{?params*}")
         SearchResult searchExplodedSinglePojo(String flavour, SearchParams params)
+
+        @Get("/search-exploded/multipleExplodedPojos{?term*}{&song*}")
+        SearchResult searchExplodedMultiplePojos(SearchParams term, SearchParams2 song)
+
+        @Get("/search-exploded/multipleOptionalExplodedPojos{?term*}{?song*}")
+        SearchResult searchExplodedMultipleOptionalPojos(@Nullable SearchParams term, @Nullable SearchParams2 song)
 
         @Get("/search-exploded/{flavour}{?params*}")
         SearchResult searchExplodedPojo(String flavour, SearchParamsAsList params)

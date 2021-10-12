@@ -24,6 +24,17 @@ import spock.lang.Specification
  */
 class LoggersEndpointConfigurationSpec extends Specification {
 
+    void 'test that the loggers endpoint is not enabled by default'() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+
+        expect:
+        !context.containsBean(LoggersEndpoint)
+
+        cleanup:
+        context.close()
+    }
+
     void 'test that the loggers endpoint is not available when disabled via config'() {
         given:
         ApplicationContext context = ApplicationContext.run(['endpoints.loggers.enabled': false])

@@ -1,7 +1,7 @@
 package io.micronaut.docs.config.value
 
-import io.kotlintest.shouldBe
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
@@ -21,6 +21,8 @@ class VehicleSpec : StringSpec({
         // end::start[]
 
         vehicle.start().shouldBe("Starting V8 Engine")
+
+        applicationContext.close()
     }
 
     "test start vehicle without configuration" {
@@ -33,6 +35,8 @@ class VehicleSpec : StringSpec({
         // end::start[]
 
         vehicle.start().shouldBe("Starting V6 Engine")
+
+        applicationContext.close()
     }
 
 })

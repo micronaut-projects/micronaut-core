@@ -1,0 +1,18 @@
+dependencies {
+    annotationProcessor project(":inject-java")
+    annotationProcessor project(":graal")
+    api project(':inject')
+    api project(':aop')
+    api libs.managed.validation
+    compileOnly project(':core-reactive')
+    testCompileOnly project(":inject-groovy")
+    testAnnotationProcessor project(":inject-java")
+    testImplementation project(":core-reactive")
+    testImplementation project(":inject-java-test")
+}
+
+spotless {
+    java {
+        targetExclude '**/io/micronaut/scheduling/cron/CronExpression.java'
+    }
+}

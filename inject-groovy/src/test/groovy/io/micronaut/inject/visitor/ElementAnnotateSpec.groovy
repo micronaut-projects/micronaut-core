@@ -1,8 +1,7 @@
 package io.micronaut.inject.visitor
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.TypeElementVisitorStart
-import io.micronaut.ast.groovy.TypeElementVisitorTransform
 import io.micronaut.core.annotation.AnnotationValueBuilder
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.inject.BeanDefinition
@@ -10,7 +9,9 @@ import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.writer.BeanDefinitionVisitor
+import spock.util.environment.RestoreSystemProperties
 
+@RestoreSystemProperties
 class ElementAnnotateSpec extends AbstractBeanDefinitionSpec{
 
     def setup() {
@@ -19,13 +20,12 @@ class ElementAnnotateSpec extends AbstractBeanDefinitionSpec{
 
     def cleanup() {
         AllElementsVisitor.clearVisited()
-        System.setProperty(TypeElementVisitorStart.ELEMENT_VISITORS_PROPERTY, "")
     }
 
     void "test annotate introduction advice"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyInterface' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
-package test;
+        BeanDefinition beanDefinition = buildBeanDefinition('elemann1.MyInterface' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package elemann1;
 
 import io.micronaut.context.annotation.*;
 import java.net.*;
@@ -34,7 +34,9 @@ import io.micronaut.aop.introduction.Stub;
 
 @Stub
 interface MyInterface{
+    @Executable
     void save(@NotBlank String name, @Min(1L) int age);
+    @Executable
     void saveTwo(String name);
 }
 
@@ -48,10 +50,10 @@ interface MyInterface{
 
     void "test that elements can be dynamically annotated at compilation time"() {
         given:
-        def definition = buildBeanDefinition('test.TestListener', '''
-package test;
+        def definition = buildBeanDefinition('elemann2.TestListener', '''
+package elemann2;
 import io.micronaut.context.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 class TestListener {
@@ -71,8 +73,8 @@ class TestListener {
 
     void "test annotation bean introspection properties"() {
         given:
-        def introspection = buildBeanIntrospection('test.Test', '''
-package test;
+        def introspection = buildBeanIntrospection('elemann3.Test', '''
+package elemann3;
 
 import io.micronaut.core.annotation.Introspected;
 
@@ -97,8 +99,8 @@ class Test {
 
     void "test annotation groovy bean introspection properties"() {
         given:
-        def introspection = buildBeanIntrospection('test.Test', '''
-package test;
+        def introspection = buildBeanIntrospection('elemann4.Test', '''
+package elemann4;
 
 import io.micronaut.core.annotation.Introspected;
 

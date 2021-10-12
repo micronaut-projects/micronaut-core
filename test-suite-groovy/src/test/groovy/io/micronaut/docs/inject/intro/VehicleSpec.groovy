@@ -17,6 +17,7 @@ package io.micronaut.docs.inject.intro
 
 import spock.lang.Specification
 import io.micronaut.context.BeanContext
+
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -24,14 +25,18 @@ import io.micronaut.context.BeanContext
 class VehicleSpec extends Specification {
 
     void "test start vehicle"() {
+
         when:
         // tag::start[]
-        Vehicle vehicle = BeanContext.run()
-                                     .getBean(Vehicle)
-        println( vehicle.start() )
+        def context = BeanContext.run()
+        Vehicle vehicle = context.getBean(Vehicle)
+        println vehicle.start()
         // end::start[]
 
         then:
         vehicle.start() == "Starting V8"
+
+        cleanup:
+        context.close()
     }
 }

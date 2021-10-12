@@ -24,7 +24,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
@@ -59,13 +59,28 @@ class ClientFilterSpec extends Specification{
 
     void "test a client with no service ids doesn't match a filter with a service id"() {
         given:
-        RxHttpClient client = context.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange("/filters/name", String.class)
 
         then:
         response.body() == 'Fred'
+
+        cleanup:
+        client.close()
+    }
+
+    void "test a client filter that throws an exception"() {
+        given:
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange("/filter-exception/name", String.class)
+
+        then:
+        def ex = thrown(RuntimeException)
+        ex.message == "from filter"
 
         cleanup:
         client.close()
@@ -81,7 +96,7 @@ class ClientFilterSpec extends Specification{
 
     void "test a root url matching a manually service client"() {
         given:
-        ApplicationContext ctx = ApplicationContext.build([
+        ApplicationContext ctx = ApplicationContext.builder([
                 'spec.name': 'ClientFilterSpec',
                 'micronaut.http.services.my-service.url': embeddedServer.getURL().toString()
         ]).start()
@@ -117,7 +132,7 @@ class ClientFilterSpec extends Specification{
     @Requires(property = 'spec.name', value = "ClientFilterSpec")
     @Client('/filters')
     static interface MyApi {
-        @Get('/name')
+        @Get(value = '/name', consumes = MediaType.TEXT_PLAIN)
         String name()
     }
 
@@ -192,6 +207,17 @@ class ClientFilterSpec extends Specification{
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
             request.header("X-Root-Filter", "processed")
             return chain.proceed(request)
+        }
+    }
+
+    // this filter should not match the test
+    @Requires(property = 'spec.name', value = "ClientFilterSpec")
+    @Filter('/filter-exception/**')
+    static class ThrowingFilter implements HttpClientFilter {
+
+        @Override
+        Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
+            throw new RuntimeException("from filter")
         }
     }
 }

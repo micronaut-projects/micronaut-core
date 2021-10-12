@@ -58,6 +58,30 @@ class StringUtilsSpec extends Specification {
         "a/"  | "/b/" | "a/b/"
         "/a"  | "/b/" | "/a/b/"
         "/a/" | "/b/" | "/a/b/"
+        "/"   | "/b"  | "/b"
+        "/"   | "?x=true"  | "/?x=true"
+        "a"   | "?x=true"  | "a?x=true"
+        "a/"  | "?x=true"  | "a/?x=true"
+        "/a"  | "?x=true"  | "/a?x=true"
+        "/a/" | "?x=true"  | "/a/?x=true"
+    }
+
+    @Unroll
+    void "test full prependUri(#base, #uri) == #expected"() {
+
+        expect:
+        StringUtils.prependUri("http://" + base, uri) == "http://" + expected
+
+        where:
+        base  | uri   | expected
+        "a"   | "b"   | "a/b"
+        "a/"  | "b"   | "a/b"
+        "a"   | "b/"  | "a/b/"
+        "a/"  | "b/"  | "a/b/"
+        "a"   | "/b"  | "a/b"
+        "a/"  | "/b"  | "a/b"
+        "a"   | "/b/" | "a/b/"
+        "a/"  | "/b/" | "a/b/"
     }
 
     @Unroll
@@ -72,5 +96,34 @@ class StringUtilsSpec extends Specification {
         '  '  | null
         ''    | null
         null  | null
+    }
+
+    void "test trimLeading"() {
+        expect:
+        StringUtils.trimLeading(input, (character) -> character == c) == expected
+
+        where:
+        input    | c   | expected
+        'abc'    | 'a' | 'bc'
+        'abc'    | 'd' | 'abc'
+        '   abc' | ' ' | 'abc'
+    }
+
+    @Unroll
+    void "test split string omit empty #string = #expected"() {
+        expect:
+        StringUtils.splitOmitEmptyStrings(string, ',' as char).toList() == expected
+        StringUtils.splitOmitEmptyStringsList(string, ',' as char) == expected
+
+        where:
+        string     | expected
+        ""         | []
+        ","        | []
+        "a"        | ["a"]
+        "a   "     | ["a   "]
+        ",,,"      | []
+        ",,a,,,"   | ['a']
+        ",a,b,,,c" | ['a', 'b', 'c']
+        "a,b,c"    | ['a', 'b', 'c']
     }
 }

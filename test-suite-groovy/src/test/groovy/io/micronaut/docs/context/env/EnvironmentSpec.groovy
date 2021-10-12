@@ -3,7 +3,6 @@ package io.micronaut.docs.context.env
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySource
-import io.micronaut.core.util.CollectionUtils
 import spock.lang.Specification
 
 class EnvironmentSpec extends Specification {
@@ -15,10 +14,12 @@ class EnvironmentSpec extends Specification {
         Environment environment = applicationContext.getEnvironment()
 
         then:
-        environment.getActiveNames().contains("test")
-        environment.getActiveNames().contains("android")
+        environment.activeNames.contains("test")
+        environment.activeNames.contains("android")
         // end::env[]
 
+        cleanup:
+        applicationContext.close()
     }
 
     void "test run environment with properties"() {
@@ -39,5 +40,7 @@ class EnvironmentSpec extends Specification {
         "foo" == environment.getProperty("micronaut.server.host", String.class).orElse("localhost")
         // end::envProps[]
 
+        cleanup:
+        applicationContext.close()
     }
 }

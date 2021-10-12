@@ -16,71 +16,70 @@
 package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
-import io.micronaut.http.client.annotation.Client
-import io.reactivex.Flowable
-import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.MediaType
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.annotation.Nullable
+import io.micronaut.http.*
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Header
-import io.micronaut.http.client.exceptions.HttpClientException
-import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.http.annotation.Put
-import spock.lang.AutoCleanup
-import spock.lang.Shared
+import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.exceptions.HttpClientException
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import jakarta.inject.Inject
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import spock.lang.Issue
 import spock.lang.Specification
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
+@Property(name = 'spec.name', value = 'HttpPutSpec')
+@MicronautTest
 class HttpPutSpec extends Specification {
 
-    @Shared
-    @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
+    @Inject
+    @Client("/")
+    HttpClient client
 
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-
-    @Shared
-    @AutoCleanup
-    HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+    @Inject
+    MyPutClient myPutClient
 
     void "test send invalid http method"() {
         given:
         def book = new Book(title: "The Stand", pages: 1000)
 
         when:
-        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<Book>> flowable = Flux.from(client.exchange(
                 HttpRequest.PATCH("/put/simple", book)
                         .accept(MediaType.APPLICATION_JSON_TYPE)
                         .header("X-My-Header", "Foo"),
 
                 Book
         ))
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientException)
-        e.message == "Method [PATCH] not allowed for URI [/put/simple]. Allowed methods: [PUT]"
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Method [PATCH] not allowed for URI [/put/simple]. Allowed methods: [PUT]"
     }
     void "test simple post request with JSON"() {
         given:
         def book = new Book(title: "The Stand", pages: 1000)
 
         when:
-        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<Book>> flowable = Flux.from(client.exchange(
                 HttpRequest.PUT("/put/simple", book)
                         .accept(MediaType.APPLICATION_JSON_TYPE)
                         .header("X-My-Header", "Foo"),
 
                 Book
         ))
-        HttpResponse<Book> response = flowable.blockingFirst()
+        HttpResponse<Book> response = flowable.blockFirst()
         Optional<Book> body = response.getBody()
 
         then:
@@ -96,14 +95,14 @@ class HttpPutSpec extends Specification {
         given:
         def book = new Book(title: "The Stand",pages: 1000)
         when:
-        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<Book>> flowable = Flux.from(client.exchange(
                 HttpRequest.PUT("/put/title/{title}", book)
                         .accept(MediaType.APPLICATION_JSON_TYPE)
                         .header("X-My-Header", "Foo"),
 
                 Book
         ))
-        HttpResponse<Book> response = flowable.blockingFirst()
+        HttpResponse<Book> response = flowable.blockFirst()
         Optional<Book> body = response.getBody()
 
         then:
@@ -120,7 +119,7 @@ class HttpPutSpec extends Specification {
         given:
         def book = new Book(title: "The Stand", pages: 1000)
         when:
-        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<Book>> flowable = Flux.from(client.exchange(
                 HttpRequest.PUT("/put/form", book)
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE)
                         .accept(MediaType.APPLICATION_JSON_TYPE)
@@ -128,7 +127,7 @@ class HttpPutSpec extends Specification {
 
                 Book
         ))
-        HttpResponse<Book> response = flowable.blockingFirst()
+        HttpResponse<Book> response = flowable.blockFirst()
         Optional<Book> body = response.getBody()
 
         then:
@@ -162,7 +161,7 @@ class HttpPutSpec extends Specification {
         BlockingHttpClient blockingHttpClient = client.toBlocking()
         String result = blockingHttpClient.retrieve(
                 HttpRequest.PUT("/put/optionalJson", [enable: true])
-                        .accept(MediaType.APPLICATION_JSON_TYPE),
+                        .accept(MediaType.TEXT_PLAIN),
 
                 String
         )
@@ -172,7 +171,7 @@ class HttpPutSpec extends Specification {
     }
 
     void "test multiple uris"() {
-        def client = embeddedServer.applicationContext.getBean(MyPutClient)
+        def client = this.myPutClient
 
         when:
         String val = client.multiple()
@@ -187,6 +186,27 @@ class HttpPutSpec extends Specification {
         val == "multiple mappings"
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/2757")
+    void "test put with nullable header"() throws Exception {
+        //This test verifies that the body is not read in an attempt to populate the header argument
+        MutableHttpRequest<?> request = HttpRequest.PUT("/put/nullableHeader", "body".getBytes()).
+                accept(MediaType.TEXT_PLAIN_TYPE)
+
+        String body = client.toBlocking().retrieve(request)
+
+        expect:
+        body == "put done"
+    }
+
+    void "test http put with empty body"() {
+        when:
+        def res = client.toBlocking().exchange(HttpRequest.PUT('/put/emptyBody', null));
+
+        then:
+        res.status == HttpStatus.NO_CONTENT
+    }
+
+    @Requires(property = 'spec.name', value = 'HttpPutSpec')
     @Controller('/put')
     static class PostController {
 
@@ -234,14 +254,28 @@ class HttpPutSpec extends Specification {
         String multipleMappings() {
             return "multiple mappings"
         }
+
+        @Put(value = "/nullableHeader", consumes = MediaType.ALL, produces = MediaType.TEXT_PLAIN)
+        String putNullableHeader(@Body final Publisher<byte[]> contents,
+                                 @Nullable @Header("foo") final String auth) {
+
+            return "put done"
+        }
+
+        @Put(uri = "/emptyBody")
+        HttpResponse emptyBody() {
+            HttpResponse.noContent()
+        }
     }
 
     @EqualsAndHashCode
+    @Introspected
     static class Book {
         String title
         Integer pages
     }
 
+    @Requires(property = 'spec.name', value = 'HttpPutSpec')
     @Client("/put")
     static interface MyPutClient {
 

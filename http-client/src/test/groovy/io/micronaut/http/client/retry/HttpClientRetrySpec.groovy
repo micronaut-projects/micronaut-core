@@ -15,14 +15,19 @@
  */
 package io.micronaut.http.client.retry
 
-import io.reactivex.Single
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.NonNull
+import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.retry.annotation.Retryable
 import io.micronaut.runtime.server.EmbeddedServer
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -38,6 +43,7 @@ class HttpClientRetrySpec extends Specification {
 
     @Shared
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+
 
     void "test simple blocking retry"() {
         given:
@@ -57,7 +63,7 @@ class HttpClientRetrySpec extends Specification {
 
         then:"The original exception is thrown"
         def e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error: Bad count"
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad count"
     }
 
     void "test simply retry with rxjava"() {
@@ -68,7 +74,7 @@ class HttpClientRetrySpec extends Specification {
         controller.count = 0
 
         when:"A method is annotated retry"
-        int result = countClient.getCountSingle().blockingGet()
+        int result = Mono.from(countClient.getCountSingle()).block()
 
         then:"It executes until successful"
         result == 3
@@ -76,13 +82,22 @@ class HttpClientRetrySpec extends Specification {
         when:"The threshold can never be met"
         controller.countThreshold = 10
         controller.count = 0
-        def single = countClient.getCountSingle()
-        single.blockingGet()
+        Publisher<Integer> single = countClient.getCountSingle()
+        Mono.from(single).block()
 
         then:"The original exception is thrown"
         def e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error: Bad count"
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad count"
 
+    }
+
+    void "test retry JSON post"() {
+        given:
+        RetryableClient client = context.getBean(RetryableClient)
+        String result = Mono.from(client.post(new FooDTO(foo: "Good"))).block()
+
+        expect:
+        result == 'Good'
     }
 
     @Client("/retry-test")
@@ -107,8 +122,9 @@ class HttpClientRetrySpec extends Specification {
         }
 
         @Override
-        Single<Integer> getCountSingle() {
-            Single.fromCallable({->
+        @SingleResult
+        Publisher<Integer> getCountSingle() {
+            Mono.fromCallable({->
                 countRx++
                 if(countRx < countThreshold) {
                     throw new IllegalStateException("Bad count")
@@ -119,12 +135,40 @@ class HttpClientRetrySpec extends Specification {
         }
     }
 
+    @Controller("/retry-test/json")
+    static class JsonController {
+        boolean first = true
+        @Post("/foo")
+        @SingleResult
+        Publisher<String> post(@Body @NonNull FooDTO foo) {
+            if (first) {
+                first = false
+                return Mono.error(new RuntimeException("First request failed"))
+            }
+            Mono.just(foo.foo)
+        }
+    }
+
     static interface CountService {
 
         @Get('/count')
         int getCount()
 
-        @Get('/rx-count')
-        Single<Integer> getCountSingle()
+        @Get('/reactive-count')
+        @SingleResult
+        Publisher<Integer> getCountSingle()
+    }
+
+    @Client("/retry-test/json")
+    @Retryable(delay = "10ms", attempts = "2", maxDelay = "1s")
+    static interface RetryableClient {
+
+        @SingleResult
+        @Post("/foo")
+        Publisher<String> post(@Body @NonNull FooDTO foo);
+    }
+
+    static class FooDTO {
+        String foo
     }
 }

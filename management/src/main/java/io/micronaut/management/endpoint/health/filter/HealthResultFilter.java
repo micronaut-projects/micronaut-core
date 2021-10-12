@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,8 +29,6 @@ import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.health.indicator.HealthResult;
 import org.reactivestreams.Publisher;
 
-import java.util.Optional;
-
 /**
  * A filter that matches the {@link io.micronaut.management.endpoint.health.HealthEndpoint}
  * and returns an appropriate HTTP status code.
@@ -39,7 +37,11 @@ import java.util.Optional;
  * @since 1.0
  *
  */
-@Filter(HealthResultFilter.DEFAULT_MAPPING)
+@Filter({
+    HealthResultFilter.DEFAULT_MAPPING,
+    HealthResultFilter.LIVENESS_PROBE_MAPPING,
+    HealthResultFilter.READINESS_PROBE_MAPPING
+})
 @Requires(beans = HealthEndpoint.class)
 public class HealthResultFilter extends OncePerRequestHttpServerFilter {
 
@@ -50,6 +52,8 @@ public class HealthResultFilter extends OncePerRequestHttpServerFilter {
             "${" + EndpointDefaultConfiguration.PREFIX + ".path:" +
                     EndpointDefaultConfiguration.DEFAULT_ENDPOINT_BASE_PATH + "}${" +
                     HealthEndpoint.PREFIX + ".id:health}";
+    public static final String LIVENESS_PROBE_MAPPING = DEFAULT_MAPPING + "/liveness";
+    public static final String READINESS_PROBE_MAPPING = DEFAULT_MAPPING + "/readiness";
 
     private final HealthEndpoint healthEndpoint;
 
@@ -65,9 +69,9 @@ public class HealthResultFilter extends OncePerRequestHttpServerFilter {
     @Override
     protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
         return Publishers.map(chain.proceed(request), response -> {
-            Optional<HealthResult> body = response.getBody(HealthResult.class);
-            if (body.isPresent()) {
-                HealthResult healthResult = body.get();
+            Object body = response.body();
+            if (body instanceof HealthResult) {
+                HealthResult healthResult = (HealthResult) body;
                 HealthStatus status = healthResult.getStatus();
 
                 HttpStatus httpStatus = healthEndpoint

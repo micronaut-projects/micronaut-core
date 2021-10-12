@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -35,7 +35,7 @@ import java.lang.annotation.Target;
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.PACKAGE, ElementType.TYPE, ElementType.ANNOTATION_TYPE, ElementType.METHOD})
+@Target({ElementType.PACKAGE, ElementType.TYPE, ElementType.ANNOTATION_TYPE, ElementType.METHOD, ElementType.FIELD})
 @Repeatable(Requirements.class)
 public @interface Requires {
 
@@ -191,6 +191,20 @@ public @interface Requires {
     String[] resources() default {};
 
     /**
+     * Expresses the current operating system must be one in the given list.
+     *
+     * @return The os families
+     */
+    Family[] os() default {};
+
+    /**
+     * Expresses the current operating system must not be one in the given list.
+     *
+     * @return The os families
+     */
+    Family[] notOs() default {};
+
+    /**
      * Used to express a required SDK version.
      */
     enum Sdk {
@@ -198,5 +212,12 @@ public @interface Requires {
         GROOVY,
         KOTLIN,
         MICRONAUT
+    }
+
+    /**
+     * Used to express an operation system family.
+     */
+    enum Family {
+        LINUX, MAC_OS, WINDOWS, SOLARIS, OTHER
     }
 }

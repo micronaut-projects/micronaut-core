@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,9 +15,15 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.TypeHint;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.http.annotation.Produces;
@@ -31,17 +37,8 @@ import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.function.Function;
+import java.util.*;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * Represents a media type.
@@ -62,6 +59,21 @@ public class MediaType implements CharSequence {
      * Default file extension used for XML.
      */
     public static final String EXTENSION_XML = "xml";
+
+    /**
+     * Default file extension used for PDF.
+     */
+    public static final String EXTENSION_PDF = "pdf";
+
+    /**
+     * File extension used for Microsoft Excel Open XML Spreadsheet (XLSX).
+     */
+    public static final String EXTENSION_XLSX = "xlsx";
+
+    /**
+     * File extension for Microsoft Excel's workbook files in use between 97-2003.
+     */
+    public static final String EXTENSION_XLS = "xls";
 
     /**
      * Default empty media type array.
@@ -114,6 +126,16 @@ public class MediaType implements CharSequence {
     public static final MediaType TEXT_HTML_TYPE = new MediaType(TEXT_HTML);
 
     /**
+     * CSV: text/csv.
+     */
+    public static final String TEXT_CSV = "text/csv";
+
+    /**
+     * CSV: text/csv.
+     */
+    public static final MediaType TEXT_CSV_TYPE = new MediaType(TEXT_CSV);
+
+    /**
      * XHTML: application/xhtml+xml.
      */
     public static final String APPLICATION_XHTML = "application/xhtml+xml";
@@ -152,6 +174,26 @@ public class MediaType implements CharSequence {
      * YAML: application/x-yaml.
      */
     public static final MediaType APPLICATION_YAML_TYPE = new MediaType(MediaType.APPLICATION_YAML);
+
+    /**
+     * XML: Microsoft Excel Open XML Spreadsheet (XLSX).
+     */
+    public static final String MICROSOFT_EXCEL_OPEN_XML = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+    /**
+     * XML: Microsoft Excel Open XML Spreadsheet (XLSX).
+     */
+    public static final MediaType MICROSOFT_EXCEL_OPEN_XML_TYPE = new MediaType(MICROSOFT_EXCEL_OPEN_XML, EXTENSION_XLSX);
+
+    /**
+     * Microsoft Excel's workbook files in use between 97-2003.
+     */
+    public static final String MICROSOFT_EXCEL = "application/vnd.ms-excel";
+
+    /**
+     * Microsoft Excel's workbook files in use between 97-2003.
+     */
+    public static final MediaType MICROSOFT_EXCEL_TYPE = new MediaType(MICROSOFT_EXCEL, EXTENSION_XLS);
 
     /**
      * XML: text/xml.
@@ -264,6 +306,16 @@ public class MediaType implements CharSequence {
     public static final MediaType APPLICATION_GRAPHQL_TYPE = new MediaType(APPLICATION_GRAPHQL);
 
     /**
+     * PDF: application/pdf.
+     */
+    public static final String APPLICATION_PDF = "application/pdf";
+
+    /**
+     * PDF: application/pdf.
+     */
+    public static final MediaType APPLICATION_PDF_TYPE = new MediaType(APPLICATION_PDF);
+
+    /**
      * Png Image: image/png.
      */
     public static final String IMAGE_PNG = "image/png";
@@ -318,12 +370,15 @@ public class MediaType implements CharSequence {
      */
     public static final String V_PARAMETER = "v";
 
-    private static final BigDecimal QUALITY_RATING_NUMBER = new BigDecimal("1.0");
-    private static final String QUALITY_RATING = "1.0";
-    private static final String SEMICOLON = ";";
+    @Internal
+    static final Argument<MediaType> ARGUMENT = Argument.of(MediaType.class);
+
+    @Internal
+    static final ArgumentConversionContext<MediaType> CONVERSION_CONTEXT = ConversionContext.of(ARGUMENT);
+
+    private static final char SEMICOLON = ';';
 
     @SuppressWarnings("ConstantName")
-    private static final Logger LOG = LoggerFactory.getLogger(MediaType.class);
     private static final String MIME_TYPES_FILE_NAME = "META-INF/http/mime.types";
     private static Map<String, String> mediaTypeFileExtensions;
     @SuppressWarnings("ConstantName")
@@ -334,13 +389,14 @@ public class MediaType implements CharSequence {
     protected final String type;
     protected final String extension;
     protected final Map<CharSequence, String> parameters;
+    private final String strRepr;
 
-    private BigDecimal qualityNumberField;
+    private BigDecimal qualityNumberField = BigDecimal.ONE;
 
     static {
-        ConversionService.SHARED.addConverter(CharSequence.class, MediaType.class, (Function<CharSequence, MediaType>) charSequence -> {
+        ConversionService.SHARED.addConverter(CharSequence.class, MediaType.class, charSequence -> {
                     if (StringUtils.isNotEmpty(charSequence)) {
-                        return new MediaType(charSequence.toString());
+                        return of(charSequence.toString());
                     }
                     return null;
                 }
@@ -392,20 +448,43 @@ public class MediaType implements CharSequence {
         if (name == null) {
             throw new IllegalArgumentException("Argument [name] cannot be null");
         }
+        name = name.trim();
         String withoutArgs;
-        if (name.contains(SEMICOLON)) {
-            this.parameters = new LinkedHashMap<>();
-            String[] tokenWithArgs = name.split(SEMICOLON);
-            withoutArgs = tokenWithArgs[0];
-            String[] paramsList = Arrays.copyOfRange(tokenWithArgs, 1, tokenWithArgs.length);
-            for (String param : paramsList) {
-                int i = param.indexOf('=');
-                if (i > -1) {
-                    parameters.put(param.substring(0, i).trim(), param.substring(i + 1).trim());
+        Iterator<String> splitIt = StringUtils.splitOmitEmptyStringsIterator(name, SEMICOLON);
+        if (splitIt.hasNext()) {
+            withoutArgs = splitIt.next();
+            if (splitIt.hasNext()) {
+                Map<CharSequence, String> parameters = null;
+                while (splitIt.hasNext()) {
+                    String paramExpression = splitIt.next();
+                    int i = paramExpression.indexOf('=');
+                    if (i > -1) {
+                        String paramName = paramExpression.substring(0, i).trim();
+                        String paramValue = paramExpression.substring(i + 1).trim();
+                        if ("q".equals(paramName)) {
+                            qualityNumberField = new BigDecimal(paramValue);
+                        }
+                        if (parameters == null) {
+                            parameters = new LinkedHashMap<>();
+                        }
+                        parameters.put(paramName, paramValue);
+                    }
                 }
+                if (parameters == null) {
+                    parameters = Collections.emptyMap();
+                }
+                this.parameters = parameters;
+            } else if (params == null) {
+                this.parameters = Collections.emptyMap();
+            } else {
+                this.parameters = (Map) params;
             }
         } else {
-            this.parameters = Collections.emptyMap();
+            if (params == null) {
+                this.parameters = Collections.emptyMap();
+            } else {
+                this.parameters = (Map) params;
+            }
             withoutArgs = name;
         }
         this.name = withoutArgs;
@@ -427,9 +506,91 @@ public class MediaType implements CharSequence {
                 this.extension = subtype;
             }
         }
-        if (params != null) {
-            parameters.putAll(params);
+        this.strRepr = toString0();
+    }
+
+    /**
+     * Create a new or get a {@link MediaType} from the given text.
+     *
+     * @param mediaType The text
+     * @return The {@link MediaType}
+     */
+    public static MediaType of(String mediaType) {
+        switch (mediaType) {
+            case ALL:
+                return ALL_TYPE;
+            case APPLICATION_FORM_URLENCODED:
+                return APPLICATION_FORM_URLENCODED_TYPE;
+            case MULTIPART_FORM_DATA:
+                return MULTIPART_FORM_DATA_TYPE;
+            case TEXT_HTML:
+                return TEXT_HTML_TYPE;
+            case TEXT_CSV:
+                return TEXT_CSV_TYPE;
+            case APPLICATION_XHTML:
+                return APPLICATION_XHTML_TYPE;
+            case APPLICATION_XML:
+                return APPLICATION_XML_TYPE;
+            case APPLICATION_JSON:
+                return APPLICATION_JSON_TYPE;
+            case APPLICATION_YAML:
+                return APPLICATION_YAML_TYPE;
+            case TEXT_XML:
+                return TEXT_XML_TYPE;
+            case TEXT_JSON:
+                return TEXT_JSON_TYPE;
+            case TEXT_PLAIN:
+                return TEXT_PLAIN_TYPE;
+            case APPLICATION_HAL_JSON:
+                return APPLICATION_HAL_JSON_TYPE;
+            case APPLICATION_HAL_XML:
+                return APPLICATION_HAL_XML_TYPE;
+            case APPLICATION_ATOM_XML:
+                return APPLICATION_ATOM_XML_TYPE;
+            case APPLICATION_VND_ERROR:
+                return APPLICATION_VND_ERROR_TYPE;
+            case TEXT_EVENT_STREAM:
+                return TEXT_EVENT_STREAM_TYPE;
+            case APPLICATION_JSON_STREAM:
+                return APPLICATION_JSON_STREAM_TYPE;
+            case APPLICATION_OCTET_STREAM:
+                return APPLICATION_OCTET_STREAM_TYPE;
+            case APPLICATION_GRAPHQL:
+                return APPLICATION_GRAPHQL_TYPE;
+            case APPLICATION_PDF:
+                return APPLICATION_PDF_TYPE;
+            case IMAGE_PNG:
+                return IMAGE_PNG_TYPE;
+            case IMAGE_JPEG:
+                return IMAGE_JPEG_TYPE;
+            case IMAGE_GIF:
+                return IMAGE_GIF_TYPE;
+            case IMAGE_WEBP:
+                return IMAGE_WEBP_TYPE;
+            default:
+                return new MediaType(mediaType);
         }
+    }
+
+    /**
+     * Determine if this requested content type can be satisfied by a given content type. e.g. text/* will be satisfied by test/html.
+     *
+     * @param expectedContentType   Content type to match against
+     * @return if successful match
+     */
+    public boolean matches(@NonNull MediaType expectedContentType) {
+        //noinspection ConstantConditions
+        if (expectedContentType == null) {
+            return false;
+        }
+        if (expectedContentType == this) {
+            return true;
+        }
+        String expectedType = expectedContentType.getType();
+        String expectedSubtype = expectedContentType.getSubtype();
+        boolean typeMatch = type.equals("*") || type.equalsIgnoreCase(expectedType);
+        boolean subtypeMatch = subtype.equals("*") || subtype.equalsIgnoreCase(expectedSubtype);
+        return typeMatch && subtypeMatch;
     }
 
     /**
@@ -471,16 +632,13 @@ public class MediaType implements CharSequence {
      * @return The quality of the Mime type
      */
     public String getQuality() {
-        return parameters.getOrDefault("q", QUALITY_RATING);
+        return qualityNumberField.toString();
     }
 
     /**
      * @return The quality in BigDecimal form
      */
     public BigDecimal getQualityAsNumber() {
-        if (this.qualityNumberField == null) {
-            this.qualityNumberField = getOrConvertQualityParameterToBigDecimal(this);
-        }
         return this.qualityNumberField;
     }
 
@@ -495,31 +653,31 @@ public class MediaType implements CharSequence {
      * @return The charset of the media type if specified
      */
     public Optional<Charset> getCharset() {
-        return getParameters().get("charset").map(Charset::forName);
+        return getParameters().get(CHARSET_PARAMETER).map(Charset::forName);
     }
 
     @Override
     public int length() {
-        return toString().length();
+        return strRepr.length();
     }
 
     @Override
     public char charAt(int index) {
-        return toString().charAt(index);
+        return strRepr.charAt(index);
     }
 
     @Override
     public CharSequence subSequence(int start, int end) {
-        return toString().subSequence(start, end);
+        return strRepr.subSequence(start, end);
     }
 
     /**
      * @return Whether the media type is text based
      */
     public boolean isTextBased() {
-        boolean matches = textTypePatterns.stream().anyMatch((p) -> p.matcher(name).matches());
+        boolean matches = textTypePatterns.stream().anyMatch(p -> p.matcher(name).matches());
         if (!matches) {
-            matches = subtype.equalsIgnoreCase("json") || subtype.equalsIgnoreCase("xml");
+            matches = subtype.equalsIgnoreCase("json") || subtype.equalsIgnoreCase("xml") || subtype.equalsIgnoreCase("x-yaml");
         }
         return matches;
     }
@@ -532,17 +690,30 @@ public class MediaType implements CharSequence {
         if (StringUtils.isEmpty(contentType)) {
             return false;
         }
-        MediaType mediaType = new MediaType(contentType);
-        return mediaType.isTextBased();
+        try {
+            return of(contentType).isTextBased();
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     @Override
     public String toString() {
+        return strRepr;
+    }
+
+    private String toString0() {
         if (parameters.isEmpty()) {
             return name;
         } else {
-            return name + ";" + parameters.entrySet().stream().map(Object::toString)
-                    .collect(Collectors.joining(";"));
+            StringBuilder sb = new StringBuilder(name);
+            parameters.forEach((name, value) -> {
+                sb.append(";");
+                sb.append(name);
+                sb.append("=");
+                sb.append(value);
+            });
+            return sb.toString();
         }
     }
 
@@ -571,13 +742,61 @@ public class MediaType implements CharSequence {
     }
 
     /**
+     * Returns the ordered media types for the given values.
+     * @param values The values
+     * @return The media types.
+     * @since 1.3.3
+     */
+    public static List<MediaType> orderedOf(CharSequence... values) {
+        return orderedOf(Arrays.asList(values));
+    }
+
+    /**
+     * Returns the ordered media types for the given values.
+     * @param values The values
+     * @return The media types.
+     * @since 1.3.3
+     */
+    public static List<MediaType> orderedOf(List<? extends CharSequence> values) {
+        if (CollectionUtils.isNotEmpty(values)) {
+            List<MediaType> mediaTypes = new LinkedList<>();
+            for (CharSequence value : values) {
+                for (String token : StringUtils.splitOmitEmptyStrings(value, ',')) {
+                    try {
+                        mediaTypes.add(MediaType.of(token));
+                    } catch (IllegalArgumentException e) {
+                        // ignore
+                    }
+                }
+            }
+            mediaTypes = new ArrayList<>(mediaTypes);
+            mediaTypes.sort((o1, o2) -> {
+                //The */* type is always last
+                if (o1.type.equals("*")) {
+                    return 1;
+                } else if (o2.type.equals("*")) {
+                    return -1;
+                }
+                if (o2.subtype.equals("*") && !o1.subtype.equals("*")) {
+                    return -1;
+                } else if (o1.subtype.equals("*") && !o2.subtype.equals("*")) {
+                    return 1;
+                }
+                return o2.getQualityAsNumber().compareTo(o1.getQualityAsNumber());
+            });
+            return Collections.unmodifiableList(mediaTypes);
+        }
+        return Collections.emptyList();
+    }
+
+    /**
      * Create a new {@link MediaType} from the given text.
      *
      * @param mediaType The text
      * @return The {@link MediaType}
      */
     public static MediaType of(CharSequence mediaType) {
-        return new MediaType(mediaType.toString());
+        return MediaType.of(mediaType.toString());
     }
 
     /**
@@ -587,7 +806,11 @@ public class MediaType implements CharSequence {
      * @return The {@link MediaType}
      */
     public static MediaType[] of(CharSequence... mediaType) {
-        return Arrays.stream(mediaType).map(txt -> new MediaType(txt.toString())).toArray(MediaType[]::new);
+        MediaType[] types = new MediaType[mediaType.length];
+        for (int i = 0; i < mediaType.length; i++) {
+            types[i] = MediaType.of(mediaType[i].toString());
+        }
+        return types;
     }
 
     /**
@@ -599,7 +822,9 @@ public class MediaType implements CharSequence {
     public static Optional<MediaType> fromType(Class<?> type) {
         Produces producesAnn = type.getAnnotation(Produces.class);
         if (producesAnn != null) {
-            return Arrays.stream(producesAnn.value()).findFirst().map(MediaType::new);
+            for (String mimeType : producesAnn.value()) {
+                return Optional.of(MediaType.of(mimeType));
+            }
         }
         return Optional.empty();
     }
@@ -653,22 +878,6 @@ public class MediaType implements CharSequence {
         return extensions;
     }
 
-    private BigDecimal getOrConvertQualityParameterToBigDecimal(MediaType mt) {
-        BigDecimal bd;
-        try {
-            String q = mt.parameters.getOrDefault(Q_PARAMETER, null);
-            if (q == null) {
-                return QUALITY_RATING_NUMBER;
-            } else {
-                bd = new BigDecimal(q);
-            }
-            return bd;
-        } catch (NumberFormatException e) {
-            bd = QUALITY_RATING_NUMBER;
-            return bd;
-        }
-    }
-
     @SuppressWarnings("MagicNumber")
     private static Map<String, String> loadMimeTypes() {
         try (InputStream is = MediaType.class.getClassLoader().getResourceAsStream(MIME_TYPES_FILE_NAME)) {
@@ -688,8 +897,9 @@ public class MediaType implements CharSequence {
             }
             return result;
         } catch (IOException ex) {
-            if (LOG.isWarnEnabled()) {
-                LOG.warn("Failed to load mime types for file extension detection!");
+            Logger logger = LoggerFactory.getLogger(MediaType.class);
+            if (logger.isWarnEnabled()) {
+                logger.warn("Failed to load mime types for file extension detection!");
             }
         }
 

@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,11 +23,10 @@ import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.session.Session;
 import io.micronaut.session.SessionSettings;
+import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Singleton;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -105,7 +104,7 @@ public class CookieHttpSessionStrategy implements HttpSessionIdStrategy {
             if (configuration.isRememberMe()) {
                 cookie.maxAge(Integer.MAX_VALUE);
             } else {
-                configuration.getCookieMaxAge().ifPresent(maxAge -> cookie.maxAge(maxAge.get(ChronoUnit.SECONDS)));
+                configuration.getCookieMaxAge().ifPresent(cookie::maxAge);
             }
         }
 
@@ -113,6 +112,7 @@ public class CookieHttpSessionStrategy implements HttpSessionIdStrategy {
 
         configuration.getCookiePath().ifPresent(cookie::path);
         configuration.getDomainName().ifPresent(cookie::domain);
+        configuration.getCookieSameSite().ifPresent(cookie::sameSite);
 
         response.cookie(cookie);
     }

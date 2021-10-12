@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,10 +24,11 @@ import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRoute;
 import io.micronaut.web.router.UriRouteMatch;
 
-import javax.annotation.Nonnull;
-import java.net.URI;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -61,106 +62,145 @@ public class FilteredRouter implements Router {
         this.routeFilter = routeFilter;
     }
 
+    @NonNull
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> findAny(CharSequence uri) {
-        return router.findAny(uri);
+    public <T, R> Stream<UriRouteMatch<T, R>> findAny(@NonNull CharSequence uri, @Nullable HttpRequest<?> context) {
+        final Stream<UriRouteMatch<T, R>> matchStream = router.findAny(uri, context);
+        if (context != null) {
+            return matchStream.filter(routeFilter.filter(context));
+        }
+        return matchStream;
     }
 
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(HttpMethod httpMethod, CharSequence uri) {
-        return router.find(httpMethod, uri);
+    public Set<Integer> getExposedPorts() {
+        return router.getExposedPorts();
     }
 
-    @Nonnull
     @Override
-    public <T, R> List<UriRouteMatch<T, R>> findAllClosest(@Nonnull HttpRequest<?> request) {
+    public void applyDefaultPorts(List<Integer> ports) {
+        router.applyDefaultPorts(ports);
+    }
+
+    @NonNull
+    @Override
+    public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri, @Nullable HttpRequest<?> context) {
+        final Stream<UriRouteMatch<T, R>> matchStream = router.find(httpMethod, uri, context);
+        if (context != null) {
+            return matchStream.filter(routeFilter.filter(context));
+        }
+        return matchStream;
+    }
+
+    @NonNull
+    @Override
+    public <T, R> List<UriRouteMatch<T, R>> findAllClosest(@NonNull HttpRequest<?> request) {
         List<UriRouteMatch<T, R>> closestMatches = router.findAllClosest(request);
         return closestMatches.stream().filter(routeFilter.filter(request))
                     .collect(Collectors.toList());
     }
 
+    @NonNull
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest request, CharSequence uri) {
+    public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest<?> request, @NonNull CharSequence uri) {
         return router.find(request, uri);
     }
 
+    @NonNull
     @Override
     public Stream<UriRoute> uriRoutes() {
         return router.uriRoutes();
     }
 
     @Override
-    public <T, R> Optional<UriRouteMatch<T, R>> route(HttpMethod httpMethod, CharSequence uri) {
+    public <T, R> Optional<UriRouteMatch<T, R>> route(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri) {
         return router.route(httpMethod, uri);
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(HttpStatus status) {
+    public <R> Optional<RouteMatch<R>> route(@NonNull HttpStatus status) {
         return router.route(status);
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(Class originatingClass, HttpStatus status) {
+    public <R> Optional<RouteMatch<R>> route(@NonNull Class originatingClass, @NonNull HttpStatus status) {
         return router.route(originatingClass, status);
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(Throwable error) {
+    public <R> Optional<RouteMatch<R>> route(@NonNull Throwable error) {
         return router.route(error);
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(Class originatingClass, Throwable error) {
+    public <R> Optional<RouteMatch<R>> route(@NonNull Class originatingClass, @NonNull Throwable error) {
         return router.route(originatingClass, error);
     }
 
     @Override
-    public List<HttpFilter> findFilters(HttpRequest<?> request) {
+    public <R> Optional<RouteMatch<R>> findErrorRoute(@NonNull Class<?> originatingClass, @NonNull Throwable error, HttpRequest<?> request) {
+        return router.findErrorRoute(originatingClass, error, request);
+    }
+
+    @Override
+    public <R> Optional<RouteMatch<R>> findErrorRoute(@NonNull Throwable error, HttpRequest<?> request) {
+        return router.findErrorRoute(error, request);
+    }
+
+    @Override
+    public <R> Optional<RouteMatch<R>> findStatusRoute(@NonNull Class<?> originatingClass, @NonNull HttpStatus status, HttpRequest<?> request) {
+        return router.findStatusRoute(originatingClass, status, request);
+    }
+
+    @Override
+    public <R> Optional<RouteMatch<R>> findStatusRoute(@NonNull HttpStatus status, HttpRequest<?> request) {
+        return router.findStatusRoute(status, request);
+    }
+
+    @NonNull
+    @Override
+    public List<HttpFilter> findFilters(@NonNull HttpRequest<?> request) {
         return router.findFilters(request);
     }
 
     @Override
-    public <T, R> Optional<UriRouteMatch<T, R>> GET(CharSequence uri) {
+    public <T, R> Optional<UriRouteMatch<T, R>> GET(@NonNull CharSequence uri) {
         return router.GET(uri);
     }
 
     @Override
-    public <T, R> Optional<UriRouteMatch<T, R>> POST(CharSequence uri) {
+    public <T, R> Optional<UriRouteMatch<T, R>> POST(@NonNull CharSequence uri) {
         return router.POST(uri);
     }
 
     @Override
-    public <T, R> Optional<UriRouteMatch<T, R>> PUT(CharSequence uri) {
+    public <T, R> Optional<UriRouteMatch<T, R>> PUT(@NonNull CharSequence uri) {
         return router.PUT(uri);
     }
 
     @Override
-    public <T, R> Optional<UriRouteMatch<T, R>> PATCH(CharSequence uri) {
+    public <T, R> Optional<UriRouteMatch<T, R>> PATCH(@NonNull CharSequence uri) {
         return router.PATCH(uri);
     }
 
     @Override
-    public <T, R> Optional<UriRouteMatch<T, R>> DELETE(CharSequence uri) {
+    public <T, R> Optional<UriRouteMatch<T, R>> DELETE(@NonNull CharSequence uri) {
         return router.DELETE(uri);
     }
 
     @Override
-    public <T, R> Optional<UriRouteMatch<T, R>> OPTIONS(CharSequence uri) {
+    public <T, R> Optional<UriRouteMatch<T, R>> OPTIONS(@NonNull CharSequence uri) {
         return router.OPTIONS(uri);
     }
 
     @Override
-    public <T, R> Optional<UriRouteMatch<T, R>> HEAD(CharSequence uri) {
+    public <T, R> Optional<UriRouteMatch<T, R>> HEAD(@NonNull CharSequence uri) {
         return router.HEAD(uri);
     }
 
+    @NonNull
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(HttpMethod httpMethod, URI uri) {
-        return router.find(httpMethod, uri);
-    }
-
-    @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request) {
+    public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest<?> request) {
         Stream<UriRouteMatch<T, R>> matches = router.find(request);
         return matches.filter(routeFilter.filter(request));
     }

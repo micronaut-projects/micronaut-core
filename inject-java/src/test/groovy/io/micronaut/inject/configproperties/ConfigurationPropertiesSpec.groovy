@@ -18,6 +18,7 @@ package io.micronaut.inject.configproperties
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
+import io.micronaut.core.util.CollectionUtils
 import spock.lang.Specification
 
 class ConfigurationPropertiesSpec extends Specification {
@@ -65,7 +66,10 @@ class ConfigurationPropertiesSpec extends Specification {
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(PropertySource.of(
             'test',
-            ['foo.bar.port':'8080',
+            ['foo.bar.innerVals': [
+                    ['expire-unsigned-seconds': 123], ['expireUnsignedSeconds': 600]
+            ],
+             'foo.bar.port':'8080',
              'foo.bar.max-size':'1MB',
              'foo.bar.another-size':'1MB',
             'foo.bar.anotherPort':'9090',
@@ -83,6 +87,9 @@ class ConfigurationPropertiesSpec extends Specification {
         MyConfig config = applicationContext.getBean(MyConfig)
 
         expect:
+        config.innerVals.size() == 2
+        config.innerVals[0].expireUnsignedSeconds == 123
+        config.innerVals[1].expireUnsignedSeconds == 600
         config.port == 8080
         config.maxSize == 1048576
         config.anotherSize == 1048576
@@ -113,5 +120,42 @@ class ConfigurationPropertiesSpec extends Specification {
 
         expect:
         config.inner.enabled
+    }
+
+    void "test binding to a map field"() {
+        ApplicationContext context = ApplicationContext.run(CollectionUtils.mapOf("map.field.yyy.zzz", 3, "map.field.yyy.xxx", 2, "map.field.yyy.yyy", 3))
+        MapProperties config = context.getBean(MapProperties.class)
+
+        expect:
+        config.field.containsKey('yyy')
+
+        cleanup:
+        context.close()
+    }
+
+    void "test binding to a map setter"() {
+        ApplicationContext context = ApplicationContext.run(CollectionUtils.mapOf("map.setter.yyy.zzz", 3, "map.setter.yyy.xxx", 2, "map.setter.yyy.yyy", 3))
+        MapProperties config = context.getBean(MapProperties.class)
+
+        expect:
+        config.setter.containsKey('yyy')
+
+        cleanup:
+        context.close()
+    }
+
+    void "test camelCase vs kebab_case"() {
+        ApplicationContext context1 = ApplicationContext.run("rec1")
+        ApplicationContext context2 = ApplicationContext.run("rec2")
+
+        RecConf config1 = context1.getBean(RecConf.class)
+        RecConf config2 = context2.getBean(RecConf.class)
+
+        expect:
+            config1 == config2
+
+        cleanup:
+            context1.close()
+            context2.close()
     }
 }

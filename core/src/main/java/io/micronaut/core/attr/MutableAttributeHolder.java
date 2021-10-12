@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,11 +15,11 @@
  */
 package io.micronaut.core.attr;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.util.StringUtils;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.util.Optional;
 
 /**
@@ -35,7 +35,7 @@ public interface MutableAttributeHolder extends AttributeHolder {
      * @return The mutable attributes
      */
     @Override
-    @Nonnull
+    @NonNull
     MutableConvertibleValues<Object> getAttributes();
 
     /**
@@ -45,7 +45,7 @@ public interface MutableAttributeHolder extends AttributeHolder {
      * @param value The value of the attribute
      * @return This message
      */
-    default @Nonnull MutableAttributeHolder setAttribute(@Nonnull CharSequence name, @Nullable Object value) {
+    default @NonNull MutableAttributeHolder setAttribute(@NonNull CharSequence name, @Nullable Object value) {
         if (StringUtils.isNotEmpty(name)) {
             if (value == null) {
                 getAttributes().remove(name.toString());
@@ -64,7 +64,7 @@ public interface MutableAttributeHolder extends AttributeHolder {
      * @param <T>  type Generic
      * @return An {@link Optional} value
      */
-    default @Nonnull <T> Optional<T> removeAttribute(@Nonnull CharSequence name, @Nonnull Class<T> type) {
+    default @NonNull <T> Optional<T> removeAttribute(@NonNull CharSequence name, @NonNull Class<T> type) {
         if (StringUtils.isNotEmpty(name)) {
             String key = name.toString();
             Optional<T> value = getAttribute(key, type);

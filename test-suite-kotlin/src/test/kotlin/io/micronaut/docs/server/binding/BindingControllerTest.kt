@@ -1,13 +1,13 @@
 package io.micronaut.docs.server.binding
 
-import io.kotlintest.shouldBe
-import io.kotlintest.shouldNotBe
-import io.kotlintest.shouldThrow
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.cookie.Cookie
 import io.micronaut.runtime.server.EmbeddedServer
@@ -19,7 +19,7 @@ class BindingControllerTest: StringSpec() {
     )
 
     val client = autoClose(
-            embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.getURL())
+            embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.getURL())
     )
 
     init {
@@ -33,6 +33,17 @@ class BindingControllerTest: StringSpec() {
 
             body shouldNotBe null
             body shouldBe "cookie value"
+        }
+
+        "test multiple cookie binding" {
+            val cookies = HashSet<Cookie>()
+            cookies.add(Cookie.of("myCookieA", "cookie A value"))
+            cookies.add(Cookie.of("myCookieB", "cookie B value"))
+
+            var body = client.toBlocking().retrieve(HttpRequest.GET<Any>("/binding/cookieMultiple").cookies(cookies))
+
+            body shouldNotBe null
+            body shouldBe "[\"cookie A value\",\"cookie B value\"]"
         }
 
         "test header binding"() {

@@ -26,6 +26,7 @@ class FieldNullableInjectionSpec {
         val context = BeanContext.run()
         val b = context.getBean(B::class.java)
         assertNull(b.a)
+        context.close()
     }
 
 }

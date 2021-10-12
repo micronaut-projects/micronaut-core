@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.netty.jackson
 
-import com.fasterxml.jackson.databind.ObjectMapper
+
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource

@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,12 +15,14 @@
  */
 package io.micronaut.inject;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.annotation.Nonnull;
+import io.micronaut.core.annotation.NonNull;
 import java.util.Map;
 
 /**
@@ -38,9 +40,14 @@ public final class ArgumentBeanType<T> implements BeanType<T>, Argument<T> {
      * Default constructor.
      * @param argument The argument
      */
-    public ArgumentBeanType(@Nonnull Argument<T> argument) {
+    public ArgumentBeanType(@NonNull Argument<T> argument) {
         ArgumentUtils.requireNonNull("argument", argument);
         this.argument = argument;
+    }
+
+    @Override
+    public boolean isContainerType() {
+        return BeanType.super.isContainerType();
     }
 
     @Override
@@ -64,7 +71,7 @@ public final class ArgumentBeanType<T> implements BeanType<T>, Argument<T> {
     }
 
     @Override
-    public boolean equalsType(Argument<?> other) {
+    public boolean equalsType(@Nullable Argument<?> other) {
         return argument.equals(other);
     }
 
@@ -85,6 +92,11 @@ public final class ArgumentBeanType<T> implements BeanType<T>, Argument<T> {
 
     @Override
     public boolean isEnabled(BeanContext context) {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled(@NonNull BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         return true;
     }
 }

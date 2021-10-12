@@ -17,7 +17,7 @@ package io.micronaut.inject.method.builderinjection
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.BeanFactory
@@ -34,11 +34,11 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
     public java.net.URL url;
     
-    @javax.inject.Inject
+    @jakarta.inject.Inject
     Test setURL( java.net.URL url) {
         this.url = url;
         return this;
@@ -90,13 +90,13 @@ class TestConfig {
         return this.name;
     }
     
-    @javax.inject.Inject
+    @jakarta.inject.Inject
     TestConfig setURL( java.net.URL url) {
         this.url = url;
         return this;
     }
     
-    @javax.inject.Inject
+    @jakarta.inject.Inject
     void setAnotherURL( java.net.URL url) {
         this.anotherUrl = url;
     }

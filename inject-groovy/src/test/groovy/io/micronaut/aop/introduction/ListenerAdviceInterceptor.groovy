@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,8 @@ package io.micronaut.aop.introduction
 
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
-
-import javax.inject.Singleton
+import io.micronaut.core.annotation.Nullable
+import jakarta.inject.Singleton
 
 /**
  * @author graemerocher
@@ -38,6 +38,7 @@ class ListenerAdviceInterceptor implements MethodInterceptor<Object,Object> {
         return recievedMessages
     }
 
+    @Nullable
     @Override
     Object intercept(MethodInvocationContext<Object, Object> context) {
         if(context.getMethodName().equalsIgnoreCase("onApplicationEvent")) {

@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -35,6 +35,7 @@ import org.reactivestreams.Subscriber;
 public class DefaultStreamedHttpRequest extends DefaultHttpRequest implements StreamedHttpRequest {
 
     private final Publisher<HttpContent> stream;
+    private boolean consumed;
 
     /**
      * @param httpVersion The Http Version
@@ -60,7 +61,13 @@ public class DefaultStreamedHttpRequest extends DefaultHttpRequest implements St
     }
 
     @Override
+    public boolean isConsumed() {
+        return this.consumed;
+    }
+
+    @Override
     public void subscribe(Subscriber<? super HttpContent> subscriber) {
+        consumed = true;
         stream.subscribe(subscriber);
     }
 

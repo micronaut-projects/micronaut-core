@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,13 +19,15 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.hateoas.JsonError;
-import io.micronaut.http.hateoas.Link;
+import io.micronaut.http.server.exceptions.response.Error;
+import io.micronaut.http.server.exceptions.response.ErrorContext;
+import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
+import java.util.Optional;
 
 /**
  * Default exception handler for JSON processing errors.
@@ -33,18 +35,37 @@ import javax.inject.Singleton;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Produces(MediaType.APPLICATION_JSON)
+@Produces
 @Singleton
 public class JsonExceptionHandler implements ExceptionHandler<JsonProcessingException, Object> {
 
+    private final ErrorResponseProcessor<?> responseProcessor;
+
+    /**
+     * Constructor.
+     * @param responseProcessor Error Response Processor
+     */
+    @Inject
+    public JsonExceptionHandler(ErrorResponseProcessor<?> responseProcessor) {
+        this.responseProcessor = responseProcessor;
+    }
+
     @Override
     public Object handle(HttpRequest request, JsonProcessingException exception) {
-        // TODO: Send JSON back with detailed error
         MutableHttpResponse<Object> response = HttpResponse.status(HttpStatus.BAD_REQUEST, "Invalid JSON");
-        JsonError body = new JsonError("Invalid JSON: " + exception.getMessage());
-        body.link(Link.SELF, Link.of(request.getUri()));
-        response.body(body);
+        return responseProcessor.processResponse(ErrorContext.builder(request)
+                .cause(exception)
+                .error(new Error() {
+                    @Override
+                    public String getMessage() {
+                        return "Invalid JSON: " + exception.getMessage();
+                    }
 
-        return response;
+                    @Override
+                    public Optional<String> getTitle() {
+                        return Optional.of("Invalid JSON");
+                    }
+                })
+                .build(), response);
     }
 }

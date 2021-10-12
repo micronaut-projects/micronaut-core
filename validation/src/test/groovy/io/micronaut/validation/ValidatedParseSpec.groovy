@@ -4,16 +4,17 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.Around
 import io.micronaut.inject.ProxyBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
+import io.micronaut.inject.writer.BeanDefinitionWriter
 
 import java.time.LocalDate
 
 class ValidatedParseSpec extends AbstractTypeElementSpec {
     void "test constraints on beans make them @Validated"() {
         given:
-        def definition = buildBeanDefinition('test.$TestDefinition' + BeanDefinitionVisitor.PROXY_SUFFIX,'''
+        def definition = buildBeanDefinition('test.$Test' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX,'''
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @io.micronaut.context.annotation.Executable

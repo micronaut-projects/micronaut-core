@@ -16,13 +16,10 @@
 package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Delete
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Patch
-import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.retry.annotation.Fallback
+import io.micronaut.retry.annotation.Recoverable
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -72,6 +69,9 @@ class BlockingFallbackSpec extends Specification {
 
     @Client('/blocking/fallback/books')
     static interface BookClient extends BookApi {
+        @Override
+        @Recoverable(api = BookApi)
+        Book get(Long id)
     }
 
     @Fallback

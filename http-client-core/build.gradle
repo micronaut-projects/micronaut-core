@@ -1,0 +1,17 @@
+dependencies {
+    annotationProcessor project(":inject-java")
+
+    implementation libs.managed.reactor
+
+    api project(":runtime")
+
+    compileOnly libs.kotlin.stdlib
+}
+
+//tasks.withType(Test) {
+//    testLogging {
+//        showStandardStreams = true
+//        exceptionFormat = 'full'
+//    }
+//}
+//

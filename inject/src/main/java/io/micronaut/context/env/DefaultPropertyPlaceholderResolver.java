@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,7 +21,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
 
-import javax.annotation.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -53,15 +53,6 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     private final PropertyResolver environment;
     private final ConversionService<?> conversionService;
     private final String prefix;
-
-    /**
-     * @param environment The property resolver for the environment
-     * @deprecated Use {@link #DefaultPropertyPlaceholderResolver(PropertyResolver, ConversionService)} instead
-     */
-    @Deprecated
-    public DefaultPropertyPlaceholderResolver(PropertyResolver environment) {
-        this(environment, ConversionService.SHARED);
-    }
 
     /**
      * @param environment The property resolver for the environment
@@ -144,24 +135,6 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     }
 
     /**
-     * Resolves a replacement for the given expression. Returning true if the replacement was resolved.
-     *
-     * @deprecated No longer used internally. See {@link #resolveExpression(String, String, Class)}
-     * @param builder The builder
-     * @param str The full string
-     * @param expr The current expression
-     * @return True if a placeholder was resolved
-     */
-    @Deprecated
-    protected boolean resolveReplacement(StringBuilder builder, String str, String expr) {
-        if (environment.containsProperty(expr)) {
-            builder.append(environment.getProperty(expr, String.class).orElseThrow(() -> new ConfigurationException("Could not resolve placeholder ${" + expr + "} in value: " + str)));
-            return true;
-        }
-        return false;
-    }
-
-    /**
      * Resolves a single expression.
      *
      * @param context The context of the expression
@@ -229,9 +202,13 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
 
         @Override
         public <T> T getValue(Class<T> type) throws ConfigurationException {
-            return conversionService.convert(text, type)
-                    .orElseThrow(() ->
-                            new ConfigurationException("Could not convert: [" + text + "] to the required type: [" + type.getName() + "]"));
+            if (type.isInstance(text)) {
+                return (T) text;
+            } else {
+                return conversionService.convert(text, type)
+                        .orElseThrow(() ->
+                                new ConfigurationException("Could not convert: [" + text + "] to the required type: [" + type.getName() + "]"));
+            }
         }
     }
 

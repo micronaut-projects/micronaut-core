@@ -1,29 +1,73 @@
 dependencies {
-    compile project(":http-server")
-    compile project(":http-netty")
+    annotationProcessor project(":inject-java")
+    annotationProcessor project(":graal")
 
-    compileOnly project(":inject-java")
-    compileOnly dependencyModuleVersion("netty", "netty-transport-native-epoll")
-    compileOnly dependencyModuleVersion("netty", "netty-transport-native-kqueue")
+    api project(":http-server")
+    api project(":core")
+    api project(":http-netty")
+    api libs.managed.netty.codec.http
 
-    testCompile project(":inject-groovy")
-    testCompile project(":inject-java")
-    testCompile project(":inject-java-test")
-    testCompile project(":http-client")
-    testCompile group: 'org.powermock', name: 'powermock-module-junit4', version: '2.0.2'
-    testCompile group: 'org.powermock', name: 'powermock-api-mockito2', version: '2.0.2'
+    implementation libs.managed.reactor
 
-    testCompile dependencyModuleVersion("groovy", "groovy-json")
-    testCompile dependencyModuleVersion("groovy", "groovy-templates")
-    testCompile dependencyVersion("rxjava2")
-    testCompile dependencyVersion("reactor")
-    testCompile(dependencyModuleVersion("netty", "netty-transport-native-epoll") + ":linux-x86_64")
-    testCompile(dependencyModuleVersion("netty", "netty-transport-native-kqueue") + ":osx-x86_64")
-}
+    compileOnly libs.kotlin.stdlib
 
-tasks.withType(Test) {
-    testLogging {
-        showStandardStreams = true
-        exceptionFormat = 'full'
+    testCompileOnly project(":inject-groovy")
+    testAnnotationProcessor project(":inject-java")
+    testImplementation project(":inject")
+    testImplementation project(":inject-java-test")
+    testImplementation project(":http-client")
+    testImplementation libs.managed.spotbugs
+    testImplementation libs.powermock.junit4
+    testImplementation libs.powermock.mockito2
+    if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
+        testImplementation libs.bcpkix
     }
+    testImplementation(libs.managed.micronaut.test.junit5) {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+    }
+    testImplementation(libs.managed.micronaut.test.spock) {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+    }
+    testImplementation(libs.managed.micronaut.xml) {
+        exclude module:'micronaut-inject'
+        exclude module:'micronaut-http'
+    }
+    testImplementation libs.managed.jackson.databind
+
+    // following 3 dependencies needed for Http2PostTest
+    testImplementation libs.vertx
+    testImplementation libs.vertx.webclient
+    testImplementation libs.jetty.alpn.openjdk8.client
+
+    testImplementation libs.managed.groovy.json
+    testImplementation libs.managed.groovy.templates
+
+    testImplementation(libs.managed.netty.transport.native.epoll) {
+        artifact {
+            classifier = "linux-x86_64"
+        }
+    }
+    testImplementation(libs.managed.netty.transport.native.kqueue) {
+        artifact {
+            classifier = "osx-x86_64"
+        }
+    }
+    testImplementation libs.managed.logback
+    testImplementation(libs.managed.micronaut.test.junit5) {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+    }
+    // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
+    testImplementation libs.junit.jupiter.api
 }
+
+//tasks.withType(Test) {
+//    testLogging {
+//        showStandardStreams = true
+//        exceptionFormat = 'full'
+//    }
+//}
+
+//compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

@@ -1,0 +1,13 @@
+You can customize the Netty pipeline by writing a <<events, Bean Event Listener>> that listens for the creation of api:http.netty.channel.ChannelPipelineCustomizer[].
+
+Both the Netty HTTP server and client implement this interface and it lets you customize the Netty `ChannelPipeline` and add additional handlers.
+
+The api:http.netty.channel.ChannelPipelineCustomizer[] interface defines constants for the names of the various handlers Micronaut registers.
+
+As an example the following code sample demonstrates registering the https://github.com/zalando/logbook[Logbook] library which includes additional Netty handlers to perform request and response logging:
+
+snippet::io.micronaut.docs.netty.LogbookPipelineCustomizer[tags="imports,class", indent=0, title="Customizing the Netty pipeline for Logbook"]
+
+<1> `LogbookPipelineCustomizer` implements api:http.netty.channel.ChannelPipelineCustomizer[] and requires the definition of a `Logbook` bean
+<2> If the bean being created is the server, the server handler is registered
+<3> if the bean being created is the client, the client handler is registered

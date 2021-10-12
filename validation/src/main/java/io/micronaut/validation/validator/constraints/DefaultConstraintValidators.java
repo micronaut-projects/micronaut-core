@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +18,8 @@ package io.micronaut.validation.validator.constraints;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.beans.BeanWrapper;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -29,11 +31,9 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.qualifiers.TypeArgumentQualifier;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import javax.validation.ValidationException;
 import javax.validation.constraints.*;
 import java.lang.annotation.Annotation;
@@ -45,7 +45,15 @@ import java.time.chrono.JapaneseDate;
 import java.time.chrono.MinguoDate;
 import java.time.chrono.ThaiBuddhistDate;
 import java.time.temporal.TemporalAccessor;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.atomic.DoubleAccumulator;
+import java.util.concurrent.atomic.DoubleAdder;
 
 /**
  * A factory bean that contains implementation for many of the default validations.
@@ -77,7 +85,7 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
 
     private final DecimalMinValidator<Number> decimalMinValidatorNumber = DefaultConstraintValidators::compareNumber;
 
-    private final DigitsValidator<Number> digitsValidatorNumber = (value) -> {
+    private final DigitsValidator<Number> digitsValidatorNumber = value -> {
             if (value instanceof BigDecimal) {
                 return (BigDecimal) value;
             }
@@ -97,9 +105,9 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
             );
 
             if (value instanceof BigInteger) {
-                return ((BigInteger) value).compareTo(BigInteger.valueOf(max)) < 0;
+                return ((BigInteger) value).compareTo(BigInteger.valueOf(max)) <= 0;
             } else if (value instanceof BigDecimal) {
-                return ((BigDecimal) value).compareTo(BigDecimal.valueOf(max)) < 0;
+                return ((BigDecimal) value).compareTo(BigDecimal.valueOf(max)) <= 0;
             }
             return value.longValue() <= max;
         };
@@ -124,25 +132,85 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
     private final ConstraintValidator<Negative, Number> negativeNumberValidator =
             (value, annotationMetadata, context) -> {
             // null is allowed according to spec
-            return value == null || value.intValue() < 0;
+            if (value == null) {
+                return true;
+            }
+            if (value instanceof  BigDecimal) {
+                return ((BigDecimal) value).signum() < 0;
+            }
+            if (value instanceof BigInteger) {
+                return ((BigInteger) value).signum() < 0;
+            }
+            if (value instanceof Double ||
+                value instanceof Float  ||
+                value instanceof DoubleAdder ||
+                value instanceof DoubleAccumulator) {
+                return value.doubleValue() < 0;
+            }
+            return value.longValue() < 0;
         };
 
     private final ConstraintValidator<NegativeOrZero, Number> negativeOrZeroNumberValidator =
             (value, annotationMetadata, context) -> {
             // null is allowed according to spec
-            return value == null || value.intValue() <= 0;
+            if (value == null) {
+                return true;
+            }
+            if (value instanceof  BigDecimal) {
+                return ((BigDecimal) value).signum() <= 0;
+            }
+            if (value instanceof BigInteger) {
+                return ((BigInteger) value).signum() <= 0;
+            }
+            if (value instanceof Double ||
+                value instanceof Float  ||
+                value instanceof DoubleAdder ||
+                value instanceof DoubleAccumulator) {
+                return value.doubleValue() <= 0;
+            }
+            return value.longValue() <= 0;
         };
 
     private final ConstraintValidator<Positive, Number> positiveNumberValidator =
             (value, annotationMetadata, context) -> {
             // null is allowed according to spec
-            return value == null || value.intValue() > 0;
+            if (value == null) {
+                return true;
+            }
+            if (value instanceof  BigDecimal) {
+                return ((BigDecimal) value).signum() > 0;
+            }
+            if (value instanceof BigInteger) {
+                return ((BigInteger) value).signum() > 0;
+            }
+            if (value instanceof Double ||
+                value instanceof Float  ||
+                value instanceof DoubleAdder ||
+                value instanceof DoubleAccumulator) {
+                return value.doubleValue() > 0;
+            }
+            return value.longValue() > 0;
         };
 
     private final ConstraintValidator<PositiveOrZero, Number> positiveOrZeroNumberValidator =
             (value, annotationMetadata, context) -> {
             // null is allowed according to spec
-            return value == null || value.intValue() >= 0;
+            if (value == null) {
+                return true;
+            }
+            if (value instanceof  BigDecimal) {
+                return ((BigDecimal) value).signum() >= 0;
+            }
+            if (value instanceof BigInteger) {
+                return ((BigInteger) value).signum() >= 0;
+            }
+            if (value instanceof Double ||
+                value instanceof Float  ||
+                value instanceof DoubleAdder ||
+                value instanceof DoubleAccumulator) {
+                return value.doubleValue() >= 0;
+            }
+            return value.longValue() >= 0;
         };
 
     private final ConstraintValidator<NotBlank, CharSequence> notBlankValidator =
@@ -189,6 +257,8 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
 
     private final ConstraintValidator<NotEmpty, Map> notEmptyMapValidator =
             (value, annotationMetadata, context) -> CollectionUtils.isNotEmpty(value);
+
+    private final SizeValidator<Object[]> sizeObjectArrayValidator = value -> value.length;
 
     private final SizeValidator<byte[]> sizeByteArrayValidator = value -> value.length;
 
@@ -318,9 +388,9 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
     }
 
     @SuppressWarnings("unchecked")
-    @Nonnull
+    @NonNull
     @Override
-    public <A extends Annotation, T> Optional<ConstraintValidator<A, T>> findConstraintValidator(@Nonnull Class<A> constraintType, @Nonnull Class<T> targetType) {
+    public <A extends Annotation, T> Optional<ConstraintValidator<A, T>> findConstraintValidator(@NonNull Class<A> constraintType, @NonNull Class<T> targetType) {
         ArgumentUtils.requireNonNull("constraintType", constraintType);
         ArgumentUtils.requireNonNull("targetType", targetType);
         final ValidatorKey key = new ValidatorKey(constraintType, targetType);
@@ -338,11 +408,11 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
                         ReflectionUtils.getWrapperType(targetType)
                 );
                 Class<T> finalTargetType = targetType;
+                final Class[] finalTypeArguments = {constraintType, finalTargetType};
                 final Optional<ConstraintValidator> local = localValidators.entrySet().stream().filter(entry -> {
                             final ValidatorKey k = entry.getKey();
-                            return TypeArgumentQualifier.areTypesCompatible(
-                                    new Class[]{constraintType, finalTargetType},
-                                    Arrays.asList(k.constraintType, k.targetType)
+                    return TypeArgumentQualifier.areTypesCompatible(
+                            finalTypeArguments, Arrays.asList(k.constraintType, k.targetType)
                             );
                         }
                 ).map(Map.Entry::getValue).findFirst();
@@ -633,6 +703,15 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
     }
 
     /**
+     * The {@link Size} validator for Object[].
+     *
+     * @return The validator
+     */
+    public SizeValidator<Object[]> getSizeObjectArrayValidator() {
+        return sizeObjectArrayValidator;
+    }
+
+    /**
      * The {@link Size} validator for byte[].
      *
      * @return The validator
@@ -776,7 +855,7 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
      * @return The validator if present
      */
     protected <A extends Annotation, T> Optional<ConstraintValidator> findLocalConstraintValidator(
-            @Nonnull Class<A> constraintType, @Nonnull Class<T> targetType) {
+            @NonNull Class<A> constraintType, @NonNull Class<T> targetType) {
         return Optional.empty();
     }
 
@@ -823,7 +902,7 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
      * @param bigDecimal The big decimal
      * @return The result
      */
-    private static int compareNumber(@Nonnull Number value, @Nonnull BigDecimal bigDecimal) {
+    private static int compareNumber(@NonNull Number value, @NonNull BigDecimal bigDecimal) {
         int result;
         if (value instanceof BigDecimal) {
             result = ((BigDecimal) value).compareTo(bigDecimal);
@@ -849,7 +928,7 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
          * @param constraintType THe constraint type
          * @param targetType The target type
          */
-        public ValidatorKey(@Nonnull Class<A> constraintType, @Nonnull Class<T> targetType) {
+        public ValidatorKey(@NonNull Class<A> constraintType, @NonNull Class<T> targetType) {
             this.constraintType = constraintType;
             this.targetType = targetType;
         }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,11 +15,13 @@
  */
 package io.micronaut.http.hateoas;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 
-import javax.annotation.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.util.Optional;
 
 /**
@@ -30,6 +32,13 @@ import java.util.Optional;
  */
 @Produces(MediaType.APPLICATION_JSON)
 public class JsonError extends AbstractResource<JsonError> {
+
+    /**
+     * The argument type.
+     *
+     * @since 1.3.3
+     */
+    public static final Argument<JsonError> TYPE = Argument.of(JsonError.class);
 
     private String message;
     private String logref;
@@ -66,6 +75,7 @@ public class JsonError extends AbstractResource<JsonError> {
     /**
      * @return The logref
      */
+    @JsonProperty("logref")
     public Optional<String> getLogref() {
         return logref == null ? Optional.empty() : Optional.of(logref);
     }
@@ -73,6 +83,7 @@ public class JsonError extends AbstractResource<JsonError> {
     /**
      * @return The path
      */
+    @JsonProperty("path")
     public Optional<String> getPath() {
         return path == null ? Optional.empty() : Optional.of(path);
     }
@@ -83,6 +94,7 @@ public class JsonError extends AbstractResource<JsonError> {
      * @param path The path
      * @return This error object
      */
+    @JsonProperty
     public JsonError path(@Nullable String path) {
         this.path = path;
         return this;
@@ -94,6 +106,7 @@ public class JsonError extends AbstractResource<JsonError> {
      * @param logref The logref
      * @return This error object
      */
+    @JsonProperty
     public JsonError logref(@Nullable String logref) {
         this.logref = logref;
         return this;

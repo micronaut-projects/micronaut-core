@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,12 +15,13 @@
  */
 package io.micronaut.inject;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.type.Argument;
 
-import javax.annotation.Nonnull;
+import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.List;
@@ -53,12 +54,17 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
     }
 
     @Override
+    default Optional<String> getScopeName() {
+        return getTarget().getScopeName();
+    }
+
+    @Override
     default AnnotationMetadata getAnnotationMetadata() {
         return getTarget().getAnnotationMetadata();
     }
 
     @Override
-    default <R> ExecutableMethod<T, R> getRequiredMethod(String name, Class... argumentTypes) {
+    default <R> ExecutableMethod<T, R> getRequiredMethod(String name, Class<?>... argumentTypes) {
         return getTarget().getRequiredMethod(name, argumentTypes);
     }
 
@@ -93,37 +99,38 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
     }
 
     @Override
-    default Collection<Class> getRequiredComponents() {
+    default Collection<Class<?>> getRequiredComponents() {
         return getTarget().getRequiredComponents();
     }
 
     @Override
-    default Collection<MethodInjectionPoint> getInjectedMethods() {
+    default Collection<MethodInjectionPoint<T, ?>> getInjectedMethods() {
         return getTarget().getInjectedMethods();
     }
 
     @Override
-    default Collection<FieldInjectionPoint> getInjectedFields() {
+    default Collection<FieldInjectionPoint<T, ?>> getInjectedFields() {
         return getTarget().getInjectedFields();
     }
 
     @Override
-    default Collection<MethodInjectionPoint> getPostConstructMethods() {
+    default Collection<MethodInjectionPoint<T, ?>> getPostConstructMethods() {
         return getTarget().getPostConstructMethods();
     }
 
     @Override
-    default Collection<MethodInjectionPoint> getPreDestroyMethods() {
+    default Collection<MethodInjectionPoint<T, ?>> getPreDestroyMethods() {
         return getTarget().getPreDestroyMethods();
     }
 
     @Override
+    @NonNull
     default String getName() {
         return getTarget().getName();
     }
 
     @Override
-    default <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class... argumentTypes) {
+    default <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class<?>... argumentTypes) {
         return getTarget().findMethod(name, argumentTypes);
     }
 
@@ -158,12 +165,17 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
     }
 
     @Override
+    default boolean isEnabled(@NonNull BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
+        return getTarget().isEnabled(context, resolutionContext);
+    }
+
+    @Override
     default Optional<Class<?>> getDeclaringType() {
         return getTarget().getDeclaringType();
     }
 
     @Override
-    default @Nonnull List<Argument<?>> getTypeArguments(String type) {
+    default @NonNull List<Argument<?>> getTypeArguments(String type) {
         return getTarget().getTypeArguments(type);
     }
 }

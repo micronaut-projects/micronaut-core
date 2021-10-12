@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,25 +15,24 @@
  */
 package io.micronaut.http.server.codec;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.codec.CodecConfiguration;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.sse.Event;
 import io.micronaut.runtime.ApplicationConfiguration;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 
-import javax.annotation.Nullable;
-import javax.inject.Inject;
-import javax.inject.Named;
-import javax.inject.Provider;
-import javax.inject.Singleton;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -65,26 +64,11 @@ public class TextStreamCodec implements MediaTypeCodec {
     private static final byte[] COMMENT_PREFIX = ": ".getBytes(StandardCharsets.UTF_8);
     private static final byte[] NEWLINE = "\n".getBytes(StandardCharsets.UTF_8);
 
-    private final Provider<MediaTypeCodecRegistry> codecRegistryProvider;
+    private final BeanProvider<MediaTypeCodecRegistry> codecRegistryProvider;
     private final ByteBufferFactory byteBufferFactory;
     private final List<MediaType> additionalTypes;
     private final Charset defaultCharset;
     private MediaTypeCodecRegistry codecRegistry;
-
-    /**
-     * @param serverConfiguration   The HTTP server configuration
-     * @param byteBufferFactory     A byte buffer factory
-     * @param codecRegistryProvider A media type codec registry
-     * @param codecConfiguration    The configuration for the codec
-     */
-    @Deprecated
-    public TextStreamCodec(
-        HttpServerConfiguration serverConfiguration,
-        ByteBufferFactory byteBufferFactory,
-        Provider<MediaTypeCodecRegistry> codecRegistryProvider,
-        @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
-        this(serverConfiguration.getDefaultCharset(), byteBufferFactory, codecRegistryProvider, codecConfiguration);
-    }
 
     /**
      * @param applicationConfiguration The application configuration
@@ -96,7 +80,7 @@ public class TextStreamCodec implements MediaTypeCodec {
     public TextStreamCodec(
             ApplicationConfiguration applicationConfiguration,
             ByteBufferFactory byteBufferFactory,
-            Provider<MediaTypeCodecRegistry> codecRegistryProvider,
+            BeanProvider<MediaTypeCodecRegistry> codecRegistryProvider,
             @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
         this(applicationConfiguration.getDefaultCharset(), byteBufferFactory, codecRegistryProvider, codecConfiguration);
     }
@@ -110,7 +94,7 @@ public class TextStreamCodec implements MediaTypeCodec {
     protected TextStreamCodec(
             Charset defaultCharset,
             ByteBufferFactory byteBufferFactory,
-            Provider<MediaTypeCodecRegistry> codecRegistryProvider,
+            BeanProvider<MediaTypeCodecRegistry> codecRegistryProvider,
             @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
         this.defaultCharset = defaultCharset;
         this.byteBufferFactory = byteBufferFactory;
@@ -131,17 +115,17 @@ public class TextStreamCodec implements MediaTypeCodec {
     }
 
     @Override
-    public <T> T decode(Argument<T> type, InputStream inputStream) throws CodecException {
+    public <T> T decode(Argument<T> type, InputStream inputStream) {
         throw new UnsupportedOperationException("This codec currently only supports encoding");
     }
 
     @Override
-    public <T> T decode(Class<T> type, InputStream inputStream) throws CodecException {
+    public <T> T decode(Class<T> type, InputStream inputStream) {
         throw new UnsupportedOperationException("This codec currently only supports encoding");
     }
 
     @Override
-    public <T> void encode(T object, OutputStream outputStream) throws CodecException {
+    public <T> void encode(T object, OutputStream outputStream) {
         try {
             outputStream.write(encode(object));
         } catch (IOException e) {
@@ -150,14 +134,14 @@ public class TextStreamCodec implements MediaTypeCodec {
     }
 
     @Override
-    public <T> byte[] encode(T object) throws CodecException {
+    public <T> byte[] encode(T object) {
         ByteBuffer buffer = encode(object, byteBufferFactory);
         return buffer.toByteArray();
     }
 
     @SuppressWarnings("MagicNumber")
     @Override
-    public <T> ByteBuffer encode(T object, ByteBufferFactory allocator) throws CodecException {
+    public <T, B> ByteBuffer<B> encode(T object, ByteBufferFactory<?, B> allocator) {
         Event<Object> event;
         if (object instanceof Event) {
             event = (Event<Object>) object;
@@ -181,11 +165,25 @@ public class TextStreamCodec implements MediaTypeCodec {
         if (retry != null) {
             writeAttribute(eventData, RETRY_PREFIX, String.valueOf(retry.toMillis()));
         }
-        // Write the data: prefix
-        eventData.write(DATA_PREFIX)
-            .write(body)
-            .write(NEWLINE) // Write new lines for event separation
-            .write(NEWLINE);
+
+        // Write the data
+        int idx = body.indexOf((byte) '\n');
+        while (idx > -1) {
+            int length = idx + 1;
+            byte[] line = new byte[length];
+            body.read(line, 0, length);
+            eventData.write(DATA_PREFIX).write(line);
+            idx = body.indexOf((byte) '\n');
+        }
+        if (body.readableBytes() > 0) {
+            int length = body.readableBytes();
+            byte[] line = new byte[length];
+            body.read(line, 0, length);
+            eventData.write(DATA_PREFIX).write(line);
+        }
+
+        // Write new lines for event separation
+        eventData.write(NEWLINE).write(NEWLINE);
         return eventData;
     }
 

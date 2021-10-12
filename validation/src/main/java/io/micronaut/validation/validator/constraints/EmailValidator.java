@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,15 +17,15 @@
  * Hibernate Validator, declare and validate application constraints
  *
  * License: Apache License, Version 2.0
- * See the license.txt file in the root directory or <http://www.apache.org/licenses/LICENSE-2.0>.
+ * See the license.txt file in the root directory or <https://www.apache.org/licenses/LICENSE-2.0>.
  */
 package io.micronaut.validation.validator.constraints;
 
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import jakarta.inject.Singleton;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import javax.inject.Singleton;
 import javax.validation.constraints.Email;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -58,8 +58,8 @@ public class EmailValidator extends AbstractPatternValidator<Email> {
     @Override
     public boolean isValid(
             @Nullable CharSequence value,
-            @Nonnull AnnotationValue<Email> annotationMetadata,
-            @Nonnull ConstraintValidatorContext context) {
+            @NonNull AnnotationValue<Email> annotationMetadata,
+            @NonNull ConstraintValidatorContext context) {
         if (value == null) {
             return true;
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,9 @@
 package io.micronaut.docs.ioc.scopes
 
 // tag::imports[]
-
 import io.micronaut.context.annotation.Requires
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import java.lang.annotation.Documented
 import java.lang.annotation.Retention
 
@@ -27,7 +26,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME
 // end::imports[]
 
 // tag::class[]
-@Requires(classes = Car.class ) // <1>
+@Requires(classes = Car.class) // <1>
 @Singleton // <2>
 @Documented
 @Retention(RUNTIME)

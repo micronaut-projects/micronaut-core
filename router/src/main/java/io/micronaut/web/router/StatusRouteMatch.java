@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,10 +18,8 @@ package io.micronaut.web.router;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpStatus;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+
+import java.util.*;
 import java.util.function.Function;
 
 /**
@@ -35,6 +33,7 @@ import java.util.function.Function;
 class StatusRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
 
     final HttpStatus httpStatus;
+    private final ArrayList<Argument> requiredArguments;
 
     /**
      * @param httpStatus The HTTP status
@@ -44,6 +43,7 @@ class StatusRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
     StatusRouteMatch(HttpStatus httpStatus, DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService<?> conversionService) {
         super(abstractRoute, conversionService);
         this.httpStatus = httpStatus;
+        this.requiredArguments = new ArrayList<>(Arrays.asList(getArguments()));
     }
 
     @Override
@@ -52,11 +52,26 @@ class StatusRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
     }
 
     @Override
+    public Collection<Argument> getRequiredArguments() {
+        return requiredArguments;
+    }
+
+    @Override
+    public boolean isErrorRoute() {
+        return true;
+    }
+
+    @Override
+    public HttpStatus findStatus(HttpStatus defaultStatus) {
+        return super.findStatus(httpStatus);
+    }
+
+    @Override
     protected RouteMatch<R> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments) {
         return new StatusRouteMatch<T, R>(httpStatus, abstractRoute, conversionService) {
             @Override
             public Collection<Argument> getRequiredArguments() {
-                return Collections.unmodifiableCollection(requiredArguments);
+                return requiredArguments;
             }
 
             @Override
@@ -74,7 +89,7 @@ class StatusRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
         return new StatusRouteMatch<T, R>(httpStatus, abstractRoute, conversionService) {
             @Override
             public Collection<Argument> getRequiredArguments() {
-                return Collections.unmodifiableCollection(arguments);
+                return arguments;
             }
 
             @Override

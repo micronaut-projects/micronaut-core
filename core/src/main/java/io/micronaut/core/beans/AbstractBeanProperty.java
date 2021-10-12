@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -23,8 +22,9 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+
 import java.util.Objects;
 
 /**
@@ -59,9 +59,9 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
     @Internal
     @UsedByGeneratedCode
     protected AbstractBeanProperty(
-            @Nonnull BeanIntrospection<B> introspection,
-            @Nonnull Class<P> type,
-            @Nonnull String name,
+            @NonNull BeanIntrospection<B> introspection,
+            @NonNull Class<P> type,
+            @NonNull String name,
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Argument[] typeArguments) {
         this.introspection = introspection;
@@ -72,28 +72,29 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
         this.typeArguments = typeArguments;
     }
 
-    @Override public @Nonnull String getName() {
+    @Override public @NonNull String getName() {
         return name;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public Class<P> getType() {
         return type;
     }
 
     @Override
+    @NonNull
     public Argument<P> asArgument() {
         if (typeArguments != null) {
-            return Argument.of(type, name, typeArguments);
+            return Argument.of(type, name, getAnnotationMetadata(), typeArguments);
         } else {
-            return Argument.of(type, name);
+            return Argument.of(type, name, getAnnotationMetadata());
         }
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    public BeanIntrospection<B> getDeclaringBean() {
+    public final BeanIntrospection<B> getDeclaringBean() {
         return introspection;
     }
 
@@ -104,7 +105,7 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
 
     @Nullable
     @Override
-    public final P get(@Nonnull B bean) {
+    public final P get(@NonNull B bean) {
         ArgumentUtils.requireNonNull("bean", bean);
 
         if (!beanType.isInstance(bean)) {
@@ -117,7 +118,21 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
     }
 
     @Override
-    public final void set(@Nonnull B bean, @Nullable P value) {
+    public B withValue(@NonNull B bean, @Nullable P value) {
+        ArgumentUtils.requireNonNull("bean", bean);
+
+        if (!beanType.isInstance(bean)) {
+            throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + introspection.getBeanType());
+        }
+        if (value == get(bean)) {
+            return bean;
+        } else {
+            return withValueInternal(bean, value);
+        }
+    }
+
+    @Override
+    public final void set(@NonNull B bean, @Nullable P value) {
         ArgumentUtils.requireNonNull("bean", bean);
 
         if (!beanType.isInstance(bean)) {
@@ -129,8 +144,27 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
         if (value != null && !ReflectionUtils.getWrapperType(getType()).isInstance(value)) {
             throw new IllegalArgumentException("Specified value [" + value + "] is not of the correct type: " + getType());
         }
-
+        /*
+        if (value == null && isNonNull()) {
+            throw new IllegalArgumentException("Null values not supported by property: " + getName());
+        }
+         */
         writeInternal(bean, value);
+    }
+
+
+    /**
+     * Mutates a property value.
+     * @param bean The bean
+     * @param value The value
+     * @see BeanProperty#withValue(Object, Object)
+     * @return Either a copy of the bean with the copy constructor invoked or the mutated instance if it mutable
+     */
+    @SuppressWarnings("WeakerAccess")
+    @UsedByGeneratedCode
+    @Internal
+    protected B withValueInternal(B bean, P value) {
+        return BeanProperty.super.withValue(bean, value);
     }
 
     /**
@@ -141,7 +175,7 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
     @SuppressWarnings("WeakerAccess")
     @UsedByGeneratedCode
     @Internal
-    protected abstract void writeInternal(@Nonnull B bean, @Nullable P value);
+    protected abstract void writeInternal(@NonNull B bean, @Nullable P value);
 
     /**
      * Reads the bean property.
@@ -151,7 +185,7 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
     @SuppressWarnings("WeakerAccess")
     @UsedByGeneratedCode
     @Internal
-    protected abstract P readInternal(@Nonnull B bean);
+    protected abstract P readInternal(@NonNull B bean);
 
     @Override
     public boolean equals(Object o) {

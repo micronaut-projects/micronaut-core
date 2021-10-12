@@ -33,13 +33,14 @@ class SslFileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test returning a file from a controller"() {
         when:
-        def response = rxClient.exchange('/test/html', String).blockingFirst()
+        def response = rxClient.exchange('/test/html', String).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
         response.body() == "<html><head></head><body>HTML Page</body></html>"
     }
 
+    @Override
     Map<String, Object> getConfiguration() {
         super.getConfiguration() << ['micronaut.ssl.enabled': true, 'micronaut.ssl.buildSelfSigned': true]
     }

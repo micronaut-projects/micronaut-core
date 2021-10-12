@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -70,4 +70,17 @@ public interface FileUpload {
      * @return True if the part is fully uploaded
      */
     boolean isComplete();
+
+    /**
+     * Discards the contents of the file. This must be called
+     * if the file will not be read and has not already been read.
+     *
+     * Failure to either read or discard the file will result in
+     * memory leaks!
+     *
+     * @since 2.4.0
+     */
+    default void discard() {
+        throw new UnsupportedOperationException("Discard not supported");
+    }
 }

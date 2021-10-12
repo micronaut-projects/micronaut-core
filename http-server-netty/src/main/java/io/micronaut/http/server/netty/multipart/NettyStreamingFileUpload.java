@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,26 +17,29 @@ package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
+import io.micronaut.core.util.functional.ThrowingSupplier;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
-import io.reactivex.Flowable;
-import io.reactivex.Single;
-import io.reactivex.schedulers.Schedulers;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Files;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
-import java.util.function.Supplier;
 
 /**
  * An implementation of the {@link StreamingFileUpload} interface for Netty.
@@ -51,7 +54,7 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
     private io.netty.handler.codec.http.multipart.FileUpload fileUpload;
     private final ExecutorService ioExecutor;
     private final HttpServerConfiguration.MultipartConfiguration configuration;
-    private final Flowable subject;
+    private final Flux<PartData> subject;
 
     /**
      * @param httpData               The file upload (the data)
@@ -63,7 +66,7 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
         io.netty.handler.codec.http.multipart.FileUpload httpData,
         HttpServerConfiguration.MultipartConfiguration multipartConfiguration,
         ExecutorService ioExecutor,
-        Flowable subject) {
+        Flux<PartData> subject) {
 
         this.configuration = multipartConfiguration;
         this.fileUpload = httpData;
@@ -73,7 +76,7 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
 
     @Override
     public Optional<MediaType> getContentType() {
-        return Optional.of(new MediaType(fileUpload.getContentType()));
+        return Optional.of(new MediaType(fileUpload.getContentType(), NameUtils.extension(fileUpload.getFilename())));
     }
 
     @Override
@@ -110,49 +113,12 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
 
     @Override
     public Publisher<Boolean> transferTo(File destination) {
-        Supplier<Boolean> transferOperation = () -> {
-            try {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Transferring file {} to location {}", fileUpload.getFilename(), destination);
-                }
-                return destination != null && fileUpload.renameTo(destination);
-            } catch (IOException e) {
-                throw new MultipartException("Error transferring file: " + fileUpload.getName(), e);
-            }
-        };
+        return transferTo(() -> Files.newOutputStream(destination.toPath()));
+    }
 
-        return Single.<Boolean>create((emitter) -> {
-
-            subject.subscribeOn(Schedulers.from(ioExecutor))
-                .subscribe(new Subscriber() {
-                    Subscription subscription;
-                    @Override
-                    public void onSubscribe(Subscription s) {
-                        subscription = s;
-                        subscription.request(1);
-                    }
-
-                    @Override
-                    public void onNext(Object o) {
-                        subscription.request(1);
-                    }
-
-                    @Override
-                    public void onError(Throwable t) {
-                        emitter.onError(t);
-                    }
-
-                    @Override
-                    public void onComplete() {
-                        if (fileUpload.isCompleted()) {
-                            emitter.onSuccess(transferOperation.get());
-                        } else {
-                            emitter.onError(new MultipartException("Transfer did not complete"));
-                        }
-                    }
-                });
-        }).toFlowable();
-
+    @Override
+    public Publisher<Boolean> transferTo(OutputStream outputStream) {
+        return transferTo(() -> outputStream);
     }
 
     @Override
@@ -170,7 +136,7 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
     protected File createTemp(String location) {
         File tempFile;
         try {
-            tempFile = File.createTempFile(DiskFileUpload.prefix, DiskFileUpload.postfix + '_' + location);
+            tempFile = Files.createTempFile(DiskFileUpload.prefix, DiskFileUpload.postfix + '_' + location).toFile();
         } catch (IOException e) {
             throw new MultipartException("Unable to create temp directory: " + e.getMessage(), e);
         }
@@ -183,5 +149,73 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
     @Override
     public void subscribe(Subscriber<? super PartData> s) {
         subject.subscribe(s);
+    }
+
+    @Override
+    public void discard() {
+        fileUpload.release();
+    }
+
+    private Publisher<Boolean> transferTo(ThrowingSupplier<OutputStream, IOException> outputStreamSupplier) {
+        return Mono.<Boolean>create(emitter ->
+
+                subject.subscribeOn(Schedulers.fromExecutorService(ioExecutor))
+                        .subscribe(new Subscriber<PartData>() {
+                            Subscription subscription;
+                            OutputStream outputStream;
+                            @Override
+                            public void onSubscribe(Subscription s) {
+                                subscription = s;
+                                subscription.request(1);
+                                try {
+                                    outputStream = outputStreamSupplier.get();
+                                } catch (IOException e) {
+                                    handleError(e);
+                                }
+                            }
+
+                            @Override
+                            public void onNext(PartData o) {
+                                try {
+                                    outputStream.write(o.getBytes());
+                                    subscription.request(1);
+                                } catch (IOException e) {
+                                    handleError(e);
+                                }
+                            }
+
+                            @Override
+                            public void onError(Throwable t) {
+                                emitter.error(t);
+                                try {
+                                    if (outputStream != null) {
+                                        outputStream.close();
+                                    }
+                                } catch (IOException e) {
+                                    if (LOG.isWarnEnabled()) {
+                                        LOG.warn("Failed to close file stream : " + fileUpload.getName());
+                                    }
+                                }
+                            }
+
+                            @Override
+                            public void onComplete() {
+                                try {
+                                    outputStream.close();
+                                    emitter.success(true);
+                                } catch (IOException e) {
+                                    if (LOG.isWarnEnabled()) {
+                                        LOG.warn("Failed to close file stream : " + fileUpload.getName());
+                                    }
+                                    emitter.success(false);
+                                }
+                            }
+
+                            private void handleError(Throwable t) {
+                                subscription.cancel();
+                                onError(new MultipartException("Error transferring file: " + fileUpload.getName(), t));
+                            }
+                        })
+        ).flux();
     }
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,14 +17,13 @@ package io.micronaut.http;
 
 import io.micronaut.http.cookie.Cookies;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.security.Principal;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Optional;
+import java.security.cert.Certificate;
+import java.util.*;
 
 /**
  * <p>Common interface for HTTP request implementations.</p>
@@ -37,30 +36,71 @@ import java.util.Optional;
 public interface HttpRequest<B> extends HttpMessage<B> {
 
     /**
+     * Constant for HTTP scheme.
+     */
+    String SCHEME_HTTP = "http";
+
+    /**
+     * Constant for HTTPS scheme.
+     */
+    String SCHEME_HTTPS = "https";
+
+    /**
      * @return The {@link Cookies} instance
      */
-    @Nonnull Cookies getCookies();
+    @NonNull Cookies getCookies();
 
     /**
      * @return The HTTP parameters contained with the URI query string
      */
-    @Nonnull HttpParameters getParameters();
+    @NonNull HttpParameters getParameters();
 
     /**
      * @return The request method
      */
-    @Nonnull HttpMethod getMethod();
+    @NonNull HttpMethod getMethod();
 
     /**
      * @return The full request URI
      */
-    @Nonnull URI getUri();
+    @NonNull URI getUri();
+
+    /**
+     * Returns a new request object that allows mutation.
+     * @return The mutable request
+     * @since 2.0.0
+     */
+    default MutableHttpRequest<B> mutate() {
+        throw new UnsupportedOperationException("Request is immutable");
+    }
+
+    /**
+     * @return The http version of the request.
+     */
+    default HttpVersion getHttpVersion() {
+        return HttpVersion.HTTP_1_1;
+    }
+
+    /**
+     * A list of accepted {@link MediaType} instances sorted by their quality rating.
+     *
+     * @return A list of zero or many {@link MediaType} instances
+     */
+    default Collection<MediaType> accept() {
+        final HttpHeaders headers = getHeaders();
+        if (headers.contains(HttpHeaders.ACCEPT)) {
+            return MediaType.orderedOf(
+                    headers.getAll(HttpHeaders.ACCEPT)
+            );
+        }
+        return Collections.emptySet();
+    }
 
     /**
      *
      * @return The name of the method (same as {@link HttpMethod} value for standard http methods).
      */
-    default @Nonnull String getMethodName() {
+    default @NonNull String getMethodName() {
         return getMethod().name();
     }
 
@@ -70,7 +110,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return The principal
      * @since 1.0.4
      */
-    default @Nonnull Optional<Principal> getUserPrincipal() {
+    default @NonNull Optional<Principal> getUserPrincipal() {
         return getAttribute(HttpAttributes.PRINCIPAL, Principal.class);
     }
 
@@ -82,28 +122,28 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @param <T> The principal type
      * @since 1.0.4
      */
-    default @Nonnull <T extends Principal> Optional<T> getUserPrincipal(Class<T> principalType) {
+    default @NonNull <T extends Principal> Optional<T> getUserPrincipal(Class<T> principalType) {
         return getAttribute(HttpAttributes.PRINCIPAL, principalType);
     }
 
     /**
-     * @return Get the path without any parameters
+     * @return Get the raw, percent-encoded path without any parameters
      */
-    default @Nonnull String getPath() {
-        return getUri().getPath();
+    default @NonNull String getPath() {
+        return getUri().getRawPath();
     }
 
     /**
      * @return Obtain the remote address
      */
-    default @Nonnull InetSocketAddress getRemoteAddress() {
+    default @NonNull InetSocketAddress getRemoteAddress() {
         return getServerAddress();
     }
 
     /**
      * @return Obtain the server address
      */
-    default @Nonnull InetSocketAddress getServerAddress() {
+    default @NonNull InetSocketAddress getServerAddress() {
         String host = getUri().getHost();
         int port = getUri().getPort();
         return new InetSocketAddress(host != null ? host : "localhost", port > -1 ? port : 80);
@@ -133,7 +173,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     @Override
     default Optional<Locale> getLocale() {
         return getHeaders().findFirst(HttpHeaders.ACCEPT_LANGUAGE)
-            .map((text) -> {
+            .map(text -> {
                 int len = text.length();
                 if (len == 0 || (len == 1 && text.charAt(0) == '*')) {
                     return Locale.getDefault().toLanguageTag();
@@ -149,6 +189,14 @@ public interface HttpRequest<B> extends HttpMessage<B> {
             .map(Locale::forLanguageTag);
     }
 
+    /**
+     * Retrieves the Certificate used for mutual authentication.
+     *
+     * @return A certificate used for authentication, if applicable.
+     */
+    default Optional<Certificate> getCertificate() {
+        return this.getAttribute(HttpAttributes.X509_CERTIFICATE, Certificate.class);
+    }
 
     /**
      * Return a {@link MutableHttpRequest} for a {@link HttpMethod#GET} request for the given URI.
@@ -244,7 +292,6 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpRequest<T> POST(String uri, T body) {
         Objects.requireNonNull(uri, "Argument [uri] is required");
-        Objects.requireNonNull(body, "Argument [body] cannot be null");
         return HttpRequestFactory.INSTANCE.post(uri, body);
     }
 
@@ -272,8 +319,6 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpRequest<T> PUT(String uri, T body) {
         Objects.requireNonNull(uri, "Argument [uri] is required");
-        Objects.requireNonNull(body, "Argument [body] cannot be null");
-
         return HttpRequestFactory.INSTANCE.put(uri, body);
     }
 
@@ -301,7 +346,6 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpRequest<T> PATCH(String uri, T body) {
         Objects.requireNonNull(uri, "Argument [uri] is required");
-        Objects.requireNonNull(body, "Argument [body] cannot be null");
         return HttpRequestFactory.INSTANCE.patch(uri, body);
     }
 

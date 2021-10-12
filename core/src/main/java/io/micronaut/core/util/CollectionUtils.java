@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,8 +18,8 @@ package io.micronaut.core.util;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.convert.ConversionService;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import java.lang.reflect.Constructor;
 import java.util.*;
 
@@ -30,6 +30,16 @@ import java.util.*;
  * @since 1.0
  */
 public class CollectionUtils {
+
+    /**
+     * Is the given type an iterable or map type.
+     * @param type The type
+     * @return True if it is iterable or map
+     * @since 2.0.0
+     */
+    public static boolean isIterableOrMap(Class<?> type) {
+        return type != null && (Iterable.class.isAssignableFrom(type) || Map.class.isAssignableFrom(type));
+    }
 
     /**
      * Null safe empty check.
@@ -154,7 +164,6 @@ public class CollectionUtils {
         return set;
     }
 
-
     /**
      * Convert an {@link Enumeration} to a {@link Iterable}.
      *
@@ -162,7 +171,7 @@ public class CollectionUtils {
      * @param <T>         The type
      * @return The set
      */
-    public static @Nonnull <T> Iterable<T> enumerationToIterable(@Nullable Enumeration<T> enumeration) {
+    public static @NonNull <T> Iterable<T> enumerationToIterable(@Nullable Enumeration<T> enumeration) {
         if (enumeration == null) {
             return Collections.emptyList();
         }
@@ -219,8 +228,12 @@ public class CollectionUtils {
             if (o == null) {
                 continue;
             } else {
-                Optional<String> converted = ConversionService.SHARED.convert(o, String.class);
-                converted.ifPresent(builder::append);
+                if (CharSequence.class.isInstance(o)) {
+                    builder.append(o.toString());
+                } else {
+                    Optional<String> converted = ConversionService.SHARED.convert(o, String.class);
+                    converted.ifPresent(builder::append);
+                }
             }
             if (i.hasNext()) {
                 builder.append(delimiter);
@@ -286,10 +299,48 @@ public class CollectionUtils {
      * @param <T> The generic type
      * @return A non-null unmodifiable list
      */
-    public static @Nonnull <T> List<T> unmodifiableList(@Nullable List<T> list) {
+    public static @NonNull <T> List<T> unmodifiableList(@Nullable List<T> list) {
         if (isEmpty(list)) {
             return Collections.emptyList();
         }
         return Collections.unmodifiableList(list);
+    }
+
+    /**
+     * Returns the last element of a collection.
+     *
+     * @param collection The collection
+     * @param <T> The generic type
+     * @return The last element of a collection or null
+     */
+    public static @Nullable <T> T last(@NonNull Collection<T> collection) {
+        if (collection instanceof List) {
+            List<T> list = (List<T>) collection;
+            final int s = list.size();
+            if (s > 0) {
+                return list.get(s - 1);
+            } else {
+                return null;
+            }
+        } else if (collection instanceof Deque) {
+            final Iterator<T> i = ((Deque<T>) collection).descendingIterator();
+            if (i.hasNext()) {
+                return i.next();
+            }
+            return null;
+        } else if (collection instanceof NavigableSet) {
+            final Iterator<T> i = ((NavigableSet<T>) collection).descendingIterator();
+            if (i.hasNext()) {
+                return i.next();
+            }
+            return null;
+        } else {
+            T result = null;
+            for (T t : collection) {
+                result = t;
+            }
+            return result;
+        }
+
     }
 }

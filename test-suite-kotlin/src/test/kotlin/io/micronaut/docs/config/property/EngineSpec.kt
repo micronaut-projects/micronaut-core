@@ -1,7 +1,7 @@
 package io.micronaut.docs.config.property
 
-import io.kotlintest.shouldBe
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
 import org.junit.Test
 
@@ -18,5 +18,7 @@ class EngineSpec : StringSpec({
 
         engine.manufacturer shouldBe "Honda"
         engine.cylinders() shouldBe 8
+
+        ctx.close()
     }
 })

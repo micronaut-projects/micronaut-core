@@ -1,10 +1,23 @@
+/*
+ * Copyright 2017-2020 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.docs.aop.retry
 
 import io.micronaut.retry.annotation.CircuitBreaker
 import io.micronaut.retry.annotation.Retryable
-import io.reactivex.Flowable
-
-import java.util.Collections
+import reactor.core.publisher.Flux
 
 open class BookService {
 
@@ -25,7 +38,8 @@ open class BookService {
     }
 
     // tag::attempts[]
-    @Retryable(attempts = "5", delay = "2s")
+    @Retryable(attempts = "5",
+               delay = "2s")
     open fun findBook(title: String): Book {
         // ...
         // end::attempts[]
@@ -33,7 +47,8 @@ open class BookService {
     }
 
     // tag::config[]
-    @Retryable(attempts = "\${book.retry.attempts:3}", delay = "\${book.retry.delay:1s}")
+    @Retryable(attempts = "\${book.retry.attempts:3}",
+               delay = "\${book.retry.delay:1s}")
     open fun getBook(title: String): Book {
         // ...
         // end::config[]
@@ -42,10 +57,10 @@ open class BookService {
 
     // tag::reactive[]
     @Retryable
-    open fun streamBooks(): Flowable<Book> {
+    open fun streamBooks(): Flux<Book> {
         // ...
         // end::reactive[]
-        return Flowable.just(
+        return Flux.just(
                 Book("The Stand")
         )
     }

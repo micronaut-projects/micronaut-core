@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,11 +15,16 @@
  */
 package io.micronaut.core.value;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.util.StringUtils;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * A {@link PropertyResolver} that resolves values from a backing map.
@@ -62,5 +67,25 @@ public class MapPropertyResolver implements PropertyResolver {
     public <T> Optional<T> getProperty(String name, ArgumentConversionContext<T> conversionContext) {
         Object value = map.get(name);
         return conversionService.convert(value, conversionContext);
+    }
+
+    @NonNull
+    @Override
+    public Collection<String> getPropertyEntries(@NonNull String name) {
+        if (StringUtils.isNotEmpty(name)) {
+            String prefix = name + ".";
+            return map.keySet().stream().filter(k -> k.startsWith(prefix))
+                    .map(k -> {
+                        String withoutPrefix = k.substring(prefix.length());
+                        int i = withoutPrefix.indexOf('.');
+                        if (i > -1) {
+                            return withoutPrefix.substring(0, i);
+                        }
+                        return withoutPrefix;
+                    })
+                    // to list to retain order from linked hash map
+                    .collect(Collectors.toList());
+        }
+        return Collections.emptySet();
     }
 }

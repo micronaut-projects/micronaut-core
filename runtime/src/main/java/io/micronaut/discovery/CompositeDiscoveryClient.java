@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,8 +17,9 @@ package io.micronaut.discovery;
 
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
-import io.reactivex.Flowable;
-import io.reactivex.Single;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -60,33 +61,33 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
     }
 
     @Override
-    public Flowable<List<ServiceInstance>> getInstances(String serviceId) {
+    public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
         serviceId = NameUtils.hyphenate(serviceId);
         if (ArrayUtils.isEmpty(discoveryClients)) {
-            return Flowable.just(Collections.emptyList());
+            return Flux.just(Collections.emptyList());
         }
         String finalServiceId = serviceId;
-        Single<List<ServiceInstance>> reduced = Flowable.fromArray(discoveryClients)
+        Mono<List<ServiceInstance>> reduced = Flux.fromArray(discoveryClients)
                 .flatMap(client -> client.getInstances(finalServiceId))
                 .reduce(new ArrayList<>(), (instances, otherInstances) -> {
                     instances.addAll(otherInstances);
                     return instances;
                 });
-        return reduced.toFlowable();
+        return reduced.flux();
     }
 
     @Override
-    public Flowable<List<String>> getServiceIds() {
+    public Publisher<List<String>> getServiceIds() {
         if (ArrayUtils.isEmpty(discoveryClients)) {
-            return Flowable.just(Collections.emptyList());
+            return Flux.just(Collections.emptyList());
         }
-        Single<List<String>> reduced = Flowable.fromArray(discoveryClients)
+        Mono<List<String>> reduced = Flux.fromArray(discoveryClients)
                 .flatMap(DiscoveryClient::getServiceIds)
                 .reduce(new ArrayList<>(), (serviceIds, otherServiceIds) -> {
                     serviceIds.addAll(otherServiceIds);
                     return serviceIds;
                 });
-        return reduced.toFlowable();
+        return reduced.flux();
     }
 
     @Override

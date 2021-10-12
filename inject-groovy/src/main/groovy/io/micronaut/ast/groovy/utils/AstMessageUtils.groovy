@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -41,9 +41,13 @@ class AstMessageUtils {
      */
     static void warning(final SourceUnit sourceUnit, final ASTNode node, final String message) {
         final String sample = sourceUnit.getSample(node.getLineNumber(), node.getColumnNumber(), new Janitor())
-        System.err.println("""WARNING: $message
+        if (sample) {
+            System.err.println("""WARNING: $message
 
 $sample""")
+        } else {
+            System.err.println("WARNING: $message")
+        }
     }
 
     static void error(SourceUnit sourceUnit, ASTNode expr, String errorMessage) {

@@ -1,52 +1,14 @@
-Features consist of additional dependencies and configuration to enable specific functionality in your application. The Micronaut profiles define a large number of features, including features for many of the configurations provided by Micronaut, such as the <<dataAccess, Data Access Configurations>>
+Features consist of additional dependencies and configuration to enable specific functionality in your application. Micronaut profiles define a large number of features, including features for many of the configurations provided by Micronaut, such as the <<dataAccess, Data Access Configurations>>
 
 [source,bash]
 ----
 $ mn create-app my-demo-app --features mongo-reactive
 ----
 
-This will add the necessary dependencies and configuration for the http://mongodb.github.io/mongo-java-driver-reactivestreams[MongoDB Reactive Driver] in your application. You can view all the available features using the `profile-info` command.
+This adds the necessary dependencies and configuration for the http://mongodb.github.io/mongo-java-driver-reactivestreams[MongoDB Reactive Driver] in your application. You can view the available features using the `--list-features` flag for whichever create command you use.
 
 [source,bash]
 ----
-$ mn profile-info service
-Profile: service
-------------------
-The service profile
-
-...
-
-Provided Features:
-------------------
-  annotation-api    Adds Java annotation API
-  config-consul     Adds support for Distributed Configuration with Consul (https://www.consul.io)
-  discovery-consul  Adds support for Service Discovery with Consul (https://www.consul.io)
-  discovery-eureka  Adds support for Service Discovery with Eureka
-  groovy            Creates a Groovy application
-  hibernate-gorm    Adds support for GORM persistence framework
-  hibernate-jpa     Adds support for Hibernate/JPA
-  http-client       Adds support for creating HTTP clients
-  http-server       Adds support for running a Netty server
-  java              Creates a Java application
-  jdbc-dbcp         Configures SQL DataSource instances using Commons DBCP
-  jdbc-hikari       Configures SQL DataSource instances using Hikari Connection Pool
-  jdbc-tomcat       Configures SQL DataSource instances using Tomcat Connection Pool
-  jrebel            Adds support for class reloading with JRebel (requires separate JRebel installation)
-  junit             Adds support for the JUnit testing framework
-  kafka             Adds support for Kafka
-  kotlin            Creates a Kotlin application
-  mongo-gorm        Configures GORM for MongoDB for Groovy applications
-  mongo-reactive    Adds support for the Mongo Reactive Streams Driver
-  neo4j-bolt        Adds support for the Neo4j Bolt Driver
-  neo4j-gorm        Configures GORM for Neo4j for Groovy applications
-  picocli           Adds support for command line parsing (http://picocli.info)
-  redis-lettuce     Configures the Lettuce driver for Redis
-  security-jwt      Adds support for JWT (JSON Web Token) based Authentication
-  security-session  Adds support for Session based Authentication
-  spek              Adds support for the Spek testing framework
-  spock             Adds support for the Spock testing framework
-  springloaded      Adds support for class reloading with Spring-Loaded
-  tracing-jaeger    Adds support for distributed tracing with Jaeger (https://www.jaegertracing.io)
-  tracing-zipkin    Adds support for distributed tracing with Zipkin (https://zipkin.io)
+$ mn create-app --list-features # Output will be supported features for the create-app command
+$ mn create-function-app --list-features # Output will be supported features for the create-function-app command, different from above.
 ----
-

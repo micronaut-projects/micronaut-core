@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,18 +15,13 @@
  */
 package io.micronaut.web.router;
 
-import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 
-import javax.annotation.Nullable;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -38,14 +33,7 @@ import java.util.function.Predicate;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, AnnotationMetadataProvider {
-
-    /**
-     * The declaring type of the route.
-     *
-     * @return The declaring type
-     */
-    Class<?> getDeclaringType();
+public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, RouteInfo<R> {
 
     /**
      * @return The variable values following a successful match.
@@ -110,6 +98,7 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Anno
     /**
      * @return The return type
      */
+    @Override
     ReturnType<? extends R> getReturnType();
 
     /**
@@ -138,7 +127,7 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Anno
      * {@link #execute()}
      */
     default boolean isExecutable() {
-        return getRequiredArguments().size() == 0;
+        return getRequiredArguments().isEmpty();
     }
 
     /**
@@ -157,7 +146,23 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Anno
      * @param contentType The content type
      * @return True if it is
      */
-    boolean accept(@Nullable MediaType contentType);
+    boolean doesConsume(@Nullable MediaType contentType);
+
+    /**
+     * Whether the route does produce any of the given types.
+     *
+     * @param acceptableTypes The acceptable types
+     * @return True if it is
+     */
+    boolean doesProduce(@Nullable Collection<MediaType> acceptableTypes);
+
+    /**
+     * Whether the route does produce any of the given types.
+     *
+     * @param acceptableType The acceptable type
+     * @return True if it is
+     */
+    boolean doesProduce(@Nullable MediaType acceptableType);
 
     /**
      * Whether the specified content type is explicitly an accepted type.
@@ -165,7 +170,18 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Anno
      * @param contentType The content type
      * @return True if it is
      */
-    default boolean explicitAccept(@Nullable MediaType contentType) {
+    default boolean explicitlyConsumes(@Nullable MediaType contentType) {
+        return false;
+    }
+
+    /**
+     * Whether the specified content type is explicitly a producing type.
+     *
+     * @param contentType The content type
+     * @return True if it is
+     * @since 2.5.0
+     */
+    default boolean explicitlyProduces(@Nullable MediaType contentType) {
         return false;
     }
 
@@ -179,4 +195,5 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Anno
         Object val = getVariableValues().get(name);
         return val != null && !(val instanceof UnresolvedArgument);
     }
+
 }

@@ -1,5 +1,6 @@
 package io.micronaut.http.client
 
+import io.micronaut.http.client.netty.ConnectTTLHandler
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.embedded.EmbeddedChannel
 import spock.lang.Specification

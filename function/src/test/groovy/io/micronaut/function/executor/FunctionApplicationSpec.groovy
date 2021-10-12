@@ -17,9 +17,11 @@ package io.micronaut.function.executor
 
 import io.micronaut.function.LocalFunctionRegistry
 import spock.lang.Specification
+import spock.util.environment.RestoreSystemProperties
 
 import java.nio.charset.StandardCharsets
 
+@RestoreSystemProperties
 class FunctionApplicationSpec extends Specification {
 
 
@@ -37,7 +39,6 @@ class FunctionApplicationSpec extends Specification {
         new String(out.toByteArray(), StandardCharsets.UTF_8).endsWith 'myvalue'
 
         cleanup:
-        System.setProperty(LocalFunctionRegistry.FUNCTION_NAME, "")
         System.out = oldOut
     }
 
@@ -58,7 +59,6 @@ class FunctionApplicationSpec extends Specification {
         new String(out.toByteArray(), StandardCharsets.UTF_8).endsWith '100'
 
         cleanup:
-        System.setProperty(LocalFunctionRegistry.FUNCTION_NAME, "")
         System.out = oldOut
         System.in = oldIn
     }
@@ -80,7 +80,6 @@ class FunctionApplicationSpec extends Specification {
         new String(out.toByteArray(), StandardCharsets.UTF_8).endsWith '{"name":"FRED"}'
 
         cleanup:
-        System.setProperty(LocalFunctionRegistry.FUNCTION_NAME, '')
         System.out = oldOut
         System.in = oldIn
     }

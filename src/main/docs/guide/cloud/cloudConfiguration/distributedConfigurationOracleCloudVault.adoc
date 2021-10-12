@@ -1,0 +1,1 @@
+See the https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/guide/#vault[Secure Distributed Configuration with Oracle Cloud Vault] documentation.

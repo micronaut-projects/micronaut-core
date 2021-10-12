@@ -1,6 +1,6 @@
-A Micronaut's controller action responds with a 200 HTTP status code by default.
+A Micronaut controller action responds with a 200 HTTP status code by default.
 
-If the controller's action responds a `HttpResponse` object, you can configure the status code for the response object with the `status` method.
+If the action returns an `HttpResponse`, configure the status code for the response with the `status` method.
 
 snippet::io.micronaut.docs.server.response.StatusController[tags="httpresponse", indent=0]
 
@@ -11,4 +11,3 @@ snippet::io.micronaut.docs.server.response.StatusController[tags="atstatus", ind
 or even respond with an `HttpStatus`
 
 snippet::io.micronaut.docs.server.response.StatusController[tags="httpstatus", indent=0]
-

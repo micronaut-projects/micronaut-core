@@ -15,8 +15,9 @@
  */
 package io.micronaut.retry.intercept
 
-import io.micronaut.core.util.CollectionUtils
 import io.micronaut.discovery.exceptions.DiscoveryException
+import io.micronaut.discovery.registration.RegistrationException
+import io.micronaut.retry.annotation.DefaultRetryPredicate
 import spock.lang.Specification
 
 import java.time.Duration
@@ -35,14 +36,14 @@ class SimpleRetryInstanceSpec extends Specification {
                 2,
                 Duration.of(1, ChronoUnit.SECONDS),
                 null,
-                CollectionUtils.setOf(DiscoveryException.class),
-                Collections.emptySet()
+                new DefaultRetryPredicate(Collections.singletonList(DiscoveryException.class), Collections.emptyList())
         )
         RuntimeException r = new RuntimeException("bad")
 
         expect:
         !simpleRetry.canRetry(r)
         simpleRetry.canRetry(new DiscoveryException("something"))
+        simpleRetry.canRetry(new RegistrationException("something"))
     }
 
     void "test retry context excludes"() {
@@ -52,15 +53,16 @@ class SimpleRetryInstanceSpec extends Specification {
                 2,
                 Duration.of(1, ChronoUnit.SECONDS),
                 null,
-                Collections.emptySet(),
-                CollectionUtils.setOf(DiscoveryException.class)
+                new DefaultRetryPredicate(Collections.emptyList(), Collections.singletonList(DiscoveryException.class))
         )
         RuntimeException r = new RuntimeException("bad")
 
         expect:
         retryContext.canRetry(r)
         !retryContext.canRetry(new DiscoveryException("something"))
+        !retryContext.canRetry(new RegistrationException("something"))
     }
+
     void "test retry context next delay is exponential"() {
 
         given:

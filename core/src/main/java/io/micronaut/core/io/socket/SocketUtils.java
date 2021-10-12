@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,8 +17,8 @@ package io.micronaut.core.io.socket;
 
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.net.SocketFactory;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.Random;
 
@@ -86,9 +86,8 @@ public class SocketUtils {
      * @return True if it is
      */
     public static boolean isTcpPortAvailable(int currentPort) {
-        try {
-            Socket socket = SocketFactory.getDefault().createSocket(InetAddress.getLocalHost(), currentPort);
-            socket.close();
+        try (Socket socket = new Socket()) {
+            socket.connect(new InetSocketAddress(InetAddress.getLocalHost(), currentPort), 20);
             return false;
         } catch (Throwable e) {
             return true;

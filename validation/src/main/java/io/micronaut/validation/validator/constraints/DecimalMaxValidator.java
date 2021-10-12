@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,10 +16,10 @@
 package io.micronaut.validation.validator.constraints;
 
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import javax.validation.ValidationException;
 import javax.validation.constraints.DecimalMax;
 import java.math.BigDecimal;
@@ -34,7 +34,7 @@ import java.math.BigDecimal;
 public interface DecimalMaxValidator<T> extends ConstraintValidator<DecimalMax, T> {
 
     @Override
-    default boolean isValid(@Nullable T value, @Nonnull AnnotationValue<DecimalMax> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
+    default boolean isValid(@Nullable T value, @NonNull AnnotationValue<DecimalMax> annotationMetadata, @NonNull ConstraintValidatorContext context) {
         if (value == null) {
             // null considered valid according to spec
             return true;
@@ -46,8 +46,6 @@ public interface DecimalMaxValidator<T> extends ConstraintValidator<DecimalMax, 
                                 .orElseThrow(() -> new ValidationException(s + " does not represent a valid BigDecimal format.")))
                 .orElseThrow(() -> new ValidationException("null does not represent a valid BigDecimal format."));
 
-        final boolean inclusive = annotationMetadata.get("inclusive", boolean.class).orElse(true);
-
 
         int result;
         try {
@@ -55,6 +53,7 @@ public interface DecimalMaxValidator<T> extends ConstraintValidator<DecimalMax, 
         } catch (NumberFormatException nfe) {
             return false;
         }
+        final boolean inclusive = annotationMetadata.get("inclusive", boolean.class).orElse(true);
         return inclusive ? result <= 0 : result < 0;
     }
 
@@ -65,5 +64,5 @@ public interface DecimalMaxValidator<T> extends ConstraintValidator<DecimalMax, 
      * @param bigDecimal The big decimal
      * @return The result
      */
-    int doComparison(@Nonnull T value, @Nonnull BigDecimal bigDecimal);
+    int doComparison(@NonNull T value, @NonNull BigDecimal bigDecimal);
 }

@@ -1,16 +1,15 @@
 package io.micronaut.inject.configuration
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
-import org.codehaus.groovy.GroovyBugError
 import org.codehaus.groovy.control.MultipleCompilationErrorsException
 
 class GroovyConfigBuilderSpec extends AbstractBeanDefinitionSpec {
 
     void "test definition uses getter instead of field"() {
         given:
-        ApplicationContext ctx = buildContext("test.TestProps", '''
+        ApplicationContext ctx = buildContext('''
 package test;
 
 import io.micronaut.context.annotation.*;
@@ -40,7 +39,7 @@ final class TestProps {
 
     void "test private config field with no getter throws an error"() {
         when:
-        ApplicationContext ctx = buildContext("test.TestProps", '''
+        ApplicationContext ctx = buildContext('''
 package test;
 
 import io.micronaut.context.annotation.*;
@@ -61,7 +60,7 @@ final class TestProps {
 
     void "test config field with setter abnormal paramater name"() {
         given:
-        ApplicationContext ctx = buildContext("test.TestProps", '''
+        ApplicationContext ctx = buildContext('''
 package test;
 
 import io.micronaut.context.annotation.*;

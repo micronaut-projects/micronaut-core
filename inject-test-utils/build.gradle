@@ -1,0 +1,7 @@
+dependencies {
+    api libs.managed.groovy
+    api(libs.managed.spock) {
+        exclude module:'groovy-all'
+    }
+    api project(":inject")
+}

@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2020 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.docs.httpclientexceptionbody;
 
 import io.micronaut.context.ApplicationContext;
@@ -6,7 +21,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.HttpClient;
-import io.micronaut.http.client.RxHttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.AfterClass;
@@ -17,7 +31,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class BindHttpClientExceptionBodySpec {
 
@@ -31,17 +48,15 @@ public class BindHttpClientExceptionBodySpec {
         map.put("spec.lang", "java");
 
         server = ApplicationContext.run(EmbeddedServer.class, map, Environment.TEST);
-        client = server
-                .getApplicationContext()
-                .createBean(RxHttpClient.class, server.getURL());
+        client = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
     }
 
     @AfterClass
     public static void stopServer() {
-        if(server != null) {
+        if (server != null) {
             server.stop();
         }
-        if(client != null) {
+        if (client != null) {
             client.stop();
         }
     }
@@ -73,10 +88,10 @@ public class BindHttpClientExceptionBodySpec {
                     Argument.of(OtherError.class)); // <2>
         } catch (HttpClientResponseException e) {
             assertEquals(HttpStatus.UNAUTHORIZED, e.getResponse().getStatus());
-            Optional<OtherError> jsonError = e.getResponse().getBody(OtherError.class);
 
+            Optional<OtherError> jsonError = e.getResponse().getBody(OtherError.class);
             assertNotNull(jsonError);
-            assertTrue(!jsonError.isPresent());
+            assertFalse(jsonError.isPresent());
         }
     }
 

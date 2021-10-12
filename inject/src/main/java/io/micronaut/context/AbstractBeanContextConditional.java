@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,7 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.Failure;
@@ -26,8 +27,7 @@ import io.micronaut.inject.BeanContextConditional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * Abstract implementation of the {@link BeanContextConditional} interface.
@@ -40,29 +40,25 @@ abstract class AbstractBeanContextConditional implements BeanContextConditional,
 
     static final Logger LOG = LoggerFactory.getLogger(Condition.class);
 
-    private final Map<Integer, Boolean> enabled = new ConcurrentHashMap<>(2);
-
     @Override
-    public boolean isEnabled(BeanContext context) {
-        int contextId = System.identityHashCode(context);
-        Boolean enabled = this.enabled.get(contextId);
-        if (enabled == null) {
-            AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-            Condition condition = annotationMetadata.hasStereotype(Requires.class) ? new RequiresCondition(annotationMetadata) : null;
-            DefaultConditionContext<AbstractBeanContextConditional> conditionContext = new DefaultConditionContext<>(context, this);
-            enabled = condition == null || condition.matches(conditionContext);
-            if (LOG.isDebugEnabled() && !enabled) {
-                if (this instanceof BeanConfiguration) {
-                    LOG.debug(this + " will not be loaded due to failing conditions:");
-                } else {
-                    LOG.debug("Bean [" + this + "] will not be loaded due to failing conditions:");
-                }
-                for (Failure failure : conditionContext.getFailures()) {
-                    LOG.debug("* {}", failure.getMessage());
-                }
+    public boolean isEnabled(@NonNull BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
+        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+        Condition condition = annotationMetadata.hasStereotype(Requires.class) ? new RequiresCondition(annotationMetadata) : null;
+        DefaultConditionContext<AbstractBeanContextConditional> conditionContext = new DefaultConditionContext<>(
+                (DefaultBeanContext) context,
+                this, resolutionContext);
+        boolean enabled = condition == null || condition.matches(conditionContext);
+        if (LOG.isDebugEnabled() && !enabled) {
+            if (this instanceof BeanConfiguration) {
+                LOG.debug(this + " will not be loaded due to failing conditions:");
+            } else {
+                LOG.debug("Bean [" + this + "] will not be loaded due to failing conditions:");
             }
-            this.enabled.put(contextId, enabled);
+            for (Failure failure : conditionContext.getFailures()) {
+                LOG.debug("* {}", failure.getMessage());
+            }
         }
+
         return enabled;
     }
 }

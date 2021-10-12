@@ -26,7 +26,7 @@ class InterceptorOrderSpec extends Specification {
 
     void "test interceptors orders"() {
         given:
-        List interceptors = [new DefaultRetryInterceptor(null), new RecoveryInterceptor() ]
+        List interceptors = [new DefaultRetryInterceptor(null, null), new RecoveryInterceptor() ]
         OrderUtil.sort(interceptors)
 
         expect:
@@ -36,7 +36,7 @@ class InterceptorOrderSpec extends Specification {
 
     void "test interceptors orders 2"() {
         given:
-        List interceptors = [new RecoveryInterceptor(), new DefaultRetryInterceptor(null) ]
+        List interceptors = [new RecoveryInterceptor(), new DefaultRetryInterceptor(null, null) ]
         OrderUtil.sort(interceptors)
 
         expect:

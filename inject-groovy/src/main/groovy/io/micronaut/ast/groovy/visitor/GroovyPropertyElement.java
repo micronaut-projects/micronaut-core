@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,10 +17,14 @@ package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.PropertyElement;
 import org.codehaus.groovy.ast.AnnotatedNode;
-import org.codehaus.groovy.control.SourceUnit;
+
+import java.util.Collections;
+import java.util.Set;
 
 /**
  * Implementation of {@link PropertyElement} for Groovy.
@@ -38,7 +42,7 @@ abstract class GroovyPropertyElement extends AbstractGroovyElement implements Pr
     /**
      * Default constructor.
      *
-     * @param sourceUnit The source unit
+     * @param visitorContext The visitor context
      * @param declaringElement The declaring element
      * @param annotatedNode    The annotated node
      * @param annotationMetadata the annotation metadata
@@ -47,18 +51,27 @@ abstract class GroovyPropertyElement extends AbstractGroovyElement implements Pr
      * @param nativeType the native underlying type
      */
     GroovyPropertyElement(
-            SourceUnit sourceUnit,
+            GroovyVisitorContext visitorContext,
             GroovyClassElement declaringElement,
             AnnotatedNode annotatedNode,
             AnnotationMetadata annotationMetadata,
             String name,
             boolean readOnly,
             Object nativeType) {
-        super(sourceUnit, annotatedNode, annotationMetadata);
+        super(visitorContext, annotatedNode, annotationMetadata);
         this.name = name;
         this.readOnly = readOnly;
         this.nativeType = nativeType;
         this.declaringElement = declaringElement;
+    }
+
+    @Override
+    public Set<ElementModifier> getModifiers() {
+        if (isReadOnly()) {
+            return CollectionUtils.setOf(ElementModifier.FINAL, ElementModifier.PUBLIC);
+        } else {
+            return Collections.singleton(ElementModifier.PUBLIC);
+        }
     }
 
     @Override

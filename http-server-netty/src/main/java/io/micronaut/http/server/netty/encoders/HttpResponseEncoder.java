@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,8 +19,10 @@ import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.http.*;
 import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
@@ -29,10 +31,16 @@ import io.micronaut.runtime.http.codec.TextPlainCodec;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelHandler.Sharable;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageEncoder;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.EmptyHttpHeaders;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -103,7 +111,7 @@ public class HttpResponseEncoder extends MessageToMessageEncoder<MutableHttpResp
         }
 
         if (response instanceof NettyMutableHttpResponse) {
-            out.add(((NettyMutableHttpResponse) response).getNativeResponse());
+            out.add(((NettyMutableHttpResponse) response).toHttpResponse());
         } else {
             io.netty.handler.codec.http.HttpHeaders nettyHeaders = new DefaultHttpHeaders();
             for (Map.Entry<String, List<String>> header : response.getHeaders()) {
@@ -123,12 +131,12 @@ public class HttpResponseEncoder extends MessageToMessageEncoder<MutableHttpResp
     }
 
     private void applyConfiguredHeaders(MutableHttpHeaders headers) {
-        if (serverConfiguration.isDateHeader() && !headers.contains("Date")) {
+        if (serverConfiguration.isDateHeader() && !headers.contains(HttpHeaders.DATE)) {
             headers.date(LocalDateTime.now());
         }
-        serverConfiguration.getServerHeader().ifPresent((server) -> {
-            if (!headers.contains("Server")) {
-                headers.add("Server", server);
+        serverConfiguration.getServerHeader().ifPresent(server -> {
+            if (!headers.contains(HttpHeaders.SERVER)) {
+                headers.add(HttpHeaderNames.SERVER, server);
             }
         });
     }
@@ -183,12 +191,11 @@ public class HttpResponseEncoder extends MessageToMessageEncoder<MutableHttpResp
                     LOG.error(e.getMessage());
                 }
             }
-
         } else {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Encoding emitted response object [{}] using codec: {}", body, codec);
             }
-            byteBuf = (ByteBuf) codec.encode(body, new NettyByteBufferFactory(context.alloc())).asNativeBuffer();
+            byteBuf = codec.encode(body, new NettyByteBufferFactory(context.alloc())).asNativeBuffer();
         }
         return byteBuf;
     }

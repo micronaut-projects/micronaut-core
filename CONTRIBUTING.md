@@ -104,7 +104,7 @@ In this case, to fix the issues, we need to:
 The plugin also adds a new tab in the bottom to run checkstyle report and see all the errors and warnings. It is recommended
 to run the report and fixing all the issues before submitting a pull request.
 
-##Building on Windows 10
+## Building on Windows 10
 
 The following prerequisites are needed for building and testing on Windows 10:
 

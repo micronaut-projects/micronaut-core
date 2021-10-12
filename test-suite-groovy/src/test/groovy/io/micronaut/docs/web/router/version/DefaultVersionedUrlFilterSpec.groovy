@@ -46,7 +46,7 @@ class DefaultVersionedUrlFilterSpec extends Specification {
             })]
 
     def setup() {
-        context = new DefaultApplicationContext("test").start()
+        context = ApplicationContext.run("test")
         def controller = new VersionedController()
         context.registerSingleton(controller)
 
@@ -58,7 +58,7 @@ class DefaultVersionedUrlFilterSpec extends Specification {
                 GET("/versioned/hello", controller, "hello")
             }
         })
-        routes = router.find(HttpMethod.GET, "/versioned/hello").collect(Collectors.toList())
+        routes = router.find(HttpMethod.GET, "/versioned/hello", null).collect(Collectors.toList())
     }
 
     def cleanup() {

@@ -17,11 +17,14 @@ class BindHttpClientExceptionBodySpec extends Specification {
 
     @Shared
     @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': BindHttpClientExceptionBodySpec.simpleName], Environment.TEST)
+    EmbeddedServer embeddedServer = ApplicationContext.run(
+            EmbeddedServer,
+            ['spec.name': BindHttpClientExceptionBodySpec.simpleName], Environment.TEST)
 
     @Shared
     @AutoCleanup
-    HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL())
+    HttpClient client = embeddedServer.applicationContext.createBean(
+            HttpClient, embeddedServer.URL)
 
     //tag::test[]
     def "after an HttpClientException the response body can be bound to a POJO"() {
@@ -66,7 +69,7 @@ class BindHttpClientExceptionBodySpec extends Specification {
 
     def "verify bind error is thrown"() {
         when:
-        HttpResponse rsp = client.toBlocking().exchange(HttpRequest.GET("/books/1491950358"),
+        client.toBlocking().exchange(HttpRequest.GET("/books/1491950358"),
                 Argument.of(Book),
                 Argument.of(CustomError))
 

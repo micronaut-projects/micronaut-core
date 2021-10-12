@@ -1,11 +1,26 @@
 dependencies {
-    compileOnly "com.oracle.substratevm:svm:$graalVersion"
-    compileOnly project(":graal")
-    compile project(":buffer-netty")
-    compile project(":http")
-    compile project(":websocket")
-    compileOnly project(":inject-java")
-    compile dependencyVersion("netty")
-    compile dependencyVersion("rxjava2")
-    compile dependencyModuleVersion("netty", "netty-handler")
+    annotationProcessor project(":inject-java")
+    annotationProcessor project(":graal")
+    compileOnly libs.managed.graal
+    compileOnly libs.managed.netty.transport.native.epoll
+    compileOnly libs.managed.netty.transport.native.kqueue
+
+    api project(":http")
+    api project(":websocket")
+    api project(":buffer-netty")
+
+    api libs.managed.netty.codec.http
+    api libs.managed.netty.codec.http2
+    api libs.managed.netty.handler
+
+    implementation libs.managed.reactor
+
+    testImplementation project(":runtime")
+}
+
+spotless {
+    format 'javaMisc', {
+        targetExclude '**/io/micronaut/http/netty/stream/package-info.java',
+                '**/io/micronaut/http/netty/reactive/package-info.java'
+    }
 }

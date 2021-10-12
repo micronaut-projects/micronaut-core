@@ -15,14 +15,16 @@
  */
 package io.micronaut.context.env
 
+import com.github.stefanbirkner.systemlambda.SystemLambda
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
+import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.convert.format.MapFormat
 import io.micronaut.core.naming.conventions.StringConvention
 import io.micronaut.core.value.MapPropertyResolver
 import io.micronaut.core.value.PropertyResolver
-import org.junit.Rule
-import org.junit.contrib.java.lang.system.EnvironmentVariables
+import io.micronaut.core.value.ValueException
+import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -32,9 +34,19 @@ import spock.lang.Unroll
  */
 class PropertySourcePropertyResolverSpec extends Specification {
 
+    void "test resolve property entries"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", [DATASOURCE_DEFAULT_URL: 'xxx', DATASOURCE_OTHER_URL:'xxx'], PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE),
+                PropertySource.of("test",
+                        ['datasource.third.url': 'xxx'],
+                        PropertySource.PropertyConvention.JAVA_PROPERTIES
+                )
+        )
 
-    @Rule
-    private final EnvironmentVariables environmentVariables = new EnvironmentVariables()
+        expect:
+        resolver.getPropertyEntries("datasource") == ['default', 'other', 'third'] as Set
+    }
 
     void "test resolve raw properties"() {
         given:
@@ -48,6 +60,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
         )
 
         expect:
+        resolver.getPropertyEntries("twitter") == ['oauth2'] as Set
         resolver.containsProperty('TWITTER_OAUTH2_ACCESS_TOKEN')
         resolver.getProperty('TWITTER_OAUTH2_ACCESS_TOKEN', String).get() == 'xxx'
         resolver.containsProperty("camelCase.URL")
@@ -126,15 +139,15 @@ class PropertySourcePropertyResolverSpec extends Specification {
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
                 PropertySource.of("test", [(property): value] + values)
         )
-        environmentVariables["FOO_BAR"] = "foo bar"
-        environmentVariables["FOO_BAR_1"] = "foo bar 1"
 
         expect:
-
-        resolver.getProperty(key, Object).isPresent()
-        resolver.getProperty(key, type)
-        resolver.getProperty(key, type).get() == expected
-        resolver.containsProperty(key)
+        SystemLambda.withEnvironmentVariable("FOO_BAR", "foo bar")
+                .and("FOO_BAR_1", "foo bar 1")
+                .execute(() -> {
+                    resolver.getProperty(key, Object).isPresent() &&
+                    resolver.getProperty(key, type).get() == expected &&
+                    resolver.containsProperty(key)
+                })
 
         where:
         property      | value                                                | key           | type    | expected
@@ -148,8 +161,8 @@ class PropertySourcePropertyResolverSpec extends Specification {
         'my.property' | '${foo.bar}'                                         | 'my.property' | String  | '10'
         'my.property' | '${not.there:50}'                                    | 'my.property' | String  | '50'
         'my.property' | '${foo.bar} + ${foo.bar}'                            | 'my.property' | String  | '10 + 10'
-        'my.property' | '${foo.bar[0]}'                                      | 'my.property' | List    | ['10']
-        'my.property' | '${foo.bar[0]}'                                      | 'my.property' | Integer | 10
+        'my.property' | '${foo.bar}'                                         | 'my.property' | List    | ['10']
+        'my.property' | '${foo.bar}'                                         | 'my.property' | Integer | 10
         'my.property' | '${FOO_BAR}'                                         | 'my.property' | String  | 'foo bar'
         'my.property' | '${FOO_BAR_1}'                                       | 'my.property' | String  | 'foo bar 1'
         'my.property' | 'bolt://${NEO4J_HOST:localhost}:${NEO4J_PORT:32781}' | 'my.property' | String  | 'bolt://localhost:32781'
@@ -224,7 +237,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
         String template = "Hello \${foo}!"
         Map<String, Object> parameters = [foo: "bar"]
         PropertyResolver propertyResolver = new MapPropertyResolver(parameters)
-        DefaultPropertyPlaceholderResolver propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(propertyResolver)
+        DefaultPropertyPlaceholderResolver propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(propertyResolver, ConversionService.SHARED)
         List<DefaultPropertyPlaceholderResolver.Segment> segments = propertyPlaceholderResolver.buildSegments("Hello \${foo} \${bar:test}!")
 
         expect:
@@ -279,6 +292,155 @@ class PropertySourcePropertyResolverSpec extends Specification {
         and:
         resolver.getProperty('random.shortuuid', String).isPresent()
         resolver.getProperty('random.shortuuid', String).get().length() == 10
+    }
+
+    void "test random integer placeholders in range for properties"() {
+        given:
+        def values = [
+                'random.integer_lower'  : '${random.integer(10)}',
+                'random.integer_lower-negative'  : '${random.integer(-10)}',
+                'random.integer_lower_upper'  : '${random.integer[5,10]}',
+                'random.integer_lower-negative_upper'  : '${random.integer[-5,10]}',
+                'random.integer_lower-negative_upper-negative'  : '${random.integer[-10,-5]}',
+        ]
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect:
+        resolver.getProperty('random.integer_lower', String).isPresent()
+        resolver.getProperty('random.integer_lower', Integer).get() >= 0
+        resolver.getProperty('random.integer_lower', Integer).get() < 10
+
+        and:
+        resolver.getProperty('random.integer_lower-negative', String).isPresent()
+        resolver.getProperty('random.integer_lower-negative', Integer).get() <= 0
+        resolver.getProperty('random.integer_lower-negative', Integer).get() > -10
+
+        and:
+        resolver.getProperty('random.integer_lower_upper', String).isPresent()
+        resolver.getProperty('random.integer_lower_upper', Integer).get() < 10
+        resolver.getProperty('random.integer_lower_upper', Integer).get() >= 5
+
+        and:
+        resolver.getProperty('random.integer_lower-negative_upper', String).isPresent()
+        resolver.getProperty('random.integer_lower-negative_upper', Integer).get() < 10
+        resolver.getProperty('random.integer_lower-negative_upper', Integer).get() >= -5
+
+        and:
+        resolver.getProperty('random.integer_lower-negative_upper-negative', String).isPresent()
+        resolver.getProperty('random.integer_lower-negative_upper-negative', Integer).get() < -5
+        resolver.getProperty('random.integer_lower-negative_upper-negative', Integer).get() >= -10
+    }
+
+    void "test random long placeholders in range for properties"() {
+        given:
+        def values = [
+                'random.long_lower'  : '${random.long(10)}',
+                'random.long_lower-negative'  : '${random.long(-10)}',
+                'random.long_lower_upper'  : '${random.long[5,10]}',
+                'random.long_lower-negative_upper'  : '${random.long[-5,10]}',
+                'random.long_lower-negative_upper-negative'  : '${random.long[-10,-5]}',
+        ]
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect:
+        resolver.getProperty('random.long_lower', String).isPresent()
+        resolver.getProperty('random.long_lower', Long).get() >= 0
+        resolver.getProperty('random.long_lower', Long).get() < 10
+
+        and:
+        resolver.getProperty('random.long_lower-negative', String).isPresent()
+        resolver.getProperty('random.long_lower-negative', Long).get() <= 0
+        resolver.getProperty('random.long_lower-negative', Long).get() > -10
+
+        and:
+        resolver.getProperty('random.long_lower_upper', String).isPresent()
+        resolver.getProperty('random.long_lower_upper', Long).get() < 10
+        resolver.getProperty('random.long_lower_upper', Long).get() >= 5
+
+        and:
+        resolver.getProperty('random.long_lower-negative_upper', String).isPresent()
+        resolver.getProperty('random.long_lower-negative_upper', Long).get() < 10
+        resolver.getProperty('random.long_lower-negative_upper', Long).get() >= -5
+
+        and:
+        resolver.getProperty('random.long_lower-negative_upper-negative', String).isPresent()
+        resolver.getProperty('random.long_lower-negative_upper-negative', Long).get() < -5
+        resolver.getProperty('random.long_lower-negative_upper-negative', Long).get() >= -10
+    }
+
+    void "test random float placeholders in range for properties"() {
+        given:
+        def values = [
+                'random.float_lower'  : '${random.float(10.5)}',
+                'random.float_lower-negative'  : '${random.float(-10.5)}',
+                'random.float_lower_upper'  : '${random.float[5.5,10.5]}',
+                'random.float_lower-negative_upper'  : '${random.float[-5.5,10.5]}',
+                'random.float_lower-negative_upper-negative'  : '${random.float[-10.5,-5.5]}',
+        ]
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect:
+        resolver.getProperty('random.float_lower', String).isPresent()
+        resolver.getProperty('random.float_lower', Float).get() >= 0.0
+        resolver.getProperty('random.float_lower', Float).get() < 10.5
+
+        and:
+        resolver.getProperty('random.float_lower-negative', String).isPresent()
+        resolver.getProperty('random.float_lower-negative', Float).get() <= 0.0
+        resolver.getProperty('random.float_lower-negative', Float).get() > -10.5
+
+        and:
+        resolver.getProperty('random.float_lower_upper', String).isPresent()
+        resolver.getProperty('random.float_lower_upper', Float).get() < 10.5
+        resolver.getProperty('random.float_lower_upper', Float).get() >= 5.5
+
+        and:
+        resolver.getProperty('random.float_lower-negative_upper', String).isPresent()
+        resolver.getProperty('random.float_lower-negative_upper', Float).get() < 10.5
+        resolver.getProperty('random.float_lower-negative_upper', Float).get() >= -5.5
+
+        and:
+        resolver.getProperty('random.float_lower-negative_upper-negative', String).isPresent()
+        resolver.getProperty('random.float_lower-negative_upper-negative', Float).get() < -5.5
+        resolver.getProperty('random.float_lower-negative_upper-negative', Float).get() >= -10.5
+    }
+
+    void "test invalid random Integer range"() {
+        when:
+        def values = [
+            'random.integer' : '${random.integer(9999999999)}'
+        ]
+        new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        then:
+        def ex= thrown(ValueException)
+        ex.message == 'Invalid range: `9999999999` found for type Integer while parsing property: random.integer'
+        ex.cause != null
+        ex.cause instanceof NumberFormatException
+    }
+
+    void "test invalid random Long range"() {
+        when:
+        def values = [
+                'random.long' : '${random.long(9999999999999999999)}'
+        ]
+        new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        then:
+        def ex= thrown(ValueException)
+        ex.message == 'Invalid range: `9999999999999999999` found for type Long while parsing property: random.long'
+        ex.cause != null
+        ex.cause instanceof NumberFormatException
     }
 
     void "test invalid random placeholders for properties"() {
@@ -419,4 +581,64 @@ class PropertySourcePropertyResolverSpec extends Specification {
             micronaut['security']['intercept-url-map'][0]['access'][1] == '/some-path-x'
     }
 
+    void "test map and list values are collapsed"() {
+        given:
+        def values = new HashMap()
+        values.put("foo", [[bar: ['foo0Bar0', 'foo0Bar1', null, 'foo0Bar2']], [bar: [abx: 'foo1Bar0', xyz: 'foo1Bar1']]])
+        values.put("custom", [[[key: [null, null, null, null, 'ohh', 'ehh'], key2: 'xyz']]])
+        values.put("micronaut.security.intercept-url-map", [[access:['/some-path']]])
+        values.put("micronaut.security.interceptUrlMap", [[access:[null, '/some-path-x']]])
+
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect:
+        resolver.getRequiredProperty('foo[0].bar[0]', String) == "foo0Bar0"
+        resolver.getRequiredProperty('foo[0].bar[1]', String) == 'foo0Bar1'
+        !resolver.containsProperty('foo[0].bar[2]')
+        resolver.getRequiredProperty('foo[0].bar[3]', String) == 'foo0Bar2'
+        resolver.getRequiredProperty('foo[1].bar.abx', String) == 'foo1Bar0'
+        resolver.getRequiredProperty('foo[1].bar.xyz', String) == 'foo1Bar1'
+        !resolver.containsProperty('custom[0][0].key[0]')
+        !resolver.containsProperty('custom[0][0].key[1]')
+        !resolver.containsProperty('custom[0][0].key[2]')
+        !resolver.containsProperty('custom[0][0].key[3]')
+        resolver.getRequiredProperty('custom[0][0].key[4]', String) == 'ohh'
+        resolver.getRequiredProperty('custom[0][0].key[5]', String) == 'ehh'
+        resolver.getRequiredProperty('custom[0][0].key2', String) == 'xyz'
+        resolver.getRequiredProperty('micronaut.security.intercept-url-map[0].access[0]', String) == '/some-path'
+        resolver.getRequiredProperty('micronaut.security.intercept-url-map[0].access[1]', String) == '/some-path-x'
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/3811")
+    void "test properties start with the letter A"() {
+        given:
+        def values = [
+                'AAA': 'fonzie',
+                'aaa': 'fonzie',
+        ]
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect:
+        resolver.getRequiredProperty('AAA', String) == "fonzie"
+        resolver.getRequiredProperty('aaa', String) == "fonzie"
+    }
+
+    void "test an inner list property is created"() {
+        given:
+        Map<String, Object> extra = ["stringval": "foo", "listval": ["item1", "item2"]];
+
+        PropertySource external = MapPropertySource.of("external", ["extra": extra])
+
+        when:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+               external
+        )
+
+        then:
+        resolver.containsProperty("extra.listval")
+    }
 }

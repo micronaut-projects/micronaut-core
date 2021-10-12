@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,8 +16,8 @@
 package io.micronaut.validation.validator.constraints;
 
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.NonNull;
 
-import javax.annotation.Nonnull;
 import javax.validation.ValidationException;
 import javax.validation.constraints.Pattern;
 import java.lang.annotation.Annotation;
@@ -46,7 +46,7 @@ abstract class AbstractPatternValidator<A extends Annotation> implements Constra
      * @return The pattern
      */
     java.util.regex.Pattern getPattern(
-            @Nonnull AnnotationValue<?> annotationMetadata,
+            @NonNull AnnotationValue<?> annotationMetadata,
             boolean isOptional) {
         final Optional<String> regexp = annotationMetadata.get("regexp", String.class);
         final String pattern;

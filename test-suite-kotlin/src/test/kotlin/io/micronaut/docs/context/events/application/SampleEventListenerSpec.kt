@@ -1,8 +1,8 @@
 package io.micronaut.docs.context.events.application
 
 // tag::imports[]
-import io.kotlintest.shouldBe
-import io.kotlintest.specs.AnnotationSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.core.spec.style.AnnotationSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.docs.context.events.SampleEventEmitterBean
 // end::imports[]
@@ -18,6 +18,8 @@ class SampleEventListenerSpec : AnnotationSpec() {
         listener.invocationCounter.shouldBe(0)
         emitter.publishSampleEvent()
         listener.invocationCounter.shouldBe(1)
+
+        context.close()
     }
 }
 // end::class[]

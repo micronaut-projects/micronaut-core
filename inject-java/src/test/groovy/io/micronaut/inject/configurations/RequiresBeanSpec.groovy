@@ -21,13 +21,14 @@ import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.inject.configurations.requiresbean.RequiresBean
-import io.micronaut.inject.configurations.requiresconditionfalse.TravisBean
+import io.micronaut.inject.configurations.requiresconditionfalse.GitHubActionsBean
 import io.micronaut.inject.configurations.requiresconditiontrue.TrueBean
 import io.micronaut.inject.configurations.requiresconfig.RequiresConfig
 import io.micronaut.inject.configurations.requiresproperty.RequiresProperty
 import io.micronaut.inject.configurations.requiressdk.RequiresJava9
 import spock.lang.IgnoreIf
 import spock.lang.Specification
+import spock.util.environment.Jvm
 
 class RequiresBeanSpec extends Specification {
 
@@ -40,10 +41,10 @@ class RequiresBeanSpec extends Specification {
         context.containsBean(ABean)
         !context.containsBean(RequiresBean)
         !context.containsBean(RequiresConfig)
-        !context.containsBean(RequiresJava9)
+        Jvm.current.isJava9Compatible() || !context.containsBean(RequiresJava9)
     }
 
-    @IgnoreIf({ env["TRAVIS"] } ) // fails on travis, which is expected
+    @IgnoreIf({ env["GITHUB_ACTIONS"] } ) // fails on GitHub actions, which is expected
     void "test that a condition can be required for a bean when false"() {
         given:
         BeanContext context = new DefaultBeanContext()
@@ -51,7 +52,7 @@ class RequiresBeanSpec extends Specification {
 
         expect:
         context.containsBean(ABean)
-        !context.containsBean(TravisBean)
+        !context.containsBean(GitHubActionsBean)
     }
 
     void "test that a condition can be required for a bean when true"() {

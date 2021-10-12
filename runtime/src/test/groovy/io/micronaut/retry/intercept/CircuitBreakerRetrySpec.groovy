@@ -18,11 +18,13 @@ package io.micronaut.retry.intercept
 import io.micronaut.context.ApplicationContext
 import io.micronaut.retry.CircuitState
 import io.micronaut.retry.annotation.CircuitBreaker
-import io.reactivex.Single
+import io.micronaut.retry.annotation.RetryPredicate
+import jakarta.inject.Singleton
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Mono
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
-
-import javax.inject.Singleton
+import io.micronaut.core.async.annotation.SingleResult
 import java.time.Duration
 
 /**
@@ -68,6 +70,11 @@ class CircuitBreakerRetrySpec extends Specification {
         then:
         retry.currentState() == CircuitState.OPEN
 
+        when: "calling close with null tests a previous execution that succeeded closing an already open circuit"
+        retry.close(null)
+
+        then:
+        retry.currentState() == CircuitState.OPEN
 
         when:
         PollingConditions conditions = new PollingConditions(timeout: 3)
@@ -132,9 +139,51 @@ class CircuitBreakerRetrySpec extends Specification {
         when:
         counterService.getCountIncludes(false)
 
+        then: "the circuit is not open because the thrown exception does not match includes"
+        noExceptionThrown()
+        counterService.countIncludes == 3
+
+        cleanup:
+        context.stop()
+    }
+
+    void "test circuit breaker with includes 2"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        CounterService counterService = context.getBean(CounterService)
+
+        when:
+        counterService.getCountIncludes(false)
+
         then: "the circuit is open so the original exception is thrown"
+        noExceptionThrown()
+        counterService.countIncludes == counterService.countThreshold
+
+        when:
+        counterService.countIncludes = 0
+        counterService.getCountIncludes(true)
+
+        then: "retry didn't kick in because the exception thrown doesn't match includes"
         thrown(IllegalStateException)
         counterService.countIncludes == 1
+
+        when:
+        counterService.countIncludes = 0
+        counterService.countThreshold = 7
+        counterService.getCountIncludes(false)
+
+        then: "used all attempts to open circuit breaker"
+        thrown(MyCustomException)
+        counterService.countIncludes == 6
+
+        when:
+        counterService.countIncludes = 0
+        counterService.countThreshold = 3
+        counterService.getCountIncludes(true)
+
+        then: "the circuit is open so the original exception is thrown"
+        thrown(MyCustomException)
+        counterService.countIncludes == 0
 
         cleanup:
         context.stop()
@@ -161,11 +210,22 @@ class CircuitBreakerRetrySpec extends Specification {
         counterService.countExcludes == 1
 
         when:
+        counterService.countExcludes = 0
+        counterService.countThreshold = 7
+        counterService.getCountExcludes(true)
+
+        then: "used all attempts to open circuit breaker"
+        thrown(IllegalStateException)
+        counterService.countExcludes == 6
+
+        when:
+        counterService.countExcludes = 0
+        counterService.countThreshold = 3
         counterService.getCountExcludes(true)
 
         then: "the circuit is open so the original exception is thrown"
-        thrown(MyCustomException)
-        counterService.countExcludes == 1
+        thrown(IllegalStateException)
+        counterService.countExcludes == 0
 
         cleanup:
         context.stop()
@@ -177,7 +237,7 @@ class CircuitBreakerRetrySpec extends Specification {
         CounterService counterService = context.getBean(CounterService)
 
         when:
-        counterService.getCount().onErrorReturnItem(1).blockingGet() //to trigger the state
+        Mono.from(counterService.getCount()).onErrorReturn(1).block() //to trigger the state
         counterService.getCount()
 
         then:
@@ -187,10 +247,60 @@ class CircuitBreakerRetrySpec extends Specification {
         context.stop()
     }
 
+    void "test circuit breaker with predicate"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        CounterService counterService = context.getBean(CounterService)
+
+        when:
+        counterService.getCountPredicate(false)
+
+        then: "the circuit is open so the original exception is thrown"
+        noExceptionThrown()
+        counterService.countPredicate == counterService.countThreshold
+
+        when:
+        counterService.countPredicate = 0
+        counterService.getCountPredicate(true)
+
+        then: "retry didn't kick in because the exception thrown doesn't match predicate"
+        thrown(IllegalStateException)
+        counterService.countPredicate == 1
+
+        when:
+        counterService.countPredicate = 0
+        counterService.countThreshold = 7
+        counterService.getCountPredicate(false)
+
+        then: "used all attempts to open circuit breaker"
+        thrown(MyCustomException)
+        counterService.countPredicate == 6
+
+        when:
+        counterService.countPredicate = 0
+        counterService.countThreshold = 3
+        counterService.getCountPredicate(true)
+
+        then: "the circuit is open so the original exception is thrown"
+        thrown(MyCustomException)
+        counterService.countPredicate == 0
+
+        cleanup:
+        context.stop()
+    }
+
+    static class MyRetryPredicate implements RetryPredicate {
+        @Override
+        boolean test(Throwable throwable) {
+            return throwable instanceof MyCustomException
+        }
+    }
+
     @Singleton
     static class CounterService {
         int countIncludes = 0
         int countExcludes = 0
+        int countPredicate = 0
         int countThreshold = 3
 
         @CircuitBreaker(attempts = '5', delay = '5ms', includes = MyCustomException.class)
@@ -220,8 +330,22 @@ class CircuitBreakerRetrySpec extends Specification {
         }
 
         @CircuitBreaker(attempts = '1', delay = '0ms')
-        Single<Integer> getCount() {
-            Single.error(new IllegalStateException("Bad count"))
+        @SingleResult
+        Publisher<Integer> getCount() {
+            Mono.error(new IllegalStateException("Bad count"))
+        }
+
+        @CircuitBreaker(attempts = '5', delay = '5ms', predicate = MyRetryPredicate.class)
+        Integer getCountPredicate(boolean illegalState) {
+            countPredicate++
+            if(countPredicate < countThreshold) {
+                if (illegalState) {
+                    throw new IllegalStateException("Bad count")
+                } else {
+                    throw new MyCustomException()
+                }
+            }
+            return countPredicate
         }
     }
 

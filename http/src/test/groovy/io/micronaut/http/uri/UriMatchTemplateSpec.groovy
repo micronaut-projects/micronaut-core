@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.uri
 
+import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -37,9 +38,9 @@ class UriMatchTemplateSpec extends Specification {
         left           | right          | result
         "/book"        | "/{name}"      | -1
         "/"            | "/"            | 0
-        "/"            | "/book"        | 0
-        "/book/foo"    | "/book"        | 0
-        "/book/{name}" | "/book"        | 1
+        "/"            | "/book"        | 1
+        "/book/foo"    | "/book"        | -1
+        "/book/{name}" | "/book"        | -1
         "/book/{name}" | "/book/{test}" | 0
         "/book/{name}" | "/book/test"   | 1
 
@@ -80,6 +81,7 @@ class UriMatchTemplateSpec extends Specification {
         where:
         template                         | uri                        | matches | variables
         // raw unencoded paths
+        "https://www.domain.com/{+path}" |'https://www.domain.com/abc'| true    | [path:'abc']
         "/books/{+path}"                 | '/books/1.xml'             | true    | [path: '1.xml']
         "/books/{+path}"                 | '/books/foo/1.xml'         | true    | [path: 'foo/1.xml']
         "/books/{+path}"                 | '/books/foo/bar/baz'       | true    | [path: 'foo/bar/baz']
@@ -131,6 +133,7 @@ class UriMatchTemplateSpec extends Specification {
         "/books{?max,offset}"            | "/books?offset=100"        | true    | [:]
         "/books{?max,offset}"            | "/books?foo=bar"           | true    | [:] //query parameters are not considered for matching
         "/books{#hashtag}"               | "/books"                   | true    | [:]
+        "/{?max,offset}"                 | "/"                        | true    | [:]
     }
 
     @Unroll
@@ -178,5 +181,27 @@ class UriMatchTemplateSpec extends Specification {
         "/book/show{/id}"                | '/book/1/'            | false   | null
         "/books{?max,offset}"            | "/books/"             | true    | [:]
         "/books{#hashtag}"               | "/books/"             | true    | [:]
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-aws/issues/110")
+    @Unroll
+    void "Test URI template #template matches uri with encoded characters: #uri"() {
+        given:
+        UriMatchTemplate matchTemplate = new UriMatchTemplate(template)
+        Optional<UriMatchInfo> info = matchTemplate.match(uri)
+
+        expect:
+        info.isPresent() == matches
+        info.orElse(null)?.variableValues == variables
+
+        where:
+        template        | uri                           | matches   | variables
+        "/{someId}"     | '/username@company.com'       | true      | [someId: 'username@company.com']
+        "/{someId}"     | '/username%2B1@company.com'   | true      | [someId: 'username%2B1@company.com']
+        "/{someId}"     | '/username+1@company.com'     | false     | null
+
+        "/{+someId}"    | '/username@company.com'       | true      | [someId: 'username@company.com']
+        "/{+someId}"    | '/username%2B1@company.com'   | true      | [someId: 'username%2B1@company.com']
+        "/{+someId}"    | '/username+1@company.com'     | true      | [someId: 'username+1@company.com']
     }
 }

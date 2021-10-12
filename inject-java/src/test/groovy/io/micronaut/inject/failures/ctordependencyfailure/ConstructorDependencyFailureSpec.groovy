@@ -37,6 +37,6 @@ Failed to inject value for parameter [a] of class: io.micronaut.inject.failures.
 
 Message: No bean of type [io.micronaut.inject.failures.ctordependencyfailure.A] exists.''')
 
-        e.message.normalize().contains('Path Taken: new B([A a])')
+        e.message.normalize().contains('Path Taken: new B(A a) --> new B([A a])')
     }
 }

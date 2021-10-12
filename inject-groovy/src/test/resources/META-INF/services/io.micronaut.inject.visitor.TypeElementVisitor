@@ -1,4 +1,4 @@
-io.micronaut.inject.visitor.InjectVisitor
+io.micronaut.inject.visitor.TestInjectVisitor
 io.micronaut.inject.visitor.AllElementsVisitor
 io.micronaut.inject.visitor.AllClassesVisitor
 io.micronaut.inject.visitor.ControllerGetVisitor

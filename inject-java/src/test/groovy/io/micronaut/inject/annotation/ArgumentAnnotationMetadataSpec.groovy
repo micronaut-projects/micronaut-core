@@ -16,9 +16,9 @@
 package io.micronaut.inject.annotation
 
 import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.inject.AbstractTypeElementSpec
-
-import javax.inject.Named
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.core.annotation.AnnotationUtil
+import jakarta.inject.Named
 import javax.validation.constraints.Size
 
 class ArgumentAnnotationMetadataSpec extends AbstractTypeElementSpec {
@@ -28,10 +28,10 @@ class ArgumentAnnotationMetadataSpec extends AbstractTypeElementSpec {
         AnnotationMetadata metadata = buildMethodArgumentAnnotationMetadata('''
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
-    void test(@javax.inject.Named("foo") String id) {
+    void test(@jakarta.inject.Named("foo") String id) {
     
     }
 }
@@ -40,8 +40,8 @@ class Test {
         expect:
         metadata != null
         !metadata.empty
-        metadata.hasDeclaredAnnotation(Named)
-        metadata.getValue(Named).get() == "foo"
+        metadata.hasDeclaredAnnotation(AnnotationUtil.NAMED)
+        metadata.getValue(AnnotationUtil.NAMED).get() == "foo"
     }
 
     void "test basic annotation on a byte[] in executable method"() {
@@ -49,7 +49,7 @@ class Test {
         AnnotationMetadata metadata = buildMethodArgumentAnnotationMetadata('''
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @io.micronaut.context.annotation.Executable
@@ -70,10 +70,12 @@ class Test {
         AnnotationMetadata metadata = buildMethodArgumentAnnotationMetadata('''
 package test;
 
-@javax.inject.Singleton
+import java.lang.annotation.*;
+
+@jakarta.inject.Singleton
 class Test implements TestApi {
 
-    @javax.annotation.PostConstruct
+    @jakarta.annotation.PostConstruct
     @java.lang.Override
     public void test(String id) {
     
@@ -82,17 +84,23 @@ class Test implements TestApi {
 
 interface TestApi {
 
-    void test(@javax.inject.Named("foo") String id);
+    void test(@MyAnn String id);
 
 }
+
+@Inherited
+@Retention(RetentionPolicy.RUNTIME)
+@jakarta.inject.Named("foo") 
+@interface MyAnn {}
 ''', 'test', 'id')
 
         expect:
         metadata != null
         !metadata.empty
-        !metadata.hasDeclaredAnnotation(Named)
-        metadata.hasAnnotation(Named)
-        metadata.getValue(Named).get() == "foo"
+        !metadata.hasDeclaredAnnotation(AnnotationUtil.NAMED)
+        metadata.hasStereotype(AnnotationUtil.NAMED)
+        metadata.getValue(AnnotationUtil.NAMED).get() == "foo"
+        metadata.stringValue(AnnotationUtil.NAMED).get() == "foo"
     }
 
 }

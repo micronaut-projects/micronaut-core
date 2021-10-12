@@ -39,7 +39,7 @@ class EachPropertyNullableSpec extends Specification {
         applicationContext.start()
 
         when:
-        SomeConfiguration bean = applicationContext.getBean(SomeConfiguration)
+        SomeConfiguration bean = applicationContext.getBean(SomeConfiguration, Qualifiers.byName("one"))
 
         then:
         noExceptionThrown()

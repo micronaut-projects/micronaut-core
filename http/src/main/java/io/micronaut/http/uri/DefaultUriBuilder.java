@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,8 +21,8 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.exceptions.UriSyntaxException;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -71,7 +71,7 @@ class DefaultUriBuilder implements UriBuilder {
         final String query = uri.getQuery();
         if (query != null) {
             final Map parameters = new QueryStringDecoder(uri).parameters();
-            this.queryParams = new MutableConvertibleMultiValuesMap<String>(parameters);
+            this.queryParams = new MutableConvertibleMultiValuesMap<>(parameters);
         } else {
             this.queryParams = new MutableConvertibleMultiValuesMap<>();
         }
@@ -116,7 +116,7 @@ class DefaultUriBuilder implements UriBuilder {
                 }
                 if (query != null) {
                     final Map parameters = new QueryStringDecoder(query).parameters();
-                    this.queryParams = new MutableConvertibleMultiValuesMap<String>(parameters);
+                    this.queryParams = new MutableConvertibleMultiValuesMap<>(parameters);
                 } else {
                     this.queryParams = new MutableConvertibleMultiValuesMap<>();
                 }
@@ -134,7 +134,7 @@ class DefaultUriBuilder implements UriBuilder {
                 this.path = new StringBuilder(path);
                 if (query != null) {
                     final Map parameters = new QueryStringDecoder(uri.toString()).parameters();
-                    this.queryParams = new MutableConvertibleMultiValuesMap<String>(parameters);
+                    this.queryParams = new MutableConvertibleMultiValuesMap<>(parameters);
                 } else {
                     this.queryParams = new MutableConvertibleMultiValuesMap<>();
                 }
@@ -146,7 +146,7 @@ class DefaultUriBuilder implements UriBuilder {
         }
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public UriBuilder fragment(@Nullable String fragment) {
         if (fragment != null) {
@@ -155,7 +155,7 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public UriBuilder scheme(@Nullable String scheme) {
         if (scheme != null) {
@@ -164,7 +164,7 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public UriBuilder userInfo(@Nullable String userInfo) {
         if (userInfo != null) {
@@ -173,7 +173,7 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public UriBuilder host(@Nullable String host) {
         if (host != null) {
@@ -182,7 +182,7 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public UriBuilder port(int port) {
         if (port < -1) {
@@ -192,7 +192,7 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public UriBuilder path(@Nullable String path) {
         if (StringUtils.isNotEmpty(path)) {
@@ -215,7 +215,7 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public UriBuilder replacePath(@Nullable String path) {
         if (path != null) {
@@ -225,7 +225,7 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public UriBuilder queryParam(String name, Object... values) {
         if (StringUtils.isNotEmpty(name) && ArrayUtils.isNotEmpty(values)) {
@@ -241,7 +241,22 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @Nonnull
+    @NonNull
+    @Override
+    public UriBuilder replaceQueryParam(String name, Object... values) {
+        if (StringUtils.isNotEmpty(name) && ArrayUtils.isNotEmpty(values)) {
+            List<String> strings = new ArrayList<>(values.length);
+            for (Object value : values) {
+                if (value != null) {
+                    strings.add(value.toString());
+                }
+            }
+            queryParams.put(name, strings);
+        }
+        return this;
+    }
+
+    @NonNull
     @Override
     public URI build() {
         try {
@@ -251,7 +266,7 @@ class DefaultUriBuilder implements UriBuilder {
         }
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public URI expand(Map<String, ? super Object> values) {
         String uri = reconstructAsString(values);
@@ -345,12 +360,13 @@ class DefaultUriBuilder implements UriBuilder {
     private String buildQueryParams(Map<String, ? super Object> values) {
         if (!queryParams.isEmpty()) {
             StringBuilder builder = new StringBuilder();
-            final Iterator<String> nameIterator = queryParams.names().iterator();
+            final Iterator<Map.Entry<String, List<String>>> nameIterator = queryParams.iterator();
             while (nameIterator.hasNext()) {
-                String name = nameIterator.next();
-                name = expandOrEncode(name, values);
+                Map.Entry<String, List<String>> entry = nameIterator.next();
+                String rawName = entry.getKey();
+                String name = expandOrEncode(rawName, values);
 
-                final Iterator<String> i = queryParams.getAll(name).iterator();
+                final Iterator<String> i = entry.getValue().iterator();
                 while (i.hasNext()) {
                     String v = expandOrEncode(i.next(), values);
                     builder.append(name).append('=').append(v);

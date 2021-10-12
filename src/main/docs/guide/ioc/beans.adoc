@@ -1,4 +1,4 @@
-Micronaut implements the http://javax-inject.github.io/javax-inject/[JSR-330 (javax.inject) - Dependency Injection for Java] specification hence to use Micronaut you simply use the link:{jeeapi}/javax/inject/package-summary.html[annotations provided by javax.inject].
+A bean is an object whose lifecycle is managed by the Micronaut IoC container. That lifecycle may include creation, execution, and destruction. Micronaut implements the http://javax-inject.github.io/javax-inject/[JSR-330 (javax.inject) - Dependency Injection for Java] specification, hence to use Micronaut you simply use the link:{jeeapi}/javax/inject/package-summary.html[annotations provided by javax.inject].
 
 The following is a simple example:
 
@@ -8,16 +8,15 @@ snippet::io.micronaut.docs.inject.intro.Engine,io.micronaut.docs.inject.intro.V8
 <2> A `V8Engine` implementation is defined and marked with `Singleton` scope
 <3> The `Engine` is injected via constructor injection
 
-To perform dependency injection simply run the  link:{api}/io/micronaut/context/BeanContext.html[BeanContext] using the `run()` method and lookup a bean using `getBean(Class)`, as per the following example:
-
+To perform dependency injection, run the link:{api}/io/micronaut/context/BeanContext.html[BeanContext] using the `run()` method and lookup a bean using `getBean(Class)`, as per the following example:
 
 snippet::io.micronaut.docs.inject.intro.VehicleSpec[tags="start",indent="0"]
 
-Micronaut will automatically discover dependency injection metadata on the classpath and wire the beans together according to injection points you define.
+Micronaut automatically discovers dependency injection metadata on the classpath and wires the beans together according to injection points you define.
 
 Micronaut supports the following types of dependency injection:
 
-* Constructor injection (must be one public constructor or a single contructor annotated with `@Inject`)
+* Constructor injection (must be one public constructor or a single constructor annotated with `@Inject`)
 * Field injection
 * JavaBean property injection
 * Method parameter injection
