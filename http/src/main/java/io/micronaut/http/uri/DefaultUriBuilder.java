@@ -30,7 +30,6 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static io.micronaut.http.uri.UriTemplate.PATTERN_FULL_PATH;
 import static io.micronaut.http.uri.UriTemplate.PATTERN_FULL_URI;
@@ -424,6 +423,7 @@ class PathAndQueryParams {
     public String getPath() {
         return this.path;
     }
+
     public String getQueryParams() {
         return this.queryParams;
     }
