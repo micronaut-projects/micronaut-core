@@ -160,12 +160,13 @@ class UriBuilderSpec extends Specification {
 
     void "test uri build parse query param"() {
         given:
-        String stringUri = "https://google.com/search?q1=v1#foo"
+        String stringUri = "https://google.com/search?q1=v1"
         UriBuilder builder = UriBuilder.of(stringUri)
-        URI uri = builder.build()
 
-        expect:
-        uri.path == "/search"
-        uri.query == "q1=v1"
+        when:
+        builder.queryParam("q2", "v2")
+
+        then:
+        builder.build().toString() == "https://google.com/search?q1=v1&q2=v2"
     }
 }
