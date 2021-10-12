@@ -408,18 +408,22 @@ class PathAndQueryParams {
 
     PathAndQueryParams(String pathWithQueryParams, String additionalQueryParams) {
         boolean isAdditionalQueryNull = additionalQueryParams == null;
-        if(pathWithQueryParams.contains("{?")) {
+        if (pathWithQueryParams.contains("{?")) {
             this.path = pathWithQueryParams.split("(\\{\\?)")[0];
-            this.queryParams = isAdditionalQueryNull ? "{?" + pathWithQueryParams.split("(\\{\\?)")[1] : "{?" + pathWithQueryParams.split("(\\{\\?)")[1]+"&"+additionalQueryParams;
-        } else if(pathWithQueryParams.contains("?")) {
+            this.queryParams = isAdditionalQueryNull ? "{?" + pathWithQueryParams.split("(\\{\\?)")[1] : "{?" + pathWithQueryParams.split("(\\{\\?)")[1] + "&" + additionalQueryParams;
+        } else if (pathWithQueryParams.contains("?")) {
             this.path = pathWithQueryParams.split("\\?")[0];
-            this.queryParams = isAdditionalQueryNull ? "?"+ pathWithQueryParams.split("\\?")[1] : "?" + pathWithQueryParams.split("\\?")[1]+"&"+additionalQueryParams;
+            this.queryParams = isAdditionalQueryNull ? "?" + pathWithQueryParams.split("\\?")[1] : "?" + pathWithQueryParams.split("\\?")[1] + "&" + additionalQueryParams;
         } else {
             this.path = pathWithQueryParams;
             this.queryParams = isAdditionalQueryNull ? "" : additionalQueryParams;
         }
     }
 
-    public String getPath() { return this.path;}
-    public String getQueryParams() { return this.queryParams;}
+    public String getPath() {
+        return this.path;
+    }
+    public String getQueryParams() {
+        return this.queryParams;
+    }
 }
