@@ -94,8 +94,9 @@ class DefaultUriBuilder implements UriBuilder {
                 String userInfo = matcher.group(5);
                 String host = matcher.group(6);
                 String port = matcher.group(8);
-                String path = matcher.group(9);
-                String query = matcher.group(11);
+                PathAndQueryParams pathAndQueryParams = new PathAndQueryParams(matcher.group(9), matcher.group(11));
+                String path = pathAndQueryParams.getPath();
+                String query = pathAndQueryParams.getQueryParams();
                 String fragment = matcher.group(13);
                 if (userInfo != null) {
                     this.userInfo = userInfo;
@@ -383,4 +384,26 @@ class DefaultUriBuilder implements UriBuilder {
             throw new IllegalStateException("No available charset: " + e.getMessage());
         }
     }
+}
+
+class PathAndQueryParams {
+    private final String path;
+    private final String queryParams;
+
+    PathAndQueryParams(String pathWithQueryParams, String additionalQueryParams) {
+        boolean isAdditionalQueryNull = additionalQueryParams == null;
+        if(pathWithQueryParams.contains("{?")) {
+            this.path = pathWithQueryParams.split("(\\{\\?)")[0];
+            this.queryParams = isAdditionalQueryNull ? "{?" + pathWithQueryParams.split("(\\{\\?)")[1] : "{?" + pathWithQueryParams.split("(\\{\\?)")[1]+"&"+additionalQueryParams;
+        } else if(pathWithQueryParams.contains("?")) {
+            this.path = pathWithQueryParams.split("\\?")[0];
+            this.queryParams = isAdditionalQueryNull ? "?"+ pathWithQueryParams.split("\\?")[1] : "?" + pathWithQueryParams.split("\\?")[1]+"&"+additionalQueryParams;
+        } else {
+            this.path = pathWithQueryParams;
+            this.queryParams = isAdditionalQueryNull ? "" : additionalQueryParams;
+        }
+    }
+
+    public String getPath() { return this.path;}
+    public String getQueryParams() { return this.queryParams;}
 }

@@ -43,7 +43,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
     private static final String STRING_PATTERN_HOST_IPV6 = "\\[[\\p{XDigit}\\:\\.]*[%\\p{Alnum}]*\\]";
     private static final String STRING_PATTERN_HOST = "(" + STRING_PATTERN_HOST_IPV6 + "|" + STRING_PATTERN_HOST_IPV4 + ")";
     private static final String STRING_PATTERN_PORT = "(\\d*(?:\\{[^/]+?\\})?)";
-    private static final String STRING_PATTERN_PATH = "([^#]*)\\?";
+    private static final String STRING_PATTERN_PATH = "([^#]*)";
     private static final String STRING_PATTERN_QUERY = "([^#]*)";
     private static final String STRING_PATTERN_REMAINING = "(.*)";
     private static final char QUERY_OPERATOR = '?';
@@ -62,7 +62,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
     static final Pattern PATTERN_FULL_PATH = Pattern.compile("^([^#\\?]*)(\\?([^#]*))?(\\#(.*))?$");
     static final Pattern PATTERN_FULL_URI = Pattern.compile(
             "^(" + STRING_PATTERN_SCHEME + ")?" + "(//(" + STRING_PATTERN_USER_INFO + "@)?" + STRING_PATTERN_HOST + "(:" + STRING_PATTERN_PORT +
-                    ")?" + ")?" + STRING_PATTERN_PATH + "(" + STRING_PATTERN_QUERY + ")?" + "(#" + STRING_PATTERN_REMAINING + ")?");
+                    ")?" + ")?" + STRING_PATTERN_PATH + "(\\?" + STRING_PATTERN_QUERY + ")?" + "(#" + STRING_PATTERN_REMAINING + ")?");
 
     private final String templateString;
     private final List<PathSegment> segments = new ArrayList<>();
@@ -108,8 +108,9 @@ public class UriTemplate implements Comparable<UriTemplate> {
                 String userInfo = matcher.group(5);
                 String host = matcher.group(6);
                 String port = matcher.group(8);
-                String path = matcher.group(9);
-                String query = matcher.group(11);
+                PathAndQueryParams pathAndQueryParams = new PathAndQueryParams(matcher.group(9), matcher.group(11));
+                String path = pathAndQueryParams.getPath();
+                String query = pathAndQueryParams.getQueryParams();
                 String fragment = matcher.group(13);
                 if (userInfo != null) {
                     createParser(userInfo, parserArguments).parse(segments);

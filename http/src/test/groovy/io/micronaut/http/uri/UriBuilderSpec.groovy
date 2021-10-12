@@ -96,17 +96,6 @@ class UriBuilderSpec extends Specification {
         then:
         builder.toString() == 'https://myhost:9090/foo/bar/baz?offset=10'
     }
-    void "test uri builder parse query param"() {
-        given:
-        String uri = "https://google.com/search?q1=v1#foo"
-        UriBuilder builder = UriBuilder.of(uri)
-
-        when:
-        builder.queryParam("q2", "v2")
-
-        then:
-        builder.build().toString() == "https://google.com/search?q1=v1&q2=v2#foo"
-    }
 
     @Unroll
     void "test queryParam method for uri #uri"() {
@@ -130,5 +119,16 @@ class UriBuilderSpec extends Specification {
         '/foo'               | ['foo': 'bar']          | '/foo?foo=bar'
         '/foo'               | ['foo': 'hello world']  | '/foo?foo=hello+world'
         '/foo'               | ['foo': ['bar', 'baz']] | '/foo?foo=bar&foo=baz'
+    }
+
+    void "test uri build parse query param"() {
+        given:
+        String stringUri = "https://google.com/search?q1=v1#foo"
+        UriBuilder builder = UriBuilder.of(stringUri)
+        URI uri = builder.build()
+
+        expect:
+        uri.path == "/search"
+        uri.query == "q1=v1"
     }
 }
