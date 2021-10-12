@@ -1,4 +1,4 @@
-Scopes can be defined on Meta annotations that you can then apply to your classes. Consider the following example meta annotation:
+Scopes can be defined on meta annotations that you can then apply to your classes. Consider the following example meta annotation:
 
 .Driver.java Annotation
 
@@ -20,14 +20,13 @@ class Foo {}
 ----
 // TODO should this be converted? it would be the same in every language I think
 
-If you wish for the scope to be overridable you should instead using the api:context.annotation.DefaultScope[] annotation on `@Driver` which allows a default scope to be specified if none other is present:
+For the scope to be overridable, instead use the api:context.annotation.DefaultScope[] annotation on `@Driver` which allows a default scope to be specified if none other is present:
 
 .Using @DefaultScope
 
-
 [source.multi-language-sample,java]
 ----
-@Requires(classes = Car.class )
+@Requires(classes = Car.class)
 @DefaultScope(Singleton.class) // <1>
 @Documented
 @Retention(RUNTIME)
@@ -36,7 +35,7 @@ public @interface Driver {
 ----
 [source.multi-language-sample,groovy]
 ----
-@Requires(classes = Car.class )
+@Requires(classes = Car.class)
 @DefaultScope(Singleton.class) // <1>
 @Documented
 @Retention(RUNTIME)
@@ -52,4 +51,4 @@ public @interface Driver {
 annotation class Driver
 ----
 
-<1> api:context.annotation.DefaultScope[] is used to declare which scope to be used if none is present
+<1> api:context.annotation.DefaultScope[] declares the scope to use if none is specified

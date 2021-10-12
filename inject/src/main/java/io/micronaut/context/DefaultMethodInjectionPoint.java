@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,17 +17,15 @@ package io.micronaut.context;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.MethodInjectionPoint;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
-
-import javax.annotation.Nullable;
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
+import io.micronaut.core.annotation.Nullable;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Objects;
@@ -37,33 +35,19 @@ import java.util.Objects;
  *
  * @author graemerocher
  * @since 1.0
+ * @param <B> The bean type
+ * @param <T> The injectable type
  */
 @Internal
-class DefaultMethodInjectionPoint implements MethodInjectionPoint, EnvironmentConfigurable {
+class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, EnvironmentConfigurable {
 
-    private final BeanDefinition declaringBean;
+    private final BeanDefinition<B> declaringBean;
     private final AnnotationMetadata annotationMetadata;
     private final Class<?> declaringType;
     private final String methodName;
     private final Class[] argTypes;
-    private final Argument[] arguments;
+    private final Argument<?>[] arguments;
     private Environment environment;
-
-    /**
-     * Constructs a new {@link DefaultMethodInjectionPoint}.
-     *
-     * @param declaringBean The declaring bean
-     * @param declaringType The declaring type
-     * @param methodName    The method name
-     * @param arguments     The arguments
-     */
-    DefaultMethodInjectionPoint(
-        BeanDefinition declaringBean,
-        Class<?> declaringType,
-        String methodName,
-        @Nullable Argument[] arguments) {
-        this(declaringBean, declaringType, methodName, arguments, AnnotationMetadata.EMPTY_METADATA);
-    }
 
     /**
      * Constructs a new {@link DefaultMethodInjectionPoint}.
@@ -75,10 +59,10 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint, EnvironmentCo
      * @param annotationMetadata The annotation metadata
      */
     DefaultMethodInjectionPoint(
-        BeanDefinition declaringBean,
+        BeanDefinition<B> declaringBean,
         Class<?> declaringType,
         String methodName,
-        @Nullable Argument[] arguments,
+        @Nullable Argument<?>[] arguments,
         @Nullable AnnotationMetadata annotationMetadata) {
         Objects.requireNonNull(declaringBean, "Declaring bean cannot be null");
         this.declaringType = declaringType;
@@ -87,6 +71,11 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint, EnvironmentCo
         this.argTypes = Argument.toClassArray(arguments);
         this.declaringBean = declaringBean;
         this.annotationMetadata = initAnnotationMetadata(annotationMetadata);
+    }
+
+    @Override
+    public final boolean hasPropertyExpressions() {
+        return annotationMetadata.hasPropertyExpressions();
     }
 
     @Override
@@ -115,27 +104,29 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint, EnvironmentCo
 
     @Override
     public boolean isPreDestroyMethod() {
-        return annotationMetadata.hasDeclaredAnnotation(PreDestroy.class);
+        return annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY);
     }
 
     @Override
     public boolean isPostConstructMethod() {
-        return annotationMetadata.hasDeclaredAnnotation(PostConstruct.class);
+        return annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT);
     }
 
     @Override
-    public Object invoke(Object instance, Object... args) {
+    public T invoke(Object instance, Object... args) {
         Method targetMethod = getMethod();
         return ReflectionUtils.invokeMethod(instance, targetMethod, args);
     }
 
     @Override
+    @NonNull
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
     }
 
     @Override
-    public BeanDefinition getDeclaringBean() {
+    @NonNull
+    public BeanDefinition<B> getDeclaringBean() {
         return declaringBean;
     }
 
@@ -145,6 +136,7 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint, EnvironmentCo
     }
 
     @Override
+    @NonNull
     public Argument<?>[] getArguments() {
         return arguments;
     }
@@ -157,7 +149,8 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint, EnvironmentCo
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        DefaultMethodInjectionPoint that = (DefaultMethodInjectionPoint) o;
+        @SuppressWarnings("unchecked")
+        DefaultMethodInjectionPoint<B, T> that = (DefaultMethodInjectionPoint<B, T>) o;
         return Objects.equals(declaringType, that.declaringType) &&
             Objects.equals(methodName, that.methodName) &&
             Arrays.equals(argTypes, that.argTypes);
@@ -165,17 +158,20 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint, EnvironmentCo
 
     @Override
     public int hashCode() {
-
         int result = Objects.hash(declaringType, methodName);
         result = 31 * result + Arrays.hashCode(argTypes);
         return result;
     }
 
     private AnnotationMetadata initAnnotationMetadata(@Nullable AnnotationMetadata annotationMetadata) {
-        if (annotationMetadata instanceof DefaultAnnotationMetadata) {
-            return new MethodAnnotationMetadata((DefaultAnnotationMetadata) annotationMetadata);
-        } else if (annotationMetadata != null) {
-            return annotationMetadata;
+        if (annotationMetadata != AnnotationMetadata.EMPTY_METADATA) {
+            if (annotationMetadata != null) {
+                if (annotationMetadata.hasPropertyExpressions()) {
+                    return new MethodAnnotationMetadata(annotationMetadata);
+                } else {
+                    return annotationMetadata;
+                }
+            }
         }
         return AnnotationMetadata.EMPTY_METADATA;
     }
@@ -184,7 +180,7 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint, EnvironmentCo
      * Internal environment aware annotation metadata delegate.
      */
     private final class MethodAnnotationMetadata extends AbstractEnvironmentAnnotationMetadata {
-        MethodAnnotationMetadata(DefaultAnnotationMetadata targetMetadata) {
+        MethodAnnotationMetadata(AnnotationMetadata targetMetadata) {
             super(targetMetadata);
         }
 

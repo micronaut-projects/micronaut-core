@@ -1,1 +1,1 @@
-io.micronaut.inject.visitor.AnnotatingVisitor
+example.micronaut.inject.visitor.AnnotatingVisitor

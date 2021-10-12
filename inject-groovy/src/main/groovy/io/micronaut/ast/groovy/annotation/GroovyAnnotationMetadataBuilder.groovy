@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,15 +15,19 @@
  */
 package io.micronaut.ast.groovy.annotation
 
+import io.micronaut.ast.groovy.utils.AstGenericUtils
+import io.micronaut.core.annotation.NonNull
 import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.core.annotation.AnnotationClassValue
+import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.io.service.ServiceDefinition
 import io.micronaut.core.io.service.SoftServiceLoader
 import io.micronaut.core.reflect.ClassUtils
+import io.micronaut.core.util.CollectionUtils
 import io.micronaut.core.util.StringUtils
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
@@ -33,22 +37,30 @@ import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.AnnotationNode
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
+import org.codehaus.groovy.ast.FieldNode
 import org.codehaus.groovy.ast.MethodNode
+import org.codehaus.groovy.ast.PackageNode
 import org.codehaus.groovy.ast.Parameter
+import org.codehaus.groovy.ast.PropertyNode
+import org.codehaus.groovy.ast.Variable
 import org.codehaus.groovy.ast.expr.AnnotationConstantExpression
 import org.codehaus.groovy.ast.expr.ClassExpression
 import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.expr.ListExpression
 import org.codehaus.groovy.ast.expr.PropertyExpression
+import org.codehaus.groovy.ast.expr.VariableExpression
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.ast.stmt.Statement
+import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.SourceUnit
 
-import javax.annotation.Nonnull
 import java.lang.annotation.Annotation
+import java.lang.annotation.Inherited
 import java.lang.annotation.Repeatable
+import java.lang.annotation.Retention
+import java.lang.annotation.RetentionPolicy
 import java.lang.reflect.Array
 
 /**
@@ -65,8 +77,10 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
 
     final SourceUnit sourceUnit
     final AnnotatedElementValidator elementValidator
+    final CompilationUnit compilationUnit
 
-    GroovyAnnotationMetadataBuilder(SourceUnit sourceUnit) {
+    GroovyAnnotationMetadataBuilder(SourceUnit sourceUnit, CompilationUnit compilationUnit) {
+        this.compilationUnit = compilationUnit
         this.sourceUnit = sourceUnit
         def ast = sourceUnit?.getAST()
         if (ast != null) {
@@ -94,13 +108,72 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     }
 
     @Override
+    protected boolean isValidationRequired(AnnotatedNode member) {
+        if (member != null) {
+            def annotations = member.getAnnotations()
+            if (annotations) {
+                return annotations.any { it.classNode.name.startsWith("javax.validation") }
+            }
+        }
+        return false
+    }
+
+    @Override
+    protected boolean isExcludedAnnotation(@NonNull AnnotatedNode element, @NonNull String annotationName) {
+        if (element instanceof ClassNode && element.isAnnotationDefinition() && annotationName.startsWith("java.lang.annotation")) {
+            return false
+        } else {
+            return super.isExcludedAnnotation(element, annotationName)
+        }
+    }
+
+    @Override
+    protected AnnotatedNode getAnnotationMember(AnnotatedNode originatingElement, CharSequence member) {
+        if (originatingElement instanceof ClassNode) {
+            def methods = ((ClassNode) originatingElement).getMethods(member.toString())
+            if (methods) {
+                return methods.iterator().next()
+            }
+        }
+        return null
+    }
+
+    @Override
+    protected RetentionPolicy getRetentionPolicy(@NonNull AnnotatedNode annotation) {
+        List<AnnotationNode> annotations = annotation.getAnnotations()
+        for(ann in annotations) {
+            if (ann.classNode.name == Retention.name) {
+                def i = ann.members.values().iterator()
+                if (i.hasNext()) {
+                    def expr = i.next()
+                    if (expr instanceof PropertyExpression) {
+                        PropertyExpression pe = (PropertyExpression) expr
+                        try {
+                            return RetentionPolicy.valueOf(pe.propertyAsString)
+                        } catch (e) {
+                            // should never happen
+                            return RetentionPolicy.RUNTIME
+                        }
+                    }
+                }
+            }
+        }
+        return RetentionPolicy.RUNTIME
+    }
+
+    @Override
     protected AnnotatedElementValidator getElementValidator() {
         return this.elementValidator
     }
 
     @Override
-    protected void addError(@Nonnull AnnotatedNode originatingElement, @Nonnull String error) {
+    protected void addError(@NonNull AnnotatedNode originatingElement, @NonNull String error) {
         AstMessageUtils.error(sourceUnit, originatingElement, error)
+    }
+
+    @Override
+    protected void addWarning(@NonNull AnnotatedNode originatingElement, @NonNull String warning) {
+        AstMessageUtils.warning(sourceUnit, originatingElement, warning)
     }
 
     @Override
@@ -109,7 +182,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     }
 
     @Override
-    protected String getDeclaringType(@Nonnull AnnotatedNode element) {
+    protected String getDeclaringType(@NonNull AnnotatedNode element) {
         if (element instanceof ClassNode) {
             return element.name
         }
@@ -122,8 +195,23 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     }
 
     @Override
+    protected boolean hasAnnotation(AnnotatedNode element, String annotation) {
+        for (AnnotationNode ann: element.getAnnotations()) {
+            if (ann.getClassNode().getName() == annotation) {
+                return true
+            }
+        }
+        return false
+    }
+
+    @Override
+    protected boolean hasAnnotations(AnnotatedNode element) {
+        return CollectionUtils.isNotEmpty(element.getAnnotations())
+    }
+
+    @Override
     protected VisitorContext createVisitorContext() {
-        return new GroovyVisitorContext(sourceUnit)
+        return new GroovyVisitorContext(sourceUnit, compilationUnit)
     }
 
     @Override
@@ -133,7 +221,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
 
     @Override
     protected String getRepeatableName(AnnotationNode annotationMirror) {
-       return getRepeatableNameForType(annotationMirror.classNode)
+        return getRepeatableNameForType(annotationMirror.classNode)
     }
 
     @Override
@@ -164,8 +252,44 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     }
 
     @Override
+    protected String getElementName(AnnotatedNode element) {
+        if (element instanceof ClassNode) {
+            return ((ClassNode) element).getName()
+        } else if (element instanceof MethodNode) {
+            return ((MethodNode) element).getName()
+        } else if (element instanceof FieldNode) {
+            return ((FieldNode) element).getName()
+        } else if (element instanceof PropertyNode) {
+            return ((PropertyNode) element).getName()
+        } else if (element instanceof PackageNode) {
+            return ((PackageNode) element).getName()
+        }
+        throw new IllegalArgumentException("Cannot establish name for node type: " + element.getClass().getName())
+    }
+
+    @Override
     protected List<? extends AnnotationNode> getAnnotationsForType(AnnotatedNode element) {
-        return element.getAnnotations()
+        List<AnnotationNode> annotations = element.getAnnotations()
+        List<AnnotationNode> expanded = new ArrayList<>(annotations.size())
+        for (AnnotationNode node: annotations) {
+            Expression value = node.getMember("value")
+            boolean repeatable = false
+            if (value != null && value instanceof ListExpression) {
+                for (Expression expression: ((ListExpression) value).getExpressions()) {
+                    if (expression instanceof AnnotationConstantExpression) {
+                        String name = getRepeatableNameForType(expression.type)
+                        if (name != null && name == node.classNode.name) {
+                            repeatable = true
+                            expanded.add((AnnotationNode) expression.value)
+                        }
+                    }
+                }
+            }
+            if (!repeatable || node.members.size() > 1) {
+                expanded.add(node)
+            }
+        }
+        return expanded
     }
 
     @Override
@@ -176,6 +300,9 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             List<AnnotatedNode> hierarchy = new ArrayList<>()
             ClassNode cn = (ClassNode) element
             hierarchy.add(cn)
+            if (cn.isAnnotationDefinition()) {
+                return hierarchy
+            }
             populateTypeHierarchy(cn, hierarchy)
             return hierarchy.reverse()
         } else if (element instanceof MethodNode) {
@@ -221,7 +348,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             Object annotationValue,
             Map<CharSequence, Object> annotationValues) {
         if (!annotationValues.containsKey(memberName)) {
-            def v = readAnnotationValue(originatingElement, memberName, annotationValue)
+            def v = readAnnotationValue(originatingElement, member, memberName, annotationValue)
             if (v != null) {
                 validateAnnotationValue(originatingElement, annotationName, member, memberName, v)
                 annotationValues.put(memberName, v)
@@ -237,7 +364,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             if (!defaults.containsKey(annotationName)) {
 
                 List<MethodNode> methods = new ArrayList<>(classNode.getMethods())
-                Map<? extends AnnotatedNode, Expression> defaultValues = new HashMap<>()
+                Map<? extends AnnotatedNode, Expression> defaultValues = new LinkedHashMap<>()
 
                 // TODO: Remove this branch of the code after upgrading to Groovy 3.0
                 // https://issues.apache.org/jira/browse/GROOVY-8696
@@ -297,6 +424,16 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     }
 
     @Override
+    protected boolean isInheritedAnnotation(@NonNull AnnotationNode annotationMirror) {
+        return annotationMirror?.classNode?.annotations?.any { it?.classNode?.name == Inherited.name }
+    }
+
+    @Override
+    protected boolean isInheritedAnnotationType(@NonNull AnnotatedNode annotationType) {
+        return annotationType?.annotations?.any { it?.classNode?.name == Inherited.name }
+    }
+
+    @Override
     protected Map<? extends AnnotatedNode, ?> readAnnotationDefaultValues(AnnotationNode annotationMirror) {
         ClassNode classNode = annotationMirror.classNode
         String annotationName = classNode.name
@@ -304,12 +441,16 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     }
 
     @Override
-    protected Object readAnnotationValue(AnnotatedNode originatingElement, String memberName, Object annotationValue) {
+    protected Object readAnnotationValue(AnnotatedNode originatingElement, AnnotatedNode member, String memberName, Object annotationValue) {
         if (annotationValue instanceof ConstantExpression) {
             if (annotationValue instanceof AnnotationConstantExpression) {
                 AnnotationConstantExpression ann = (AnnotationConstantExpression) annotationValue
                 AnnotationNode value = (AnnotationNode) ann.getValue()
-                return readNestedAnnotationValue(originatingElement, value)
+                if (member instanceof MethodNode && member.returnType.isArray()) {
+                    return [readNestedAnnotationValue(originatingElement, value)] as AnnotationValue[]
+                } else {
+                    return readNestedAnnotationValue(originatingElement, value)
+                }
             } else {
                 return ((ConstantExpression) annotationValue).value
             }
@@ -342,8 +483,28 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             List converted = []
             Class arrayType = Object.class
             for (exp in le.expressions) {
+                if (exp instanceof PropertyExpression) {
+                    PropertyExpression propertyExpression = (PropertyExpression) exp
+                    Expression valueExpression = propertyExpression.getProperty()
+                    Expression objectExpression = propertyExpression.getObjectExpression()
+                    if (valueExpression instanceof ConstantExpression && objectExpression instanceof ClassExpression) {
+                        Object value = ((ConstantExpression) valueExpression).value
+                        if (value != null) {
+                            if (value instanceof CharSequence) {
+                                value = value.toString()
+                            }
+                            ClassNode enumType = ((ClassExpression) objectExpression).type
+                            if (enumType.isResolved()) {
+                                arrayType = enumType.typeClass
+                            } else {
+                                arrayType = String.class
+                            }
+                            converted.add(value)
+                        }
+                    }
+                }
                 if (exp instanceof AnnotationConstantExpression) {
-                    arrayType = io.micronaut.core.annotation.AnnotationValue
+                    arrayType = AnnotationValue
                     AnnotationConstantExpression ann = (AnnotationConstantExpression) exp
                     AnnotationNode value = (AnnotationNode) ann.getValue()
                     converted.add(readNestedAnnotationValue(originatingElement, value))
@@ -358,11 +519,28 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
                     }
                 } else if (exp instanceof ClassExpression) {
                     arrayType = AnnotationClassValue
-                    converted.add(new AnnotationClassValue<>(((ClassExpression) exp).type.name))
+                    ClassExpression classExp = ((ClassExpression) exp)
+                    String typeName
+                    if (classExp.type.isArray()) {
+                        typeName = "[L" + classExp.type.componentType.name + ";"
+                    } else {
+                        typeName = classExp.type.name
+                    }
+                    converted.add(new AnnotationClassValue<>(typeName))
                 }
             }
             // for some reason this is necessary to produce correct array type in Groovy
             return ConversionService.SHARED.convert(converted, Array.newInstance(arrayType, 0).getClass()).orElse(null)
+        } else if (annotationValue instanceof VariableExpression) {
+            VariableExpression ve = (VariableExpression) annotationValue
+            Variable variable = ve.accessedVariable
+            if (variable != null && variable.hasInitialExpression()) {
+                return readAnnotationValue(originatingElement, member, memberName, variable.getInitialExpression())
+            }
+        } else if (annotationValue != null) {
+            if (ClassUtils.isJavaLangType(annotationValue.getClass())) {
+                return annotationValue
+            }
         }
         return null
     }
@@ -426,29 +604,58 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
         ClassNode classNode = methodNode.getDeclaringClass()
 
         String methodName = methodNode.name
-        Parameter[] methodParameters = methodNode.parameters
+        Map<String, Map<String, ClassNode>> genericsInfo = AstGenericUtils.buildAllGenericElementInfo(classNode, createVisitorContext())
 
+        classLoop:
         while (classNode != null && classNode.name != Object.name) {
-
             for (i in classNode.getAllInterfaces()) {
-                MethodNode parent = i.getDeclaredMethod(methodName, methodParameters)
-                if (parent != null) {
-                    overriddenMethods.add(parent)
+                for (MethodNode parent: i.getMethods(methodName)) {
+                    if (methodOverrides(methodNode, parent, genericsInfo.get(i.name))) {
+                        overriddenMethods.add(parent)
+                    }
                 }
             }
             classNode = classNode.superClass
             if (classNode != null && classNode.name != Object.name) {
-                MethodNode parent = classNode.getDeclaredMethod(methodName, methodParameters)
-                if (parent != null) {
-                    if (!parent.isPrivate()) {
-                        overriddenMethods.add(parent)
-                    }
-                    if (parent.getAnnotations(ANN_OVERRIDE).isEmpty()) {
-                        break
+
+                for (MethodNode parent: classNode.getMethods(methodName)) {
+                    if (methodOverrides(methodNode, parent, genericsInfo.get(classNode.name))) {
+                        if (!parent.isPrivate()) {
+                            overriddenMethods.add(parent)
+                        }
+                        if (parent.getAnnotations(ANN_OVERRIDE).isEmpty()) {
+                            break classLoop
+                        }
                     }
                 }
             }
         }
         return overriddenMethods
+    }
+
+    private boolean methodOverrides(MethodNode child,
+                                    MethodNode parent,
+                                    Map<String, ClassNode> genericsSpec) {
+        Parameter[] childParameters = child.parameters
+        Parameter[] parentParameters = parent.parameters
+        if (childParameters.length == parentParameters.length) {
+            for (int i = 0, n = childParameters.length; i < n; i += 1) {
+                ClassNode aType = childParameters[i].getType()
+                ClassNode bType = parentParameters[i].getType()
+
+                if (aType != bType) {
+                    if (bType.isGenericsPlaceHolder() && genericsSpec != null) {
+                        def classNode = genericsSpec.get(bType.getUnresolvedName())
+                        if (!classNode || aType != classNode) {
+                            return false
+                        }
+                    } else {
+                        return false
+                    }
+                }
+            }
+            return true
+        }
+        return false
     }
 }

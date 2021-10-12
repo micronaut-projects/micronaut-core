@@ -8,11 +8,14 @@ class VehicleSpec {
     @Test
     fun testStartVehicle() {
         // tag::start[]
-        val vehicle = BeanContext.run().getBean(Vehicle::class.java)
+        val context = BeanContext.run()
+        val vehicle = context.getBean(Vehicle::class.java)
         println(vehicle.start())
         // end::start[]
 
         assertEquals("Starting V8", vehicle.start())
+
+        context.close()
     }
 
 }

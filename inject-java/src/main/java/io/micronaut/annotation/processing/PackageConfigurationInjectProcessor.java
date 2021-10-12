@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,9 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.annotation.processing.visitor.JavaPackageElement;
 import io.micronaut.context.annotation.Configuration;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.writer.BeanConfigurationWriter;
 
@@ -50,8 +52,8 @@ public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotatio
     }
 
     @Override
-    public Set<String> getSupportedOptions() {
-        return Collections.singleton("org.gradle.annotation.processing.aggregating");
+    public Set<String> getSupportedAnnotationTypes() {
+        return Collections.singleton("io.micronaut.context.annotation.Configuration");
     }
 
     @Override
@@ -80,9 +82,11 @@ public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotatio
             Object aPackage = super.visitPackage(packageElement, p);
             if (annotationUtils.hasStereotype(packageElement, Configuration.class)) {
                 String packageName = packageElement.getQualifiedName().toString();
+                AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(packageElement);
                 BeanConfigurationWriter writer = new BeanConfigurationWriter(
                     packageName,
-                    annotationUtils.getAnnotationMetadata(packageElement)
+                    new JavaPackageElement(packageElement, annotationMetadata, javaVisitorContext),
+                    annotationMetadata
                 );
                 try {
                     writer.accept(classWriterOutputVisitor);

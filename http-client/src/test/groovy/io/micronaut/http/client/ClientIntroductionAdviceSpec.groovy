@@ -16,15 +16,13 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.ServiceInstanceList
+import io.micronaut.http.BasicAuth
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Body
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Header
-import io.micronaut.http.annotation.Post
-import io.micronaut.http.annotation.Put
+import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
@@ -33,97 +31,130 @@ class ClientIntroductionAdviceSpec extends Specification {
 
     void "test implement HTTP client"() {
         given:
-        ApplicationContext context = ApplicationContext.run()
-        context.getBean(EmbeddedServer).start()
-        MyClient myService = context.getBean(MyClient)
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientIntroductionAdviceSpec'])
+        MyClient myService = embeddedServer.applicationContext.getBean(MyClient)
 
         expect:
         myService.index() == 'success'
 
         cleanup:
-        context.close()
+        embeddedServer.close()
     }
 
     void "test multiple clients with the same id and different paths"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
-        ApplicationContext client = ApplicationContext.run()
-        client.registerSingleton(new TestServiceInstanceList(server.getURI()))
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientIntroductionAdviceSpec'])
+        server.applicationContext.registerSingleton(new TestServiceInstanceList(server.getURI()))
 
         expect:
-        client.getBean(PolicyClient).index() == 'policy'
-        client.getBean(OfferClient).index() == 'offer'
+        server.applicationContext.getBean(PolicyClient).index() == 'policy'
+        server.applicationContext.getBean(OfferClient).index() == 'offer'
 
         cleanup:
         server.close()
-        client.close()
     }
 
     void "test a client with a body and header"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
-        ApplicationContext ctx = ApplicationContext.run()
-        ctx.registerSingleton(new TestServiceInstanceList(server.getURI()))
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientIntroductionAdviceSpec'])
+        server.applicationContext.registerSingleton(new TestServiceInstanceList(server.getURI()))
 
         when:
-        OfferClient client = ctx.getBean(OfferClient)
+        OfferClient client = server.applicationContext.getBean(OfferClient)
 
         then:
         client.post('abc', 'bar') == 'abc header=bar'
 
         cleanup:
         server.close()
-        ctx.close()
     }
 
     void "test a client that auto encodes basic auth header"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
-        ApplicationContext ctx = ApplicationContext.run()
-        ctx.registerSingleton(new TestServiceInstanceList(server.getURI()))
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientIntroductionAdviceSpec'])
+        server.applicationContext.registerSingleton(new TestServiceInstanceList(server.getURI()))
 
         when:
-        BasicAuthHeaderAutoEncodingClient client = ctx.getBean(BasicAuthHeaderAutoEncodingClient)
+        ApplicationContext ctx = ApplicationContext.run(['spec.name': 'ClientIntroductionAdviceSpec', 'server-port': server.port])
+        BasicAuthHeaderAutoEncodingClient client = server.applicationContext.getBean(BasicAuthHeaderAutoEncodingClient)
 
         then:
         client.post('abc', new BasicAuth("username", "password")) == 'abc basic-auth-header=Basic dXNlcm5hbWU6cGFzc3dvcmQ='
 
         cleanup:
         server.close()
-        ctx.close()
     }
 
     void "test non body params have preference for uri templates"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
-        ApplicationContext ctx = server.applicationContext
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientIntroductionAdviceSpec'])
 
         when:
-        LocalOfferClient client = ctx.getBean(LocalOfferClient)
+        LocalOfferClient client = server.applicationContext.getBean(LocalOfferClient)
 
         then:
         client.putTest("abc", new MyObject(code: "def")) == "abc"
 
         cleanup:
-        ctx.close()
+        server.close()
     }
 
     void "test basic auth"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
-        ApplicationContext ctx = ApplicationContext.run(['server-port': server.getPort()])
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientIntroductionAdviceSpec'])
+        ApplicationContext ctx = ApplicationContext.run(['spec.name': 'ClientIntroductionAdviceSpec', 'server-port': server.port])
 
         when:
         BasicAuthClient client = ctx.getBean(BasicAuthClient)
 
         then:
-        client.get() == 'Basic Y29uZmlnOnNlY3JldA=='
+        client.get() == 'config:secret'
+
+        cleanup:
+        ctx.close()
+        server.close()
+    }
+
+    void "test execution of a default method"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientIntroductionAdviceSpec'])
+        DefaultMethodClient myService = server.applicationContext.getBean(DefaultMethodClient)
+
+        expect:
+        myService.defaultMethod() == 'success from default method mutated'
 
         cleanup:
         server.close()
-        ctx.close()
     }
 
+    void "test execution of a default method 2"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientIntroductionAdviceSpec'])
+        DefaultMethodClient2 myService = server.applicationContext.getBean(DefaultMethodClient2)
+        expect:
+        myService.index("ZZZ") == 'success ZZZ XYZ from default method'
+        myService.defaultMethod() == 'success from default method mutated'
+        myService.defaultMethod2("ABC") == 'success ABC XYZ from default method 2 mutated'
+
+        cleanup:
+        server.close()
+    }
+
+    void "test execution of a default method 3"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientIntroductionAdviceSpec'])
+        DefaultMethodClient3 myService = server.applicationContext.getBean(DefaultMethodClient3)
+
+        expect:
+        myService.index("ZZZ") == 'success ZZZ XYZ from default method'
+        myService.defaultMethod() == 'success from default method mutated'
+        myService.defaultMethod2("ABC") == 'success ABC XYZ from default method 2 mutated'
+
+        cleanup:
+        server.close()
+    }
+
+    @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
     @Controller('/aop')
     static class AopController implements MyApi {
         @Override
@@ -132,6 +163,7 @@ class ClientIntroductionAdviceSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
     @Controller('/policies')
     static class PolicyController {
         @Get
@@ -140,6 +172,7 @@ class ClientIntroductionAdviceSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
     @Controller('/offers')
     static class OfferController {
         @Get
@@ -158,6 +191,7 @@ class ClientIntroductionAdviceSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
     @Controller('/encoded-basic-auth')
     static class EncodedBasicAuthController {
         @Post(produces = MediaType.TEXT_PLAIN, consumes = MediaType.TEXT_PLAIN)
@@ -166,15 +200,13 @@ class ClientIntroductionAdviceSpec extends Specification {
         }
     }
 
-    /**
-     * Also used by {@link BasicAuthSpec}
-     */
+    @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
     @Controller("/basic-auth")
     static class BasicAuthController {
 
         @Get
-        String index(@Header String authorization) {
-            authorization
+        String index(BasicAuth basicAuth) {
+            basicAuth.getUsername() + ":" + basicAuth.getPassword()
         }
     }
 
@@ -183,16 +215,19 @@ class ClientIntroductionAdviceSpec extends Specification {
         String index()
     }
 
+    @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
     @Client('/aop')
     static interface MyClient extends MyApi {
     }
 
+    @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
     @Client(id="test-service", path="/policies")
     static interface PolicyClient {
         @Get
         String index()
     }
 
+    @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
     @Client(id="test-service", path="/offers")
     static interface OfferClient {
         @Get
@@ -202,6 +237,7 @@ class ClientIntroductionAdviceSpec extends Specification {
         String post(@Body String data, @Header String foo)
     }
 
+    @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
     @Client("/offers")
     static interface LocalOfferClient {
 
@@ -209,6 +245,7 @@ class ClientIntroductionAdviceSpec extends Specification {
         String putTest(String code, @Body MyObject myObject)
     }
 
+    @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
     @Client('http://config:secret@localhost:${server-port}/basic-auth')
     static interface BasicAuthClient {
 
@@ -216,15 +253,18 @@ class ClientIntroductionAdviceSpec extends Specification {
         String get()
     }
 
+    @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
     @Client(id="test-service", path="/encoded-basic-auth")
     static interface BasicAuthHeaderAutoEncodingClient {
         @Post(produces = MediaType.TEXT_PLAIN, consumes = MediaType.TEXT_PLAIN)
-        String post(@Body String data, @Header BasicAuth basicAuth)
+        String post(@Body String data, BasicAuth basicAuth)
     }
 
-    class MyObject {
+    @Introspected
+    static class MyObject {
         String code
     }
+
     class TestServiceInstanceList implements ServiceInstanceList {
 
         private final URI uri

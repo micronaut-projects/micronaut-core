@@ -1,0 +1,30 @@
+You can use the ann:context.annotation.Import[] annotation to import beans from external, already compiled libraries that use JSR-330 annotations.
+
+NOTE: Bean import is currently only supported in the Java language as other languages have limitations on classpath scanning during source code processing.
+
+For example, to import the JSR-330 TCK into an application, add a dependency on the TCK:
+
+dependency::jakarta.inject:jakarta.inject-tck:2.0.1[]
+
+Then define the `@Import` annotation on your `Application` class:
+
+[source,java]
+----
+package example;
+
+import io.micronaut.context.annotation.Import;
+
+@Import( // <1>
+        packages = { // <2>
+                "org.atinject.tck.auto",
+                "org.atinject.tck.auto.accessories"},
+        annotated = "*") // <3>
+public class Application {
+}
+----
+
+<1> The ann:context.annotation.Import[] is defined
+<2> The `packages` to import are defined. Note that Micronaut will not recurse through sub-packages so sub-packages need to be listed explicitly
+<3> By default Micronaut will only import classes that feature a scope or a qualifier. By using `*` you can make every type a bean.
+
+NOTE: In general `@Import` should be used in applications rather than libraries since if two libraries import the same beans the result will likely be a api:context.exceptions.NonUniqueBeanException[]

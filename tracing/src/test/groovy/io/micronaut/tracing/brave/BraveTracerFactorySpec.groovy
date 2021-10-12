@@ -21,7 +21,6 @@ import brave.http.HttpServerHandler
 import brave.http.HttpTracing
 import io.micronaut.context.ApplicationContext
 import io.micronaut.tracing.brave.sender.HttpClientSender
-import io.opentracing.Span
 import io.opentracing.Tracer
 import io.opentracing.noop.NoopTracer
 import spock.lang.Specification
@@ -88,7 +87,7 @@ class BraveTracerFactorySpec extends Specification {
 
         given:
         def reporter = new TestReporter()
-        ApplicationContext context = ApplicationContext.build(
+        ApplicationContext context = ApplicationContext.builder(
                 'tracing.zipkin.enabled':true,
                 'tracing.zipkin.sampler.probability':1
         ).singletons(reporter)

@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,8 +16,7 @@
 package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-
-import javax.annotation.Nonnull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * Allows configuration of properties for the {@link FileTypeHandler}.
@@ -26,6 +25,7 @@ import javax.annotation.Nonnull;
  * @since 1.0
  */
 @ConfigurationProperties("netty.responses.file")
+@Deprecated
 public class FileTypeHandlerConfiguration {
 
     /**
@@ -72,6 +72,7 @@ public class FileTypeHandlerConfiguration {
      * Configuration for the Cache-Control header.
      */
     @ConfigurationProperties("cache-control")
+    @Deprecated
     public static class CacheControlConfiguration {
 
         private static final boolean DEFAULT_PUBLIC_CACHE = false;
@@ -90,7 +91,7 @@ public class FileTypeHandlerConfiguration {
         /**
          * @return True if the cache control should be public
          */
-        @Nonnull
+        @NonNull
         public boolean getPublic() {
             return publicCache;
         }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,8 +39,9 @@ public interface MutableHttpMessage<B> extends HttpMessage<B> {
      *
      * @param body The body
      * @return This message
+     * @param <T> The new body type
      */
-    MutableHttpMessage<B> body(B body);
+    <T> MutableHttpMessage<T> body(T body);
 
     /**
      * Mutate the headers with the given consumer.
@@ -116,7 +117,7 @@ public interface MutableHttpMessage<B> extends HttpMessage<B> {
      * @return This response
      */
     default MutableHttpMessage<B> contentLength(long length) {
-        getHeaders().add(HttpHeaders.CONTENT_LENGTH, String.valueOf(length));
+        getHeaders().set(HttpHeaders.CONTENT_LENGTH, String.valueOf(length));
         return this;
     }
 
@@ -127,7 +128,11 @@ public interface MutableHttpMessage<B> extends HttpMessage<B> {
      * @return This response
      */
     default MutableHttpMessage<B> contentType(CharSequence contentType) {
-        getHeaders().add(HttpHeaders.CONTENT_TYPE, contentType);
+        if (contentType == null) {
+            getHeaders().remove(HttpHeaders.CONTENT_TYPE);
+        } else {
+            getHeaders().set(HttpHeaders.CONTENT_TYPE, contentType);
+        }
         return this;
     }
 
@@ -138,7 +143,11 @@ public interface MutableHttpMessage<B> extends HttpMessage<B> {
      * @return This response
      */
     default MutableHttpMessage<B> contentType(MediaType mediaType) {
-        getHeaders().add(HttpHeaders.CONTENT_TYPE, mediaType);
+        if (mediaType == null) {
+            getHeaders().remove(HttpHeaders.CONTENT_TYPE);
+        } else {
+            getHeaders().set(HttpHeaders.CONTENT_TYPE, mediaType);
+        }
         return this;
     }
 
@@ -149,8 +158,10 @@ public interface MutableHttpMessage<B> extends HttpMessage<B> {
      * @return This message
      */
     default MutableHttpMessage<B> contentEncoding(CharSequence encoding) {
-        if (encoding != null) {
-            getHeaders().add(HttpHeaders.CONTENT_ENCODING, encoding);
+        if (encoding == null) {
+            getHeaders().remove(HttpHeaders.CONTENT_ENCODING);
+        } else {
+            getHeaders().set(HttpHeaders.CONTENT_ENCODING, encoding);
         }
         return this;
     }

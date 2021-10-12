@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,8 @@
  */
 package io.micronaut.core.type;
 
-import io.micronaut.core.annotation.AnnotationSource;
-
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -28,19 +28,40 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ReturnType<T> extends TypeVariableResolver, AnnotationSource {
-
-    /**
-     * @return The type of the argument
-     */
-    Class<T> getType();
+public interface ReturnType<T> extends TypeInformation<T>, AnnotationMetadataProvider, ArgumentCoercible<T> {
 
     /**
      * @return The return type as an argument
      */
-    default Argument<T> asArgument() {
+    @Override
+    default @NonNull Argument<T> asArgument() {
         Collection<Argument<?>> values = getTypeVariables().values();
-        return Argument.of(getType(), values.toArray(new Argument[0]));
+        return Argument.of(getType(), values.toArray(Argument.ZERO_ARGUMENTS));
+    }
+
+    /**
+     * @return Is the return type suspended function (Kotlin).
+     * @since 2.0.0
+     */
+    default boolean isSuspended() {
+        return false;
+    }
+
+    /**
+     * @return Is the return type a single result or multiple results
+     * @since 2.0
+     */
+    default boolean isSingleResult() {
+        if (isSpecifiedSingle()) {
+            return true;
+        } else {
+            if (isReactive()) {
+                Class<T> returnType = getType();
+                return RuntimeTypeInformation.isSingle(returnType);
+            } else {
+                return true;
+            }
+        }
     }
 
     /**

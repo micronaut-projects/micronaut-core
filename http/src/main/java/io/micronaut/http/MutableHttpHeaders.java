@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -38,9 +38,14 @@ import java.util.stream.Collectors;
 public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
 
     /**
+     * The default GMT zone for date values.
+     */
+    ZoneId GMT = ZoneId.of("GMT");
+
+    /**
      * Add a header for the given name and value.
      *
-     * @param header The head name
+     * @param header The header name
      * @param value  The value
      * @return This headers object
      */
@@ -49,6 +54,11 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
 
     @Override
     MutableHttpHeaders remove(CharSequence header);
+
+    @Override
+    default MutableHeaders set(CharSequence header, CharSequence value) {
+        return MutableHeaders.super.set(header, value);
+    }
 
     /**
      * Set the allowed HTTP methods.
@@ -61,10 +71,11 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
     }
 
     /**
-     * Adds the date header for the given {@link ZonedDateTime}.
+     * Adds the date header for the given {@link LocalDateTime}.
      *
-     * @param date The local date time (will be converted to GMT) as per {@link DateTimeFormatter#RFC_1123_DATE_TIME}
+     * @param date The local date time (assumed to represent system's default time-zone {@link ZoneId#systemDefault}, will be converted to GMT) as per {@link DateTimeFormatter#RFC_1123_DATE_TIME}
      * @return The {@link MutableHttpHeaders}
+     * @see #add(CharSequence, ZonedDateTime) to set date time with time-zone.
      */
     default MutableHttpHeaders date(LocalDateTime date) {
         if (date != null) {
@@ -74,10 +85,11 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
     }
 
     /**
-     * Adds the EXPIRES header for the given {@link ZonedDateTime}.
+     * Adds the EXPIRES header for the given {@link LocalDateTime}.
      *
-     * @param date The local date time (will be converted to GMT) as per {@link DateTimeFormatter#RFC_1123_DATE_TIME}
+     * @param date The local date time (assumed to represent system's default time-zone {@link ZoneId#systemDefault}, will be converted to GMT) as per {@link DateTimeFormatter#RFC_1123_DATE_TIME}
      * @return The {@link MutableHttpHeaders}
+     * @see #add(CharSequence, ZonedDateTime) to set date time with time-zone.
      */
     default MutableHttpHeaders expires(LocalDateTime date) {
         if (date != null) {
@@ -87,10 +99,11 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
     }
 
     /**
-     * Adds the LAST_MODIFIED header for the given {@link ZonedDateTime}.
+     * Adds the LAST_MODIFIED header for the given {@link LocalDateTime}.
      *
-     * @param date The local date time (will be converted to GMT) as per {@link DateTimeFormatter#RFC_1123_DATE_TIME}
+     * @param date The local date time (assumed to represent system's default time-zone {@link ZoneId#systemDefault}, will be converted to GMT) as per {@link DateTimeFormatter#RFC_1123_DATE_TIME}
      * @return The {@link MutableHttpHeaders}
+     * @see #add(CharSequence, ZonedDateTime) to set date time with time-zone.
      */
     default MutableHttpHeaders lastModified(LocalDateTime date) {
         if (date != null) {
@@ -102,8 +115,9 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
     /**
      * Adds the IF_MODIFIED_SINCE header for the given {@link ZonedDateTime}.
      *
-     * @param date The local date time (will be converted to GMT) as per {@link DateTimeFormatter#RFC_1123_DATE_TIME}
+     * @param date The local date time (assumed to represent system's default time-zone {@link ZoneId#systemDefault}, will be converted to GMT) as per {@link DateTimeFormatter#RFC_1123_DATE_TIME}
      * @return The {@link MutableHttpHeaders}
+     * @see #add(CharSequence, ZonedDateTime) to set date time with time-zone.
      */
     default MutableHttpHeaders ifModifiedSince(LocalDateTime date) {
         if (date != null) {
@@ -113,9 +127,9 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
     }
 
     /**
-     * Adds the DATE header for the given {@link ZonedDateTime}.
+     * Adds the DATE header for the given {@link Long}.
      *
-     * @param timeInMillis The current time in milli seconds
+     * @param timeInMillis The time in milli seconds since Epoch.
      * @return The {@link MutableHttpHeaders}
      */
     default MutableHttpHeaders date(long timeInMillis) {
@@ -124,9 +138,9 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
     }
 
     /**
-     * Adds the EXPIRES header for the given {@link ZonedDateTime}.
+     * Adds the EXPIRES header for the given {@link Long}.
      *
-     * @param timeInMillis The current time in milli seconds
+     * @param timeInMillis The time in milli seconds since Epoch.
      * @return The {@link MutableHttpHeaders}
      */
     default MutableHttpHeaders expires(long timeInMillis) {
@@ -135,9 +149,9 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
     }
 
     /**
-     * Adds the LAST_MODIFIED header for the given {@link ZonedDateTime}.
+     * Adds the LAST_MODIFIED header for the given {@link Long}.
      *
-     * @param timeInMillis The current time in milli seconds
+     * @param timeInMillis The time in milli seconds since Epoch.
      * @return The {@link MutableHttpHeaders}
      */
     default MutableHttpHeaders lastModified(long timeInMillis) {
@@ -146,9 +160,9 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
     }
 
     /**
-     * Adds the IF_MODIFIED_SINCE header for the given {@link ZonedDateTime}.
+     * Adds the IF_MODIFIED_SINCE header for the given {@link Long}.
      *
-     * @param timeInMillis The current time in milli seconds
+     * @param timeInMillis The time in milli seconds since Epoch.
      * @return The {@link MutableHttpHeaders}
      */
     default MutableHttpHeaders ifModifiedSince(long timeInMillis) {
@@ -231,13 +245,13 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
     /**
      * Add a header for the given name and value.
      *
-     * @param header The head name
+     * @param header The header name
      * @param value  The value
      * @return This headers object
      */
     default MutableHttpHeaders add(CharSequence header, ZonedDateTime value) {
         if (header != null && value != null) {
-            add(header, value.withZoneSameInstant(ZoneId.of("GMT")).format(DateTimeFormatter.RFC_1123_DATE_TIME));
+            add(header, value.withZoneSameInstant(GMT).format(DateTimeFormatter.RFC_1123_DATE_TIME));
         }
         return this;
     }
@@ -245,7 +259,7 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
     /**
      * Add a header for the given name and value.
      *
-     * @param header The head name
+     * @param header The header name
      * @param value  The value
      * @return This headers object
      */

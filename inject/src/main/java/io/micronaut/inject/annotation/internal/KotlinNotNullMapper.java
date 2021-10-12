@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,11 +15,12 @@
  */
 package io.micronaut.inject.annotation.internal;
 
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.inject.annotation.NamedAnnotationMapper;
+import io.micronaut.inject.annotation.NamedAnnotationTransformer;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import javax.annotation.Nonnull;
+import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.List;
@@ -30,17 +31,17 @@ import java.util.List;
  * @author graemerocher
  * @since 1.1.4
  */
-public class KotlinNotNullMapper implements NamedAnnotationMapper {
-    @Nonnull
+public class KotlinNotNullMapper implements NamedAnnotationTransformer {
+    @NonNull
     @Override
     public String getName() {
         return "org.jetbrains.annotations.NotNull";
     }
 
     @Override
-    public List<AnnotationValue<?>> map(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
+    public List<AnnotationValue<?>> transform(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
         return Collections.singletonList(
-                AnnotationValue.builder("javax.annotation.Nonnull").build()
+                AnnotationValue.builder(AnnotationUtil.NON_NULL).build()
         );
     }
 }

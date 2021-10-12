@@ -27,6 +27,8 @@ import io.micronaut.inject.configurations.requiresconfig.RequiresConfig
 import io.micronaut.inject.configurations.requiresproperty.RequiresProperty
 import io.micronaut.inject.configurations.requiressdk.RequiresJava9
 import spock.lang.Specification
+import spock.util.environment.Jvm
+
 /**
  * Created by graemerocher on 19/05/2017.
  */
@@ -43,9 +45,9 @@ class RequiresBeanSpec extends Specification {
         context.containsBean(TrueLambdaBean)
         !context.containsBean(RequiresBean)
         !context.containsBean(RequiresConfig)
-        !context.containsBean(RequiresJava9)
-//        !context.containsBean(TravisBean) // TODO: these are broken because closures are not supported for @Requires( condition = {})
-//        !context.containsBean(TravisBean2)
+        Jvm.current.isJava9Compatible() || !context.containsBean(RequiresJava9)
+//        !context.containsBean(GitHubActionsBean) // TODO: these are broken because closures are not supported for @Requires( condition = {})
+//        !context.containsBean(GitHubActionsBean2)
     }
 
     void "test that a condition can be required for a bean when false"() {
@@ -55,7 +57,7 @@ class RequiresBeanSpec extends Specification {
 
         expect:
         context.containsBean(ABean)
-//        !context.containsBean(TravisBean2) // TODO: these are broken because closures are not supported for @Requires( condition = {})
+//        !context.containsBean(GitHubActionsBean2) // TODO: these are broken because closures are not supported for @Requires( condition = {})
     }
 
 //    @Ignore("it doesn't matter whether TrueEnvCondition returns true or false, context never has TrueBean")

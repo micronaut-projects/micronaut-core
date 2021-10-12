@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,9 +15,6 @@
  */
 package io.micronaut.http.server.netty.binders;
 
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.netty.stream.StreamedHttpRequest;
-import io.micronaut.context.BeanLocator;
 import io.micronaut.core.async.subscriber.TypedSubscriber;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
@@ -25,22 +22,23 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
-import io.micronaut.http.server.netty.*;
+import io.micronaut.http.netty.stream.StreamedHttpRequest;
+import io.micronaut.http.server.netty.HttpContentProcessor;
+import io.micronaut.http.server.netty.HttpContentProcessorResolver;
+import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
-import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.EmptyByteBuf;
 import io.netty.util.ReferenceCounted;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
@@ -50,28 +48,26 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
-@Internal
 public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> implements NonBlockingBodyArgumentBinder<Publisher> {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
+    private static final Argument<Publisher> TYPE = Argument.of(Publisher.class);
 
-    private final BeanLocator beanLocator;
-    private final HttpServerConfiguration httpServerConfiguration;
+    private final HttpContentProcessorResolver httpContentProcessorResolver;
 
     /**
-     * @param conversionService       The conversion service
-     * @param beanLocator             The bean locator
-     * @param httpServerConfiguration The Http server configuration
+     * @param conversionService            The conversion service
+     * @param httpContentProcessorResolver The http content processor resolver
      */
-    public PublisherBodyBinder(ConversionService conversionService, BeanLocator beanLocator, HttpServerConfiguration httpServerConfiguration) {
+    public PublisherBodyBinder(ConversionService conversionService,
+                               HttpContentProcessorResolver httpContentProcessorResolver) {
         super(conversionService);
-        this.beanLocator = beanLocator;
-        this.httpServerConfiguration = httpServerConfiguration;
+        this.httpContentProcessorResolver = httpContentProcessorResolver;
     }
 
     @Override
     public Argument<Publisher> argumentType() {
-        return Argument.of(Publisher.class);
+        return TYPE;
     }
 
     @Override
@@ -80,12 +76,9 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
             NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) source;
             io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
             if (nativeRequest instanceof StreamedHttpRequest) {
-                Optional<MediaType> contentType = source.getContentType();
                 Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-                HttpContentProcessor<?> processor = contentType
-                    .flatMap(type -> beanLocator.findBean(HttpContentSubscriberFactory.class, new ConsumesMediaTypeQualifier<>(type)))
-                    .map(factory -> factory.build(nettyHttpRequest))
-                    .orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration));
+
+                HttpContentProcessor<?> processor = httpContentProcessorResolver.resolve(nettyHttpRequest, targetType);
 
                 //noinspection unchecked
                 return () -> Optional.of(subscriber -> processor.subscribe(new TypedSubscriber<Object>((Argument) context.getArgument()) {
@@ -103,7 +96,6 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                         if (LOG.isTraceEnabled()) {
                             LOG.trace("Server received streaming message for argument [{}]: {}", context.getArgument(), message);
                         }
-                        ArgumentConversionContext<?> conversionContext = context.with(targetType);
                         if (message instanceof ByteBufHolder) {
                             message = ((ByteBufHolder) message).content();
                             if (message instanceof EmptyByteBuf) {
@@ -111,6 +103,7 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                             }
                         }
 
+                        ArgumentConversionContext<?> conversionContext = context.with(targetType);
                         Optional<?> converted = conversionService.convert(message, conversionContext);
 
                         if (converted.isPresent()) {
@@ -128,7 +121,7 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                                     if (LOG.isDebugEnabled()) {
                                         LOG.debug("Cannot convert message for argument [{}] and value: {}", context.getArgument(), message);
                                     }
-                                    subscriber.onError(new UnsatisfiedRouteException(context.getArgument()));
+                                    subscriber.onError(UnsatisfiedRouteException.create(context.getArgument()));
                                 }
                             } finally {
                                 s.cancel();

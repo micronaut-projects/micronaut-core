@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,12 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.context;
 
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.annotation.Nonnull;
+import io.micronaut.core.annotation.NonNull;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -29,47 +28,80 @@ import java.util.Objects;
  * @since 1.2
  */
 public abstract class AbstractMessageSource implements MessageSource {
-    @Nonnull
+
+    private static final char QUOT = '\'';
+    private static final char L_BRACE = '{';
+    private static final char R_BRACE = '}';
+
+    @NonNull
     @Override
-    public String interpolate(@Nonnull String template, @Nonnull MessageContext context) {
+    public String interpolate(@NonNull String template, @NonNull MessageContext context) {
         ArgumentUtils.requireNonNull("template", template);
         ArgumentUtils.requireNonNull("context", context);
-        int start = template.indexOf('{');
-        int end = template.indexOf('}');
-        boolean hasVar = start < end;
-        if (hasVar) {
-            StringBuilder builder = new StringBuilder();
-            while (hasVar) {
 
-                if (start > 0) {
-                    builder.append(template, 0, start);
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < template.length(); i++) {
+            char c = template.charAt(i);
+            if (c == QUOT) {
+                int next = i + 1;
+                if (next < template.length()) {
+                    c = template.charAt(next);
+                    if (c == QUOT) {
+                        i++;
+                        builder.append(QUOT);
+                    } else {
+                        StringBuilder escaped = new StringBuilder();
+                        while (c != QUOT) {
+                            escaped.append(c);
+                            if (++next < template.length()) {
+                                c = template.charAt(next);
+                            } else {
+                                break;
+                            }
+                        }
+                        if (escaped.length() > 0) {
+                            i = next;
+                            builder.append(escaped);
+                        }
+                    }
                 }
-                String message = template.substring(start + 1, end);
-                final Object val = context.getVariables().get(message);
-                if (val != null) {
-                    builder.append(val);
+            } else if (c == L_BRACE) {
+                StringBuilder variable = new StringBuilder();
+                int next = i + 1;
+                if (next < template.length()) {
+                    c = template.charAt(next);
+                    while (c != R_BRACE) {
+                        variable.append(c);
+                        if (++next < template.length()) {
+                            c = template.charAt(next);
+                        } else {
+                            break;
+                        }
+                    }
+                    if (variable.length() > 0) {
+                        i = next;
+                        String var = variable.toString();
+                        if (c == R_BRACE) {
+                            final Object val = context.getVariables().get(var);
+                            if (val != null) {
+                                builder.append(val);
+                            } else {
+                                final String resolved = getMessage(var, context).orElse(var);
+                                builder.append(resolved);
+                            }
+                        } else {
+                            builder.append(L_BRACE).append(var);
+                        }
+                    }
                 } else {
-
-                    final String resolved = getMessage(message, context)
-                            .map(msg -> interpolate(msg, context))
-                            .orElse(message);
-                    builder.append(resolved);
+                    builder.append(c);
                 }
-
-                final String remaining = template.substring(end + 1);
-                start = remaining.indexOf('{');
-                end = remaining.indexOf('}');
-                hasVar = start < end;
-                if (!hasVar) {
-                    builder.append(remaining);
-                } else {
-                    template = remaining;
-                }
+            } else {
+                builder.append(c);
             }
-
-            return builder.toString();
         }
-        return template;
+
+        return builder.toString();
     }
 
     /**
@@ -84,7 +116,7 @@ public abstract class AbstractMessageSource implements MessageSource {
          * @param locale The locale
          * @param code The code
          */
-        public MessageKey(@Nonnull Locale locale, @Nonnull String code) {
+        public MessageKey(@NonNull Locale locale, @NonNull String code) {
             this.locale = locale;
             this.code = code;
         }

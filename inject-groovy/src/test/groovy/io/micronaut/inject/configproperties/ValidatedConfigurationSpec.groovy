@@ -15,29 +15,25 @@
  */
 package io.micronaut.inject.configproperties
 
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.BeanInstantiationException
-import spock.lang.Specification
+import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.ValidatedBeanDefinition
 
-import javax.validation.Validation
+import javax.validation.constraints.NotBlank
 import javax.validation.constraints.NotNull
-import org.hibernate.validator.constraints.NotBlank
-/**
- * Created by graemerocher on 15/06/2017.
- */
-class ValidatedConfigurationSpec extends Specification {
+
+class ValidatedConfigurationSpec extends AbstractBeanDefinitionSpec {
 
 
     void "test validated config with invalid config"() {
 
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.registerSingleton(
-                Validation.buildDefaultValidatorFactory()
-        )
         applicationContext.start()
 
         when:
@@ -46,7 +42,7 @@ class ValidatedConfigurationSpec extends Specification {
         then:
         def e = thrown(BeanInstantiationException)
         e.message.contains('url - must not be null')
-        e.message.contains('name - may not be empty')
+        e.message.contains('name - must not be blank')
     }
 
     void "test validated config with valid config"() {
@@ -58,10 +54,6 @@ class ValidatedConfigurationSpec extends Specification {
                 ['foo.bar.url':'http://localhost',
                 'foo.bar.name':'test']
         ))
-
-        applicationContext.registerSingleton(
-                Validation.buildDefaultValidatorFactory()
-        )
 
         applicationContext.start()
 
@@ -75,12 +67,99 @@ class ValidatedConfigurationSpec extends Specification {
 
     }
 
+    void "test config props with @Valid on field is a validating bean definition"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig2', '''
+package test
+
+import io.micronaut.context.annotation.ConfigurationProperties
+import io.micronaut.inject.configproperties.Pojo
+
+import javax.validation.Valid
+import java.util.List
+
+@ConfigurationProperties("test.valid")
+public class MyConfig2 {
+
+    @Valid
+    private List<Pojo> pojos
+
+    List<Pojo> getPojos() {
+        pojos
+    }
+
+    void setPojos(List<Pojo> pojos) {
+        this.pojos = pojos
+    }
+
+}
+''')
+
+        then:
+        beanDefinition instanceof ValidatedBeanDefinition
+    }
+
+    void "test config props with @Valid on getter is a validating bean definition"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig', '''
+package test
+
+import io.micronaut.context.annotation.ConfigurationProperties
+import io.micronaut.inject.configproperties.Pojo
+
+import javax.validation.Valid
+import java.util.List
+
+@ConfigurationProperties("test.valid")
+class MyConfig {
+  
+    private List<Pojo> pojos
+
+    @Valid
+    List<Pojo> getPojos() {
+        pojos
+    }
+
+    void setPojos(List<Pojo> pojos) {
+        this.pojos = pojos
+    }
+
+}
+''')
+
+        then:
+        beanDefinition instanceof ValidatedBeanDefinition
+    }
+
+    void "test config props with @Valid on property is a validating bean definition"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig', '''
+package test
+
+import io.micronaut.context.annotation.ConfigurationProperties
+import io.micronaut.inject.configproperties.Pojo
+
+import javax.validation.Valid
+import java.util.List
+
+@ConfigurationProperties("test.valid")
+class MyConfig {
+  
+    @Valid
+    List<Pojo> pojos
+}
+''')
+
+        then:
+        beanDefinition instanceof ValidatedBeanDefinition
+    }
+
     @ConfigurationProperties('foo.bar')
     static class ValidatedConfig {
         @NotNull
         URL url
 
         @NotBlank
-        protected String name
+        String name
     }
 }

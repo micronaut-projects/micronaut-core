@@ -1,11 +1,11 @@
 package io.micronaut.context.inject
 
-import io.micronaut.test.annotation.MicronautTest
 import io.micronaut.test.annotation.MockBean
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import spock.lang.Issue
 import spock.lang.Specification
 
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 @MicronautTest
 class CircularBeanResolutionWithPostConstructSpec extends Specification {

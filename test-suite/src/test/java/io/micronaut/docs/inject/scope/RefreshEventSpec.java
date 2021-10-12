@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2020 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.docs.inject.scope;
 
 import io.micronaut.context.ApplicationContext;
@@ -16,14 +31,17 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import javax.annotation.PostConstruct;
-import javax.inject.Inject;
+import jakarta.annotation.PostConstruct;
+import jakarta.inject.Inject;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.*;
 
 public class RefreshEventSpec {
@@ -69,10 +87,17 @@ public class RefreshEventSpec {
 // end::evictResponse[]
                 , response);
 
-        String thirdResponse = fetchForecast();
+        AtomicReference<String> thirdResponse = new AtomicReference<>(fetchForecast());
+        await().atMost(5, SECONDS).until(() -> {
+            if (!thirdResponse.get().equals(secondResponse)) {
+                return true;
+            }
+            thirdResponse.set(fetchForecast());
+            return false;
+        });
 
-        assertNotEquals(thirdResponse, secondResponse);
-        assertTrue(thirdResponse.contains("\"forecast\":\"Scattered Clouds"));
+        assertNotEquals(thirdResponse.get(), secondResponse);
+        assertTrue(thirdResponse.get().contains("\"forecast\":\"Scattered Clouds"));
     }
 
     public String fetchForecast() {

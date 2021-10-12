@@ -7,7 +7,6 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-import javax.validation.ConstraintViolation
 import javax.validation.Valid
 import javax.validation.constraints.NotBlank
 

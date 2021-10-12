@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.visitor
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 
 class CustomVisitorSpec extends AbstractBeanDefinitionSpec {
@@ -24,7 +24,7 @@ class CustomVisitorSpec extends AbstractBeanDefinitionSpec {
         ControllerGetVisitor.clearVisited()
         AllElementsVisitor.clearVisited()
         AllClassesVisitor.clearVisited()
-        InjectVisitor.clearVisited()
+        TestInjectVisitor.clearVisited()
     }
 
     void cleanup() {
@@ -36,7 +36,7 @@ class CustomVisitorSpec extends AbstractBeanDefinitionSpec {
 package test
 
 import io.micronaut.http.annotation.*
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 @Controller("/test")
 class TestController {
@@ -71,11 +71,11 @@ class TestController {
     }
 
     void "test non controller class is not visited by custom visitor"() {
-        buildBeanDefinition('test.TestController', '''
-package test;
+        buildBeanDefinition('customvis1.TestController', '''
+package customvis1;
 
 import io.micronaut.http.annotation.*
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 public class TestController {
 
@@ -105,7 +105,37 @@ public class TestController {
         expect:
         ControllerGetVisitor.getVisited().empty
         AllElementsVisitor.getVisited().empty
-        AllClassesVisitor.getVisited() == ["test.TestController", "getMethod"]
-        InjectVisitor.getVisited() == ["test.TestController", "privateField"]
+        AllClassesVisitor.getVisited() == ["customvis1.TestController", "getMethod"]
+        TestInjectVisitor.getVisited() == ["customvis1.TestController", "privateField"]
+    }
+
+    void "test @Generated class is not visited by any visitor"() {
+        buildBeanDefinition('customvis2.TestGenerated', '''
+package customvis2;
+
+import io.micronaut.core.annotation.Generated
+import jakarta.inject.Inject
+
+@Generated
+public class TestGenerated {
+
+    @Inject private String privateField
+    protected String protectedField  
+    public String publicField
+    @groovy.transform.PackageScope String packagePrivateField
+    String property
+    
+    
+    TestGenerated(String constructorArg) {}
+    
+    void setterMethod(String method) {}
+
+}
+''')
+        expect:
+        ControllerGetVisitor.getVisited().empty
+        AllElementsVisitor.getVisited().empty
+        AllClassesVisitor.getVisited().empty
+        TestInjectVisitor.getVisited().empty
     }
 }

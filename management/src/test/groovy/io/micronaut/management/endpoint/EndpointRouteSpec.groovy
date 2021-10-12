@@ -16,18 +16,14 @@
 package io.micronaut.management.endpoint
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.management.endpoint.annotation.Delete
-import io.micronaut.management.endpoint.annotation.Endpoint
-import io.micronaut.management.endpoint.annotation.Read
-import io.micronaut.management.endpoint.annotation.Selector
-import io.micronaut.management.endpoint.annotation.Write
+import io.micronaut.core.annotation.Nullable
+import io.micronaut.management.endpoint.annotation.*
 import io.micronaut.web.router.Router
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import javax.annotation.Nullable
 import java.security.Principal
 
 import static io.micronaut.http.HttpMethod.*
@@ -42,7 +38,7 @@ class EndpointRouteSpec extends Specification {
         Router router = ctx.getBean(Router)
 
         then:
-        router.find(method, uri).count() == (exists ? 1 : 0)
+        router.find(method, uri, null).count() == (exists ? 1 : 0)
 
         where:
         method | uri      | exists

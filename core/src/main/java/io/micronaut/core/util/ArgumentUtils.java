@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,10 @@
  */
 package io.micronaut.core.util;
 
-import javax.annotation.Nonnull;
-import java.util.Objects;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.naming.Described;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.Executable;
 
 /**
  * Utility methods for checking method argument values.
@@ -34,23 +36,25 @@ public class ArgumentUtils {
      * @throws IllegalArgumentException if the argument is not positive
      * @return The value
      */
-    public static @Nonnull Number requirePositive(String name, Number value) {
+    public static @NonNull Number requirePositive(String name, Number value) {
         requireNonNull(name, value);
         requirePositive(name, value.intValue());
         return value;
     }
 
     /**
-     * Adds a check that the given number is positive.
+     * Adds a check that the given number is not null.
      *
      * @param name The name of the argument
      * @param value The value
      * @param <T> The generic type
-     * @throws IllegalArgumentException if the argument is not positive
+     * @throws NullPointerException if the argument is null
      * @return The value
      */
     public static <T> T requireNonNull(String name, T value) {
-        Objects.requireNonNull(value, "Argument [" + name + "] cannot be null");
+        if (value == null) {
+            throw new NullPointerException("Argument [" + name + "] cannot be null");
+        }
         return value;
     }
 
@@ -89,6 +93,33 @@ public class ArgumentUtils {
      */
     public static <T> ArgumentCheck check(String name, T value) {
         return new ArgumentCheck<>(name, value);
+    }
+
+    /**
+     * Validates the given values are appropriate for the given arguments.
+     * @param described The described instance
+     * @param arguments The arguments
+     * @param values The values
+     */
+    public static void validateArguments(
+            @NonNull Described described,
+            @NonNull Argument<?>[] arguments,
+            @NonNull Object[] values) {
+        int requiredCount = arguments.length;
+        @SuppressWarnings("ConstantConditions") int actualCount = values == null ? 0 : values.length;
+        if (requiredCount != actualCount) {
+            throw new IllegalArgumentException("Wrong number of arguments to " + (described instanceof Executable ? "method" : "constructor") + ": " + described.getDescription());
+        }
+        if (requiredCount > 0) {
+            for (int i = 0; i < arguments.length; i++) {
+                Argument<?> argument = arguments[i];
+                Class<?> type = argument.getWrapperType();
+                Object value = values[i];
+                if (value != null && !type.isInstance(value)) {
+                    throw new IllegalArgumentException("Invalid type [" + values[i].getClass().getName() + "] for argument [" + argument + "] of " + (described instanceof Executable ? "method" : "constructor") + ": " + described.getDescription());
+                }
+            }
+        }
     }
 
     /**
@@ -135,11 +166,11 @@ public class ArgumentUtils {
         /**
          * Fail the argument with the given message.
          *
-         * @throws IllegalArgumentException Thrown with the given message if the check fails
+         * @throws NullPointerException Thrown with the given message if the check fails
          */
         public void notNull() {
-            if (name != null && value != null) {
-                Objects.requireNonNull(value, "Argument [" + name + "] cannot be null");
+            if (value == null) {
+                throw new NullPointerException("Argument [" + name + "] cannot be null");
             }
         }
     }

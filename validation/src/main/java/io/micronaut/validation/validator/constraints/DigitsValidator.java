@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,9 +16,9 @@
 package io.micronaut.validation.validator.constraints;
 
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import javax.validation.constraints.Digits;
 import java.math.BigDecimal;
 
@@ -32,18 +32,18 @@ import java.math.BigDecimal;
 @FunctionalInterface
 public interface DigitsValidator<T> extends ConstraintValidator<Digits, T> {
     @Override
-    default boolean isValid(@Nullable T value, @Nonnull AnnotationValue<Digits> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
+    default boolean isValid(@Nullable T value, @NonNull AnnotationValue<Digits> annotationMetadata, @NonNull ConstraintValidatorContext context) {
         if (value == null) {
             // null valid according to spec
             return true;
         }
         final int intMax = annotationMetadata.get("integer", int.class).orElse(0);
-        final int fracMax = annotationMetadata.get("fraction", int.class).orElse(0);
 
         if (intMax < 0) {
             throw new IllegalArgumentException("The length of the integer part cannot be negative.");
         }
 
+        final int fracMax = annotationMetadata.get("fraction", int.class).orElse(0);
         if (fracMax < 0) {
             throw new IllegalArgumentException("The length of the fraction part cannot be negative.");
         }
@@ -66,5 +66,5 @@ public interface DigitsValidator<T> extends ConstraintValidator<Digits, T> {
      * @param value The value
      * @return The big decimal
      */
-    BigDecimal getBigDecimal(@Nonnull T value);
+    BigDecimal getBigDecimal(@NonNull T value);
 }

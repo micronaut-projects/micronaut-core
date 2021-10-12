@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,15 +15,20 @@
  */
 package io.micronaut.inject.constructor.factoryinjection;
 
-import javax.inject.Inject;
-import javax.inject.Provider;
-import javax.inject.Singleton;
+import io.micronaut.context.annotation.Factory;
 
-@Singleton
+import jakarta.inject.Inject;
+import jakarta.inject.Provider;
+import jakarta.inject.Singleton;
+
+@Factory
 public class AProvider implements Provider<A> {
     final C c;
     @Inject
     C another;
+
+    @Inject
+    protected D d;
 
     @Inject
     public AProvider(C c) {
@@ -31,7 +36,10 @@ public class AProvider implements Provider<A> {
     }
 
     @Override
+    @Singleton
     public A get() {
-        return new AImpl(c, another);
+        final AImpl a = new AImpl(c, another);
+        a.d = d;
+        return a;
     }
 }

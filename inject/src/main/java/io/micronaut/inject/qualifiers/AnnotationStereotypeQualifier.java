@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,9 +31,9 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-class AnnotationStereotypeQualifier<T> implements Qualifier<T> {
+final class AnnotationStereotypeQualifier<T> implements Qualifier<T> {
 
-    private final Class<? extends Annotation> stereotype;
+    final Class<? extends Annotation> stereotype;
 
     /**
      * @param stereotype The stereotype
@@ -57,15 +57,26 @@ class AnnotationStereotypeQualifier<T> implements Qualifier<T> {
         if (this == o) {
             return true;
         }
-        if (o == null || getClass() != o.getClass()) {
+        if (o == null) {
             return false;
         }
-        AnnotationStereotypeQualifier<?> that = (AnnotationStereotypeQualifier<?>) o;
-        return Objects.equals(stereotype, that.stereotype);
+        if (o instanceof AnnotationStereotypeQualifier) {
+            AnnotationStereotypeQualifier<?> that = (AnnotationStereotypeQualifier<?>) o;
+            return Objects.equals(stereotype.getName(), that.stereotype.getName());
+        } else if (o instanceof NamedAnnotationStereotypeQualifier) {
+            NamedAnnotationStereotypeQualifier<?> that = (NamedAnnotationStereotypeQualifier<?>) o;
+            return Objects.equals(stereotype.getName(), that.stereotype);
+        } else if (o instanceof AnnotationMetadataQualifier) {
+            AnnotationMetadataQualifier<?> that = (AnnotationMetadataQualifier<?>) o;
+            if (that.qualifierAnn == null) {
+                return Objects.equals(stereotype.getName(), that.qualifiedName);
+            }
+        }
+        return false;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(stereotype);
+        return Objects.hash(stereotype.getName());
     }
 }

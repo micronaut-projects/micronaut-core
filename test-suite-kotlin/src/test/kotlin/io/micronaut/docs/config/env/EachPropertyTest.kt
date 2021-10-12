@@ -1,16 +1,14 @@
 package io.micronaut.docs.config.env
 
-import io.kotlintest.specs.AnnotationSpec
+import io.kotest.core.spec.style.AnnotationSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.core.util.CollectionUtils
 import io.micronaut.inject.qualifiers.Qualifiers
-import org.junit.Test
-
+import org.junit.Assert.assertEquals
 import java.net.URI
 import java.net.URISyntaxException
-
-import org.junit.Assert.assertEquals
+import java.util.stream.Collectors
 
 class EachPropertyTest : AnnotationSpec() {
 
@@ -29,7 +27,7 @@ class EachPropertyTest : AnnotationSpec() {
 
         // tag::beans[]
         val beansOfType = applicationContext.getBeansOfType(DataSourceConfiguration::class.java)
-        assertEquals(2, beansOfType.size.toLong()) // <1>
+        assertEquals(2, beansOfType.size) // <1>
 
         val firstConfig = applicationContext.getBean(
                 DataSourceConfiguration::class.java,
@@ -41,5 +39,28 @@ class EachPropertyTest : AnnotationSpec() {
                 firstConfig.url
         )
         // end::beans[]
+        applicationContext.close()
+    }
+
+    @Test
+    fun testEachPropertyList() {
+        val limits: MutableList<Map<*, *>> = ArrayList()
+        limits.add(CollectionUtils.mapOf("period", "10s", "limit", "1000"))
+        limits.add(CollectionUtils.mapOf("period", "1m", "limit", "5000"))
+        val applicationContext = ApplicationContext.run(
+            mapOf("ratelimits" to listOf(
+                mapOf("period" to "10s", "limit" to "1000"),
+                mapOf("period" to "1m", "limit" to "5000"))))
+
+        val beansOfType = applicationContext.streamOfType(RateLimitsConfiguration::class.java).collect(Collectors.toList())
+
+        assertEquals(
+                2,
+                beansOfType.size
+        )
+        assertEquals(1000, beansOfType[0].limit)
+        assertEquals(5000, beansOfType[1].limit)
+
+        applicationContext.close()
     }
 }

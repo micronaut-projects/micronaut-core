@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,21 +16,16 @@
 package io.micronaut.http.client.docs.streaming;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.http.client.RxStreamingHttpClient;
+import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.reactivex.Flowable;
-import io.reactivex.Maybe;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
-
+import reactor.core.publisher.Flux;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-
-import static io.micronaut.http.HttpRequest.*;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static io.micronaut.http.HttpRequest.GET;
 
 /**
  * @author graemerocher
@@ -46,12 +41,11 @@ public class HeadlineControllerTest {
                                                 .getApplicationContext()
                                                 .getBean(HeadlineClient.class); // <1>
 
-            Maybe<Headline> firstHeadline = headlineClient.streamHeadlines().firstElement(); // <2>
+            Headline headline = headlineClient.streamHeadlines() // <2>
+                    .blockFirst(); // <3>
 
-            Headline headline = firstHeadline.blockingGet(); // <3>
-
-            assertNotNull( headline );
-            assertTrue( headline.getText().startsWith("Latest Headline") );
+            Assertions.assertNotNull( headline );
+            Assertions.assertTrue( headline.getText().startsWith("Latest Headline") );
         }
     }
     // end::streamingClient[]
@@ -60,11 +54,10 @@ public class HeadlineControllerTest {
     @Test
     public void testStreamingClient() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
-        RxStreamingHttpClient client = embeddedServer.getApplicationContext().createBean(RxStreamingHttpClient.class, embeddedServer.getURL());
-
+        StreamingHttpClient client = embeddedServer.getApplicationContext().createBean(StreamingHttpClient.class, embeddedServer.getURL());
 
         // tag::streaming[]
-        Flowable<Headline> headlineStream = client.jsonStream(GET("/streaming/headlines"), Headline.class); // <1>
+        Flux<Headline> headlineStream = Flux.from(client.jsonStream(GET("/streaming/headlines"), Headline.class)); // <1>
         CompletableFuture<Headline> future = new CompletableFuture<>(); // <2>
         headlineStream.subscribe(new Subscriber<Headline>() {
             @Override
@@ -91,13 +84,13 @@ public class HeadlineControllerTest {
         // end::streaming[]
         try {
             Headline headline = future.get(3, TimeUnit.SECONDS);
-            assertTrue(headline.getText().startsWith("Latest Headline"));
+            Assertions.assertTrue(headline.getText().startsWith("Latest Headline"));
 
         } catch (Throwable e) {
-            fail("Asynchronous error occurred: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
+            Assertions.fail("Asynchronous error occurred: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
         }
 
-
+        //cleanup:
         embeddedServer.stop();
         client.stop();
     }

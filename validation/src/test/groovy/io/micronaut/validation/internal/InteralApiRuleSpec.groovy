@@ -32,7 +32,7 @@ package test;
 
 import io.micronaut.core.io.scan.*;
 
-class Foo extends CachingClassPathAnnotationScanner {
+class Foo extends BeanIntrospectionScanner {
 
 }
 
@@ -41,9 +41,9 @@ class Foo extends CachingClassPathAnnotationScanner {
 
         then:
         noExceptionThrown()
-        output.contains("warning: Element extends or implements an internal or experimental API\n" +
-                "class Foo extends CachingClassPathAnnotationScanner {")
-        output.contains("Overriding an internal API may result in breaking changes in minor or patch versions")
+        output.contains("warning: Element extends or implements an internal or experimental Micronaut API\n" +
+                "class Foo extends BeanIntrospectionScanner {")
+        output.contains("Overriding an internal Micronaut API may result in breaking changes in minor or patch versions")
 
         cleanup:
         System.out = oldOut

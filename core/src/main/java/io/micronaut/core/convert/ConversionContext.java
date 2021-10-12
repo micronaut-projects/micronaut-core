@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,7 +21,7 @@ import io.micronaut.core.type.TypeVariableResolver;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 
-import javax.annotation.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -40,6 +40,36 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
      */
     ConversionContext DEFAULT = new ConversionContext() {
     };
+
+    /**
+     * Constant for Boolean argument.
+     */
+    ArgumentConversionContext<Boolean> BOOLEAN = ConversionContext.of(Argument.BOOLEAN);
+
+    /**
+     * Constant for Integer argument.
+     */
+    ArgumentConversionContext<Integer> INT = ConversionContext.of(Argument.INT);
+
+    /**
+     * Constant for Long argument.
+     */
+    ArgumentConversionContext<Long> LONG = ConversionContext.of(Argument.LONG);
+
+    /**
+     * Constant for String argument.
+     */
+    ArgumentConversionContext<String> STRING = ConversionContext.of(Argument.STRING);
+
+    /**
+     * Constant for List<String> argument.
+     */
+    ArgumentConversionContext<List<String>> LIST_OF_STRING = ConversionContext.of(Argument.LIST_OF_STRING);
+
+    /**
+     * Constant for List<String> argument.
+     */
+    ArgumentConversionContext<Map> MAP = ConversionContext.of(Argument.of(Map.class));
 
     /**
      * In the case where the type to be converted contains generic type arguments this map will return
@@ -105,6 +135,11 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
             }
 
             @Override
+            public void reject(Object value, Exception exception) {
+                thisContext.reject(value, exception);
+            }
+
+            @Override
             public Iterator<ConversionError> iterator() {
                 return thisContext.iterator();
             }
@@ -115,8 +150,6 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
             }
         };
     }
-
-
 
     /**
      * Create a simple {@link ConversionContext} for the given generic type variables.

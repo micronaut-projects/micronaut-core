@@ -1,18 +1,28 @@
 dependencies {
-    compile project(":router")
-    compile project(":runtime")
-    compileOnly project(":inject-java")
-    compileOnly project(":graal")
+    annotationProcessor project(":inject-java")
+    annotationProcessor project(":graal")
 
-    testCompile project(":http-client")
-    testCompile project(":inject-groovy")
-    testCompile project(":http-server-netty")
-    testCompile dependencyModuleVersion("micronaut.sql", "micronaut-jdbc-tomcat")
-    testCompile dependencyModuleVersion("groovy", "groovy-json")
-    testCompile dependencyVersion("h2")
-    testCompile "mysql:mysql-connector-java:6.0.6"
+    api project(":router")
+    api project(":runtime")
+    compileOnly(libs.managed.micronaut.sql.jdbc) {
+        exclude module:'micronaut-inject'
+        exclude module:'micronaut-bom'
+    }
 
-    compileOnly "ch.qos.logback:logback-classic:1.2.3"
+    implementation libs.managed.reactor
+
+    testImplementation project(":http-client")
+    testImplementation project(":inject-groovy")
+    testImplementation project(":http-server-netty")
+    testImplementation(libs.managed.micronaut.sql.jdbc.tomcat) {
+        exclude module:'micronaut-inject'
+        exclude module:'micronaut-bom'
+    }
+    testImplementation libs.managed.groovy.json
+    testImplementation libs.managed.h2
+    testImplementation libs.mysql.driver
+
+    compileOnly libs.managed.logback
+    compileOnly libs.log4j
+
 }
-
-//compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

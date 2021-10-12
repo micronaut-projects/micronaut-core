@@ -16,17 +16,16 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.netty.DefaultHttpClient
 import io.micronaut.runtime.ApplicationConfiguration
 import io.micronaut.runtime.server.EmbeddedServer
-import spock.lang.AutoCleanup
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 import spock.lang.Retry
-import spock.lang.Shared
 import spock.lang.Specification
-
-import javax.inject.Inject
-import javax.inject.Singleton
 
 // sometimes fails due to a port bind issue on Travis
 // this is because there is a timing issue between when an available port
@@ -35,31 +34,30 @@ import javax.inject.Singleton
 @Retry
 class ClientSpecificLoggerSpec extends Specification {
 
-    @Shared
-    int port = SocketUtils.findAvailableTcpPort()
-
-    @Shared
-    @AutoCleanup
-    ApplicationContext context = ApplicationContext.run(
-            'micronaut.server.port': port,
-            'micronaut.http.services.clientOne.url': "http://localhost:$port",
-            'micronaut.http.services.clientOne.logger-name': "${ClientSpecificLoggerSpec.class}.client.one",
-            'micronaut.http.services.clientOne.read-timeout': '500s'
-
-    )
-
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-
     void "test client specific logger"() {
         given:
+        int port = SocketUtils.findAvailableTcpPort()
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
+                ['micronaut.server.port': port,
+                 'spec.name': 'ClientSpecificLoggerSpec',
+                'micronaut.http.services.clientOne.url': "http://localhost:$port",
+                'micronaut.http.services.clientOne.logger-name': "${ClientSpecificLoggerSpec.class}.client.one",
+                'micronaut.http.services.clientOne.read-timeout': '500s']
+        )
+        ApplicationContext context = server.applicationContext
+
+        when:
         MyService myService = context.getBean(MyService)
 
-        expect:
+        then:
         ((DefaultHttpClient) myService.client).log.name == "${ClientSpecificLoggerSpec.class}.client.one".toString()
-        ((DefaultHttpClient) myService.rxHttpClient).log.name == "${ClientSpecificLoggerSpec.class}.client.two".toString()
+        ((DefaultHttpClient) myService.reactiveHttpClient).log.name == "${ClientSpecificLoggerSpec.class}.client.two".toString()
+
+        cleanup:
+        context.close()
     }
 
+    @Requires(property = 'spec.name', value = 'ClientSpecificLoggerSpec')
     @Singleton
     static class MyService {
 
@@ -69,10 +67,10 @@ class ClientSpecificLoggerSpec extends Specification {
 
         @Inject
         @Client(value = "client-two", configuration = ClientTwoHttpConfiguration.class)
-        RxHttpClient rxHttpClient
-
+        HttpClient reactiveHttpClient
     }
 
+    @Requires(property = 'spec.name', value = 'ClientSpecificLoggerSpec')
     @Singleton
     static class ClientTwoHttpConfiguration extends HttpClientConfiguration {
 

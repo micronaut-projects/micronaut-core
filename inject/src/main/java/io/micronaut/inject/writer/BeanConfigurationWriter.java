@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,7 +19,7 @@ import io.micronaut.context.AbstractBeanConfiguration;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanConfiguration;
-import io.micronaut.inject.annotation.AnnotationMetadataWriter;
+import io.micronaut.inject.ast.Element;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
@@ -48,10 +48,14 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
 
     /**
      * @param packageName        The package name
+     * @param originatingElement The originating element
      * @param annotationMetadata The annotation metadata
      */
-    public BeanConfigurationWriter(String packageName, AnnotationMetadata annotationMetadata) {
-        super(packageName + '.' + CLASS_SUFFIX, annotationMetadata, true);
+    public BeanConfigurationWriter(
+            String packageName,
+            Element originatingElement,
+            AnnotationMetadata annotationMetadata) {
+        super(packageName + '.' + CLASS_SUFFIX, originatingElement, annotationMetadata, true);
         this.packageName = packageName;
         this.configurationClassName = targetClassType.getClassName();
         this.configurationClassInternalName = targetClassType.getInternalName();
@@ -59,11 +63,7 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
 
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        AnnotationMetadataWriter annotationMetadataWriter = getAnnotationMetadataWriter();
-        if (annotationMetadataWriter != null) {
-            annotationMetadataWriter.accept(classWriterOutputVisitor);
-        }
-        try (OutputStream outputStream = classWriterOutputVisitor.visitClass(configurationClassName)) {
+        try (OutputStream outputStream = classWriterOutputVisitor.visitClass(configurationClassName, getOriginatingElements())) {
             ClassWriter classWriter = generateClassBytes();
             outputStream.write(classWriter.toByteArray());
         }
@@ -77,7 +77,7 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
             Class<AbstractBeanConfiguration> superType = AbstractBeanConfiguration.class;
             Type beanConfigurationType = Type.getType(superType);
 
-            startPublicClass(classWriter, configurationClassInternalName, beanConfigurationType);
+            startService(classWriter, BeanConfiguration.class, configurationClassInternalName, beanConfigurationType);
             writeAnnotationMetadataStaticInitializer(classWriter);
 
             writeConstructor(classWriter);
@@ -85,6 +85,10 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
 
         } catch (NoSuchMethodException e) {
             throw new ClassGenerationException("Error generating configuration class. Incompatible JVM or Micronaut version?: " + e.getMessage(), e);
+        }
+        for (GeneratorAdapter method : loadTypeMethods.values()) {
+            method.visitMaxs(3, 1);
+            method.visitEnd();
         }
 
         return classWriter;

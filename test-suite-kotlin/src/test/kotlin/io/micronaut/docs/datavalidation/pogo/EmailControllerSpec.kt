@@ -1,29 +1,28 @@
 package io.micronaut.docs.datavalidation.pogo
 
-import io.kotlintest.shouldBe
-import io.kotlintest.shouldThrow
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 
 class EmailControllerSpec: StringSpec() {
 
     val embeddedServer = autoClose(
-            ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to "datavalidationpogo"))
+        ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to "datavalidationpogo"))
     )
 
     val client = autoClose(
-            embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.getURL())
+        embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
     )
 
     init {
         //tag::pojovalidated[]
-        "test poko validation"() {
+        "test pojo validation" {
             val e = shouldThrow<HttpClientResponseException> {
                 val email = Email()
                 email.subject = "Hi"

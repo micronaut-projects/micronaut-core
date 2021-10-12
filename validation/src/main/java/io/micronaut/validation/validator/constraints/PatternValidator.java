@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,10 +16,10 @@
 package io.micronaut.validation.validator.constraints;
 
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import jakarta.inject.Singleton;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import javax.inject.Singleton;
 import javax.validation.constraints.Pattern;
 
 /**
@@ -32,7 +32,7 @@ import javax.validation.constraints.Pattern;
 public class PatternValidator extends AbstractPatternValidator<Pattern> {
 
     @Override
-    public boolean isValid(@Nullable CharSequence value, @Nonnull AnnotationValue<Pattern> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
+    public boolean isValid(@Nullable CharSequence value, @NonNull AnnotationValue<Pattern> annotationMetadata, @NonNull ConstraintValidatorContext context) {
         if (value == null) {
             // null valid according to spec
             return true;

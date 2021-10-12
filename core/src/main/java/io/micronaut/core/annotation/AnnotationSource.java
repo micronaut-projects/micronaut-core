@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,8 +17,6 @@ package io.micronaut.core.annotation;
 
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
 import java.util.Optional;
@@ -50,8 +48,46 @@ public interface AnnotationSource {
      * @param <T>             The annotation generic type
      * @return The annotation or null if it doesn't exist
      */
-    default @Nullable <T extends Annotation> T synthesize(@Nonnull Class<T> annotationClass) {
+    default @Nullable <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        return null;
+    }
+
+    /**
+     * Synthesizes a new annotation for the given annotation type using the member values of the given source annotation.
+     *
+     * <p>This method allows supporting synthesizing annotations that have been renamed, for example a {@code jakarta.inject.Named} annotation an be synthesized from the metadata of the a {@code javax.inject.Named} annotation.</p>
+     *
+     * @param annotationClass The annotation class
+     * @param sourceAnnotation The source annotation that provides the member values
+     * @param <T>             The annotation generic type
+     * @return The annotation or null if it doesn't exist
+     * @since 3.0.0
+     */
+    default @Nullable <T extends Annotation> T synthesize(
+            @NonNull Class<T> annotationClass,
+            @NonNull String sourceAnnotation) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        ArgumentUtils.requireNonNull("sourceAnnotation", sourceAnnotation);
+        return null;
+    }
+
+    /**
+     * Synthesizes a new annotation declared for the given annotation type using the member values of the given source annotation.
+     *
+     * <p>This method allows supporting synthesizing annotations that have been renamed, for example a {@code jakarta.inject.Named} annotation an be synthesized from the metadata of the a {@code javax.inject.Named} annotation.</p>
+     *
+     * @param annotationClass The annotation class
+     * @param sourceAnnotation The source annotation that provides the member values
+     * @param <T>             The annotation generic type
+     * @return The annotation or null if it doesn't exist
+     * @since 3.0.0
+     */
+    default @Nullable <T extends Annotation> T synthesizeDeclared(
+            @NonNull Class<T> annotationClass,
+            @NonNull String sourceAnnotation) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        ArgumentUtils.requireNonNull("sourceAnnotation", sourceAnnotation);
         return null;
     }
 
@@ -67,7 +103,7 @@ public interface AnnotationSource {
      * @param <T>             The annotation generic type
      * @return The annotation or null if it doesn't exist
      */
-    default @Nullable <T extends Annotation> T synthesizeDeclared(@Nonnull Class<T> annotationClass) {
+    default @Nullable <T extends Annotation> T synthesizeDeclared(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         return null;
     }
@@ -79,7 +115,7 @@ public interface AnnotationSource {
      *
      * @return All the annotations
      */
-    default @Nonnull Annotation[] synthesizeAll() {
+    default @NonNull Annotation[] synthesizeAll() {
         return AnnotationUtil.ZERO_ANNOTATIONS;
     }
 
@@ -90,7 +126,7 @@ public interface AnnotationSource {
      *
      * @return All declared annotations
      */
-    default @Nonnull Annotation[] synthesizeDeclared() {
+    default @NonNull Annotation[] synthesizeDeclared() {
         return AnnotationUtil.ZERO_ANNOTATIONS;
     }
 
@@ -104,7 +140,7 @@ public interface AnnotationSource {
      * @return All annotations by the given type
      */
     @SuppressWarnings("unchecked")
-    default @Nonnull <T extends Annotation> T[] synthesizeAnnotationsByType(@Nonnull Class<T> annotationClass) {
+    default @NonNull <T extends Annotation> T[] synthesizeAnnotationsByType(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         return (T[]) Array.newInstance(annotationClass, 0);
     }
@@ -119,7 +155,7 @@ public interface AnnotationSource {
      * @return Declared annotations by the given type
      */
     @SuppressWarnings("unchecked")
-    default @Nonnull <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(@Nonnull Class<T> annotationClass) {
+    default @NonNull <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         return (T[]) Array.newInstance(annotationClass, 0);
     }
@@ -131,7 +167,7 @@ public interface AnnotationSource {
      * @param <T> The annotation type
      * @return A {@link AnnotationValue} instance
      */
-    default @Nonnull <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(@Nonnull String annotation) {
+    default @NonNull <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(@NonNull String annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return Optional.empty();
     }
@@ -143,7 +179,7 @@ public interface AnnotationSource {
      * @param <T> The annotation type
      * @return A {@link AnnotationValue} instance
      */
-    default @Nonnull <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(@Nonnull Class<T> annotationClass) {
+    default @NonNull <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         return Optional.empty();
     }
@@ -155,7 +191,7 @@ public interface AnnotationSource {
      * @param <T> The annotation type
      * @return A {@link AnnotationValue} instance
      */
-    default @Nonnull <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(@Nonnull String annotation) {
+    default @NonNull <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(@NonNull String annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return Optional.empty();
     }
@@ -167,7 +203,7 @@ public interface AnnotationSource {
      * @param <T> The annotation type
      * @return A {@link AnnotationValue} instance
      */
-    default @Nonnull <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(@Nonnull Class<T> annotationClass) {
+    default @NonNull <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         return Optional.empty();
     }
@@ -179,7 +215,7 @@ public interface AnnotationSource {
      * @param <T> The annotation type
      * @return A {@link AnnotationValue} instance or null
      */
-    default @Nullable <T extends Annotation> AnnotationValue<T> getAnnotation(@Nonnull String annotation) {
+    default @Nullable <T extends Annotation> AnnotationValue<T> getAnnotation(@NonNull String annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return this.<T>findAnnotation(annotation).orElse(null);
     }
@@ -191,7 +227,7 @@ public interface AnnotationSource {
      * @param <T> The annotation type
      * @return A {@link AnnotationValue} instance or null
      */
-    default @Nullable <T extends Annotation> AnnotationValue<T> getAnnotation(@Nonnull Class<T> annotationClass) {
+    default @Nullable <T extends Annotation> AnnotationValue<T> getAnnotation(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         return this.findAnnotation(annotationClass).orElse(null);
     }
@@ -203,7 +239,7 @@ public interface AnnotationSource {
      * @param <T> The annotation type
      * @return A {@link AnnotationValue} instance
      */
-    default @Nullable <T extends Annotation> AnnotationValue<T> getDeclaredAnnotation(@Nonnull String annotation) {
+    default @Nullable <T extends Annotation> AnnotationValue<T> getDeclaredAnnotation(@NonNull String annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return this.<T>findDeclaredAnnotation(annotation).orElse(null);
     }
@@ -215,7 +251,7 @@ public interface AnnotationSource {
      * @param <T> The annotation type
      * @return A {@link AnnotationValue} instance or null
      */
-    default @Nullable <T extends Annotation> AnnotationValue<T> getDeclaredAnnotation(@Nonnull Class<T> annotationClass) {
+    default @Nullable <T extends Annotation> AnnotationValue<T> getDeclaredAnnotation(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         return this.findDeclaredAnnotation(annotationClass).orElse(null);
     }
@@ -226,7 +262,7 @@ public interface AnnotationSource {
      * @param annotationClass The annotation class
      * @return True if it is
      */
-    default boolean isAnnotationPresent(@Nonnull Class<? extends Annotation> annotationClass) {
+    default boolean isAnnotationPresent(@NonNull Class<? extends Annotation> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         return false;
     }
@@ -237,8 +273,30 @@ public interface AnnotationSource {
      * @param annotationClass The annotation class
      * @return True if it is
      */
-    default boolean isDeclaredAnnotationPresent(@Nonnull Class<? extends Annotation> annotationClass) {
+    default boolean isDeclaredAnnotationPresent(@NonNull Class<? extends Annotation> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        return false;
+    }
+
+    /**
+     * Return whether an annotation is present.
+     *
+     * @param annotationName The annotation name
+     * @return True if it is
+     */
+    default boolean isAnnotationPresent(@NonNull String annotationName) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationName);
+        return false;
+    }
+
+    /**
+     * Variation of {@link #isAnnotationPresent(String)} for declared annotations.
+     *
+     * @param annotationName The annotation name
+     * @return True if it is
+     */
+    default boolean isDeclaredAnnotationPresent(@NonNull String annotationName) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationName);
         return false;
     }
 }

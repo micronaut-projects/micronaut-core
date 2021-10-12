@@ -1,17 +1,19 @@
 Although not required to use Micronaut, the Micronaut CLI is the quickest way to create a new server application.
 
-Using the CLI you can create a new Micronaut application in either Groovy, Java or Kotlin (the default is Java).
+Using the CLI you can create a new Micronaut application in either Groovy, Java, or Kotlin (the default is Java).
 
 The following command creates a new "Hello World" server application in Java with a Gradle build:
+
+NOTE: Applications generated via our CLI include Gradle or Maven wrappers, so it is not even necessary to have Gradle or Maven installed on your machine to begin running the applications. Simply use the `mvnw` or `gradlew` command, as explained further below.
 
 [source,bash]
 ----
 $ mn create-app hello-world
 ----
 
-TIP: You can supply `--build maven` if you wish to create a Maven based build instead
+TIP: Supply `--build maven` to create a Maven-based build instead
 
-The previous command will create a new Java application in a directory called `hello-world` featuring a Gradle a build. The application can be run with `./gradlew run`:
+The previous command creates a new Java application in a directory called `hello-world` featuring a Gradle build. You can run the application with `./gradlew run`:
 
 [source,bash]
 ----
@@ -20,23 +22,26 @@ $ ./gradlew run
 [main] INFO  io.micronaut.runtime.Micronaut - Startup completed in 972ms. Server Running: http://localhost:28933
 ----
 
-If you have created a Maven based project, use `./mvnw compile exec:exec` instead.
+If you have created a Maven-based project, use `./mvnw mn:run` instead.
 
-By default the Micronaut HTTP server is configured to run on port 8080. See the section <<runningSpecificPort, Running Server on a Specific Port>> in the user guide for more options.
+NOTE: For Windows the ./ before commands is not needed
 
-In order to create a service that responds to "Hello World" you first need a controller. The following is an example of a controller:
+By default the Micronaut HTTP server is configured to run on port 8080. See the section <<runningSpecificPort, Running Server on a Specific Port>> for more options.
+
+To create a service that responds to "Hello World" you first need a controller. The following is an example:
 
 snippet::io.micronaut.docs.server.intro.HelloController[tags="imports,class"]
 
-<1> The class is defined as a controller with the link:{api}/io/micronaut/http/annotation/Controller.html[@Controller] annotation mapped to the path `/hello`
-<2> The link:{api}/io/micronaut/http/annotation/Get.html[@Get] annotation is used to map the `index` method to all requests that use an HTTP `GET`
-<3> A String "Hello World" is returned as the result
+<1> The link:{api}/io/micronaut/http/annotation/Controller.html[@Controller] annotation defines the class as a controller mapped to the path `/hello`
+<2> The link:{api}/io/micronaut/http/annotation/Get.html[@Get] annotation maps the `index` method to all requests that use an HTTP `GET`
+<3> A String "Hello World" is returned as the response
 
-If you are using Java, place the previous file in `src/main/java/hello/world`.
-If you are using Groovy, place the previous file in `src/main/groovy/hello/world`.
-If you are using Kotlin, place the previous file in `src/main/kotlin/hello/world`.
+[%hardbreaks]
+If you use Java, place the previous file in `src/main/java/hello/world`.
+If you use Groovy, place the previous file in `src/main/groovy/hello/world`.
+If you use Kotlin, place the previous file in `src/main/kotlin/hello/world`.
 
-If you start the application and send a request to the `/hello` URI then the text "Hello World" is returned:
+If you start the application and send a `GET` request to the `/hello` URI, the text "Hello World" is returned:
 
 [source,bash]
 ----

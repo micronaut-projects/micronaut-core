@@ -42,6 +42,7 @@ class DefaultConversionServiceSpec extends Specification {
         10                      | Float       | 10.0f
         10                      | String      | "10"
         "1,2"                   | int[]       | [1, 2] as int[]
+        "str"                   | char[]      | ['s', 't', 'r'] as char[]
         "10"                    | Byte        | 10
         "10"                    | Integer     | 10
         "${5 + 5}"              | Integer     | 10
@@ -88,7 +89,7 @@ class DefaultConversionServiceSpec extends Specification {
         then:
         def e = thrown(ConversionErrorException)
         e.conversionError.originalValue.get() == 'junk'
-        e.message == 'Failed to convert argument [integer] for value [junk] due to: For input string: "junk"'
+        e.message == 'Failed to convert argument [Integer] for value [junk] due to: For input string: "junk"'
     }
 
     void "test conversion service with type arguments"() {

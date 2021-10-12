@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -72,7 +72,7 @@ public interface ValueResolver<K extends CharSequence> {
      * @param requiredType The required type
      * @param defaultValue The default value
      * @param <T>          The concrete type
-     * @return An optional containing the property value if it exists
+     * @return Property value if it exists or default value
      */
     default <T> T get(K name, Class<T> requiredType, T defaultValue) {
         return get(name, requiredType).orElse(defaultValue);

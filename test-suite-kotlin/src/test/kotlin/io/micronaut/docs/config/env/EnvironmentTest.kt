@@ -1,6 +1,6 @@
 package io.micronaut.docs.config.env
 
-import io.kotlintest.specs.AnnotationSpec
+import io.kotest.core.spec.style.AnnotationSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySource
@@ -21,7 +21,7 @@ class EnvironmentTest: AnnotationSpec(){
         assertTrue(environment.activeNames.contains("test"))
         assertTrue(environment.activeNames.contains("android"))
         // end::env[]
-
+        applicationContext.close()
     }
 
     @Test
@@ -43,6 +43,6 @@ class EnvironmentTest: AnnotationSpec(){
                 environment.getProperty("micronaut.server.host", String::class.java).orElse("localhost")
         )
         // end::envProps[]
-
+        applicationContext.close()
     }
 }

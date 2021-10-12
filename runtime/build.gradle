@@ -1,52 +1,50 @@
-shadowJar.enabled = true
-dependencies {
-    for(proj in ['inject', 'http', 'aop']) {
-        compile project(":$proj")
-    }
-    compileOnly "com.oracle.substratevm:svm:$graalVersion"
-    compileOnly project(":graal")
-    compileOnly dependencyVersion("jcache")
-    compile dependencyVersion("validation")
-    compile dependencyVersion("jackson.databind")
-    compile dependencyVersion("rxjava2")
-
-    compile([
-        dependencyVersion('jackson.datatype'),
-        dependencyModuleVersion('jackson.datatype', 'jackson-datatype-jsr310')
-    ])
-
-    compileOnly(
-        dependencyModuleVersion('jackson.modules', 'jackson-module-kotlin')
-    ) {
-        transitive = false
-    }
-    compileOnly(
-            dependencyVersion('jackson.modules')
-    ) {
-        transitive = false
-    }
-    compileOnly(
-        dependencyModuleVersion('jackson.modules', 'jackson-module-parameter-names')
-    ) {
-        transitive = false
-    }
-
-    compileOnly 'org.glassfish:javax.el:3.0.1-b09'
-    compileOnly dependencyVersion("reactor")
-    compileOnly dependencyVersion("rxjava1.interop")
-    compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
-    compileOnly project(":inject-java")
-
-    testCompile 'org.jsr107.ri:cache-ri-impl:1.1.0'
-    testCompile dependencyVersion("jcache")
-    testCompile dependencyVersion("rxjava1.interop")
-    testCompile dependencyVersion("reactor")
-    testCompile project(":inject-java")
-    testCompile project(":inject-java-test")
-    testCompile project(":inject-groovy")
-    testCompile dependencyModuleVersion("gorm", "grails-datastore-gorm")
-    testCompile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+ext {
+    shadowJarEnabled = true
 }
 
+dependencies {
+    annotationProcessor project(":inject-java")
+    annotationProcessor project(":graal")
+    api project(":http")
+    api project(':inject')
+    api project(':aop')
+    api project(':context')
+    api project(":core-reactive")
+    api project(":jackson-databind")
+    api libs.managed.validation
+
+    implementation libs.managed.reactor
+
+    compileOnly libs.managed.graal
+    compileOnly libs.managed.jcache
+
+    compileOnly libs.log4j
+    compileOnly libs.javax.el
+    compileOnly libs.caffeine
+    compileOnly libs.kotlinx.coroutines.core
+    compileOnly libs.kotlinx.coroutines.reactive
+    compileOnly libs.managed.logback
+    testImplementation libs.managed.logback
+
+    testAnnotationProcessor project(":inject-java")
+    testImplementation libs.jsr107
+    testImplementation libs.managed.jcache
+    testImplementation project(":inject-java")
+    testImplementation project(":inject-java-test")
+    testImplementation project(":inject-groovy")
+    if (!JavaVersion.current().isJava9Compatible()) {
+        testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    }
+    testImplementation libs.systemlambda
+}
+
+//compileJava.options.fork = true
+//compileJava.options.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
+
+spotless {
+    java {
+        targetExclude '**/io/micronaut/scheduling/cron/CronExpression.java'
+    }
+}

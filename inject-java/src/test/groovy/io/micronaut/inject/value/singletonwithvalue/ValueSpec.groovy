@@ -23,6 +23,7 @@ class ValueSpec extends Specification {
     void "test configuration injection with @Value"() {
         given:
         ApplicationContext context = ApplicationContext.run(
+                "spec.name": getClass().simpleName,
                 "foo.bar":"8080",
                 "camelCase.URL":"http://localhost"
         )

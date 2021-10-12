@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@
 package io.micronaut.inject.requires
 
 import io.micronaut.context.annotation.Requires
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 @Singleton
-@Requires(sdk = Requires.Sdk.KOTLIN, version = "1.3.70")
+@Requires(sdk = Requires.Sdk.KOTLIN, version = "10.3.70")
 class RequiresFuture

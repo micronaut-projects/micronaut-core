@@ -8,31 +8,12 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Unroll
 
-import javax.validation.constraints.AssertFalse
-import javax.validation.constraints.AssertTrue
-import javax.validation.constraints.DecimalMax
-import javax.validation.constraints.DecimalMin
-import javax.validation.constraints.Digits
-import javax.validation.constraints.Email
-import javax.validation.constraints.Future
-import javax.validation.constraints.Max
-import javax.validation.constraints.Min
-import javax.validation.constraints.Negative
-import javax.validation.constraints.NegativeOrZero
-import javax.validation.constraints.NotBlank
-import javax.validation.constraints.NotEmpty
-import javax.validation.constraints.NotNull
-import javax.validation.constraints.Null
-import javax.validation.constraints.Past
-import javax.validation.constraints.Pattern
-import javax.validation.constraints.Positive
-import javax.validation.constraints.PositiveOrZero
-import javax.validation.constraints.Size
-import java.lang.annotation.Annotation
+import javax.validation.constraints.*
 import java.time.Instant
 import java.time.LocalDateTime
-import java.time.LocalTime
 import java.time.temporal.ChronoUnit
+
+import static java.math.BigInteger.ONE
 
 class ConstraintsSpec extends AbstractTypeElementSpec {
     @Shared
@@ -91,45 +72,67 @@ class ConstraintsSpec extends AbstractTypeElementSpec {
         Negative       | -1                                            | true    | new AnnotationValue<>(constraint.getName())
         Negative       | -100                                          | true    | new AnnotationValue<>(constraint.getName())
         Negative       | -100 as double                                | true    | new AnnotationValue<>(constraint.getName())
+        Negative       | -0.001 as double                              | true    | new AnnotationValue<>(constraint.getName())
         Negative       | -100 as long                                  | true    | new AnnotationValue<>(constraint.getName())
-        Negative       | -100 as float                                 | true    | new AnnotationValue<>(constraint.getName())
-        Negative       | -100 as short                                 | true    | new AnnotationValue<>(constraint.getName())
-        Negative       | -100 as byte                                  | true    | new AnnotationValue<>(constraint.getName())
-        Negative       | new BigInteger("-100")                        | true    | new AnnotationValue<>(constraint.getName())
-        Negative       | new BigDecimal("-100")                        | true    | new AnnotationValue<>(constraint.getName())
-        Negative       | new BigInteger("100")                         | false   | new AnnotationValue<>(constraint.getName())
-        Negative       | new BigDecimal("100")                         | false   | new AnnotationValue<>(constraint.getName())
+        Negative       | Integer.MIN_VALUE - 1L as long                | true    | new AnnotationValue<>(constraint.getName())
+        Negative       | Integer.MAX_VALUE + 1L as long                | false   | new AnnotationValue<>(constraint.getName())
+        Negative       | -100 as float                                    | true  | new AnnotationValue<>(constraint.getName())
+        Negative       | -100 as short                                    | true  | new AnnotationValue<>(constraint.getName())
+        Negative       | -100 as byte                                     | true  | new AnnotationValue<>(constraint.getName())
+        Negative       | new BigInteger("-100")                           | true  | new AnnotationValue<>(constraint.getName())
+        Negative       | BigInteger.valueOf(Long.MIN_VALUE).subtract(ONE)     | true  | new AnnotationValue<>(constraint.getName())
+        Negative       | new BigDecimal("-100")                           | true  | new AnnotationValue<>(constraint.getName())
+        Negative       | new BigDecimal("-0.01")                          | true  | new AnnotationValue<>(constraint.getName())
+        Negative       | new BigInteger("100")                            | false | new AnnotationValue<>(constraint.getName())
+        Negative       | BigInteger.valueOf(Long.MAX_VALUE).add(ONE)          | false  | new AnnotationValue<>(constraint.getName())
+        Negative       | new BigDecimal("100")                            | false | new AnnotationValue<>(constraint.getName())
+        Negative       | BigDecimal.ZERO                                   | false   | new AnnotationValue<>(constraint.getName())
         Negative       | 0                                             | false   | new AnnotationValue<>(constraint.getName())
         NegativeOrZero | -1                                            | true    | new AnnotationValue<>(constraint.getName())
         NegativeOrZero | -100                                          | true    | new AnnotationValue<>(constraint.getName())
         NegativeOrZero | -100 as double                                | true    | new AnnotationValue<>(constraint.getName())
+        NegativeOrZero | -0.001 as double                              | true    | new AnnotationValue<>(constraint.getName())
+        NegativeOrZero |  0.001 as double                              | false   | new AnnotationValue<>(constraint.getName())
         NegativeOrZero | -100 as long                                  | true    | new AnnotationValue<>(constraint.getName())
+        NegativeOrZero | Integer.MIN_VALUE - 1L as long                | true    | new AnnotationValue<>(constraint.getName())
+        NegativeOrZero | Integer.MAX_VALUE + 1L as long                | false   | new AnnotationValue<>(constraint.getName())
         NegativeOrZero | -100 as float                                 | true    | new AnnotationValue<>(constraint.getName())
         NegativeOrZero | -100 as short                                 | true    | new AnnotationValue<>(constraint.getName())
         NegativeOrZero | -100 as byte                                  | true    | new AnnotationValue<>(constraint.getName())
         NegativeOrZero | new BigInteger("-100")                        | true    | new AnnotationValue<>(constraint.getName())
+        NegativeOrZero | BigInteger.valueOf(Long.MIN_VALUE).subtract(ONE)  | true  | new AnnotationValue<>(constraint.getName())
         NegativeOrZero | new BigDecimal("-100")                        | true    | new AnnotationValue<>(constraint.getName())
+        NegativeOrZero | BigDecimal.ZERO                                   | true    | new AnnotationValue<>(constraint.getName())
         NegativeOrZero | new BigInteger("100")                         | false   | new AnnotationValue<>(constraint.getName())
+        NegativeOrZero | BigInteger.valueOf(Long.MAX_VALUE).add(ONE)       | false  | new AnnotationValue<>(constraint.getName())
         NegativeOrZero | new BigDecimal("100")                         | false   | new AnnotationValue<>(constraint.getName())
+        NegativeOrZero | new BigDecimal("0.01")                        | false   | new AnnotationValue<>(constraint.getName())
         NegativeOrZero | 0                                             | true    | new AnnotationValue<>(constraint.getName())
         // Positive
         Positive       | 1                                             | true    | new AnnotationValue<>(constraint.getName())
         Positive       | 100                                           | true    | new AnnotationValue<>(constraint.getName())
         Positive       | 100 as double                                 | true    | new AnnotationValue<>(constraint.getName())
+        Positive       | 0.001 as double                               | true    | new AnnotationValue<>(constraint.getName())
         Positive       | 100 as long                                   | true    | new AnnotationValue<>(constraint.getName())
+        Positive       | Integer.MAX_VALUE + 1L as long                | true    | new AnnotationValue<>(constraint.getName())
         Positive       | 100 as float                                  | true    | new AnnotationValue<>(constraint.getName())
         Positive       | 100 as short                                  | true    | new AnnotationValue<>(constraint.getName())
         Positive       | 100 as byte                                   | true    | new AnnotationValue<>(constraint.getName())
         Positive       | new BigInteger("100")                         | true    | new AnnotationValue<>(constraint.getName())
+        Positive       | BigInteger.valueOf(Long.MAX_VALUE).add(ONE)       | true    | new AnnotationValue<>(constraint.getName())
         Positive       | new BigDecimal("100")                         | true    | new AnnotationValue<>(constraint.getName())
+        Positive       | new BigDecimal("0.01")                        | true    | new AnnotationValue<>(constraint.getName())
         Positive       | new BigInteger("-100")                        | false   | new AnnotationValue<>(constraint.getName())
         Positive       | new BigDecimal("-100")                        | false   | new AnnotationValue<>(constraint.getName())
-        Positive       | 0                                             | false   | new AnnotationValue<>(constraint.getName())
-        Positive       | -100 as double                                | false   | new AnnotationValue<>(constraint.getName())
-        Positive       | -100 as long                                  | false   | new AnnotationValue<>(constraint.getName())
-        Positive       | -100 as float                                 | false   | new AnnotationValue<>(constraint.getName())
-        Positive       | -100 as short                                 | false   | new AnnotationValue<>(constraint.getName())
-        Positive       | -100 as byte                                  | false   | new AnnotationValue<>(constraint.getName())
+        Positive       | BigDecimal.ZERO                                   | false   | new AnnotationValue<>(constraint.getName())
+        Positive       | 0                                                 | false   | new AnnotationValue<>(constraint.getName())
+        Positive       | -100 as double                                    | false   | new AnnotationValue<>(constraint.getName())
+        Positive       | -100 as long                                      | false   | new AnnotationValue<>(constraint.getName())
+        Positive       | Integer.MIN_VALUE - 1L as long                    | false   | new AnnotationValue<>(constraint.getName())
+        Positive       | BigInteger.valueOf(Long.MIN_VALUE).subtract(ONE)  | false  | new AnnotationValue<>(constraint.getName())
+        Positive       | -100 as float                                     | false   | new AnnotationValue<>(constraint.getName())
+        Positive       | -100 as short                                     | false   | new AnnotationValue<>(constraint.getName())
+        Positive       | -100 as byte                                      | false   | new AnnotationValue<>(constraint.getName())
         // PositiveOrZero
         PositiveOrZero | 1                                             | true    | new AnnotationValue<>(constraint.getName())
         PositiveOrZero | null                                          | true    | new AnnotationValue<>(constraint.getName())
@@ -138,25 +141,34 @@ class ConstraintsSpec extends AbstractTypeElementSpec {
         PositiveOrZero | 100                                           | true    | new AnnotationValue<>(constraint.getName())
         PositiveOrZero | 100 as double                                 | true    | new AnnotationValue<>(constraint.getName())
         PositiveOrZero | 100 as long                                   | true    | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | Integer.MAX_VALUE + 1L as long                | true    | new AnnotationValue<>(constraint.getName())
         PositiveOrZero | 100 as float                                  | true    | new AnnotationValue<>(constraint.getName())
         PositiveOrZero | 100 as short                                  | true    | new AnnotationValue<>(constraint.getName())
         PositiveOrZero | 100 as byte                                   | true    | new AnnotationValue<>(constraint.getName())
         PositiveOrZero | new BigInteger("100")                         | true    | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | BigInteger.valueOf(Long.MAX_VALUE).add(ONE)       | true    | new AnnotationValue<>(constraint.getName())
         PositiveOrZero | new BigDecimal("100")                         | true    | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | BigDecimal.ZERO                                   | true    | new AnnotationValue<>(constraint.getName())
         PositiveOrZero | new BigInteger("-100")                        | false   | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | BigInteger.valueOf(Long.MIN_VALUE).subtract(ONE)  | false  | new AnnotationValue<>(constraint.getName())
         PositiveOrZero | new BigDecimal("-100")                        | false   | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | new BigDecimal("-0.01")                           | false   | new AnnotationValue<>(constraint.getName())
         PositiveOrZero | -100 as double                                | false   | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | -0.001 as double                              | false   | new AnnotationValue<>(constraint.getName())
         PositiveOrZero | -100 as long                                  | false   | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | Integer.MIN_VALUE - 1L as long                | false   | new AnnotationValue<>(constraint.getName())
         PositiveOrZero | -100 as float                                 | false   | new AnnotationValue<>(constraint.getName())
         PositiveOrZero | -100 as short                                 | false   | new AnnotationValue<>(constraint.getName())
         PositiveOrZero | -100 as byte                                  | false   | new AnnotationValue<>(constraint.getName())
         // Max
-        Max            | 10                                            | false   | constraintMetadata(constraint, "@Max(5)")
+        Max            | 10                                            | false  | constraintMetadata(constraint, "@Max(5)")
         Max            | 5                                             | true   | constraintMetadata(constraint, "@Max(5)")
-        Max            | new BigInteger("10")                          | false   | constraintMetadata(constraint, "@Max(5)")
-        Max            | new BigDecimal("10")                          | false   | constraintMetadata(constraint, "@Max(5)")
-        Max            | 0                                             | true    | constraintMetadata(constraint, "@Max(5)")
-        Max            | null                                          | true    | constraintMetadata(constraint, "@Max(5)")
+        Max            | new BigInteger("6")                           | false  | constraintMetadata(constraint, "@Max(5)")
+        Max            | new BigDecimal("6")                           | false  | constraintMetadata(constraint, "@Max(5)")
+        Max            | new BigInteger("5")                           | true   | constraintMetadata(constraint, "@Max(5)")
+        Max            | new BigDecimal("5")                           | true   | constraintMetadata(constraint, "@Max(5)")
+        Max            | 0                                             | true   | constraintMetadata(constraint, "@Max(5)")
+        Max            | null                                          | true   | constraintMetadata(constraint, "@Max(5)")
         // Min
         Min            | 10                                            | true    | constraintMetadata(constraint, "@Min(5)")
         Min            | 5                                             | true    | constraintMetadata(constraint, "@Min(5)")

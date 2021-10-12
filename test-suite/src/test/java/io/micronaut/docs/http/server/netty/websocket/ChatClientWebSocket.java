@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,18 +16,16 @@
 package io.micronaut.docs.http.server.netty.websocket;
 
 // tag::imports[]
-
 import io.micronaut.http.HttpRequest;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
-import io.reactivex.Single;
-
+import org.reactivestreams.Publisher;
+import io.micronaut.core.async.annotation.SingleResult;
 import java.util.Collection;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Future;
-
 // end::imports[]
 
 // tag::class[]
@@ -41,7 +39,8 @@ public abstract class ChatClientWebSocket implements AutoCloseable { // <2>
     private Collection<String> replies = new ConcurrentLinkedQueue<>();
 
     @OnOpen
-    public void onOpen(String topic, String username, WebSocketSession session, HttpRequest request) { // <3>
+    public void onOpen(String topic, String username,
+                       WebSocketSession session, HttpRequest request) { // <3>
         this.topic = topic;
         this.username = username;
         this.session = session;
@@ -69,8 +68,7 @@ public abstract class ChatClientWebSocket implements AutoCloseable { // <2>
     }
 
     @OnMessage
-    public void onMessage(
-            String message) {
+    public void onMessage(String message) {
         replies.add(message); // <4>
     }
 
@@ -79,6 +77,6 @@ public abstract class ChatClientWebSocket implements AutoCloseable { // <2>
 
     public abstract Future<String> sendAsync(String message);
 
-    public abstract Single<String> sendRx(String message);
-
+    @SingleResult
+    public abstract Publisher<String> sendRx(String message);
 }

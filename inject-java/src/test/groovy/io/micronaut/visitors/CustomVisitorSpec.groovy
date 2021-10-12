@@ -15,7 +15,7 @@
  */
 package io.micronaut.visitors
 
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
 class CustomVisitorSpec extends AbstractTypeElementSpec {
 
@@ -31,7 +31,7 @@ class CustomVisitorSpec extends AbstractTypeElementSpec {
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController {
@@ -69,7 +69,7 @@ public class TestController {
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public class TestController {
 
@@ -99,5 +99,33 @@ public class TestController {
         AllElementsVisitor.VISITED_ELEMENTS == []
         AllClassesVisitor.VISITED_ELEMENTS == ["test.TestController", "getMethod"]
         InjectVisitor.VISITED_ELEMENTS == ["test.TestController", "privateField"]
+    }
+
+    void "test @Generated class is not visited by any visitor"() {
+        buildBeanDefinition('test.TestGenerated', '''
+package test;
+
+import io.micronaut.core.annotation.Generated;
+import jakarta.inject.Inject;
+
+@Generated
+public class TestGenerated {
+
+    @Inject private String privateField;  
+    protected String protectedField;   
+    public String publicField;
+    String packagePrivateField;
+    
+    TestGenerated(String constructorArg) {}
+    
+    void setterMethod(String method) {}
+
+}
+''')
+        expect:
+        ControllerGetVisitor.VISITED_ELEMENTS == []
+        AllElementsVisitor.VISITED_ELEMENTS == []
+        AllClassesVisitor.VISITED_ELEMENTS == []
+        InjectVisitor.VISITED_ELEMENTS == []
     }
 }

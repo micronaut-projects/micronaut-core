@@ -1,17 +1,40 @@
-shadowJar.enabled = true
+ext {
+    shadowJarEnabled = true
+}
+
 shadowJar {
     exclude "module-info.class"
 }
 
 dependencies {
-    compile dependencyVersion("slf4j")
-    compile dependencyVersion("reactive.streams")
-    compile dependencyVersion("jsr305")
-    
-    compileOnly "org.ow2.asm:asm-tree:$asmVersion"
-    shadowCompile "org.ow2.asm:asm:$asmVersion"
-    shadowCompile "org.ow2.asm:asm-commons:$asmVersion"
-    shadowCompile "org.ow2.asm:asm-tree:$asmVersion"
-    shadowCompile "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
+    api libs.managed.slf4j
+    compileOnly libs.managed.jsr305
+    compileOnly libs.managed.graal
+    compileOnly libs.kotlin.stdlib
+    compileOnly libs.asm.tree
+    shadowCompile libs.bundles.asm
+    shadowCompile libs.asm.tree
+    shadowCompile(libs.caffeine) {
+        exclude group: "com.google.errorprone", module: "error_prone_annotations"
+        exclude group: "org.checkerframework", module: "checker-qual"
+    }
 }
 
+spotless {
+    java {
+        targetExclude '**/io/micronaut/core/io/scan/AnnotationClassReader.java',
+                '**/io/micronaut/core/io/scan/Attribute.java',
+                '**/io/micronaut/core/io/scan/Context.java',
+                '**/io/micronaut/core/util/clhm/**',
+                '**/io/micronaut/core/util/AntPathMatcher.java'
+    }
+    format 'javaMisc', {
+        targetExclude '**/io/micronaut/core/util/clhm/**'
+    }
+}
+
+processResources.dependsOn('micronautVersionInfo')
+task micronautVersionInfo(type: WriteProperties) {
+    outputFile = "${buildDir}/resources/main/micronaut-version.properties"
+    property 'micronaut.version', projectVersion
+}

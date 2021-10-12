@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.context.BeanLocator;
+import io.micronaut.context.BeanProvider;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.subscriber.TypedSubscriber;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
@@ -26,7 +27,11 @@ import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.multipart.MultipartBody;
-import io.micronaut.http.server.netty.*;
+import io.micronaut.http.server.netty.DefaultHttpContentProcessor;
+import io.micronaut.http.server.netty.HttpContentProcessor;
+import io.micronaut.http.server.netty.HttpContentSubscriberFactory;
+import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.EmptyByteBuf;
@@ -37,7 +42,6 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Singleton;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -47,13 +51,13 @@ import java.util.concurrent.atomic.AtomicLong;
  * @author James Kleeh
  * @since 1.3.0
  */
-@Singleton
+@Internal
 public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinder<MultipartBody> {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
-    
+
     private final BeanLocator beanLocator;
-    private final HttpServerConfiguration httpServerConfiguration;
+    private final BeanProvider<HttpServerConfiguration> httpServerConfiguration;
 
     /**
      * Default constructor.
@@ -61,14 +65,9 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
      * @param beanLocator The bean locator
      * @param httpServerConfiguration The server configuration
      */
-    public MultipartBodyArgumentBinder(BeanLocator beanLocator, HttpServerConfiguration httpServerConfiguration) {
+    public MultipartBodyArgumentBinder(BeanLocator beanLocator, BeanProvider<HttpServerConfiguration> httpServerConfiguration) {
         this.beanLocator = beanLocator;
         this.httpServerConfiguration = httpServerConfiguration;
-    }
-
-    @Override
-    public boolean supportsSuperTypes() {
-        return false;
     }
 
     @Override
@@ -85,7 +84,7 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
                 HttpContentProcessor<?> processor = beanLocator.findBean(HttpContentSubscriberFactory.class,
                         new ConsumesMediaTypeQualifier<>(MediaType.MULTIPART_FORM_DATA_TYPE))
                         .map(factory -> factory.build(nettyHttpRequest))
-                        .orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration));
+                        .orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration.get()));
 
                 //noinspection unchecked
                 return () -> Optional.of(subscriber -> processor.subscribe(new TypedSubscriber<Object>((Argument) context.getArgument()) {
@@ -100,7 +99,7 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
 
                             @Override
                             public void request(long n) {
-                                if (partsRequested.getAndUpdate((prev) -> prev + n) == 0) {
+                                if (partsRequested.getAndUpdate(prev -> prev + n) == 0) {
                                     s.request(n);
                                 }
                             }
@@ -117,10 +116,8 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
                         if (LOG.isTraceEnabled()) {
                             LOG.trace("Server received streaming message for argument [{}]: {}", context.getArgument(), message);
                         }
-                        if (message instanceof ByteBufHolder) {
-                            if (((ByteBufHolder) message).content() instanceof EmptyByteBuf) {
-                                return;
-                            }
+                        if (message instanceof ByteBufHolder && ((ByteBufHolder) message).content() instanceof EmptyByteBuf) {
+                            return;
                         }
 
                         if (message instanceof HttpData) {

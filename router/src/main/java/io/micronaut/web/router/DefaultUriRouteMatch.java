@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +18,7 @@ package io.micronaut.web.router;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
@@ -25,11 +26,9 @@ import io.micronaut.http.uri.UriMatchVariable;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.charset.Charset;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -73,7 +72,7 @@ class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements Uri
         return new DefaultUriRouteMatch<T, R>(matchInfo, uriRoute, defaultCharset, conversionService) {
             @Override
             public List<Argument> getRequiredArguments() {
-                return Collections.unmodifiableList(arguments);
+                return arguments;
             }
 
             @Override
@@ -94,17 +93,12 @@ class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements Uri
 
             @Override
             public List<Argument> getRequiredArguments() {
-                return Collections.unmodifiableList(requiredArguments);
+                return requiredArguments;
             }
 
             @Override
             public Map<String, Object> getVariableValues() {
                 return newVariables;
-            }
-
-            @Override
-            public Optional<Argument<?>> getRequiredInput(String name) {
-                return super.getRequiredInput(name);
             }
         };
     }
@@ -122,25 +116,32 @@ class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements Uri
     @Override
     public Map<String, Object> getVariableValues() {
         Map<String, Object> variables = matchInfo.getVariableValues();
-        Map<String, Object> decoded = new LinkedHashMap<>(variables.size());
-        for (Map.Entry<String, Object> entry : variables.entrySet()) {
-            String k = entry.getKey();
-            Object v = entry.getValue();
-            if (v instanceof CharSequence) {
-                try {
-                    v = URLDecoder.decode(v.toString(), defaultCharset.toString());
-                } catch (UnsupportedEncodingException e) {
-                    // ignore
+        if (CollectionUtils.isNotEmpty(variables)) {
+            final String charset = defaultCharset.toString();
+            Map<String, Object> decoded = new LinkedHashMap<>(variables.size());
+            variables.forEach((k, v) -> {
+                if (v instanceof CharSequence) {
+                    try {
+                        v = URLDecoder.decode(v.toString(), charset);
+                    } catch (UnsupportedEncodingException e) {
+                        // ignore
+                    }
                 }
-            }
-            decoded.put(k, v);
+                decoded.put(k, v);
+            });
+            return decoded;
         }
-        return decoded;
+        return variables;
     }
 
     @Override
     public List<UriMatchVariable> getVariables() {
         return matchInfo.getVariables();
+    }
+
+    @Override
+    public Map<String, UriMatchVariable> getVariableMap() {
+        return matchInfo.getVariableMap();
     }
 
     @Override

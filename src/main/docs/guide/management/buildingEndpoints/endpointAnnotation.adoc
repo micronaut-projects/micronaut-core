@@ -1,4 +1,4 @@
-An Endpoint can be created by annotating a class with the link:{api}/io/micronaut/management/endpoint/Endpoint.html[Endpoint] annotation, and supplying it with (at minimum) an endpoint id.
+An Endpoint can be created by annotating a class with the link:{api}/io/micronaut/management/endpoint/annotation/Endpoint.html[Endpoint] annotation, and supplying it with (at minimum) an endpoint id.
 
 [source,java]
 .FooEndpoint.java
@@ -9,7 +9,7 @@ class FooEndpoint {
 }
 ----
 
-If a single `String` argument is supplied to the annotation, it will be used as the endpoint id.
+If a single `String` argument is supplied to the annotation, it is used as the endpoint id.
 
 It is possible to supply additional (named) arguments to the annotation. Other possible arguments to `@Endpoint` are described in the table below:
 
@@ -25,7 +25,6 @@ It is possible to supply additional (named) arguments to the annotation. Other p
 |Prefix used for configuring the endpoint (see <<endpointConfiguration, Endpoint Configuration>>)
 |`@Endpoint(prefix = "foo")`
 
-
 |`boolean defaultEnabled`
 |Sets whether the endpoint is enabled when no configuration is set (see <<endpointConfiguration, Endpoint Configuration>>)
 |`@Endpoint(defaultEnabled = false)`
@@ -38,14 +37,6 @@ It is possible to supply additional (named) arguments to the annotation. Other p
 
 == Example of custom Endpoint
 
-The following example `Endpoint` class will create an endpoint accessible at `/date`:
+The following example `Endpoint` class creates an endpoint accessible at `/date`:
 
-[source,groovy]
-.CurrentDateEndpoint.groovy
-----
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointImport, indent=0]
-
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointClassBegin, indent=0]
-  //.. endpoint methods
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointClassEnd, indent=0]
-----
+snippet::io.micronaut.docs.server.endpoint.CurrentDateEndpoint[tags="endpointImport, endpointClassBegin, methodSummary, endpointClassEnd", indent=0, title="CurrentDateEndpoint"]

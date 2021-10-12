@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,12 +18,10 @@ package io.micronaut.core.naming;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 
-import javax.annotation.Nonnull;
-import java.util.Arrays;
+import io.micronaut.core.annotation.NonNull;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * <p>Naming convention utilities.</p>
@@ -33,8 +31,8 @@ import java.util.stream.Collectors;
  */
 public class NameUtils {
 
-    private static final int PREFIX_LENTGH = 3;
-    private static final int IS_LENTGH = 2;
+    private static final int PREFIX_LENGTH = 3;
+    private static final int IS_LENGTH = 2;
 
     private static final Pattern DOT_UPPER = Pattern.compile("\\.[A-Z\\$]");
     private static final Pattern SERVICE_ID_REGEX = Pattern.compile("[\\p{javaLowerCase}\\d-]+");
@@ -42,7 +40,7 @@ public class NameUtils {
     private static final String PREFIX_SET = "set";
     private static final Pattern ENVIRONMENT_VAR_SEQUENCE = Pattern.compile("^[\\p{Lu}_{0-9}]+");
     private static final Pattern KEBAB_CASE_SEQUENCE = Pattern.compile("^(([a-z0-9])+(\\-|\\.|:)?)*([a-z0-9])+$");
-
+    private static final Pattern KEBAB_REPLACEMENTS = Pattern.compile("[_ ]");
 
     /**
      * Checks whether the given name is a valid service identifier.
@@ -120,10 +118,10 @@ public class NameUtils {
      */
     public static String hyphenate(String name, boolean lowerCase) {
         if (isHyphenatedLowerCase(name)) {
-            return name.replace('_', '-');
+            return KEBAB_REPLACEMENTS.matcher(name).replaceAll("-");
         } else {
             char separatorChar = '-';
-            return separateCamelCase(name.replace('_', '-'), lowerCase, separatorChar);
+            return separateCamelCase(KEBAB_REPLACEMENTS.matcher(name).replaceAll("-"), lowerCase, separatorChar);
         }
     }
 
@@ -134,14 +132,16 @@ public class NameUtils {
      * @return The camel case form
      */
     public static String dehyphenate(String name) {
-        return Arrays.stream(name.split("-"))
-            .map((str) -> {
-                if (str.length() > 0 && Character.isLetter(str.charAt(0))) {
-                    return Character.toUpperCase(str.charAt(0)) + str.substring(1);
-                }
-                return str;
-            })
-            .collect(Collectors.joining(""));
+        StringBuilder sb = new StringBuilder(name.length());
+        for (String token : StringUtils.splitOmitEmptyStrings(name, '-')) {
+            if (token.length() > 0 && Character.isLetter(token.charAt(0))) {
+                sb.append(Character.toUpperCase(token.charAt(0)));
+                sb.append(token.substring(1));
+            } else {
+                sb.append(token);
+            }
+        }
+        return sb.toString();
     }
 
     /**
@@ -203,8 +203,8 @@ public class NameUtils {
      */
     public static boolean isSetterName(String methodName) {
         int len = methodName.length();
-        if (len > PREFIX_LENTGH && methodName.startsWith(PREFIX_SET)) {
-            return Character.isUpperCase(methodName.charAt(PREFIX_LENTGH));
+        if (len > PREFIX_LENGTH && methodName.startsWith(PREFIX_SET)) {
+            return Character.isUpperCase(methodName.charAt(PREFIX_LENGTH));
         }
         return false;
     }
@@ -217,7 +217,7 @@ public class NameUtils {
      */
     public static String getPropertyNameForSetter(String setterName) {
         if (isSetterName(setterName)) {
-            return decapitalize(setterName.substring(PREFIX_LENTGH));
+            return decapitalize(setterName.substring(PREFIX_LENGTH));
         }
         return setterName;
     }
@@ -228,7 +228,7 @@ public class NameUtils {
      * @param propertyName The property name
      * @return The setter name
      */
-    public static @Nonnull String setterNameFor(@Nonnull String propertyName) {
+    public static @NonNull String setterNameFor(@NonNull String propertyName) {
         ArgumentUtils.requireNonNull("propertyName", propertyName);
         return nameFor(PREFIX_SET, propertyName);
     }
@@ -240,15 +240,15 @@ public class NameUtils {
      * @return True if it is a valid getter name
      */
     public static boolean isGetterName(String methodName) {
-        int len = methodName.length();
         int prefixLength = 0;
         if (methodName.startsWith(PREFIX_GET)) {
-            prefixLength = PREFIX_LENTGH;
+            prefixLength = PREFIX_LENGTH;
         } else if (methodName.startsWith("is")) {
-            prefixLength = IS_LENTGH;
+            prefixLength = IS_LENGTH;
         } else {
             return false;
         }
+        int len = methodName.length();
         if (len > prefixLength) {
             return Character.isUpperCase(methodName.charAt(prefixLength));
         }
@@ -265,10 +265,10 @@ public class NameUtils {
         if (isGetterName(getterName)) {
             int prefixLength = 0;
             if (getterName.startsWith(PREFIX_GET)) {
-                prefixLength = PREFIX_LENTGH;
+                prefixLength = PREFIX_LENGTH;
             }
             if (getterName.startsWith("is")) {
-                prefixLength = IS_LENTGH;
+                prefixLength = IS_LENGTH;
             }
             return decapitalize(getterName.substring(prefixLength));
         }
@@ -281,7 +281,7 @@ public class NameUtils {
      * @param propertyName The property name
      * @return The getter name
      */
-    public static @Nonnull String getterNameFor(@Nonnull String propertyName) {
+    public static @NonNull String getterNameFor(@NonNull String propertyName) {
         ArgumentUtils.requireNonNull("propertyName", propertyName);
         return nameFor(PREFIX_GET, propertyName);
     }
@@ -293,7 +293,7 @@ public class NameUtils {
      * @param type The type of the property
      * @return The getter name
      */
-    public static @Nonnull String getterNameFor(@Nonnull String propertyName, @Nonnull Class<?> type) {
+    public static @NonNull String getterNameFor(@NonNull String propertyName, @NonNull Class<?> type) {
         ArgumentUtils.requireNonNull("propertyName", propertyName);
         final boolean isBoolean = type == boolean.class;
         return getterNameFor(propertyName, isBoolean);
@@ -306,11 +306,11 @@ public class NameUtils {
      * @param isBoolean Is the property a boolean
      * @return The getter name
      */
-    public static String getterNameFor(@Nonnull String propertyName, boolean isBoolean) {
+    public static String getterNameFor(@NonNull String propertyName, boolean isBoolean) {
         return nameFor(isBoolean ? "is" : PREFIX_GET, propertyName);
     }
 
-    private static String nameFor(String prefix, @Nonnull String propertyName) {
+    private static String nameFor(String prefix, @NonNull String propertyName) {
         final int len = propertyName.length();
         switch (len) {
             case 0:
@@ -334,22 +334,34 @@ public class NameUtils {
      * @return The decapitalized version of the String
      */
     public static String decapitalize(String name) {
-
         if (name == null) {
             return null;
         }
-
-        // The rule for decapitalize is that:
-        // If the first letter of the string is Upper Case, make it lower case
-        // UNLESS the second letter of the string is also Upper Case, in which case no
-        // changes are made.
-        if (name.length() == 0 || (name.length() > 1 && Character.isUpperCase(name.charAt(1)))) {
+        int length = name.length();
+        if (length == 0) {
             return name;
         }
+        // Decapitalizes the first character if a lower case
+        // letter is found within 2 characters after the first
+        // Abc -> abc
+        // AB  -> AB
+        // ABC -> ABC
+        // ABc -> aBc
+        boolean firstUpper = Character.isUpperCase(name.charAt(0));
+        if (firstUpper) {
+            if (length == 1) {
+                return Character.toString(Character.toLowerCase(name.charAt(0)));
+            }
+            for (int i = 1; i < Math.min(length, 3); i++) {
+                if (Character.isLowerCase(name.charAt(i))) {
+                    char[] chars = name.toCharArray();
+                    chars[0] = Character.toLowerCase(chars[0]);
+                    return new String(chars);
+                }
+            }
+        }
 
-        char[] chars = name.toCharArray();
-        chars[0] = Character.toLowerCase(chars[0]);
-        return new String(chars);
+        return name;
     }
 
     private static String separateCamelCase(String name, boolean lowerCase, char separatorChar) {
@@ -387,7 +399,9 @@ public class NameUtils {
             char[] chars = name.toCharArray();
             boolean first = true;
             char last = '0';
-            for (char c : chars) {
+            char secondLast = separatorChar;
+            for (int i = 0; i < chars.length; i++) {
+                char c = chars[i];
                 if (Character.isLowerCase(c) || !Character.isLetter(c)) {
                     first = false;
                     if (c != separatorChar) {
@@ -401,11 +415,16 @@ public class NameUtils {
                     if (first) {
                         first = false;
                         newName.append(lowerCaseChar);
-                    } else if (Character.isUpperCase(last) || Character.isDigit(last) || last == '.') {
+                    } else if (Character.isUpperCase(last) || last == '.') {
+                        newName.append(lowerCaseChar);
+                    } else if (Character.isDigit(last) && (Character.isUpperCase(secondLast) || secondLast == separatorChar)) {
                         newName.append(lowerCaseChar);
                     } else {
                         newName.append(separatorChar).append(lowerCaseChar);
                     }
+                }
+                if (i > 1) {
+                    secondLast = last;
                 }
                 last = c;
             }
@@ -452,7 +471,12 @@ public class NameUtils {
      * @return The new string in camel case
      */
     public static String camelCase(String str, boolean lowerCaseFirstLetter) {
-        String result = Arrays.stream(str.split("[\\s_-]")).map(NameUtils::capitalize).collect(Collectors.joining(""));
+        StringBuilder sb = new StringBuilder(str.length());
+        for (String s : str.split("[\\s_-]")) {
+            String capitalize = capitalize(s);
+            sb.append(capitalize);
+        }
+        String result = sb.toString();
         if (lowerCaseFirstLetter) {
             return decapitalize(result);
         }

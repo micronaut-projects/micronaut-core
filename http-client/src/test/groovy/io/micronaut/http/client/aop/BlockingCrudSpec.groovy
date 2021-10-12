@@ -15,22 +15,22 @@
  */
 package io.micronaut.http.client.aop
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
-import io.micronaut.context.ApplicationContext
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Delete
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Patch
-import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.retry.annotation.Retryable
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
-import io.reactivex.Single
 import spock.lang.AutoCleanup
+import spock.lang.Issue
 import spock.lang.Shared
 import spock.lang.Specification
 
+import java.lang.annotation.ElementType
+import java.lang.annotation.Retention
+import java.lang.annotation.RetentionPolicy
+import java.lang.annotation.Target
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -179,6 +179,15 @@ class BlockingCrudSpec extends Specification {
         noExceptionThrown()
     }
 
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2959')
+    void "test annotation stereotype"() {
+        given:
+        def client = context.getBean(StereotypeClient)
+
+        expect:
+        client.list().size() == 0
+    }
+
     @Client('/blocking/books')
     static interface BookClient extends BookApi {
     }
@@ -276,4 +285,17 @@ class BlockingCrudSpec extends Specification {
         void call()
     }
 
+
+    @BookRetryClient
+    static interface StereotypeClient extends BookApi {
+    }
+
+
+}
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+@Client("/blocking/books")
+@Retryable
+@interface BookRetryClient {
+    // ...
 }

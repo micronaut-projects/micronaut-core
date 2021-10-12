@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,21 +16,23 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.context.annotation.*;
-import io.micronaut.core.annotation.AnnotationClassValue;
-import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.annotation.*;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.StringUtils;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
-import javax.inject.*;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
+import jakarta.inject.Qualifier;
+import jakarta.inject.Scope;
+import jakarta.inject.Singleton;
+
+import javax.validation.constraints.NotNull;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationHandler;
@@ -48,9 +50,10 @@ import java.util.function.Function;
  * @since 1.0
  */
 @Internal
-class AnnotationMetadataSupport {
+public final class AnnotationMetadataSupport {
 
     private static final Map<String, Map<String, Object>> ANNOTATION_DEFAULTS = new ConcurrentHashMap<>(20);
+    private static final Map<String, String> REPEATABLE_ANNOTATIONS = new ConcurrentHashMap<>(20);
 
     private static final Map<Class<? extends Annotation>, Optional<Constructor<InvocationHandler>>> ANNOTATION_PROXY_CACHE = new ConcurrentHashMap<>(20);
     private static final Map<String, Class<? extends Annotation>> ANNOTATION_TYPES = new ConcurrentHashMap<>(20);
@@ -59,7 +62,7 @@ class AnnotationMetadataSupport {
         // some common ones for startup optimization
         Arrays.asList(
                 Nullable.class,
-                Nonnull.class,
+                NonNull.class,
                 PreDestroy.class,
                 PostConstruct.class,
                 Named.class,
@@ -90,14 +93,41 @@ class AnnotationMetadataSupport {
                 Factory.class).forEach(ann ->
                 ANNOTATION_TYPES.put(ann.getName(), ann)
         );
+
+        for (Map.Entry<Class<? extends Annotation>, Class<? extends Annotation>> e : getCoreRepeatableAnnotations()) {
+            REPEATABLE_ANNOTATIONS.put(e.getKey().getName(), e.getValue().getName());
+        }
+    }
+
+    /**
+     * @return core repeatable annotations
+     */
+    @Internal
+    public static List<Map.Entry<Class<? extends Annotation>, Class<? extends Annotation>>> getCoreRepeatableAnnotations() {
+        return Arrays.asList(
+                new AbstractMap.SimpleEntry<>(Indexed.class, Indexes.class),
+                new AbstractMap.SimpleEntry<>(Requires.class, Requirements.class),
+                new AbstractMap.SimpleEntry<>(AliasFor.class, Aliases.class),
+                new AbstractMap.SimpleEntry<>(Property.class, PropertySource.class)
+        );
     }
 
     /**
      * @param annotation The annotation
      * @return The default values for the annotation
      */
-    static Map<String, Object> getDefaultValues(String annotation) {
-        return ANNOTATION_DEFAULTS.computeIfAbsent(annotation, s -> Collections.emptyMap());
+    @UsedByGeneratedCode
+    public static Map<String, Object> getDefaultValues(String annotation) {
+        return ANNOTATION_DEFAULTS.getOrDefault(annotation, Collections.emptyMap());
+    }
+
+    /**
+     * @param annotation The annotation
+     * @return The repeatable annotation container.
+     */
+    @Internal
+    public static String getRepeatableAnnotation(String annotation) {
+        return REPEATABLE_ANNOTATIONS.get(annotation);
     }
 
     /**
@@ -107,12 +137,23 @@ class AnnotationMetadataSupport {
      * @return The annotation
      */
     static Optional<Class<? extends Annotation>> getAnnotationType(String name) {
+        return getAnnotationType(name, AnnotationMetadataSupport.class.getClassLoader());
+    }
+
+    /**
+     * Gets a registered annotation type.
+     *
+     * @param name        The name of the annotation type
+     * @param classLoader The classloader to retrieve the type
+     * @return The annotation
+     */
+    static Optional<Class<? extends Annotation>> getAnnotationType(String name, ClassLoader classLoader) {
         final Class<? extends Annotation> type = ANNOTATION_TYPES.get(name);
         if (type != null) {
             return Optional.of(type);
         } else {
             // last resort, try dynamic load, shouldn't normally happen.
-            final Optional<Class> aClass = ClassUtils.forName(name, AnnotationMetadataSupport.class.getClassLoader());
+            final Optional<Class> aClass = ClassUtils.forName(name, classLoader);
             return aClass.flatMap((Function<Class, Optional<Class<? extends Annotation>>>) aClass1 -> {
                 if (Annotation.class.isAssignableFrom(aClass1)) {
                     //noinspection unchecked
@@ -160,7 +201,7 @@ class AnnotationMetadataSupport {
     /**
      * Registers default values for the given annotation and values.
      *
-     * @param annotation The annotation
+     * @param annotation    The annotation
      * @param defaultValues The default values
      */
     static void registerDefaultValues(String annotation, Map<String, Object> defaultValues) {
@@ -172,7 +213,7 @@ class AnnotationMetadataSupport {
     /**
      * Registers default values for the given annotation and values.
      *
-     * @param annotation The annotation
+     * @param annotation    The annotation
      * @param defaultValues The default values
      */
     static void registerDefaultValues(AnnotationClassValue<?> annotation, Map<String, Object> defaultValues) {
@@ -181,7 +222,6 @@ class AnnotationMetadataSupport {
         }
         registerAnnotationType(annotation);
     }
-
 
     /**
      * Registers a annotation type.
@@ -201,40 +241,56 @@ class AnnotationMetadataSupport {
     }
 
     /**
+     * Registers repeatable annotations.
+     *
+     * @param repeatableAnnotations the repeatable annotations
+     */
+    @Internal
+    static void registerRepeatableAnnotations(Map<String, String> repeatableAnnotations) {
+        REPEATABLE_ANNOTATIONS.putAll(repeatableAnnotations);
+    }
+
+    /**
+     * Remove Core repeatable annotations.
+     *
+     * @param repeatableAnnotations the repeatable annotations
+     */
+    @Internal
+    static void removeCoreRepeatableAnnotations(@NotNull Map<String, String> repeatableAnnotations) {
+        for (Map.Entry<Class<? extends Annotation>, Class<? extends Annotation>> e : getCoreRepeatableAnnotations()) {
+            repeatableAnnotations.remove(e.getKey().getName());
+        }
+    }
+
+    /**
      * @param annotation The annotation
      * @return The proxy class
      */
     @SuppressWarnings("unchecked")
     static Optional<Constructor<InvocationHandler>> getProxyClass(Class<? extends Annotation> annotation) {
         return ANNOTATION_PROXY_CACHE.computeIfAbsent(annotation, aClass -> {
-            Class proxyClass = Proxy.getProxyClass(annotation.getClassLoader(), annotation);
+            Class proxyClass = Proxy.getProxyClass(annotation.getClassLoader(), annotation, AnnotationValueProvider.class);
             return ReflectionUtils.findConstructor(proxyClass, InvocationHandler.class);
         });
     }
 
     /**
-     * @param annotationClass  The annotation class
-     * @param annotationValues The annotation values
-     * @param <T>              The type
+     * @param annotationClass The annotation class
+     * @param annotationValue The annotation value
+     * @param <T>             The type
      * @return The annotation
      */
-    static <T extends Annotation> T buildAnnotation(Class<T> annotationClass, ConvertibleValues<Object> annotationValues) {
+    static <T extends Annotation> T buildAnnotation(Class<T> annotationClass, @Nullable AnnotationValue<T> annotationValue) {
         Optional<Constructor<InvocationHandler>> proxyClass = getProxyClass(annotationClass);
         if (proxyClass.isPresent()) {
-            Method[] declaredMethods = annotationClass.getDeclaredMethods();
-            Map<CharSequence, Object> resolvedValues = new LinkedHashMap<>(declaredMethods.length);
-            for (Method declaredMethod : declaredMethods) {
-                String name = declaredMethod.getName();
-                if (annotationValues.contains(name)) {
-                    Optional<?> converted = annotationValues.get(name, declaredMethod.getReturnType());
-                    converted.ifPresent(o -> resolvedValues.put(name, o));
-                }
-            }
             Map<String, Object> values = new HashMap<>(getDefaultValues(annotationClass));
-            values.putAll(annotationValues.asMap());
+            if (annotationValue != null) {
+                final Map<CharSequence, Object> annotationValues = annotationValue.getValues();
+                annotationValues.forEach((key, o) -> values.put(key.toString(), o));
+            }
             int hashCode = AnnotationUtil.calculateHashCode(values);
 
-            Optional instantiated = InstantiationUtils.tryInstantiate(proxyClass.get(), (InvocationHandler) new AnnotationProxyHandler(hashCode, annotationClass, resolvedValues));
+            Optional instantiated = InstantiationUtils.tryInstantiate(proxyClass.get(), (InvocationHandler) new AnnotationProxyHandler(hashCode, annotationClass, annotationValue));
             if (instantiated.isPresent()) {
                 return (T) instantiated.get();
             }
@@ -244,21 +300,18 @@ class AnnotationMetadataSupport {
 
     /**
      * Annotation proxy handler.
+     *
+     * @param <A> The annotation type
      */
-    private static class AnnotationProxyHandler implements InvocationHandler {
+    private static class AnnotationProxyHandler<A extends Annotation> implements InvocationHandler, AnnotationValueProvider<A> {
         private final int hashCode;
-        private final Class<?> annotationClass;
+        private final Class<A> annotationClass;
+        private final AnnotationValue<A> annotationValue;
 
-        private final Map<CharSequence, Object> resolvedValues;
-
-        AnnotationProxyHandler(int hashCode, Class<?> annotationClass, Map<CharSequence, Object> resolvedValues) {
+        AnnotationProxyHandler(int hashCode, Class<A> annotationClass, @Nullable AnnotationValue<A> annotationValue) {
             this.hashCode = hashCode;
             this.annotationClass = annotationClass;
-            this.resolvedValues = resolvedValues;
-        }
-
-        public Map<CharSequence, Object> getValues() {
-            return resolvedValues;
+            this.annotationValue = annotationValue;
         }
 
         @Override
@@ -280,30 +333,22 @@ class AnnotationMetadataSupport {
 
             Annotation other = (Annotation) annotationClass.cast(obj);
 
-            Map<CharSequence, Object> otherValues = getAnnotationValues(other);
+            final AnnotationValue<?> otherValues = getAnnotationValues(other);
 
-            if (resolvedValues.size() != otherValues.size()) {
+            if (this.annotationValue == null && otherValues == null) {
+                return true;
+            } else if (this.annotationValue == null || otherValues == null) {
                 return false;
+            } else {
+                return annotationValue.equals(otherValues);
             }
-
-            // compare annotation member values
-            for (Map.Entry<CharSequence, Object> member : resolvedValues.entrySet()) {
-                Object value = member.getValue();
-                Object otherValue = otherValues.get(member.getKey());
-
-                if (!AnnotationUtil.areEqual(value, otherValue)) {
-                    return false;
-                }
-            }
-
-            return true;
         }
 
-        private Map<CharSequence, Object> getAnnotationValues(Annotation other) {
+        private AnnotationValue<?> getAnnotationValues(Annotation other) {
             if (other instanceof AnnotationProxyHandler) {
-                return ((AnnotationProxyHandler) other).resolvedValues;
+                return ((AnnotationProxyHandler) other).annotationValue;
             }
-            return Collections.emptyMap();
+            return null;
         }
 
         @Override
@@ -315,10 +360,22 @@ class AnnotationMetadataSupport {
                 return equals(args[0]);
             } else if ("annotationType".equals(name)) {
                 return annotationClass;
-            } else if (resolvedValues.containsKey(name)) {
-                return resolvedValues.get(name);
+            } else if (method.getReturnType() == AnnotationValue.class) {
+                return annotationValue;
+            } else if (annotationValue != null && annotationValue.contains(name)) {
+                return annotationValue.getRequiredValue(name, method.getReturnType());
             }
             return method.getDefaultValue();
+        }
+
+        @NonNull
+        @Override
+        public AnnotationValue<A> annotationValue() {
+            if (annotationValue != null) {
+                return this.annotationValue;
+            } else {
+                return new AnnotationValue<A>(annotationClass.getName());
+            }
         }
     }
 }

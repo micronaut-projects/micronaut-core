@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,16 +18,16 @@ package io.micronaut.validation.validator.extractors;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.beans.BeanWrapper;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import javax.validation.valueextraction.UnwrapByDefault;
 import javax.validation.valueextraction.ValueExtractor;
 import java.util.*;
@@ -296,9 +296,9 @@ public class DefaultValueExtractors implements ValueExtractorRegistry {
     }
 
     @SuppressWarnings("unchecked")
-    @Nonnull
+    @NonNull
     @Override
-    public <T> Optional<ValueExtractor<T>> findValueExtractor(@Nonnull Class<T> targetType) {
+    public <T> Optional<ValueExtractor<T>> findValueExtractor(@NonNull Class<T> targetType) {
         final ValueExtractor valueExtractor = valueExtractors.get(targetType);
         if (valueExtractor != null) {
             return Optional.of(valueExtractor);
@@ -311,9 +311,9 @@ public class DefaultValueExtractors implements ValueExtractorRegistry {
     }
 
     @SuppressWarnings("unchecked")
-    @Nonnull
+    @NonNull
     @Override
-    public <T> Optional<ValueExtractor<T>> findUnwrapValueExtractor(@Nonnull Class<T> targetType) {
+    public <T> Optional<ValueExtractor<T>> findUnwrapValueExtractor(@NonNull Class<T> targetType) {
         if (unwrapByDefaultTypes.contains(targetType)) {
             return Optional.ofNullable(valueExtractors.get(targetType));
         }

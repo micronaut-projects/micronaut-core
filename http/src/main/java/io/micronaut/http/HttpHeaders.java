@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,20 +15,16 @@
  */
 package io.micronaut.http;
 
-import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.type.Headers;
+import io.micronaut.core.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
-import java.util.OptionalLong;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.*;
 
 /**
  * Constants for common HTTP headers. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html.
@@ -42,6 +38,16 @@ public interface HttpHeaders extends Headers {
      * {@code "Accept"}.
      */
     String ACCEPT = "Accept";
+
+    /**
+     * {@code "Accept-CH"}.
+     */
+    String ACCEPT_CH = "Accept-CH";
+
+    /**
+     * {@code "Accept-CH"}.
+     */
+    String ACCEPT_CH_LIFETIME = "Accept-CH-Lifetime";
 
     /**
      * {@code "Accept-Charset"}.
@@ -149,6 +155,11 @@ public interface HttpHeaders extends Headers {
     String CONTENT_DISPOSITION = "Content-Disposition";
 
     /**
+     * {@code "Content-DPR"}.
+     */
+    String CONTENT_DPR = "Content-DPR";
+
+    /**
      * {@code "Content-Encoding"}.
      */
     String CONTENT_ENCODING = "Content-Encoding";
@@ -194,9 +205,34 @@ public interface HttpHeaders extends Headers {
     String COOKIE = "Cookie";
 
     /**
+     * {@code "Cross-Origin-Resource-Policy"}.
+     */
+    String CROSS_ORIGIN_RESOURCE_POLICY = "Cross-Origin-Resource-Policy";
+
+    /**
      * {@code "Date"}.
      */
     String DATE = "Date";
+
+    /**
+     * {@code "Device-Memory"}.
+     */
+    String DEVICE_MEMORY = "Device-Memory";
+
+    /**
+     * {@code "Downlink"}.
+     */
+    String DOWNLINK = "Downlink";
+
+    /**
+     * {@code "DPR"}.
+     */
+    String DPR = "DPR";
+
+    /**
+     * {@code "ECT"}.
+     */
+    String ECT = "ECT";
 
     /**
      * {@code "ETag"}.
@@ -212,6 +248,11 @@ public interface HttpHeaders extends Headers {
      * {@code "Expires"}.
      */
     String EXPIRES = "Expires";
+
+    /**
+     * {@code "Feature-Policy"}.
+     */
+    String FEATURE_POLICY = "Feature-Policy";
 
     /**
      * {@code "Forwarded"}.
@@ -259,6 +300,11 @@ public interface HttpHeaders extends Headers {
     String LAST_MODIFIED = "Last-Modified";
 
     /**
+     * {@code "Link"}.
+     */
+    String LINK = "Link";
+
+    /**
      * {@code "Location"}.
      */
     String LOCATION = "Location";
@@ -299,9 +345,24 @@ public interface HttpHeaders extends Headers {
     String REFERER = "Referer";
 
     /**
+     * {@code "Referrer-Policy"}.
+     */
+    String REFERRER_POLICY = "Referrer-Policy";
+
+    /**
      * {@code "Retry-After"}.
      */
     String RETRY_AFTER = "Retry-After";
+
+    /**
+     * {@code "RTT"}.
+     */
+    String RTT = "RTT";
+
+    /**
+     * {@code "Save-Data"}.
+     */
+    String SAVE_DATA = "Save-Data";
 
     /**
      * {@code "Sec-WebSocket-Key1"}.
@@ -359,6 +420,11 @@ public interface HttpHeaders extends Headers {
     String SET_COOKIE2 = "Set-Cookie2";
 
     /**
+     * {@code "Source-Map"}.
+     */
+    String SOURCE_MAP = "SourceMap";
+
+    /**
      * {@code "TE"}.
      */
     String TE = "TE";
@@ -394,6 +460,11 @@ public interface HttpHeaders extends Headers {
     String VIA = "Via";
 
     /**
+     * {@code "Viewport-Width"}.
+     */
+    String VIEWPORT_WIDTH = "Viewport-Width";
+
+    /**
      * {@code "Warning"}.
      */
     String WARNING = "Warning";
@@ -414,6 +485,11 @@ public interface HttpHeaders extends Headers {
     String WEBSOCKET_PROTOCOL = "WebSocket-Protocol";
 
     /**
+     * {@code "Width"}.
+     */
+    String WIDTH = "Width";
+
+    /**
      * {@code "WWW-Authenticate"}.
      */
     String WWW_AUTHENTICATE = "WWW-Authenticate";
@@ -432,7 +508,7 @@ public interface HttpHeaders extends Headers {
      */
     default Optional<ZonedDateTime> findDate(CharSequence name) {
         try {
-            return findFirst(name).map((str) -> {
+            return findFirst(name).map(str -> {
                     LocalDateTime localDateTime = LocalDateTime.parse(str, DateTimeFormatter.RFC_1123_DATE_TIME);
                     return ZonedDateTime.of(localDateTime, ZoneId.of("GMT"));
                 }
@@ -470,7 +546,7 @@ public interface HttpHeaders extends Headers {
      * @return An {@link Optional} of {@link Integer}
      */
     default Optional<Integer> findInt(CharSequence name) {
-        return get(name, Integer.class);
+        return get(name, ConversionContext.INT);
     }
 
     /**
@@ -480,7 +556,7 @@ public interface HttpHeaders extends Headers {
      * @return The first value or null if it is present
      */
     default Optional<String> findFirst(CharSequence name) {
-        return getFirst(name, String.class);
+        return getFirst(name, ConversionContext.STRING);
     }
 
     /**
@@ -489,7 +565,7 @@ public interface HttpHeaders extends Headers {
      * @return The content type
      */
     default Optional<MediaType> contentType() {
-        return getFirst(HttpHeaders.CONTENT_TYPE, MediaType.class);
+        return getFirst(HttpHeaders.CONTENT_TYPE, MediaType.CONVERSION_CONTEXT);
     }
 
     /**
@@ -498,8 +574,12 @@ public interface HttpHeaders extends Headers {
      * @return The content type
      */
     default OptionalLong contentLength() {
-        Optional<Long> optional = getFirst(HttpHeaders.CONTENT_LENGTH, Long.class);
-        return optional.map(OptionalLong::of).orElseGet(OptionalLong::empty);
+        final Long aLong = getFirst(HttpHeaders.CONTENT_LENGTH, ConversionContext.LONG).orElse(null);
+        if (aLong != null) {
+            return OptionalLong.of(aLong);
+        } else {
+            return OptionalLong.empty();
+        }
     }
 
     /**
@@ -508,19 +588,30 @@ public interface HttpHeaders extends Headers {
      * @return A list of zero or many {@link MediaType} instances
      */
     default List<MediaType> accept() {
-        return getAll(HttpHeaders.ACCEPT)
-            .stream()
-            .flatMap(x -> Arrays.stream(x.split(",")))
-            .flatMap(s -> ConversionService.SHARED.convert(s, MediaType.class).map(Stream::of).orElse(Stream.empty()))
-            .distinct()
-            .collect(Collectors.toList());
+        final List<String> values = getAll(HttpHeaders.ACCEPT);
+        if (!values.isEmpty()) {
+            List<MediaType> mediaTypes = new ArrayList<>(10);
+            for (String value : values) {
+                for (String token : StringUtils.splitOmitEmptyStrings(value, ',')) {
+                    try {
+                        mediaTypes.add(MediaType.of(token));
+                    } catch (IllegalArgumentException e) {
+                        // ignore
+                    }
+                }
+            }
+            return mediaTypes;
+        } else {
+            return Collections.emptyList();
+        }
     }
 
     /**
      * @return Whether the {@link HttpHeaders#CONNECTION} header is set to Keep-Alive
      */
     default boolean isKeepAlive() {
-        return getFirst(CONNECTION, String.class).map(val -> val.equalsIgnoreCase("keep-alive")).orElse(false);
+        return getFirst(CONNECTION, ConversionContext.STRING)
+                 .map(val -> val.equalsIgnoreCase(HttpHeaderValues.CONNECTION_KEEP_ALIVE)).orElse(false);
     }
 
     /**

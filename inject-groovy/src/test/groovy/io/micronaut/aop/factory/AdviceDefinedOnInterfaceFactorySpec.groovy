@@ -121,12 +121,6 @@ class AdviceDefinedOnInterfaceFactorySpec extends Specification {
         given:
         BeanContext beanContext = new DefaultBeanContext().start()
 
-        when: "the bean definition is obtained"
-        BeanDefinition<InterfaceClass> beanDefinition = beanContext.findBeanDefinition(InterfaceClass).get()
-
-        then:
-        beanDefinition.findMethod("test", String).isPresent()
-
         when:
         InterfaceClass foo = beanContext.getBean(InterfaceClass)
         InterfaceClass another = beanContext.getBean(InterfaceClass, Qualifiers.byName("another"))
@@ -134,7 +128,6 @@ class AdviceDefinedOnInterfaceFactorySpec extends Specification {
         then:
         foo instanceof Intercepted
         another instanceof Intercepted
-        beanContext.findExecutableMethod(InterfaceClass, "test", String).isPresent()
         // should not be a reflection based method
         foo.test("test") == "Name is changed"
 

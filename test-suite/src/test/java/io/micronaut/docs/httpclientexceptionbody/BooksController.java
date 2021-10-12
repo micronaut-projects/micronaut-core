@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -36,10 +36,10 @@ public class BooksController {
             m.put("status", 401);
             m.put("error", "Unauthorized");
             m.put("message", "No message available");
-            m.put("path", "/books/"+isbn);
+            m.put("path", "/books/" + isbn);
             return HttpResponse.status(HttpStatus.UNAUTHORIZED).body(m);
-
         }
+
         return HttpResponse.ok(new Book("1491950358", "Building Microservices"));
     }
 }

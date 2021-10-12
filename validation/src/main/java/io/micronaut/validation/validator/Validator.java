@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,14 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.validation.validator;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanIntrospection;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import javax.validation.Constraint;
 import javax.validation.ConstraintViolation;
+import javax.validation.Valid;
 import java.util.Set;
 
 /**
@@ -34,15 +35,24 @@ import java.util.Set;
 public interface Validator extends javax.validation.Validator {
 
     /**
+     * Annotation used to define an object as valid.
+     */
+    String ANN_VALID = Valid.class.getName();
+    /**
+     * Annotation used to define a constraint.
+     */
+    String ANN_CONSTRAINT = Constraint.class.getName();
+
+    /**
      * Overridden variation that returns a {@link ExecutableMethodValidator}.
      * @return The validator
      */
     @Override
-    @Nonnull ExecutableMethodValidator forExecutables();
+    @NonNull ExecutableMethodValidator forExecutables();
 
     @Override
-    @Nonnull <T> Set<ConstraintViolation<T>> validate(
-            @Nonnull T object,
+    @NonNull <T> Set<ConstraintViolation<T>> validate(
+            @NonNull T object,
             Class<?>... groups
     );
 
@@ -54,22 +64,22 @@ public interface Validator extends javax.validation.Validator {
      * @param <T> The object type
      * @return The constraint violations
      */
-    @Nonnull
+    @NonNull
     <T> Set<ConstraintViolation<T>> validate(
-            @Nonnull BeanIntrospection<T> introspection,
-            @Nonnull T object, @Nullable Class<?>... groups);
+            @NonNull BeanIntrospection<T> introspection,
+            @NonNull T object, @Nullable Class<?>... groups);
 
     @Override
-    @Nonnull <T> Set<ConstraintViolation<T>> validateProperty(
-            @Nonnull T object,
-            @Nonnull String propertyName,
+    @NonNull <T> Set<ConstraintViolation<T>> validateProperty(
+            @NonNull T object,
+            @NonNull String propertyName,
             Class<?>... groups
     );
 
     @Override
-    @Nonnull <T> Set<ConstraintViolation<T>> validateValue(
-            @Nonnull Class<T> beanType,
-            @Nonnull String propertyName,
+    @NonNull <T> Set<ConstraintViolation<T>> validateValue(
+            @NonNull Class<T> beanType,
+            @NonNull String propertyName,
             @Nullable Object value,
             Class<?>... groups
     );
@@ -81,7 +91,7 @@ public interface Validator extends javax.validation.Validator {
      *
      * @return The validator.
      */
-    static @Nonnull Validator getInstance() {
+    static @NonNull Validator getInstance() {
         return new DefaultValidator(
                 new DefaultValidatorConfiguration()
         );

@@ -11,5 +11,4 @@
     <root level="info">
         <appender-ref ref="STDOUT" />
     </root>
-    <logger name="io.micronaut.context.env" level="info"/>
 </configuration>

@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,8 @@
  */
 package io.micronaut.validation.validator.constraints;
 
-import javax.annotation.Nonnull;
+import io.micronaut.core.annotation.NonNull;
+
 import javax.validation.ValidationException;
 import java.lang.annotation.Annotation;
 import java.util.Optional;
@@ -36,10 +37,10 @@ public interface ConstraintValidatorRegistry {
      * @param <T> The target type
      * @return The validator
      */
-    @Nonnull
+    @NonNull
     <A extends Annotation, T> Optional<ConstraintValidator<A, T>> findConstraintValidator(
-            @Nonnull Class<A> constraintType,
-            @Nonnull Class<T> targetType);
+            @NonNull Class<A> constraintType,
+            @NonNull Class<T> targetType);
 
     /**
      * Finds a constraint validator for the given type and target type.
@@ -50,10 +51,10 @@ public interface ConstraintValidatorRegistry {
      * @return The validator
      * @throws ValidationException if no validator is present
      */
-    @Nonnull
+    @NonNull
     default <A extends Annotation, T> ConstraintValidator<A, T> getConstraintValidator(
-            @Nonnull Class<A> constraintType,
-            @Nonnull Class<T> targetType) {
+            @NonNull Class<A> constraintType,
+            @NonNull Class<T> targetType) {
         return findConstraintValidator(constraintType, targetType)
                 .orElseThrow(() -> new ValidationException("No constraint validator present able to validate constraint [" + constraintType + "] on type: " + targetType));
     }

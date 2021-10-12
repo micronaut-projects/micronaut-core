@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,19 +15,19 @@
  */
 package io.micronaut.management.endpoint.annotation;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.management.endpoint.EndpointConfiguration;
 import io.micronaut.management.endpoint.EndpointEnabledCondition;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Defines a management endpoint for a given ID.
@@ -54,6 +54,16 @@ public @interface Endpoint {
     boolean SENSITIVE = true;
 
     /**
+     * The default prefix.
+     */
+    String DEFAULT_PREFIX = "endpoints";
+
+    /**
+     * The ID used to refer to all.
+     */
+    String ALL = "all";
+
+    /**
      * @return The ID of the endpoint
      */
     @AliasFor(annotation = ConfigurationReader.class, member = "value")
@@ -71,7 +81,7 @@ public @interface Endpoint {
      * @return The default prefix to use
      */
     @AliasFor(annotation = ConfigurationReader.class, member = "prefix")
-    String prefix() default "endpoints";
+    String prefix() default DEFAULT_PREFIX;
 
     /**
      * @return If the endpoint is enabled when no configuration is provided
@@ -86,5 +96,5 @@ public @interface Endpoint {
     /**
      * @return The configuration key to look for when no configuration is provided
      */
-    String defaultConfigurationId() default "all";
+    String defaultConfigurationId() default ALL;
 }

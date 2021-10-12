@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,27 +15,27 @@
  */
 package io.micronaut.http.server.netty.types.files;
 
-import io.micronaut.http.HttpRequest;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
+import io.micronaut.http.server.netty.types.stream.NettyStreamedCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFile;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.*;
-import io.netty.handler.stream.ChunkedStream;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValues;
 
 import java.io.InputStream;
 import java.net.URL;
 import java.util.Optional;
 
 /**
- * Writes an {@link InputStream} to the Netty context.
+ * Writes a file backed by an {@link InputStream} to the Netty context.
  *
  * @author James Kleeh
  * @since 1.0
  */
-public class NettyStreamedFileCustomizableResponseType extends StreamedFile implements NettyFileCustomizableResponseType {
+@Internal
+public class NettyStreamedFileCustomizableResponseType extends StreamedFile implements NettyFileCustomizableResponseType, NettyStreamedCustomizableResponseType {
 
     private final Optional<StreamedFile> delegate;
 
@@ -81,20 +81,6 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
         } else {
             response.header(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
         }
-        delegate.ifPresent((type) -> type.process(response));
-    }
-
-    @Override
-    public void write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
-        if (response instanceof NettyMutableHttpResponse) {
-            FullHttpResponse nettyResponse = ((NettyMutableHttpResponse) response).getNativeResponse();
-
-            // Write the request data
-            context.write(new DefaultHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), nettyResponse.headers()), context.voidPromise());
-            context.writeAndFlush(new HttpChunkedInput(new ChunkedStream(getInputStream())));
-
-        } else {
-            throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + response);
-        }
+        delegate.ifPresent(type -> type.process(response));
     }
 }

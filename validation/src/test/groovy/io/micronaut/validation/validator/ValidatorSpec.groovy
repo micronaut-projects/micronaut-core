@@ -5,23 +5,17 @@ import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.validation.validator.resolver.CompositeTraversableResolver
+import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
+import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
-import spock.lang.Unroll
 
-import javax.inject.Singleton
-import javax.validation.ConstraintViolation
 import javax.validation.ElementKind
 import javax.validation.Valid
 import javax.validation.ValidatorFactory
-import javax.validation.constraints.Max
-import javax.validation.constraints.Min
-import javax.validation.constraints.NotBlank
-import javax.validation.constraints.NotNull
-import javax.validation.constraints.Size
+import javax.validation.constraints.*
 import javax.validation.metadata.BeanDescriptor
-import javax.validation.metadata.ConstraintDescriptor
 
 class ValidatorSpec extends Specification {
 
@@ -50,15 +44,26 @@ class ValidatorSpec extends Specification {
         violations.size() == 4
         violations[0].invalidValue == []
         violations[0].messageTemplate == '{javax.validation.constraints.Size.message}'
+        violations[0].constraintDescriptor != null
+        violations[0].constraintDescriptor.annotation instanceof Size
+        violations[0].constraintDescriptor.annotation.min() == 1
+        violations[0].constraintDescriptor.annotation.max() == 10
         violations[1].invalidValue == 50
         violations[1].propertyPath.iterator().next().name == 'pages'
         violations[1].rootBean == b
         violations[1].rootBeanClass == Book
         violations[1].messageTemplate == '{javax.validation.constraints.Min.message}'
+        violations[1].constraintDescriptor != null
+        violations[1].constraintDescriptor.annotation instanceof Min
+        violations[1].constraintDescriptor.annotation.value() == 100l
         violations[2].invalidValue == null
         violations[2].propertyPath.iterator().next().name == 'primaryAuthor'
+        violations[2].constraintDescriptor != null
+        violations[2].constraintDescriptor.annotation instanceof NotNull
         violations[3].invalidValue == ''
         violations[3].propertyPath.iterator().next().name == 'title'
+        violations[3].constraintDescriptor != null
+        violations[3].constraintDescriptor.annotation instanceof NotBlank
 
     }
 
@@ -72,6 +77,8 @@ class ValidatorSpec extends Specification {
         violations.size() == 1
         violations[0].invalidValue == ''
         violations[0].propertyPath.iterator().next().name == 'title'
+        violations[0].constraintDescriptor != null
+        violations[0].constraintDescriptor.annotation instanceof NotBlank
 
     }
 
@@ -83,6 +90,8 @@ class ValidatorSpec extends Specification {
         violations.size() == 1
         violations[0].invalidValue == ''
         violations[0].propertyPath.iterator().next().name == 'title'
+        violations[0].constraintDescriptor != null
+        violations[0].constraintDescriptor.annotation instanceof NotBlank
     }
 
     void "test cascade to bean"() {
@@ -99,8 +108,13 @@ class ValidatorSpec extends Specification {
         v1.invalidValue == 150
         v1.rootBean.is(b)
         v1.leafBean instanceof Author
+        v1.constraintDescriptor != null
+        v1.constraintDescriptor.annotation instanceof Max
+        v1.constraintDescriptor.annotation.value() == 100l
         v2.messageTemplate == '{javax.validation.constraints.NotBlank.message}'
         v2.propertyPath.toString() == 'primaryAuthor.name'
+        v2.constraintDescriptor != null
+        v2.constraintDescriptor.annotation instanceof NotBlank
     }
 
     void "test cascade to bean - no cycle"() {
@@ -124,8 +138,13 @@ class ValidatorSpec extends Specification {
         v1.invalidValue == 150
         v1.rootBean.is(b)
         v1.leafBean instanceof Author
+        v1.constraintDescriptor != null
+        v1.constraintDescriptor.annotation instanceof Max
+        v1.constraintDescriptor.annotation.value() == 100l
         v2.messageTemplate == '{javax.validation.constraints.NotBlank.message}'
         v2.propertyPath.toString() == 'primaryAuthor.name'
+        v2.constraintDescriptor != null
+        v2.constraintDescriptor.annotation instanceof NotBlank
     }
 
     void "test cascade to list - no cycle"() {
@@ -154,9 +173,67 @@ class ValidatorSpec extends Specification {
         v1.propertyPath[1].kind == ElementKind.PROPERTY
         v1.rootBean.is(b)
         v1.leafBean instanceof Author
+        v1.constraintDescriptor != null
+        v1.constraintDescriptor.annotation instanceof Max
+        v1.constraintDescriptor.annotation.value() == 100l
         v2.messageTemplate == '{javax.validation.constraints.NotBlank.message}'
+        v2.constraintDescriptor != null
+        v2.constraintDescriptor.annotation instanceof NotBlank
     }
 
+    void "test array elements"() {
+        given:
+        ObjectArray arrayTest = new ObjectArray(strings: [] as String[])
+        def violations = validator.validate(arrayTest)
+
+        expect:
+        violations.size() == 1
+        violations[0].invalidValue == []
+        violations[0].messageTemplate == '{javax.validation.constraints.Size.message}'
+        violations[0].constraintDescriptor != null
+        violations[0].constraintDescriptor.annotation instanceof Size
+        violations[0].constraintDescriptor.annotation.min() == 1
+        violations[0].constraintDescriptor.annotation.max() == 2
+
+        when:
+        arrayTest = new ObjectArray(strings: ["a", "b", "c"] as String[])
+        violations = validator.validate(arrayTest)
+
+        then:
+        violations.size() == 1
+        violations[0].invalidValue == ["a", "b", "c"]
+        violations[0].messageTemplate == '{javax.validation.constraints.Size.message}'
+        violations[0].constraintDescriptor != null
+        violations[0].constraintDescriptor.annotation instanceof Size
+        violations[0].constraintDescriptor.annotation.min() == 1
+        violations[0].constraintDescriptor.annotation.max() == 2
+
+        when:
+        arrayTest = new ObjectArray(numbers: [] as Long[])
+        violations = validator.validate(arrayTest)
+
+        then:
+        violations.size() == 1
+        violations[0].invalidValue == []
+        violations[0].messageTemplate == '{javax.validation.constraints.Size.message}'
+        violations[0].constraintDescriptor != null
+        violations[0].constraintDescriptor.annotation instanceof Size
+        violations[0].constraintDescriptor.annotation.min() == 1
+        violations[0].constraintDescriptor.annotation.max() == 2
+
+        when:
+        arrayTest = new ObjectArray(numbers: [1L, 2L, 3L] as long[])
+        violations = validator.validate(arrayTest)
+
+        then:
+        violations.size() == 1
+        violations[0].invalidValue == [1L, 2L, 3L]
+        violations[0].messageTemplate == '{javax.validation.constraints.Size.message}'
+        violations[0].constraintDescriptor != null
+        violations[0].constraintDescriptor.annotation instanceof Size
+        violations[0].constraintDescriptor.annotation.min() == 1
+        violations[0].constraintDescriptor.annotation.max() == 2
+    }
 
     void "test cascade to array elements"() {
         given:
@@ -165,11 +242,16 @@ class ValidatorSpec extends Specification {
 
         expect:
         violations.size() == 2
-        violations.find {
+        def v1 = violations.find {
             it.invalidValue == 30 &&
                     it.propertyPath.toList()[0].index == 0 &&
             it.propertyPath.toString() =='integers[0]'}
-        violations.find { it.invalidValue == 60 && it.propertyPath.toList()[0].index == 2 }
+        v1.constraintDescriptor != null
+        v1.constraintDescriptor.annotation instanceof  Max
+
+        def v2 = violations.find { it.invalidValue == 60 && it.propertyPath.toList()[0].index == 2 }
+        v2.constraintDescriptor != null
+        v2.constraintDescriptor.annotation instanceof  Max
     }
 
     void "test cascade to array elements - nested"() {
@@ -180,6 +262,8 @@ class ValidatorSpec extends Specification {
         then:
         violations.size() == 1
         violations[0].propertyPath.toString() == 'child.integers[1]'
+        violations[0].constraintDescriptor != null
+        violations[0].constraintDescriptor.annotation instanceof  Max
 
 
         when:
@@ -191,6 +275,8 @@ class ValidatorSpec extends Specification {
         then:
         violations.size() == 1
         violations[0].propertyPath.toString() == 'child.child.integers[1]'
+        violations[0].constraintDescriptor != null
+        violations[0].constraintDescriptor.annotation instanceof  Max
     }
 
 
@@ -203,6 +289,8 @@ class ValidatorSpec extends Specification {
         violations.size() == 1
         violations.first().messageTemplate == '{javax.validation.constraints.NotNull.message}'
         violations.first().propertyPath.toString() == 'integers'
+        violations.first().constraintDescriptor != null
+        violations.first().constraintDescriptor.annotation instanceof  NotNull
     }
 
     void "test executable validator"() {
@@ -218,15 +306,20 @@ class ValidatorSpec extends Specification {
         constraintViolations.size() == 2
         constraintViolations[0].invalidValue == 50
         constraintViolations[0].propertyPath.toString() == 'saveBook.pages'
+        constraintViolations[0].constraintDescriptor != null
+        constraintViolations[0].constraintDescriptor.annotation instanceof  Min
+        constraintViolations[0].constraintDescriptor.annotation.value() == 100l
+        constraintViolations[1].constraintDescriptor != null
+        constraintViolations[1].constraintDescriptor.annotation instanceof  NotBlank
 
     }
 
     void "test executable validator - cascade to array"() {
         when:
-        BookService bookService = applicationContext.getBean(BookService)
+        ArrayTest arrayTest = applicationContext.getBean(ArrayTest)
         def constraintViolations = validator.forExecutables().validateParameters(
-                bookService,
-                BookService.getDeclaredMethod("saveIntArray", int[].class),
+                arrayTest,
+                ArrayTest.getDeclaredMethod("saveIntArray", int[].class),
                 [[30, 10, 60] as int[]] as Object[]
         ).toList().sort({ it.propertyPath.toString() })
 
@@ -234,9 +327,14 @@ class ValidatorSpec extends Specification {
         then:
         constraintViolations.size() == 2
         constraintViolations[0].propertyPath.toString() == 'saveIntArray.integers[0]'
+        constraintViolations[0].constraintDescriptor != null
+        constraintViolations[0].constraintDescriptor.annotation instanceof  Max
+        constraintViolations[1].propertyPath.toString() == 'saveIntArray.integers[2]'
+        constraintViolations[1].constraintDescriptor != null
+        constraintViolations[1].constraintDescriptor.annotation instanceof  Max
 
         when:
-        ArrayTest arrayTest = applicationContext.createBean(ArrayTest)
+        arrayTest = applicationContext.createBean(ArrayTest)
         arrayTest.integers = [30,10,60] as int[]
         def violations = validator.forExecutables().validateParameters(
                 new ArrayTest(),
@@ -247,6 +345,11 @@ class ValidatorSpec extends Specification {
         then:
         violations.size() == 2
         violations[0].propertyPath.toString() == 'saveChild.arrayTest.integers[0]'
+        violations[0].constraintDescriptor != null
+        violations[0].constraintDescriptor.annotation instanceof  Max
+        violations[1].propertyPath.toString() == 'saveChild.arrayTest.integers[2]'
+        violations[1].constraintDescriptor != null
+        violations[1].constraintDescriptor.annotation instanceof  Max
 
     }
 
@@ -275,6 +378,139 @@ class ValidatorSpec extends Specification {
         !beanDescriptor.isBeanConstrained()
         beanDescriptor.getConstrainedProperties().size() == 0
     }
+
+    void "test cascade to container of non-introspected class" () {
+        when:
+        Bee notIntrospected = new Bee(name: "")
+        HiveOfBeeList beeHive = new HiveOfBeeList(bees: [notIntrospected])
+        def violations = validator.validate(beeHive)
+
+        then:
+        violations.size() == 1
+        !violations[0].constraintDescriptor
+        violations[0].message == "Cannot validate io.micronaut.validation.validator.Bee. No bean introspection present. " +
+                "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
+
+        when:
+        beeHive = new HiveOfBeeList(bees: [null])
+        violations = validator.validate(beeHive)
+
+        then:
+        violations.size() == 1
+        !violations[0].constraintDescriptor
+        violations[0].message == "Cannot validate io.micronaut.validation.validator.Bee. No bean introspection present. " +
+                "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
+    }
+
+    void "test cascade to map of non-introspected value class" () {
+        when:
+        Bee notIntrospected = new Bee(name: "")
+        HiveOfBeeMap beeHive = new HiveOfBeeMap(bees: ["blank" : notIntrospected])
+        def violations = validator.validate(beeHive)
+
+        then:
+        violations.size() == 1
+        !violations[0].constraintDescriptor
+        violations[0].message == "Cannot validate io.micronaut.validation.validator.Bee. No bean introspection present. " +
+                "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
+
+        when:
+        Map<String, Bee> map = [:]
+        map.put("blank", null)
+        beeHive = new HiveOfBeeMap(bees: map)
+        violations = validator.validate(beeHive)
+
+        then:
+        violations.size() == 1
+        !violations[0].constraintDescriptor
+        violations[0].message == "Cannot validate io.micronaut.validation.validator.Bee. No bean introspection present. " +
+                "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
+    }
+
+    @Ignore("FIXME: https://github.com/micronaut-projects/micronaut-core/issues/4410")
+    void "test element validation in String collection" () {
+        when:
+        ListOfStrings strings = new ListOfStrings(strings: ["", null, "a string that's too long"])
+        def violations = validator.validate(strings)
+
+        then:
+        // should be: two for violating element size, and one null string violation
+        violations.size() == 3
+        violations[0].constraintDescriptor
+        violations[0].constraintDescriptor.annotation instanceof Size
+        violations[1].constraintDescriptor
+        violations[1].constraintDescriptor.annotation instanceof NotNull
+        violations[2].constraintDescriptor
+        violations[2].constraintDescriptor.annotation instanceof Size
+    }
+
+    void "test cascade to bean - enum"() {
+        given:
+        EnumList b = new EnumList(
+                enums: [null]
+        )
+
+        def violations = validator.validate(b)
+
+        expect:
+        violations.size() == 1
+        violations.first().message == "must not be null"
+    }
+
+    void "test helpful toString() message for constraintViolation"() {
+        given:
+        BookService bookService = applicationContext.getBean(BookService)
+        def constraintViolations = validator.forExecutables().validateParameters(
+                bookService,
+                BookService.getDeclaredMethod("saveBook", String, int.class),
+                ["", 50] as Object[]
+        ).toList().sort({ it.propertyPath.toString() })
+
+        expect:
+        constraintViolations.size() == 2
+        constraintViolations[0].toString() == 'DefaultConstraintViolation{rootBean=class io.micronaut.validation.validator.$BookService$Definition$Intercepted, invalidValue=50, path=saveBook.pages}'
+        constraintViolations[1].toString() == 'DefaultConstraintViolation{rootBean=class io.micronaut.validation.validator.$BookService$Definition$Intercepted, invalidValue=, path=saveBook.title}'
+    }
+}
+
+@Introspected
+class HiveOfBeeMap {
+    @Valid
+    Map<String, Bee> bees
+}
+
+@Introspected
+class HiveOfBeeList {
+    @Valid
+    List<Bee> bees
+}
+
+// not introspected, expect validation failure
+class Bee {
+    @NotBlank
+    String name
+}
+
+// FIXME see https://github.com/micronaut-projects/micronaut-core/issues/4410
+// demonstrated by "test fail elements in String list"
+// List, Set and array all work same
+// 1) With Valid and constraints, validation is broken because it also applies @Size constraint to the container itself
+// 2) Without @Valid only the container itself is validated for given constraints (makes sense)
+@Introspected
+class ListOfStrings {
+    @Valid
+    @Size(min=1, max=2)
+    @NotNull
+    List<String> strings
+}
+
+@Introspected
+class ObjectArray {
+    @Size(min = 1, max = 2)
+    String[] strings
+
+    @Size(min = 1, max = 2)
+    Long[] numbers
 }
 
 @Introspected
@@ -320,6 +556,13 @@ class ArrayTest {
     void saveChild(@Valid ArrayTest arrayTest) {
 
     }
+
+    @Executable
+    ArrayTest saveIntArray(@Valid
+                           @Max(20l)
+                           @NotNull int[] integers) {
+        new ArrayTest(integers: integers)
+    }
 }
 
 @Singleton
@@ -328,11 +571,17 @@ class BookService {
     Book saveBook(@NotBlank String title, @Min(100l) int pages) {
         new Book(title: title, pages: pages)
     }
+}
 
-    @Executable
-    ArrayTest saveIntArray(@Valid
-                   @Max(20l)
-                   @NotNull int[] integers) {
-        new ArrayTest(integers: integers)
-    }
+@Introspected
+class EnumList {
+
+    @Valid
+    @NotNull
+    List<AuthorState> enums
+}
+
+enum AuthorState {
+    PUBLISHED,
+    DRAFT
 }

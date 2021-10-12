@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,35 +15,35 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.BeanLocator;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataResolver;
+import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.naming.NameResolver;
-import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.naming.conventions.TypeConvention;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Status;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
-import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.web.router.exceptions.RoutingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import javax.inject.Qualifier;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -64,30 +64,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     public static final UriNamingStrategy CAMEL_CASE_NAMING_STRATEGY = new UriNamingStrategy() {
     };
 
-    /**
-     * A {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy} whereby hyphenated naming conventions are used.
-     *
-     * @deprecated Dynamic naming conventions are no longer supported
-     */
-    @Deprecated
-    public static final UriNamingStrategy HYPHENATED_NAMING_STRATEGY = new UriNamingStrategy() {
-        @Override
-        public @Nonnull String resolveUri(Class type) {
-            return '/' + TypeConvention.CONTROLLER.asHyphenatedName(type);
-        }
-
-        @Override
-        public @Nonnull String resolveUri(String property) {
-            if (StringUtils.isEmpty(property)) {
-                return "/";
-            }
-            if (property.charAt(0) != '/') {
-                return '/' + NameUtils.hyphenate(property, true);
-            }
-            return property;
-        }
-    };
-
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultRouteBuilder.class);
 
     static final Object NO_VALUE = new Object();
@@ -101,6 +77,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     private List<StatusRoute> statusRoutes = new ArrayList<>();
     private List<ErrorRoute> errorRoutes = new ArrayList<>();
     private List<FilterRoute> filterRoutes = new ArrayList<>();
+    private Set<Integer> exposedPorts = new HashSet<>(5);
 
     /**
      * @param executionHandleLocator The execution handler locator
@@ -136,13 +113,33 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
+    public Set<Integer> getExposedPorts() {
+        return exposedPorts;
+    }
+
+    @Override
     public List<FilterRoute> getFilterRoutes() {
         return filterRoutes;
     }
 
     @Override
     public FilterRoute addFilter(String pathPattern, Supplier<HttpFilter> filter) {
-        DefaultFilterRoute route = new DefaultFilterRoute(pathPattern, filter);
+        DefaultFilterRoute route = new DefaultFilterRoute(
+                pathPattern,
+                filter,
+                (AnnotationMetadataResolver) executionHandleLocator
+        );
+        filterRoutes.add(route);
+        return route;
+    }
+
+    @Override
+    public FilterRoute addFilter(String pathPattern, BeanLocator beanLocator, BeanDefinition<? extends HttpFilter> beanDefinition) {
+        DefaultFilterRoute route = new BeanDefinitionFilterRoute(
+                pathPattern,
+                beanLocator,
+                beanDefinition
+        );
         filterRoutes.add(route);
         return route;
     }
@@ -179,11 +176,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     @Override
     public StatusRoute status(Class originatingClass, HttpStatus status, Class type, String method, Class[] parameterTypes) {
-        // do not allow multiple local status routes in the same controller
-        // locally declared @Error routes will be allowed and will take precedence over globally defined ones
-        if (this.statusRoutes.stream().anyMatch((route) -> route.status() == status && route.originatingType() == originatingClass)) {
-            throw new RoutingException("Attempted to register multiple local routes for http status " + String.valueOf(status.getCode()));
-        }
         Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
         MethodExecutionHandle<?, Object> executableHandle = executionHandle.orElseThrow(() ->
@@ -197,10 +189,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     @Override
     public StatusRoute status(HttpStatus status, Class type, String method, Class[] parameterTypes) {
-        // do not allow multiple @Error global routes defined for one status
-        if (this.statusRoutes.stream().anyMatch((route) -> route.status() == status && route.originatingType() == null)) {
-            throw new RoutingException("Attempted to register multiple global routes for http status " + String.valueOf(status.getCode()));
-        }
         Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
         MethodExecutionHandle<?, Object> executableHandle = executionHandle.orElseThrow(() ->
@@ -214,9 +202,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     @Override
     public ErrorRoute error(Class originatingClass, Class<? extends Throwable> error, Class type, String method, Class[] parameterTypes) {
-        if (this.errorRoutes.stream().anyMatch((route) -> route.exceptionType() == error && route.originatingType() == originatingClass)) {
-            throw new RoutingException("Attempted to register multiple local error routes for exception " + error.getName());
-        }
         Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
         MethodExecutionHandle<?, Object> executableHandle = executionHandle.orElseThrow(() ->
@@ -230,9 +215,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     @Override
     public ErrorRoute error(Class<? extends Throwable> error, Class type, String method, Class[] parameterTypes) {
-        if (this.errorRoutes.stream().anyMatch((route) -> route.exceptionType() == error && route.originatingType() == null)) {
-            throw new RoutingException("Attempted to register multiple global error routes for exception " + error.getName());
-        }
         Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
         MethodExecutionHandle<?, Object> executableHandle = executionHandle.orElseThrow(() ->
@@ -425,27 +407,35 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
      * @return The uri route corresponding to the method.
      */
     protected UriRoute buildBeanRoute(String httpMethodName, HttpMethod httpMethod, String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        io.micronaut.context.Qualifier<?> qualifier = beanDefinition.getAnnotationTypeByStereotype(Qualifier.class).map(aClass -> Qualifiers.byAnnotation(beanDefinition, aClass)).orElse(null);
-        if (qualifier == null && beanDefinition.isIterable() && beanDefinition instanceof NameResolver) {
-            qualifier = ((NameResolver) beanDefinition).resolveName()
-                    .map(Qualifiers::byName).orElse(null);
-        }
-        MethodExecutionHandle<?, Object> executionHandle = executionHandleLocator.findExecutionHandle(beanDefinition.getBeanType(), qualifier, method.getMethodName(), method.getArgumentTypes())
-                .orElseThrow(() -> new RoutingException("No such route: " + beanDefinition.getBeanType().getName() + "." + method));
+        MethodExecutionHandle<?, Object> executionHandle = executionHandleLocator
+                                                                .createExecutionHandle(beanDefinition, (ExecutableMethod<Object, ?>) method);
         return buildRoute(httpMethodName, httpMethod, uri, executionHandle);
     }
 
     /**
      * Abstract class for base {@link MethodBasedRoute}.
      */
-    abstract class AbstractRoute implements MethodBasedRoute {
+    abstract class AbstractRoute implements MethodBasedRoute, RouteInfo<Object> {
         protected final List<Predicate<HttpRequest<?>>> conditions = new ArrayList<>();
-        protected final MethodExecutionHandle targetMethod;
+        protected final MethodExecutionHandle<?, ?> targetMethod;
         protected final ConversionService<?> conversionService;
-        protected List<MediaType> acceptedMediaTypes;
+        protected List<MediaType> consumesMediaTypes;
         protected List<MediaType> producesMediaTypes;
         protected String bodyArgumentName;
         protected Argument<?> bodyArgument;
+        protected final Map<String, Argument> requiredInputs;
+        protected final Class<?> declaringType;
+        protected boolean consumesMediaTypesContainsAll;
+        protected boolean producesMediaTypesContainsAll;
+        protected final HttpStatus definedStatus;
+        protected final boolean isWebSocketRoute;
+        private final boolean isVoid;
+        private final boolean suspended;
+        private final boolean reactive;
+        private final boolean single;
+        private final boolean async;
+        private final boolean specifiedSingle;
+        private final boolean isAsyncOrReactive;
 
         /**
          * @param targetMethod The target method execution handle
@@ -455,30 +445,130 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         AbstractRoute(MethodExecutionHandle targetMethod, ConversionService<?> conversionService, List<MediaType> mediaTypes) {
             this.targetMethod = targetMethod;
             this.conversionService = conversionService;
-            this.acceptedMediaTypes = mediaTypes;
-
-            MediaType[] types = MediaType.of(targetMethod.stringValues(Produces.class));
-            if (ArrayUtils.isNotEmpty(types)) {
-                this.producesMediaTypes = Arrays.asList(types);
+            this.consumesMediaTypes = mediaTypes;
+            this.declaringType = targetMethod.getDeclaringType();
+            this.producesMediaTypes = RouteInfo.super.getProduces();
+            this.consumesMediaTypes = RouteInfo.super.getConsumes();
+            suspended = targetMethod.getExecutableMethod().isSuspend();
+            reactive = RouteInfo.super.isReactive();
+            async = RouteInfo.super.isAsync();
+            single = RouteInfo.super.isSingleResult();
+            isVoid = RouteInfo.super.isVoid();
+            specifiedSingle = RouteInfo.super.isSpecifiedSingle();
+            isAsyncOrReactive = RouteInfo.super.isAsyncOrReactive();
+            for (Argument argument : targetMethod.getArguments()) {
+                if (argument.getAnnotationMetadata().hasAnnotation(Body.class)) {
+                    this.bodyArgument = argument;
+                }
             }
+            Argument[] requiredArguments = targetMethod.getArguments();
+            if (requiredArguments.length > 0) {
+                Map<String, Argument> requiredInputs = new LinkedHashMap<>(requiredArguments.length);
+                for (Argument requiredArgument : requiredArguments) {
+                    String inputName = resolveInputName(requiredArgument);
+                    requiredInputs.put(inputName, requiredArgument);
+                }
+                this.requiredInputs = Collections.unmodifiableMap(requiredInputs);
+            } else {
+                this.requiredInputs = Collections.emptyMap();
+            }
+            setConsumesMediaTypesContainsAll();
+            setProducesMediaTypesContainsAll();
+            this.definedStatus = targetMethod.enumValue(Status.class, HttpStatus.class).orElse(null);
+            this.isWebSocketRoute = targetMethod.hasAnnotation("io.micronaut.websocket.annotation.OnMessage");
+        }
+
+        @Override
+        public Class<?> getDeclaringType() {
+            return declaringType;
+        }
+
+        private void setConsumesMediaTypesContainsAll() {
+            this.consumesMediaTypesContainsAll = consumesMediaTypes == null || consumesMediaTypes.isEmpty() || consumesMediaTypes.contains(MediaType.ALL_TYPE);
+        }
+
+        private void setProducesMediaTypesContainsAll() {
+            this.producesMediaTypesContainsAll = producesMediaTypes == null || producesMediaTypes.isEmpty() || producesMediaTypes.contains(MediaType.ALL_TYPE);
+        }
+
+        /**
+         * Resolves the name for an argument.
+         *
+         * @param argument the argument
+         * @return the name
+         */
+        protected @NonNull String resolveInputName(@NonNull Argument argument) {
+            String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(null);
+            if (StringUtils.isEmpty(inputName)) {
+                inputName = argument.getName();
+            }
+            return inputName;
+        }
+
+        @NonNull
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return targetMethod.getAnnotationMetadata();
+        }
+
+        @Override
+        public ReturnType<?> getReturnType() {
+            return targetMethod.getReturnType();
+        }
+
+        @Override
+        public boolean isSuspended() {
+            return suspended;
+        }
+
+        @Override
+        public boolean isReactive() {
+            return reactive;
+        }
+
+        @Override
+        public boolean isSingleResult() {
+            return single;
+        }
+
+        @Override
+        public boolean isSpecifiedSingle() {
+            return specifiedSingle;
+        }
+
+        @Override
+        public boolean isAsync() {
+            return async;
+        }
+
+        @Override
+        public boolean isAsyncOrReactive() {
+            return isAsyncOrReactive;
+        }
+
+        @Override
+        public boolean isVoid() {
+            return isVoid;
         }
 
         @Override
         public Route consumes(MediaType... mediaTypes) {
             if (mediaTypes != null) {
-                this.acceptedMediaTypes = Collections.unmodifiableList(Arrays.asList(mediaTypes));
+                this.consumesMediaTypes = Collections.unmodifiableList(Arrays.asList(mediaTypes));
+                setConsumesMediaTypesContainsAll();
             }
             return this;
         }
 
         @Override
         public List<MediaType> getConsumes() {
-            return acceptedMediaTypes;
+            return consumesMediaTypes;
         }
 
         @Override
-        public Route acceptAll() {
-            this.acceptedMediaTypes = Collections.emptyList();
+        public Route consumesAll() {
+            this.consumesMediaTypes = Collections.emptyList();
+            setConsumesMediaTypesContainsAll();
             return this;
         }
 
@@ -505,18 +595,15 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public Route produces(MediaType... mediaType) {
             if (mediaType != null) {
-                this.producesMediaTypes = Arrays.asList(mediaType);
+                this.producesMediaTypes = Collections.unmodifiableList(Arrays.asList(mediaType));
+                setProducesMediaTypesContainsAll();
             }
             return this;
         }
 
         @Override
         public List<MediaType> getProduces() {
-            if (producesMediaTypes != null) {
-                return Collections.unmodifiableList(producesMediaTypes);
-            } else {
-                return DEFAULT_PRODUCES;
-            }
+            return producesMediaTypes;
         }
 
         @Override
@@ -530,6 +617,24 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          */
         protected boolean permitsRequestBody() {
             return true;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof AbstractRoute)) {
+                return false;
+            }
+            AbstractRoute that = (AbstractRoute) o;
+            return Objects.equals(consumesMediaTypes, that.consumesMediaTypes) &&
+                    Objects.equals(producesMediaTypes, that.producesMediaTypes);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(consumesMediaTypes, producesMediaTypes);
         }
     }
 
@@ -556,7 +661,10 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param targetMethod The target method execution handle
          * @param conversionService The conversion service
          */
-        public  DefaultErrorRoute(Class originatingClass, Class<? extends Throwable> error, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
+        public DefaultErrorRoute(
+                Class originatingClass, Class<? extends Throwable> error,
+                MethodExecutionHandle targetMethod,
+                ConversionService<?> conversionService) {
             super(targetMethod, conversionService, Collections.emptyList());
             this.originatingClass = originatingClass;
             this.error = error;
@@ -593,11 +701,17 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public ErrorRoute consumes(MediaType... mediaType) {
-            return this;
+            return (ErrorRoute) super.consumes(mediaType);
         }
 
         @Override
-        public Route acceptAll() {
+        public ErrorRoute produces(MediaType... mediaType) {
+            return (ErrorRoute) super.produces(mediaType);
+        }
+
+        @Override
+        public Route consumesAll() {
+            super.consumesAll();
             return this;
         }
 
@@ -619,27 +733,24 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             if (o == null || getClass() != o.getClass()) {
                 return false;
             }
-
-            DefaultErrorRoute that = (DefaultErrorRoute) o;
-
-            if (error != null ? !error.equals(that.error) : that.error != null) {
+            if (!super.equals(o)) {
                 return false;
             }
-            return originatingClass != null ? originatingClass.equals(that.originatingClass) : that.originatingClass == null;
+            DefaultErrorRoute that = (DefaultErrorRoute) o;
+            return error.equals(that.error) &&
+                    Objects.equals(originatingClass, that.originatingClass);
         }
 
         @Override
         public int hashCode() {
-            int result = error != null ? error.hashCode() : 0;
-            result = 31 * result + (originatingClass != null ? originatingClass.hashCode() : 0);
-            return result;
+            return Objects.hash(super.hashCode(), error, originatingClass);
         }
 
         @Override
         public String toString() {
             StringBuilder builder = new StringBuilder();
             return builder.append(' ')
-                .append(error.getName())
+                .append(error.getSimpleName())
                 .append(" -> ")
                 .append(targetMethod.getDeclaringType().getSimpleName())
                 .append('#')
@@ -712,7 +823,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public Route acceptAll() {
+        public Route consumesAll() {
             return this;
         }
 
@@ -738,23 +849,20 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             if (this == o) {
                 return true;
             }
-            if (o == null || getClass() != o.getClass()) {
+            if (!(o instanceof DefaultStatusRoute)) {
                 return false;
             }
-
+            if (!super.equals(o)) {
+                return false;
+            }
             DefaultStatusRoute that = (DefaultStatusRoute) o;
-
-            if (status != null ? !status.equals(that.status) : that.status != null) {
-                return false;
-            }
-            return originatingClass != null ? originatingClass.equals(that.originatingClass) : that.originatingClass == null;
+            return status == that.status &&
+                    Objects.equals(originatingClass, that.originatingClass);
         }
 
         @Override
         public int hashCode() {
-            int result = status != null ? status.hashCode() : 0;
-            result = 31 * result + (originatingClass != null ? originatingClass.hashCode() : 0);
-            return result;
+            return Objects.hash(super.hashCode(), status, originatingClass);
         }
     }
 
@@ -766,6 +874,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         final HttpMethod httpMethod;
         final UriMatchTemplate uriMatchTemplate;
         final List<DefaultUriRoute> nestedRoutes = new ArrayList<>(2);
+        private Integer port;
 
         /**
          * @param httpMethod The HTTP method
@@ -863,10 +972,10 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 .append(" -> ")
                 .append(targetMethod.getDeclaringType().getSimpleName())
                 .append('#')
-                .append(targetMethod)
+                .append(targetMethod.getName())
                 .append(" (")
-                .append(String.join(",", acceptedMediaTypes))
-                .append(" )")
+                .append(String.join(",", consumesMediaTypes))
+                .append(")")
                 .toString();
         }
 
@@ -881,6 +990,19 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
+        public UriRoute exposedPort(int port) {
+            this.port = port;
+            where(httpRequest -> httpRequest.getServerAddress().getPort() == port);
+            DefaultRouteBuilder.this.exposedPorts.add(port);
+            return this;
+        }
+
+        @Override
+        public Integer getPort() {
+            return port;
+        }
+
+        @Override
         public UriRoute consumes(MediaType... mediaTypes) {
             return (UriRoute) super.consumes(mediaTypes);
         }
@@ -891,8 +1013,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public UriRoute acceptAll() {
-            return (UriRoute) super.acceptAll();
+        public UriRoute consumesAll() {
+            return (UriRoute) super.consumesAll();
         }
 
         @Override
@@ -916,7 +1038,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public Optional<UriRouteMatch> match(String uri) {
             Optional<UriMatchInfo> matchInfo = uriMatchTemplate.match(uri);
-            return matchInfo.map((info) -> new DefaultUriRouteMatch(info, this, defaultCharset, conversionService));
+            return matchInfo.map(info -> new DefaultUriRouteMatch(info, this, defaultCharset, conversionService));
         }
 
         @Override
@@ -1029,7 +1151,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public Route acceptAll() {
+        public Route consumesAll() {
             return consumes(MediaType.EMPTY_ARRAY);
         }
 

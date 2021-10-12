@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,15 +19,19 @@ import brave.CurrentSpanCustomizer;
 import brave.SpanCustomizer;
 import brave.Tracing;
 import brave.opentracing.BraveTracer;
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Nullable;
 import io.opentracing.Tracer;
 import io.opentracing.util.GlobalTracer;
+import jakarta.inject.Singleton;
 import zipkin2.Span;
 import zipkin2.reporter.AsyncReporter;
 import zipkin2.reporter.Reporter;
-
-import javax.annotation.Nullable;
-import javax.inject.Singleton;
+import zipkin2.reporter.brave.ZipkinSpanHandler;
 
 /**
  * Builds a {@link io.opentracing.Tracer} for Brave using {@link brave.opentracing.BraveTracer}.
@@ -62,9 +66,9 @@ public class BraveTracerFactory {
     Tracing braveTracing(@Nullable Reporter<Span> reporter) {
         Tracing.Builder builder = braveTracerConfiguration.getTracingBuilder();
         if (reporter != null) {
-            builder.spanReporter(reporter);
+            builder.addSpanHandler(ZipkinSpanHandler.newBuilder(reporter).build());
         } else {
-            builder.spanReporter(Reporter.NOOP);
+            builder.addSpanHandler(ZipkinSpanHandler.newBuilder(Reporter.NOOP).build());
         }
         return builder.build();
     }
@@ -93,9 +97,7 @@ public class BraveTracerFactory {
     @Primary
     Tracer braveTracer(Tracing tracing) {
         BraveTracer braveTracer = BraveTracer.create(tracing);
-        if (!GlobalTracer.isRegistered()) {
-            GlobalTracer.register(braveTracer);
-        }
+        GlobalTracer.registerIfAbsent(braveTracer);
         return braveTracer;
     }
 

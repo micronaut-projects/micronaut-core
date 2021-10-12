@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,13 +18,12 @@ package io.micronaut.core.reflect;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.util.Toggleable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.helpers.NOPLogger;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.URI;
@@ -62,9 +61,6 @@ public class ClassUtils {
      * A logger that should be used for any reflection access.
      */
     public static final Logger REFLECTION_LOGGER;
-
-    static final List<ClassLoadingReporter> CLASS_LOADING_REPORTERS;
-    static final boolean CLASS_LOADING_REPORTER_ENABLED;
 
     private static final boolean ENABLE_CLASS_LOADER_LOGGING = Boolean.getBoolean(PROPERTY_MICRONAUT_CLASSLOADER_LOGGING);
 
@@ -125,6 +121,7 @@ public class ClassUtils {
         COMMON_CLASS_MAP.put(Float.class.getName(), Float.class);
         COMMON_CLASS_MAP.put(Character.class.getName(), Character.class);
         COMMON_CLASS_MAP.put(String.class.getName(), String.class);
+        COMMON_CLASS_MAP.put(CharSequence.class.getName(), CharSequence.class);
 
         BASIC_TYPE_MAP.put(UUID.class.getName(), UUID.class);
         BASIC_TYPE_MAP.put(BigDecimal.class.getName(), BigDecimal.class);
@@ -139,25 +136,6 @@ public class ClassUtils {
         BASIC_TYPE_MAP.put(LocalDate.class.getName(), LocalDate.class);
         BASIC_TYPE_MAP.put(Instant.class.getName(), Instant.class);
         BASIC_TYPE_MAP.put(ZonedDateTime.class.getName(), ZonedDateTime.class);
-
-        List<ClassLoadingReporter> reporterList = new ArrayList<>();
-        try {
-            ServiceLoader<ClassLoadingReporter> reporters = ServiceLoader.load(ClassLoadingReporter.class);
-            for (ClassLoadingReporter reporter : reporters) {
-                if (reporter.isEnabled()) {
-                    reporterList.add(reporter);
-                }
-            }
-        } catch (Throwable e) {
-            reporterList = Collections.emptyList();
-        }
-
-        CLASS_LOADING_REPORTERS = reporterList;
-        if (CLASS_LOADING_REPORTERS == Collections.EMPTY_LIST) {
-            CLASS_LOADING_REPORTER_ENABLED = false;
-        } else {
-            CLASS_LOADING_REPORTER_ENABLED = reporterList.stream().anyMatch(Toggleable::isEnabled);
-        }
     }
 
     /**
@@ -166,7 +144,7 @@ public class ClassUtils {
      * @param type The type
      * @return The logger
      */
-    public static @Nonnull Logger getLogger(@Nonnull Class type) {
+    public static @NonNull Logger getLogger(@NonNull Class type) {
         if (ENABLE_CLASS_LOADER_LOGGING) {
             return LoggerFactory.getLogger(type);
         } else {
@@ -179,7 +157,7 @@ public class ClassUtils {
      * @param primitiveType The primitive type name
      * @return The array type
      */
-    public static @Nonnull Optional<Class> arrayTypeForPrimitive(String primitiveType) {
+    public static @NonNull Optional<Class> arrayTypeForPrimitive(String primitiveType) {
         if (primitiveType != null) {
             return Optional.ofNullable(PRIMITIVE_ARRAY_MAP.get(primitiveType));
         }
@@ -296,14 +274,12 @@ public class ClassUtils {
                     REFLECTION_LOGGER.debug("Attempting to dynamically load class {}", name);
                 }
                 Class<?> type = Class.forName(name, true, classLoader);
-                ClassLoadingReporter.reportPresent(type);
                 if (REFLECTION_LOGGER.isDebugEnabled()) {
                     REFLECTION_LOGGER.debug("Successfully loaded class {}", name);
                 }
                 return Optional.of(type);
             }
         } catch (ClassNotFoundException | NoClassDefFoundError e) {
-            ClassLoadingReporter.reportMissing(name);
             if (REFLECTION_LOGGER.isDebugEnabled()) {
                 REFLECTION_LOGGER.debug("Class {} is not present", name);
             }
@@ -321,14 +297,21 @@ public class ClassUtils {
     public static List<Class> resolveHierarchy(Class<?> type) {
         Class<?> superclass = type.getSuperclass();
         List<Class> hierarchy = new ArrayList<>();
+        List<Class> interfaces = new ArrayList<>();
         if (superclass != null) {
-            populateHierarchyInterfaces(type, hierarchy);
+            hierarchy.add(type);
+            populateHierarchyInterfaces(type, interfaces);
 
             while (superclass != Object.class) {
-                populateHierarchyInterfaces(superclass, hierarchy);
+                if (!hierarchy.contains(superclass)) {
+                    hierarchy.add(superclass);
+                }
+                populateHierarchyInterfaces(superclass, interfaces);
                 superclass = superclass.getSuperclass();
             }
+            hierarchy.addAll(interfaces);
         } else if (type.isInterface()) {
+            hierarchy.add(type);
             populateHierarchyInterfaces(type, hierarchy);
         }
 
@@ -344,9 +327,6 @@ public class ClassUtils {
     }
 
     private static void populateHierarchyInterfaces(Class<?> superclass, List<Class> hierarchy) {
-        if (!hierarchy.contains(superclass)) {
-            hierarchy.add(superclass);
-        }
         for (Class<?> aClass : superclass.getInterfaces()) {
             if (!hierarchy.contains(aClass)) {
                 hierarchy.add(aClass);

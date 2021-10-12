@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,7 +22,6 @@ import io.micronaut.core.util.Toggleable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collections;
@@ -52,12 +51,8 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
     }
 
     @Override
-    public Optional<PropertySource> load(String resourceName, ResourceLoader resourceLoader, @Nullable String environmentName) {
-        if (environmentName != null) {
-            return loadEnv(resourceName, resourceLoader, ActiveEnvironment.of(environmentName, 0));
-        } else {
-            return load(resourceLoader, resourceName, getOrder());
-        }
+    public Optional<PropertySource> load(String resourceName, ResourceLoader resourceLoader) {
+        return load(resourceLoader, resourceName, getOrder());
     }
 
     @Override
@@ -73,18 +68,28 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
                 Map<String, Object> finalMap = loadProperties(resourceLoader, fileName, fileExt);
 
                 if (!finalMap.isEmpty()) {
-                    MapPropertySource newPropertySource = new MapPropertySource(fileName, finalMap) {
-                        @Override
-                        public int getOrder() {
-                            return order;
-                        }
-                    };
-                    return Optional.of(newPropertySource);
+                    return Optional.of(createPropertySource(fileName, finalMap, order));
                 }
             }
         }
 
         return Optional.empty();
+    }
+
+    /**
+     *
+     * @param name The name of the property source
+     * @param map  The map
+     * @param order The order of the property source
+     * @return property source
+     */
+    protected MapPropertySource createPropertySource(String name, Map<String, Object> map, int order) {
+        return new MapPropertySource(name, map) {
+                            @Override
+                            public int getOrder() {
+                                return order;
+                            }
+                        };
     }
 
     private Map<String, Object> loadProperties(ResourceLoader resourceLoader, String qualifiedName, String fileName) {

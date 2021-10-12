@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,7 @@
 package io.micronaut.tracing.instrument.http;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.Filter;
@@ -30,8 +31,6 @@ import io.opentracing.Tracer;
 import io.opentracing.noop.NoopTracer;
 import io.opentracing.propagation.Format;
 import org.reactivestreams.Publisher;
-
-import javax.annotation.Nonnull;
 
 /**
  * An HTTP client instrumentation filter that uses Open Tracing.
@@ -69,7 +68,7 @@ public class OpenTracingClientFilter extends AbstractOpenTracingFilter implement
                 true
         ) {
             @Override
-            protected void doOnSubscribe(@Nonnull Span span) {
+            protected void doOnSubscribe(@NonNull Span span) {
                 span.setTag(TAG_HTTP_CLIENT, true);
                 SpanContext spanContext = span.context();
                 tracer.inject(
@@ -85,14 +84,14 @@ public class OpenTracingClientFilter extends AbstractOpenTracingFilter implement
             }
 
             @Override
-            protected void doOnNext(@Nonnull Object object, @Nonnull Span span) {
+            protected void doOnNext(@NonNull Object object, @NonNull Span span) {
                 if (object instanceof HttpResponse) {
                     setResponseTags(request, (HttpResponse<?>) object, span);
                 }
             }
 
             @Override
-            protected void doOnError(@Nonnull Throwable error, @Nonnull Span span) {
+            protected void doOnError(@NonNull Throwable error, @NonNull Span span) {
                 if (error instanceof HttpClientResponseException) {
                     HttpClientResponseException e = (HttpClientResponseException) error;
                     HttpResponse<?> response = e.getResponse();

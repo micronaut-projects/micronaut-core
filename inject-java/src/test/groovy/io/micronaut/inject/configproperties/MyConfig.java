@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -40,6 +40,7 @@ public class MyConfig {
     Inner inner;
     protected int defaultPort = 9999;
     protected Integer anotherPort;
+    private List<InnerVal> innerVals;
 
     private int maxSize;
     @ReadableBytes
@@ -234,5 +235,25 @@ public class MyConfig {
 
     public void setInner(Inner inner) {
         this.inner = inner;
+    }
+
+    public List<InnerVal> getInnerVals() {
+        return innerVals;
+    }
+
+    public void setInnerVals(List<InnerVal> innerVals) {
+        this.innerVals = innerVals;
+    }
+}
+
+class InnerVal {
+    private Integer expireUnsignedSeconds;
+
+    public Integer getExpireUnsignedSeconds() {
+        return expireUnsignedSeconds;
+    }
+
+    public void setExpireUnsignedSeconds(Integer expireUnsignedSeconds) {
+        this.expireUnsignedSeconds = expireUnsignedSeconds;
     }
 }

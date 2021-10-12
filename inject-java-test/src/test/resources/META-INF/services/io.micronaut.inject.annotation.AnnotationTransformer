@@ -1,0 +1,2 @@
+io.micronaut.inject.annotation.ToTransformTransformer
+io.micronaut.inject.annotation.ToTransformRetentionTransformer

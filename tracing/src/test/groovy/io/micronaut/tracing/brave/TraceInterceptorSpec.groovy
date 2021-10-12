@@ -20,15 +20,13 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.tracing.annotation.ContinueSpan
 import io.micronaut.tracing.annotation.NewSpan
 import io.micronaut.tracing.annotation.SpanTag
-import io.reactivex.Single
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
+import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
-import reactor.core.scheduler.Schedulers
 import spock.lang.Specification
-import spock.util.concurrent.PollingConditions
-
-import javax.inject.Inject
-import javax.inject.Singleton
 import java.util.concurrent.CompletableFuture
+import io.micronaut.core.async.annotation.SingleResult
 
 /**
  * @author graemerocher
@@ -81,34 +79,9 @@ class TraceInterceptorSpec extends Specification {
         applicationContext.close()
     }
 
-    void "test trace mono"() {
-        given:
-        ApplicationContext applicationContext = buildContext()
-        TracedService tracedService = applicationContext.getBean(TracedService)
-        TestReporter reporter = applicationContext.getBean(TestReporter)
-
-        when:
-        String result = tracedService.mono("test").block()
-        PollingConditions conditions = new PollingConditions(timeout: 3)
-
-        then:
-        conditions.eventually {
-            result == "test"
-            reporter.spans[0].tags().get("more.stuff") == 'test'
-            reporter.spans[0].tags().get("class") == 'TracedService'
-            reporter.spans[0].tags().get("method") == 'mono'
-            reporter.spans[0].tags().get("foo") == "bar"
-            reporter.spans[0].name() == 'trace-mono'
-        }
-
-        cleanup:
-        applicationContext.close()
-    }
-
     ApplicationContext buildContext() {
         def reporter = new TestReporter()
-        ApplicationContext.build(
-                'tracing.instrument-threads':true,
+        ApplicationContext.builder(
                 'tracing.zipkin.enabled':true,
                 'tracing.zipkin.sampler.probability':1
         ).singletons(reporter)
@@ -126,20 +99,13 @@ class TraceInterceptorSpec extends Specification {
 
         @ContinueSpan
         String methodTwo(@SpanTag("foo.baz") String another) {
-            methodThree(another).blockingGet()
+            Mono.from(methodThree(another)).block()
         }
 
         @NewSpan("trace-rx")
-        Single<String> methodThree(@SpanTag("more.stuff") String name) {
-            return Single.just(name)
-        }
-
-        @NewSpan("trace-mono")
-        Mono<String> mono(@SpanTag("more.stuff") String name) {
-            return Mono.fromCallable({
-                spanCustomizer.tag("foo", "bar")
-                return name
-            }).subscribeOn(Schedulers.elastic())
+        @SingleResult
+        Publisher<String> methodThree(@SpanTag("more.stuff") String name) {
+            return Mono.just(name)
         }
 
         @NewSpan("trace-cs")

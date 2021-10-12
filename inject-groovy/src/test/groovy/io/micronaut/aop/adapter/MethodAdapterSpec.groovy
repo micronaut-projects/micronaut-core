@@ -15,13 +15,99 @@
  */
 package io.micronaut.aop.adapter
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.context.event.StartupEvent
 import io.micronaut.core.reflect.ReflectionUtils
 import io.micronaut.inject.BeanDefinition
 
 class MethodAdapterSpec extends AbstractBeanDefinitionSpec {
+    void 'test method adapter with failing requirements is not present'() {
+        given:
+        def context = buildContext('''
+package issue5640;
+
+import io.micronaut.aop.Adapter;
+import java.lang.annotation.*;
+import io.micronaut.context.annotation.Requires;
+import static java.lang.annotation.ElementType.*;
+import static java.lang.annotation.RetentionPolicy.*;
+import jakarta.inject.Singleton;
+import static java.nio.charset.StandardCharsets.US_ASCII;
+
+@Singleton
+@Requires(property="not.present")
+class AsciiParser {
+    @Parse
+    public String parseAsAscii(byte[] value) {
+        return new String(value, US_ASCII);
+    }
+}
+
+@Retention(RUNTIME)
+@Target(METHOD)
+@Adapter(Parser.class)
+@interface Parse {}
+
+interface Parser {
+    String parse(byte[] value);
+}
+''')
+        def adaptedType = context.classLoader.loadClass('issue5640.Parser')
+
+        expect:
+        !context.containsBean(adaptedType)
+        context.getBeansOfType(adaptedType).isEmpty()
+    }
+
+    void "test method adapter with overloading"() {
+        given:
+        def context = buildContext('''
+package adapteroverloading;
+
+import io.micronaut.context.event.*;
+import io.micronaut.scheduling.annotation.Async;
+import jakarta.inject.Singleton;
+import java.util.concurrent.CompletableFuture;
+import io.micronaut.runtime.event.annotation.*;
+
+@Singleton
+public class Test {
+    boolean invoked = false;
+    boolean shutdown = false;
+    
+    public boolean getInvoked() {
+        return invoked;
+    } 
+    public boolean isShutdown() {
+        return shutdown;
+    }
+    
+    @EventListener
+    void receive(StartupEvent event) {
+        invoked = true;
+    }
+    
+    @EventListener
+    void receive(ShutdownEvent event) {
+        shutdown = true;
+    } 
+}
+
+''')
+
+        when:
+        def bean = context.getBean(context.classLoader.loadClass('adapteroverloading.Test'))
+
+        then:
+        bean.invoked
+
+        when:
+        context.close()
+
+        then:
+        bean.shutdown
+    }
 
     void  "test method adapter produces additional bean"() {
         when:"An adapter method is parsed"
@@ -33,7 +119,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MethodAdapterTest {
 
     @Adapter(ApplicationEventListener.class)
@@ -48,8 +134,37 @@ class MethodAdapterTest {
         ApplicationEventListener.isAssignableFrom(definition.getBeanType())
         !definition.getTypeArguments(ApplicationEventListener).isEmpty()
         definition.getTypeArguments(ApplicationEventListener).get(0).type == StartupEvent
+    }
 
+    void "test method adapter inherited from an interface produces additional bean"() {
+        when:"An adapter method is parsed"
+        BeanDefinition definition = buildBeanDefinition('test.MethodAdapterTest$ApplicationEventListener$onStartup1$Intercepted','''\
+package test
 
+import io.micronaut.aop.*
+import io.micronaut.inject.annotation.*
+import io.micronaut.context.annotation.*
+import io.micronaut.context.event.*
+
+@jakarta.inject.Singleton
+class MethodAdapterTest implements Contract {
+
+    @Override
+    void onStartup(StartupEvent event) {
+        
+    }
+}
+
+interface Contract {
+    @Adapter(ApplicationEventListener)
+    void onStartup(StartupEvent event)
+}
+''')
+        then:"Then a bean is produced that is valid"
+        definition != null
+        ApplicationEventListener.isAssignableFrom(definition.getBeanType())
+        !definition.getTypeArguments(ApplicationEventListener).isEmpty()
+        definition.getTypeArguments(ApplicationEventListener).get(0).type == StartupEvent
     }
 
     void  "test method adapter honours type restraints - correct path"() {
@@ -62,7 +177,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MethodAdapterTest2 {
 
     @Adapter(Foo.class)
@@ -91,7 +206,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MethodAdapterTest3 {
 
     @Adapter(Foo.class)
@@ -117,7 +232,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MethodAdapterTest4 {
 
     @Adapter(ApplicationEventListener.class)

@@ -1,26 +1,47 @@
 dependencies {
-    compileOnly project(":inject-java")
-    compile dependencyVersion("rxjava2")
-    compile project(":http-netty")
-    compile project(":runtime")
-    compile dependencyModuleVersion("netty", "netty-handler-proxy")
+    annotationProcessor project(":inject-java")
+    api project(":runtime")
+    api project(":http-client-core")
+    api project(":websocket")
+    api project(":http-netty")
+    api libs.managed.netty.handler.proxy
 
-    compileOnly dependencyVersion("reactor")
-    compile project(":websocket")
+    testAnnotationProcessor project(":validation")
+    testAnnotationProcessor project(":inject-java")
 
-    testCompile project(":inject-groovy")
-    testCompile project(":validation")
-    testCompile project(":inject-java")
-    testCompile dependencyVersion("rxjava2")
-    testCompile dependencyVersion("reactor")
-    testCompile project(":http-server-netty")
-    testCompile "com.github.tomakehurst:wiremock-jre8:2.25.0"
+    testCompileOnly project(":inject-groovy")
+    testImplementation project(":validation")
+    testImplementation project(":inject")
+
+    implementation libs.managed.reactor
+
+    testImplementation project(":http-server-netty")
+    testImplementation libs.wiremock
+    testImplementation(libs.managed.micronaut.test.junit5) {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+    }
+    testImplementation(libs.managed.micronaut.test.spock) {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+    }
+
+    if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
+        testImplementation libs.bcpkix
+    }
 }
 
 //tasks.withType(Test) {
+//    jvmArgs('-Dio.netty.leakDetection.level=paranoid')
 //    testLogging {
 //        showStandardStreams = true
-//        exceptionFormat = 'full'
+//    }
+//    beforeTest {
+//        System.out.println("STARTING: ${it.className}.$it.name")
+//        System.out.flush()
+//    }
+//    afterTest {
+//        System.out.println("FINISHED: ${it.className}.$it.name")
+//        System.out.flush()
 //    }
 //}
-//

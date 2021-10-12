@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.convert.value;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -70,7 +71,18 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
      * @return True if it is
      */
     default boolean contains(String name) {
-        return get(name, Object.class).isPresent();
+        return get(name, Argument.OBJECT_ARGUMENT).isPresent();
+    }
+
+    /**
+     * Get a raw value without any conversion.
+     *
+     * @param name The key name
+     * @return True if it is
+     * @since 2.0.0
+     */
+    default @Nullable V getValue(CharSequence name) {
+        return (V) get(name, Argument.OBJECT_ARGUMENT).orElse(null);
     }
 
     /**
@@ -187,7 +199,7 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
         String finalPrefix = prefix + '.';
         return names().stream()
             .filter(name -> name.startsWith(finalPrefix))
-            .collect(Collectors.toMap((name) -> name.substring(finalPrefix.length()), (name) -> get(name, valueType).orElse(null)));
+            .collect(Collectors.toMap(name -> name.substring(finalPrefix.length()), name -> get(name, valueType).orElse(null)));
     }
 
     @SuppressWarnings("NullableProblems")

@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,22 +15,28 @@
  */
 package io.micronaut.core.io.service;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.reflect.ClassUtils;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
 import java.net.URL;
+import java.util.Collection;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.ServiceConfigurationError;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.RecursiveAction;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 /**
  * <p>Variation of {@link java.util.ServiceLoader} that allows soft loading and conditional loading of
@@ -41,6 +47,7 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>> {
+
     public static final String META_INF_SERVICES = "META-INF/services";
 
     private final Class<S> serviceType;
@@ -129,6 +136,27 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     }
 
     /**
+     * Collects all initialized instances.
+     *
+     * @param values The collection to be populated.
+     * @param predicate The predicated to filter the instances or null if not needed.
+     */
+    public void collectAll(@NonNull Collection<S> values, @Nullable Predicate<S> predicate) {
+        ServicesLoader<S> servicesLoader = new ServicesLoader<>(serviceType.getName(), condition, classLoader, predicate);
+        ForkJoinPool.commonPool().invoke(servicesLoader);
+        servicesLoader.collect(values);
+    }
+
+    /**
+     * Collects all initialized instances.
+     *
+     * @param values The collection to be populated.
+     */
+    public void collectAll(@NonNull Collection<S> values) {
+        collectAll(values, null);
+    }
+
+    /**
      * @return The iterator
      */
     @Override
@@ -141,10 +169,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                 if (loaded.hasNext()) {
                     return true;
                 }
-                if (unloadedServices.hasNext()) {
-                    return true;
-                }
-                return false;
+                return unloadedServices.hasNext();
             }
 
             @Override
@@ -202,21 +227,27 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                 URL url = serviceConfigs.nextElement();
                 try {
                     try (BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()))) {
-                        List<String> lines = reader.lines()
-                            .filter((line) -> line.length() != 0 && line.charAt(0) != '#')
-                            .filter(condition)
-                            .map((line) -> {
-                                int i = line.indexOf('#');
-                                if (i > -1) {
-                                    line = line.substring(0, i);
-                                }
-                                return line;
-                            })
-                            .collect(Collectors.toList());
+                        List<String> lines = new LinkedList<>();
+                        while (true) {
+                            String line = reader.readLine();
+                            if (line == null) {
+                                break;
+                            }
+                            if (line.length() == 0 || line.charAt(0) == '#') {
+                                continue;
+                            }
+                            if (!condition.test(line)) {
+                                continue;
+                            }
+                            int i = line.indexOf('#');
+                            if (i > -1) {
+                                line = line.substring(0, i);
+                            }
+                            lines.add(line);
+                        }
                         unprocessed = lines.iterator();
-
                     }
-                } catch (IOException e) {
+                } catch (IOException | UncheckedIOException e) {
                     // ignore, can't do anything here and can't log because class used in compiler
                 }
             }
@@ -237,5 +268,166 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                 return newService(nextName, Optional.empty());
             }
         }
+    }
+
+    /**
+     * Fork-join recursive services loader.
+     *
+     * @param <S> The type
+     */
+    private static class ServicesLoader<S> extends RecursiveActionValuesCollector<S> {
+
+        private final String serviceName;
+        private final Predicate<String> lineCondition;
+        private final ClassLoader classLoader;
+        private final Predicate<S> predicate;
+        private final List<RecursiveActionValuesCollector<S>> tasks = new LinkedList<>();
+
+        public ServicesLoader(String serviceName, Predicate<String> lineCondition, ClassLoader classLoader, Predicate<S> predicate) {
+            this.serviceName = serviceName;
+            this.lineCondition = lineCondition;
+            this.classLoader = classLoader;
+            this.predicate = predicate;
+        }
+
+        @Override
+        protected void compute() {
+            try {
+                Enumeration<URL> serviceConfigs = classLoader.getResources(META_INF_SERVICES + '/' + serviceName);
+                while (serviceConfigs.hasMoreElements()) {
+                    URL url = serviceConfigs.nextElement();
+                    UrlServicesLoader<S> task = new UrlServicesLoader<>(url, lineCondition, classLoader, predicate);
+                    tasks.add(task);
+                    task.fork();
+                }
+            } catch (IOException e) {
+                throw new ServiceConfigurationError("Failed to load resources for service: " + serviceName, e);
+            }
+        }
+
+        public void collect(Collection<S> values) {
+            for (RecursiveActionValuesCollector<S> task : tasks) {
+                task.join();
+                task.collect(values);
+            }
+        }
+    }
+
+    /**
+     * Reads URL, parses the file and produces sub tasks to initialize the entry.
+     *
+     * @param <S> The type
+     */
+    private static class UrlServicesLoader<S> extends RecursiveActionValuesCollector<S> {
+
+        private final URL url;
+        private final Predicate<String> lineCondition;
+        private final ClassLoader classLoader;
+        private final Predicate<S> predicate;
+        private final List<ServiceInstanceLoader<S>> tasks = new LinkedList<>();
+
+        public UrlServicesLoader(URL url, Predicate<String> lineCondition, ClassLoader classLoader, Predicate<S> predicate) {
+            this.url = url;
+            this.lineCondition = lineCondition;
+            this.classLoader = classLoader;
+            this.predicate = predicate;
+        }
+
+        @Override
+        protected void compute() {
+            try {
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()))) {
+                    while (true) {
+                        String line = reader.readLine();
+                        if (line == null) {
+                            break;
+                        }
+                        if (line.length() == 0 || line.charAt(0) == '#') {
+                            continue;
+                        }
+                        if (!lineCondition.test(line)) {
+                            continue;
+                        }
+                        int i = line.indexOf('#');
+                        if (i > -1) {
+                            line = line.substring(0, i);
+                        }
+                        ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(line, classLoader, predicate);
+                        tasks.add(task);
+                        task.fork();
+                    }
+                }
+            } catch (IOException | UncheckedIOException e) {
+                // ignore, can't do anything here and can't log because class used in compiler
+            }
+        }
+
+        public void collect(Collection<S> values) {
+            for (ServiceInstanceLoader<S> task : tasks) {
+                task.join();
+                task.collect(values);
+            }
+        }
+
+    }
+
+    /**
+     * Initializes and filters the entry.
+     *
+     * @param <S> The type
+     */
+    private static class ServiceInstanceLoader<S> extends RecursiveActionValuesCollector<S> {
+
+        private final String className;
+        private final ClassLoader classLoader;
+        private final Predicate<S> predicate;
+        private S result;
+        private Throwable throwable;
+
+        public ServiceInstanceLoader(String className, ClassLoader classLoader, Predicate<S> predicate) {
+            this.className = className;
+            this.classLoader = classLoader;
+            this.predicate = predicate;
+        }
+
+        @Override
+        protected void compute() {
+            try {
+                final Class<?> loadedClass = Class.forName(className, false, classLoader);
+                result = (S) loadedClass.getDeclaredConstructor().newInstance();
+                if (predicate != null && !predicate.test(result)) {
+                    result = null;
+                }
+            } catch (NoClassDefFoundError | ClassNotFoundException e) {
+                // Ignore
+            } catch (Throwable e) {
+                throwable = e;
+            }
+        }
+
+        public void collect(Collection<S> values) {
+            if (throwable != null) {
+                throw new RuntimeException("Failed to load a service: " + throwable.getMessage(), throwable);
+            }
+            if (result != null) {
+                values.add(result);
+            }
+        }
+    }
+
+    /**
+     * Abstract recursive action class.
+     *
+     * @param <S> The type
+     */
+    private abstract static class RecursiveActionValuesCollector<S> extends RecursiveAction {
+
+        /**
+         * Collects loaded values.
+         *
+         * @param values The values
+         */
+        public abstract void collect(Collection<S> values);
+
     }
 }

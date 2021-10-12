@@ -1,15 +1,15 @@
-One significant difference between Micronaut's Dependency Injection system and Spring is the way beans can be replaced.
+One significant difference between Micronaut's Dependency Injection system and Spring's is the way beans are replaced.
 
-In a Spring application, beans have names and can effectively be overridden simply by creating a bean with the same name, regardless of the type of the bean. Spring also has the notion of bean registration order, hence in Spring Boot you have `@AutoConfigureBefore` and `@AutoConfigureAfter` the control how beans override each other.
+In a Spring application, beans have names and are overridden by creating a bean with the same name, regardless of the type of the bean. Spring also has the notion of bean registration order, hence in Spring Boot you have `@AutoConfigureBefore` and `@AutoConfigureAfter` annotations that control how beans override each other.
 
-This strategy leads to difficult to debug problems, for example:
+This strategy leads to problems that are difficult to debug, for example:
 
 * Bean loading order changes, leading to unexpected results
 * A bean with the same name overrides another bean with a different type
 
 To avoid these problems, Micronaut's DI has no concept of bean names or load order. Beans have a type and a api:context.Qualifier[]. You cannot override a bean of a completely different type with another.
 
-A useful benefit of Spring's approach is that it allows overriding existing beans to customize behaviour. In order to support the same ability, Micronaut's DI provides an explicit ann:context.annotation.Replaces[] annotation, which integrates nicely with support for <<conditionalBeans, Conditional Beans>> and clearly documents and expresses the intention of the developer.
+A useful benefit of Spring's approach is that it allows overriding existing beans to customize behaviour. To support the same ability, Micronaut's DI provides an explicit ann:context.annotation.Replaces[] annotation, which integrates nicely with support for <<conditionalBeans, Conditional Beans>> and clearly documents and expresses the intention of the developer.
 
 Any existing bean can be replaced by another bean that declares ann:context.annotation.Replaces[]. For example, consider the following class:
 
@@ -29,13 +29,13 @@ For example, it may be desired to replace all or part of the given factory class
 
 snippet::io.micronaut.docs.replaces.BookFactory[tags="class",indent=0, title="BookFactory"]
 
-WARNING: To replace a factory in its entirety, it is necessary that your factory methods match the return types of all of the methods in the replaced factory.
+WARNING: To replace a factory entirely, your factory methods must match the return types of all methods in the replaced factory.
 
-In this example, the `BookFactory#textBook()` will *not* be replaced because this factory does not have a factory method that returns a TextBook.
+In this example, `BookFactory#textBook()` is *not* replaced because this factory does not have a factory method that returns a `TextBook`.
 
 snippet::io.micronaut.docs.replaces.CustomBookFactory[tags="class",indent=0, title="CustomBookFactory"]
 
-It may be the case that you don't wish for the factory methods to be replaced, except for a select few. For that use case, you can apply the `@Replaces` annotation on the method and denote the factory that it should apply to.
+To replace one or more factory methods but retain the rest, apply the `@Replaces` annotation on the method(s) and denote the factory to apply to.
 
 snippet::io.micronaut.docs.replaces.TextBookFactory[tags="class",indent=0, title="TextBookFactory"]
 
@@ -43,7 +43,7 @@ The `BookFactory#novel()` method will not be replaced because the TextBook class
 
 === Default Implementation
 
-When exposing an API, it may be desirable for the default implementation of an interface to not be exposed as part of the public API. Doing so would prevent users from being able to replace the implementation because they would not be able to reference the class. The solution is to annotate the interface with api:context.annotation.DefaultImplementation[] to indicate which implementation should be replaced if a user creates a bean that `@Replaces(YourInterface.class)`.
+When exposing an API, it may be desirable to not expose the default implementation of an interface as part of the public API. Doing so prevents users from being able to replace the implementation because they will not be able to reference the class. The solution is to annotate the interface with api:context.annotation.DefaultImplementation[] to indicate which implementation to replace if a user creates a bean that `@Replaces(YourInterface.class)`.
 
 For example consider:
 
@@ -59,4 +59,4 @@ The custom implementation
 
 snippet::io.micronaut.docs.qualifiers.replaces.defaultimpl.CustomResponseStrategy[tags="clazz"]
 
-In the above example, the `CustomResponseStrategy` will replace the `DefaultResponseStrategy` because the api:context.annotation.DefaultImplementation[] annotation points to the `DefaultResponseStrategy`.
+In the above example, the `CustomResponseStrategy` replaces the `DefaultResponseStrategy` because the api:context.annotation.DefaultImplementation[] annotation points to the `DefaultResponseStrategy`.

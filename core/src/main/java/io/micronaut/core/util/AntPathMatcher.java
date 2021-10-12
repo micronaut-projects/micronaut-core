@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -24,7 +24,7 @@ package io.micronaut.core.util;
  * Examples are provided below.</p>
  * <p>
  * <p>Part of this mapping code has been kindly borrowed from
- * <a href="http://ant.apache.org">Apache Ant</a>.
+ * <a href="https://ant.apache.org">Apache Ant</a>.
  * <p>
  * <p>The mapping matches URLs using the following rules:<br>
  * <ul>
@@ -100,7 +100,7 @@ public class AntPathMatcher implements PathMatcher {
      * <code>false</code> if it didn't
      */
     protected boolean doMatch(String pattern, String path, boolean fullMatch) {
-        if (path.startsWith(this.pathSeparator) != pattern.startsWith(this.pathSeparator)) {
+        if (path == null || pattern == null || path.startsWith(this.pathSeparator) != pattern.startsWith(this.pathSeparator)) {
             return false;
         }
 
@@ -196,8 +196,8 @@ public class AntPathMatcher implements PathMatcher {
             strLoop:
             for (int i = 0; i <= strLength - patLength; i++) {
                 for (int j = 0; j < patLength; j++) {
-                    String subPat = (String) pattDirs[pattIdxStart + j + 1];
-                    String subStr = (String) pathDirs[pathIdxStart + i + j];
+                    String subPat = pattDirs[pattIdxStart + j + 1];
+                    String subStr = pathDirs[pathIdxStart + i + j];
                     if (!matchStrings(subPat, subStr)) {
                         continue strLoop;
                     }

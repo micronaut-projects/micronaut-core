@@ -1,32 +1,27 @@
 package io.micronaut.docs.streaming
 
-import io.kotlintest.matchers.string.shouldStartWith
-import io.kotlintest.shouldNotBe
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldNotBe
+import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.string.shouldStartWith
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.client.RxStreamingHttpClient
+import io.micronaut.http.HttpRequest.GET
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
-import io.reactivex.Maybe
-import org.junit.Test
+import org.junit.Assert.fail
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
-
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
-
-import io.micronaut.http.HttpRequest.GET
-import io.micronaut.http.client.RxHttpClient
-import org.junit.Assert.*
 
 class HeadlineControllerSpec: StringSpec() {
 
     val embeddedServer = autoClose(
-            ApplicationContext.run(EmbeddedServer::class.java)
+        ApplicationContext.run(EmbeddedServer::class.java)
     )
 
     val client = autoClose(
-            embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
+        embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
     )
 
     init {
@@ -36,9 +31,9 @@ class HeadlineControllerSpec: StringSpec() {
                     .applicationContext
                     .getBean(HeadlineClient::class.java) // <1>
 
-            val firstHeadline = headlineClient.streamHeadlines().firstElement() // <2>
+            val firstHeadline = headlineClient.streamHeadlines().next() // <2>
 
-            val headline = firstHeadline.blockingGet() // <3>
+            val headline = firstHeadline.block() // <3>
 
             headline shouldNotBe null
             headline.text shouldStartWith "Latest Headline"
@@ -46,10 +41,12 @@ class HeadlineControllerSpec: StringSpec() {
         // end::streamingClient[]
 
         "test streaming client" {
-            val client = embeddedServer.applicationContext.createBean(RxStreamingHttpClient::class.java, embeddedServer.url)
+            val client = embeddedServer.applicationContext.createBean(
+                StreamingHttpClient::class.java, embeddedServer.url)
 
             // tag::streaming[]
-            val headlineStream = client.jsonStream(GET<Any>("/streaming/headlines"), Headline::class.java) // <1>
+            val headlineStream = client.jsonStream(
+                GET<Any>("/streaming/headlines"), Headline::class.java) // <1>
             val future = CompletableFuture<Headline>() // <2>
             headlineStream.subscribe(object : Subscriber<Headline> {
                 override fun onSubscribe(s: Subscription) {
@@ -57,7 +54,7 @@ class HeadlineControllerSpec: StringSpec() {
                 }
 
                 override fun onNext(headline: Headline) {
-                    println("Received Headline = " + headline.text!!)
+                    println("Received Headline = ${headline.text!!}")
                     future.complete(headline) // <4>
                 }
 
@@ -70,12 +67,12 @@ class HeadlineControllerSpec: StringSpec() {
                 }
             })
             // end::streaming[]
+
             try {
                 val headline = future.get(3, TimeUnit.SECONDS)
                 headline.text shouldStartWith "Latest Headline"
-
             } catch (e: Throwable) {
-                fail("Asynchronous error occurred: " + if (e.message != null) e.message else e.javaClass.simpleName)
+                fail("Asynchronous error occurred: " + (e.message ?: e.javaClass.simpleName))
             }
             client.stop()
         }

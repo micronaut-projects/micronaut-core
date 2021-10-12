@@ -1,0 +1,16 @@
+plugins {
+    id 'io.micronaut.build.internal.bom-checker'
+}
+
+repositories {
+    mavenCentral()
+}
+
+boolean micronautSnapshot = rootProject.version.toString().endsWith("-SNAPSHOT")
+
+tasks.withType(io.micronaut.build.internal.pom.PomChecker).configureEach {
+    onlyIf {
+        // We only perform validation on releases
+        !micronautSnapshot || providers.gradleProperty("force.check.bom").isPresent()
+    }
+}

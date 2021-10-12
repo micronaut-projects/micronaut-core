@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,13 +14,16 @@
  * limitations under the License.
  */
 package io.micronaut.http.server.netty.websocket;
-
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
 import io.netty.buffer.ByteBuf;
-import io.reactivex.Single;
+import io.netty.handler.codec.http.websocketx.ContinuationWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
 
 import java.nio.ByteBuffer;
 import java.util.Collection;
@@ -70,5 +73,21 @@ public abstract class BinaryChatClientWebSocket implements AutoCloseable{
 
     public abstract Future<ByteBuf> sendAsync(ByteBuf message);
 
-    public abstract Single<ByteBuffer> sendRx(ByteBuffer message);
+    @SingleResult
+    public abstract Publisher<ByteBuffer> sendRx(ByteBuffer message);
+
+    public void sendMultiple() {
+        session.sendSync(new TextWebSocketFrame(false, 0, "hello"));
+        session.sendSync(new ContinuationWebSocketFrame(false, 0, " "));
+        session.sendSync(new ContinuationWebSocketFrame(true, 0, "world"));
+    }
+
+    public void sendMany() {
+        session.sendSync(new TextWebSocketFrame(false, 0, "a"));
+        session.sendSync(new ContinuationWebSocketFrame(false, 0, "b"));
+        session.sendSync(new ContinuationWebSocketFrame(false, 0, "c"));
+        session.sendSync(new ContinuationWebSocketFrame(false, 0, "d"));
+        session.sendSync(new ContinuationWebSocketFrame(false, 0, "e"));
+        session.sendSync(new ContinuationWebSocketFrame(true, 0, "f"));
+    }
 }

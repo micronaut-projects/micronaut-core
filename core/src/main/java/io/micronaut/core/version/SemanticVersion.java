@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -48,17 +48,20 @@ public class SemanticVersion implements Comparable<SemanticVersion> {
      */
     public SemanticVersion(String version) {
         this.version = version;
-        String[] parts = version.replace('_', '.').split("\\.");
+        String[] parts = version
+                .replace('_', '.')
+                .replace('-', '.')
+                .split("\\.");
         if (parts.length >= PARTS_MIN) {
             try {
                 this.major = Integer.valueOf(parts[0]);
                 this.minor = Integer.valueOf(parts[1]);
                 this.patch = Integer.valueOf(parts[2]);
             } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("Version number is not semantic [" + version + "]! Should be in the format d.d.d. See http://semver.org");
+                throw new IllegalArgumentException("Version number is not semantic [" + version + "]! Should be in the format d.d.d. See https://semver.org");
             }
         } else {
-            throw new IllegalArgumentException("Version number is not semantic. Should be in the format d.d.d. See http://semver.org");
+            throw new IllegalArgumentException("Version number is not semantic. Should be in the format d.d.d. See https://semver.org");
         }
     }
 

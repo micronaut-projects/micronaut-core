@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,6 +21,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriMatcher;
 
+import io.micronaut.core.annotation.Nullable;
 import java.net.URI;
 import java.util.Optional;
 import java.util.function.Predicate;
@@ -39,6 +40,7 @@ public interface UriRoute extends Route, UriMatcher, Comparable<UriRoute> {
      * @param nested The nested routes
      * @return This route
      */
+    @Override
     UriRoute nest(Runnable nested);
 
     /**
@@ -78,13 +80,27 @@ public interface UriRoute extends Route, UriMatcher, Comparable<UriRoute> {
     UriRoute produces(MediaType... mediaType);
 
     @Override
-    UriRoute acceptAll();
+    UriRoute consumesAll();
 
     @Override
     UriRoute where(Predicate<HttpRequest<?>> condition);
 
     @Override
     UriRoute body(String argument);
+
+    /**
+     * The exposed port that the route applies to.
+     *
+     * @param port The port
+     * @return The route
+     */
+    UriRoute exposedPort(int port);
+
+    /**
+     * @return The port the route listens to, or null if the default port
+     */
+    @Nullable
+    Integer getPort();
 
     /**
      *

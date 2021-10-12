@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,9 +16,9 @@
 package io.micronaut.validation.validator.constraints;
 
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import javax.validation.constraints.Size;
 
 /**
@@ -31,7 +31,7 @@ import javax.validation.constraints.Size;
 @FunctionalInterface
 public interface SizeValidator<T> extends ConstraintValidator<Size, T> {
     @Override
-    default boolean isValid(@Nullable T value, @Nonnull AnnotationValue<Size> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
+    default boolean isValid(@Nullable T value, @NonNull AnnotationValue<Size> annotationMetadata, @NonNull ConstraintValidatorContext context) {
         if (value == null) {
             return true; // null considered valid according to spec
         }
@@ -46,5 +46,5 @@ public interface SizeValidator<T> extends ConstraintValidator<Size, T> {
      * @param value The value
      * @return The size
      */
-    int getSize(@Nonnull T value);
+    int getSize(@NonNull T value);
 }

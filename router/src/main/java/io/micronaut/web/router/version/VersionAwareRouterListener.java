@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,11 +18,12 @@ package io.micronaut.web.router.version;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.filter.FilteredRouter;
+import jakarta.inject.Singleton;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import static io.micronaut.web.router.version.RoutesVersioningConfiguration.PREFIX;
 
 /**
  * Configuration to decorate {@link Router} with version matching logic.
@@ -31,18 +32,18 @@ import javax.inject.Singleton;
  * @since 1.1.0
  */
 @Singleton
+@Requires(property = PREFIX + ".enabled", value = StringUtils.TRUE)
 @Requires(beans = RoutesVersioningConfiguration.class)
 public class VersionAwareRouterListener implements BeanCreatedEventListener<Router> {
 
-    private final RouteVersionFilter routeVersionFilter;
+    private final VersionRouteMatchFilter routeVersionFilter;
 
     /**
      * Creates a configuration to decorate existing {@link Router} beans with a {@link FilteredRouter}.
      *
-     * @param filter A {@link io.micronaut.web.router.filter.RouteMatchFilter} to delegate routes filtering
+     * @param filter A {@link VersionRouteMatchFilter} to delegate routes filtering
      */
-    @Inject
-    public VersionAwareRouterListener(RouteVersionFilter filter) {
+    public VersionAwareRouterListener(VersionRouteMatchFilter filter) {
         this.routeVersionFilter = filter;
     }
 

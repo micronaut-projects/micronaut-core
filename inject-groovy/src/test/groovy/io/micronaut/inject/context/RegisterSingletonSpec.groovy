@@ -17,6 +17,7 @@ package io.micronaut.inject.context
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
 import javax.inject.Inject
@@ -37,14 +38,42 @@ class RegisterSingletonSpec extends Specification {
 
         then:
         context.getBean(B) == b
+        context.getBeansOfType(B).size() == 1
         b.a != null
         b.a == context.getBean(A)
+
+        cleanup:
+        context.close()
+    }
+
+
+    void "test register named singleton method"() {
+        given:
+        BeanContext context = new DefaultBeanContext().start()
+        def b = new B()
+
+        when:
+        context.registerSingleton(B, b, Qualifiers.byName("test"))
+
+        then:
+        context.getBean(B, Qualifiers.byName("test")) == b
+        // there are 2 because currently defining only @Inject results in
+        // another bean definition with the primary qualifier
+        context.getBeansOfType(B).size() == 2
+        // no bean definition for qualifier to not injected
+        b.a == null
+
+        cleanup:
+        context.close()
     }
 
     @Singleton
     static class A {}
 
     static class B {
+        B() {
+            println "created"
+        }
         @Inject A a
     }
 }

@@ -15,57 +15,59 @@
  */
 package io.micronaut.http.client
 
-import io.micronaut.http.client.annotation.Client
-import io.reactivex.Flowable
-import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
-import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.http.annotation.Delete
-import spock.lang.AutoCleanup
-import spock.lang.Shared
+import io.micronaut.http.client.annotation.Client
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import jakarta.inject.Inject
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 /**
- * TODO: Javadoc description
- *
  * @author graemerocher
  * @since 1.0
  */
+@Property(name = 'spec.name', value = 'HttpDeleteSpec')
+@MicronautTest
 class HttpDeleteSpec extends Specification {
 
+    @Inject
+    @Client("/")
+    HttpClient client
 
-    @Shared
-    @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
-
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-
-    @Shared
-    @AutoCleanup
-    HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
-
+    @Inject
+    MyDeleteClient myDeleteClient
 
     void "test http delete"() {
         when:
-        def res = Flowable.fromPublisher(client.exchange(HttpRequest.DELETE('/delete/simple'))).blockingFirst()
+        HttpResponse<?> res = client.toBlocking().exchange(HttpRequest.DELETE('/delete/simple'))
 
         then:
         res.status == HttpStatus.NO_CONTENT
     }
 
+    void "test http delete with blocking client"() {
+        when:
+        HttpResponse<?> res = client.toBlocking().exchange(HttpRequest.DELETE('/delete/simple'))
+
+        then:
+        res.status == HttpStatus.NO_CONTENT
+    }
 
     void "test http delete with body"() {
         when:
-        def res = Flowable.fromPublisher(client.exchange(
+        HttpResponse<?> res = Flux.from(client.exchange(
                 HttpRequest.DELETE('/delete/body', 'test')
-                           .contentType(MediaType.TEXT_PLAIN) , String)).blockingFirst()
-        def body = res.body
+                           .contentType(MediaType.TEXT_PLAIN) , String)).blockFirst()
+        Optional<String> body = res.body
+
         then:
         res.status == HttpStatus.ACCEPTED
         body.isPresent()
@@ -73,7 +75,7 @@ class HttpDeleteSpec extends Specification {
     }
 
     void "test multiple uris"() {
-        def client = embeddedServer.applicationContext.getBean(MyDeleteClient)
+        def client = myDeleteClient
 
         when:
         String val = client.multiple()
@@ -88,6 +90,17 @@ class HttpDeleteSpec extends Specification {
         val == "multiple mappings"
     }
 
+    void "test delete annotation with HttpRequest<Void> injection"() {
+        def client = myDeleteClient
+
+        when:
+        String val = client.voidRequest()
+
+        then:
+        val == "ok"
+    }
+
+    @Requires(property = 'spec.name', value = 'HttpDeleteSpec')
     @Controller("/delete")
     static class DeleteController {
 
@@ -107,8 +120,14 @@ class HttpDeleteSpec extends Specification {
         String multipleMappings() {
             return "multiple mappings"
         }
+
+        @Delete("/void")
+        String voidRequest(HttpRequest<Void> req) {
+            "ok"
+        }
     }
 
+    @Requires(property = 'spec.name', value = 'HttpDeleteSpec')
     @Client("/delete")
     static interface MyDeleteClient {
 
@@ -117,5 +136,8 @@ class HttpDeleteSpec extends Specification {
 
         @Delete("/multiple/mappings")
         String multipleMappings()
+
+        @Delete("/void")
+        String voidRequest()
     }
 }

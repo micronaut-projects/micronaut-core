@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,13 +18,14 @@ package io.micronaut.management.endpoint.info.source;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.context.env.PropertySource;
-import io.micronaut.core.async.SupplierUtil;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.management.endpoint.info.InfoEndpoint;
-import io.micronaut.runtime.context.scope.Refreshable;
-import io.reactivex.Flowable;
+
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -35,7 +36,7 @@ import java.util.function.Supplier;
  * @author Zachary Klein
  * @since 1.0
  */
-@Refreshable
+@Singleton
 @Requires(beans = InfoEndpoint.class)
 @Requires(property = "endpoints.info.build.enabled", notEquals = StringUtils.FALSE)
 public class BuildInfoSource implements PropertiesInfoSource {
@@ -63,7 +64,7 @@ public class BuildInfoSource implements PropertiesInfoSource {
     @Override
     public Publisher<PropertySource> getSource() {
         Optional<PropertySource> propertySource = supplier.get();
-        return propertySource.map(Flowable::just).orElse(Flowable.empty());
+        return propertySource.map(Flux::just).orElse(Flux.empty());
     }
 
     private Optional<PropertySource> retrieveBuildInfo() {

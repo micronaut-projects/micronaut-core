@@ -15,12 +15,33 @@
  */
 package io.micronaut.inject.executable
 
-import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.inject.BeanDefinition
 
-import java.util.function.Function
-
 class ExecutableBeanSpec extends AbstractBeanDefinitionSpec {
+
+    void "test executable on stereotype"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.ExecutableController','''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import io.micronaut.http.annotation.Get;
+
+@jakarta.inject.Singleton
+class ExecutableController {
+
+    @Get("/round")
+    public int round(float num) {
+        return Math.round(num);
+    }
+}
+''')
+        expect:
+        definition != null
+        definition.findMethod("round", float.class).get().returnType.type == int.class
+    }
 
     void "test executable method return types"() {
         given:
@@ -30,7 +51,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Executable
 class ExecutableBean1 {
 
@@ -43,5 +64,61 @@ class ExecutableBean1 {
         definition != null
         definition.findMethod("round", float.class).get().returnType.type == int.class
 
+    }
+
+    void "bean definition should not be created for class with only executable methods"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.MyBean','''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+class MyBean {
+
+    @Executable
+    public int round(float num) {
+        return Math.round(num);
+    }
+}
+
+''')
+
+        expect:
+        definition == null
+    }
+
+    void "test multiple executable annotations on a method"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.MyBean','''\
+package test
+
+import io.micronaut.inject.annotation.*
+import io.micronaut.context.annotation.*
+import io.micronaut.inject.executable.*
+
+@jakarta.inject.Singleton
+class MyBean  {
+
+    @RepeatableExecutables([
+        @RepeatableExecutable("a"),
+        @RepeatableExecutable("b")
+    ])
+    void run() {
+        
+    }
+    
+       
+    @RepeatableExecutable("a")
+    @RepeatableExecutable("b")
+    void run2() {
+        
+    }
+}
+''')
+        expect:
+        definition != null
+        definition.findMethod("run2").isPresent()
+        definition.findMethod("run").isPresent()
     }
 }

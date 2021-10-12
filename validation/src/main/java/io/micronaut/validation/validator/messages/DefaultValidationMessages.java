@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.validation.validator.messages;
 
 import io.micronaut.context.StaticMessageSource;
+import io.micronaut.core.annotation.Introspected;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import javax.validation.constraints.*;
 
 /**
@@ -41,6 +41,8 @@ public class DefaultValidationMessages extends StaticMessageSource {
     public DefaultValidationMessages() {
         addMessage(AssertTrue.class.getName() + MESSAGE_SUFFIX, "must be true");
         addMessage(AssertFalse.class.getName() + MESSAGE_SUFFIX, "must be false");
+        addMessage(DecimalMax.class.getName() + MESSAGE_SUFFIX, "must be less than or equal to {value}");
+        addMessage(DecimalMin.class.getName() + MESSAGE_SUFFIX, "must be greater than or equal to {value}");
         addMessage(Digits.class.getName() + MESSAGE_SUFFIX, "numeric value out of bounds (<{integer} digits>.<{fraction} digits> expected)");
         addMessage(Email.class.getName() + MESSAGE_SUFFIX, "must be a well-formed email address");
         addMessage(Future.class.getName() + MESSAGE_SUFFIX, "must be a future date");
@@ -60,5 +62,7 @@ public class DefaultValidationMessages extends StaticMessageSource {
         addMessage(Positive.class.getName() + MESSAGE_SUFFIX, "must be greater than 0");
         addMessage(PositiveOrZero.class.getName() + MESSAGE_SUFFIX, "must be greater than or equal to 0");
         addMessage(Size.class.getName() + MESSAGE_SUFFIX, "size must be between {min} and {max}");
+
+        addMessage(Introspected.class.getName() + MESSAGE_SUFFIX, "Cannot validate {type}. No bean introspection present. Please add @Introspected to the class and ensure Micronaut annotation processing is enabled");
     }
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -37,26 +37,34 @@ import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.bind.WebSocketState;
 import io.micronaut.websocket.bind.WebSocketStateBinderRegistry;
 import io.micronaut.websocket.context.WebSocketBean;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-
 import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.ContinuationWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
-import io.reactivex.Flowable;
-import io.reactivex.functions.BiConsumer;
-import io.reactivex.schedulers.Schedulers;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 /**
  * Abstract implementation that handles WebSocket frames.
@@ -79,12 +87,14 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     protected final WebSocketBean<?> webSocketBean;
     protected final HttpRequest<?> originatingRequest;
     protected final MethodExecutionHandle<?, ?> messageHandler;
-    protected final NettyRxWebSocketSession session;
+    protected final NettyWebSocketSession session;
     protected final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected final WebSocketVersion webSocketVersion;
+    protected final String subProtocol;
     protected final WebSocketSessionRepository webSocketSessionRepository;
     private final Argument<?> bodyArgument;
     private final AtomicBoolean closed = new AtomicBoolean(false);
+    private AtomicReference<CompositeByteBuf> frameBuffer = new AtomicReference<>();
 
     /**
      * Default constructor.
@@ -96,6 +106,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param request                    The originating request
      * @param uriVariables               The URI variables
      * @param version                    The websocket version being used
+     * @param subProtocol                The handler sub-protocol
      * @param webSocketSessionRepository The web socket repository if they are supported (like on the server), null otherwise
      */
     protected AbstractNettyWebSocketHandler(
@@ -106,7 +117,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             HttpRequest<?> request,
             Map<String, Object> uriVariables,
             WebSocketVersion version,
+            String subProtocol,
             WebSocketSessionRepository webSocketSessionRepository) {
+        this.subProtocol = subProtocol;
         this.webSocketSessionRepository = webSocketSessionRepository;
         this.webSocketBinder = new WebSocketStateBinderRegistry(binderRegistry);
         this.uriVariables = uriVariables;
@@ -162,11 +175,11 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         BoundExecutable finalBoundExecutable = boundExecutable;
                         Object result = invokeExecutable(finalBoundExecutable, openMethod);
                         if (Publishers.isConvertibleToPublisher(result)) {
-                            Flowable<?> flowable = instrumentPublisher(ctx, result);
+                            Flux<?> flowable = Flux.from(instrumentPublisher(ctx, result));
                             flowable.subscribe(
-                                    (o) -> {
+                                    o -> {
                                     },
-                                    (error) -> {
+                                    error -> {
                                         if (LOG.isErrorEnabled()) {
                                             LOG.error("Error Opening WebSocket [" + webSocketBean + "]: " + error.getMessage(), error);
                                         }
@@ -203,12 +216,13 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     /**
      * @return The session
      */
-    public NettyRxWebSocketSession getSession() {
+    public NettyWebSocketSession getSession() {
         return session;
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        cleanupBuffer();
         Optional<? extends MethodExecutionHandle<?, ?>> opt = webSocketBean.errorMethod();
 
         if (opt.isPresent()) {
@@ -234,15 +248,12 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     return;
                 }
                 if (Publishers.isConvertibleToPublisher(result)) {
-                    Flowable<?> flowable = instrumentPublisher(ctx, result);
-                    flowable.toList().subscribe((BiConsumer<List<?>, Throwable>) (objects, throwable) -> {
-                        if (throwable != null) {
-
-                            if (LOG.isErrorEnabled()) {
-                                LOG.error("Error subscribing to @OnError handler " + target.getClass().getSimpleName() + "." + errorMethod.getExecutableMethod() + ": " + throwable.getMessage(), throwable);
-                            }
+                    Flux<?> flowable = Flux.from(instrumentPublisher(ctx, result));
+                    flowable.collectList().subscribe(objects -> handleUnexpected(ctx, cause), throwable -> {
+                        if (throwable != null && LOG.isErrorEnabled()) {
+                            LOG.error("Error subscribing to @OnError handler " + target.getClass().getSimpleName() + "." + errorMethod.getExecutableMethod() + ": " + throwable.getMessage(), throwable);
                         }
-                        handleUnexpected(ctx, throwable);
+                        handleUnexpected(ctx, cause);
                     });
                 }
 
@@ -261,12 +272,12 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     }
 
     /**
-     * Subclasses should implement to create the actual {@link NettyRxWebSocketSession}.
+     * Subclasses should implement to create the actual {@link NettyWebSocketSession}.
      *
      * @param ctx The context
      * @return The session
      */
-    protected abstract NettyRxWebSocketSession createWebSocketSession(ChannelHandlerContext ctx);
+    protected abstract NettyWebSocketSession createWebSocketSession(ChannelHandlerContext ctx);
 
     /**
      * Subclasses can override to customize publishers returned from message handlers.
@@ -275,9 +286,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param result The result
      * @return The flowable
      */
-    protected Flowable<?> instrumentPublisher(ChannelHandlerContext ctx, Object result) {
-        Flowable<?> actual = Publishers.convertPublisher(result, Flowable.class);
-        return actual.subscribeOn(Schedulers.from(ctx.channel().eventLoop()));
+    protected Publisher<?> instrumentPublisher(ChannelHandlerContext ctx, Object result) {
+        Publisher<?> actual = Publishers.convertPublisher(result, Publisher.class);
+        return Flux.from(actual).subscribeOn(Schedulers.fromExecutorService(ctx.channel().eventLoop()));
     }
 
     /**
@@ -307,7 +318,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param msg The frame
      */
     protected void handleWebSocketFrame(ChannelHandlerContext ctx, WebSocketFrame msg) {
-        if (msg instanceof TextWebSocketFrame || msg instanceof BinaryWebSocketFrame) {
+        if (msg instanceof TextWebSocketFrame || msg instanceof BinaryWebSocketFrame || msg instanceof ContinuationWebSocketFrame) {
 
             if (messageHandler == null) {
                 if (LOG.isDebugEnabled()) {
@@ -318,13 +329,39 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         CloseReason.UNSUPPORTED_DATA
                 );
             } else {
+                ByteBuf msgContent = msg.content().retain();
+                if (!msg.isFinalFragment()) {
+                    frameBuffer.updateAndGet((buffer) -> {
+                        if (buffer == null) {
+                            buffer = ctx.alloc().compositeBuffer();
+                        }
+                        buffer.addComponent(true, msgContent);
+                        return buffer;
+                    });
+                    return;
+                }
+
+                ByteBuf content;
+                CompositeByteBuf buffer = frameBuffer.getAndSet(null);
+                if (buffer == null) {
+                    content = msgContent;
+                } else {
+                    buffer.addComponent(true, msgContent);
+                    content = buffer;
+                }
 
                 Argument<?> bodyArgument = this.getBodyArgument();
-                Optional<?> converted = ConversionService.SHARED.convert(msg.content(), bodyArgument);
-                NettyRxWebSocketSession currentSession = getSession();
+                Optional<?> converted = ConversionService.SHARED.convert(content, bodyArgument);
+                content.release();
 
                 if (!converted.isPresent()) {
-                    MediaType mediaType = messageHandler.stringValue(Consumes.class).map(MediaType::new).orElse(MediaType.APPLICATION_JSON_TYPE);
+                    MediaType mediaType;
+                    try {
+                        mediaType = messageHandler.stringValue(Consumes.class).map(MediaType::of).orElse(MediaType.APPLICATION_JSON_TYPE);
+                    } catch (IllegalArgumentException e) {
+                        exceptionCaught(ctx, e);
+                        return;
+                    }
                     try {
                         converted = mediaTypeCodecRegistry.findCodec(mediaType).map(codec -> codec.decode(bodyArgument, new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content())));
                     } catch (CodecException e) {
@@ -339,6 +376,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 if (converted.isPresent()) {
                     Object v = converted.get();
 
+                    NettyWebSocketSession currentSession = getSession();
                     ExecutableBinder<WebSocketState> executableBinder = new DefaultExecutableBinder<>(
                             Collections.singletonMap(bodyArgument, v)
                     );
@@ -352,11 +390,11 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
                         Object result = invokeExecutable(boundExecutable, messageHandler);
                         if (Publishers.isConvertibleToPublisher(result)) {
-                            Flowable<?> flowable = instrumentPublisher(ctx, result);
+                            Flux<?> flowable = Flux.from(instrumentPublisher(ctx, result));
                             flowable.subscribe(
-                                    (o) -> {
+                                    o -> {
                                     },
-                                    (error) -> {
+                                    error -> {
                                         if (LOG.isErrorEnabled()) {
                                             LOG.error("Error Processing WebSocket Message [" + webSocketBean + "]: " + error.getMessage(), error);
                                         }
@@ -382,10 +420,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     );
                 }
             }
-
         } else if (msg instanceof PingWebSocketFrame) {
             // respond with pong
-            PingWebSocketFrame frame = (PingWebSocketFrame) msg;
+            PingWebSocketFrame frame = (PingWebSocketFrame) msg.retain();
             ctx.writeAndFlush(new PongWebSocketFrame(frame.content()));
 
         } else if (msg instanceof PongWebSocketFrame) {
@@ -408,7 +445,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param session The session
      * @param message The message that was handled
      */
-    protected void messageHandled(ChannelHandlerContext ctx, NettyRxWebSocketSession session, Object message) {
+    protected void messageHandled(ChannelHandlerContext ctx, NettyWebSocketSession session, Object message) {
         // no-op
     }
 
@@ -429,6 +466,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param cr The reason
      */
     private void handleCloseReason(ChannelHandlerContext ctx, CloseReason cr) {
+        cleanupBuffer();
         if (closed.compareAndSet(false, true)) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Closing WebSocket session {} with reason {}", getSession(), cr);
@@ -453,7 +491,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     }
                 }
             } else {
-                ctx.close();
+                writeCloseFrameAndTerminate(ctx, cr);
             }
         }
     }
@@ -476,13 +514,12 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         }
 
         if (Publishers.isConvertibleToPublisher(result)) {
-            Flowable<?> flowable = instrumentPublisher(ctx, result);
-            flowable.toList().subscribe((BiConsumer<List<?>, Throwable>) (objects, throwable) -> {
-                if (throwable != null) {
+            Flux<?> reactiveSequence = Flux.from(instrumentPublisher(ctx, result));
+            reactiveSequence.collectList().subscribe((Consumer<List<?>>) objects -> {
 
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error("Error subscribing to @" + (isClose ? "OnClose" : "OnError") + " handler for WebSocket bean [" + target + "]: " + throwable.getMessage(), throwable);
-                    }
+            }, throwable -> {
+                if (throwable != null && LOG.isErrorEnabled()) {
+                    LOG.error("Error subscribing to @" + (isClose ? "OnClose" : "OnError") + " handler for WebSocket bean [" + target + "]: " + throwable.getMessage(), throwable);
                 }
                 ctx.close();
             });
@@ -535,8 +572,16 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     }
 
     private void writeCloseFrameAndTerminate(ChannelHandlerContext ctx, int code, String reason) {
+        cleanupBuffer();
         final CloseWebSocketFrame closeFrame = new CloseWebSocketFrame(code, reason);
         ctx.channel().writeAndFlush(closeFrame)
                      .addListener(future -> handleCloseFrame(ctx, new CloseWebSocketFrame(code, reason)));
+    }
+
+    private void cleanupBuffer() {
+        CompositeByteBuf buffer = frameBuffer.getAndSet(null);
+        if (buffer != null) {
+            buffer.release();
+        }
     }
 }

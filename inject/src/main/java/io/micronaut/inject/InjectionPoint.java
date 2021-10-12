@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,18 +17,21 @@ package io.micronaut.inject;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 
+import io.micronaut.core.annotation.NonNull;
+
 /**
  * An injection point as a point in a class definition where dependency injection is required.
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @param <T> the bean type
  */
-public interface InjectionPoint extends AnnotationMetadataProvider {
+public interface InjectionPoint<T> extends AnnotationMetadataProvider {
 
     /**
      * @return The bean that declares this injection point
      */
-    BeanDefinition getDeclaringBean();
+    @NonNull BeanDefinition<T> getDeclaringBean();
 
     /**
      * @return Whether reflection is required to satisfy the injection point

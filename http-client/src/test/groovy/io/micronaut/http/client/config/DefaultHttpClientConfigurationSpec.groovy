@@ -23,6 +23,8 @@ import spock.lang.Unroll
 
 import java.time.Duration
 
+//required because https://issues.apache.org/jira/browse/GROOVY-9566
+
 class DefaultHttpClientConfigurationSpec extends Specification {
 
     @Unroll
@@ -41,13 +43,18 @@ class DefaultHttpClientConfigurationSpec extends Specification {
         ctx.close()
 
         where:
-        key                 | property          | value  | expected
-        'read-timeout'      | 'readTimeout'     | '15s'  | Optional.of(Duration.ofSeconds(15))
-        'proxy-type'        | 'proxyType'       | 'http' | Proxy.Type.HTTP
-        'read-idle-timeout' | 'readIdleTimeout' | '-1s'  | Optional.of(Duration.ofSeconds(-1))
-        'read-idle-timeout' | 'readIdleTimeout' | '1s'   | Optional.of(Duration.ofSeconds(1))
-        'read-idle-timeout' | 'readIdleTimeout' | '-1'   | Optional.empty()
-        'connect-ttl'       | 'connectTtl'      | '1s'   | Optional.of(Duration.ofSeconds(1))
+        key                         | property                 | value   | expected
+        'read-timeout'              | 'readTimeout'            | '15s'   | Optional.of(Duration.ofSeconds(15))
+        'proxy-type'                | 'proxyType'              | 'http'  | Proxy.Type.HTTP
+        'read-idle-timeout'         | 'readIdleTimeout'        | '-1s'   | Optional.of(Duration.ofSeconds(-1))
+        'read-idle-timeout'         | 'readIdleTimeout'        | '1s'    | Optional.of(Duration.ofSeconds(1))
+        'read-idle-timeout'         | 'readIdleTimeout'        | '-1'    | Optional.empty()
+        'connect-ttl'               | 'connectTtl'             | '1s'    | Optional.of(Duration.ofSeconds(1))
+        'exception-on-error-status' | 'exceptionOnErrorStatus' | 'false' | false
+        'shutdown-quiet-period'     | 'shutdownQuietPeriod'    | '1ms'   | Optional.of(Duration.ofMillis(1))
+        'shutdown-quiet-period'     | 'shutdownQuietPeriod'    | '2s'    | Optional.of(Duration.ofSeconds(2))
+        'shutdown-timeout'          | 'shutdownTimeout'        | '100ms' | Optional.of(Duration.ofMillis(100))
+        'shutdown-timeout'          | 'shutdownTimeout'        | '15s'   | Optional.of(Duration.ofSeconds(15))
     }
 
 

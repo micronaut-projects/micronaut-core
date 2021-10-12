@@ -1,11 +1,13 @@
 package io.micronaut.inject.visitor.beans
 
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.annotation.ReflectiveAccess
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospector
+import spock.lang.PendingFeature
 import spock.lang.Specification
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import javax.persistence.Entity
 import javax.persistence.Id
 import javax.persistence.Version
@@ -41,6 +43,7 @@ class BeanIntrospectorSpec extends Specification {
         BeanIntrospection<TestEntity> introspection = BeanIntrospection.getIntrospection(TestEntity)
 
         expect:
+        introspection.hasAnnotation(ReflectiveAccess)
         introspection.getProperty("id").get().hasAnnotation(Id)
         !introspection.getProperty("id").get().hasAnnotation(Entity)
         !introspection.getProperty("id").get().hasStereotype(Entity)
@@ -53,8 +56,18 @@ class BeanIntrospectorSpec extends Specification {
     void "test find introspections"() {
         expect:
         BeanIntrospector.SHARED.findIntrospections(Introspected).size() > 0
-        BeanIntrospector.SHARED.findIntrospections(Introspected, "io.micronaut.inject.visitor.beans").size() == 2
+        BeanIntrospector.SHARED.findIntrospections(Introspected, "io.micronaut.inject.visitor.beans").size() == 5
         BeanIntrospector.SHARED.findIntrospections(Introspected, "blah").size() == 0
-        BeanIntrospector.SHARED.findIntrospections(Singleton).size() == 0
+    }
+
+    @PendingFeature
+    void "test instantiating with a non null argument with null"() {
+        BeanIntrospection<NonNullBean> introspection = BeanIntrospection.getIntrospection(NonNullBean)
+
+        when:
+        introspection.instantiate(false, [null] as Object[])
+
+        then:
+        def ex = thrown(IllegalArgumentException)
     }
 }

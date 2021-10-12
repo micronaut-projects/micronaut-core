@@ -29,6 +29,8 @@ class ConstructorNullableInjectionSpec {
         val context = BeanContext.run()
         val b = context.getBean(B::class.java)
         assertNull(b.a)
+
+        context.close()
     }
 
     @Test
@@ -38,5 +40,6 @@ class ConstructorNullableInjectionSpec {
             context.getBean(C::class.java)
             fail<Any>("Expected a DependencyInjectionException to be thrown")
         } catch (e: DependencyInjectionException) {}
+        context.close()
     }
 }

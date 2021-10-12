@@ -15,7 +15,7 @@
  */
 package io.micronaut.aop.compile
 
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 
@@ -32,7 +32,7 @@ package test;
 
 import io.micronaut.aop.introduction.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 @Stub
 @Singleton
 abstract class AbstractBean {
@@ -43,6 +43,7 @@ abstract class AbstractBean {
     @Inject public void setValue( @Value("something") String val) {}  
     public abstract String isAbstract(); 
     
+    @io.micronaut.context.annotation.Executable
     public String nonAbstract() {
         return "good";
     }

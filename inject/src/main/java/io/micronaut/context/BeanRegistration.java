@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,10 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.scope.CreatedBean;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.order.OrderUtil;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 
@@ -22,13 +26,13 @@ import java.util.Objects;
 
 /**
  * <p>A bean registration is an association between a {@link BeanDefinition} and a created bean, typically a
- * {@link javax.inject.Singleton}.</p>
+ * {@link jakarta.inject.Singleton}.</p>
  *
  * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
-public class BeanRegistration<T> {
+public class BeanRegistration<T> implements Ordered, CreatedBean<T> {
     final BeanIdentifier identifier;
     final BeanDefinition<T> beanDefinition;
     final T bean;
@@ -42,6 +46,11 @@ public class BeanRegistration<T> {
         this.identifier = identifier;
         this.beanDefinition = beanDefinition;
         this.bean = bean;
+    }
+
+    @Override
+    public int getOrder() {
+        return OrderUtil.getOrder(beanDefinition.getAnnotationMetadata(), bean);
     }
 
     /**
@@ -86,5 +95,26 @@ public class BeanRegistration<T> {
     @Override
     public int hashCode() {
         return Objects.hash(identifier, beanDefinition);
+    }
+
+    @Override
+    public BeanDefinition<T> definition() {
+        return beanDefinition;
+    }
+
+    @NonNull
+    @Override
+    public T bean() {
+        return bean;
+    }
+
+    @Override
+    public BeanIdentifier id() {
+        return identifier;
+    }
+
+    @Override
+    public void close() {
+        // no-op
     }
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,10 +15,14 @@
  */
 package io.micronaut.websocket;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.client.HttpClientConfiguration;
 import org.reactivestreams.Publisher;
+
 import java.net.URI;
+import java.net.URL;
 import java.util.Map;
 
 /**
@@ -28,6 +32,16 @@ import java.util.Map;
  * @since 1.0
  */
 public interface WebSocketClient extends AutoCloseable {
+
+    /**
+     * Constant for HTTP scheme.
+     */
+    String SCHEME_WS = "ws";
+
+    /**
+     * Constant for HTTPS scheme.
+     */
+    String SCHEME_WSS = "wss";
 
     /**
      * Connect the given client endpoint type to the URI over WebSocket.
@@ -88,4 +102,32 @@ public interface WebSocketClient extends AutoCloseable {
     ) {
         return connect(clientEndpointType, HttpRequest.GET(uri));
     }
+
+    /**
+     * Create a new {@link WebSocketClient}.
+     * Note that this method should only be used outside of the context of a Micronaut application.
+     * The returned {@link WebSocketClient} is not subject to dependency injection.
+     * The creator is responsible for closing the client to avoid leaking connections.
+     * Within a Micronaut application use {@link jakarta.inject.Inject} to inject a client instead.
+     *
+     * @param url The base URL
+     * @return The client
+     */
+    static WebSocketClient create(@Nullable URL url) {
+        return WebSocketClientFactoryResolver.getFactory().createWebSocketClient(url);
+    }
+
+    /**
+     * Create a new {@link WebSocketClient} with the specified configuration. Note that this method should only be used
+     * outside of the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @param configuration the client configuration
+     * @return The client
+     * @since 2.2.0
+     */
+    static WebSocketClient create(@Nullable URL url, HttpClientConfiguration configuration) {
+        return WebSocketClientFactoryResolver.getFactory().createWebSocketClient(url, configuration);
+    }
+
 }

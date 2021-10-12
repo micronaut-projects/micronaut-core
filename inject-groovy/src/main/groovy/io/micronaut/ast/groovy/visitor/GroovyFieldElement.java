@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,13 +17,18 @@ package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.FieldElement;
 import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.control.SourceUnit;
 
-import javax.annotation.Nonnull;
+import io.micronaut.core.annotation.NonNull;
+
 import java.lang.reflect.Modifier;
+import java.util.Collections;
+import java.util.Set;
 
 /**
  * A field element returning data from a {@link Variable}. The
@@ -38,17 +43,74 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     private final SourceUnit sourceUnit;
 
     /**
-     * @param sourceUnit         the source unit
+     * @param visitorContext     The visitor context
      * @param variable           The {@link Variable}
-     * @param annotatedNode       The annotated ndoe
+     * @param annotatedNode      The annotated ndoe
      * @param annotationMetadata The annotation medatada
      */
     GroovyFieldElement(
-            SourceUnit sourceUnit,
+            GroovyVisitorContext visitorContext,
             Variable variable, AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata) {
-        super(sourceUnit, annotatedNode, annotationMetadata);
+        super(visitorContext, annotatedNode, annotationMetadata);
         this.variable = variable;
-        this.sourceUnit = sourceUnit;
+        this.sourceUnit = visitorContext.getSourceUnit();
+    }
+
+    @Override
+    public Set<ElementModifier> getModifiers() {
+        if (variable instanceof FieldNode) {
+            return super.resolveModifiers(((FieldNode) variable));
+        } else {
+            return Collections.emptySet();
+        }
+    }
+
+    @Override
+    public String toString() {
+        return variable.getName();
+    }
+
+    @Override
+    public ClassElement getGenericField() {
+        if (isPrimitive()) {
+            ClassNode cn = ClassHelper.make(ClassUtils.getPrimitiveType(getType().getName()).orElse(null));
+            if (cn != null) {
+
+                return new GroovyClassElement(
+                        visitorContext,
+                        cn,
+                        getAnnotationMetadata()
+                ) {
+                    @Override
+                    public boolean isPrimitive() {
+                        return true;
+                    }
+                };
+            } else {
+                return getGenericType();
+            }
+        } else {
+            return new GroovyClassElement(
+                    visitorContext,
+                    (ClassNode) getGenericType().getNativeType(),
+                    getAnnotationMetadata()
+            );
+        }
+    }
+
+    @Override
+    public boolean isPrimitive() {
+        return getType().isPrimitive();
+    }
+
+    @Override
+    public boolean isArray() {
+        return getType().isArray();
+    }
+
+    @Override
+    public int getArrayDimensions() {
+        return getType().getArrayDimensions();
     }
 
     @Override
@@ -91,10 +153,10 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
         return variable;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public ClassElement getType() {
-        return new GroovyClassElement(sourceUnit, variable.getType(), AstAnnotationUtils.getAnnotationMetadata(sourceUnit, variable.getType()));
+        return visitorContext.getElementFactory().newClassElement(variable.getType(), AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, variable.getType()));
     }
 
     @Override
@@ -112,11 +174,11 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
             throw new IllegalStateException("Declaring class could not be established");
         }
 
-        return new GroovyClassElement(
-                sourceUnit,
+        return visitorContext.getElementFactory().newClassElement(
                 declaringClass,
                 AstAnnotationUtils.getAnnotationMetadata(
                         sourceUnit,
+                        compilationUnit,
                         declaringClass
                 )
         );

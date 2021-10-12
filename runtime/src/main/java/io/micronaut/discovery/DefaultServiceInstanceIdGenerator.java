@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,10 +16,9 @@
 package io.micronaut.discovery;
 
 import io.micronaut.context.env.Environment;
-import io.micronaut.runtime.server.EmbeddedServerInstance;
+import io.micronaut.core.annotation.NonNull;
+import jakarta.inject.Singleton;
 
-import javax.annotation.Nonnull;
-import javax.inject.Singleton;
 import java.util.Optional;
 import java.util.StringJoiner;
 
@@ -38,7 +37,7 @@ public class DefaultServiceInstanceIdGenerator implements ServiceInstanceIdGener
     protected DefaultServiceInstanceIdGenerator() {
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public String generateId(Environment environment, ServiceInstance serviceInstance) {
         Optional<String> cloudFoundryId = environment.getProperty("vcap.application.instance_id", String.class);

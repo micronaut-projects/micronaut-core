@@ -15,8 +15,9 @@
  */
 package io.micronaut.inject.executable
 
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
+import spock.lang.Issue
 
 class ExecutableBeanSpec extends AbstractTypeElementSpec {
 
@@ -28,7 +29,7 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Executable
 class ExecutableBean1 {
 
@@ -41,6 +42,88 @@ class ExecutableBean1 {
         definition != null
         definition.findMethod("round", float.class).get().returnType.type == int.class
 
+    }
+
+    @Issue('#2789')
+    void "test don't generate executable methods for inherited protected or package private methods"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.MyBean','''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+@jakarta.inject.Singleton
+@Executable
+class MyBean extends Parent {
+
+    public int round(float num) {
+        return Math.round(num);
+    }
+}
+
+class Parent {
+    protected void protectedMethod() {
+    }
+    
+    void packagePrivateMethod() {
+    }
+    
+    private void privateMethod() {
+    }
+}
+''')
+        expect:
+        definition != null
+        !definition.findMethod("privateMethod").isPresent()
+        !definition.findMethod("packagePrivateMethod").isPresent()
+        !definition.findMethod("protectedMethod").isPresent()
+    }
+
+    void "bean definition should not be created for class with only executable methods"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.MyBean','''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+class MyBean {
+
+    @Executable
+    public int round(float num) {
+        return Math.round(num);
+    }
+}
+
+''')
+
+        expect:
+        definition == null
+    }
+
+    void "test multiple executable annotations on a method"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.MyBean','''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import io.micronaut.inject.executable.*;
+
+@jakarta.inject.Singleton
+class MyBean  {
+
+    @RepeatableExecutable("a")
+    @RepeatableExecutable("b")
+    public void run() {
+        
+    }
+}
+''')
+        expect:
+        definition != null
+        definition.findMethod("run").isPresent()
     }
 }
 

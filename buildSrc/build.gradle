@@ -1,0 +1,12 @@
+plugins {
+    id 'groovy-gradle-plugin'
+}
+
+repositories {
+    gradlePluginPortal()
+}
+
+dependencies {
+    implementation "io.micronaut.build.internal:micronaut-gradle-plugins:4.1.1"
+    implementation "org.tomlj:tomlj:1.0.0"
+}

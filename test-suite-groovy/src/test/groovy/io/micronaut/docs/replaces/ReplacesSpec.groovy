@@ -14,5 +14,8 @@ class ReplacesSpec extends Specification {
         applicationContext.getBean(BookService.class) instanceof MockBookService
         "An OK Novel" == applicationContext.getBean(Book.class).getTitle()
         "Learning 305" == applicationContext.getBean(TextBook.class).getTitle()
+
+        cleanup:
+        applicationContext.close()
     }
 }

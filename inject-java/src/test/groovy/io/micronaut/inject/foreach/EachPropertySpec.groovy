@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
+import io.micronaut.context.exceptions.NonUniqueBeanException
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 /**
@@ -59,10 +60,19 @@ class EachPropertySpec extends Specification {
 
         applicationContext.start()
 
-        MyConfiguration bean = applicationContext.getBean(MyConfiguration)
-        MyConfiguration bean2 = applicationContext.getBean(MyConfiguration, Qualifiers.byName("two"))
+        when:
+        applicationContext.getBean(MyConfiguration)
 
-        expect:
+        then:
+        thrown(NonUniqueBeanException)
+
+        when:
+        MyConfiguration bean = applicationContext.getBean(MyConfiguration, Qualifiers.byName("one"))
+        MyConfiguration bean2 = applicationContext.getBean(MyConfiguration, Qualifiers.byName("two"))
+        def listener = applicationContext.getBean(MyContextBeanListener)
+
+        then:
+        listener.createdNames == ['one', 'two'] as Set
         bean.port == 8080
         bean.anotherPort == 9090
         bean.intList == [1,2,3]
@@ -130,10 +140,17 @@ class EachPropertySpec extends Specification {
 
         applicationContext.start()
 
-        MyBean bean = applicationContext.getBean(MyBean)
+        when:
+        applicationContext.getBean(MyBean)
+
+        then:
+        thrown(NonUniqueBeanException)
+
+        when:
+        MyBean bean = applicationContext.getBean(MyBean, Qualifiers.byName("one"))
         MyBean bean2 = applicationContext.getBean(MyBean, Qualifiers.byName("two"))
 
-        expect:
+        then:
         bean != bean2
         bean.configuration.port == 8080
         bean.configuration.anotherPort == 9090
@@ -181,10 +198,17 @@ class EachPropertySpec extends Specification {
 
         applicationContext.start()
 
-        NonBeanClass bean = applicationContext.getBean(NonBeanClass)
+        when:
+        applicationContext.getBean(NonBeanClass)
+
+        then:
+        thrown(NonUniqueBeanException)
+
+        when:
+        NonBeanClass bean = applicationContext.getBean(NonBeanClass, Qualifiers.byName("one"))
         NonBeanClass bean2 = applicationContext.getBean(NonBeanClass, Qualifiers.byName("two"))
 
-        expect:
+        then:
         bean != bean2
         bean.port == 8080
         bean2.port == 8888
@@ -303,5 +327,164 @@ class EachPropertySpec extends Specification {
 
         cleanup:
         applicationContext.close()
+    }
+
+    void "test eachbean with providers"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of(
+                'test',
+                ['foo.bar.one.port':'8080',
+                 'foo.bar.two.port':'8888']
+        ))
+
+        applicationContext.start()
+
+        MyBeanProvider bean = applicationContext.getBean(MyBeanProvider, Qualifiers.byName("one"))
+        MyBeanProvider bean2 = applicationContext.getBean(MyBeanProvider, Qualifiers.byName("two"))
+
+        expect:
+        bean.configuration.port == 8080
+        bean2.configuration.port == 8888
+
+        cleanup:
+        applicationContext.close()
+    }
+
+    void "test eachbean with parameter providers"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of(
+                'test',
+                ['foo.bar.one.port':'8080',
+                 'foo.bar.two.port':'8888']
+        ))
+
+        applicationContext.start()
+
+        MyBeanParameterProvider bean = applicationContext.getBean(MyBeanParameterProvider, Qualifiers.byName("one"))
+        MyBeanParameterProvider bean2 = applicationContext.getBean(MyBeanParameterProvider, Qualifiers.byName("two"))
+
+        expect:
+        bean.configuration.port == 8080
+        bean2.configuration.port == 8888
+
+        cleanup:
+        applicationContext.close()
+    }
+
+    void "test configuration properties array"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of('test', [
+                'array': [['name': 'Sally'], ['name': 'John']]
+        ]))
+        applicationContext.start()
+
+        when:
+        Collection<ArrayProperties> props = applicationContext.getBeansOfType(ArrayProperties)
+
+        then:
+        props.size() == 2
+        props[0].name == "Sally"
+        props[1].name == "John"
+    }
+
+    void "test config array with missing indexes"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of('test', [
+                'array[0].name': 'Sally',
+                'array[4].name': 'John'
+        ]))
+        applicationContext.start()
+
+        when:
+        Collection<ArrayProperties> props = applicationContext.getBeansOfType(ArrayProperties)
+
+        then:
+        props.size() == 2
+        props[0].name == "Sally"
+        props[0].getOrder() == 0
+        props[1].name == "John"
+        props[1].getOrder() == 4
+    }
+
+    void "test array config overridden with smaller set"() {
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of('test', [
+                'array': [['name': 'Sally'], ['name': 'John']]
+        ], 100))
+        applicationContext.environment.addPropertySource(PropertySource.of('test2', [
+                'array': [['name': 'Samantha']]
+        ], 101))
+        applicationContext.start()
+
+        when:
+        Collection<ArrayProperties> props = applicationContext.getBeansOfType(ArrayProperties)
+
+        then:
+        props.size() == 1
+        props[0].name == "Samantha"
+        props[0].getOrder() == 0
+    }
+
+    void "test eachproperty inner class of config props"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of('test', [
+                'outer.name': 'Outer',
+                'outer.inner.sally.age': 20,
+                'outer.inner.joe.age': 30
+        ]))
+        applicationContext.start()
+
+        when:
+        OuterProperties props = applicationContext.getBean(OuterProperties)
+
+        then:
+        props.name == 'Outer'
+        props.inner.size() == 2
+        props.inner.any { it.age == 20 }
+        props.inner.any { it.age == 30 }
+    }
+
+    void "test field injection eachproperty inner class of config props"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of('test', [
+                'outer-field.name': 'Outer',
+                'outer-field.inner.sally.age': 20,
+                'outer-field.inner.joe.age': 30
+        ]))
+        applicationContext.start()
+
+        when:
+        OuterFieldProperties props = applicationContext.getBean(OuterFieldProperties)
+
+        then:
+        props.name == 'Outer'
+        props.inner.size() == 2
+        props.inner.any { it.age == 20 }
+        props.inner.any { it.age == 30 }
+    }
+
+    void "test eachproperty list inner class of config props"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of('test', [
+                'outer-list.name': 'Outer',
+                'outer-list.inner-list': [['age': 20], ['age': 30]]
+        ]))
+        applicationContext.start()
+
+        when:
+        OuterListProperties props = applicationContext.getBean(OuterListProperties)
+
+        then:
+        props.name == 'Outer'
+        props.innerList.size() == 2
+        props.innerList.any { it.age == 20 }
+        props.innerList.any { it.age == 30 }
     }
 }

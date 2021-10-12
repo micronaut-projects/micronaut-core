@@ -26,9 +26,12 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.IgnoreIf
+import spock.lang.Requires
+import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 
+@Retry
 class HostHeaderSpec extends Specification {
 
     @Shared
@@ -36,9 +39,10 @@ class HostHeaderSpec extends Specification {
 
     // Unix-like environments (e.g. Travis) may not allow to bind on reserved ports without proper privileges.
     @IgnoreIf({ os.linux })
+    @Requires({ SocketUtils.isTcpPortAvailable(80) })
     void "test host header with server on 80"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.build(['micronaut.server.port': 80]).run(EmbeddedServer)
+        EmbeddedServer embeddedServer = ApplicationContext.builder(['spec.name': 'HostHeaderSpec', 'micronaut.server.port': 80]).run(EmbeddedServer)
         def asyncClient = HttpClient.create(embeddedServer.getURL())
         BlockingHttpClient client = asyncClient.toBlocking()
 
@@ -53,11 +57,12 @@ class HostHeaderSpec extends Specification {
 
         cleanup:
         embeddedServer.close()
+        asyncClient.close()
     }
 
     void "test host header with server on random port"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'HostHeaderSpec', ])
         def asyncClient = HttpClient.create(embeddedServer.getURL())
         BlockingHttpClient client = asyncClient.toBlocking()
 
@@ -72,13 +77,15 @@ class HostHeaderSpec extends Specification {
 
         cleanup:
         embeddedServer.close()
+        asyncClient.close()
     }
 
     // Unix-like environments (e.g. Travis) may not allow to bind on reserved ports without proper privileges.
     @IgnoreIf({ os.linux })
+    @Requires({ SocketUtils.isTcpPortAvailable(80) })
     void "test host header with client authority"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.build(['micronaut.server.port': 80]).run(EmbeddedServer)
+        EmbeddedServer embeddedServer = ApplicationContext.builder(['spec.name': 'HostHeaderSpec', 'micronaut.server.port': 80]).run(EmbeddedServer)
         def asyncClient = HttpClient.create(new URL("http://foo@localhost"))
         BlockingHttpClient client = asyncClient.toBlocking()
 
@@ -93,13 +100,16 @@ class HostHeaderSpec extends Specification {
 
         cleanup:
         embeddedServer.close()
+        asyncClient.close()
     }
 
     // Unix-like environments (e.g. Travis) may not allow to bind on reserved ports without proper privileges.
     @IgnoreIf({ os.linux })
+    @Requires({ SocketUtils.isTcpPortAvailable(443) })
     void "test host header with https server on 443"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.build([
+        EmbeddedServer embeddedServer = ApplicationContext.builder([
+                'spec.name': 'HostHeaderSpec',
                 'micronaut.ssl.enabled': true,
                 'micronaut.ssl.buildSelfSigned': true,
                 'micronaut.ssl.port': 443
@@ -118,11 +128,14 @@ class HostHeaderSpec extends Specification {
 
         cleanup:
         embeddedServer.close()
+        asyncClient.close()
     }
 
     void "test host header with https server on custom port"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.build([
+        EmbeddedServer embeddedServer = ApplicationContext.builder([
+                'spec.name': 'HostHeaderSpec',
+                'micronaut.ssl.port': -1,
                 'micronaut.ssl.enabled': true,
                 'micronaut.ssl.buildSelfSigned': true
         ]).run(EmbeddedServer)
@@ -140,8 +153,10 @@ class HostHeaderSpec extends Specification {
 
         cleanup:
         embeddedServer.close()
+        asyncClient.close()
     }
 
+    @io.micronaut.context.annotation.Requires(property = 'spec.name', value = 'HostHeaderSpec')
     @Controller("/echo-host")
     static class EchoHostController {
 

@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,19 +16,24 @@
 package io.micronaut.function;
 
 import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import java.net.URI;
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -47,7 +52,6 @@ public class DefaultLocalFunctionRegistry implements ExecutableMethodProcessor<F
     private final Map<String, ExecutableMethod<?, ?>> biFunctions = new LinkedHashMap<>(1);
     private final Map<String, ExecutableMethod<?, ?>> suppliers = new LinkedHashMap<>(1);
     private final MediaTypeCodecRegistry decoderRegistry;
-
 
     /**
      * Constructor.
@@ -174,12 +178,12 @@ public class DefaultLocalFunctionRegistry implements ExecutableMethodProcessor<F
     }
 
     @Override
-    public Optional<MediaTypeCodec> findCodec(MediaType mediaType) {
+    public Optional<MediaTypeCodec> findCodec(@Nullable MediaType mediaType) {
         return decoderRegistry.findCodec(mediaType);
     }
 
     @Override
-    public Optional<MediaTypeCodec> findCodec(MediaType mediaType, Class<?> type) {
+    public Optional<MediaTypeCodec> findCodec(@Nullable MediaType mediaType, Class<?> type) {
         return decoderRegistry.findCodec(mediaType, type);
     }
 
@@ -189,34 +193,19 @@ public class DefaultLocalFunctionRegistry implements ExecutableMethodProcessor<F
     }
 
     private void registerSupplier(ExecutableMethod<?, ?> method, String functionId) {
-        ClassLoadingReporter.reportBeanPresent(method.getReturnType().getType());
 
         suppliers.put(functionId, method);
     }
 
     private void registerBiFunction(ExecutableMethod<?, ?> method, String functionId) {
-        ClassLoadingReporter.reportBeanPresent(method.getReturnType().getType());
-        for (Class argumentType : method.getArgumentTypes()) {
-            ClassLoadingReporter.reportBeanPresent(argumentType);
-        }
-
         biFunctions.put(functionId, method);
     }
 
     private void registerConsumer(ExecutableMethod<?, ?> method, String functionId) {
-        for (Class argumentType : method.getArgumentTypes()) {
-            ClassLoadingReporter.reportBeanPresent(argumentType);
-        }
-
         consumers.put(functionId, method);
     }
 
     private void registerFunction(ExecutableMethod<?, ?> method, String functionId) {
-        ClassLoadingReporter.reportBeanPresent(method.getReturnType().getType());
-        for (Class argumentType : method.getArgumentTypes()) {
-            ClassLoadingReporter.reportBeanPresent(argumentType);
-        }
-
         functions.put(functionId, method);
     }
 }

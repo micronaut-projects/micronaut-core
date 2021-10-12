@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,9 +15,9 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.bind.ArgumentBinder;
-import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
@@ -25,27 +25,19 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
-import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.sse.Event;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 
-import javax.annotation.Nonnull;
+import io.micronaut.core.annotation.NonNull;
+
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 /**
  * Abstract implementation of the {@link RouteMatch} interface.
@@ -59,9 +51,9 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
     protected final MethodExecutionHandle<T, R> executableMethod;
     protected final ConversionService<?> conversionService;
-    protected final Map<String, Argument> requiredInputs;
     protected final DefaultRouteBuilder.AbstractRoute abstractRoute;
-    protected final List<MediaType> acceptedMediaTypes;
+    protected final List<MediaType> consumedMediaTypes;
+    protected final List<MediaType> producedMediaTypes;
 
     /**
      * Constructor.
@@ -71,16 +63,46 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
      */
     protected AbstractRouteMatch(DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService<?> conversionService) {
         this.abstractRoute = abstractRoute;
-        this.executableMethod = abstractRoute.targetMethod;
+        //noinspection unchecked
+        this.executableMethod = (MethodExecutionHandle<T, R>) abstractRoute.targetMethod;
         this.conversionService = conversionService;
-        Argument[] requiredArguments = executableMethod.getArguments();
-        this.requiredInputs = new LinkedHashMap<>(requiredArguments.length);
-        for (Argument requiredArgument : requiredArguments) {
-            String inputName = resolveInputName(requiredArgument);
-            requiredInputs.put(inputName, requiredArgument);
-        }
+        this.consumedMediaTypes = abstractRoute.getConsumes();
+        this.producedMediaTypes = abstractRoute.getProduces();
+    }
 
-        this.acceptedMediaTypes = abstractRoute.getConsumes();
+    @Override
+    public final boolean isSuspended() {
+        return this.abstractRoute.isSuspended();
+    }
+
+    @Override
+    public final boolean isReactive() {
+        return this.abstractRoute.isReactive();
+    }
+
+    @Override
+    public final boolean isSingleResult() {
+        return this.abstractRoute.isSingleResult();
+    }
+
+    @Override
+    public final boolean isSpecifiedSingle() {
+        return this.abstractRoute.isSpecifiedSingle();
+    }
+
+    @Override
+    public final boolean isAsync() {
+        return this.abstractRoute.isAsync();
+    }
+
+    @Override
+    public final boolean isVoid() {
+        return this.abstractRoute.isVoid();
+    }
+
+    @Override
+    public boolean isAsyncOrReactive() {
+        return abstractRoute.isAsyncOrReactive();
     }
 
     @Override
@@ -88,7 +110,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         return executableMethod.getTarget();
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public ExecutableMethod<?, R> getExecutableMethod() {
         return executableMethod.getExecutableMethod();
@@ -96,12 +118,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
     @Override
     public List<MediaType> getProduces() {
-        Optional<Argument<?>> firstTypeVariable = executableMethod.getReturnType().getFirstTypeVariable();
-        if (firstTypeVariable.isPresent() && Event.class.isAssignableFrom(firstTypeVariable.get().getType())) {
-            return Collections.singletonList(MediaType.TEXT_EVENT_STREAM_TYPE);
-        } else {
-            return abstractRoute.getProduces();
-        }
+        return abstractRoute.getProduces();
     }
 
     @Override
@@ -120,32 +137,26 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
         String bodyArgument = abstractRoute.bodyArgumentName;
         if (bodyArgument != null) {
-            return Optional.ofNullable(requiredInputs.get(bodyArgument));
-        } else {
-            for (Argument argument : getArguments()) {
-                if (argument.getAnnotationMetadata().hasAnnotation(Body.class)) {
-                    return Optional.of(argument);
-                }
-            }
+            return Optional.ofNullable(abstractRoute.requiredInputs.get(bodyArgument));
         }
         return Optional.empty();
     }
 
     @Override
     public boolean isRequiredInput(String name) {
-        return requiredInputs.containsKey(name);
+        return abstractRoute.requiredInputs.containsKey(name);
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public Optional<Argument<?>> getRequiredInput(String name) {
-        return Optional.ofNullable(requiredInputs.get(name));
+        return Optional.ofNullable(abstractRoute.requiredInputs.get(name));
     }
 
     @Override
     public boolean isExecutable() {
         Map<String, Object> variables = getVariableValues();
-        for (Map.Entry<String, Argument> entry : requiredInputs.entrySet()) {
+        for (Map.Entry<String, Argument> entry : abstractRoute.requiredInputs.entrySet()) {
             Object value = variables.get(entry.getKey());
             if (value == null || value instanceof UnresolvedArgument) {
                 return false;
@@ -197,17 +208,17 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
     @Override
     public R invoke(Object... arguments) {
-        ConversionService conversionService = this.conversionService;
+        ConversionService<?> conversionService = this.conversionService;
 
         Argument[] targetArguments = getArguments();
         if (targetArguments.length == 0) {
             return executableMethod.invoke();
         } else {
-            List argumentList = new ArrayList();
+            List<Object> argumentList = new ArrayList<>(arguments.length);
             Map<String, Object> variables = getVariableValues();
             Iterator<Object> valueIterator = variables.values().iterator();
             int i = 0;
-            for (Argument targetArgument : targetArguments) {
+            for (Argument<?> targetArgument : targetArguments) {
                 String name = targetArgument.getName();
                 Object value = variables.get(name);
                 if (value != null) {
@@ -234,11 +245,11 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         if (targetArguments.length == 0) {
             return executableMethod.invoke();
         } else {
-            ConversionService conversionService = this.conversionService;
+            ConversionService<?> conversionService = this.conversionService;
             Map<String, Object> uriVariables = getVariableValues();
-            List argumentList = new ArrayList();
+            List<Object> argumentList = new ArrayList<>(argumentValues.size());
 
-            for (Map.Entry<String, Argument> entry : requiredInputs.entrySet()) {
+            for (Map.Entry<String, Argument> entry : abstractRoute.requiredInputs.entrySet()) {
                 Argument argument = entry.getValue();
                 String name = entry.getKey();
                 Object value = DefaultRouteBuilder.NO_VALUE;
@@ -248,6 +259,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                     value = argumentValues.get(name);
                 }
 
+                Class argumentType = argument.getType();
                 if (value instanceof UnresolvedArgument) {
                     UnresolvedArgument<?> unresolved = (UnresolvedArgument<?>) value;
                     ArgumentBinder.BindingResult<?> bindingResult = unresolved.get();
@@ -259,14 +271,11 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                             ConversionError conversionError = (ConversionError) resolved;
                             throw new ConversionErrorException(argument, conversionError);
                         } else {
-                            ConversionContext conversionContext = ConversionContext.of(argument);
-                            Optional<?> result = conversionService.convert(resolved, argument.getType(), conversionContext);
-                            argumentList.add(resolveValueOrError(argument, conversionContext, result));
+                            convertValueAndAddToList(conversionService, argumentList, argument, resolved, argumentType);
                         }
                     } else {
                         if (argument.isNullable()) {
                             argumentList.add(null);
-                            continue;
                         } else {
 
                             List<ConversionError> conversionErrors = bindingResult.getConversionErrors();
@@ -275,19 +284,19 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                                 ConversionError conversionError = conversionErrors.iterator().next();
                                 throw new ConversionErrorException(argument, conversionError);
                             } else {
-                                throw new UnsatisfiedRouteException(argument);
+                                throw UnsatisfiedRouteException.create(argument);
                             }
                         }
 
                     }
+                } else if (value instanceof NullArgument) {
+                    argumentList.add(null);
                 } else if (value instanceof ConversionError) {
                     throw new ConversionErrorException(argument, (ConversionError) value);
                 } else if (value == DefaultRouteBuilder.NO_VALUE) {
-                    throw new UnsatisfiedRouteException(argument);
+                    throw UnsatisfiedRouteException.create(argument);
                 } else {
-                    ConversionContext conversionContext = ConversionContext.of(argument);
-                    Optional<?> result = conversionService.convert(value, argument.getType(), conversionContext);
-                    argumentList.add(resolveValueOrError(argument, conversionContext, result));
+                    convertValueAndAddToList(conversionService, argumentList, argument, value, argumentType);
                 }
             }
 
@@ -295,51 +304,120 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         }
     }
 
-    @Override
-    public boolean accept(MediaType contentType) {
-        return acceptedMediaTypes.isEmpty() || contentType == null || acceptedMediaTypes.contains(MediaType.ALL_TYPE) || explicitAccept(contentType);
+    private void convertValueAndAddToList(ConversionService conversionService, List argumentList, Argument argument, Object value, Class argumentType) {
+        if (argumentType.isInstance(value)) {
+            if (argument.isContainerType()) {
+                if (argument.hasTypeVariables()) {
+                    ConversionContext conversionContext = ConversionContext.of(argument);
+                    Optional<?> result = conversionService.convert(value, argumentType, conversionContext);
+                    argumentList.add(resolveValueOrError(argument, conversionContext, result));
+                } else {
+                    argumentList.add(value);
+                }
+            } else {
+                argumentList.add(value);
+            }
+        } else {
+            ConversionContext conversionContext = ConversionContext.of(argument);
+            Optional<?> result = conversionService.convert(value, argumentType, conversionContext);
+            argumentList.add(resolveValueOrError(argument, conversionContext, result));
+        }
     }
 
     @Override
-    public boolean explicitAccept(MediaType contentType) {
-        return acceptedMediaTypes.contains(contentType);
+    public boolean doesConsume(MediaType contentType) {
+        return contentType == null || abstractRoute.consumesMediaTypesContainsAll || explicitlyConsumes(contentType);
+    }
+
+    @Override
+    public boolean doesProduce(@Nullable Collection<MediaType> acceptableTypes) {
+        return abstractRoute.producesMediaTypesContainsAll || anyMediaTypesMatch(producedMediaTypes, acceptableTypes);
+    }
+
+    @Override
+    public boolean doesProduce(@Nullable MediaType acceptableType) {
+        return abstractRoute.producesMediaTypesContainsAll || acceptableType == null || acceptableType.equals(MediaType.ALL_TYPE) || producedMediaTypes.contains(acceptableType);
+    }
+
+    private boolean anyMediaTypesMatch(List<MediaType> producedMediaTypes, Collection<MediaType> acceptableTypes) {
+        if (CollectionUtils.isEmpty(acceptableTypes)) {
+            return true;
+        }
+        for (MediaType acceptableType : acceptableTypes) {
+            if (acceptableType.equals(MediaType.ALL_TYPE) || producedMediaTypes.contains(acceptableType)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean explicitlyConsumes(MediaType contentType) {
+        return consumedMediaTypes.contains(contentType);
+    }
+
+    @Override
+    public boolean explicitlyProduces(MediaType contentType) {
+        return producedMediaTypes == null || producedMediaTypes.isEmpty() || producedMediaTypes.contains(contentType);
     }
 
     @Override
     public RouteMatch<R> fulfill(Map<String, Object> argumentValues) {
-        Map<String, Object> oldVariables = getVariableValues();
-        Map<String, Object> newVariables = new LinkedHashMap<>(oldVariables);
-        for (Argument requiredArgument : getArguments()) {
-            Object value = argumentValues.get(requiredArgument.getName());
-            Optional<Argument<?>> ba = getBodyArgument();
-            if (ba.isPresent()) {
-                Argument<?> a = ba.get();
-                if (a.getName().equals(requiredArgument.getName())) {
-                    requiredArgument = a;
-                }
-            }
+        if (CollectionUtils.isEmpty(argumentValues)) {
+            return this;
+        } else {
+            Map<String, Object> oldVariables = getVariableValues();
+            Map<String, Object> newVariables = new LinkedHashMap<>(oldVariables);
+            final Argument<?> bodyArgument = getBodyArgument().orElse(null);
+            Argument[] arguments = getArguments();
+            Collection<Argument> requiredArguments = getRequiredArguments();
+            boolean hasRequiredArguments = CollectionUtils.isNotEmpty(requiredArguments);
+            for (Argument requiredArgument : arguments) {
 
-            if (value != null) {
-                String name = resolveInputName(requiredArgument);
-                if (value instanceof UnresolvedArgument) {
-                    newVariables.put(name, value);
-                } else {
-                    ArgumentConversionContext conversionContext = ConversionContext.of(requiredArgument);
-                    Optional converted = conversionService.convert(value, conversionContext);
-                    Object result = converted.isPresent() ? converted.get() : conversionContext.getLastError().orElse(null);
-                    if (result != null) {
-                        newVariables.put(name, result);
+                String argumentName = requiredArgument.getName();
+                if (argumentValues.containsKey(argumentName)) {
+
+                    Object value = argumentValues.get(argumentName);
+                    if (bodyArgument != null && bodyArgument.getName().equals(argumentName)) {
+                        requiredArgument = bodyArgument;
+                    }
+
+                    if (hasRequiredArguments) {
+                        requiredArguments.remove(requiredArgument);
+                    }
+
+                    if (value != null) {
+                        String name = abstractRoute.resolveInputName(requiredArgument);
+                        if (value instanceof UnresolvedArgument || value instanceof NullArgument) {
+                            newVariables.put(name, value);
+                        } else {
+                            Class type = requiredArgument.getType();
+                            if (type.isInstance(value)) {
+                                newVariables.put(name, value);
+                            } else {
+                                ArgumentConversionContext conversionContext = ConversionContext.of(requiredArgument);
+                                Optional converted = conversionService.convert(value, conversionContext);
+                                Object result = converted.isPresent() ? converted.get() : conversionContext.getLastError().orElse(null);
+                                if (result != null) {
+                                    newVariables.put(name, result);
+                                }
+                            }
+                        }
                     }
                 }
             }
+            return newFulfilled(newVariables, (List<Argument>) requiredArguments);
         }
-        Set<String> argumentNames = argumentValues.keySet();
-        List<Argument> requiredArguments = getRequiredArguments()
-            .stream()
-            .filter(arg -> !argumentNames.contains(arg.getName()))
-            .collect(Collectors.toList());
+    }
 
-        return newFulfilled(newVariables, requiredArguments);
+    @Override
+    public HttpStatus findStatus(HttpStatus defaultStatus) {
+        return abstractRoute.definedStatus == null ? defaultStatus : abstractRoute.definedStatus;
+    }
+
+    @Override
+    public boolean isWebSocketRoute() {
+        return abstractRoute.isWebSocketRoute;
     }
 
     /**
@@ -355,7 +433,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                 return null;
             }
             throw lastError.map(conversionError ->
-                (RuntimeException) new ConversionErrorException(argument, conversionError)).orElseGet(() -> new UnsatisfiedRouteException(argument)
+                (RuntimeException) new ConversionErrorException(argument, conversionError)).orElseGet(() -> UnsatisfiedRouteException.create(argument)
             );
         } else {
             return result.get();
@@ -369,11 +447,4 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
      */
     protected abstract RouteMatch<R> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments);
 
-    private String resolveInputName(Argument requiredArgument) {
-        String inputName = requiredArgument.getAnnotationMetadata().stringValue(Bindable.class).orElse(null);
-        if (StringUtils.isEmpty(inputName)) {
-            inputName = requiredArgument.getName();
-        }
-        return inputName;
-    }
 }

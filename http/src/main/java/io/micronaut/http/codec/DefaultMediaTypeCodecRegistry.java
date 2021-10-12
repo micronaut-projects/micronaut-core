@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.codec;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.MediaType;
 
 import java.util.Arrays;
@@ -32,8 +33,8 @@ import java.util.Optional;
  */
 public class DefaultMediaTypeCodecRegistry implements MediaTypeCodecRegistry {
 
-    Map<String, MediaTypeCodec> decodersByExtension = new LinkedHashMap<>(3);
-    Map<MediaType, MediaTypeCodec> decodersByType = new LinkedHashMap<>(3);
+    Map<String, Optional<MediaTypeCodec>> decodersByExtension = new LinkedHashMap<>(3);
+    Map<MediaType, Optional<MediaTypeCodec>> decodersByType = new LinkedHashMap<>(3);
 
     private final Collection<MediaTypeCodec> codecs;
 
@@ -54,8 +55,8 @@ public class DefaultMediaTypeCodecRegistry implements MediaTypeCodecRegistry {
                 Collection<MediaType> mediaTypes = decoder.getMediaTypes();
                 for (MediaType mediaType : mediaTypes) {
                     if (mediaType != null) {
-                        decodersByExtension.put(mediaType.getExtension(), decoder);
-                        decodersByType.put(mediaType, decoder);
+                        decodersByExtension.put(mediaType.getExtension(), Optional.of(decoder));
+                        decodersByType.put(mediaType, Optional.of(decoder));
                     }
                 }
             }
@@ -65,19 +66,19 @@ public class DefaultMediaTypeCodecRegistry implements MediaTypeCodecRegistry {
     }
 
     @Override
-    public Optional<MediaTypeCodec> findCodec(MediaType mediaType) {
+    public Optional<MediaTypeCodec> findCodec(@Nullable MediaType mediaType) {
         if (mediaType == null) {
             return Optional.empty();
         }
-        MediaTypeCodec decoder = decodersByType.get(mediaType);
+        Optional<MediaTypeCodec> decoder = decodersByType.get(mediaType);
         if (decoder == null) {
             decoder = decodersByExtension.get(mediaType.getExtension());
         }
-        return Optional.ofNullable(decoder);
+        return decoder == null ? Optional.empty() : decoder;
     }
 
     @Override
-    public Optional<MediaTypeCodec> findCodec(MediaType mediaType, Class<?> type) {
+    public Optional<MediaTypeCodec> findCodec(@Nullable MediaType mediaType, Class<?> type) {
         Optional<MediaTypeCodec> codec = findCodec(mediaType);
         if (codec.isPresent()) {
             MediaTypeCodec mediaTypeCodec = codec.get();

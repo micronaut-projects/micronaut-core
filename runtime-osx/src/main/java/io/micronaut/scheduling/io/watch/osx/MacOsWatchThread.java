@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,13 +22,13 @@ import io.micronaut.context.annotation.Parallel;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.io.watch.DefaultWatchThread;
 import io.micronaut.scheduling.io.watch.FileWatchCondition;
 import io.micronaut.scheduling.io.watch.FileWatchConfiguration;
+import jakarta.inject.Singleton;
 
-import javax.annotation.Nonnull;
-import javax.inject.Singleton;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.StandardWatchEventKinds;
@@ -63,7 +63,7 @@ public class MacOsWatchThread extends DefaultWatchThread {
     }
 
     @Override
-    protected @Nonnull WatchKey registerPath(@Nonnull Path dir) throws IOException {
+    protected @NonNull WatchKey registerPath(@NonNull Path dir) throws IOException {
         WatchablePath watchPath = new WatchablePath(dir);
         return watchPath.register(
                 getWatchService(),

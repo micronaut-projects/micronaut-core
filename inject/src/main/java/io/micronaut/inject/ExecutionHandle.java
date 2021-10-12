@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 
-import javax.annotation.Nonnull;
+import io.micronaut.core.annotation.NonNull;
 import java.lang.reflect.Method;
 
 /**
@@ -73,7 +73,7 @@ public interface ExecutionHandle<T, R> extends AnnotationMetadataDelegate {
      */
     static <T2, R2> MethodExecutionHandle<T2, R2> of(T2 bean, ExecutableMethod<T2, R2> method) {
         return new MethodExecutionHandle<T2, R2>() {
-            @Nonnull
+            @NonNull
             @Override
             public ExecutableMethod<?, R2> getExecutableMethod() {
                 return method;

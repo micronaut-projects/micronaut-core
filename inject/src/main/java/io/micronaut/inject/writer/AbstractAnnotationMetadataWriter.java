@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,14 +16,21 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
+import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
+import io.micronaut.inject.ast.Element;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 
-import javax.annotation.Nonnull;
+import io.micronaut.core.annotation.NonNull;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Base class for types that also write {@link io.micronaut.core.annotation.AnnotationMetadata}.
@@ -39,33 +46,44 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
      */
     public static final String FIELD_ANNOTATION_METADATA = "$ANNOTATION_METADATA";
 
-    protected final AnnotationMetadataWriter annotationMetadataWriter;
     protected final Type targetClassType;
     protected final AnnotationMetadata annotationMetadata;
+    protected final Map<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
+    protected final Map<String, Integer> defaults = new HashMap<>();
+    private final boolean writeAnnotationDefault;
 
     /**
      * @param className               The class name
+     * @param originatingElements     The originating elements
      * @param annotationMetadata      The annotation metadata
      * @param writeAnnotationDefaults Whether to write annotation defaults
      */
     protected AbstractAnnotationMetadataWriter(
             String className,
+            OriginatingElements originatingElements,
             AnnotationMetadata annotationMetadata,
             boolean writeAnnotationDefaults) {
-        this.targetClassType = getTypeReference(className);
-        if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
-            this.annotationMetadataWriter = null;
-        } else {
-            this.annotationMetadataWriter = annotationMetadata instanceof AnnotationMetadataReference ? null : new AnnotationMetadataWriter(className, annotationMetadata, writeAnnotationDefaults);
-        }
+        super(originatingElements);
+        this.targetClassType = getTypeReferenceForName(className);
         this.annotationMetadata = annotationMetadata;
+        this.writeAnnotationDefault = writeAnnotationDefaults;
     }
 
     /**
-     * @return The annotation metadata writer
+     * @param className               The class name
+     * @param originatingElement     The originating element
+     * @param annotationMetadata      The annotation metadata
+     * @param writeAnnotationDefaults Whether to write annotation defaults
      */
-    protected AnnotationMetadataWriter getAnnotationMetadataWriter() {
-        return annotationMetadataWriter;
+    protected AbstractAnnotationMetadataWriter(
+            String className,
+            Element originatingElement,
+            AnnotationMetadata annotationMetadata,
+            boolean writeAnnotationDefaults) {
+        super(new Element[]{ originatingElement });
+        this.targetClassType = getTypeReferenceForName(className);
+        this.annotationMetadata = annotationMetadata;
+        this.writeAnnotationDefault = writeAnnotationDefaults;
     }
 
     /**
@@ -82,7 +100,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
         } else if (annotationMetadata instanceof AnnotationMetadataReference) {
             AnnotationMetadataReference reference = (AnnotationMetadataReference) annotationMetadata;
             String className = reference.getClassName();
-            annotationMetadataMethod.getStatic(getTypeReference(className), AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
+            annotationMetadataMethod.getStatic(getTypeReferenceForName(className), AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
         } else {
             annotationMetadataMethod.getStatic(targetClassType, AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
         }
@@ -97,7 +115,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
      * @param classWriter The class writer
      * @return The generator adapter
      */
-    protected @Nonnull
+    protected @NonNull
     GeneratorAdapter beginAnnotationMetadataMethod(ClassWriter classWriter) {
         return startPublicMethod(classWriter, "getAnnotationMetadata", AnnotationMetadata.class.getName());
     }
@@ -106,11 +124,33 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
      * @param classWriter The {@link ClassWriter}
      */
     protected void writeAnnotationMetadataStaticInitializer(ClassWriter classWriter) {
+        writeAnnotationMetadataStaticInitializer(classWriter, defaults);
+    }
+
+    /**
+     * @param classWriter The {@link ClassWriter}
+     * @param defaults    The annotation defaults
+     */
+    protected void writeAnnotationMetadataStaticInitializer(ClassWriter classWriter, Map<String, Integer> defaults) {
         if (!(annotationMetadata instanceof AnnotationMetadataReference)) {
 
             // write the static initializers for the annotation metadata
             GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
-            initializeAnnotationMetadata(staticInit, classWriter);
+            staticInit.visitCode();
+            staticInit.visitLabel(new Label());
+            initializeAnnotationMetadata(staticInit, classWriter, defaults);
+            if (writeAnnotationDefault && annotationMetadata instanceof DefaultAnnotationMetadata) {
+                DefaultAnnotationMetadata dam = (DefaultAnnotationMetadata) annotationMetadata;
+                AnnotationMetadataWriter.writeAnnotationDefaults(
+                        targetClassType,
+                        classWriter,
+                        staticInit,
+                        dam,
+                        defaults,
+                        loadTypeMethods
+                );
+
+            }
             staticInit.visitInsn(RETURN);
             staticInit.visitMaxs(1, 1);
             staticInit.visitEnd();
@@ -120,16 +160,32 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
     /**
      * @param staticInit  The {@link GeneratorAdapter}
      * @param classWriter The {@link ClassWriter}
+     * @param defaults    The annotation defaults
      */
-    protected void initializeAnnotationMetadata(GeneratorAdapter staticInit, ClassWriter classWriter) {
+    protected void initializeAnnotationMetadata(GeneratorAdapter staticInit, ClassWriter classWriter, Map<String, Integer> defaults) {
         Type annotationMetadataType = Type.getType(AnnotationMetadata.class);
         classWriter.visitField(ACC_PUBLIC | ACC_FINAL | ACC_STATIC, FIELD_ANNOTATION_METADATA, annotationMetadataType.getDescriptor(), null, null);
 
-        if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
-            staticInit.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
+        if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+            AnnotationMetadataWriter.instantiateNewMetadata(
+                    targetClassType,
+                    classWriter,
+                    staticInit,
+                    (DefaultAnnotationMetadata) annotationMetadata,
+                    defaults,
+                    loadTypeMethods
+            );
+        } else if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
+            AnnotationMetadataWriter.instantiateNewMetadataHierarchy(
+                    targetClassType,
+                    classWriter,
+                    staticInit,
+                    (AnnotationMetadataHierarchy) annotationMetadata,
+                    defaults,
+                    loadTypeMethods
+            );
         } else {
-            Type concreteMetadataType = getTypeReference(annotationMetadataWriter.getClassName());
-            pushNewInstance(staticInit, concreteMetadataType);
+            staticInit.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
         }
 
         staticInit.putStatic(targetClassType, FIELD_ANNOTATION_METADATA, annotationMetadataType);

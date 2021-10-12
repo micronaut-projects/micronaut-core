@@ -15,160 +15,149 @@
  */
 package io.micronaut.http.client
 
-import io.micronaut.context.ApplicationContext
+import io.micronaut.core.async.annotation.SingleResult
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
+import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.core.convert.format.Format
 import io.micronaut.core.type.Argument
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.MediaType
-import io.micronaut.http.MutableHttpRequest
+import io.micronaut.http.*
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.http.uri.UriBuilder
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Completable
-import io.reactivex.Flowable
-import io.reactivex.Single
-import io.reactivex.functions.Consumer
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import jakarta.inject.Inject
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
-import spock.lang.AutoCleanup
-import spock.lang.Shared
+import spock.lang.Issue
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
+import javax.annotation.Nullable
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.function.Consumer
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
+@MicronautTest
+@Property(name = 'spec.name', value = 'HttpGetSpec')
+@Property(name = "micronaut.server.netty.log-level", value = 'trace')
+@Property(name = "micronaut.http.client.log-level", value = 'trace')
 class HttpGetSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer)
+    @Inject
+    @Client("/")
+    HttpClient client
+
+    @Inject
+    MyGetClient myGetClient
+
+    @Inject
+    MyGetHelper myGetHelper
+
+    @Inject
+    OverrideUrlClient overrideUrlClient
+
+    @Inject
+    EmbeddedServer embeddedServer
 
     void "test simple get request"() {
-        given:
-        HttpClient client = HttpClient.create(embeddedServer.getURL())
-
         when:
-        def flowable = Flowable.fromPublisher(client.exchange(
+        Flux flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/get/simple").header("Accept-Encoding", "gzip")
         ))
-        Optional<String> body = flowable.map({res ->
+        Optional<String> body = flowable.map({ res ->
             res.getBody(String)}
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         body.isPresent()
         body.get() == 'success'
-
-        cleanup:
-        client.stop()
-        client.close()
     }
 
-
-    void "test simple 404 request"() {
-        given:
-        HttpClient client = HttpClient.create(embeddedServer.getURL())
+    void "test simple get with Publisher<Void> return"() {
+        JavaClient javaClient = embeddedServer.applicationContext.getBean(JavaClient)
 
         when:
-        def flowable = Flowable.fromPublisher(client.exchange(
+        javaClient.subscribe(javaClient.simple())
+
+        then:
+        noExceptionThrown()
+    }
+
+    void "test simple 404 request"() {
+        when:
+        Flux<?> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/get/doesntexist")
         ))
 
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Page Not Found"
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Page Not Found"
         e.status == HttpStatus.NOT_FOUND
 
-        cleanup:
-        client.stop()
-        client.close()
     }
 
     void "test 500 request with body"() {
-        given:
-        HttpClient client = HttpClient.create(embeddedServer.getURL())
-
         when:
-        def flowable = Flowable.fromPublisher(client.exchange(
+        Flux.from(client.exchange(
                 HttpRequest.GET("/get/error"), Argument.of(String), Argument.of(String)
-        ))
-
-        flowable.blockingFirst()
+        )).blockFirst()
 
         then:
-        def e = thrown(HttpClientResponseException)
+        HttpClientResponseException e = thrown()
         e.message == "Server error"
         e.status == HttpStatus.INTERNAL_SERVER_ERROR
         e.response.getBody(String).get() == "Server error"
 
-        cleanup:
-        client.stop()
-        client.close()
     }
 
     void "test 500 request with json body"() {
-        given:
-        HttpClient client = HttpClient.create(embeddedServer.getURL())
-
         when:
-        def flowable = Flowable.fromPublisher(client.exchange(
+        Flux.from(client.exchange(
                 HttpRequest.GET("/get/jsonError"), Argument.of(String), Argument.of(Map)
-        ))
-
-        flowable.blockingFirst()
+        )).blockFirst()
 
         then:
-        def e = thrown(HttpClientResponseException)
+        HttpClientResponseException e = thrown()
         e.message == "{foo=bar}"
         e.status == HttpStatus.INTERNAL_SERVER_ERROR
 
-        cleanup:
-        client.stop()
-        client.close()
     }
 
     void "test simple 404 request as VndError"() {
-        given:
-        HttpClient client = HttpClient.create(embeddedServer.getURL())
-
         when:
-        def flowable = Flowable.fromPublisher(client.exchange(
+        HttpResponse<?> response = Flux.from(client.exchange(
                 HttpRequest.GET("/get/doesntexist")
-        ))
-
-        def response = flowable.onErrorReturn({ error ->
+        )).onErrorResume({ error ->
             if (error instanceof HttpClientResponseException) {
-                return HttpResponse.status(error.status).body(error.response.getBody(Map).orElse(null))
+                return Flux.just(HttpResponse.status(error.status).body(error.response.getBody(Map).orElse(null)))
             }
             throw error
-        }).blockingFirst()
+        }).blockFirst()
 
         def body = response.body
 
         then:
         body.isPresent()
-        body.get().message == "Page Not Found"
-
-        cleanup:
-        client.stop()
-        client.close()
+        body.get()._embedded.errors[0].message == "Page Not Found"
     }
 
     void "test simple blocking get request"() {
-
         given:
-        def asyncClient = HttpClient.create(embeddedServer.getURL())
-        BlockingHttpClient client = asyncClient.toBlocking()
+        BlockingHttpClient client = this.client.toBlocking()
 
         when:
         HttpResponse<String> response = client.exchange(
@@ -181,89 +170,79 @@ class HttpGetSpec extends Specification {
         then:
         body.isPresent()
         body.get() == 'success'
-
-        cleanup:
-        asyncClient.stop()
-        asyncClient.close()
     }
 
     void "test simple get request with type"() {
-        given:
-        HttpClient client = new DefaultHttpClient(embeddedServer.getURL())
-
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/get/simple"), String
         ))
-        HttpResponse<String> response = flowable.blockingFirst()
-        def body = response.getBody()
+        HttpResponse<String> response = flowable.blockFirst()
+        Optional<String> body = response.getBody()
 
         then:
         response.status == HttpStatus.OK
         body.isPresent()
         body.get() == 'success'
-
-        cleanup:
-        client.stop()
     }
 
     void "test simple exchange request with POJO"() {
-        given:
-        def context = ApplicationContext.run()
-        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
-
         when:
-        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<Book>> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/get/pojo"), Book
         ))
 
-        HttpResponse<Book> response = flowable.blockingFirst()
+        HttpResponse<Book> response = flowable.blockFirst()
         Optional<Book> body = response.getBody()
-
         then:
         response.contentType.isPresent()
         response.contentType.get() == MediaType.APPLICATION_JSON_TYPE
         response.status == HttpStatus.OK
         body.isPresent()
         body.get().title == 'The Stand'
+        response.getBody(String.class).get() == '{"title":"The Stand"}'
+        response.getBody(byte[].class).get().length > 0
+    }
 
+    void "test simple exchange request with POJO with String response"() {
+        when:
+        Flux<HttpResponse<Book>> flowable = Flux.from(client.exchange(
+                HttpRequest.GET("/get/pojo"), String
+        ))
 
-        cleanup:
-        client.stop()
+        HttpResponse<String> response = flowable.blockFirst()
+        Optional<String> body = response.getBody()
+
+        then:
+        response.contentType.isPresent()
+        response.contentType.get() == MediaType.APPLICATION_JSON_TYPE
+        response.status == HttpStatus.OK
+        body.isPresent()
+        response.getBody(String.class).get() == '{"title":"The Stand"}'
+        response.getBody(Book.class).get().title == 'The Stand'
+        response.getBody(byte[].class).get().length > 0
     }
 
     void "test simple retrieve request with POJO"() {
-        given:
-        def context = ApplicationContext.run()
-        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
-
         when:
-        Flowable<Book> flowable = Flowable.fromPublisher(client.retrieve(
+        Flux<Book> flowable = Flux.from(client.retrieve(
                 HttpRequest.GET("/get/pojo"), Book
         ))
 
-        Book book = flowable.blockingFirst()
+        Book book = flowable.blockFirst()
 
         then:
         book != null
         book.title == "The Stand"
-
-
-        cleanup:
-        client.stop()
     }
 
     void "test simple get request with POJO list"() {
-        given:
-        def context = ApplicationContext.run()
-        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
-
         when:
-        Flowable<HttpResponse<List<Book>>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<List<Book>>> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/get/pojoList"), Argument.of(List, Book)
         ))
 
-        HttpResponse<List<Book>> response = flowable.blockingFirst()
+        HttpResponse<List<Book>> response = flowable.blockFirst()
         Optional<List<Book>> body = response.getBody()
 
         then:
@@ -280,44 +259,31 @@ class HttpGetSpec extends Specification {
         list.size() == 1
         list.get(0) instanceof Book
         list.get(0).title == 'The Stand'
-
-
-        cleanup:
-        client.stop()
     }
 
     void "test get with @Client"() {
-        given:
-        MyGetHelper helper = embeddedServer.applicationContext.getBean(MyGetHelper)
-
         expect:
-        helper.simple() == "success"
-        helper.simpleSlash() == "success"
-        helper.simplePreceedingSlash() == "success"
-        helper.simpleDoubleSlash() == "success"
-        helper.queryParam() == "a!b"
+        myGetHelper.simple() == "success"
+        myGetHelper.simpleSlash() == "success"
+        myGetHelper.simplePreceedingSlash() == "success"
+        myGetHelper.simpleDoubleSlash() == "success"
+        myGetHelper.queryParam() == "a!b"
     }
 
     void "test query parameter with @Client interface"() {
-        given:
-        MyGetClient client = embeddedServer.applicationContext.getBean(MyGetClient)
-
         expect:
-        client.queryParam('{"service":["test"]}') == '{"service":["test"]}'
-        client.queryParam('foo', 'bar') == 'foo-bar'
-        client.queryParam('foo%', 'bar') == 'foo%-bar'
+        myGetClient.queryParam('{"service":["test"]}') == '{"service":["test"]}'
+        myGetClient.queryParam('foo', 'bar') == 'foo-bar'
+        myGetClient.queryParam('foo%', 'bar') == 'foo%-bar'
     }
 
     void "test body availability"() {
-        given:
-        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
-
         when:
-        Flowable<HttpResponse> flowable = client.exchange(
+        Flux<HttpResponse> flowable = client.exchange(
                 HttpRequest.GET("/get/simple")
         )
         String body
-        flowable.firstOrError().subscribe((Consumer){ HttpResponse res ->
+        flowable.next().subscribe((Consumer){ HttpResponse res ->
             Thread.sleep(3000)
             body = res.getBody(String).orElse(null)
         })
@@ -327,15 +293,11 @@ class HttpGetSpec extends Specification {
         conditions.eventually {
             assert body == 'success'
         }
-
-        cleanup:
-        client.stop()
     }
 
     void "test blocking body availability"() {
         given:
-        HttpClient backing = HttpClient.create(embeddedServer.getURL())
-        BlockingHttpClient client = backing.toBlocking()
+        BlockingHttpClient client = client.toBlocking()
 
         when:
         HttpResponse res = client.exchange(
@@ -345,36 +307,23 @@ class HttpGetSpec extends Specification {
 
         then:
         body == null
-
-        cleanup:
-        backing.stop()
     }
 
     void "test that Optional.empty() should return 404"() {
-        given:
-        HttpClient client = HttpClient.create(embeddedServer.getURL())
-
         when:
-        def flowable = Flowable.fromPublisher(client.exchange(
+        Flux<?> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/get/empty")
         ))
 
-        HttpResponse<Optional<String>> response = flowable.blockingFirst()
+        HttpResponse<Optional<String>> response = flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Page Not Found"
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Page Not Found"
         e.status == HttpStatus.NOT_FOUND
-
-        cleanup:
-        client.stop()
-        client.close()
     }
 
     void "test a non empty optional should return the value"() {
-        given:
-        HttpClient client = HttpClient.create(embeddedServer.getURL())
-
         when:
         String body = client.toBlocking().retrieve(
                 HttpRequest.GET("/get/notEmpty"), String
@@ -383,15 +332,11 @@ class HttpGetSpec extends Specification {
 
         then:
         body == "not empty"
-
-        cleanup:
-        client.stop()
-        client.close()
     }
 
     void 'test format dates with @Format'() {
         given:
-        MyGetClient client = embeddedServer.applicationContext.getBean(MyGetClient)
+        MyGetClient client = this.myGetClient
         Date d = new Date(2018, 10, 20)
         LocalDate dt = LocalDate.now()
 
@@ -404,101 +349,89 @@ class HttpGetSpec extends Specification {
 
     void "test controller slash concatenation"() {
         given:
-        BlockingHttpClient client = HttpClient.create(embeddedServer.getURL()).toBlocking()
+        BlockingHttpClient client = this.client.toBlocking()
 
         expect:
         client.retrieve("/noslash/slash") == "slash"
         client.retrieve("/noslash/slash/") == "slash"
         client.retrieve("/noslash/noslash") == "noslash"
         client.retrieve("/noslash/noslash/") == "noslash"
+        client.retrieve("/noslash/startslash") == "startslash"
+        client.retrieve("/noslash/startslash/") == "startslash"
+        client.retrieve("/noslash/endslash") == "endslash"
+        client.retrieve("/noslash/endslash/") == "endslash"
+
         client.retrieve("/slash/slash") == "slash"
         client.retrieve("/slash/slash/") == "slash"
         client.retrieve("/slash/noslash") == "noslash"
         client.retrieve("/slash/noslash/") == "noslash"
+        client.retrieve("/slash/startslash") == "startslash"
+        client.retrieve("/slash/startslash/") == "startslash"
+        client.retrieve("/slash/endslash") == "endslash"
+        client.retrieve("/slash/endslash/") == "endslash"
 
         client.retrieve("/ending-slash/slash") == "slash"
         client.retrieve("/ending-slash/slash/") == "slash"
         client.retrieve("/ending-slash/noslash") == "noslash"
         client.retrieve("/ending-slash/noslash/") == "noslash"
+        client.retrieve("/ending-slash/startslash") == "startslash"
+        client.retrieve("/ending-slash/startslash/") == "startslash"
+        client.retrieve("/ending-slash/endslash") == "endslash"
+        client.retrieve("/ending-slash/endslash/") == "endslash"
 
         client.retrieve("/noslash") == "noslash"
         client.retrieve("/noslash/") == "noslash"
         client.retrieve("/slash") == "slash"
         client.retrieve("/slash/") == "slash"
+        client.retrieve("/startslash") == "startslash"
+        client.retrieve("/startslash/") == "startslash"
+        client.retrieve("/endslash") == "endslash"
+        client.retrieve("/endslash/") == "endslash"
+
+        cleanup:
+        client.close()
     }
 
     void "test a request with a custom host header"() {
-        given:
-        HttpClient client = HttpClient.create(embeddedServer.getURL())
-
         when:
         String body = client.toBlocking().retrieve(
                 HttpRequest.GET("/get/host").header("Host", "http://foo.com"), String
         )
 
-
         then:
         body == "http://foo.com"
 
         cleanup:
-        client.stop()
         client.close()
     }
 
     void "test empty list returns ok"() {
-        given:
-        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
-
         when:
-        HttpResponse response = client.exchange(HttpRequest.GET("/get/emptyList"), Argument.listOf(Book)).blockingFirst()
+        HttpResponse response = client.toBlocking().exchange(HttpRequest.GET("/get/emptyList"), Argument.listOf(Book))
 
         then:
         noExceptionThrown()
         response.status == HttpStatus.OK
         response.body().isEmpty()
+
+        cleanup:
+        client.close()
     }
 
     void "test single empty list returns ok"() {
-        given:
-        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
-
         when:
-        HttpResponse response = client.exchange(HttpRequest.GET("/get/emptyList/single"), Argument.listOf(Book)).blockingFirst()
+        HttpResponse response = client.toBlocking().exchange(HttpRequest.GET("/get/emptyList/single"), Argument.listOf(Book))
 
         then:
         noExceptionThrown()
         response.status == HttpStatus.OK
         response.body().isEmpty()
-    }
 
-    void "test mono empty list returns ok"() {
-        given:
-        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
-
-        when:
-        HttpResponse response = client.exchange(HttpRequest.GET("/get/emptyList/mono"), Argument.listOf(Book)).blockingFirst()
-
-        then:
-        noExceptionThrown()
-        response.status == HttpStatus.OK
-        response.body().isEmpty()
-    }
-
-    void "test completable returns 200"() {
-        when:
-        MyGetClient client = embeddedServer.applicationContext.getBean(MyGetClient)
-        def ex = client.completableError().blockingGet()
-
-        then:
-        client.completable().blockingGet() == null
-        ex instanceof HttpClientResponseException
-        ex.message.contains("completable error")
+        cleanup:
+        client.close()
     }
 
     void "test setting query params on the request"() {
-        given:
-        HttpClient client = HttpClient.create(embeddedServer.getURL())
-
         when:
         MutableHttpRequest request = HttpRequest.GET("/get/multipleQueryParam?foo=x")
         request.parameters.add('bar', 'y')
@@ -507,10 +440,13 @@ class HttpGetSpec extends Specification {
         then:
         noExceptionThrown()
         body == 'x-y'
+
+        cleanup:
+        client.close()
     }
 
     void "test overriding the URL"() {
-        def client = embeddedServer.applicationContext.getBean(OverrideUrlClient)
+        def client = this.overrideUrlClient
 
         when:
         String val = client.overrideUrl(embeddedServer.getURL().toString())
@@ -520,7 +456,7 @@ class HttpGetSpec extends Specification {
     }
 
     void "test multiple uris"() {
-        def client = embeddedServer.applicationContext.getBean(MyGetClient)
+        def client = this.myGetClient
 
         when:
         String val = client.multiple()
@@ -535,8 +471,164 @@ class HttpGetSpec extends Specification {
         val == "multiple mappings"
     }
 
+    void "test exploded query param request URI"() {
+        when:
+        MyGetClient client = this.myGetClient
+        String requestUri = client.queryParamExploded(["abc", "xyz"])
+
+        then:
+        requestUri.endsWith("bar=abc&bar=xyz")
+    }
+
+    void "test exploded query param request URI 2"() {
+        when:
+        MyGetClient client = this.myGetClient
+        String requestUri = client.queryParamExploded2(["abc", "xyz"])
+
+        then:
+        requestUri.endsWith("bar=abc&bar=xyz")
+    }
+
+    void "test multiple exploded query param request URI"() {
+        when:
+        MyGetClient client = this.myGetClient
+        String requestUri = client.multipleExplodedQueryParams(["abc", "xyz"], "random")
+
+        then:
+        requestUri.endsWith("bar=abc&bar=xyz&tag=random")
+    }
+
+    void "test multiple exploded query param request URI 2"() {
+        when:
+        MyGetClient client = this.myGetClient
+        String requestUri = client.multipleExplodedQueryParams2(["abc", "xyz"], "random")
+
+        then:
+        requestUri.endsWith("bar=abc&bar=xyz&tag=random")
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/2782")
+    void "test single letter uri"() {
+        given:
+        HttpClient client = HttpClient.create(embeddedServer.getURL())
+
+        when:
+        MutableHttpRequest request = HttpRequest.GET("/get/a")
+        String body = client.toBlocking().retrieve(request)
+
+        then:
+        noExceptionThrown()
+        body == 'success'
+
+        cleanup:
+        client.close()
+    }
+
+    void "test creating a client with a null URL"() {
+        given:
+        BlockingHttpClient client = HttpClient.create(null).toBlocking()
+
+        when:
+        String uri = UriBuilder.of(embeddedServer.getURI()).path("/get/simple").toString()
+        HttpResponse<String> response = client.exchange(
+                HttpRequest.GET(uri),
+                String
+        )
+        def body = response.getBody()
+
+        then:
+        body.isPresent()
+        body.get() == 'success'
+    }
+
+    void "test creating an rx client with a null URL"() {
+        given:
+        BlockingHttpClient client = HttpClient.create(null).toBlocking()
+
+        when:
+        String uri = UriBuilder.of(embeddedServer.getURI()).path("/get/simple").toString()
+        HttpResponse<String> response = client.exchange(
+                HttpRequest.GET(uri),
+                String
+        )
+        def body = response.getBody()
+
+        then:
+        body.isPresent()
+        body.get() == 'success'
+
+        cleanup:
+        client.close()
+    }
+
+    void "test a nested list"() {
+        when:
+        List<List<Book>> books = myGetClient.nestedPojoList()
+
+        then:
+        books[0][0] instanceof Book
+        books[0][0].title == "The Stand"
+
+        when:
+        BlockingHttpClient client = HttpClient.create(embeddedServer.getURL()).toBlocking()
+        books = client.retrieve(HttpRequest.GET("/get/nestedPojoList"), Argument.listOf(Argument.listOf(Book.class)))
+
+        then:
+        books[0][0] instanceof Book
+        books[0][0].title == "The Stand"
+
+        cleanup:
+        client.close()
+    }
+
+    void "test an invalid content type"() {
+        when:
+        myGetClient.invalidContentType()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.message == "Failed to decode the body for the given content type [does/notexist]"
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/5223")
+    void "format query param declared in URI"() {
+        given:
+        MyGetClient client = this.myGetClient
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")
+        LocalDateTime dt = LocalDateTime.now()
+
+        expect:
+        client.formatUriDeclaredQueryParam(dt) == formatter.format(dt)
+    }
+
+    void "test an invalid content type reactive response"() {
+        when:
+        Mono.from(myGetClient.invalidContentTypeReactive()).block()
+
+        then:
+        HttpClientResponseException ex = thrown()
+        ex.message == "Failed to decode the body for the given content type [does/notexist]"
+    }
+
+    @Requires(property = 'spec.name', value = 'HttpGetSpec')
+    void "test deserializing map wrapped by Reactive type"() {
+        when:
+        def response = Mono.from(myGetClient.reactiveMap()).block()
+        def book1 = response.get("key1")
+
+        then:
+        book1 instanceof Book
+        book1.title == "title1"
+    }
+
+    @Requires(property = 'spec.name', value = 'HttpGetSpec')
     @Controller("/get")
     static class GetController {
+
+        @Get(value = "a", produces = MediaType.TEXT_PLAIN)
+        String a() {
+            return "success"
+        }
 
         @Get(value = "/simple", produces = MediaType.TEXT_PLAIN)
         String simple() {
@@ -553,18 +645,19 @@ class HttpGetSpec extends Specification {
             return [ new Book(title: "The Stand") ]
         }
 
+        @Get("/nestedPojoList")
+        List<List<Book>> nestedPojoList() {
+            return [[ new Book(title: "The Stand") ]]
+        }
+
         @Get("/emptyList")
         List<Book> emptyList() {
             return []
         }
 
         @Get("/emptyList/single")
-        Single<List<Book>> emptyListSingle() {
-            return Single.just([])
-        }
-
-        @Get("/emptyList/mono")
-        Mono<List<Book>> emptyListMono() {
+        @SingleResult
+        Publisher<List<Book>> emptyListSingle() {
             return Mono.just([])
         }
 
@@ -581,6 +674,16 @@ class HttpGetSpec extends Specification {
         @Get("/queryParam")
         String queryParam(@QueryValue String foo) {
             return foo
+        }
+
+        @Get("/queryParamExploded{?bar*}")
+        String queryParamExploded(@QueryValue("bar") List<String> foo, HttpRequest<?> request) {
+            return request.getUri().toString()
+        }
+
+        @Get("/multipleExplodedQueryParams{?bar*,tag}")
+        String multipleExplodedQueryParams(@QueryValue("bar") List<String> foo, @Nullable @QueryValue("tag") String label, HttpRequest<?> request) {
+            return request.getUri().toString()
         }
 
         @Get("/multipleQueryParam")
@@ -618,32 +721,44 @@ class HttpGetSpec extends Specification {
             return myDate.toString()
         }
 
+        @Get("/formatUriDeclaredQueryParam")
+        String formatUriDeclaredQueryParam(@QueryValue @Format("MMMM dd yyyy 'at' h:m a") LocalDateTime time) {
+            return time.toString();
+        }
+
         @Get("/host")
         String hostHeader(@Header String host) {
             return host
-        }
-
-        @Get("/completable")
-        Completable completable(){
-            return Completable.complete()
-        }
-
-        @Get("/completable/error")
-        Completable completableError() {
-            return Completable.error(new RuntimeException("completable error"))
         }
 
         @Get(uris = ["/multiple", "/multiple/mappings"])
         String multipleMappings() {
             return "multiple mappings"
         }
+
+        @Get(value = "/invalidContentType", produces = "does/notexist")
+        String invalidContentType() {
+            return "hello"
+        }
+
+        @Get("/reactiveMap")
+        @SingleResult
+        Publisher<Map<String, Book>> reactiveMap() {
+            def map = ["key1": new Book(title: "title1"), "key2": new Book(title: "title2")]
+            return Mono.just(map)
+        }
+
+        @Get(value = "/nestedPublishers")
+        Publisher<HttpResponse<Publisher<String>>> nestedPublishers() {
+            return Publishers.just(HttpResponse.ok(Publishers.just("abc")))
+        }
     }
 
-
+    @Requires(property = 'spec.name', value = 'HttpGetSpec')
     @Controller("noslash")
     static class NoSlashController {
 
-        @Get("/slash")
+        @Get("/slash/")
         String slash() {
             "slash"
         }
@@ -652,13 +767,23 @@ class HttpGetSpec extends Specification {
         String noSlash() {
             "noslash"
         }
+
+        @Get("/startslash")
+        String startSlash() {
+            "startslash"
+        }
+
+        @Get("endslash/")
+        String endSlash() {
+            "endslash"
+        }
     }
 
-
+    @Requires(property = 'spec.name', value = 'HttpGetSpec')
     @Controller("/slash")
     static class SlashController {
 
-        @Get("/slash")
+        @Get("/slash/")
         String slash() {
             "slash"
         }
@@ -667,8 +792,19 @@ class HttpGetSpec extends Specification {
         String noSlash() {
             "noslash"
         }
+
+        @Get("/startslash")
+        String startSlash() {
+            "startslash"
+        }
+
+        @Get("endslash/")
+        String endSlash() {
+            "endslash"
+        }
     }
 
+    @Requires(property = 'spec.name', value = 'HttpGetSpec')
     @Controller("/ending-slash/")
     static class EndingSlashController {
 
@@ -677,16 +813,27 @@ class HttpGetSpec extends Specification {
             "slash"
         }
 
-        @Get("noslash/")
+        @Get("noslash")
         String noSlash() {
             "noslash"
         }
+
+        @Get("/startslash")
+        String startSlash() {
+            "startslash"
+        }
+
+        @Get("endslash/")
+        String endSlash() {
+            "endslash"
+        }
     }
 
+    @Requires(property = 'spec.name', value = 'HttpGetSpec')
     @Controller
     static class SlashRootController {
 
-        @Get("/slash")
+        @Get("/slash/")
         String slash() {
             "slash"
         }
@@ -694,6 +841,16 @@ class HttpGetSpec extends Specification {
         @Get("noslash")
         String noSlash() {
             "noslash"
+        }
+
+        @Get("/startslash")
+        String startSlash() {
+            "startslash"
+        }
+
+        @Get("endslash/")
+        String endSlash() {
+            "endslash"
         }
     }
 
@@ -705,8 +862,10 @@ class HttpGetSpec extends Specification {
         String message
     }
 
+    @Requires(property = 'spec.name', value = 'HttpGetSpec')
     @Client("/get")
     static interface MyGetClient {
+
         @Get(value = "/simple", produces = MediaType.TEXT_PLAIN)
         String simple()
 
@@ -716,6 +875,9 @@ class HttpGetSpec extends Specification {
         @Get("/pojoList")
         List<Book> pojoList()
 
+        @Get("/nestedPojoList")
+        List<List<Book>> nestedPojoList()
+
         @Get(value = "/error", produces = MediaType.TEXT_PLAIN)
         HttpResponse error()
 
@@ -724,6 +886,18 @@ class HttpGetSpec extends Specification {
 
         @Get("/queryParam")
         String queryParam(@QueryValue String foo)
+
+        @Get("/queryParamExploded{?bar*}")
+        String queryParamExploded(@QueryValue("bar") List<String> foo)
+
+        @Get("/queryParamExploded{?bar*}")
+        String queryParamExploded2(@QueryValue List<String> bar)
+
+        @Get("/multipleExplodedQueryParams{?bar*,tag}")
+        String multipleExplodedQueryParams(@QueryValue("bar") List<String> foo, @QueryValue("tag") String label)
+
+        @Get("/multipleExplodedQueryParams{?bar*,tag}")
+        String multipleExplodedQueryParams2(@QueryValue List<String> bar, @QueryValue String tag)
 
         @Get("/multipleQueryParam")
         String queryParam(@QueryValue String foo, @QueryValue String bar)
@@ -740,34 +914,44 @@ class HttpGetSpec extends Specification {
         @Get("/dateTimeQuery")
         String formatDateTimeQuery(@QueryValue @Format('yyyy-MM-dd') LocalDate myDate)
 
-        @Get("/completable")
-        Completable completable()
-
-        @Get("/completable/error")
-        Completable completableError()
-
         @Get("/multiple")
         String multiple()
 
         @Get("/multiple/mappings")
         String multipleMappings()
+
+        @Get(value = "/invalidContentType", consumes = "does/notexist")
+        Book invalidContentType()
+
+        @Get(value = "/formatUriDeclaredQueryParam{?time}")
+        String formatUriDeclaredQueryParam(@QueryValue @Format("MMMM dd yyyy 'at' h:m a") LocalDateTime time);
+
+        @Get(value = "/invalidContentType", consumes = "does/notexist")
+        @SingleResult
+        Publisher<Book> invalidContentTypeReactive()
+
+        @Get("/reactiveMap")
+        @SingleResult
+        Publisher<Map<String, Book>> reactiveMap()
     }
 
+    @Requires(property = 'spec.name', value = 'HttpGetSpec')
     @Client("http://not.used")
     static interface OverrideUrlClient {
 
-        @Get("{+url}/get/simple")
+        @Get(value = "{+url}/get/simple", consumes = MediaType.TEXT_PLAIN)
         String overrideUrl(String url);
-
     }
 
-    @javax.inject.Singleton
+    @Requires(property = 'spec.name', value = 'HttpGetSpec')
+    @jakarta.inject.Singleton
     static class MyGetHelper {
-        private final RxStreamingHttpClient rxClientSlash
-        private final RxStreamingHttpClient rxClient
 
-        MyGetHelper(@Client("/get/") RxStreamingHttpClient rxClientSlash,
-                    @Client("/get") RxStreamingHttpClient rxClient) {
+        private final StreamingHttpClient rxClientSlash
+        private final StreamingHttpClient rxClient
+
+        MyGetHelper(@Client("/get/") StreamingHttpClient rxClientSlash,
+                    @Client("/get") StreamingHttpClient rxClient) {
             this.rxClient = rxClient
             this.rxClientSlash = rxClientSlash
         }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.context.BeanLocator;
 import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.MethodConvention;
@@ -30,9 +31,10 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ProxyBeanDefinition;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /**
@@ -49,6 +51,11 @@ public interface RouteBuilder {
      * Used to signify to the route that the ID of the resource is used.
      */
     PropertyConvention ID = PropertyConvention.ID;
+
+    /**
+     * @return The exposed ports
+     */
+    Set<Integer> getExposedPorts();
 
     /**
      * @return The filter routes
@@ -83,6 +90,17 @@ public interface RouteBuilder {
      * @return The {@link FilterRoute}
      */
     FilterRoute addFilter(String pathPattern, Supplier<HttpFilter> filter);
+
+    /**
+     * Add a filter.
+     *
+     * @param pathPattern The path pattern for the filter
+     * @param beanLocator The bean locator
+     * @param beanDefinition The bean definition
+     * @return The {@link FilterRoute}
+     * @since 2.0
+     */
+    FilterRoute addFilter(String pathPattern, BeanLocator beanLocator, BeanDefinition<? extends HttpFilter> beanDefinition);
 
     /**
      * <p>Builds the necessary mappings to treat the given class as a REST endpoint.</p>
@@ -436,7 +454,6 @@ public interface RouteBuilder {
     default UriRoute POST(String uri, ExecutableMethod<?, ?> method) {
         return POST(uri, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes());
     }
-
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
@@ -1166,7 +1183,7 @@ public interface RouteBuilder {
          * @param beanDefinition The type
          * @return The URI to use
          */
-        default @Nonnull
+        default @NonNull
         String resolveUri(BeanDefinition<?> beanDefinition) {
             String uri = beanDefinition.stringValue(UriMapping.class).orElseGet(() ->
                     beanDefinition.stringValue(Controller.class).orElse(UriMapping.DEFAULT_URI)
@@ -1191,7 +1208,7 @@ public interface RouteBuilder {
          * @param property The property
          * @return The URI to use
          */
-        default @Nonnull
+        default @NonNull
         String resolveUri(String property) {
             if (StringUtils.isEmpty(property)) {
                 return "/";
@@ -1209,8 +1226,7 @@ public interface RouteBuilder {
          * @param id   the route id
          * @return The URI to use
          */
-        default @Nonnull
-        String resolveUri(Class type, PropertyConvention id) {
+        default @NonNull String resolveUri(Class type, PropertyConvention id) {
             return resolveUri(type) + "/{" + id.lowerCaseName() + "}";
         }
 

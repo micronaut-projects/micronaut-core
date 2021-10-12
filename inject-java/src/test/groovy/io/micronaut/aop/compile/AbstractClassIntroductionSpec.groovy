@@ -15,8 +15,8 @@
  */
 package io.micronaut.aop.compile
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.DefaultBeanContext
-import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.writer.BeanDefinitionVisitor
@@ -36,7 +36,7 @@ import io.micronaut.aop.introduction.*;
 import io.micronaut.context.annotation.*;
 
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 abstract class AbstractBean {
     public abstract String isAbstract(); 
     
@@ -74,7 +74,7 @@ interface Foo {
     String nonAbstract();
 }
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 abstract class AbstractBean implements Foo {
     public abstract String isAbstract(); 
     
@@ -114,7 +114,7 @@ interface Foo {
     String nonAbstract();
 }
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 abstract class AbstractBean implements Foo {
     public abstract String isAbstract(); 
     
@@ -161,7 +161,7 @@ interface Foo extends Bar {
 }
 
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 abstract class AbstractBean implements Foo {
     public abstract String isAbstract(); 
     
@@ -207,7 +207,7 @@ interface Foo {
     String nonAbstract();
 }
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 abstract class AbstractBean implements Foo {
     public abstract String isAbstract(); 
     
@@ -251,7 +251,7 @@ interface Foo {
     }
 }
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 abstract class AbstractBean implements Foo {
     public abstract String isAbstract(); 
     
@@ -300,7 +300,7 @@ interface Foo extends Bar {
     }
 }
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 abstract class AbstractBean implements Foo {
     public abstract String isAbstract(); 
     

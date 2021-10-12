@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,8 +20,14 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PropertyElement;
 
-import javax.annotation.Nonnull;
+import io.micronaut.core.annotation.NonNull;
+
+import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.TypeMirror;
+import java.util.Collections;
+import java.util.Map;
 
 /**
  * Models a {@link PropertyElement} for Java.
@@ -36,30 +42,84 @@ class JavaPropertyElement extends AbstractJavaElement implements PropertyElement
     private final ClassElement type;
     private final boolean readOnly;
     private final ClassElement declaringElement;
+    private final JavaVisitorContext visitorContext;
 
     /**
      * Default constructor.
-     *  @param declaringElement The declaring element
-     * @param getter The element
+     *
+     * @param declaringElement   The declaring element
+     * @param rootElement        The element
      * @param annotationMetadata The annotation metadata
-     * @param name The name
-     * @param type The type
-     * @param readOnly Whether it is read only
-     * @param visitorContext The java visitor context
+     * @param name               The name
+     * @param type               The type
+     * @param readOnly           Whether it is read only
+     * @param visitorContext     The java visitor context
      */
     JavaPropertyElement(
             ClassElement declaringElement,
-            ExecutableElement getter,
+            Element rootElement,
             AnnotationMetadata annotationMetadata,
             String name,
             ClassElement type,
             boolean readOnly,
             JavaVisitorContext visitorContext) {
-        super(getter, annotationMetadata, visitorContext);
+        super(rootElement, annotationMetadata, visitorContext);
         this.name = name;
         this.type = type;
         this.readOnly = readOnly;
         this.declaringElement = declaringElement;
+        this.visitorContext = visitorContext;
+    }
+
+    /**
+     * Default constructor.
+     *
+     * @param declaringElement   The declaring element
+     * @param rootElement        The element
+     * @param annotationMetadata The annotation metadata
+     * @param name               The name
+     * @param type               The type
+     * @param readOnly           Whether it is read only
+     * @param visitorContext     The java visitor context
+     * @deprecated Use {@link #JavaPropertyElement(ClassElement, Element, AnnotationMetadata, String, ClassElement, boolean, JavaVisitorContext)} instead
+     */
+    @SuppressWarnings("DeprecatedIsStillUsed") // used by openapi processor
+    @Deprecated
+    JavaPropertyElement(
+            ClassElement declaringElement,
+            ExecutableElement rootElement,
+            AnnotationMetadata annotationMetadata,
+            String name,
+            ClassElement type,
+            boolean readOnly,
+            JavaVisitorContext visitorContext) {
+        this(declaringElement, (Element) rootElement, annotationMetadata, name, type, readOnly, visitorContext);
+    }
+
+    @Override
+    public ClassElement getGenericType() {
+        Map<String, Map<String, TypeMirror>> declaredGenericInfo;
+        if (declaringElement instanceof JavaClassElement) {
+            declaredGenericInfo = ((JavaClassElement) declaringElement).getGenericTypeInfo();
+        } else {
+            declaredGenericInfo = Collections.emptyMap();
+        }
+        return parameterizedClassElement(((TypeElement) type.getNativeType()).asType(), visitorContext, declaredGenericInfo);
+    }
+
+    @Override
+    public boolean isPrimitive() {
+        return type.isPrimitive();
+    }
+
+    @Override
+    public boolean isArray() {
+        return type.isArray();
+    }
+
+    @Override
+    public int getArrayDimensions() {
+        return type.getArrayDimensions();
     }
 
     @Override
@@ -72,7 +132,7 @@ class JavaPropertyElement extends AbstractJavaElement implements PropertyElement
         return name;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public ClassElement getType() {
         return type;

@@ -1,19 +1,40 @@
 dependencies {
-    compile project(":inject")
-    compile project(":aop")
-    compile dependencyVersion("groovy")
+    api project(":inject")
+    api project(':aop')
+    api libs.managed.groovy
 
-    testCompile "junit:junit:4.7"
-//    testCompile 'javax.validation:validation-api:1.1.0.Final'
-    testCompile "org.hibernate:hibernate-core:5.3.6.Final"
-    testCompile 'org.hibernate:hibernate-validator:6.0.13.Final'
-    testRuntime 'org.glassfish.web:el-impl:2.2.1-b05'
-    testRuntime 'org.glassfish:javax.el:3.0.1-b08'
-    testCompile project(":http-server-netty")
-    testCompile project(":http-client")
-    testCompile project(":validation")
-    testCompile 'org.neo4j.driver:neo4j-java-driver:1.4.5'
-    testCompile dependencyModuleVersion("groovy", "groovy-json")
+//    testImplementation 'javax.validation:validation-api:1.1.0.Final'
+    testImplementation project(":context")
+    testImplementation libs.javax.inject
+    testImplementation libs.managed.spotbugs
+    testImplementation libs.hibernate
+    testImplementation libs.hibernate.validator
+    testRuntimeOnly libs.javax.el.impl
+    testRuntimeOnly libs.javax.el
+    testImplementation project(":http-server-netty")
+    testImplementation project(":http-client")
+    testImplementation project(":inject-test-utils")
+    testImplementation project(":inject-groovy-test")
+    testImplementation project(":validation")
+    testImplementation(libs.managed.neo4j.bolt) {
+        version {
+            require "1.4.5"
+        }
+    }
+    testImplementation libs.managed.groovy.json
+    testImplementation libs.blaze.persistence.core
+
+    testImplementation(libs.managed.micronaut.test.core) {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+        exclude module:'micronaut-bom'
+    }
+
+    testImplementation libs.managed.reactor
+}
+
+test {
+    exclude '**/*$_closure*'
 }
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

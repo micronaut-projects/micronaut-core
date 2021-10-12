@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,13 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Default implementation of the {@link ConversionContext} interface.
@@ -39,7 +33,7 @@ class DefaultArgumentConversionContext<T> implements ArgumentConversionContext<T
     private final Argument<T> argument;
     private final Locale finalLocale;
     private final Charset finalCharset;
-    private final List<ConversionError> conversionErrors = new ArrayList<>();
+    private final List<ConversionError> conversionErrors = new ArrayList<>(3);
 
     /**
      * @param argument     The argument
@@ -112,6 +106,25 @@ class DefaultArgumentConversionContext<T> implements ArgumentConversionContext<T
     @Override
     public Argument<T> getArgument() {
         return argument;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        DefaultArgumentConversionContext<?> that = (DefaultArgumentConversionContext<?>) o;
+        return Objects.equals(getArgument(), that.getArgument()) &&
+            Objects.equals(finalLocale, that.finalLocale) &&
+            Objects.equals(finalCharset, that.finalCharset);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(argument, finalLocale, finalCharset);
     }
 
     @Override

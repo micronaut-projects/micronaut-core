@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 package io.micronaut.ast.groovy.annotation
 import io.micronaut.aop.Around;
 
-import javax.inject.Scope;
+import jakarta.inject.Scope;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

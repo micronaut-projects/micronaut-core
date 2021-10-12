@@ -39,6 +39,9 @@ class VersionResolvingStrategiesConfigSpec extends Specification {
         )
         then:
         !context.containsBean(RequestVersionResolver)
+
+        cleanup:
+        context.close()
     }
 
     def "contains 'Header resolver' in context"() {
@@ -52,6 +55,9 @@ class VersionResolvingStrategiesConfigSpec extends Specification {
         then:
         context.containsBean(HeaderVersionResolver)
         !context.containsBean(ParameterVersionResolver)
+
+        cleanup:
+        context.close()
     }
 
     def "contains 'Parameter resolver' in context"() {
@@ -65,6 +71,9 @@ class VersionResolvingStrategiesConfigSpec extends Specification {
         then:
         context.containsBean(ParameterVersionResolver)
         !context.containsBean(HeaderVersionResolver)
+
+        cleanup:
+        context.close()
     }
 
     def "'Router' is not decorated with 'VersionedRouter'"() {
@@ -75,6 +84,9 @@ class VersionResolvingStrategiesConfigSpec extends Specification {
         ))
         then:
         context.getBean(Router).class != FilteredRouter
+
+        cleanup:
+        context.close()
     }
 
     def "'Router' is instance of 'VersionedRouter'"() {
@@ -85,6 +97,9 @@ class VersionResolvingStrategiesConfigSpec extends Specification {
         ))
         then:
         context.getBean(Router).class == FilteredRouter
+
+        cleanup:
+        context.close()
     }
 
     def "'Configuration' picked up the header name"() {
@@ -99,6 +114,9 @@ class VersionResolvingStrategiesConfigSpec extends Specification {
         then:
         bean.getNames().contains("X-API")
         bean.getNames().contains("X-VERSION")
+
+        cleanup:
+        context.close()
     }
 
     def "Decorating the existing router bean works properly"() {
@@ -110,6 +128,9 @@ class VersionResolvingStrategiesConfigSpec extends Specification {
         def bean = context.getBean(DefaultRouter)
         then:
         bean instanceof FilteredRouter
+
+        cleanup:
+        context.close()
     }
 
 }

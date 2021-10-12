@@ -1,7 +1,7 @@
 package io.micronaut.inject.factory.enummethod
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
 class FactoryEnumSpec extends AbstractTypeElementSpec {
 
@@ -17,7 +17,7 @@ import io.micronaut.inject.factory.enummethod.TestEnum;
 @Factory
 class TestFactory$TestEnum {
 
-    @javax.inject.Singleton
+    @jakarta.inject.Singleton
     TestEnum testEnum() {
         return TestEnum.ONE;
     }

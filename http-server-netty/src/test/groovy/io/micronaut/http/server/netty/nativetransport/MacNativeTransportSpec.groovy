@@ -1,9 +1,10 @@
 package io.micronaut.http.server.netty.nativetransport
 
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.netty.channel.EventLoopGroupFactory
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import io.micronaut.http.server.netty.EventLoopGroupFactory
 import io.netty.channel.kqueue.KQueueServerSocketChannel
+import reactor.core.publisher.Flux
 import spock.lang.Requires
 import spock.util.environment.OperatingSystem
 
@@ -12,14 +13,16 @@ class MacNativeTransportSpec extends AbstractMicronautSpec {
 
     void "test a basic request works with mac native transport"() {
         when:
-        String body = rxClient.retrieve(HttpRequest.GET("/native-transport")).blockingFirst()
+        String body = rxClient.toBlocking().retrieve(HttpRequest.GET("/native-transport"))
 
         then:
         noExceptionThrown()
         body == "works"
 
+        def eventLoopGroupFactory = applicationContext.getBean(EventLoopGroupFactory)
+
         expect:
-        applicationContext.getBean(EventLoopGroupFactory).serverSocketChannelClass() == KQueueServerSocketChannel.class
+        eventLoopGroupFactory.serverSocketChannelClass() == KQueueServerSocketChannel.class
     }
 
     @Override

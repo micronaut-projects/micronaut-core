@@ -1,16 +1,16 @@
-Micronaut includes the ability to expose Metrics via integration with http://micrometer.io[Micrometer].
+Micronaut can expose application metrics via integration with http://micrometer.io[Micrometer].
 
 [TIP]
 .Using the CLI
 ====
-If you are creating your project using the Micronaut CLI, supply one of `micrometer-atlas`, `micrometer-graphite`, `micrometer-prometheus`, or `micrometer-statsd` features to enable metrics and preconfigure the selected registery in your project:
+If you create your project using the Micronaut CLI, supply one of the micrometer features to enable metrics and preconfigure the selected registry in your project. For example:
 ----
 $ mn create-app my-app --features micrometer-atlas
 ----
 ====
 
-The metrics endpoint returns information about the "metrics" of the application. To execute the metrics endpoint, send a GET request to `/metrics`. This will return a list of availble metric names.
+The metrics endpoint returns information about the "metrics" of the application. To execute the metrics endpoint, send a GET request to `/metrics`. This returns a list of available metric names.
 
 You can get specific metrics by using `/metrics/[name]` such as `/metrics/jvm.memory.used`.
 
-See the documentation for https://micronaut-projects.github.io/micronaut-micrometer/latest/guide/[Micronaut Micrometer] for information on how to configure, expose and customize metrics output.
+See the documentation for https://micronaut-projects.github.io/micronaut-micrometer/latest/guide/[Micronaut Micrometer] for a list of registries and information on how to configure, expose and customize metrics output.

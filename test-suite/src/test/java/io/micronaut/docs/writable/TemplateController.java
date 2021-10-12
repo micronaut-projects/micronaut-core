@@ -1,7 +1,21 @@
+/*
+ * Copyright 2017-2020 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.docs.writable;
 
 //tag::imports[]
-
 import groovy.text.SimpleTemplateEngine;
 import groovy.text.Template;
 import io.micronaut.core.io.Writable;
@@ -17,11 +31,7 @@ import io.micronaut.http.server.exceptions.HttpServerException;
 public class TemplateController {
 
     private final SimpleTemplateEngine templateEngine = new SimpleTemplateEngine();
-    private final Template template;
-
-    public TemplateController() {
-        template = initTemplate(); // <1>
-    }
+    private final Template template = initTemplate(); // <1>
 
     @Get(value = "/welcome", produces = MediaType.TEXT_PLAIN)
     Writable render() { // <2>
@@ -34,15 +44,13 @@ public class TemplateController {
     }
 
     private Template initTemplate() {
-        Template template;
         try {
-            template = templateEngine.createTemplate(
+            return templateEngine.createTemplate(
                     "Dear $firstName $lastName. Nice to meet you."
             );
         } catch (Exception e) {
             throw new HttpServerException("Cannot create template");
         }
-        return template;
     }
 }
 //end::clazz[]

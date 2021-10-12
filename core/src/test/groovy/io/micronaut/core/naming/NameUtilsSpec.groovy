@@ -76,6 +76,7 @@ class NameUtilsSpec extends Specification {
         '8gr8-notification-service'.toUpperCase()   | '8gr8-notification-service'
         '8gr8-notification-s3rv1c3'.toUpperCase()   | '8gr8-notification-s3rv1c3'
         'gr8-7notification-service'.toUpperCase()   | 'gr8-7notification-service'
+        'ec55Metadata'                              | 'ec55-metadata'
         'micronaut.config-client.enabled'           | 'micronaut.config-client.enabled'
         "com.fooBar.FooBar"                         | "com.foo-bar.foo-bar"
         "FooBar"                                    | "foo-bar"
@@ -85,7 +86,9 @@ class NameUtilsSpec extends Specification {
         "FOO_BAR"                                   | 'foo-bar'
         "fooBBar"                                   | 'foo-bbar'
         'gr8crm-notification-service'               | 'gr8crm-notification-service'
-
+        'aws.disableEc2Metadata'                    | 'aws.disable-ec2-metadata'
+        'aws.disableEcMetadata'                     | 'aws.disable-ec-metadata'
+        'aws.disableEc2instanceMetadata'            | 'aws.disable-ec2instance-metadata'
     }
 
     @Unroll
@@ -104,6 +107,7 @@ class NameUtilsSpec extends Specification {
         "FOO_BAR"                         | 'foo-bar'
         "fooBBar"                         | 'foo-bbar'
         "fooBar"                          | 'foo-bar'
+        "test.Foo bar"                    | 'test.foo-bar'
     }
 
     @Unroll
@@ -122,6 +126,39 @@ class NameUtilsSpec extends Specification {
         "FOO-BAR"           | 'FOO_BAR'
         "foo-bar-baz"       | 'FOO_BAR_BAZ'
         "fooBBar"           | 'FOO_BBAR'
+    }
+
+    void "test decapitalize"() {
+        expect:
+        NameUtils.decapitalize(name) == result
+
+        where:
+        name    | result
+        "Title" | "title"
+        "T"     | "t"
+        "TiTLE" | "tiTLE"
+        "aBCD"  | "aBCD"
+        "ABCD"  | "ABCD"
+        "aBC"   | "aBC"
+        "ABC"   | "ABC"
+        "AB"    | "AB"
+        "ABc"   | "aBc"
+    }
+
+    void "test decapitalize returns same ref"() {
+        expect:
+        NameUtils.decapitalize(name).is(name)
+
+        where:
+        name      | _
+        ""        | _
+        "a"       | _
+        "aa"      | _
+        "aB"      | _
+        "AA"      | _
+        "ABCD"    | _
+        "a a"     | _
+        "abcd ef" | _
     }
 
     @Unroll

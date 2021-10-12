@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,7 @@
  */
 package io.micronaut.tracing.instrument.util;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.MutableHttpResponse;
 import io.opentracing.Scope;
@@ -25,8 +26,6 @@ import io.opentracing.noop.NoopScopeManager;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
-
-import javax.annotation.Nonnull;
 
 import java.util.Optional;
 
@@ -41,7 +40,7 @@ import static io.micronaut.tracing.interceptor.TraceInterceptor.logError;
  * @since 1.0
  */
 @SuppressWarnings("PublisherImplementation")
-public class TracingPublisher<T> implements Publisher<T> {
+public class TracingPublisher<T> implements Publishers.MicronautPublisher<T> {
 
     private final Publisher<T> publisher;
     private final Tracer tracer;
@@ -82,7 +81,6 @@ public class TracingPublisher<T> implements Publisher<T> {
         this(publisher, tracer, spanBuilder, Publishers.isSingle(publisher.getClass()));
     }
 
-
     /**
      * Creates a new tracing publisher for the given arguments.
      *
@@ -111,7 +109,7 @@ public class TracingPublisher<T> implements Publisher<T> {
             finishOnClose = true;
         } else {
             span = parentSpan;
-            finishOnClose = false;
+            finishOnClose = isContinued();
         }
         if (span != null) {
             final ScopeManager scopeManager = tracer.scopeManager();
@@ -170,7 +168,7 @@ public class TracingPublisher<T> implements Publisher<T> {
                             actual.onError(t);
                             finished = true;
                         } finally {
-                            if (finishOnClose) {
+                            if (finishOnClose && isFinishOnError()) {
                                 span.finish();
                             }
                         }
@@ -178,18 +176,13 @@ public class TracingPublisher<T> implements Publisher<T> {
 
                     @Override
                     public void onComplete() {
-                        if (!finished) {
-                            try (Scope ignored = scopeManager.activeSpan() != span ? scopeManager.activate(span) : NoopScopeManager.NoopScope.INSTANCE) {
-                                actual.onComplete();
-                                TracingPublisher.this.doOnFinish(span);
-                            } finally {
-                                if (finishOnClose) {
-                                    span.finish();
-                                }
-                            }
-
-                        } else {
+                        try (Scope ignored = scopeManager.activeSpan() != span ? scopeManager.activate(span) : NoopScopeManager.NoopScope.INSTANCE) {
                             actual.onComplete();
+                            TracingPublisher.this.doOnFinish(span);
+                        } finally {
+                            if (!finished && finishOnClose) {
+                                span.finish();
+                            }
                         }
                     }
                 });
@@ -200,12 +193,33 @@ public class TracingPublisher<T> implements Publisher<T> {
     }
 
     /**
+     * Designed for subclasses to override if the current active span is to be continued by this publisher. False by default.
+     * This only has effects if no spanBuilder was defined.
+     *
+     * @return true, if the current span should be continued by this publisher
+     * @since 2.0.3
+     */
+    protected boolean isContinued() {
+        return false;
+    }
+
+    /**
+     * Designed for subclasses to override if the span needs to be finished upon error. True by default.
+     *
+     * @return true, if the active span needs to be finished on error
+     * @since 2.0.3
+     */
+    protected boolean isFinishOnError() {
+        return true;
+    }
+
+    /**
      * Designed for subclasses to override and implement custom behaviour when an item is emitted.
      *
      * @param object The object
      * @param span The span
      */
-    protected void doOnNext(@Nonnull T object, @Nonnull Span span) {
+    protected void doOnNext(@NonNull T object, @NonNull Span span) {
         // no-op
     }
 
@@ -214,7 +228,7 @@ public class TracingPublisher<T> implements Publisher<T> {
      *
      * @param span The span
      */
-    protected void doOnSubscribe(@Nonnull Span span) {
+    protected void doOnSubscribe(@NonNull Span span) {
         // no-op
     }
 
@@ -225,7 +239,7 @@ public class TracingPublisher<T> implements Publisher<T> {
      * @param span The span
      */
     @SuppressWarnings("WeakerAccess")
-    protected void doOnFinish(@Nonnull Span span) {
+    protected void doOnFinish(@NonNull Span span) {
         // no-op
     }
 
@@ -235,7 +249,7 @@ public class TracingPublisher<T> implements Publisher<T> {
      * @param throwable The error
      * @param span The span
      */
-    protected void doOnError(@Nonnull Throwable throwable, @Nonnull Span span) {
+    protected void doOnError(@NonNull Throwable throwable, @NonNull Span span) {
         // no-op
     }
 

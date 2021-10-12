@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,13 @@
  */
 package io.micronaut.http.uri;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -34,6 +40,11 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
     protected List<UriMatchVariable> variables;
     private final Pattern matchPattern;
     private final boolean isRoot;
+    private final boolean exactMatch;
+
+    // Matches cache
+    private Optional<UriMatchInfo> rootMatchInfo;
+    private Optional<UriMatchInfo> exactMatchInfo;
 
     /**
      * Construct a new URI template for the given template.
@@ -52,10 +63,15 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
      */
     protected UriMatchTemplate(CharSequence templateString, Object... parserArguments) {
         super(templateString, parserArguments);
-        this.matchPattern = Pattern.compile(pattern.toString());
-        String tmpl = templateString.toString();
-        int len = tmpl.length();
-        this.isRoot = len == 0 || (len == 1 && tmpl.charAt(0) == '/');
+        if (variables.isEmpty() && Pattern.quote(templateString.toString()).equals(pattern.toString())) {
+            // if there are no variables and a match pattern matches template we can assume it matches exactly
+            this.matchPattern = null;
+            this.exactMatch = true;
+        } else {
+            this.matchPattern = Pattern.compile(pattern.toString());
+            this.exactMatch = false;
+        }
+        this.isRoot = isRoot();
         // cleanup / reduce memory consumption
         this.pattern = null;
     }
@@ -68,11 +84,16 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
      */
     protected UriMatchTemplate(CharSequence templateString, List<PathSegment> segments, Pattern matchPattern, List<UriMatchVariable> variables) {
         super(templateString.toString(), segments);
-        this.matchPattern = matchPattern;
         this.variables = variables;
-        String tmpl = templateString.toString();
-        int len = tmpl.length();
-        this.isRoot = len == 0 || (len == 1 && tmpl.charAt(0) == '/');
+        this.isRoot = isRoot();
+        if (variables.isEmpty() && matchPattern.matcher(templateString).matches()) {
+            // if there are no variables and match pattern matches template we can assume it matches exactly
+            this.matchPattern = null;
+            this.exactMatch = true;
+        } else {
+            this.matchPattern = matchPattern;
+            this.exactMatch = false;
+        }
     }
 
     /**
@@ -133,26 +154,41 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         if (uri == null) {
             throw new IllegalArgumentException("Argument 'uri' cannot be null");
         }
-        if (uri.length() > 1 && uri.charAt(uri.length() - 1) == '/') {
-            uri = uri.substring(0, uri.length() - 1);
+        int length = uri.length();
+        if (length > 1 && uri.charAt(length - 1) == '/') {
+            uri = uri.substring(0, length - 1);
         }
 
-        int len = uri.length();
-        if (isRoot && (len == 0 || (len == 1 && uri.charAt(0) == '/'))) {
-            return Optional.of(new DefaultUriMatchInfo(uri, Collections.emptyMap(), variables));
+        if (isRoot && (length == 0 || (length == 1 && uri.charAt(0) == '/'))) {
+            if (rootMatchInfo == null) {
+                rootMatchInfo = Optional.of(new DefaultUriMatchInfo(uri, Collections.emptyMap(), variables));
+            }
+            return rootMatchInfo;
         }
         //Remove any url parameters before matching
         int parameterIndex = uri.indexOf('?');
         if (parameterIndex > -1) {
             uri = uri.substring(0, parameterIndex);
         }
+        if (uri.endsWith("/")) {
+            uri = uri.substring(0, uri.length() - 1);
+        }
+        if (exactMatch) {
+            if (uri.equals(templateString)) {
+                if (exactMatchInfo == null) {
+                    exactMatchInfo = Optional.of(new DefaultUriMatchInfo(uri, Collections.emptyMap(), variables));
+                }
+                return exactMatchInfo;
+            }
+            return Optional.empty();
+        }
         Matcher matcher = matchPattern.matcher(uri);
         if (matcher.matches()) {
             if (variables.isEmpty()) {
                 return Optional.of(new DefaultUriMatchInfo(uri, Collections.emptyMap(), variables));
             } else {
-                Map<String, Object> variableMap = new LinkedHashMap<>();
                 int count = matcher.groupCount();
+                Map<String, Object> variableMap = new LinkedHashMap<>(count);
                 for (int j = 0; j < variables.size(); j++) {
                     int index = (j * 2) + 2;
                     if (index > count) {
@@ -185,18 +221,45 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
 
     @Override
     protected UriTemplate newUriTemplate(CharSequence uriTemplate, List<PathSegment> newSegments) {
-        Pattern newPattern = Pattern.compile(this.matchPattern.toString() + pattern.toString());
+        Pattern newPattern = Pattern.compile(exactMatch ? Pattern.quote(templateString) + pattern.toString() : matchPattern.pattern() + pattern.toString());
         pattern = null;
         return newUriMatchTemplate(normalizeNested(toString(), uriTemplate), newSegments, newPattern, new ArrayList<>(variables));
     }
 
     @Override
     protected UriTemplateParser createParser(String templateString, Object... parserArguments) {
-        this.pattern = new StringBuilder();
+
+        if (Objects.isNull(this.pattern)) {
+            this.pattern = new StringBuilder();
+        }
+
         if (this.variables == null) {
             this.variables = new ArrayList<>();
         }
         return new UriMatchTemplateParser(templateString, this);
+    }
+
+    private boolean isRoot() {
+        CharSequence rawSegment = null;
+        for (PathSegment segment : segments) {
+            if (segment.isVariable()) {
+                if (!segment.isQuerySegment()) {
+                    return false;
+                }
+            } else {
+                if (rawSegment == null) {
+                    rawSegment = segment;
+                } else {
+                    return false;
+                }
+            }
+        }
+        if (rawSegment == null) {
+            return true;
+        } else {
+            int len = rawSegment.length();
+            return len == 0 || (len == 1 && rawSegment.charAt(0) == '/');
+        }
     }
 
     /**
@@ -207,6 +270,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         private final String uri;
         private final Map<String, Object> variableValues;
         private final List<UriMatchVariable> variables;
+        private final Map<String, UriMatchVariable> variableMap;
 
         /**
          * @param uri            The URI
@@ -217,6 +281,11 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
             this.uri = uri;
             this.variableValues = variableValues;
             this.variables = variables;
+            LinkedHashMap<String, UriMatchVariable> vm = new LinkedHashMap<>(variables.size());
+            for (UriMatchVariable variable : variables) {
+                vm.put(variable.getName(), variable);
+            }
+            this.variableMap = Collections.unmodifiableMap(vm);
         }
 
         @Override
@@ -232,6 +301,11 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         @Override
         public List<UriMatchVariable> getVariables() {
             return Collections.unmodifiableList(variables);
+        }
+
+        @Override
+        public Map<String, UriMatchVariable> getVariableMap() {
+            return variableMap;
         }
 
         @Override

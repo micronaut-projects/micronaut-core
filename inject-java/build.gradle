@@ -1,25 +1,57 @@
 dependencies {
-    compile project(":inject")
-    compile project(":aop")
+    api project(":inject")
+    api project(':aop')
 
-    compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
-    compileOnly dependencyVersion("validation")
+    if (!JavaVersion.current().isJava9Compatible()) {
+        compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    }
+    compileOnly libs.managed.validation
 
-    testCompile 'com.github.spotbugs:spotbugs-annotations:3.1.12'
-    testCompile project(":aop")
-    testCompile project(":runtime")
-    testCompile dependencyVersion("rxjava2")
-    testCompile "org.hibernate:hibernate-core:5.3.6.Final"
-    testCompile 'org.hibernate:hibernate-validator:6.0.13.Final'
-    testRuntime 'org.glassfish.web:el-impl:2.2.1-b05'
-    testCompile "junit:junit:4.7"
-    testCompile "com.google.testing.compile:compile-testing:0.12"
-    testCompile 'org.mongodb:mongo-java-driver:3.7.1'
-    testCompile 'org.neo4j.driver:neo4j-java-driver:1.4.5'
-    testCompile dependencyModuleVersion("groovy", "groovy-json")
-    testCompile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
-    testRuntime 'org.glassfish:javax.el:3.0.1-b08'
-    testCompile dependencyVersion("micrometer")
+    testImplementation project(":context")
+    testImplementation project(':aop')
+    testAnnotationProcessor project(":inject-java")
+    testImplementation project(":inject-java-test")
+    testImplementation project(":inject-test-utils")
+    testImplementation project(":runtime")
+
+    testImplementation libs.managed.reactor
+
+    testImplementation libs.managed.spotbugs
+    testImplementation libs.hibernate
+    testImplementation libs.junit4
+    testImplementation libs.compile.testing
+    testImplementation libs.mongo.javadriver
+    testImplementation(libs.managed.neo4j.bolt) {
+        version {
+            require "1.4.5"
+        }
+    }
+    testImplementation libs.managed.groovy.json
+    if (!JavaVersion.current().isJava9Compatible()) {
+        testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    }
+    testImplementation libs.managed.micrometer.core
+    testImplementation project(":validation")
+    testImplementation libs.junit.jupiter.api
+    testImplementation libs.managed.zipkin.reporter
+    testImplementation(libs.managed.micronaut.test.core) {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-bom'
+        exclude module:'micronaut-inject'
+    }
+    testRuntimeOnly libs.javax.el.impl
+    testRuntimeOnly libs.javax.el
 }
 
+//compileTestJava.options.fork = true
+//compileTestJava.options.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
 
+
+tasks.withType(Test) {
+    forkEvery = 100
+    maxParallelForks = 2
+    useJUnitPlatform()
+}
+
+//compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
+//compileTestGroovy.groovyOptions.fork = true

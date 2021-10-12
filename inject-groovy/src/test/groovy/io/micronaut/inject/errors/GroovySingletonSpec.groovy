@@ -15,11 +15,8 @@
  */
 package io.micronaut.inject.errors
 
-import io.micronaut.AbstractBeanDefinitionSpec
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
-import io.micronaut.inject.qualifiers.One
 
 class GroovySingletonSpec extends AbstractBeanDefinitionSpec {
 
@@ -32,19 +29,19 @@ import io.micronaut.inject.qualifiers.*
 
 @Singleton
 class MyBean  {
-    @javax.inject.Inject
+    @jakarta.inject.Inject
     @javax.annotation.Nullable
     AnotherBean injected
 }
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class AnotherBean {
     
 }
 ''')
         then:
         def e = thrown(Exception)
-        e.message.contains("Class annotated with groovy.lang.Singleton instead of javax.inject.Singleton. Import javax.inject.Singleton to use Micronaut Dependency Injection")
+        e.message.contains("Class annotated with groovy.lang.Singleton instead of jakarta.inject.Singleton. Import jakarta.inject.Singleton to use Micronaut Dependency Injection")
 
     }
 

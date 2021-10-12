@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import io.netty.buffer.ByteBuf;
@@ -23,6 +24,7 @@ import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.handler.codec.http.multipart.FileUpload;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -70,7 +72,19 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
      */
     @Override
     public InputStream getInputStream() throws IOException {
-        return new ByteBufInputStream(fileUpload.getByteBuf(), controlRelease);
+        if (fileUpload.isInMemory()) {
+            ByteBuf byteBuf = fileUpload.getByteBuf();
+            if (byteBuf == null) {
+                throw new IOException("The input stream has already been released");
+            }
+            return new ByteBufInputStream(byteBuf, controlRelease);
+        } else {
+            File file = fileUpload.getFile();
+            if (file == null) {
+                throw new IOException("The input stream has already been released");
+            }
+            return new NettyFileUploadInputStream(fileUpload, controlRelease);
+        }
     }
 
     /**
@@ -85,6 +99,9 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
     @Override
     public byte[] getBytes() throws IOException {
         ByteBuf byteBuf = fileUpload.getByteBuf();
+        if (byteBuf == null) {
+            throw new IOException("The bytes have already been released");
+        }
         try {
             return ByteBufUtil.getBytes(byteBuf);
         } finally {
@@ -106,6 +123,9 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
     @Override
     public ByteBuffer getByteBuffer() throws IOException {
         ByteBuf byteBuf = fileUpload.getByteBuf();
+        if (byteBuf == null) {
+            throw new IOException("The byte buffer has already been released");
+        }
         try {
             return byteBuf.nioBuffer();
         } finally {
@@ -117,7 +137,7 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
 
     @Override
     public Optional<MediaType> getContentType() {
-        return Optional.of(MediaType.of(fileUpload.getContentType()));
+        return Optional.of(new MediaType(fileUpload.getContentType(), NameUtils.extension(fileUpload.getFilename())));
     }
 
     @Override
@@ -143,5 +163,10 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
     @Override
     public boolean isComplete() {
         return fileUpload.isCompleted();
+    }
+
+    @Override
+    public void discard() {
+        fileUpload.release();
     }
 }

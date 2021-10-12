@@ -1,12 +1,12 @@
 package io.micronaut.docs.context.annotation.primary
 
-import io.kotlintest.shouldBe
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 
 class PrimarySpec : StringSpec() {
@@ -15,7 +15,7 @@ class PrimarySpec : StringSpec() {
             "spec.name" to "primaryspec"
     ), Environment.TEST))
 
-    val rxClient = autoClose(embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.getURL()))
+    val rxClient = autoClose(embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.getURL()))
 
     init {
         "test @Primary annotated beans gets injected in case of a collection" {

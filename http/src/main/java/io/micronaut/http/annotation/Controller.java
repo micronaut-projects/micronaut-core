@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,10 +20,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.DefaultScope;
-import io.micronaut.context.annotation.Executable;
 import io.micronaut.http.MediaType;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -31,9 +30,6 @@ import java.lang.annotation.Target;
 
 /**
  * <p>Indicates that the role of a class is a controller within an application.</p>
- * <p>
- * <p>By default all public methods of a controller are considered {@link Executable} and
- * the necessary classes generated to perform the invocation.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -42,7 +38,6 @@ import java.lang.annotation.Target;
 @Retention(RUNTIME)
 @Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE})
 @Bean
-@Executable
 @DefaultScope(Singleton.class)
 public @interface Controller {
 
@@ -68,4 +63,13 @@ public @interface Controller {
      */
     @AliasFor(annotation = Consumes.class, member = "value")
     String[] consumes() default MediaType.APPLICATION_JSON;
+
+    /**
+     * Allows specifying an alternate port to run the controller on. Setting this member will
+     * cause.
+     *
+     * <p>The member is defined as a string to allow resolving the port value from configuration. For example: {@code member="${my.port.number}"}</p>
+     * @return The port to use.
+     */
+    String port() default "";
 }

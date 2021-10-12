@@ -18,10 +18,10 @@ package io.micronaut.http.server.netty.consumes
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
-import io.micronaut.http.annotation.Body
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.*
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import reactor.core.publisher.Flux
+import spock.lang.Unroll
 
 import static io.micronaut.http.MediaType.*
 
@@ -29,14 +29,14 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
 
     void "test routes are filtered by consumes"() {
         when:
-        String body = rxClient.retrieve(HttpRequest.POST("/test-consumes", [x: 1]).contentType(APPLICATION_JSON_TYPE)).blockingFirst()
+        String body = rxClient.toBlocking().retrieve(HttpRequest.POST("/test-consumes", [x: 1]).contentType(APPLICATION_JSON_TYPE))
 
         then:
         noExceptionThrown()
         body == "json"
 
         when:
-        body = rxClient.retrieve(HttpRequest.POST("/test-consumes", "abc").contentType(APPLICATION_GRAPHQL_TYPE)).blockingFirst()
+        body = rxClient.toBlocking().retrieve(HttpRequest.POST("/test-consumes", "abc").contentType(APPLICATION_GRAPHQL_TYPE))
 
         then:
         noExceptionThrown()
@@ -47,7 +47,7 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
         URL url = new URL(url1.getProtocol(), url1.getHost(), url1.getPort(), url1.getFile() + "/test-consumes", null)
         URLConnection connection = url.openConnection()
         connection.setRequestMethod("POST")
-        connection.setRequestProperty('Content-Type', null)
+        connection.setRequestProperty('Content-Type', TEXT_PLAIN_TYPE.getName())
         connection.doOutput = true
 
         def writer = new OutputStreamWriter(connection.outputStream)
@@ -63,18 +63,69 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
         body == "all"
     }
 
+    void "test routes are not filtered by content-type when consumes=all"() {
+        when:
+        String body = rxClient.toBlocking().retrieve(HttpRequest.POST("/test-consumes-all", "true").contentType(APPLICATION_JSON_TYPE))
+
+        then:
+        noExceptionThrown()
+        body == "all:true"
+
+        when:
+        body = rxClient.toBlocking().retrieve(HttpRequest.POST("/test-consumes-all", "graphql").contentType(APPLICATION_GRAPHQL_TYPE))
+
+        then:
+        noExceptionThrown()
+        body == "all:graphql"
+
+        when:
+        URL url1 = embeddedServer.getURL()
+        URL url = new URL(url1.getProtocol(), url1.getHost(), url1.getPort(), url1.getFile() + "/test-consumes-all", null)
+        URLConnection connection = url.openConnection()
+        connection.setRequestMethod("POST")
+        connection.setRequestProperty('Content-Type', TEXT_PLAIN_TYPE.getName())
+        connection.doOutput = true
+
+        def writer = new OutputStreamWriter(connection.outputStream)
+        writer.write("abc")
+        writer.flush()
+        writer.close()
+        connection.connect()
+
+        body = connection.content.text
+
+        then:
+        noExceptionThrown()
+        body == "all:abc"
+    }
+
     void "test accept matching has priority over route complexity"() {
         when:
-        String body = rxClient.retrieve(HttpRequest.POST("/test-accept/foo", [x: 1]).contentType(APPLICATION_JSON_TYPE)).blockingFirst()
+        String body = rxClient.toBlocking().retrieve(HttpRequest.POST("/test-accept/foo", [x: 1]).contentType(APPLICATION_JSON_TYPE))
 
         then:
         noExceptionThrown()
         body == "json"
     }
 
+    @Unroll
+    void "test pick most specific route for #uri"() {
+        given:
+        String result = rxClient.toBlocking().retrieve(HttpRequest.GET("/hello$uri").accept("text/html", "*/*;q=0.8"))
+
+        expect:
+        result == expected
+
+        where:
+        uri      | expected
+        '/Tom'   | 'Hey Tom!  It\'s been a long time.  How have you been?'
+        '/other' | 'Hello other'
+    }
+
+
     @Requires(property = "spec.name", value = "ConsumesMatchesRouteSpec")
     @Controller("/test-consumes")
-    static class MyController  {
+    static class MyController {
 
         @Post(consumes = APPLICATION_JSON)
         HttpResponse posta(@Body String body) {
@@ -93,8 +144,18 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
     }
 
     @Requires(property = "spec.name", value = "ConsumesMatchesRouteSpec")
+    @Controller("/test-consumes-all")
+    static class MyControllerForAll {
+
+        @Post(consumes = ALL)
+        HttpResponse posta(@Body String body) {
+            HttpResponse.ok("all:" + body)
+        }
+    }
+
+    @Requires(property = "spec.name", value = "ConsumesMatchesRouteSpec")
     @Controller("/test-accept")
-    static class MyOtherController  {
+    static class MyOtherController {
 
         //If the content type is json, this method should be chosen even for /foo
         @Post(uri = "/{name}", consumes = APPLICATION_JSON)
@@ -105,6 +166,23 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
         @Post(uri = "/foo", consumes = ALL)
         HttpResponse postc(@Body String body) {
             HttpResponse.ok("all")
+        }
+    }
+
+    @Controller("/hello")
+    @Requires(property = "spec.name", value = "ConsumesMatchesRouteSpec")
+    static class AController {
+
+        @Get("/{name}")
+        @Produces(TEXT_PLAIN)
+        String sayHello(String name) {
+            return "Hello " + name
+        }
+
+        @Get("/Tom")
+        @Produces(TEXT_PLAIN)
+        String sayHelloToTom() {
+            return "Hey Tom!  It's been a long time.  How have you been?"
         }
     }
 }

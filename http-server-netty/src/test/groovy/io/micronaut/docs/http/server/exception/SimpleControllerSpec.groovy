@@ -10,15 +10,14 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.http.hateos.JsonError
+import io.micronaut.http.hateoas.JsonError
 import io.micronaut.runtime.server.EmbeddedServer
+import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-
-import javax.inject.Singleton
 
 class SimpleControllerSpec extends Specification {
 
@@ -26,7 +25,7 @@ class SimpleControllerSpec extends Specification {
             'spec.name': SimpleControllerSpec.simpleName
     ], Environment.TEST)
 
-    @AutoCleanup @Shared RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+    @AutoCleanup @Shared HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
 
     def "should not go into infinite loop when exception occurs in bean initialization"() {
@@ -45,6 +44,7 @@ class SimpleControllerSpec extends Specification {
         then:
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.BAD_REQUEST
+        e.response.reason() == "Fix it!"
     }
 
     @Requires(property = 'spec.name', value = 'SimpleControllerSpec')
@@ -87,9 +87,23 @@ class SimpleControllerSpec extends Specification {
         }
 
         @Error
-        HttpResponse exceptionHandler(HttpRequest request, Throwable throwable) {
+        HttpResponse throwableExceptionHandler(HttpRequest request, Throwable throwable) {
+            JsonError error = new JsonError("Invalid: " + throwable.getMessage())
+            return HttpResponse.<JsonError>status(HttpStatus.BAD_REQUEST, "throwableExceptionHandler")
+                    .body(error)
+        }
+
+        @Error
+        HttpResponse exceptionHandler(HttpRequest request, RuntimeException throwable) {
             JsonError error = new JsonError("Invalid: " + throwable.getMessage())
             return HttpResponse.<JsonError>status(HttpStatus.BAD_REQUEST, "Fix it!")
+                    .body(error)
+        }
+
+        @Error
+        HttpResponse exceptionExceptionHandler(HttpRequest request, Exception throwable) {
+            JsonError error = new JsonError("Invalid: " + throwable.getMessage())
+            return HttpResponse.<JsonError>status(HttpStatus.BAD_REQUEST, "exceptionExceptionHandler")
                     .body(error)
         }
     }

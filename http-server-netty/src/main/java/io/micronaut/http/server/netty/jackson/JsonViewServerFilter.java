@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.jackson;
 import com.fasterxml.jackson.annotation.JsonView;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
@@ -25,13 +26,15 @@ import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
-import io.micronaut.jackson.JacksonConfiguration;
+import io.micronaut.http.filter.ServerFilterPhase;
+import io.micronaut.json.JsonConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
-import io.reactivex.Flowable;
-import io.reactivex.schedulers.Schedulers;
+import jakarta.inject.Named;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
-import javax.inject.Named;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 
@@ -42,7 +45,7 @@ import java.util.concurrent.ExecutorService;
  * @author mmindenhall
  * @author graemerocher
  */
-@Requires(beans = JacksonConfiguration.class)
+@Requires(beans = JsonConfiguration.class)
 @Requires(property = JsonViewServerFilter.PROPERTY_JSON_VIEW_ENABLED)
 @Filter("/**")
 public class JsonViewServerFilter implements HttpServerFilter {
@@ -71,21 +74,33 @@ public class JsonViewServerFilter implements HttpServerFilter {
         Optional<Class> viewClass = request.getAttribute(HttpAttributes.ROUTE_MATCH, AnnotationMetadata.class)                                                          .flatMap(ann -> ann.classValue(JsonView.class));
         final Publisher<MutableHttpResponse<?>> responsePublisher = chain.proceed(request);
         if (viewClass.isPresent()) {
-            return Flowable.fromPublisher(responsePublisher).switchMap(response -> {
-                final Optional<?> body = response.getBody();
-                if (body.isPresent()) {
+            return Flux.from(responsePublisher).switchMap(response -> {
+                final Optional<?> optionalBody = response.getBody();
+                if (optionalBody.isPresent()) {
+                    Object body = optionalBody.get();
                     MediaTypeCodec codec = codecFactory.resolveJsonViewCodec(viewClass.get());
-                    return Flowable.fromCallable(() -> {
-                        final byte[] encoded = codec.encode(body.get());
-                        ((MutableHttpResponse) response).body(encoded);
-                        return response;
-                    }).subscribeOn(Schedulers.from(executorService));
-                } else {
-                    return Flowable.just(response);
+                    if (Publishers.isConvertibleToPublisher(body)) {
+                        Publisher<?> pub = Publishers.convertPublisher(body, Publisher.class);
+                        response.body(Flux.from(pub)
+                                .map(codec::encode)
+                                .subscribeOn(Schedulers.fromExecutorService(executorService)));
+                    } else {
+                        return Mono.fromCallable(() -> {
+                            final byte[] encoded = codec.encode(body);
+                            response.body(encoded);
+                            return response;
+                        }).subscribeOn(Schedulers.fromExecutorService(executorService));
+                    }
                 }
+                return Flux.just(response);
             });
         } else {
             return responsePublisher;
         }
+    }
+
+    @Override
+    public int getOrder() {
+        return ServerFilterPhase.RENDERING.order();
     }
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,12 +21,16 @@ import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.cookie.ClientCookieDecoder;
 import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -38,6 +42,8 @@ import java.util.Set;
  * @since 1.0
  */
 public class NettyCookies implements Cookies {
+
+    private static final Logger LOG = LoggerFactory.getLogger(NettyCookies.class);
 
     private final ConversionService<?> conversionService;
     private final Map<CharSequence, Cookie> cookies;
@@ -62,6 +68,34 @@ public class NettyCookies implements Cookies {
                 } else {
                     cookies.put(nettyCookie.name(), new NettyCookie(nettyCookie));
                 }
+            }
+        } else {
+            cookies = Collections.emptyMap();
+        }
+    }
+
+    /**
+     * @param nettyHeaders      The Netty HTTP headers
+     * @param conversionService The conversion service
+     */
+    public NettyCookies(HttpHeaders nettyHeaders, ConversionService conversionService) {
+        this.conversionService = conversionService;
+        if (nettyHeaders != null) {
+            List<String> values = nettyHeaders.getAll(HttpHeaderNames.SET_COOKIE);
+            if (values != null && !values.isEmpty()) {
+                cookies = new LinkedHashMap<>();
+                for (String value: values) {
+                    io.netty.handler.codec.http.cookie.Cookie nettyCookie = ClientCookieDecoder.STRICT.decode(value);
+                    if (nettyCookie != null) {
+                        cookies.put(nettyCookie.name(), new NettyCookie(nettyCookie));
+                    } else {
+                        if (LOG.isTraceEnabled()) {
+                            LOG.trace("Failed to decode cookie value [{}]", value);
+                        }
+                    }
+                }
+            } else {
+                cookies = Collections.emptyMap();
             }
         } else {
             cookies = Collections.emptyMap();

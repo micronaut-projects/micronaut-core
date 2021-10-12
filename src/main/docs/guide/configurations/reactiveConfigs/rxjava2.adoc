@@ -1,0 +1,9 @@
+To add support for RxJava 2, add the following module:
+
+dependency:io.micronaut.rxjava2:micronaut-rxjava2[scope="compile"]
+
+To use the RxJava 2 HTTP client, add the following dependency:
+
+dependency:io.micronaut.rxjava2:micronaut-rxjava2-http-client[scope="compile"]
+
+For more information see the documentation for https://micronaut-projects.github.io/micronaut-rxjava2/latest/guide/[Micronaut RxJava 2].

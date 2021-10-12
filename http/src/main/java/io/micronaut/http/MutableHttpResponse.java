@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,11 +17,12 @@ package io.micronaut.http;
 
 import io.micronaut.http.cookie.Cookie;
 
-import javax.annotation.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -43,13 +44,26 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
     MutableHttpResponse<B> cookie(Cookie cookie);
 
     /**
+     * Adds the specified cookies to the response.
+     *
+     * @param cookies the Set of Cookies to return to the client
+     * @return This response object
+     */
+    default MutableHttpResponse<B> cookies(Set<Cookie> cookies) {
+        for (Cookie cookie: cookies) {
+            cookie(cookie);
+        }
+        return this;
+    }
+
+    /**
      * Sets the body.
      *
      * @param body The body
      * @return This response object
      */
     @Override
-    MutableHttpResponse<B> body(@Nullable B body);
+    <T> MutableHttpResponse<T> body(@Nullable T body);
 
     /**
      * Sets the response status.
@@ -160,5 +174,15 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
      */
     default MutableHttpResponse<B> status(HttpStatus status) {
         return status(status, null);
+    }
+
+    /**
+     * Sets an attribute on the response.
+     * @param name The attribute name
+     * @param value The attribute value
+     * @return This response object
+     */
+    default MutableHttpResponse<B> attribute(CharSequence name, Object value) {
+        return (MutableHttpResponse<B>) setAttribute(name, value);
     }
 }

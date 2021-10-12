@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,12 +15,13 @@
  */
 package io.micronaut.core.convert.value;
 
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.type.Argument;
 
-import javax.annotation.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
@@ -166,6 +167,22 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
         V v = get(name);
         if (v != null) {
             return ConversionService.SHARED.convert(v, ConversionContext.of(requiredType));
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Find a header and convert it to the given type.
+     *
+     * @param name              The name of the header
+     * @param conversionContext The conversion context
+     * @param <T>               The generic type
+     * @return If the header is presented and can be converted an optional of the value otherwise {@link Optional#empty()}
+     */
+    default <T> Optional<T> getFirst(CharSequence name, ArgumentConversionContext<T> conversionContext) {
+        V v = get(name);
+        if (v != null) {
+            return ConversionService.SHARED.convert(v, conversionContext);
         }
         return Optional.empty();
     }

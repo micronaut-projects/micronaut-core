@@ -21,7 +21,7 @@ import io.micronaut.context.exceptions.DependencyInjectionException
 import spock.lang.Specification
 
 import javax.annotation.Nullable
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 /**
  * Created by graemerocher on 30/05/2017.

@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,9 @@
  */
 package io.micronaut.validation.validator.constraints;
 
-import javax.annotation.Nonnull;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+
 import javax.validation.ClockProvider;
 
 /**
@@ -37,5 +39,24 @@ public interface ConstraintValidatorContext {
      *
      * @since 2.0
      */
-    @Nonnull ClockProvider getClockProvider();
+    @NonNull ClockProvider getClockProvider();
+
+    /**
+     * In case of using this constraint validator with {@code javax.validation.ConstraintValidator} returns null, because JRS-303 doesn't
+     * support passing a root bean in their validation context.
+     *
+     * @return The root bean under validation.
+     */
+    @Nullable Object getRootBean();
+
+    /**
+     * Sets a message template to be used for the validation error message.
+     *
+     * @param messageTemplate the message template
+     * @since 2.5.0
+     */
+    default void messageTemplate(@Nullable final String messageTemplate) {
+        throw new UnsupportedOperationException("not implemented");
+    }
+    
 }

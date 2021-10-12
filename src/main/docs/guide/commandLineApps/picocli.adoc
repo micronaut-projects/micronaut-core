@@ -1,3 +1,3 @@
-https://github.com/remkop/picocli[Picocli] is a command line parser that supports usage help with ANSI colors, autocomplete and nested subcommands. It has an annotations API to create command line applications with almost no code, and a programmatic API for dynamic uses like creating Domain Specific Languages.
+https://github.com/remkop/picocli[Picocli] is a command line parser that supports usage help with ANSI colors, autocomplete, and nested subcommands. It has an annotations API to create command line applications with almost no code, and a programmatic API for dynamic uses like creating Domain Specific Languages.
 
 See the https://micronaut-projects.github.io/micronaut-picocli/latest/guide/[documentation for the Picocli integration] for more information.

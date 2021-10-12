@@ -1,10 +1,10 @@
 package io.micronaut.docs.server.request
 
-import io.kotlintest.shouldBe
-import io.kotlintest.shouldNotBe
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.shouldBe
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 
 class MessageControllerSpec: StringSpec() {
@@ -14,12 +14,22 @@ class MessageControllerSpec: StringSpec() {
     )
 
     val client = autoClose( // <2>
-            embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.getURL()) // <1>
+            embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.getURL()) // <1>
     )
 
     init {
         "test message controller"() {
-            val body = client.toBlocking().retrieve("/request/hello?name=John")
+            var body = client.toBlocking().retrieve("/request/hello?name=John")
+
+            body shouldNotBe null
+            body shouldBe "Hello John!!"
+
+            body = client.toBlocking().retrieve("/request/hello-static?name=John")
+
+            body shouldNotBe null
+            body shouldBe "Hello John!!"
+
+            body = client.toBlocking().retrieve("/request/hello-reactor?name=John")
 
             body shouldNotBe null
             body shouldBe "Hello John!!"

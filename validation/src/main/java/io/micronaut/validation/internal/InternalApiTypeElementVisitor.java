@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,7 +17,13 @@ package io.micronaut.validation.internal;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.inject.ast.*;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MemberElement;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -33,6 +39,12 @@ public class InternalApiTypeElementVisitor implements TypeElementVisitor<Object,
     private static final String IO_MICRONAUT = "io.micronaut";
 
     private boolean warned = false;
+
+    @NonNull
+    @Override
+    public VisitorKind getVisitorKind() {
+        return VisitorKind.ISOLATING;
+    }
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
@@ -65,14 +77,14 @@ public class InternalApiTypeElementVisitor implements TypeElementVisitor<Object,
     private void warn(Element element, VisitorContext context) {
         if (element.hasAnnotation(Internal.class) || element.hasAnnotation(Experimental.class)) {
             warned = true;
-            context.warn("Element extends or implements an internal or experimental API", element);
+            context.warn("Element extends or implements an internal or experimental Micronaut API", element);
         }
     }
 
     @Override
     public void finish(VisitorContext visitorContext) {
         if (warned) {
-            visitorContext.warn("Overriding an internal API may result in breaking changes in minor or patch versions of the framework. Proceed with caution!", null);
+            visitorContext.warn("Overriding an internal Micronaut API may result in breaking changes in minor or patch versions of the framework. Proceed with caution!", null);
         }
     }
 }

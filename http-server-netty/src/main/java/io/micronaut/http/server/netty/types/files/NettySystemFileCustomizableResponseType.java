@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,21 +15,23 @@
  */
 package io.micronaut.http.server.netty.types.files;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
+import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.SmartHttpContentCompressor;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.http.server.types.files.SystemFile;
-import io.micronaut.http.server.types.files.SystemFileCustomizableResponseType;
-import io.netty.channel.*;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.DefaultFileRegion;
 import io.netty.handler.codec.http.DefaultHttpResponse;
-import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpChunkedInput;
-import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedFile;
@@ -49,7 +51,8 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class NettySystemFileCustomizableResponseType extends SystemFileCustomizableResponseType implements NettyFileCustomizableResponseType {
+@Internal
+public class NettySystemFileCustomizableResponseType extends SystemFile implements NettyFileCustomizableResponseType {
 
     private static final int LENGTH_8K = 8192;
     private static final Logger LOG = LoggerFactory.getLogger(NettySystemFileCustomizableResponseType.class);
@@ -78,14 +81,6 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
     /**
      * @param delegate The system file customizable response type
      */
-    public NettySystemFileCustomizableResponseType(SystemFileCustomizableResponseType delegate) {
-        this(delegate.getFile());
-        this.delegate = Optional.of(delegate);
-    }
-
-    /**
-     * @param delegate The system file customizable response type
-     */
     public NettySystemFileCustomizableResponseType(SystemFile delegate) {
         this(delegate.getFile());
         this.delegate = Optional.of(delegate);
@@ -102,12 +97,6 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
     }
 
     @Override
-    @Deprecated
-    public String getName() {
-        return delegate.map(FileCustomizableResponseType::getName).orElse(super.getName());
-    }
-
-    @Override
     public MediaType getMediaType() {
         return delegate.map(FileCustomizableResponseType::getMediaType).orElse(super.getMediaType());
     }
@@ -115,9 +104,10 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
     /**
      * @param response The response to modify
      */
+    @Override
     public void process(MutableHttpResponse response) {
         response.header(io.micronaut.http.HttpHeaders.CONTENT_LENGTH, String.valueOf(getLength()));
-        delegate.ifPresent((type) -> type.process(response));
+        delegate.ifPresent(type -> type.process(response));
     }
 
     @Override
@@ -125,37 +115,46 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
 
         if (response instanceof NettyMutableHttpResponse) {
 
-            FullHttpResponse nettyResponse = ((NettyMutableHttpResponse) response).getNativeResponse();
+            NettyMutableHttpResponse nettyResponse = ((NettyMutableHttpResponse) response);
 
             // Write the request data
-            HttpHeaders headers = nettyResponse.headers();
-            context.write(new DefaultHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), headers), context.voidPromise());
+            final DefaultHttpResponse finalResponse = new DefaultHttpResponse(nettyResponse.getNettyHttpVersion(), nettyResponse.getNettyHttpStatus(), nettyResponse.getNettyHeaders());
+            final io.micronaut.http.HttpVersion httpVersion = request.getHttpVersion();
+            final boolean isHttp2 = httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0;
+            if (isHttp2 && request instanceof NettyHttpRequest) {
+                final io.netty.handler.codec.http.HttpHeaders nativeHeaders = ((NettyHttpRequest<?>) request).getNativeRequest().headers();
+                final String streamId = nativeHeaders.get(AbstractNettyHttpRequest.STREAM_ID);
+                if (streamId != null) {
+                    finalResponse.headers().set(AbstractNettyHttpRequest.STREAM_ID, streamId);
+                }
+            }
+            context.write(finalResponse, context.voidPromise());
 
-            ChannelFuture sendFileFuture;
+            ChannelFutureListener closeListener = (future) -> {
+                try {
+                    raf.close();
+                } catch (IOException e) {
+                    LOG.warn("An error occurred closing the file reference: " + getFile().getAbsolutePath(), e);
+                }
+            };
+
             // Write the content.
-            if (context.pipeline().get(SslHandler.class) == null && context.pipeline().get(SmartHttpContentCompressor.class).shouldSkip(nettyResponse)) {
+            if (context.pipeline().get(SslHandler.class) == null && context.pipeline().get(SmartHttpContentCompressor.class).shouldSkip(finalResponse)) {
                 // SSL not enabled - can use zero-copy file transfer.
-                sendFileFuture = context.write(new DefaultFileRegion(raf.getChannel(), 0, getLength()), context.newProgressivePromise());
+                context.write(new DefaultFileRegion(raf.getChannel(), 0, getLength()), context.newProgressivePromise())
+                        .addListener(closeListener);
                 context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
             } else {
                 // SSL enabled - cannot use zero-copy file transfer.
                 try {
                     // HttpChunkedInput will write the end marker (LastHttpContent) for us.
-                    sendFileFuture = context.writeAndFlush(new HttpChunkedInput(new ChunkedFile(raf, 0, getLength(), LENGTH_8K)),
-                        context.newProgressivePromise());
+                    final HttpChunkedInput chunkedInput = new HttpChunkedInput(new ChunkedFile(raf, 0, getLength(), LENGTH_8K));
+                    context.writeAndFlush(chunkedInput, context.newProgressivePromise())
+                            .addListener(closeListener);
                 } catch (IOException e) {
                     throw new CustomizableResponseTypeException("Could not read file", e);
                 }
             }
-
-            sendFileFuture.addListener((future) -> {
-                try {
-                    raf.close();
-                } catch (IOException e) {
-                    LOG.warn("An error occurred closing the file reference: " + file.getAbsolutePath(), e);
-                }
-            });
-
         } else {
             throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + response);
         }

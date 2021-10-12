@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,10 +15,11 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameResolver;
@@ -49,6 +50,17 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
         this.definition = definition;
     }
 
+    @Nullable
+    @Override
+    public Qualifier<T> resolveDynamicQualifier() {
+        Qualifier<T> qualifier = null;
+        Object o = attributes.get(NAMED_ATTRIBUTE);
+        if (o instanceof CharSequence) {
+            qualifier = Qualifiers.byName(o.toString());
+        }
+        return qualifier;
+    }
+
     /**
      * @return The bean definition type
      */
@@ -63,12 +75,20 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
 
     @Override
     public boolean isIterable() {
-        return classValue(EachProperty.class.getName()).isPresent() || definition.isIterable();
+        return definition.isIterable();
     }
 
     @Override
     public boolean isPrimary() {
-        return definition.isPrimary() || get(PRIMARY_ATTRIBUTE, Boolean.class).orElse(false);
+        return definition.isPrimary() || isPrimaryThroughAttribute();
+    }
+
+    private boolean isPrimaryThroughAttribute() {
+        Object o = attributes.get(PRIMARY_ATTRIBUTE);
+        if (o instanceof Boolean) {
+            return (Boolean) o;
+        }
+        return false;
     }
 
     @Override
@@ -93,14 +113,17 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                 if (named != null) {
                     Map<String, Object> fulfilled = new LinkedHashMap<>(requiredArguments.length);
                     for (Argument argument : requiredArguments) {
-                        Class argumentType = argument.getType();
-                        Optional result = ConversionService.SHARED.convert(named, argumentType);
+                        Optional result = ConversionService.SHARED.convert(named, argument);
                         String argumentName = argument.getName();
                         if (result.isPresent()) {
                             fulfilled.put(argumentName, result.get());
                         } else {
-                            // attempt bean lookup to full argument
-                            Optional bean = context.findBean(argumentType, Qualifiers.byName(named.toString()));
+                            Qualifier qualifier = Qualifiers.byName(named.toString());
+                            Optional bean;
+                            try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+                                    .pushConstructorResolve(definition, argument)) {
+                                bean = ((DefaultBeanContext) context).findBean(resolutionContext, argument, qualifier);
+                            }
                             if (bean.isPresent()) {
                                 fulfilled.put(argumentName, bean.get());
                             }
@@ -145,6 +168,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     /**
      * @return The bean definition type
      */
+    @Override
     public BeanDefinition<T> getTarget() {
         return definition;
     }
@@ -196,6 +220,12 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
         return new BeanDefinitionDelegate<>(definition);
     }
 
+    @Override
+    @NonNull
+    public String getName() {
+        return definition.getName();
+    }
+
     /**
      * @param <T> The bean definition type
      */
@@ -235,6 +265,20 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                 return ((ValidatedBeanDefinition<T>) definition).validate(resolutionContext, instance);
             }
             return instance;
+        }
+
+        @Override
+        default <V> void validateBeanArgument(@NonNull BeanResolutionContext resolutionContext, @NonNull InjectionPoint injectionPoint, @NonNull Argument<V> argument, int index, @Nullable V value) {
+            BeanDefinition<T> definition = getTarget();
+            if (definition instanceof ValidatedBeanDefinition) {
+                ((ValidatedBeanDefinition<T>) definition).validateBeanArgument(
+                        resolutionContext,
+                        injectionPoint,
+                        argument,
+                        index,
+                        value
+                );
+            }
         }
     }
 

@@ -1,4 +1,4 @@
-The HTTP server will emit a number of <<events, Bean Events>>, defined in the pkg:io.micronaut.runtime.server.event[] package, that you can write listeners for. The following table summarizes those events:
+The HTTP server emits a number of <<events, Bean Events>>, defined in the pkg:io.micronaut.runtime.server.event[] package, that you can write listeners for. The following table summarizes these:
 
 .Server Events
 |===
@@ -10,15 +10,15 @@ The HTTP server will emit a number of <<events, Bean Events>>, defined in the pk
 |api:runtime.server.event.ServerShutdownEvent[]
 |Emitted when the server shuts down
 
-|api:discovery.event.ServiceStartedEvent[]
-|Emitted after all api:runtime.server.event.ServerStartupEvent[] listeners have been executed and exposes the api:runtime.server.EmbeddedServerInstance[]
+|api:discovery.event.ServiceReadyEvent[]
+|Emitted after all api:runtime.server.event.ServerStartupEvent[] listeners have been invoked and exposes the api:discovery.EmbeddedServerInstance[]
 
-|api:discovery.event.ServiceShutdownEvent[]
-|Emitted after all api:runtime.server.event.ServerShutdownEvent[] listeners have been executed and exposes the api:runtime.server.EmbeddedServerInstance[]
+|api:discovery.event.ServiceStoppedEvent[]
+|Emitted after all api:runtime.server.event.ServerShutdownEvent[] listeners have been invoked and exposes the api:discovery.EmbeddedServerInstance[]
 
 |===
 
-WARNING: If you do significant work within a listener for a api:runtime.server.event.ServerStartupEvent[] this will slow down you startup time.
+WARNING: Doing significant work within a listener for a api:runtime.server.event.ServerStartupEvent[] will increase startup time.
 
 The following example defines a api:context.event.ApplicationEventListener[] that listens for api:runtime.server.event.ServerStartupEvent[]:
 
@@ -37,13 +37,14 @@ public class StartupListener implements ApplicationEventListener<ServerStartupEv
 }
 ----
 
-Alternatively, you can also use the ann:runtime.event.annotation.EventListener[] annotation on a method of any existing bean that accepts `ServerStartupEvent`:
+Alternatively, you can also use the ann:runtime.event.annotation.EventListener[] annotation on a method of any bean that accepts `ServerStartupEvent`:
 
 .Using `@EventListener` with `ServerStartupEvent`
 [source,java]
 ----
-import io.micronaut.runtime.server.event.*;
-import io.micronaut.runtime.event.annotation.*;
+import io.micronaut.runtime.event.annotation.EventListener;
+import io.micronaut.runtime.server.event.ServerStartupEvent;
+import javax.inject.Singleton;
 ...
 @Singleton
 public class MyBean {

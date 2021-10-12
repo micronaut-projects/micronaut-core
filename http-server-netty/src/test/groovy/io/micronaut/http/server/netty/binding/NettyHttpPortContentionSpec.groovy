@@ -4,22 +4,10 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.runtime.server.EmbeddedServer
-import org.junit.runner.RunWith
-import org.mockito.Mockito
-import org.powermock.api.mockito.PowerMockito
-import org.powermock.core.classloader.annotations.PowerMockIgnore
-import org.powermock.core.classloader.annotations.PrepareForTest
-import org.powermock.modules.junit4.PowerMockRunner
-import org.powermock.modules.junit4.PowerMockRunnerDelegate
-import org.spockframework.runtime.Sputnik
-import spock.lang.Retry
+import spock.lang.Ignore
 import spock.lang.Specification
 
-@RunWith(PowerMockRunner.class)
-@PowerMockRunnerDelegate(Sputnik.class)
-@PowerMockIgnore(["javax.net.ssl.*"])
-@PrepareForTest([SocketUtils.class])
-@Retry // due to the nature of port binding here there is a likelyhood this will sometimes fails to bind port on Travis
+@Ignore
 class NettyHttpPortContentionSpec extends Specification{
     void "test server url is correct when having to rebind on port contention"() {
         given: "we have some ports to use"

@@ -1,19 +1,31 @@
 dependencies {
-    compile project(":inject-java")
-    compile "com.google.testing.compile:compile-testing:0.12"
-    compile dependencyVersion("groovy")
-    compile(dependencyVersion("spock")) {
+    annotationProcessor project(":inject-java")
+
+    api project(":inject-java")
+    api project(":context")
+//    api "com.google.testing.compile:compile-testing:0.19", {
+//        exclude group:'com.google.truth', module:'truth'
+//    }
+    api libs.managed.groovy
+    api(libs.managed.spock) {
         exclude module:'groovy-all'
     }
-    compile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
-    testCompile dependencyVersion("validation")
-    testCompile "javax.persistence:javax.persistence-api:2.2"
-    testCompile project(":runtime")
+    if (!JavaVersion.current().isJava9Compatible()) {
+        api files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    }
 
-//    testCompile "org.ow2.asm:asm-tree:$asmVersion"
-//    testCompile "org.ow2.asm:asm-util:$asmVersion"
-//    testCompile "org.ow2.asm:asm:$asmVersion"
-//    testCompile "org.ow2.asm:asm-commons:$asmVersion"
-//    testCompile "org.ow2.asm:asm-tree:$asmVersion"
+    testAnnotationProcessor project(":inject-java")
+    testCompileOnly project(":inject-groovy")
+    testImplementation libs.managed.validation
+    testImplementation libs.javax.persistence
+    testImplementation project(":runtime")
+    testImplementation libs.javax.inject
+    testImplementation libs.blaze.persistence.core
+    testImplementation libs.smallrye
+}
 
+afterEvaluate {
+    sourcesJar {
+        from "$projectDir/src/main/groovy"
+    }
 }

@@ -1,9 +1,8 @@
-It is easy to validate incoming data with Micronaut's controllers with the
-<<validation, Validation Advice>>.
+It is easy to validate incoming data with Micronaut controllers using <<validation, Validation Advice>>.
 
 First, add the Hibernate Validator configuration to your application:
 
-dependency:micronaut-hibernate-validator[groupId="io.micronaut.configuration"]
+dependency:micronaut-hibernate-validator[groupId="io.micronaut.beanvalidation"]
 
 We can validate parameters using `javax.validation` annotations and the api:validation.Validated[] annotation at the class level.
 
@@ -12,29 +11,27 @@ snippet::io.micronaut.docs.datavalidation.params.EmailController[tags="imports,c
 <1> Annotate controller with api:validation.Validated[]
 <2> `subject` and `recipient` cannot be blank.
 
-The validation behaviour is shown in the following test:
+If a validation error occurs a `javax.validation.ConstraintViolationException` is thrown. By default, the integrated `io.micronaut.validation.exception.ConstraintExceptionHandler` handles the exception, leading to a behaviour as shown in the following test:
 
 snippet::io.micronaut.docs.datavalidation.params.EmailControllerSpec[tags="paramsvalidated",indent=0,title="Example Test"]
 
-Often, you may want to use POJOs as controller method parameters.
+To use your own `ExceptionHandler` to handle the constraint exceptions, annotate it with `@Replaces(ConstraintExceptionHandler.class)`
 
-snippet::io.micronaut.docs.datavalidation.pogo.Email[]
+Often you may want to use POJOs as controller method parameters.
+
+snippet::io.micronaut.docs.datavalidation.pogo.Email[tags="clazz", indent=0]
 
 <1> You can use `javax.validation` annotations in your POJOs.
 
-You need to annotate your controller with api:validation.Validated[]. Also, you need to annotate the binding POJO with `@Valid`.
+Annotate your controller with api:validation.Validated[], and annotate the binding POJO with `@Valid`.
 
 snippet::io.micronaut.docs.datavalidation.pogo.EmailController[tags="imports,clazz", indent=0,title="Example"]
 
-<1> Annotate controller with api:validation.Validated[]
-<2> Annotate the POJO which you wish to validate with `@Valid`
+<1> Annotate the controller with api:validation.Validated[]
+<2> Annotate the POJO to validate with `@Valid`
 
+Validation of POJOs is shown in the following test:
 
-The validation of POJOs is shown in the following test:
+snippet::io.micronaut.docs.datavalidation.pogo.EmailControllerSpec[tags="pojovalidated",indent=0]
 
-[source,groovy]
-----
-include::{testsuitegroovy}/datavalidation/pogo/EmailControllerSpec.groovy[tag=pojovalidated,indent=0]
-----
-
-NOTE: Bean injection is supported in custom constraints with the hibernate validator configuration.
+NOTE: Bean injection is supported in custom constraints with the Hibernate Validator configuration.

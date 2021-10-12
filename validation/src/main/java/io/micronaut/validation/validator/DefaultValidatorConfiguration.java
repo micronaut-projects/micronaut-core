@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,18 +18,24 @@ package io.micronaut.validation.validator;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.MessageSource;
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.validation.validator.constraints.ConstraintValidatorRegistry;
 import io.micronaut.validation.validator.constraints.DefaultConstraintValidators;
 import io.micronaut.validation.validator.extractors.DefaultValueExtractors;
 import io.micronaut.validation.validator.extractors.ValueExtractorRegistry;
 import io.micronaut.validation.validator.messages.DefaultValidationMessages;
+import jakarta.inject.Inject;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import javax.inject.Inject;
-import javax.validation.*;
+import javax.validation.ClockProvider;
+import javax.validation.ConstraintValidatorFactory;
+import javax.validation.MessageInterpolator;
+import javax.validation.ParameterNameProvider;
+import javax.validation.Path;
+import javax.validation.TraversableResolver;
 import javax.validation.Validator;
+import javax.validation.ValidatorContext;
 import javax.validation.valueextraction.ValueExtractor;
 import java.lang.annotation.ElementType;
 
@@ -63,7 +69,7 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
     private boolean enabled = true;
 
     @Override
-    @Nonnull
+    @NonNull
     public ConstraintValidatorRegistry getConstraintValidatorRegistry() {
         if (constraintValidatorRegistry != null) {
             return constraintValidatorRegistry;
@@ -99,7 +105,7 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
     }
 
     @Override
-    @Nonnull
+    @NonNull
     public ValueExtractorRegistry getValueExtractorRegistry() {
         if (valueExtractorRegistry != null) {
             return valueExtractorRegistry;
@@ -119,7 +125,7 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
     }
 
     @Override
-    @Nonnull
+    @NonNull
     public ClockProvider getClockProvider() {
         if (clockProvider != null) {
             return clockProvider;
@@ -140,7 +146,7 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
     }
 
     @Override
-    @Nonnull
+    @NonNull
     public TraversableResolver getTraversableResolver() {
         if (traversableResolver != null) {
             return traversableResolver;
@@ -171,7 +177,7 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
     }
 
     @Override
-    @Nonnull
+    @NonNull
     public MessageSource getMessageSource() {
         if (messageSource != null) {
             return messageSource;
@@ -192,7 +198,7 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
     }
 
     @Override
-    @Nonnull
+    @NonNull
     public ExecutionHandleLocator getExecutionHandleLocator() {
         if (executionHandleLocator != null) {
             return executionHandleLocator;
