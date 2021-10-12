@@ -30,6 +30,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static io.micronaut.http.uri.UriTemplate.PATTERN_FULL_PATH;
 import static io.micronaut.http.uri.UriTemplate.PATTERN_FULL_URI;
@@ -410,10 +411,10 @@ class PathAndQueryParams {
         boolean isAdditionalQueryNull = additionalQueryParams == null;
         if (pathWithQueryParams.contains("{?")) {
             this.path = pathWithQueryParams.split("(\\{\\?)")[0];
-            this.queryParams = isAdditionalQueryNull ? "{?" + pathWithQueryParams.split("(\\{\\?)")[1] : "{?" + pathWithQueryParams.split("(\\{\\?)")[1] + "&" + additionalQueryParams;
+            this.queryParams = isAdditionalQueryNull ? pathWithQueryParams.substring(pathWithQueryParams.indexOf("{?")) : pathWithQueryParams.substring(pathWithQueryParams.indexOf("{?")) + "&" + additionalQueryParams;
         } else if (pathWithQueryParams.contains("?")) {
             this.path = pathWithQueryParams.split("\\?")[0];
-            this.queryParams = isAdditionalQueryNull ? "?" + pathWithQueryParams.split("\\?")[1] : "?" + pathWithQueryParams.split("\\?")[1] + "&" + additionalQueryParams;
+            this.queryParams = isAdditionalQueryNull ? pathWithQueryParams.substring(pathWithQueryParams.indexOf('?')) : pathWithQueryParams.substring(pathWithQueryParams.indexOf('?')) + "&" + additionalQueryParams;
         } else {
             this.path = pathWithQueryParams;
             this.queryParams = isAdditionalQueryNull ? "" : additionalQueryParams;
