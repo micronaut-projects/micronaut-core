@@ -44,17 +44,50 @@ import java.util.function.BiConsumer;
 @UsedByGeneratedCode
 final class ImmutableSortedStringsArrayMap<V> implements Map<String, V> {
 
+    private final int[] index;
     private final String[] keys;
     private final Object[] values;
 
     ImmutableSortedStringsArrayMap(String[] keys, Object[] values) {
+        this.index = computeIndex(keys);
         this.keys = keys;
         this.values = values;
+    }
+
+    private static int[] computeIndex(String[] keys) {
+        int len = keys.length;
+        int[] filter = new int[8 * len];
+        Arrays.fill(filter, (byte) -1);
+        for (int i = 0; i < keys.length; i++) {
+            String key = keys[i];
+            int reduced = reduceHashCode(key.hashCode(), len);
+            filter[reduced] = i;
+        }
+        return filter;
+    }
+
+    private static int reduceHashCode(int hashCode, int mod) {
+        return (hashCode & 0xFFFFFF) % mod;
     }
 
     private int findKeyIndex(Object key) {
         if (!(key instanceof Comparable)) {
             return -1;
+        }
+        int v = index[reduceHashCode(key.hashCode(), keys.length)];
+        if (v < 0) {
+            // Bloom filter will be more efficient if the index is sparse
+            // that is to say that it contains more -1 than positive values
+            // for this reason we build an index which length is 8*key length
+            // which will be reasonable in most cases given the uses cases of
+            // this map which is for storing small maps
+            return -1;
+        }
+        String k = keys[v];
+        if (k.equals(key)) {
+            // Because there are collisions we need to double-check
+            // that the key found at the index location is the right one
+            return v;
         }
         return Arrays.binarySearch(keys, key);
     }

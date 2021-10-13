@@ -67,7 +67,7 @@ import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriMatchTemplate;
-import io.micronaut.jackson.codec.JsonMediaTypeCodec;
+import io.micronaut.json.codec.JsonMediaTypeCodec;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
@@ -336,7 +336,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
                         Publisher<?> publisher;
                         if (!isSingle && httpClient instanceof StreamingHttpClient) {
-                            publisher = httpClientResponseStreamingPublisher((StreamingHttpClient) httpClient, acceptTypes, request, valueType);
+                            publisher = httpClientResponseStreamingPublisher((StreamingHttpClient) httpClient, acceptTypes, request, errorType, valueType);
                         } else {
                             publisher = httpClientResponsePublisher(httpClient, request, returnType, errorType, valueType);
                         }
@@ -441,6 +441,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private Publisher httpClientResponseStreamingPublisher(StreamingHttpClient streamingHttpClient,
                                                            MediaType[] acceptTypes,
                                                            MutableHttpRequest<?> request,
+                                                           Argument<?> errorType,
                                                            Argument<?> reactiveValueArgument) {
         Class<?> reactiveValueType = reactiveValueArgument.getType();
         if (Void.class == reactiveValueType) {
@@ -451,15 +452,15 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             SseClient sseClient = (SseClient) streamingHttpClient;
             if (reactiveValueArgument.getType() == Event.class) {
                 return sseClient.eventStream(
-                        request, reactiveValueArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT)
+                        request, reactiveValueArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT), errorType
                 );
             }
-            return Publishers.map(sseClient.eventStream(request, reactiveValueArgument), Event::getData);
+            return Publishers.map(sseClient.eventStream(request, reactiveValueArgument, errorType), Event::getData);
         } else {
             if (isJsonParsedMediaType(acceptTypes)) {
-                return streamingHttpClient.jsonStream(request, reactiveValueArgument);
+                return streamingHttpClient.jsonStream(request, reactiveValueArgument, errorType);
             } else {
-                Publisher<ByteBuffer<?>> byteBufferPublisher = streamingHttpClient.dataStream(request);
+                Publisher<ByteBuffer<?>> byteBufferPublisher = streamingHttpClient.dataStream(request, errorType);
                 if (reactiveValueType == ByteBuffer.class) {
                     return byteBufferPublisher;
                 } else {

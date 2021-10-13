@@ -26,6 +26,7 @@ import io.micronaut.core.util.KotlinUtils;
 import kotlin.coroutines.Continuation;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
 
@@ -153,6 +154,9 @@ final class KotlinInterceptedMethod implements InterceptedMethod {
                 }
                 CompletableFutureContinuation.Companion.completeSuccess(continuation, value);
             } else {
+                if (throwable instanceof CompletionException) {
+                    throwable = ((CompletionException) throwable).getCause();
+                }
                 CompletableFutureContinuation.Companion.completeExceptionally(continuation, (Throwable) throwable);
             }
         });

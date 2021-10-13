@@ -69,7 +69,7 @@ public final class StringUtils {
      * Return whether the given string is empty.
      *
      * @param str The string
-     * @return True if is
+     * @return True if str is empty or null
      */
     public static boolean isEmpty(@Nullable CharSequence str) {
         return str == null || str.length() == 0;
@@ -79,7 +79,7 @@ public final class StringUtils {
      * Return whether the given string is not empty.
      *
      * @param str The string
-     * @return True if is
+     * @return True if str is not null and not empty
      */
     public static boolean isNotEmpty(@Nullable CharSequence str) {
         return !isEmpty(str);
@@ -89,7 +89,7 @@ public final class StringUtils {
      * Return whether the given string has non whitespace characters.
      *
      * @param str The string
-     * @return True if is
+     * @return True if str contains any non whitespace characters
      */
     public static boolean hasText(@Nullable CharSequence str) {
         if (isEmpty(str)) {

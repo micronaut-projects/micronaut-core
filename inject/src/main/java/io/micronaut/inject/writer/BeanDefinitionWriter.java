@@ -23,6 +23,7 @@ import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.Qualifier;
+import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationInject;
@@ -30,6 +31,7 @@ import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.InjectScope;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Property;
@@ -86,6 +88,7 @@ import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.JavaModelUtils;
+import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.visitor.BeanElementVisitor;
 import io.micronaut.inject.visitor.BeanElementVisitorContext;
@@ -103,6 +106,7 @@ import org.objectweb.asm.signature.SignatureVisitor;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.annotation.Annotation;
+import java.lang.annotation.Repeatable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.time.Duration;
@@ -331,6 +335,35 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             Argument.class, // argument;
             boolean.class // requiresReflection;
     ));
+    private static final org.objectweb.asm.commons.Method METHOD_QUALIFIER_FOR_ARGUMENT =
+            org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredMethod(Qualifiers.class, "forArgument", Argument.class)
+    );
+    private static final org.objectweb.asm.commons.Method METHOD_QUALIFIER_BY_NAME =
+            org.objectweb.asm.commons.Method.getMethod(
+                    ReflectionUtils.getRequiredMethod(Qualifiers.class, "byName", String.class)
+            );
+    private static final org.objectweb.asm.commons.Method METHOD_QUALIFIER_BY_ANNOTATION =
+            org.objectweb.asm.commons.Method.getMethod(
+                    ReflectionUtils.getRequiredMethod(Qualifiers.class, "byAnnotationSimple", AnnotationMetadata.class, String.class)
+            );
+    private static final org.objectweb.asm.commons.Method METHOD_QUALIFIER_BY_REPEATABLE_ANNOTATION =
+            org.objectweb.asm.commons.Method.getMethod(
+                    ReflectionUtils.getRequiredMethod(Qualifiers.class, "byRepeatableAnnotation", AnnotationMetadata.class, String.class)
+            );
+    private static final org.objectweb.asm.commons.Method METHOD_QUALIFIER_BY_QUALIFIERS =
+            org.objectweb.asm.commons.Method.getMethod(
+                    ReflectionUtils.getRequiredMethod(Qualifiers.class, "byQualifiers", Qualifier[].class)
+            );
+    private static final org.objectweb.asm.commons.Method METHOD_QUALIFIER_BY_INTERCEPTOR_BINDING =
+            org.objectweb.asm.commons.Method.getMethod(
+                    ReflectionUtils.getRequiredMethod(Qualifiers.class, "byInterceptorBinding", AnnotationMetadata.class)
+            );
+    private static final org.objectweb.asm.commons.Method METHOD_QUALIFIER_BY_TYPE = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredMethod(Qualifiers.class, "byType", Class[].class)
+    );
+    private static final Type TYPE_QUALIFIERS = Type.getType(Qualifiers.class);
+    private static final Type TYPE_QUALIFIER = Type.getType(Qualifier.class);
 
     private final ClassWriter classWriter;
     private final String beanFullClassName;
@@ -1705,31 +1738,87 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         return type.isAssignable(Map.class) || type.isAssignable(Collection.class) || isConfigurationProperties(type);
     }
 
-    private void pushQualifier(GeneratorAdapter generatorAdapter, AnnotationMetadata element, Runnable resolveArgument) {
-        if (!element.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER).isEmpty()) {
-            resolveArgument.run();
-            generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), org.objectweb.asm.commons.Method.getMethod(
-                    ReflectionUtils.getRequiredMethod(Qualifiers.class, "forArgument", Argument.class)
-            ));
+    private void pushQualifier(GeneratorAdapter generatorAdapter, Element element, Runnable resolveArgument) {
+        final List<String> qualifierNames = element.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER);
+        if (!qualifierNames.isEmpty()) {
+            if (qualifierNames.size() == 1) {
+                // simple qualifier
+                final String annotationName = qualifierNames.iterator().next();
+                pushQualifierForAnnotation(generatorAdapter, element, annotationName, resolveArgument);
+            } else {
+                // composite qualifier
+                final int len = qualifierNames.size();
+                pushNewArray(generatorAdapter, TYPE_QUALIFIER, len);
+                for (int i = 0; i < len; i++) {
+                    final String annotationName = qualifierNames.get(i);
+                    pushStoreInArray(generatorAdapter, i, len, () ->
+                        pushQualifierForAnnotation(generatorAdapter, element, annotationName, resolveArgument)
+                    );
+                }
+                generatorAdapter.invokeStatic(TYPE_QUALIFIERS, METHOD_QUALIFIER_BY_QUALIFIERS);
+
+            }
         } else if (element.hasAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER)) {
             resolveArgument.run();
-            generatorAdapter.invokeInterface(Type.getType(AnnotationMetadataProvider.class), org.objectweb.asm.commons.Method.getMethod(
-                    ReflectionUtils.getRequiredMethod(AnnotationMetadataProvider.class, "getAnnotationMetadata")
-            ));
-            generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), org.objectweb.asm.commons.Method.getMethod(
-                    ReflectionUtils.getRequiredMethod(Qualifiers.class, "byInterceptorBinding", AnnotationMetadata.class)
-            ));
+            retrieveAnnotationMetadataFromProvider(generatorAdapter);
+            generatorAdapter.invokeStatic(TYPE_QUALIFIERS, METHOD_QUALIFIER_BY_INTERCEPTOR_BINDING);
         } else {
             String[] byType = element.hasDeclaredAnnotation(io.micronaut.context.annotation.Type.NAME) ? element.stringValues(io.micronaut.context.annotation.Type.NAME) : null;
             if (byType != null && byType.length > 0) {
                 pushArrayOfClasses(generatorAdapter, byType);
-                generatorAdapter.invokeStatic(Type.getType(Qualifiers.class), org.objectweb.asm.commons.Method.getMethod(
-                        ReflectionUtils.getRequiredMethod(Qualifiers.class, "byType", Class[].class)
-                ));
+                generatorAdapter.invokeStatic(TYPE_QUALIFIERS, METHOD_QUALIFIER_BY_TYPE);
             } else {
                 generatorAdapter.push((String) null);
             }
         }
+    }
+
+    private void retrieveAnnotationMetadataFromProvider(GeneratorAdapter generatorAdapter) {
+        generatorAdapter.invokeInterface(Type.getType(AnnotationMetadataProvider.class), org.objectweb.asm.commons.Method.getMethod(
+                ReflectionUtils.getRequiredMethod(AnnotationMetadataProvider.class, "getAnnotationMetadata")
+        ));
+    }
+
+    private void pushQualifierForAnnotation(GeneratorAdapter generatorAdapter,
+                                            Element element,
+                                            String annotationName,
+                                            Runnable resolveArgument) {
+        if (annotationName.equals(AnnotationUtil.NAMED)) {
+            final String n = element.stringValue(AnnotationUtil.NAMED)
+                                    .orElse(element.getName());
+            if (!n.contains("$")) {
+                generatorAdapter.push(n);
+                generatorAdapter.invokeStatic(TYPE_QUALIFIERS, METHOD_QUALIFIER_BY_NAME);
+            } else {
+                // need to resolve the name at runtime
+                doResolveArgument(generatorAdapter, resolveArgument);
+            }
+        } else if (annotationName.equals(Any.NAME)) {
+            final Type t = Type.getType(AnyQualifier.class);
+            generatorAdapter.getStatic(
+                    t,
+                    "INSTANCE",
+                    t
+            );
+        } else {
+            final String repeatableName = visitorContext
+                    .getClassElement(annotationName)
+                    .flatMap(ce -> ce.stringValue(Repeatable.class)).orElse(null);
+            resolveArgument.run();
+            retrieveAnnotationMetadataFromProvider(generatorAdapter);
+            if (repeatableName != null) {
+                generatorAdapter.push(repeatableName);
+                generatorAdapter.invokeStatic(TYPE_QUALIFIERS, METHOD_QUALIFIER_BY_REPEATABLE_ANNOTATION);
+            } else {
+                generatorAdapter.push(annotationName);
+                generatorAdapter.invokeStatic(TYPE_QUALIFIERS, METHOD_QUALIFIER_BY_ANNOTATION);
+            }
+        }
+    }
+
+    private void doResolveArgument(GeneratorAdapter generatorAdapter, Runnable resolveArgument) {
+        resolveArgument.run();
+        generatorAdapter.invokeStatic(TYPE_QUALIFIERS, METHOD_QUALIFIER_FOR_ARGUMENT);
     }
 
     private void pushArrayOfClasses(GeneratorAdapter writer, String[] byType) {
@@ -1803,9 +1892,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         boolean hasArguments = methodElement.hasParameters();
         int argCount = hasArguments ? argumentTypes.size() : 0;
         Type declaringTypeRef = JavaModelUtils.getTypeReference(declaringType);
-
+        boolean hasInjectScope = false;
         for (ParameterElement value : argumentTypes) {
             DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, value.getAnnotationMetadata());
+            if (value.hasDeclaredAnnotation(InjectScope.class)) {
+                hasInjectScope = true;
+            }
         }
 
         if (!requiresReflection) {
@@ -1854,8 +1946,22 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             injectMethodVisitor.invokeVirtual(superType, INVOKE_WITH_REFLECTION_METHOD);
         }
 
+        destroyInjectScopeBeansIfNecessary(injectMethodVisitor, hasInjectScope);
+
         // increment the method index
         currentMethodIndex++;
+    }
+
+    private void destroyInjectScopeBeansIfNecessary(GeneratorAdapter injectMethodVisitor, boolean hasInjectScope) {
+        if (hasInjectScope) {
+            injectMethodVisitor.loadArg(0);
+            injectMethodVisitor.invokeInterface(
+                Type.getType(BeanResolutionContext.class),
+                org.objectweb.asm.commons.Method.getMethod(
+                    ReflectionUtils.getRequiredInternalMethod(BeanResolutionContext.class, "destroyInjectScopedBeans")
+                )
+            );
+        }
     }
 
     private void pushMethodParameterValue(GeneratorAdapter injectMethodVisitor, int i, ParameterElement entry) {
@@ -2331,6 +2437,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             buildMethodVisitor.loadLocal(factoryVar);
             pushCastToType(buildMethodVisitor, factoryClass);
             String methodDescriptor = getMethodDescriptorForReturnType(beanType, parameterList);
+            boolean hasInjectScope = false;
             if (isIntercepted) {
                 int constructorIndex = initInterceptedConstructorWriter(
                         buildMethodVisitor,
@@ -2343,13 +2450,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             } else {
 
                 if (!parameterList.isEmpty()) {
-                    pushConstructorArguments(buildMethodVisitor, parameters);
+                    hasInjectScope = pushConstructorArguments(buildMethodVisitor, parameters);
                 }
                 if (factoryMethod instanceof MethodElement) {
                     buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
                             factoryType.getInternalName(),
                             factoryMethod.getName(),
-                            methodDescriptor, false);
+                            methodDescriptor,
+                            false
+                    );
                 } else {
                     buildMethodVisitor.getField(
                             factoryType,
@@ -2367,6 +2476,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 pushCastToType(buildMethodVisitor, beanType);
                 buildMethodVisitor.storeLocal(buildInstanceLocalVarIndex);
             }
+            destroyInjectScopeBeansIfNecessary(buildMethodVisitor, hasInjectScope);
             buildMethodVisitor.loadLocal(buildInstanceLocalVarIndex);
             initLifeCycleMethodsIfNecessary();
         }
@@ -2740,15 +2850,20 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         });
     }
 
-    private void pushConstructorArguments(GeneratorAdapter buildMethodVisitor,
-                                          ParameterElement[] parameters) {
+    private boolean pushConstructorArguments(GeneratorAdapter buildMethodVisitor,
+                                             ParameterElement[] parameters) {
         int size = parameters.length;
+        boolean hasInjectScope = false;
         if (size > 0) {
             for (int i = 0; i < parameters.length; i++) {
                 ParameterElement parameter = parameters[i];
                 pushConstructorArgument(buildMethodVisitor, parameter.getName(), parameter, parameter.getAnnotationMetadata(), i);
+                if (parameter.hasDeclaredAnnotation(InjectScope.class)) {
+                    hasInjectScope = true;
+                }
             }
         }
+        return hasInjectScope;
     }
 
     private void pushConstructorArgument(GeneratorAdapter buildMethodVisitor,

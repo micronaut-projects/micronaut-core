@@ -117,8 +117,9 @@ public class RequestArgumentSatisfier {
 
                     if (bindingResult.isPresentAndSatisfied()) {
                         value = bindingResult.get();
+                    } else if (bindingResult.isSatisfied() && argument.isNullable()) {
+                        value = NullArgument.INSTANCE;
                     }
-
                 } else {
                     value = getValueForBlockingBodyArgumentBinder(request, argumentBinder, conversionContext);
                 }

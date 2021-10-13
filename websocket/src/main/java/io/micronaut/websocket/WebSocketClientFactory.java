@@ -49,6 +49,6 @@ public interface WebSocketClientFactory {
      * @return The client
      */
     @NonNull
-    WebSocketClient createWebSocketClient(@Nullable URL url,  HttpClientConfiguration configuration);
+    WebSocketClient createWebSocketClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration);
 
 }

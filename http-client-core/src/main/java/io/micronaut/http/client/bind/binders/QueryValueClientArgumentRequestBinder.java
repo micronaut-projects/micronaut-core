@@ -16,17 +16,17 @@
 package io.micronaut.http.client.bind.binders;
 
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.client.bind.AnnotatedClientArgumentRequestBinder;
 import io.micronaut.http.client.bind.ClientRequestUriContext;
+import io.micronaut.http.uri.UriMatchVariable;
 
 import java.util.List;
 import java.util.Map;
@@ -58,12 +58,12 @@ public class QueryValueClientArgumentRequestBinder implements AnnotatedClientArg
      * If value can be converted to ConvertibleMultiValues, then use it and add it to the uriContext.queryParameters.
      * The ConvertibleMultiValues converters are found in
      * {@link io.micronaut.core.convert.converters.MultiValuesConverterFactory} and perform conversion only when the
-     * {@link Format} annotation has one of the supported values.
-     * Otherwise if the {@link Format} annotation is present, it is converted to {@link String}. If none of these
+     * {@link io.micronaut.core.convert.format.Format} annotation has one of the supported values.
+     * Otherwise if the {@link io.micronaut.core.convert.format.Format} annotation is present, it is converted to {@link String}. If none of these
      * are satisfied, the{@link io.micronaut.http.uri.UriTemplate} decides what to do with the given value which
      * is supplied as an Object (it is added to uriContext.pathParameter).
      *
-     * <br> By default value is converted to ConvertibleMultiValues when the {@link Format} annotation is present and has
+     * <br> By default value is converted to ConvertibleMultiValues when the {@link io.micronaut.core.convert.format.Format} annotation is present and has
      * one of the defined above formats. Otherwise empty optional is returned.
      *
      * <br> The default {@link io.micronaut.http.uri.UriTemplate} will convert the value to String and to parameters.
@@ -76,35 +76,48 @@ public class QueryValueClientArgumentRequestBinder implements AnnotatedClientArg
             @NonNull Object value,
             @NonNull MutableHttpRequest<?> request
     ) {
-        ArgumentConversionContext<ConvertibleMultiValues> conversionContext = context.with(
-                Argument.of(ConvertibleMultiValues.class, context.getArgument().getName(), context.getAnnotationMetadata()));
-        Optional<ConvertibleMultiValues> convertedValue = conversionService.convert(value, conversionContext);
+        String parameterName = context.getAnnotationMetadata().stringValue(QueryValue.class)
+                .filter(StringUtils::isNotEmpty)
+                .orElse(context.getArgument().getName());
 
-        if (convertedValue.isPresent()) {
-            ConvertibleMultiValues<String> multiValues;
-            // noinspection unchecked
-            multiValues = convertedValue.get();
+        final UriMatchVariable uriVariable = uriContext.getUriTemplate().getVariables()
+                .stream()
+                .filter(v -> v.getName().equals(parameterName))
+                .findFirst()
+                .orElse(null);
 
-            Map<String, List<String>> queryParameters = uriContext.getQueryParameters();
-
-            // Add all the parameters
-            multiValues.forEach((k, v) -> {
-                if (queryParameters.containsKey(k)) {
-                    queryParameters.get(k).addAll(v);
-                } else {
-                    queryParameters.put(k, v);
-                }
-            });
-        } else {
-            Argument<Object> argument = context.getArgument();
-            String name = argument.getAnnotationMetadata()
-                    .getValue(Bindable.class, String.class).orElse(argument.getName());
-
-            if (context.getAnnotationMetadata().hasStereotype(Format.class)) {
-                conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
-                        .ifPresent(v -> uriContext.setPathParameter(name, v));
+        if (uriVariable != null) {
+            if (uriVariable.isExploded()) {
+                uriContext.setPathParameter(parameterName, value);
             } else {
-                uriContext.setPathParameter(name, value);
+                String convertedValue
+                        = conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
+                        .filter(StringUtils::isNotEmpty)
+                        .orElse(null);
+                if (convertedValue != null) {
+                    uriContext.setPathParameter(parameterName, convertedValue);
+                } else {
+                    uriContext.setPathParameter(parameterName, value);
+                }
+            }
+        } else {
+            ArgumentConversionContext<ConvertibleMultiValues> conversionContext = context.with(
+                    Argument.of(ConvertibleMultiValues.class, context.getArgument().getName(), context.getAnnotationMetadata()));
+            final Optional<ConvertibleMultiValues<String>> multiValues = conversionService.convert(value, conversionContext)
+                    .map(values -> (ConvertibleMultiValues<String>) values);
+            if (multiValues.isPresent())  {
+                Map<String, List<String>> queryParameters = uriContext.getQueryParameters();
+                // Add all the parameters
+                multiValues.get().forEach((k, v) -> {
+                    if (queryParameters.containsKey(k)) {
+                        queryParameters.get(k).addAll(v);
+                    } else {
+                        queryParameters.put(k, v);
+                    }
+                });
+            } else {
+                conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
+                        .ifPresent(v -> uriContext.addQueryParameter(parameterName, v));
             }
         }
     }
