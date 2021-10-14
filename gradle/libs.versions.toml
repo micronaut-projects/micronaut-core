@@ -26,7 +26,6 @@ logbook-netty = "2.4.1"
 log4j = "2.14.1"
 mongo-javadriver = "3.12.10"
 mysql-driver = "8.0.22"
-netty-tcnative = "2.0.42.Final"
 powermock = "2.0.9"
 rxjava3 = "3.0.13"
 selenium = "3.141.59"
@@ -128,7 +127,7 @@ managed-mongo = "4.3.0"
 managed-mongo-reactive = "4.3.0"
 managed-neo4j = "3.5.29"
 managed-neo4j-java-driver = "4.2.7"
-managed-netty = "4.1.68.Final"
+managed-netty = "4.1.69.Final"
 managed-opentracing = "0.33.0"
 managed-paho-v3 = "1.2.5"
 managed-paho-v5 = "1.2.5"
@@ -524,8 +523,8 @@ mongo-javadriver = { module = "org.mongodb:mongo-java-driver", version.ref = "mo
 
 mysql-driver = { module = "mysql:mysql-connector-java", version.ref = "mysql-driver" }
 
-netty-tcnative = { module = 'io.netty:netty-tcnative', version.ref = "netty-tcnative" }
-netty-tcnative-boringssl = { module = 'io.netty:netty-tcnative-boringssl-static', version.ref = "netty-tcnative" }
+netty-tcnative = { module = 'io.netty:netty-tcnative' }
+netty-tcnative-boringssl = { module = 'io.netty:netty-tcnative-boringssl-static' }
 
 powermock-junit4 = { module = "org.powermock:powermock-module-junit4", version.ref = "powermock" }
 powermock-mockito2 = { module = "org.powermock:powermock-api-mockito2", version.ref = "powermock" }
