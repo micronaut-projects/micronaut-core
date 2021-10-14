@@ -1,19 +1,22 @@
 package io.micronaut.kotlin.processing
 
 import com.google.devtools.ksp.closestClassDeclaration
-import com.google.devtools.ksp.symbol.KSAnnotation
-import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.google.devtools.ksp.symbol.KSDeclaration
-import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
+import io.micronaut.inject.processing.JavaModelUtils
 import io.micronaut.inject.visitor.VisitorContext
 import java.lang.annotation.RetentionPolicy
 import java.util.*
+import javax.lang.model.element.Element
+import javax.lang.model.element.ElementKind
+import javax.lang.model.element.TypeElement
+import javax.lang.model.type.DeclaredType
+import javax.lang.model.util.Types
 
 class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSDeclaration, KSAnnotation>() {
 
-    override fun isMethodOrClassElement(element: KSDeclaration?): Boolean {
+    override fun isMethodOrClassElement(element: KSDeclaration): Boolean {
         return element is KSClassDeclaration || element is KSFunctionDeclaration
     }
 
@@ -26,39 +29,61 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSDecla
     }
 
     override fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSDeclaration {
-        TODO("Not yet implemented")
+        return annotationMirror.annotationType.resolve().declaration
     }
 
-    override fun hasAnnotation(element: KSDeclaration?, annotation: Class<out Annotation>?): Boolean {
-        TODO("Not yet implemented")
+    override fun hasAnnotation(element: KSDeclaration, annotation: Class<out Annotation>): Boolean {
+        return hasAnnotation(element, annotation.name)
     }
 
-    override fun hasAnnotation(element: KSDeclaration?, annotation: String?): Boolean {
-        TODO("Not yet implemented")
+    override fun hasAnnotation(element: KSDeclaration, annotation: String): Boolean {
+        return element.annotations.map {
+            it.annotationType.resolve().declaration.qualifiedName
+        }.any {
+            it?.asString() == annotation
+        }
     }
 
-    override fun hasAnnotations(element: KSDeclaration?): Boolean {
-        TODO("Not yet implemented")
+    override fun hasAnnotations(element: KSDeclaration): Boolean {
+        return element.annotations.iterator().hasNext()
     }
 
-    override fun getAnnotationTypeName(annotationMirror: KSAnnotation?): String {
-        TODO("Not yet implemented")
+    override fun getAnnotationTypeName(annotationMirror: KSAnnotation): String {
+        return getTypeForAnnotation(annotationMirror).qualifiedName!!.asString()
     }
 
-    override fun getElementName(element: KSDeclaration?): String {
-        TODO("Not yet implemented")
+    override fun getElementName(element: KSDeclaration): String {
+        return if (element is KSClassDeclaration) {
+            element.qualifiedName!!.asString()
+        } else {
+            element.simpleName.asString()
+        }
     }
 
-    override fun getAnnotationsForType(element: KSDeclaration?): MutableList<out KSAnnotation> {
-        TODO("Not yet implemented")
+    override fun getAnnotationsForType(element: KSDeclaration): MutableList<out KSAnnotation> {
+        return element.annotations.toMutableList()
     }
 
     override fun buildHierarchy(
-        element: KSDeclaration?,
+        element: KSDeclaration,
         inheritTypeAnnotations: Boolean,
         declaredOnly: Boolean
     ): MutableList<KSDeclaration> {
-        TODO("Not yet implemented")
+        if (declaredOnly) {
+            return mutableListOf(element)
+        }
+        if (element is KSClassDeclaration) {
+            val hierarchy = mutableListOf<KSDeclaration>()
+            hierarchy.add(element)
+            if (element.classKind == ClassKind.ANNOTATION_CLASS) {
+                return hierarchy
+            }
+            populateTypeHierarchy(element, hierarchy)
+            hierarchy.reverse()
+            return hierarchy
+        } else {
+            return mutableListOf(element)
+        }
     }
 
     override fun readAnnotationRawValues(
@@ -93,18 +118,18 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSDecla
         TODO("Not yet implemented")
     }
 
-    override fun readAnnotationDefaultValues(annotationMirror: KSAnnotation?): MutableMap<out KSDeclaration, *> {
-        TODO("Not yet implemented")
+    override fun readAnnotationDefaultValues(annotationMirror: KSAnnotation): MutableMap<out KSDeclaration, *> {
+        return mutableMapOf<KSDeclaration, Any>()
     }
 
     override fun readAnnotationDefaultValues(
-        annotationName: String?,
-        annotationType: KSDeclaration?
+        annotationName: String,
+        annotationType: KSDeclaration
     ): MutableMap<out KSDeclaration, *> {
-        TODO("Not yet implemented")
+        return mutableMapOf<KSDeclaration, Any>()
     }
 
-    override fun readAnnotationRawValues(annotationMirror: KSAnnotation?): MutableMap<out KSDeclaration, *> {
+    override fun readAnnotationRawValues(annotationMirror: KSAnnotation): MutableMap<out KSDeclaration, *> {
         TODO("Not yet implemented")
     }
 
@@ -141,7 +166,14 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSDecla
     }
 
     override fun getRetentionPolicy(annotation: KSDeclaration): RetentionPolicy {
-        TODO("Not yet implemented")
+        val retentionPolicy = annotation.annotations.find {
+            getAnnotationTypeName(it) == RetentionPolicy::class.java.name
+        }
+        if (retentionPolicy == null) {
+            return RetentionPolicy.RUNTIME
+        } else {
+            TODO("get value from annotation")
+        }
     }
 
     override fun isInheritedAnnotation(annotationMirror: KSAnnotation): Boolean {
@@ -150,5 +182,13 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSDecla
 
     override fun isInheritedAnnotationType(annotationType: KSDeclaration): Boolean {
         TODO("Not yet implemented")
+    }
+
+    private fun populateTypeHierarchy(element: KSClassDeclaration, hierarchy: MutableList<KSDeclaration>) {
+        element.superTypes.forEach {
+            val declaration = it.resolve().declaration
+            hierarchy.add(declaration)
+            populateTypeHierarchy(declaration as KSClassDeclaration, hierarchy)
+        }
     }
 }

@@ -14,6 +14,7 @@ public class Compiler {
         KotlinCompilation compilation = new KotlinCompilation();
         compilation.setSources(Collections.singletonList(SourceFile.Companion.kotlin(name + ".kt", clazz, true)));
         KspKt.setSymbolProcessorProviders(compilation, Collections.singletonList(new TypeElementSymbolProcessorProvider()));
+        compilation.setInheritClassPath(true);
         final KotlinCompilation.Result result = compilation.compile();
         if (result.getExitCode() != KotlinCompilation.ExitCode.OK) {
             throw new RuntimeException(result.getMessages());

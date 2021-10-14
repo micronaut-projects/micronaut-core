@@ -2,59 +2,57 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.google.devtools.ksp.symbol.KSType
 import io.micronaut.core.order.Ordered
 import io.micronaut.inject.visitor.TypeElementVisitor
+import org.omg.CORBA.Object
 
 class LoadedVisitor(val visitor: TypeElementVisitor<*, *>,
                     val visitorContext: KotlinVisitorContext): Ordered {
+
+    companion object {
+        const val ANY = "kotlin.Any"
+    }
+
+    var classAnnotation: String = ANY
+    var elementAnnotation: String = ANY
 
     init {
         val javaClass = visitor.javaClass
         val resolver = visitorContext.resolver
         val declaration = resolver.getClassDeclarationByName(javaClass.name)
+        val tevClassName = TypeElementVisitor::class.java.name
 
         if (declaration != null) {
-            //resolver.getTypeArgument()
-//            val generics = declaration.asStarProjectedType().arguments.filter { typeArgument ->
-//                typeArgument.type!!.resolve().declaration.qualifiedName!!.asString() == TypeElementVisitor::class.java.name
-//            }
-//            val typeName = generics[0].variance.declaringClass()
-//            if (typeName == io.micronaut.annotation.processing.visitor.LoadedVisitor.OBJECT_CLASS) {
-//                classAnnotation = visitor.classType
-//            } else {
-//                classAnnotation = typeName
-//            }
-//            val elementName = generics[1].toString()
-//            if (elementName == io.micronaut.annotation.processing.visitor.LoadedVisitor.OBJECT_CLASS) {
-//                elementAnnotation = visitor.elementType
-//            } else {
-//                elementAnnotation = elementName
-//            }
-//        } else {
-//            val classes = GenericTypeUtils.resolveInterfaceTypeArguments(
-//                aClass,
-//                TypeElementVisitor::class.java
-//            )
-//            if (classes != null && classes.size == 2) {
-//                val classGeneric = classes[0]
-//                if (classGeneric == Any::class.java) {
-//                    classAnnotation = visitor.classType
-//                } else {
-//                    classAnnotation = classGeneric.name
-//                }
-//                val elementGeneric = classes[1]
-//                if (elementGeneric == Any::class.java) {
-//                    elementAnnotation = visitor.elementType
-//                } else {
-//                    elementAnnotation = elementGeneric.name
-//                }
-//            } else {
-//                classAnnotation = Any::class.java.name
-//                elementAnnotation = Any::class.java.name
-//            }
+            val reference = declaration.superTypes
+                .map { it.resolve() }
+                .find {
+                    it.declaration.qualifiedName?.asString() == tevClassName
+                }!!
+
+            classAnnotation = reference.arguments[0].type!!.resolve().declaration.qualifiedName!!.asString()
+            if (classAnnotation == ANY) {
+                classAnnotation = visitor.classType
+            }
+
+            elementAnnotation = reference.arguments[1].type!!.resolve().declaration.qualifiedName!!.asString()
+            if (elementAnnotation == ANY) {
+                elementAnnotation = visitor.elementType
+            }
+        }
+        if (classAnnotation == ANY) {
+            classAnnotation = Object::class.java.name
+        }
+        if (elementAnnotation == ANY) {
+            elementAnnotation = Object::class.java.name
         }
     }
 
-    fun matches(classDeclaration: KSClassDeclaration) = true
+    fun matches(classDeclaration: KSClassDeclaration): Boolean {
+        if (classAnnotation == "java.lang.Object") {
+            return true
+        }
+        val annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(classDeclaration)
+
+        return annotationMetadata.hasStereotype(classAnnotation)
+    }
 }
