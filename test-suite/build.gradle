@@ -61,6 +61,7 @@ dependencies {
     testRuntimeOnly libs.aws.java.sdk.lambda
 
     // needed for HTTP/2 tests
+    testImplementation platform(libs.boms.netty)
     testImplementation libs.netty.tcnative
     testImplementation libs.netty.tcnative.boringssl
     testImplementation(libs.netty.tcnative.boringssl) {
