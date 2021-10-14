@@ -179,6 +179,10 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
             TODO("Not yet implemented")
         }
 
+        override fun visitPropertyDeclaration(property: KSPropertyDeclaration, data: Any): Any {
+            return super.visitPropertyDeclaration(property, data)
+        }
+
         override fun defaultHandler(node: KSNode, data: Any): Any {
             return data
         }
