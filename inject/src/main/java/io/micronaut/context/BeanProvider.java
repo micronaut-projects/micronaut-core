@@ -18,34 +18,78 @@ package io.micronaut.context;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.BeanDefinition;
 
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 /**
- * A provider contract.
+ * A BeanProvider is a richer replacement for the {@link jakarta.inject.Provider} interface that
+ * provides additional Micronaut specific methods to assist in programmatic bean creation and discovery.
  *
- * @param <T> The type
+ * @param <T> The generic bean type
  * @author James Kleeh
  * @author graemerocher
  * @since 2.4.0
  */
+@FunctionalInterface
 public interface BeanProvider<T> extends Iterable<T> {
 
     /**
-     * @return A fully-constructed and injected instance of T.
+     * The get method will materialize an instance of the bean if it is resolvable.
+     *
+     * <p>A bean is considered resolvable if it is both unique and present. See {@link #isUnique()} and {@link #isPresent()}.</p>
+     *
+     * <p>Note that if the bean is {@link jakarta.inject.Singleton} then multiple calls to this method will return the same instance.</p>
+     *
+     * @return A fully-constructed and injected instance of {@link T}.
+     * @throws io.micronaut.context.exceptions.BeanCreationException If an error occurs during the creation of the bean
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException if the bean doesn't exist
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException if more than one bean matching the current qualifier exists and cannot be resolved unambiguously
      */
     @NonNull
     T get();
 
     /**
-     * @param qualifier The qualifier to use.
-     * @return A fully-constructed and injected instance of T.
+     * Finds a bean for the optionally specified qualifier. Return empty if non-exists.
+     * @param qualifier The qualifier to use. Can be {@code null} which is equivalent to specifying the default qualifier.
+     * @return An optional of the bean.
+     * @since 3.2.0
+     */
+    default Optional<T> find(@Nullable Qualifier<T> qualifier) {
+        if (isPresent()) {
+            return Optional.of(get());
+        } else {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Obtains a reference to the {@link io.micronaut.inject.BeanDefinition} if the bean is resolvable.
+     * @return The {@link io.micronaut.inject.BeanDefinition}
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException if the bean doesn't exist
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException if more than one bean matching the current qualifier exists and cannot be resolved unambiguously
+     * @throws java.lang.UnsupportedOperationException If the BeanProvider was obtained via other means other than dependency injection
+     * @since 3.2.0
+     */
+    @NonNull
+    default BeanDefinition<T> getDefinition() {
+        throw new UnsupportedOperationException("BeanDefinition information can only be obtained from dependency injected providers");
+    }
+
+    /**
+     * @see #get()
+     * @param qualifier The qualifier to use, can be {@code null}.
+     * @return A fully-constructed and injected instance of {@link T}.
      * @since 3.0.0
+     * @throws io.micronaut.context.exceptions.BeanCreationException If an error occurs during the creation of the bean
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException if the bean doesn't exist
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException if more than one bean matching the current qualifier exists and cannot be resolved unambiguously
      */
     @NonNull
     default T get(@Nullable Qualifier<T> qualifier) {
@@ -133,18 +177,6 @@ public interface BeanProvider<T> extends Iterable<T> {
     }
 
     /**
-     * Create an argument for the given type to aid with bean provider lookup.
-     *
-     * @param type The type
-     * @param <T1>  The generic type
-     * @return 3.0.0
-     */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    static @NonNull <T1> Argument<BeanProvider<T1>> argumentOf(@NonNull Class<T1> type) {
-        return (Argument) Argument.of(BeanProvider.class, Objects.requireNonNull(type, "Type cannot be null"));
-    }
-
-    /**
      * Allows selecting an alternative bean if the backing bean is not present.
      * @param alternative The alternative, can be {@code null}
      * @return The bean if present or else the supplied alternative
@@ -156,5 +188,17 @@ public interface BeanProvider<T> extends Iterable<T> {
         } else {
             return alternative;
         }
+    }
+
+    /**
+     * Create an argument for the given type to aid with bean provider lookup.
+     *
+     * @param type The type
+     * @param <T1>  The generic type
+     * @return 3.0.0
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    static @NonNull <T1> Argument<BeanProvider<T1>> argumentOf(@NonNull Class<T1> type) {
+        return (Argument) Argument.of(BeanProvider.class, Objects.requireNonNull(type, "Type cannot be null"));
     }
 }
