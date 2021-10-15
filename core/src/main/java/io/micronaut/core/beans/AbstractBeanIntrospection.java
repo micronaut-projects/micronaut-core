@@ -287,7 +287,7 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
     protected final void indexProperty(
             @NonNull Class<? extends Annotation> annotationType,
             @NonNull String propertyName,
-            @NonNull String annotationValue) {
+            @Nullable String annotationValue) {
         indexProperty(annotationType, propertyName);
         if (StringUtils.isNotEmpty(annotationValue) && StringUtils.isNotEmpty(propertyName)) {
             if (indexedValues == null) {
