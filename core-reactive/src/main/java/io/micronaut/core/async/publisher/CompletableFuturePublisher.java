@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.async.publisher;
 
+import io.micronaut.core.annotation.Internal;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
@@ -30,6 +31,7 @@ import java.util.function.Supplier;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class CompletableFuturePublisher<T> implements Publishers.MicronautPublisher<T> {
 
     private final Supplier<CompletableFuture<T>> futureSupplier;

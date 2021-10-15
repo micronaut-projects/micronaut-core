@@ -16,6 +16,7 @@
 package io.micronaut.core.optim;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,6 +29,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * which can be injected at initialization time. Every class
  * which needs static optimizations should go through this
  * class to get its static state.
+ *
+ * @since 3.2.0
  */
 @SuppressWarnings("unchecked")
 @Internal
@@ -37,11 +40,25 @@ public abstract class StaticOptimizations {
     private static final Map<Class<?>, Object> OPTIMIZATIONS = new ConcurrentHashMap<>();
     private static boolean cacheEnvironment = false;
 
+    /**
+     * Enables environment caching. If enabled, both the environment variables
+     * and system properties will be deemed immutable.
+     */
     public static void cacheEnvironment() {
         cacheEnvironment = true;
     }
 
-    public static <T> Optional<T> get(Class<T> optimizationClass) {
+    /**
+     * Returns, if available, the optimization data of the requested
+     * type. Those optimizations are singletons, which is why they
+     * are accessed by type.
+     *
+     * @param optimizationClass the type of the optimization class
+     * @param <T> the optimization type
+     * @return the optimization if set, otherwise empty
+     */
+    @NonNull
+    public static <T> Optional<T> get(@NonNull Class<T> optimizationClass) {
         T value = (T) OPTIMIZATIONS.get(optimizationClass);
         if (value != null) {
             LOGGER.debug("Found optimizations {}", optimizationClass);
@@ -51,12 +68,25 @@ public abstract class StaticOptimizations {
         return Optional.ofNullable(value);
     }
 
-    public static <T> void set(T value) {
+    /**
+     * Injects an optimization. Optimizations must be immutable final
+     * data classes: there's a one-to-one mapping between an optimization
+     * class and its associated data.
+     * @param value the optimization to store
+     * @param <T> the type of the optimization
+     */
+    public static <T> void set(@NonNull T value) {
         Class<?> optimizationClass = value.getClass();
         LOGGER.debug("Setting optimizations for {}", optimizationClass);
         OPTIMIZATIONS.put(optimizationClass, value);
     }
 
+    /**
+     * Returns true if the environment should be cached, that is to say
+     * if the environment variables and system properties are deemed
+     * immutable during the whole application run time.
+     * @return true if the environment is cached
+     */
     public static boolean isEnvironmentCached() {
         return cacheEnvironment;
     }

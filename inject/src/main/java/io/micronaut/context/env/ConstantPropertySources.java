@@ -19,6 +19,15 @@ import io.micronaut.core.annotation.Internal;
 
 import java.util.List;
 
+/**
+ * An optimization class which is used to register property sources
+ * statically. This is typically used when converting "dynamic"
+ * property sources like YAML files into "static" property sources
+ * (Java configuration) at build time.
+ * The list of static property sources is injected via this class.
+ *
+ * @since 3.2.0
+ */
 @Internal
 public final class ConstantPropertySources {
     private final List<PropertySource> sources;
@@ -27,7 +36,7 @@ public final class ConstantPropertySources {
         this.sources = sources;
     }
 
-    public List<PropertySource> getSources() {
+    List<PropertySource> getSources() {
         return sources;
     }
 }

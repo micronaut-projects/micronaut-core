@@ -540,6 +540,7 @@ public class Publishers {
      *
      * @param <T> The type
      */
+    @Internal
     public static class JustPublisher<T> implements MicronautPublisher<T> {
         private final T value;
 

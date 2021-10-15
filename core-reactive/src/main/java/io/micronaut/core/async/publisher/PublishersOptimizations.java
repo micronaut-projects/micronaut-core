@@ -15,8 +15,18 @@
  */
 package io.micronaut.core.async.publisher;
 
+import io.micronaut.core.annotation.Internal;
+
 import java.util.List;
 
+/**
+ * Static optimizations for the {@link Publishers class}.
+ * This is used when we can compute the reactive types at
+ * build time instead of runtime.
+ *
+ * @since 3.2.0
+ */
+@Internal
 public final class PublishersOptimizations {
 
     private final List<Class<?>> reactiveTypes;
@@ -29,15 +39,15 @@ public final class PublishersOptimizations {
         this.completableTypes = completableTypes;
     }
 
-    public List<Class<?>> getReactiveTypes() {
+    List<Class<?>> getReactiveTypes() {
         return reactiveTypes;
     }
 
-    public List<Class<?>> getSingleTypes() {
+    List<Class<?>> getSingleTypes() {
         return singleTypes;
     }
 
-    public List<Class<?>> getCompletableTypes() {
+    List<Class<?>> getCompletableTypes() {
         return completableTypes;
     }
 }

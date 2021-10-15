@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.reflect;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.optim.StaticOptimizations;
@@ -353,6 +354,7 @@ public class ClassUtils {
         }
     }
 
+    @Internal
     public static final class Optimizations {
         private final Set<String> missingTypes;
 
