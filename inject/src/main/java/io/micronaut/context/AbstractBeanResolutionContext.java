@@ -15,6 +15,7 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.annotation.InjectScope;
 import io.micronaut.context.exceptions.CircularDependencyException;
 import io.micronaut.context.scope.CustomScope;
@@ -212,7 +213,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         public String toCircularString() {
             Iterator<Segment<?>> i = descendingIterator();
             StringBuilder path = new StringBuilder();
-            String ls = System.getProperty("line.separator");
+            String ls = CachedEnvironment.getProperty("line.separator");
             while (i.hasNext()) {
                 String segmentString = i.next().toString();
                 path.append(segmentString);

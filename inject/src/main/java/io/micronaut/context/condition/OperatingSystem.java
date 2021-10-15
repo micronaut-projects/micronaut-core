@@ -16,6 +16,7 @@
 package io.micronaut.context.condition;
 
 import io.micronaut.context.annotation.Requires.Family;
+import io.micronaut.context.env.CachedEnvironment;
 
 import java.util.Locale;
 
@@ -40,7 +41,7 @@ public final class OperatingSystem {
         if (instance == null) {
             synchronized (OperatingSystem.class) {
                 if (instance == null) {
-                    String osName = System.getProperty("os.name").toLowerCase(Locale.ENGLISH);
+                    String osName = CachedEnvironment.getProperty("os.name").toLowerCase(Locale.ENGLISH);
                     Family osFamily;
                     if (osName.contains("linux")) {
                         osFamily = Family.LINUX;

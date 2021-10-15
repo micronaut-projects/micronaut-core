@@ -19,6 +19,7 @@ import io.jaegertracing.Configuration;
 import io.jaegertracing.spi.MetricsFactory;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.StringUtils;
@@ -61,8 +62,8 @@ public class JaegerConfiguration implements Toggleable  {
      * @param applicationConfiguration The common application configurations
      */
     public JaegerConfiguration(ApplicationConfiguration applicationConfiguration) {
-        if (StringUtils.isEmpty(System.getProperty(JAEGER_SERVICE_NAME))
-                && StringUtils.isEmpty(System.getenv(JAEGER_SERVICE_NAME))) {
+        if (StringUtils.isEmpty(CachedEnvironment.getProperty(JAEGER_SERVICE_NAME))
+                && StringUtils.isEmpty(CachedEnvironment.getenv(JAEGER_SERVICE_NAME))) {
             System.setProperty(JAEGER_SERVICE_NAME, applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME));
         }
         configuration = Configuration.fromEnv();

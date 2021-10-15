@@ -15,6 +15,7 @@
  */
 package io.micronaut.validation.routes;
 
+import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver.RawSegment;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver.Segment;
@@ -141,7 +142,7 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, Object
     }
 
     private static int getVersion() {
-        String version = System.getProperty("java.version");
+        String version = CachedEnvironment.getProperty("java.version");
         if (version.startsWith("1.")) {
             version = version.substring(2, 3);
         } else {

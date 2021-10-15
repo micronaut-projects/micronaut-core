@@ -29,6 +29,7 @@ import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.scan.BeanIntrospectionScanner;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
@@ -60,6 +61,10 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 public class DefaultEnvironment extends PropertySourcePropertyResolver implements Environment {
+
+    private static final List<PropertySource> CONSTANT_PROPERTY_SOURCES = StaticOptimizations.get(ConstantPropertySources.class)
+            .map(ConstantPropertySources::getSources)
+            .orElse(Collections.emptyList());
 
     private static final String EC2_LINUX_HYPERVISOR_FILE = "/sys/hypervisor/uuid";
     private static final String EC2_LINUX_BIOS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/bios_vendor";
@@ -114,8 +119,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         Set<String> environments = new LinkedHashSet<>(3);
         List<String> specifiedNames = new ArrayList<>(configuration.getEnvironments());
 
-        specifiedNames.addAll(0, Stream.of(System.getProperty(ENVIRONMENTS_PROPERTY),
-                System.getenv(ENVIRONMENTS_ENV))
+        specifiedNames.addAll(0, Stream.of(CachedEnvironment.getProperty(ENVIRONMENTS_PROPERTY),
+                CachedEnvironment.getenv(ENVIRONMENTS_ENV))
                 .filter(StringUtils::isNotEmpty)
                 .flatMap(s -> Arrays.stream(s.split(",")))
                 .map(String::trim)
@@ -145,6 +150,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         // Search config locations in reverse order
         Collections.reverse(configLocations);
         this.configLocations = configLocations;
+        CONSTANT_PROPERTY_SOURCES.forEach(p -> propertySources.put(p.getName(), p));
     }
 
     @Override
@@ -340,8 +346,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
             return deduceEnvironments;
         } else {
-            String deduceProperty = System.getProperty(Environment.DEDUCE_ENVIRONMENT_PROPERTY);
-            String deduceEnv = System.getenv(Environment.DEDUCE_ENVIRONMENT_ENV);
+            String deduceProperty = CachedEnvironment.getProperty(Environment.DEDUCE_ENVIRONMENT_PROPERTY);
+            String deduceEnv = CachedEnvironment.getenv(Environment.DEDUCE_ENVIRONMENT_ENV);
 
             if (StringUtils.isNotEmpty(deduceEnv)) {
                 boolean deduce = Boolean.parseBoolean(deduceEnv);
@@ -389,7 +395,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         refreshablePropertySources.clear();
         List<PropertySource> propertySources = readPropertySourceList(name);
         addDefaultPropertySources(propertySources);
-        String propertySourcesSystemProperty = System.getProperty(Environment.PROPERTY_SOURCES_KEY);
+        String propertySourcesSystemProperty = CachedEnvironment.getProperty(Environment.PROPERTY_SOURCES_KEY);
         if (propertySourcesSystemProperty != null) {
             propertySources.addAll(readPropertySourceListFromFiles(propertySourcesSystemProperty));
         }
@@ -415,7 +421,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @return The comma-separated list of files
      */
     protected String readPropertySourceListKeyFromEnvironment() {
-        return System.getenv(StringUtils.convertDotToUnderscore(Environment.PROPERTY_SOURCES_KEY));
+        return CachedEnvironment.getenv(StringUtils.convertDotToUnderscore(Environment.PROPERTY_SOURCES_KEY));
     }
 
     /**
@@ -665,25 +671,25 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         if (deduceEnvironments) {
             if (!environments.contains(ANDROID)) {
                 // deduce k8s
-                if (StringUtils.isNotEmpty(System.getenv(K8S_ENV))) {
+                if (StringUtils.isNotEmpty(CachedEnvironment.getenv(K8S_ENV))) {
                     environments.add(Environment.KUBERNETES);
                     environments.add(Environment.CLOUD);
                 }
                 // deduce CF
-                if (StringUtils.isNotEmpty(System.getenv(PCF_ENV))) {
+                if (StringUtils.isNotEmpty(CachedEnvironment.getenv(PCF_ENV))) {
                     environments.add(Environment.CLOUD_FOUNDRY);
                     environments.add(Environment.CLOUD);
                 }
 
                 // deduce heroku
-                if (StringUtils.isNotEmpty(System.getenv(HEROKU_DYNO))) {
+                if (StringUtils.isNotEmpty(CachedEnvironment.getenv(HEROKU_DYNO))) {
                     environments.add(Environment.HEROKU);
                     environments.add(Environment.CLOUD);
                     deduceComputePlatform = false;
                 }
 
                 // deduce GAE
-                if (StringUtils.isNotEmpty(System.getenv(GOOGLE_APPENGINE_ENVIRONMENT))) {
+                if (StringUtils.isNotEmpty(CachedEnvironment.getenv(GOOGLE_APPENGINE_ENVIRONMENT))) {
                     environments.add(Environment.GAE);
                     environments.add(Environment.GOOGLE_COMPUTE);
                     deduceComputePlatform = false;
@@ -734,7 +740,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
         if (deduceFunctionPlatform) {
             // deduce AWS Lambda
-            if (StringUtils.isNotEmpty(System.getenv(AWS_LAMBDA_FUNCTION_NAME_ENV))) {
+            if (StringUtils.isNotEmpty(CachedEnvironment.getenv(AWS_LAMBDA_FUNCTION_NAME_ENV))) {
                 environments.add(Environment.AMAZON_EC2);
                 environments.add(Environment.CLOUD);
             }
@@ -796,7 +802,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     private static ComputePlatform determineCloudProvider() {
-        String computePlatform = System.getProperty(CLOUD_PLATFORM_PROPERTY);
+        String computePlatform = CachedEnvironment.getProperty(CLOUD_PLATFORM_PROPERTY);
         if (computePlatform != null) {
 
             try {
@@ -806,7 +812,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
 
         }
-        boolean isWindows = System.getProperty("os.name")
+        boolean isWindows = CachedEnvironment.getProperty("os.name")
             .toLowerCase().startsWith("windows");
 
         if (isWindows ? isEC2Windows() : isEC2Linux()) {
@@ -868,7 +874,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             ProcessBuilder builder = new ProcessBuilder();
             builder.command("cmd.exe", "/c", cmd);
             builder.redirectErrorStream(true);
-            builder.directory(new File(System.getProperty("user.home")));
+            builder.directory(new File(CachedEnvironment.getProperty("user.home")));
             Process process = builder.start();
             return Optional.of(process);
         } catch (IOException e) {

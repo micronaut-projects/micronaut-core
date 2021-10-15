@@ -16,8 +16,8 @@
 package io.micronaut.context.env;
 
 import io.micronaut.core.annotation.Nullable;
+
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -67,21 +67,23 @@ public class EnvironmentPropertySource extends MapPropertySource {
     }
 
     static Map getEnv(@Nullable List<String> includes, @Nullable List<String> excludes) {
-        return getEnv(new HashMap<>(System.getenv()), includes, excludes);
+        return getEnv(CachedEnvironment.getenv(), includes, excludes);
     }
 
     static Map getEnv(Map<String, String> env, @Nullable List<String> includes, @Nullable List<String> excludes) {
         if (includes != null || excludes != null) {
-            Iterator<String> it = env.keySet().iterator();
-            while (it.hasNext()) {
-                String envVar = it.next();
+            Map<String, String> result = new HashMap<>();
+            for (Map.Entry<String, String> entry : env.entrySet()) {
+                String envVar = entry.getKey();
                 if (excludes != null && excludes.contains(envVar)) {
-                    it.remove();
+                    continue;
                 }
                 if (includes != null && !includes.contains(envVar)) {
-                    it.remove();
+                    continue;
                 }
+                result.put(envVar, entry.getValue());
             }
+            return result;
         }
         return env;
     }
