@@ -30,7 +30,7 @@ class CacheControlSpec extends Specification {
         applicationContext.close()
     }
 
-    void "test cache control public"() {
+    void "test cache control public - deprecated"() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 ("spec.name"): "FileTypeHandlerSpec",
                 "netty.responses.file.cache-control.public": true
@@ -50,10 +50,50 @@ class CacheControlSpec extends Specification {
         applicationContext.close()
     }
 
-    void "test cache control max-age"() {
+    void "test cache control max-age - deprecated"() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 ("spec.name"): "FileTypeHandlerSpec",
                 "netty.responses.file.cache-seconds": 120
+        ])
+        int serverPort = embeddedServer.getPort()
+        URL server = embeddedServer.getURL()
+        ApplicationContext applicationContext = embeddedServer.applicationContext
+        HttpClient rxClient = applicationContext.createBean(HttpClient, server)
+
+        when:
+        def response = rxClient.toBlocking().exchange('/test/html', String)
+
+        then:
+        response.header(CACHE_CONTROL) == "private, max-age=120"
+
+        cleanup:
+        applicationContext.close()
+    }
+
+    void "test cache control public"() {
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                ("spec.name"): "FileTypeHandlerSpec",
+                "micronaut.server.netty.responses.file.cache-control.public": true
+        ])
+        int serverPort = embeddedServer.getPort()
+        URL server = embeddedServer.getURL()
+        ApplicationContext applicationContext = embeddedServer.applicationContext
+        HttpClient rxClient = applicationContext.createBean(HttpClient, server)
+
+        when:
+        def response = rxClient.toBlocking().exchange('/test/html', String)
+
+        then:
+        response.header(CACHE_CONTROL) == "public, max-age=60"
+
+        cleanup:
+        applicationContext.close()
+    }
+
+    void "test cache control max-age"() {
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                ("spec.name"): "FileTypeHandlerSpec",
+                "micronaut.server.netty.responses.file.cache-seconds": 120
         ])
         int serverPort = embeddedServer.getPort()
         URL server = embeddedServer.getURL()

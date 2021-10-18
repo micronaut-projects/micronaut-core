@@ -1549,7 +1549,12 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         return resolveBean(resolutionContext, context, argument, qualifier, false);
     }
 
-    private Object resolveBean(BeanResolutionContext resolutionContext, BeanContext context, Argument argument, @Nullable Qualifier qualifier, boolean resolveIsInnerConfiguration) {
+    private Object resolveBean(
+            BeanResolutionContext resolutionContext,
+            BeanContext context,
+            Argument argument,
+            @Nullable Qualifier qualifier,
+            boolean resolveIsInnerConfiguration) {
         qualifier = qualifier == null ? resolveQualifier(resolutionContext, argument, resolveIsInnerConfiguration) : qualifier;
         if (Qualifier.class.isAssignableFrom(argument.getType())) {
             return qualifier;

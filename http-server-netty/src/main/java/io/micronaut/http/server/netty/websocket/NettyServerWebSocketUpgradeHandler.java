@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.netty.websocket;
 
-import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.StringUtils;
@@ -34,6 +33,7 @@ import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
+import io.micronaut.http.server.netty.NettyEmbeddedServices;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.web.router.Router;
@@ -94,36 +94,26 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     private final WebSocketBeanRegistry webSocketBeanRegistry;
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final WebSocketSessionRepository webSocketSessionRepository;
-    private final ApplicationEventPublisher eventPublisher;
     private final RouteExecutor routeExecutor;
+    private final NettyEmbeddedServices nettyEmbeddedServices;
     private WebSocketServerHandshaker handshaker;
 
     /**
      * Default constructor.
      *
-     * @param webSocketSessionRepository The websocket sessions repository
-     * @param router                     The router
-     * @param binderRegistry             the request binder registry
-     * @param webSocketBeanRegistry      The web socket bean register
-     * @param mediaTypeCodecRegistry     The codec registry
-     * @param eventPublisher             The event publisher
-     * @param routeExecutor              The route executor
+     * @param embeddedServices The embedded server services
+     * @param webSocketSessionRepository The websocket session repository
      */
     public NettyServerWebSocketUpgradeHandler(
-            WebSocketSessionRepository webSocketSessionRepository,
-            Router router,
-            RequestBinderRegistry binderRegistry,
-            WebSocketBeanRegistry webSocketBeanRegistry,
-            MediaTypeCodecRegistry mediaTypeCodecRegistry,
-            ApplicationEventPublisher eventPublisher,
-            RouteExecutor routeExecutor) {
-        this.router = router;
-        this.binderRegistry = binderRegistry;
-        this.webSocketBeanRegistry = webSocketBeanRegistry;
-        this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
+            NettyEmbeddedServices embeddedServices,
+            WebSocketSessionRepository webSocketSessionRepository) {
+        this.router = embeddedServices.getRouter();
+        this.binderRegistry = embeddedServices.getRequestArgumentSatisfier().getBinderRegistry();
+        this.webSocketBeanRegistry = embeddedServices.getWebSocketBeanRegistry();
+        this.mediaTypeCodecRegistry = embeddedServices.getMediaTypeCodecRegistry();
         this.webSocketSessionRepository = webSocketSessionRepository;
-        this.eventPublisher = eventPublisher;
-        this.routeExecutor = routeExecutor;
+        this.routeExecutor = embeddedServices.getRouteExecutor();
+        this.nettyEmbeddedServices = embeddedServices;
     }
 
     @Override
@@ -187,14 +177,12 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
                                 pipeline.remove(accessLoggerHandler);
                             }
                             NettyServerWebSocketHandler webSocketHandler = new NettyServerWebSocketHandler(
+                                    nettyEmbeddedServices,
                                     webSocketSessionRepository,
                                     handshaker,
+                                    webSocketBean,
                                     msg,
                                     routeMatch,
-                                    webSocketBean,
-                                    binderRegistry,
-                                    mediaTypeCodecRegistry,
-                                    eventPublisher,
                                     ctx
                             );
                             pipeline.addAfter("wsdecoder", NettyServerWebSocketHandler.ID, webSocketHandler);

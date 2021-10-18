@@ -15,9 +15,6 @@
  */
 package io.micronaut.http.client.netty;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
@@ -25,7 +22,6 @@ import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -51,7 +47,6 @@ import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.client.sse.SseClientRegistry;
-import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.filter.HttpClientFilter;
@@ -63,11 +58,9 @@ import io.micronaut.http.netty.channel.EventLoopGroupFactory;
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.qualifiers.Qualifiers;
-import io.micronaut.jackson.ObjectMapperFactory;
-import io.micronaut.jackson.annotation.JacksonFeatures;
-import io.micronaut.jackson.codec.JacksonMediaTypeCodec;
-import io.micronaut.jackson.codec.JsonMediaTypeCodec;
-import io.micronaut.runtime.ApplicationConfiguration;
+import io.micronaut.json.JsonMapper;
+import io.micronaut.json.JsonFeatures;
+import io.micronaut.json.codec.MapperMediaTypeCodec;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.websocket.WebSocketClient;
 import io.micronaut.websocket.WebSocketClientRegistry;
@@ -352,52 +345,19 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                     beanContext,
                     annotationMetadata
             );
-            final AnnotationValue<JacksonFeatures> jacksonFeaturesAnn = clientKey.jacksonFeaturesAnn;
-            if (jacksonFeaturesAnn != null) {
-                io.micronaut.jackson.codec.JacksonFeatures jacksonFeatures = new io.micronaut.jackson.codec.JacksonFeatures();
-
-
-                SerializationFeature[] enabledSerializationFeatures = jacksonFeaturesAnn.get("enabledSerializationFeatures", SerializationFeature[].class).orElse(null);
-                if (enabledSerializationFeatures != null) {
-                    for (SerializationFeature serializationFeature : enabledSerializationFeatures) {
-                        jacksonFeatures.addFeature(serializationFeature, true);
-                    }
-                }
-
-                DeserializationFeature[] enabledDeserializationFeatures = jacksonFeaturesAnn.get("enabledDeserializationFeatures", DeserializationFeature[].class).orElse(null);
-
-                if (enabledDeserializationFeatures != null) {
-                    for (DeserializationFeature deserializationFeature : enabledDeserializationFeatures) {
-                        jacksonFeatures.addFeature(deserializationFeature, true);
-                    }
-                }
-
-                SerializationFeature[] disabledSerializationFeatures = jacksonFeaturesAnn.get("disabledSerializationFeatures", SerializationFeature[].class).orElse(null);
-                if (disabledSerializationFeatures != null) {
-                    for (SerializationFeature serializationFeature : disabledSerializationFeatures) {
-                        jacksonFeatures.addFeature(serializationFeature, false);
-                    }
-                }
-
-                DeserializationFeature[] disabledDeserializationFeatures = jacksonFeaturesAnn.get("disabledDeserializationFeatures", DeserializationFeature[].class).orElse(null);
-
-                if (disabledDeserializationFeatures != null) {
-                    for (DeserializationFeature feature : disabledDeserializationFeatures) {
-                        jacksonFeatures.addFeature(feature, false);
-                    }
-                }
-
+            final JsonFeatures jsonFeatures = clientKey.jsonFeatures;
+            if (jsonFeatures != null) {
                 List<MediaTypeCodec> codecs = new ArrayList<>(2);
                 MediaTypeCodecRegistry codecRegistry = client.getMediaTypeCodecRegistry();
                 for (MediaTypeCodec codec : codecRegistry.getCodecs()) {
-                    if (codec instanceof JacksonMediaTypeCodec) {
-                        codecs.add(((JacksonMediaTypeCodec) codec).cloneWithFeatures(jacksonFeatures));
+                    if (codec instanceof MapperMediaTypeCodec) {
+                        codecs.add(((MapperMediaTypeCodec) codec).cloneWithFeatures(jsonFeatures));
                     } else {
                         codecs.add(codec);
                     }
                 }
                 if (!codecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE).isPresent()) {
-                    codecs.add(createNewJsonCodec(this.beanContext, jacksonFeatures));
+                    codecs.add(createNewJsonCodec(this.beanContext, jsonFeatures));
                 }
                 client.setMediaTypeCodecRegistry(MediaTypeCodecRegistry.of(codecs));
             }
@@ -510,20 +470,17 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 .getAnnotationNamesByStereotype(FilterMatcher.class);
         final Class configurationClass =
                 metadata.classValue(Client.class, "configuration").orElse(null);
-        AnnotationValue<JacksonFeatures> jacksonFeaturesAnn = metadata.findAnnotation(JacksonFeatures.class).orElse(null);
+        JsonFeatures jsonFeatures = beanContext.getBean(JsonMapper.class).detectFeatures(metadata).orElse(null);
 
-        return new ClientKey(httpVersion, clientId, filterAnnotation, path, configurationClass, jacksonFeaturesAnn);
+        return new ClientKey(httpVersion, clientId, filterAnnotation, path, configurationClass, jsonFeatures);
     }
 
-    private static MediaTypeCodec createNewJsonCodec(BeanContext beanContext, io.micronaut.jackson.codec.JacksonFeatures jacksonFeatures) {
-        ObjectMapper objectMapper = new ObjectMapperFactory().objectMapper(null, null);
+    private static MediaTypeCodec createNewJsonCodec(BeanContext beanContext, JsonFeatures jsonFeatures) {
+        return getJsonCodec(beanContext).cloneWithFeatures(jsonFeatures);
+    }
 
-        jacksonFeatures.getDeserializationFeatures().forEach(objectMapper::configure);
-        jacksonFeatures.getSerializationFeatures().forEach(objectMapper::configure);
-
-        return new JsonMediaTypeCodec(objectMapper,
-                beanContext.getBean(ApplicationConfiguration.class),
-                beanContext.findBean(CodecConfiguration.class, Qualifiers.byName(JsonMediaTypeCodec.CONFIGURATION_QUALIFIER)).orElse(null));
+    private static MapperMediaTypeCodec getJsonCodec(BeanContext beanContext) {
+        return beanContext.getBean(MapperMediaTypeCodec.class, Qualifiers.byName(MapperMediaTypeCodec.REGULAR_JSON_MEDIA_TYPE_CODEC_NAME));
     }
 
     /**
@@ -536,7 +493,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         final List<String> filterAnnotations;
         final String path;
         final Class<?> configurationClass;
-        final AnnotationValue<JacksonFeatures> jacksonFeaturesAnn;
+        final JsonFeatures jsonFeatures;
 
         ClientKey(
                 HttpVersion httpVersion,
@@ -544,13 +501,13 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 List<String> filterAnnotations,
                 String path,
                 Class<?> configurationClass,
-                AnnotationValue<JacksonFeatures> jacksonFeaturesAnn) {
+                JsonFeatures jsonFeatures) {
             this.httpVersion = httpVersion;
             this.clientId = clientId;
             this.filterAnnotations = filterAnnotations;
             this.path = path;
             this.configurationClass = configurationClass;
-            this.jacksonFeaturesAnn = jacksonFeaturesAnn;
+            this.jsonFeatures = jsonFeatures;
         }
 
         @Override
@@ -567,12 +524,12 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                     Objects.equals(filterAnnotations, clientKey.filterAnnotations) &&
                     Objects.equals(path, clientKey.path) &&
                     Objects.equals(configurationClass, clientKey.configurationClass) &&
-                    Objects.equals(jacksonFeaturesAnn, clientKey.jacksonFeaturesAnn);
+                    Objects.equals(jsonFeatures, clientKey.jsonFeatures);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(httpVersion, clientId, filterAnnotations, path, configurationClass, jacksonFeaturesAnn);
+            return Objects.hash(httpVersion, clientId, filterAnnotations, path, configurationClass, jsonFeatures);
         }
     }
 }

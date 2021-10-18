@@ -49,5 +49,5 @@ public interface HttpClientFactory {
      * @since 2.2.0
      */
     @NonNull
-    HttpClient createClient(@Nullable URL url, HttpClientConfiguration configuration);
+    HttpClient createClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration);
 }

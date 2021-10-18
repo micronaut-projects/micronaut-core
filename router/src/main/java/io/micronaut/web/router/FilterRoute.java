@@ -16,6 +16,7 @@
 package io.micronaut.web.router;
 
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.filter.HttpFilterResolver;
 
@@ -60,4 +61,12 @@ public interface FilterRoute extends HttpFilterResolver.FilterEntry<HttpFilter> 
      * @return This route
      */
     FilterRoute methods(HttpMethod... methods);
+
+    /**
+     * Sets the pattern style that this filter route matches.
+     *
+     * @param patternStyle The pattern style
+     * @return This route
+     */
+    FilterRoute patternStyle(FilterPatternStyle patternStyle);
 }

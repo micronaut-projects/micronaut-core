@@ -31,7 +31,7 @@ import java.lang.annotation.Target;
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Inherited
-@Target(value = { ElementType.PARAMETER })
+@Target(value = { ElementType.PARAMETER, ElementType.ANNOTATION_TYPE })
 public @interface SpanTag {
 
     /**

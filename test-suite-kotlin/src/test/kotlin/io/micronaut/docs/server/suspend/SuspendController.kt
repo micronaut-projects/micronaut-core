@@ -17,6 +17,7 @@ package io.micronaut.docs.server.suspend
 
 import io.micronaut.http.*
 import io.micronaut.http.annotation.*
+import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.scheduling.TaskExecutors
 import kotlinx.coroutines.*
 import java.util.concurrent.ExecutorService
@@ -139,5 +140,22 @@ class SuspendController(
     @Get("/requestContext")
     suspend fun requestContext(): String {
         return suspendService.requestContext()
+    }
+
+    @Get("/requestContext2")
+    suspend fun requestContext2(): String = supervisorScope {
+        require(ServerRequestContext.currentRequest<Any>().isPresent) {
+            "Initial request is not set"
+        }
+        val result = withContext(coroutineContext) {
+            require(ServerRequestContext.currentRequest<Any>().isPresent) {
+                "Request is not available in `withContext`"
+            }
+            "test"
+        }
+        require(ServerRequestContext.currentRequest<Any>().isPresent) {
+            "Request is lost after `withContext`"
+        }
+        result
     }
 }

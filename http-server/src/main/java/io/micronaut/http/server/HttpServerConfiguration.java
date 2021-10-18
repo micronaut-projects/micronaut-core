@@ -155,7 +155,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
             this.defaultCharset = applicationConfiguration.getDefaultCharset();
         }
 
-        this.applicationConfiguration = applicationConfiguration;
+        this.applicationConfiguration = applicationConfiguration != null ? applicationConfiguration : new ApplicationConfiguration();
     }
 
     /**

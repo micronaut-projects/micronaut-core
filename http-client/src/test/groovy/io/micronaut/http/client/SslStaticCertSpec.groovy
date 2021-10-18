@@ -36,13 +36,11 @@ class SslStaticCertSpec extends Specification {
     @Shared
     String host = Optional.ofNullable(System.getenv(Environment.HOSTNAME)).orElse(SocketUtils.LOCALHOST)
 
-    int port
     ApplicationContext context
     EmbeddedServer embeddedServer
     HttpClient client
 
     void setup() {
-        port = SocketUtils.findAvailableTcpPort()
         context = ApplicationContext.run([
                 'spec.name': 'SslStaticCertSpec',
                 'micronaut.ssl.enabled': true,
@@ -50,7 +48,7 @@ class SslStaticCertSpec extends Specification {
                 'micronaut.ssl.keyStore.password': 'foobar',
                 'micronaut.ssl.keyStore.type': 'PKCS12',
                 'micronaut.ssl.protocols': ['TLSv1.2'],
-                'micronaut.ssl.port': port,
+                'micronaut.ssl.port': -1,
                 'micronaut.ssl.ciphers': ['TLS_RSA_WITH_AES_128_CBC_SHA',
                                           'TLS_RSA_WITH_AES_256_CBC_SHA',
                                           'TLS_RSA_WITH_AES_128_GCM_SHA256',
@@ -71,7 +69,7 @@ class SslStaticCertSpec extends Specification {
 
     void "expect the url to be https"() {
         expect:
-        embeddedServer.getURL().toString() == "https://${host}:${port}"
+        embeddedServer.getURL().toString() == "https://${host}:${embeddedServer.port}"
     }
 
     void "test send https request"() {

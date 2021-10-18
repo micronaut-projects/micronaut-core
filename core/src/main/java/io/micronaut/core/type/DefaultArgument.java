@@ -18,6 +18,7 @@ package io.micronaut.core.type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 
@@ -228,7 +229,7 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     }
 
     @Override
-    public boolean equalsType(Argument<?> o) {
+    public boolean equalsType(@Nullable Argument<?> o) {
         if (this == o) {
             return true;
         }

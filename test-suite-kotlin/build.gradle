@@ -16,6 +16,8 @@ dependencies {
     testImplementation project(":context")
     testImplementation libs.kotlin.test
     testImplementation libs.kotlinx.coroutines.rx2
+    testImplementation libs.kotlinx.coroutines.slf4j
+    testImplementation libs.kotlinx.coroutines.reactor
 
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation libs.junit.jupiter.api

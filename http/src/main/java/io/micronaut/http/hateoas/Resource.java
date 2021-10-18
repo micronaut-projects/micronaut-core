@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.hateoas;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.value.OptionalMultiValues;
 
 /**
@@ -38,6 +39,7 @@ public interface Resource {
     /**
      * @return The links for this resource
      */
+    @JsonProperty(LINKS)
     default OptionalMultiValues<? extends Link> getLinks() {
         return OptionalMultiValues.empty();
     }
@@ -45,6 +47,7 @@ public interface Resource {
     /**
      * @return The embedded resources
      */
+    @JsonProperty(EMBEDDED)
     default OptionalMultiValues<? extends Resource> getEmbedded() {
         return OptionalMultiValues.empty();
     }

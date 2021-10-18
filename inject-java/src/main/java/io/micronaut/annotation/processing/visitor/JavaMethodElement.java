@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
@@ -34,6 +35,7 @@ import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.WildcardType;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * A method element returning data from a {@link ExecutableElement}.
@@ -71,8 +73,50 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     }
 
     @Override
+    public Optional<ClassElement> getReceiverType() {
+        final TypeMirror receiverType = executableElement.getReceiverType();
+        if (receiverType != null) {
+            if (receiverType.getKind() != TypeKind.NONE) {
+                final ClassElement classElement = mirrorToClassElement(receiverType,
+                                                                       visitorContext,
+                                                                       declaringClass.getGenericTypeInfo());
+                return Optional.of(classElement);
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    @NonNull
+    public ClassElement[] getThrownTypes() {
+        final List<? extends TypeMirror> thrownTypes = executableElement.getThrownTypes();
+        if (!thrownTypes.isEmpty()) {
+            return thrownTypes.stream()
+                    .map(tm -> mirrorToClassElement(
+                            tm,
+                            visitorContext,
+                            declaringClass.getGenericTypeInfo()
+                    )).toArray(ClassElement[]::new);
+        }
+
+        return ClassElement.ZERO_CLASS_ELEMENTS;
+    }
+
+    @Override
     public boolean isDefault() {
         return executableElement.isDefault();
+    }
+
+    @Override
+    public boolean overrides(MethodElement methodElement) {
+        if (methodElement instanceof JavaMethodElement) {
+            return visitorContext.getElements().overrides(
+                    executableElement,
+                    ((JavaMethodElement) methodElement).executableElement,
+                    declaringClass.classElement
+            );
+        }
+        return false;
     }
 
     @NonNull
@@ -91,6 +135,13 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
             this.returnType = returnType(Collections.emptyMap());
         }
         return this.returnType;
+    }
+
+    @Override
+    public List<? extends GenericPlaceholderElement> getDeclaredTypeVariables() {
+        return executableElement.getTypeParameters().stream()
+                .map(tpe -> (GenericPlaceholderElement) mirrorToClassElement(tpe.asType(), visitorContext))
+                .collect(Collectors.toList());
     }
 
     @Override
