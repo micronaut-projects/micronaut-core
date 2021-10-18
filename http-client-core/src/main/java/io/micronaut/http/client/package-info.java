@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 /**
- * Reactive transformers.
- *
- * @author Graeme Rocher
- * @since 1.0
+ * Core HTTP Client Library.
  */
-package io.micronaut.http.client.reactor;
+@Configuration
+@Requires(beans = HttpClientRegistry.class)
+package io.micronaut.http.client;
+
+import io.micronaut.context.annotation.Configuration;
+import io.micronaut.context.annotation.Requires;
