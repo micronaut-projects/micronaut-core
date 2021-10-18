@@ -78,7 +78,7 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
         }
         try {
             NettyHttpRequest<Object> request = new NettyHttpRequest<>(msg, ctx, conversionService, configuration);
-            if (msg instanceof HttpContent) {
+            if (msg instanceof HttpContent && ((HttpContent) msg).content().readableBytes() > 0) {
                 request.addContent(((HttpContent) msg).retain());
             }
             if (httpRequestReceivedEventPublisher != ApplicationEventPublisher.NO_OP) {
