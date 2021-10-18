@@ -113,7 +113,7 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, Object
         rules.add(new MissingParameterRule());
         rules.add(new NullableParameterRule());
         rules.add(new RequestBeanParameterRule());
-        rules.add(new ClientReturnTypeRule());
+        rules.add(new ClientTypesRule());
     }
 
     /**
