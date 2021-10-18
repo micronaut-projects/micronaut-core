@@ -23,7 +23,6 @@ import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpParameters;
@@ -53,9 +52,9 @@ import org.reactivestreams.Publisher;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -74,7 +73,7 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
     private final MutableConvertibleValues<Object> attributes = new MutableConvertibleValuesMap<>();
     private final HttpMethod httpMethod;
     private final String httpMethodName;
-    private final List<String> cookies = new ArrayList<>(1);
+    private final Map<String, String> cookies = new LinkedHashMap<>(1);
     private URI uri;
     private Object body;
     private NettyHttpParameters httpParameters;
@@ -126,10 +125,10 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
         if (cookie instanceof NettyCookie) {
             NettyCookie nettyCookie = (NettyCookie) cookie;
             String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
-            cookies.add(value);
+            cookies.put(cookie.getName(), value);
             String headerValue;
             if (cookies.size() > 1) {
-                headerValue = String.join(";", cookies);
+                headerValue = String.join(";", cookies.values());
             } else {
                 headerValue = value;
             }
@@ -147,12 +146,12 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
                 if (cookie instanceof NettyCookie) {
                     NettyCookie nettyCookie = (NettyCookie) cookie;
                     String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
-                    this.cookies.add(value);
+                    this.cookies.put(cookie.getName(), value);
                 } else {
                     throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
                 }
             }
-            headers.set(HttpHeaderNames.COOKIE, String.join(";", this.cookies));
+            headers.set(HttpHeaderNames.COOKIE, String.join(";", this.cookies.values()));
         } else if (!cookies.isEmpty()) {
             cookie(cookies.iterator().next());
         }
