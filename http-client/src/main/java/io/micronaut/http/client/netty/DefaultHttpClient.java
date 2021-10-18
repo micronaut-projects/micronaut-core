@@ -1343,7 +1343,7 @@ public class DefaultHttpClient implements
             // if the request URI includes a scheme then it is fully qualified so use the direct server
             return Flux.just(requestURI);
         } else {
-            if (parentRequest == null) {
+            if (parentRequest == null || parentRequest.getUri().getHost() == null) {
                 return resolveURI(request, false);
             } else {
                 URI parentURI = parentRequest.getUri();
@@ -2125,13 +2125,11 @@ public class DefaultHttpClient implements
                                 @Override
                                 public void onNext(io.micronaut.http.HttpResponse<Object> objectHttpResponse) {
                                     emitter.next(objectHttpResponse);
-                                    sub.cancel();
                                 }
 
                                 @Override
                                 public void onError(Throwable t) {
                                     emitter.error(t);
-                                    sub.cancel();
                                 }
 
                                 @Override
