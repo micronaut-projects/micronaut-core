@@ -904,7 +904,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     final HttpServerCodec sourceCodec = http2OrHttpHandler.createServerCodec();
                     final HttpServerUpgradeHandler upgradeHandler = new HttpServerUpgradeHandler(
                             sourceCodec,
-                            upgradeCodecFactory
+                            upgradeCodecFactory,
+                            serverConfiguration.getMaxH2cUpgradeRequestSize()
                     );
                     final CleartextHttp2ServerUpgradeHandler cleartextHttp2ServerUpgradeHandler =
                             new CleartextHttp2ServerUpgradeHandler(sourceCodec, upgradeHandler, connectionHandler);
