@@ -792,16 +792,20 @@ public final class RouteExecutor {
     private MutableHttpResponse<?> processPublisherBody(HttpRequest<?> request,
                                                         MutableHttpResponse<?> response,
                                                         RouteInfo<?> routeInfo) {
-        MediaType mediaType = response.getContentType().orElseGet(() -> resolveDefaultResponseContentType(request, routeInfo));
+        if (response.body() == null) {
+            return response;
+        } else {
+            MediaType mediaType = response.getContentType().orElseGet(() -> resolveDefaultResponseContentType(request, routeInfo));
 
-        Flux<Object> bodyPublisher = applyExecutorToPublisher(
-                Publishers.convertPublisher(response.body(), Publisher.class),
-                findExecutor(routeInfo));
+            Flux<Object> bodyPublisher = applyExecutorToPublisher(
+                    Publishers.convertPublisher(response.body(), Publisher.class),
+                    findExecutor(routeInfo));
 
-        return response
-                .header(HttpHeaders.TRANSFER_ENCODING, "chunked")
-                .header(HttpHeaders.CONTENT_TYPE, mediaType)
-                .body(bodyPublisher);
+            return response
+                    .header(HttpHeaders.TRANSFER_ENCODING, "chunked")
+                    .header(HttpHeaders.CONTENT_TYPE, mediaType)
+                    .body(bodyPublisher);
+        }
     }
 
     private void applyConfiguredHeaders(MutableHttpHeaders headers) {

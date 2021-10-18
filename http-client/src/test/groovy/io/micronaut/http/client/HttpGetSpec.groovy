@@ -35,6 +35,7 @@ import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import spock.lang.AutoCleanup
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -57,6 +58,7 @@ class HttpGetSpec extends Specification {
 
     @Inject
     @Client("/")
+    @AutoCleanup
     HttpClient client
 
     @Inject
@@ -387,9 +389,6 @@ class HttpGetSpec extends Specification {
         client.retrieve("/startslash/") == "startslash"
         client.retrieve("/endslash") == "endslash"
         client.retrieve("/endslash/") == "endslash"
-
-        cleanup:
-        client.close()
     }
 
     void "test a request with a custom host header"() {
@@ -400,9 +399,6 @@ class HttpGetSpec extends Specification {
 
         then:
         body == "http://foo.com"
-
-        cleanup:
-        client.close()
     }
 
     void "test empty list returns ok"() {
@@ -413,9 +409,6 @@ class HttpGetSpec extends Specification {
         noExceptionThrown()
         response.status == HttpStatus.OK
         response.body().isEmpty()
-
-        cleanup:
-        client.close()
     }
 
     void "test single empty list returns ok"() {
@@ -426,9 +419,6 @@ class HttpGetSpec extends Specification {
         noExceptionThrown()
         response.status == HttpStatus.OK
         response.body().isEmpty()
-
-        cleanup:
-        client.close()
     }
 
     void "test setting query params on the request"() {
@@ -440,9 +430,6 @@ class HttpGetSpec extends Specification {
         then:
         noExceptionThrown()
         body == 'x-y'
-
-        cleanup:
-        client.close()
     }
 
     void "test overriding the URL"() {
@@ -610,7 +597,6 @@ class HttpGetSpec extends Specification {
         ex.message == "Failed to decode the body for the given content type [does/notexist]"
     }
 
-    @Requires(property = 'spec.name', value = 'HttpGetSpec')
     void "test deserializing map wrapped by Reactive type"() {
         when:
         def response = Mono.from(myGetClient.reactiveMap()).block()
@@ -619,6 +605,17 @@ class HttpGetSpec extends Specification {
         then:
         book1 instanceof Book
         book1.title == "title1"
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/6358")
+    void "test a controller returning null for Response<Publisher<?>>"() {
+        when:
+        HttpResponse response = client.toBlocking().exchange(HttpRequest.GET("/get/nullPublisher"))
+
+        then:
+        noExceptionThrown()
+        response.status == HttpStatus.OK
+        response.body() == null
     }
 
     @Requires(property = 'spec.name', value = 'HttpGetSpec')
@@ -751,6 +748,11 @@ class HttpGetSpec extends Specification {
         @Get(value = "/nestedPublishers")
         Publisher<HttpResponse<Publisher<String>>> nestedPublishers() {
             return Publishers.just(HttpResponse.ok(Publishers.just("abc")))
+        }
+
+        @Get(value = "/nullPublisher")
+        HttpResponse<Publisher<String>> nullPublisher() {
+            return HttpResponse.ok()
         }
     }
 
