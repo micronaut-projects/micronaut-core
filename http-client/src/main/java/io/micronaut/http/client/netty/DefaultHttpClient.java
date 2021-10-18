@@ -83,6 +83,7 @@ import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.netty.stream.DefaultHttp2Content;
+import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
 import io.micronaut.http.netty.stream.Http2Content;
 import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
 import io.micronaut.http.netty.stream.JsonSubscriber;
@@ -2028,7 +2029,6 @@ public class DefaultHttpClient implements
         ChannelPipeline pipeline = channel.pipeline();
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL, new SimpleChannelInboundHandlerInstrumented<FullHttpResponse>() {
             final AtomicBoolean received = new AtomicBoolean(false);
-            final AtomicBoolean emitted = new AtomicBoolean(false);
 
             @Override
             public boolean acceptInboundMessage(Object msg) {
@@ -2053,10 +2053,28 @@ public class DefaultHttpClient implements
             @Override
             protected void channelReadInstrumented(ChannelHandlerContext ctx, FullHttpResponse msg) {
                 if (received.compareAndSet(false, true)) {
-                    NettyMutableHttpResponse<Object> response = new NettyMutableHttpResponse<>(
-                            msg,
-                            ConversionService.SHARED
+                    HttpResponseStatus status = msg.status();
+                    int statusCode = status.code();
+                    HttpStatus httpStatus;
+                    try {
+                        httpStatus = HttpStatus.valueOf(statusCode);
+                    } catch (IllegalArgumentException e) {
+                        emitter.error(e);
+                        return;
+                    }
+                    Publisher<HttpContent> bodyPublisher;
+                    if (msg.content() instanceof EmptyByteBuf) {
+                        bodyPublisher = Publishers.empty();
+                    } else {
+                        bodyPublisher = Publishers.just(new DefaultLastHttpContent(msg.content()));
+                    }
+                    DefaultStreamedHttpResponse nettyResponse = new DefaultStreamedHttpResponse(
+                            msg.protocolVersion(),
+                            msg.status(),
+                            msg.headers(),
+                            bodyPublisher
                     );
+                    NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(nettyResponse, httpStatus);
                     HttpHeaders headers = msg.headers();
                     if (log.isTraceEnabled()) {
                         log.trace("HTTP Client Streaming Response Received ({}) for Request: {} {}", msg.status(), nettyRequest.method().name(), nettyRequest.uri());

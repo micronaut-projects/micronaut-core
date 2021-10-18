@@ -618,6 +618,16 @@ class HttpGetSpec extends Specification {
         response.body() == null
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/4735")
+    void "test a declarative client that returns a publisher and no content response"() {
+        when:
+        def publisher = myGetClient.noContentPublisher()
+
+        then:
+        publisher != null
+        Mono.from(publisher).block() == null
+    }
+
     @Requires(property = 'spec.name', value = 'HttpGetSpec')
     @Controller("/get")
     static class GetController {
@@ -753,6 +763,11 @@ class HttpGetSpec extends Specification {
         @Get(value = "/nullPublisher")
         HttpResponse<Publisher<String>> nullPublisher() {
             return HttpResponse.ok()
+        }
+
+        @Get("/noContentPublisher")
+        HttpResponse noContent() {
+            return HttpResponse.noContent()
         }
     }
 
@@ -935,6 +950,9 @@ class HttpGetSpec extends Specification {
         @Get("/reactiveMap")
         @SingleResult
         Publisher<Map<String, Book>> reactiveMap()
+
+        @Get(value = "/noContentPublisher")
+        Publisher<String> noContentPublisher()
     }
 
     @Requires(property = 'spec.name', value = 'HttpGetSpec')
