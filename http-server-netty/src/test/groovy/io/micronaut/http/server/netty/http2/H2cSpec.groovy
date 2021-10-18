@@ -21,6 +21,7 @@ import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.codec.http.DefaultFullHttpRequest
+import io.netty.handler.codec.http.FullHttpResponse
 import io.netty.handler.codec.http.HttpClientCodec
 import io.netty.handler.codec.http.HttpClientUpgradeHandler
 import io.netty.handler.codec.http.HttpMessage
@@ -32,6 +33,7 @@ import io.netty.handler.codec.http2.Http2ClientUpgradeCodec
 import io.netty.handler.codec.http2.HttpConversionUtil
 import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder
 import io.netty.handler.codec.http2.InboundHttp2ToHttpAdapterBuilder
+import io.netty.util.ReferenceCountUtil
 import jakarta.inject.Inject
 import org.jetbrains.annotations.NotNull
 import org.reactivestreams.Publisher
@@ -63,8 +65,7 @@ class H2cSpec extends Specification {
     @Inject
     StreamingHttpClient streamingHttpClient
 
-    void 'test using direct netty http2 client'() {
-        given:
+    private CompletableFuture requestUpgrade(DefaultFullHttpRequest initialRequest) {
         def responseFuture = new CompletableFuture()
         def bootstrap = new Bootstrap()
                 .remoteAddress(embeddedServer.host, embeddedServer.port)
@@ -74,51 +75,57 @@ class H2cSpec extends Specification {
                     @Override
                     protected void initChannel(@NotNull SocketChannel ch) throws Exception {
                         def http2Connection = new DefaultHttp2Connection(false)
-                    def inboundAdapter = new InboundHttp2ToHttpAdapterBuilder(http2Connection)
-                            .maxContentLength(1000000)
-                            .validateHttpHeaders(true)
-                            .propagateSettings(true)
-                            .build()
-                    def connectionHandler = new HttpToHttp2ConnectionHandlerBuilder()
-                            .connection(http2Connection)
-                            .frameListener(new DelegatingDecompressorFrameListener(http2Connection, inboundAdapter))
-                            .build()
-                    def clientCodec = new HttpClientCodec()
-                    def upgradeCodec = new Http2ClientUpgradeCodec(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, connectionHandler)
-                    def upgradeHandler = new HttpClientUpgradeHandler(clientCodec, upgradeCodec, 1000000)
+                        def inboundAdapter = new InboundHttp2ToHttpAdapterBuilder(http2Connection)
+                                .maxContentLength(1000000)
+                                .validateHttpHeaders(true)
+                                .propagateSettings(true)
+                                .build()
+                        def connectionHandler = new HttpToHttp2ConnectionHandlerBuilder()
+                                .connection(http2Connection)
+                                .frameListener(new DelegatingDecompressorFrameListener(http2Connection, inboundAdapter))
+                                .build()
+                        def clientCodec = new HttpClientCodec()
+                        def upgradeCodec = new Http2ClientUpgradeCodec(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, connectionHandler)
+                        def upgradeHandler = new HttpClientUpgradeHandler(clientCodec, upgradeCodec, 1000000)
 
-                    ch.pipeline()
-                            .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, clientCodec)
-                            .addLast(upgradeHandler)
-                            .addLast(new ChannelInboundHandlerAdapter() {
-                                @Override
-                                void channelRead(@NotNull ChannelHandlerContext ctx, @NotNull Object msg) throws Exception {
-                                    ctx.read()
-                                    if (msg instanceof HttpMessage) {
-                                        if (msg.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), -1) != 1) {
-                                            responseFuture.completeExceptionally(new AssertionError("Response must be on stream 1"));
+                        ch.pipeline()
+                                .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, clientCodec)
+                                .addLast(upgradeHandler)
+                                .addLast(new ChannelInboundHandlerAdapter() {
+                                    @Override
+                                    void channelRead(@NotNull ChannelHandlerContext ctx, @NotNull Object msg) throws Exception {
+                                        ctx.read()
+                                        if (msg instanceof HttpMessage) {
+                                            if (msg.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), -1) != 1) {
+                                                responseFuture.completeExceptionally(new AssertionError("Response must be on stream 1"));
+                                            }
+                                            responseFuture.complete(ReferenceCountUtil.retain(msg))
                                         }
-                                        responseFuture.complete(msg)
+                                        super.channelRead(ctx, msg)
                                     }
-                                    super.channelRead(ctx, msg)
-                                }
 
-                                @Override
-                                void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-                                    super.exceptionCaught(ctx, cause)
-                                    cause.printStackTrace()
-                                    responseFuture.completeExceptionally(cause)
-                                }
-                            })
+                                    @Override
+                                    void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+                                        super.exceptionCaught(ctx, cause)
+                                        cause.printStackTrace()
+                                        responseFuture.completeExceptionally(cause)
+                                    }
+                                })
 
-                }
-            })
+                    }
+                })
 
         def channel = (SocketChannel) bootstrap.connect().await().channel()
 
-        def request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/h2c/test')
-        channel.writeAndFlush(request)
+        channel.writeAndFlush(initialRequest)
         channel.read()
+
+        return responseFuture
+    }
+
+    void 'test using direct netty http2 client'() {
+        given:
+        def responseFuture = requestUpgrade(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/h2c/test'))
 
         expect:
         responseFuture.get(10, TimeUnit.SECONDS) != null
@@ -190,6 +197,17 @@ class H2cSpec extends Specification {
 
         expect:
         http1Client.toBlocking().exchange(HttpRequest.PUT("http://localhost:${embeddedServer.port}/h2c/put", "foo"), String).body() == 'Example response: foo'
+    }
+
+    void 'test using direct netty http2 client: body in initial request'() {
+        given:
+        def request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.PUT, '/h2c/put', Unpooled.wrappedBuffer('foo'.getBytes(StandardCharsets.UTF_8)))
+        request.headers().add("Content-Length", 3)
+
+        CompletableFuture responseFuture = requestUpgrade(request)
+
+        expect:
+        ((FullHttpResponse) responseFuture.get(10, TimeUnit.SECONDS)).content().toString(StandardCharsets.UTF_8) == 'Example response: foo'
     }
 
     @Controller("/h2c")
