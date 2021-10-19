@@ -27,6 +27,7 @@ The ann:websocket.annotation.OnMessage[] method can define a parameter for the m
 * Any Java primitive or simple type (such as `String`). In fact, any type that can be converted from `ByteBuf` (you can register additional api:core.convert.TypeConverter[] beans to support a custom type).
 * A `byte[]`, a `ByteBuf` or a Java NIO `ByteBuffer`.
 * A POJO. In this case, it will be decoded by default as JSON using api:jackson.codec.JsonMediaTypeCodec[]. You can register a custom codec and define the content type of the handler using the ann:http.annotation.Consumes[] annotation.
+* A api:websocket.WebSocketPongMessage[]. This is a special case: The method will not receive regular messages, but instead handle WebSocket pongs that arrive as a reply to a ping sent to the client.
 
 === The @OnError Method
 
