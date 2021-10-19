@@ -22,6 +22,7 @@ import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Infrastructure;
 import io.micronaut.context.annotation.Parallel;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Secondary;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
@@ -2844,33 +2845,28 @@ public class DefaultBeanContext implements BeanContext {
         final boolean isProxy = definition.isProxy();
         final boolean isScopedProxyDefinition = definition.hasStereotype(SCOPED_PROXY_ANN);
         if (isProxy && isScopedProxyDefinition && qualifier != PROXY_TARGET_QUALIFIER
-                && (definition.getDeclaredQualifier() == null || !definition.getDeclaredQualifier().contains(AnyQualifier.INSTANCE))) {
+                && (definition.getDeclaredQualifier() == null)) {
             // With scopes proxies we have to inject a reference into the injection point
-            Argument<T> proxiedType = (Argument<T>) resolveProxiedType(beanType, definition);
-            BeanKey<T> key = new BeanKey<>(proxiedType, qualifier);
-            BeanDefinition<T> finalDefinition = definition;
-            return (T) scopedProxies.computeIfAbsent(key, beanKey -> ProviderUtils.memoized(() -> {
-                Qualifier<T> q = qualifier;
-                if (q == null) {
-                    q = finalDefinition.getDeclaredQualifier();
-                }
+            Qualifier<T> q = qualifier;
+            if (q == null) {
+                q = definition.getDeclaredQualifier();
+            }
 
-                T createBean = doCreateBean(
-                        resolutionContext,
-                        finalDefinition,
-                        q,
-                        beanType,
-                        false,
-                        null
-                );
-                if (createBean instanceof Qualified) {
-                    ((Qualified<T>) createBean).$withBeanQualifier(q);
-                }
-                if (createBean == null && throwNoSuchBean) {
-                    throw new NoSuchBeanException(finalDefinition.asArgument(), qualifier);
-                }
-                return createBean;
-            })).get();
+            T createBean = doCreateBean(
+                    resolutionContext,
+                    definition,
+                    q,
+                    beanType,
+                    false,
+                    null
+            );
+            if (createBean instanceof Qualified) {
+                ((Qualified<T>) createBean).$withBeanQualifier(q);
+            }
+            if (createBean == null && throwNoSuchBean) {
+                throw new NoSuchBeanException(definition.asArgument(), qualifier);
+            }
+            return createBean;
         } else {
             BeanResolutionContext.Segment<?> currentSegment = resolutionContext
                     .getPath()
@@ -2883,7 +2879,7 @@ public class DefaultBeanContext implements BeanContext {
                 registeredScope =  customScopeRegistry.findDeclaredScope(argument).orElse(null);
             }
 
-            if (registeredScope == null && !isProxy && isScopedProxyDefinition) {
+            if (registeredScope == null && (!isScopedProxyDefinition || !isProxy)) {
                 registeredScope = customScopeRegistry.findDeclaredScope(definition).orElse(null);
             }
             if (registeredScope != null) {
@@ -2939,9 +2935,11 @@ public class DefaultBeanContext implements BeanContext {
                 );
                 if (createdBean == null && throwNoSuchBean) {
                     throw new NoSuchBeanException(definition.getBeanType(), qualifier);
-                } else if (definition instanceof DisposableBeanDefinition && !definition.getScope().isPresent()) {
-                    // dependent object with lifecycle call backs for disposal
-                    resolutionContext.addDependentBean(new BeanKey<>(beanType, qualifier), definition, createdBean);
+                } else if (definition instanceof DisposableBeanDefinition) {
+                    final String scopeName = definition.getScopeName().orElse(null);
+                    if (scopeName == null || scopeName.equals(Prototype.class.getName())) {
+                        resolutionContext.addDependentBean(new BeanKey<>(beanType, qualifier), definition, createdBean);
+                    }
                 }
                 return createdBean;
             }
@@ -3524,7 +3522,6 @@ public class DefaultBeanContext implements BeanContext {
             }
         }
         final Class<T> beanClass = beanType.getType();
-        hasQualifier = qualifier != null;
         BeanKey<T> key = new BeanKey<>(beanType, qualifier);
 
         if (LOG.isTraceEnabled()) {
@@ -3549,7 +3546,7 @@ public class DefaultBeanContext implements BeanContext {
             }
 
             HashSet<BeanRegistration<T>> beansOfTypeList;
-            boolean allCandidatesAreSingleton = false;
+            boolean allCandidatesAreSingleton = true;
             boolean hasOrderAnnotation = false;
             Collection<BeanRegistration<T>> beanRegistrations;
             Collection<BeanDefinition<T>> candidates = findBeanCandidatesInternal(resolutionContext, beanType);
@@ -3567,8 +3564,8 @@ public class DefaultBeanContext implements BeanContext {
                 if (!reduced.isEmpty()) {
                     beansOfTypeList = new HashSet<>(reduced.size());
                     for (BeanDefinition<T> definition : reduced) {
-                        if (definition.isSingleton()) {
-                            allCandidatesAreSingleton = true;
+                        if (!definition.isSingleton()) {
+                            allCandidatesAreSingleton = false;
                         }
                         if (definition.hasAnnotation(Order.class)) {
                             hasOrderAnnotation = true;
@@ -3581,11 +3578,9 @@ public class DefaultBeanContext implements BeanContext {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Found no matching beans of type [{}] for qualifier: {} ", beanType.getName(), qualifier);
                     }
-                    allCandidatesAreSingleton = true;
                     beanRegistrations = Collections.emptySet();
                 }
             } else if (hasCandidates) {
-                boolean hasNonSingletonCandidate = false;
                 int candidateCount = candidates.size();
                 Stream<BeanDefinition<T>> candidateStream = candidates.stream();
                 candidateStream = applyBeanResolutionFilters(resolutionContext, candidateStream);
@@ -3593,23 +3588,19 @@ public class DefaultBeanContext implements BeanContext {
                 List<BeanDefinition<T>> candidateList = candidateStream.collect(Collectors.toList());
                 beansOfTypeList = new HashSet<>(candidateCount);
                 for (BeanDefinition<T> candidate : candidateList) {
-                    if (!hasNonSingletonCandidate && !candidate.isSingleton()) {
-                        hasNonSingletonCandidate = true;
+                    if (!candidate.isSingleton()) {
+                        allCandidatesAreSingleton = false;
                     }
                     if (candidate.hasAnnotation(Order.class)) {
                         hasOrderAnnotation = true;
                     }
                     addCandidateToList(resolutionContext, beanType, candidate, beansOfTypeList, qualifier, candidateCount == 1);
                 }
-                if (!hasNonSingletonCandidate) {
-                    allCandidatesAreSingleton = true;
-                }
                 beanRegistrations = beansOfTypeList;
             } else {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Found no possible candidate beans of type [{}] for qualifier: {} ", beanType.getName(), qualifier);
                 }
-                allCandidatesAreSingleton = true;
                 beanRegistrations = Collections.emptySet();
             }
 
