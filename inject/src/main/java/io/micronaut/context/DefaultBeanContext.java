@@ -2845,7 +2845,7 @@ public class DefaultBeanContext implements BeanContext {
         final boolean isProxy = definition.isProxy();
         final boolean isScopedProxyDefinition = definition.hasStereotype(SCOPED_PROXY_ANN);
         if (isProxy && isScopedProxyDefinition && qualifier != PROXY_TARGET_QUALIFIER
-                && (definition.getDeclaredQualifier() == null || !definition.getDeclaredQualifier().contains(AnyQualifier.INSTANCE))) {
+                && (definition.getDeclaredQualifier() == null)) {
             // With scopes proxies we have to inject a reference into the injection point
             Qualifier<T> q = qualifier;
             if (q == null) {

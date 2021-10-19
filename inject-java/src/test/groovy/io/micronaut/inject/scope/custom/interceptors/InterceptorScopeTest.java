@@ -19,8 +19,10 @@ import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.context.scope.AbstractConcurrentCustomScope;
 import io.micronaut.context.scope.CreatedBean;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.runtime.context.scope.ScopedProxy;
+import jakarta.annotation.PreDestroy;
 import jakarta.inject.Scope;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Assertions;
@@ -71,11 +73,11 @@ public class InterceptorScopeTest {
             // the prototype interceptor should inject a new instance into
             // each newly created bean
             assertEquals(
-                    "Hello World! Interceptor2 created: [1]  Interceptor1 created: [1] ",
+                    "Hello World! Interceptor1 created: [1]  Interceptor2 created: [1] ",
                     result1
             );
             assertEquals(
-                    "Hello World! Interceptor2 created: [1]  Interceptor1 created: [2] ",
+                    "Hello World! Interceptor1 created: [2]  Interceptor2 created: [1] ",
                     result2
             );
         }
@@ -168,13 +170,25 @@ public class InterceptorScopeTest {
     @InterceptorBean(MyIntercepted1.class)
     static class MyIntercepted1Interceptor implements MethodInterceptor<Object, Object> {
         private static int creationCount = 0;
+        public boolean destroyed;
+
         MyIntercepted1Interceptor() {
             creationCount++;
         }
 
         @Override
+        public int getOrder() {
+            return Ordered.LOWEST_PRECEDENCE;
+        }
+
+        @Override
         public Object intercept(MethodInvocationContext<Object, Object> context) {
             return context.proceed() + " Interceptor1 created: [" + creationCount + "] ";
+        }
+
+        @PreDestroy
+        void close() {
+            this.destroyed = true;
         }
     }
 
