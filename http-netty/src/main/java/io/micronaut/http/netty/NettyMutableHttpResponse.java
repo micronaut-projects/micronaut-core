@@ -50,6 +50,10 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 
+import java.net.URI;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -77,6 +81,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
     private final ConversionService conversionService;
     private MutableConvertibleValues<Object> attributes;
     private ServerCookieEncoder serverCookieEncoder = DEFAULT_SERVER_COOKIE_ENCODER;
+    private final Map<URI, io.micronaut.http.HttpResponse<?>> serverPushResponses = new LinkedHashMap<>();
 
     private final BodyConvertor bodyConvertor = newBodyConvertor();
 
@@ -344,6 +349,23 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
     @Override
     public boolean isStream() {
         return false;
+    }
+
+    @Override
+    @NonNull
+    public Map<URI, io.micronaut.http.HttpResponse<?>> getServerPushResponses() {
+        return serverPushResponses;
+    }
+
+    @Override
+    @NonNull
+    public MutableHttpResponse<B> serverPush(@NonNull URI uri, @NonNull io.micronaut.http.HttpResponse<?> pushResponse) {
+        Objects.requireNonNull(uri, "uri");
+        Objects.requireNonNull(pushResponse, "pushResponse");
+        if (serverPushResponses.putIfAbsent(uri, pushResponse) != null) {
+            throw new IllegalArgumentException("Duplicate push response");
+        }
+        return this;
     }
 
     private void setBody(Object body) {

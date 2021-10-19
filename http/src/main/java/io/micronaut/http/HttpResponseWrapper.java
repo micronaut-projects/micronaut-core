@@ -15,6 +15,11 @@
  */
 package io.micronaut.http;
 
+import org.jetbrains.annotations.NotNull;
+
+import java.net.URI;
+import java.util.Map;
+
 /**
  * A wrapper around a {@link HttpResponse}.
  *
@@ -35,9 +40,14 @@ public class HttpResponseWrapper<B> extends HttpMessageWrapper<B> implements Htt
         return getDelegate().getStatus();
     }
 
+    @NotNull
+    @Override
+    public Map<URI, HttpResponse<?>> getServerPushResponses() {
+        return getDelegate().getServerPushResponses();
+    }
+
     @Override
     public HttpResponse<B> getDelegate() {
         return (HttpResponse<B>) super.getDelegate();
     }
-
 }

@@ -90,8 +90,15 @@ import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
+import io.netty.handler.codec.http2.DefaultHttp2Headers;
+import io.netty.handler.codec.http2.DefaultHttp2PushPromiseFrame;
+import io.netty.handler.codec.http2.Http2ChannelDuplexHandler;
+import io.netty.handler.codec.http2.Http2ConnectionHandler;
 import io.netty.handler.codec.http2.Http2Error;
 import io.netty.handler.codec.http2.Http2Exception;
+import io.netty.handler.codec.http2.Http2FrameCodec;
+import io.netty.handler.codec.http2.Http2FrameStream;
+import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.concurrent.Future;
@@ -109,6 +116,7 @@ import reactor.core.publisher.UnicastProcessor;
 import javax.net.ssl.SSLException;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.channels.ClosedChannelException;
@@ -117,6 +125,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -1110,6 +1119,19 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             io.netty.handler.codec.http.HttpResponse nettyResponse = NettyHttpResponseBuilder.toHttpResponse(message);
             io.netty.handler.codec.http.HttpHeaders nettyHeaders = nettyResponse.headers();
 
+            Map<URI, io.netty.handler.codec.http.HttpResponse> serverPushResponses;
+            if (isHttp2) {
+                Map<URI, HttpResponse<?>> responsesOriginal = message.getServerPushResponses();
+                if (responsesOriginal.isEmpty()) {
+                    serverPushResponses = Collections.emptyMap();
+                } else {
+                    serverPushResponses = responsesOriginal.entrySet().stream()
+                            .collect(Collectors.toMap(Map.Entry::getKey, e -> NettyHttpResponseBuilder.toHttpResponse(e.getValue())));
+                }
+            } else {
+                serverPushResponses = Collections.emptyMap();
+            }
+
             // default Connection header if not set explicitly
             if (!isHttp2) {
                 if (!nettyHeaders.contains(HttpHeaderNames.CONNECTION)) {
@@ -1180,27 +1202,49 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                     @Override
                     public void onError(Throwable t) {
-                        context.writeAndFlush(nettyResponse)
-                                .addListener(requestCompletor);
+                        syncWriteAndFlushNettyResponse(context, request, nettyResponse, serverPushResponses, requestCompletor);
                     }
 
                     @Override
                     public void onComplete() {
-                        context.writeAndFlush(nettyResponse)
-                                .addListener(requestCompletor);
+                        syncWriteAndFlushNettyResponse(context, request, nettyResponse, serverPushResponses, requestCompletor);
                     }
                 });
             } else {
-                context.writeAndFlush(nettyResponse)
-                        .addListener(requestCompletor);
-
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Response {} - {} {}",
-                            nettyResponse.status().code(),
-                            request.getMethodName(),
-                            request.getUri());
-                }
+                syncWriteAndFlushNettyResponse(context, request, nettyResponse, serverPushResponses, requestCompletor);
             }
+        }
+    }
+
+    private void syncWriteAndFlushNettyResponse(
+            ChannelHandlerContext context,
+            HttpRequest<?> request,
+            io.netty.handler.codec.http.HttpResponse nettyResponse,
+            Map<URI, io.netty.handler.codec.http.HttpResponse> serverPushResponses,
+            GenericFutureListener<Future<? super Void>> requestCompletor
+    ) {
+        if (!serverPushResponses.isEmpty()) {
+            Http2FrameCodec frameCodec = context.pipeline().get(Http2FrameCodec.class);
+            Http2ChannelDuplexHandler channelDuplexHandler = context.pipeline().get(Http2ChannelDuplexHandler.class);
+            int requestStreamId = Integer.parseInt(request.getHeaders().get(AbstractNettyHttpRequest.STREAM_ID));
+            for (Map.Entry<URI, io.netty.handler.codec.http.HttpResponse> serverPushResponse : serverPushResponses.entrySet()) {
+                DefaultHttp2Headers pushRequestHeaders = new DefaultHttp2Headers();
+                pushRequestHeaders.authority(serverPushResponse.getKey().getAuthority());
+                pushRequestHeaders.path(serverPushResponse.getKey().getPath());
+                Http2FrameStream newStream = channelDuplexHandler.newStream();
+                DefaultHttp2PushPromiseFrame promiseFrame = new DefaultHttp2PushPromiseFrame(pushRequestHeaders);
+                promiseFrame.pushStream(newStream);
+            }
+        }
+
+        context.writeAndFlush(nettyResponse)
+                .addListener(requestCompletor);
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Response {} - {} {}",
+                    nettyResponse.status().code(),
+                    request.getMethodName(),
+                    request.getUri());
         }
     }
 
