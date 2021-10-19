@@ -243,7 +243,8 @@ public class GroovyVisitorContext implements VisitorContext {
     /**
      * @return The compilation unit
      */
-    CompilationUnit getCompilationUnit() {
+    @Internal
+    public CompilationUnit getCompilationUnit() {
         return compilationUnit;
     }
 

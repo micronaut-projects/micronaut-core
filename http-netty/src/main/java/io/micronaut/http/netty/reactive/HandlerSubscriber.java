@@ -172,7 +172,8 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
     }
 
     /**
-     * Write the message with the supplied promise
+     * Write the message with the supplied promise.
+     *
      * @param t The message
      * @param promise The promise
      */

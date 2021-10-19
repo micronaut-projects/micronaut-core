@@ -243,6 +243,15 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
+    protected boolean isExcludedAnnotation(@NonNull Element element, @NonNull String annotationName) {
+        if (annotationName.startsWith("java.lang.annotation") && element.getKind() == ElementKind.ANNOTATION_TYPE) {
+            return false;
+        } else {
+            return super.isExcludedAnnotation(element, annotationName);
+        }
+    }
+
+    @Override
     protected List<Element> buildHierarchy(Element element, boolean inheritTypeAnnotations, boolean declaredOnly) {
         if (declaredOnly) {
             List<Element> onlyDeclared = new ArrayList<>(1);
@@ -253,6 +262,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         if (element instanceof TypeElement) {
             List<Element> hierarchy = new ArrayList<>();
             hierarchy.add(element);
+            if (element.getKind() == ElementKind.ANNOTATION_TYPE) {
+                return hierarchy;
+            }
             populateTypeHierarchy(element, hierarchy);
             Collections.reverse(hierarchy);
             return hierarchy;

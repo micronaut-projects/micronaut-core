@@ -15,13 +15,19 @@
  */
 package io.micronaut.discovery.cloud.digitalocean;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadata;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadataResolver;
 import io.micronaut.discovery.cloud.NetworkInterface;
+import io.micronaut.jackson.core.tree.JsonNodeTreeCodec;
+import io.micronaut.jackson.databind.JacksonDatabindMapper;
+import io.micronaut.json.JsonMapper;
+import io.micronaut.json.JsonStreamConfig;
+import io.micronaut.json.tree.JsonNode;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
@@ -33,13 +39,11 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
-import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.populateMetadata;
-import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.readMetadataUrl;
+import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.*;
 import static io.micronaut.discovery.cloud.digitalocean.DigitalOceanMetadataKeys.*;
 
 /**
@@ -56,27 +60,45 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
     private static final int READ_TIMEOUT_IN_MILLS = 5000;
     private static final int CONNECTION_TIMEOUT_IN_MILLS = 5000;
 
-    private final ObjectMapper objectMapper;
     private final DigitalOceanMetadataConfiguration configuration;
+    private final JsonFactory jsonFactory;
+    private final JsonStreamConfig jsonStreamConfig;
+
     private DigitalOceanInstanceMetadata cachedMetadata;
 
     /**
-     *
-     * @param objectMapper To read and write JSON
      * @param configuration Digital Ocean Metadata configuration
+     * @param jsonFactory   Factory to use for json parsing
+     * @param mapper        Mapper to use for deserialization
      */
     @Inject
-    public DigitalOceanMetadataResolver(ObjectMapper objectMapper, DigitalOceanMetadataConfiguration configuration) {
-        this.objectMapper = objectMapper;
+    @Experimental
+    public DigitalOceanMetadataResolver(
+            DigitalOceanMetadataConfiguration configuration,
+            JsonFactory jsonFactory,
+            JsonMapper mapper
+    ) {
         this.configuration = configuration;
+        this.jsonFactory = jsonFactory;
+        this.jsonStreamConfig = mapper.getStreamConfig();
     }
 
     /**
      * Construct with default settings.
      */
     public DigitalOceanMetadataResolver() {
-        objectMapper = new ObjectMapper();
         configuration = new DigitalOceanMetadataConfiguration();
+        jsonFactory = new JsonFactory();
+        jsonStreamConfig = JsonStreamConfig.DEFAULT;
+    }
+
+    /**
+     *
+     * @param objectMapper To read and write JSON
+     * @param configuration Digital Ocean Metadata configuration
+     */
+    public DigitalOceanMetadataResolver(ObjectMapper objectMapper, DigitalOceanMetadataConfiguration configuration) {
+        this(configuration, objectMapper.getFactory(), new JacksonDatabindMapper(objectMapper));
     }
 
     @Override
@@ -93,7 +115,7 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
 
         try {
             String metadataUrl = configuration.getUrl();
-            JsonNode metadataJson = readMetadataUrl(new URL(metadataUrl), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS, objectMapper, new HashMap<>());
+            JsonNode metadataJson = readMetadataUrl(new URL(metadataUrl), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS, JsonNodeTreeCodec.getInstance().withConfig(jsonStreamConfig), jsonFactory, new HashMap<>());
             if (metadataJson != null) {
                 instanceMetadata.setInstanceId(textValue(metadataJson, DROPLET_ID));
                 instanceMetadata.setName(textValue(metadataJson, HOSTNAME));
@@ -101,16 +123,15 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
                 instanceMetadata.setUserData(textValue(metadataJson, USER_DATA));
                 instanceMetadata.setRegion(textValue(metadataJson, REGION));
 
-                JsonNode networkInterfaces = metadataJson.findValue(INTERFACES.getName());
-                List<NetworkInterface> privateInterfaces = processJsonInterfaces(networkInterfaces.findValue(PRIVATE_INTERFACES.getName()), instanceMetadata::setPrivateIpV4, instanceMetadata::setPrivateIpV6);
-                List<NetworkInterface> publicInterfaces = processJsonInterfaces(networkInterfaces.findValue(PUBLIC_INTERFACES.getName()), instanceMetadata::setPublicIpV4, instanceMetadata::setPublicIpV6);
+                JsonNode networkInterfaces = metadataJson.get(INTERFACES.getName());
+                List<NetworkInterface> privateInterfaces = processJsonInterfaces(networkInterfaces.get(PRIVATE_INTERFACES.getName()), instanceMetadata::setPrivateIpV4, instanceMetadata::setPrivateIpV6);
+                List<NetworkInterface> publicInterfaces = processJsonInterfaces(networkInterfaces.get(PUBLIC_INTERFACES.getName()), instanceMetadata::setPublicIpV4, instanceMetadata::setPublicIpV6);
                 List<NetworkInterface> allInterfaces = new ArrayList<>();
                 allInterfaces.addAll(publicInterfaces);
                 allInterfaces.addAll(privateInterfaces);
                 instanceMetadata.setInterfaces(allInterfaces);
 
-                final Map<?, ?> metadata = objectMapper.convertValue(metadataJson, Map.class);
-                populateMetadata(instanceMetadata, metadata);
+                populateMetadata(instanceMetadata, metadataJson);
                 cachedMetadata = instanceMetadata;
 
                 return Optional.of(instanceMetadata);
@@ -133,21 +154,21 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
 
         if (interfaces != null) {
             AtomicReference<Integer> networkCounter = new AtomicReference<>(0);
-            interfaces.elements().forEachRemaining(
+            interfaces.values().forEach(
                     jsonNode -> {
                         DigitalOceanNetworkInterface networkInterface = new DigitalOceanNetworkInterface();
                         networkInterface.setId(networkCounter.toString());
-                        JsonNode ipv4 = jsonNode.findValue(IPV4.getName());
+                        JsonNode ipv4 = jsonNode.get(IPV4.getName());
                         if (ipv4 != null) {
                             networkInterface.setIpv4(textValue(ipv4, IP_ADDRESS));
                             networkInterface.setNetmask(textValue(ipv4, NETMASK));
                             networkInterface.setGateway(textValue(ipv4, GATEWAY));
                         }
-                        JsonNode ipv6 = jsonNode.findValue(IPV6.getName());
+                        JsonNode ipv6 = jsonNode.get(IPV6.getName());
                         if (ipv6 != null) {
                             networkInterface.setIpv6(textValue(ipv6, IP_ADDRESS));
                             networkInterface.setIpv6Gateway(textValue(ipv6, GATEWAY));
-                            networkInterface.setCidr(ipv6.findValue(CIDR.getName()).intValue());
+                            networkInterface.setCidr(ipv6.get(CIDR.getName()).getIntValue());
                         }
                         networkInterface.setMac(textValue(jsonNode, MAC));
 
@@ -156,10 +177,10 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
                     }
             );
 
-            JsonNode firstIpv4 = interfaces.get(0).findValue(IPV4.getName());
+            JsonNode firstIpv4 = interfaces.get(0).get(IPV4.getName());
             ipv4Setter.accept(textValue(firstIpv4, IP_ADDRESS));
 
-            JsonNode firstIpv6 = interfaces.get(0).findValue(IPV6.getName());
+            JsonNode firstIpv6 = interfaces.get(0).get(IPV6.getName());
             if (firstIpv6 != null) {
                 ipv6Setter.accept(textValue(firstIpv6, IP_ADDRESS));
             }
@@ -170,9 +191,9 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
     }
 
     private String textValue(JsonNode node, DigitalOceanMetadataKeys key) {
-        JsonNode value = node.findValue(key.getName());
+        JsonNode value = node.get(key.getName());
         if (value != null) {
-            return value.asText();
+            return value.coerceStringValue();
         } else {
             return null;
         }

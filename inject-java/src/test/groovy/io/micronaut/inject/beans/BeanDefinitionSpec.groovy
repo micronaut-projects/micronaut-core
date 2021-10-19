@@ -325,7 +325,7 @@ public class NumberThingManager extends AbstractThingManager<NumberThing<?>> {}
         then:
         noExceptionThrown()
         definition != null
-        definition.getTypeArguments("test.AbstractThingManager")[0].getTypeVariables().get("T").getType() == Object.class
+        definition.getTypeArguments("test.AbstractThingManager")[0].getTypeVariables().get("T").getType() == Number.class
     }
 
     void "test a bean definition in a package with uppercase letters"() {

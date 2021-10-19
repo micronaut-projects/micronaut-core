@@ -27,7 +27,7 @@ import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.filter.ServerFilterPhase;
-import io.micronaut.jackson.JacksonConfiguration;
+import io.micronaut.json.JsonConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Named;
 import org.reactivestreams.Publisher;
@@ -45,7 +45,7 @@ import java.util.concurrent.ExecutorService;
  * @author mmindenhall
  * @author graemerocher
  */
-@Requires(beans = JacksonConfiguration.class)
+@Requires(beans = JsonConfiguration.class)
 @Requires(property = JsonViewServerFilter.PROPERTY_JSON_VIEW_ENABLED)
 @Filter("/**")
 public class JsonViewServerFilter implements HttpServerFilter {

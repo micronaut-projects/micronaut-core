@@ -57,6 +57,18 @@ public interface BeanContext extends
     @NonNull BeanContextConfiguration getContextConfiguration();
 
     /**
+     * Obtain an {@link io.micronaut.context.event.ApplicationEventPublisher} for the given even type.
+     * @param eventType The event type
+     * @param <E> The event generic type
+     * @return The event publisher, never {@code null}
+     */
+    @SuppressWarnings("unchecked")
+    default @NonNull <E> ApplicationEventPublisher<E> getEventPublisher(@NonNull Class<E> eventType) {
+        Objects.requireNonNull(eventType, "Event type cannot be null");
+        return getBean(Argument.of(ApplicationEventPublisher.class, eventType));
+    }
+
+    /**
      * Publish the given event. The event will be published synchronously and only return once all listeners have consumed the event.
      *
      * @deprecated Preferred way is to use event typed {@code ApplicationEventPublisher<MyEventType>}

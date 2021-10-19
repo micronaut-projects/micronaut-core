@@ -89,6 +89,14 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             )
     );
 
+    private static final org.objectweb.asm.commons.Method METHOD_REGISTER_REPEATABLE_ANNOTATIONS = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(
+                    DefaultAnnotationMetadata.class,
+                    "registerRepeatableAnnotations",
+                    Map.class
+            )
+    );
+
     private static final org.objectweb.asm.commons.Method METHOD_GET_DEFAULT_VALUES = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(
                     AnnotationMetadataSupport.class,
@@ -105,6 +113,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                     Map.class,
                     Map.class,
                     Map.class,
+                    boolean.class,
                     boolean.class
             )
     );
@@ -413,6 +422,17 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 }
 //                staticInit.visitLabel(falseCondition);
             }
+            if (annotationMetadata.repeated != null && !annotationMetadata.repeated.isEmpty()) {
+                Map<String, String> repeated = new HashMap<>();
+                for (Map.Entry<String, String> e : annotationMetadata.repeated.entrySet()) {
+                    repeated.put(e.getValue(), e.getKey());
+                }
+                AnnotationMetadataSupport.removeCoreRepeatableAnnotations(repeated);
+                if (!repeated.isEmpty()) {
+                    pushStringMapOf(staticInit, repeated, true, null, v -> pushValue(owningType, classWriter, staticInit, v, defaultsStorage, loadTypeMethods, true));
+                    staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_REPEATABLE_ANNOTATIONS);
+                }
+            }
         }
     }
 
@@ -463,6 +483,8 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         pushStringMapOf(generatorAdapter, annotationMetadata.annotationsByStereotype, false, Collections.emptyList(), list -> pushListOfString(generatorAdapter, list));
         // 6th argument: has property expressions
         generatorAdapter.push(annotationMetadata.hasPropertyExpressions());
+        // 7th argument: use repeatable annotations
+        generatorAdapter.push(true);
 
         // invoke the constructor
         generatorAdapter.invokeConstructor(TYPE_DEFAULT_ANNOTATION_METADATA, CONSTRUCTOR_ANNOTATION_METADATA);
@@ -518,7 +540,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
 
         pushStringMapOf(methodVisitor, annotationData, false, Collections.emptyMap(), attributes ->
                 pushStringMapOf(methodVisitor, attributes, true, null, v ->
-                    pushValue(declaringType, declaringClassWriter, methodVisitor, v, defaultsStorage, loadTypeMethods, true)
+                        pushValue(declaringType, declaringClassWriter, methodVisitor, v, defaultsStorage, loadTypeMethods, true)
                 )
         );
     }
@@ -588,7 +610,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                     }
                     Class<?> finalArrayType = arrayType;
                     pushStoreInArray(methodVisitor, Type.getType(arrayType), i, len, () ->
-                        pushValue(declaringType, declaringClassWriter, methodVisitor, v, defaultsStorage, loadTypeMethods, !finalArrayType.isPrimitive())
+                            pushValue(declaringType, declaringClassWriter, methodVisitor, v, defaultsStorage, loadTypeMethods, !finalArrayType.isPrimitive())
                     );
                 }
             }

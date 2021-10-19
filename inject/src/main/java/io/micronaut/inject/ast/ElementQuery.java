@@ -34,6 +34,13 @@ import java.util.function.Predicate;
 public interface ElementQuery<T extends Element> {
 
     /**
+     * Constant to retrieve inner classes.
+     *
+     * @since 3.1.0
+     */
+    ElementQuery<ClassElement> ALL_INNER_CLASSES = ElementQuery.of(ClassElement.class);
+
+    /**
      * Constant to retrieve all fields.
      */
     ElementQuery<FieldElement> ALL_FIELDS = ElementQuery.of(FieldElement.class);

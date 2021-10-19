@@ -17,6 +17,7 @@ package io.micronaut.http.annotation;
 
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.filter.FilterPatternStyle;
 import jakarta.inject.Singleton;
 
 import java.lang.annotation.Documented;
@@ -50,6 +51,11 @@ public @interface Filter {
      * @return The patterns this filter should match
      */
     String[] value() default {};
+
+    /**
+     * @return The style of pattern this filter uses
+     */
+    FilterPatternStyle patternStyle() default FilterPatternStyle.ANT;
 
     /**
      * Same as {@link #value()}.

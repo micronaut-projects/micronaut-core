@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
+import io.micronaut.core.util.functional.ThrowingSupplier;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.MultipartException;
@@ -112,67 +113,12 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
 
     @Override
     public Publisher<Boolean> transferTo(File destination) {
-        return Mono.<Boolean>create(emitter ->
+        return transferTo(() -> Files.newOutputStream(destination.toPath()));
+    }
 
-            subject.subscribeOn(Schedulers.fromExecutorService(ioExecutor))
-                .subscribe(new Subscriber<PartData>() {
-                    Subscription subscription;
-                    OutputStream outputStream;
-                    @Override
-                    public void onSubscribe(Subscription s) {
-                        subscription = s;
-                        subscription.request(1);
-                        try {
-                            outputStream = Files.newOutputStream(destination.toPath());
-                        } catch (IOException e) {
-                            handleError(e);
-                        }
-                    }
-
-                    @Override
-                    public void onNext(PartData o) {
-                        try {
-                            outputStream.write(o.getBytes());
-                            subscription.request(1);
-                        } catch (IOException e) {
-                            handleError(e);
-                        }
-                    }
-
-                    @Override
-                    public void onError(Throwable t) {
-                        emitter.error(t);
-                        try {
-                            if (outputStream != null) {
-                                outputStream.close();
-                            }
-                        } catch (IOException e) {
-                            if (LOG.isWarnEnabled()) {
-                                LOG.warn("Failed to close file stream : " + fileUpload.getName());
-                            }
-                        }
-                    }
-
-                    @Override
-                    public void onComplete() {
-                        try {
-                            outputStream.close();
-                            emitter.success(true);
-                        } catch (IOException e) {
-                            if (LOG.isWarnEnabled()) {
-                                LOG.warn("Failed to close file stream : " + fileUpload.getName());
-                            }
-                            emitter.success(false);
-                        }
-                    }
-
-                    private void handleError(Throwable t) {
-                        subscription.cancel();
-                        onError(new MultipartException("Error transferring file: " + fileUpload.getName(), t));
-                    }
-                })
-        ).flux();
-
+    @Override
+    public Publisher<Boolean> transferTo(OutputStream outputStream) {
+        return transferTo(() -> outputStream);
     }
 
     @Override
@@ -208,5 +154,68 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
     @Override
     public void discard() {
         fileUpload.release();
+    }
+
+    private Publisher<Boolean> transferTo(ThrowingSupplier<OutputStream, IOException> outputStreamSupplier) {
+        return Mono.<Boolean>create(emitter ->
+
+                subject.subscribeOn(Schedulers.fromExecutorService(ioExecutor))
+                        .subscribe(new Subscriber<PartData>() {
+                            Subscription subscription;
+                            OutputStream outputStream;
+                            @Override
+                            public void onSubscribe(Subscription s) {
+                                subscription = s;
+                                subscription.request(1);
+                                try {
+                                    outputStream = outputStreamSupplier.get();
+                                } catch (IOException e) {
+                                    handleError(e);
+                                }
+                            }
+
+                            @Override
+                            public void onNext(PartData o) {
+                                try {
+                                    outputStream.write(o.getBytes());
+                                    subscription.request(1);
+                                } catch (IOException e) {
+                                    handleError(e);
+                                }
+                            }
+
+                            @Override
+                            public void onError(Throwable t) {
+                                emitter.error(t);
+                                try {
+                                    if (outputStream != null) {
+                                        outputStream.close();
+                                    }
+                                } catch (IOException e) {
+                                    if (LOG.isWarnEnabled()) {
+                                        LOG.warn("Failed to close file stream : " + fileUpload.getName());
+                                    }
+                                }
+                            }
+
+                            @Override
+                            public void onComplete() {
+                                try {
+                                    outputStream.close();
+                                    emitter.success(true);
+                                } catch (IOException e) {
+                                    if (LOG.isWarnEnabled()) {
+                                        LOG.warn("Failed to close file stream : " + fileUpload.getName());
+                                    }
+                                    emitter.success(false);
+                                }
+                            }
+
+                            private void handleError(Throwable t) {
+                                subscription.cancel();
+                                onError(new MultipartException("Error transferring file: " + fileUpload.getName(), t));
+                            }
+                        })
+        ).flux();
     }
 }

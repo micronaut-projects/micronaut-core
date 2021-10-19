@@ -10,26 +10,13 @@ dependencies {
     api project(':aop')
     api project(':context')
     api project(":core-reactive")
+    api project(":jackson-databind")
     api libs.managed.validation
-    api libs.managed.jackson.databind
 
     implementation libs.managed.reactor
 
-    api libs.managed.jackson.datatype.jdk8
-    api libs.managed.jackson.datatype.jsr310
-
     compileOnly libs.managed.graal
     compileOnly libs.managed.jcache
-
-    compileOnly(libs.managed.jackson.module.kotlin) {
-        transitive = false
-    }
-    compileOnly(libs.managed.jackson.module.afterburner) {
-        transitive = false
-    }
-    compileOnly(libs.managed.jackson.module.parameterNames) {
-        transitive = false
-    }
 
     compileOnly libs.log4j
     compileOnly libs.javax.el

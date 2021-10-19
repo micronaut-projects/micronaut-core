@@ -2,9 +2,9 @@ package io.micronaut.build.internal.pom
 
 import groovy.transform.Canonical
 import io.micronaut.build.catalogs.internal.LenientVersionCatalogParser
+import io.micronaut.build.catalogs.internal.VersionCatalogTomlModel
 import org.gradle.api.InvalidUserCodeException
 import org.gradle.api.plugins.catalog.CatalogPluginExtension
-import org.gradle.api.tasks.TaskAction
 /**
  * This is an internal task which responsibility is to parse
  * the Micronaut version catalog used internally, extract components
@@ -23,11 +23,18 @@ class VersionCatalogConverter {
     final Map<String, String> extraVersions = [:]
     final Map<String, Library> extraLibraries = [:]
 
-    @TaskAction
+    private VersionCatalogTomlModel model
+
+    VersionCatalogTomlModel getModel() {
+        if (model == null) {
+            def parser = new LenientVersionCatalogParser()
+            parser.parse(catalogFile.newInputStream())
+            model = parser.model
+        }
+        model
+    }
+
     void populateModel() {
-        def parser = new LenientVersionCatalogParser()
-        parser.parse(catalogFile.newInputStream())
-        def model = parser.model
         catalogExtension.versionCatalog {builder ->
             extraVersions.forEach { alias, version ->
                 builder.version(alias, version)

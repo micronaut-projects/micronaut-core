@@ -17,6 +17,7 @@ package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.annotation.Any;
 import io.micronaut.core.annotation.*;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -171,11 +172,21 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
 
     @Override
     public String toString() {
-        String annName = annotationType == null ? super.toString() : "@" + annotationType.getSimpleName();
         if (this.qualifierAnn != null) {
             final Map<CharSequence, Object> values = qualifierAnn.getValues();
-            annName += "(" + values.entrySet().stream().map(entry -> entry.getKey() + "=" + entry.getValue()).collect(Collectors.joining(", ")) + ")";
+            String annName = annotationType != null ? "@" + annotationType.getSimpleName() : "@" + NameUtils.getSimpleName(qualifierAnn.getAnnotationName());
+            annName += "(" + values.entrySet().stream().map(entry -> entry.getKey() + "=" + valueToString(entry)).collect(Collectors.joining(", ")) + ")";
+            return annName;
+        } else {
+            return annotationType == null ? super.toString() : "@" + annotationType.getSimpleName();
         }
-        return annName;
+    }
+
+    private Object valueToString(Map.Entry<CharSequence, Object> entry) {
+        final Object v = entry.getValue();
+        if (v instanceof Object[]) {
+            return Arrays.toString((Object[]) v);
+        }
+        return v;
     }
 }

@@ -28,8 +28,10 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
@@ -65,7 +67,7 @@ import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriMatchTemplate;
-import io.micronaut.jackson.codec.JsonMediaTypeCodec;
+import io.micronaut.json.codec.JsonMediaTypeCodec;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
@@ -108,12 +110,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      */
     private static final MediaType[] DEFAULT_ACCEPT_TYPES = {MediaType.APPLICATION_JSON_TYPE};
 
-    private static final int HEADERS_INITIAL_CAPACITY = 3;
-    private static final int ATTRIBUTES_INITIAL_CAPACITY = 1;
     private final List<ReactiveClientResultTransformer> transformers;
     private final HttpClientBinderRegistry binderRegistry;
     private final JsonMediaTypeCodec jsonMediaTypeCodec;
     private final HttpClientRegistry<?> clientFactory;
+    private final ConversionService<?> conversionService;
 
     /**
      * Constructor for advice class to setup things like Headers, Cookies, Parameters for Clients.
@@ -122,17 +123,19 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      * @param jsonMediaTypeCodec   The JSON media type codec
      * @param transformers         transformation classes
      * @param binderRegistry       The client binder registry
+     * @param conversionService    The bean conversion context
      */
     public HttpClientIntroductionAdvice(
             HttpClientRegistry<?> clientFactory,
             JsonMediaTypeCodec jsonMediaTypeCodec,
             List<ReactiveClientResultTransformer> transformers,
-            HttpClientBinderRegistry binderRegistry) {
-
+            HttpClientBinderRegistry binderRegistry,
+            ConversionService<?> conversionService) {
         this.clientFactory = clientFactory;
         this.jsonMediaTypeCodec = jsonMediaTypeCodec;
         this.transformers = transformers != null ? transformers : Collections.emptyList();
         this.binderRegistry = binderRegistry;
+        this.conversionService = conversionService;
     }
 
     /**
@@ -212,18 +215,24 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             }
 
+            InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
+
             // Apply all the argument binders
             Argument[] arguments = context.getArguments();
             if (arguments.length > 0) {
                 Map<String, Object> paramMap = context.getParameterValueMap();
                 for (Argument argument : arguments) {
-                    Object definedValue = getValue(argument, context, parameters, paramMap);
+                    Object definedValue = getValue(argument, context, parameters);
 
                     if (definedValue != null) {
                         final ClientArgumentRequestBinder<Object> binder = (ClientArgumentRequestBinder<Object>) binderRegistry
                                 .findArgumentBinder((Argument<Object>) argument)
                                 .orElse(defaultBinder);
-                        binder.bind(ConversionContext.of(argument), uriContext, definedValue, request);
+                        ArgumentConversionContext conversionContext = ConversionContext.of(argument);
+                        binder.bind(conversionContext, uriContext, definedValue, request);
+                        if (conversionContext.hasErrors()) {
+                            return interceptedMethod.handleException(new ConversionErrorException(argument, conversionContext.getLastError().get()));
+                        }
                     }
                 }
             }
@@ -270,12 +279,13 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
 
             uri = uriTemplate.expand(pathParams);
-            // Remove all the queryParams that have already been used.
-            // Others need to be still added
-            uriVariables.forEach(queryParams::remove);
+            // Remove all the pathParams that have already been used.
+            // Other path parameters are added to query
+            uriVariables.forEach(pathParams::remove);
+            addParametersToQuery(pathParams, uriContext);
 
             // The original query can be added by getting it from the request.getUri() and appending
-            request.uri(URI.create(appendQuery(uri, queryParams)));
+            request.uri(URI.create(appendQuery(uri, uriContext.getQueryParameters())));
 
             if (body != null && !request.getContentType().isPresent()) {
                 MediaType[] contentTypes = MediaType.of(context.stringValues(Produces.class));
@@ -312,7 +322,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             ReturnType<?> returnType = context.getReturnType();
 
-            InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
             try {
                 Argument<?> valueType = interceptedMethod.returnTypeValue();
                 Class<?> reactiveValueType = valueType.getType();
@@ -325,7 +334,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
                         Publisher<?> publisher;
                         if (!isSingle && httpClient instanceof StreamingHttpClient) {
-                            publisher = httpClientResponseStreamingPublisher((StreamingHttpClient) httpClient, acceptTypes, request, valueType);
+                            publisher = httpClientResponseStreamingPublisher((StreamingHttpClient) httpClient, acceptTypes, request, errorType, valueType);
                         } else {
                             publisher = httpClientResponsePublisher(httpClient, request, returnType, errorType, valueType);
                         }
@@ -430,6 +439,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private Publisher httpClientResponseStreamingPublisher(StreamingHttpClient streamingHttpClient,
                                                            MediaType[] acceptTypes,
                                                            MutableHttpRequest<?> request,
+                                                           Argument<?> errorType,
                                                            Argument<?> reactiveValueArgument) {
         Class<?> reactiveValueType = reactiveValueArgument.getType();
         if (Void.class == reactiveValueType) {
@@ -440,15 +450,15 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             SseClient sseClient = (SseClient) streamingHttpClient;
             if (reactiveValueArgument.getType() == Event.class) {
                 return sseClient.eventStream(
-                        request, reactiveValueArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT)
+                        request, reactiveValueArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT), errorType
                 );
             }
-            return Publishers.map(sseClient.eventStream(request, reactiveValueArgument), Event::getData);
+            return Publishers.map(sseClient.eventStream(request, reactiveValueArgument, errorType), Event::getData);
         } else {
             if (isJsonParsedMediaType(acceptTypes)) {
-                return streamingHttpClient.jsonStream(request, reactiveValueArgument);
+                return streamingHttpClient.jsonStream(request, reactiveValueArgument, errorType);
             } else {
-                Publisher<ByteBuffer<?>> byteBufferPublisher = streamingHttpClient.dataStream(request);
+                Publisher<ByteBuffer<?>> byteBufferPublisher = streamingHttpClient.dataStream(request, errorType);
                 if (reactiveValueType == ByteBuffer.class) {
                     return byteBufferPublisher;
                 } else {
@@ -467,10 +477,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
     private Object getValue(Argument argument,
                             MethodInvocationContext<?, ?> context,
-                            Map<String, MutableArgumentValue<?>> parameters,
-                            Map<String, Object> paramMap) {
+                            Map<String, MutableArgumentValue<?>> parameters) {
         String argumentName = argument.getName();
-        AnnotationMetadata argumentMetadata = argument.getAnnotationMetadata();
         MutableArgumentValue<?> value = parameters.get(argumentName);
 
         Object definedValue = value.getValue();
@@ -544,6 +552,16 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
     private String getClientId(AnnotationMetadata clientAnn) {
         return clientAnn.stringValue(Client.class).orElse(null);
+    }
+
+    private void addParametersToQuery(Map<String, Object> parameters, ClientRequestUriContext uriContext) {
+        for (Map.Entry<String, Object> entry: parameters.entrySet()) {
+            conversionService.convert(entry.getValue(), ConversionContext.STRING).ifPresent(v -> {
+                conversionService.convert(entry.getKey(), ConversionContext.STRING).ifPresent(k -> {
+                    uriContext.addQueryParameter(k, v);
+                });
+            });
+        }
     }
 
     private String appendQuery(String uri, Map<String, List<String>> queryParams) {

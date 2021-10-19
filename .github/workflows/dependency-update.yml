@@ -26,9 +26,11 @@ jobs:
       - name: Export Gradle Properties
         uses: micronaut-projects/github-actions/export-gradle-properties@master
       - name: Check Dependencies
+        env:
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
         run: ./gradlew useLatestVersions
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v3.10.0
+        uses: peter-evans/create-pull-request@v3.10.1
         with:
           token: ${{ secrets.GH_TOKEN }}
           committer: micronaut-build <${{ secrets.MICRONAUT_BUILD_EMAIL }}>

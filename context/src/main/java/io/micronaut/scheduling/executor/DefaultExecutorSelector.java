@@ -97,4 +97,9 @@ public class DefaultExecutorSelector implements ExecutorSelector {
         }
         return Optional.empty();
     }
+
+    @Override
+    public Optional<ExecutorService> select(String name) {
+        return beanLocator.findBean(ExecutorService.class, Qualifiers.byName(name));
+    }
 }
