@@ -3582,7 +3582,6 @@ public class DefaultBeanContext implements BeanContext {
                     beanRegistrations = Collections.emptySet();
                 }
             } else if (hasCandidates) {
-                boolean hasNonSingletonCandidate = false;
                 int candidateCount = candidates.size();
                 Stream<BeanDefinition<T>> candidateStream = candidates.stream();
                 candidateStream = applyBeanResolutionFilters(resolutionContext, candidateStream);
@@ -3590,23 +3589,19 @@ public class DefaultBeanContext implements BeanContext {
                 List<BeanDefinition<T>> candidateList = candidateStream.collect(Collectors.toList());
                 beansOfTypeList = new HashSet<>(candidateCount);
                 for (BeanDefinition<T> candidate : candidateList) {
-                    if (!hasNonSingletonCandidate && !candidate.isSingleton()) {
-                        hasNonSingletonCandidate = true;
+                    if (!candidate.isSingleton()) {
+                        allCandidatesAreSingleton = false;
                     }
                     if (candidate.hasAnnotation(Order.class)) {
                         hasOrderAnnotation = true;
                     }
                     addCandidateToList(resolutionContext, beanType, candidate, beansOfTypeList, qualifier, candidateCount == 1);
                 }
-                if (!hasNonSingletonCandidate) {
-                    allCandidatesAreSingleton = true;
-                }
                 beanRegistrations = beansOfTypeList;
             } else {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Found no possible candidate beans of type [{}] for qualifier: {} ", beanType.getName(), qualifier);
                 }
-                allCandidatesAreSingleton = true;
                 beanRegistrations = Collections.emptySet();
             }
 
