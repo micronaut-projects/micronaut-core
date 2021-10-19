@@ -3522,7 +3522,6 @@ public class DefaultBeanContext implements BeanContext {
             }
         }
         final Class<T> beanClass = beanType.getType();
-        hasQualifier = qualifier != null;
         BeanKey<T> key = new BeanKey<>(beanType, qualifier);
 
         if (LOG.isTraceEnabled()) {
