@@ -279,6 +279,32 @@ class Test {
         definition.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).get() == AnnotationUtil.NAMED
     }
 
+    void 'test named via alias and applyDefault'() {
+        given:
+        def definition = buildBeanDefinition('test.Test', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@MockBean
+class Test {
+
+}
+
+@Bean
+@interface MockBean {
+
+    @AliasFor(annotation = Replaces.class, member = "named", applyDefault = true)
+    @AliasFor(annotation = jakarta.inject.Named.class, member = "value", applyDefault = true)
+    String named() default "foo";
+}
+''')
+        expect:
+        definition.getDeclaredQualifier() == Qualifiers.byName("foo")
+        definition.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).get() == AnnotationUtil.NAMED
+        definition.annotationMetadata.stringValue(Replaces, "named").get() == "foo"
+    }
+
     void 'test qualifier annotation'() {
         given:
         def definition = buildBeanDefinition('test.Test', '''
