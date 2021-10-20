@@ -116,4 +116,13 @@ class MyRepoIntroductionSpec extends Specification {
             MyRepoIntroducer.EXECUTED_METHODS.clear()
     }
 
+    void "test overridden void methods"() {
+        when:
+            def bean = applicationContext.getBean(MyRepo2)
+            bean.deleteById(1)
+        then:
+            MyRepoIntroducer.EXECUTED_METHODS.size() == 1
+            MyRepoIntroducer.EXECUTED_METHODS.clear()
+    }
+
 }
