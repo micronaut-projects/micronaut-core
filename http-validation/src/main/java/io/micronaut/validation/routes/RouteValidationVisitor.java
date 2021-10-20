@@ -27,10 +27,7 @@ import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.validation.routes.rules.MissingParameterRule;
-import io.micronaut.validation.routes.rules.NullableParameterRule;
-import io.micronaut.validation.routes.rules.RequestBeanParameterRule;
-import io.micronaut.validation.routes.rules.RouteValidationRule;
+import io.micronaut.validation.routes.rules.*;
 
 import javax.annotation.processing.SupportedOptions;
 import java.util.ArrayList;
@@ -117,6 +114,7 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, Object
         rules.add(new MissingParameterRule());
         rules.add(new NullableParameterRule());
         rules.add(new RequestBeanParameterRule());
+        rules.add(new ClientTypesRule());
     }
 
     /**
