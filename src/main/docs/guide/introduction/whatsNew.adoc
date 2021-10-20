@@ -1,4 +1,11 @@
 //Micronaut {version} includes the following changes:
+
+== 3.2.0
+
+=== GraalVM 21.3.0
+
+Micronaut has been updated to support the latest GraalVM 21.3.0 release. Please keep in mind that starting with 21.3.0 GraalVM doesn't release a version based on JDK 8. If you still use Java 8 use the GraalVM JDK 11 distribution.
+
 == 3.1.0
 
 === Core Features
