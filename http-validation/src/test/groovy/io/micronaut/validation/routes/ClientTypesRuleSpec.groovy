@@ -30,7 +30,6 @@ interface Foo {
     void "test disallowed return type"() {
         when:
         buildTypeElement("""
-
 package test;
 
 import io.micronaut.http.annotation.*;
@@ -40,23 +39,19 @@ import io.micronaut.http.server.types.files.StreamedFile;
 
 @Client("/foo")
 interface Foo {
-    
     @Get
-    StreamedFile abc();    
-   
+    StreamedFile abc();
 }
 
 """)
         then:
         def ex = thrown(RuntimeException)
-        ex.message.contains("Type [class io.micronaut.http.server.types.files.StreamedFile] and its subtypes " +
-                "must not be used as return types in declarative client methods")
+        ex.message.contains("The type [io.micronaut.http.server.types.files.StreamedFile] must not be used in declarative client methods. The type is specific to server based usages.")
     }
 
     void "test disallowed return type subclass"() {
         when:
         buildTypeElement("""
-
 package test;
 
 import java.io.InputStream;
@@ -77,18 +72,15 @@ interface Foo {
     @Get
     InheritedStreamedFile abc();
 }
-
 """)
         then:
         def ex = thrown(RuntimeException)
-        ex.message.contains("Type [class io.micronaut.http.server.types.files.StreamedFile] and its subtypes " +
-                "must not be used as return types in declarative client methods")
+        ex.message.contains("The type [test.InheritedStreamedFile] must not be used in declarative client methods. The type is specific to server based usages.")
     }
 
     void "test disallowed parameter type"() {
         when:
         buildTypeElement("""
-
 package test;
 
 import java.io.InputStream;
@@ -104,11 +96,9 @@ interface Foo {
     @Get
     String abc(MultipartBody file);
 }
-
 """)
         then:
         def ex = thrown(RuntimeException)
-        ex.message.contains("Type [interface io.micronaut.http.server.multipart.MultipartBody] and its subtypes must not be used " +
-                "as client method parameters. Use [class io.micronaut.http.client.multipart.MultipartBody] instead")
+        ex.message.contains("The type [io.micronaut.http.server.multipart.MultipartBody] must not be used in declarative client methods. The type is specific to server based usages.")
     }
 }
