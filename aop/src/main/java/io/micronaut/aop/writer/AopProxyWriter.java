@@ -528,6 +528,11 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     public void visitAroundMethod(TypedElement beanType,
                                   MethodElement methodElement) {
 
+        ClassElement returnType = methodElement.isSuspend() ? ClassElement.of(Object.class) : methodElement.getReturnType();
+        Type returnTypeObject = JavaModelUtils.getTypeReference(returnType);
+        boolean isPrimitive = returnType.isPrimitive();
+        boolean isVoidReturn = isPrimitive && returnTypeObject.equals(Type.VOID_TYPE);
+
         final Optional<MethodElement> overridden = methodElement.getOwningType()
                 .getEnclosedElement(ElementQuery.ALL_METHODS
                         .onlyInstance()
@@ -548,18 +553,14 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                             .collect(Collectors.joining(","));
 
             if (!methodElementKey.equals(overriddenByKey)) {
-                buildMethodDelegate(methodElement, overriddenBy);
+                buildMethodDelegate(methodElement, overriddenBy, isVoidReturn);
                 return;
             }
         }
 
         String methodName = methodElement.getName();
-        ClassElement returnType = methodElement.isSuspend() ? ClassElement.of(Object.class) : methodElement.getReturnType();
         List<ParameterElement> argumentTypeList = Arrays.asList(methodElement.getSuspendParameters());
         int argumentCount = argumentTypeList.size();
-        Type returnTypeObject = JavaModelUtils.getTypeReference(returnType);
-        boolean isPrimitive = returnType.isPrimitive();
-        boolean isVoidReturn = isPrimitive && returnTypeObject.equals(Type.VOID_TYPE);
         final Type declaringTypeReference = JavaModelUtils.getTypeReference(beanType);
         MethodRef methodKey = new MethodRef(methodName, argumentTypeList, returnTypeObject);
 
@@ -699,7 +700,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         overriddenMethodGenerator.visitEnd();
     }
 
-    private void buildMethodDelegate(MethodElement methodElement, MethodElement overriddenBy) {
+    private void buildMethodDelegate(MethodElement methodElement, MethodElement overriddenBy, boolean isVoidReturn) {
         String desc = getMethodDescriptor(methodElement.getReturnType().getType(), Arrays.asList(methodElement.getSuspendParameters()));
         MethodVisitor overridden = classWriter.visitMethod(ACC_PUBLIC, methodElement.getName(), desc, null, null);
         GeneratorAdapter overriddenMethodGenerator = new GeneratorAdapter(overridden, ACC_PUBLIC, methodElement.getName(), desc);
@@ -715,12 +716,12 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 getMethodDescriptor(overriddenBy.getReturnType().getType(), Arrays.asList(overriddenBy.getSuspendParameters())),
                 this.isInterface && overriddenBy.isDefault());
 
-        ClassElement returnType = overriddenBy.getReturnType();
-        if (returnType.isTypeVariable()) {
-            returnVoid(overriddenMethodGenerator);
+        if (isVoidReturn) {
+            overriddenMethodGenerator.returnValue();
         } else {
+            ClassElement returnType = overriddenBy.getReturnType();
             pushCastToType(overriddenMethodGenerator, returnType);
-            pushReturnValue(overriddenMethodGenerator, returnType);
+            pushReturnValue(overriddenMethodGenerator, overriddenBy.getReturnType());
         }
         overriddenMethodGenerator.visitMaxs(DEFAULT_MAX_STACK, 1);
         overriddenMethodGenerator.visitEnd();

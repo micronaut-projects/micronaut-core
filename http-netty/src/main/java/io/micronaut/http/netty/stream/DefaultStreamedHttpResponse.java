@@ -18,6 +18,7 @@ package io.micronaut.http.netty.stream;
 import io.micronaut.core.annotation.Internal;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import org.reactivestreams.Publisher;
@@ -53,6 +54,17 @@ public class DefaultStreamedHttpResponse extends DefaultHttpResponse implements 
      */
     public DefaultStreamedHttpResponse(HttpVersion version, HttpResponseStatus status, boolean validateHeaders, Publisher<HttpContent> stream) {
         super(version, status, validateHeaders);
+        this.stream = stream;
+    }
+
+    /**
+     * @param version         The Http Version
+     * @param status          The Http response status
+     * @param headers         The Http headers
+     * @param stream          The publisher
+     */
+    public DefaultStreamedHttpResponse(HttpVersion version, HttpResponseStatus status, HttpHeaders headers, Publisher<HttpContent> stream) {
+        super(version, status, headers);
         this.stream = stream;
     }
 

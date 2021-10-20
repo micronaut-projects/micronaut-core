@@ -44,9 +44,9 @@ For sending messages asynchronously outside Micronaut annotated handler methods,
 
 === @ServerWebSocket and Scopes
 
-By default, a unique `@ServerWebSocket` instance is created for each WebSocket connection. This lets you retrieve the api:websocket.WebSocketSession[] from the `@OnOpen` handler and assign it to a field of the `@ServerWebSocket` instance.
+By default, the `@ServerWebSocket` instance is shared for all WebSocket connections. Extra care must be taken to synchronize local state to avoid thread safety issues.
 
-If you define the `@ServerWebSocket` as `@Singleton`, extra care must be taken to synchronize local state to avoid thread safety issues.
+If you prefer to have an instance for each connection, annotate the class with ann:context.annotation.Prototype[]. This lets you retrieve the api:websocket.WebSocketSession[] from the `@OnOpen` handler and assign it to a field of the `@ServerWebSocket` instance.
 
 === Sharing Sessions with the HTTP Session
 

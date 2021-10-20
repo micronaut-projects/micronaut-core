@@ -24,6 +24,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.jackson.JacksonConfiguration;
+import io.micronaut.jackson.ObjectMapperFactory;
 import io.micronaut.jackson.codec.JacksonFeatures;
 import io.micronaut.jackson.core.tree.JsonNodeTreeCodec;
 import io.micronaut.jackson.core.tree.TreeGenerator;
@@ -69,7 +70,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
 
     @Internal
     public JacksonDatabindMapper() {
-        this(new ObjectMapper());
+        this(new ObjectMapperFactory().objectMapper(null, null));
     }
 
     @Internal
