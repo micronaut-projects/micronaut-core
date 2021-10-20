@@ -91,14 +91,11 @@ import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.codec.http2.DefaultHttp2Headers;
-import io.netty.handler.codec.http2.DefaultHttp2PushPromiseFrame;
-import io.netty.handler.codec.http2.Http2ChannelDuplexHandler;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
 import io.netty.handler.codec.http2.Http2Error;
 import io.netty.handler.codec.http2.Http2Exception;
-import io.netty.handler.codec.http2.Http2FrameCodec;
-import io.netty.handler.codec.http2.Http2FrameStream;
-import io.netty.handler.codec.http2.Http2Headers;
+import io.netty.handler.codec.http2.Http2FrameWriter;
+import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.concurrent.Future;
@@ -121,6 +118,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.channels.ClosedChannelException;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -1223,22 +1221,43 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             Map<URI, io.netty.handler.codec.http.HttpResponse> serverPushResponses,
             GenericFutureListener<Future<? super Void>> requestCompletor
     ) {
+        List<Object> pushMessages = Collections.emptyList();
         if (!serverPushResponses.isEmpty()) {
-            Http2FrameCodec frameCodec = context.pipeline().get(Http2FrameCodec.class);
-            Http2ChannelDuplexHandler channelDuplexHandler = context.pipeline().get(Http2ChannelDuplexHandler.class);
-            int requestStreamId = Integer.parseInt(request.getHeaders().get(AbstractNettyHttpRequest.STREAM_ID));
-            for (Map.Entry<URI, io.netty.handler.codec.http.HttpResponse> serverPushResponse : serverPushResponses.entrySet()) {
-                DefaultHttp2Headers pushRequestHeaders = new DefaultHttp2Headers();
-                pushRequestHeaders.authority(serverPushResponse.getKey().getAuthority());
-                pushRequestHeaders.path(serverPushResponse.getKey().getPath());
-                Http2FrameStream newStream = channelDuplexHandler.newStream();
-                DefaultHttp2PushPromiseFrame promiseFrame = new DefaultHttp2PushPromiseFrame(pushRequestHeaders);
-                promiseFrame.pushStream(newStream);
+            if (request.isServerPushSupported()) {
+                pushMessages = new ArrayList<>();
+                Http2ConnectionHandler connectionHandler = context.pipeline().get(Http2ConnectionHandler.class);
+                Http2FrameWriter frameWriter = connectionHandler.encoder().frameWriter();
+                int requestStreamId = Integer.parseInt(request.getHeaders().get(AbstractNettyHttpRequest.STREAM_ID));
+                for (Map.Entry<URI, io.netty.handler.codec.http.HttpResponse> serverPushResponse : serverPushResponses.entrySet()) {
+                    DefaultHttp2Headers pushRequestHeaders = new DefaultHttp2Headers();
+                    String authority = serverPushResponse.getKey().getAuthority();
+                    if (authority == null) {
+                        authority = ""; // TODO
+                    }
+                    pushRequestHeaders.authority(authority);
+                    pushRequestHeaders.path(serverPushResponse.getKey().getPath());
+                    int newStream = connectionHandler.connection().local().incrementAndGetNextStreamId();
+                    frameWriter.writePushPromise(context, requestStreamId, newStream, pushRequestHeaders, 0, context.voidPromise());
+
+                    io.netty.handler.codec.http.HttpResponse response = serverPushResponse.getValue();
+                    response.headers().add(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), newStream);
+                    pushMessages.add(response);
+                }
+            } else {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Discarding {} HTTP2 server push responses because they are not supported by the client. You can check HttpRequest.isServerPushSupported() before adding responses to avoid doing unnecessary computations.",
+                            serverPushResponses.size());
+                }
             }
         }
 
-        context.writeAndFlush(nettyResponse)
-                .addListener(requestCompletor);
+        context.write(nettyResponse).addListener(requestCompletor);
+
+        for (Object pushMessage : pushMessages) {
+            context.write(pushMessage);
+        }
+
+        context.flush();
 
         if (LOG.isDebugEnabled()) {
             LOG.debug("Response {} - {} {}",

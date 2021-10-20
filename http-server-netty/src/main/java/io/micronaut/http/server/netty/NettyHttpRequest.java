@@ -57,6 +57,7 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import io.netty.handler.codec.http.multipart.AbstractHttpData;
+import io.netty.handler.codec.http2.Http2ConnectionHandler;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCounted;
@@ -376,6 +377,12 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     @Internal
     boolean isBodyRequired() {
         return bodyRequired || HttpMethod.requiresRequestBody(getMethod());
+    }
+
+    @Override
+    public boolean isServerPushSupported() {
+        Http2ConnectionHandler http2ConnectionHandler = channelHandlerContext.pipeline().get(Http2ConnectionHandler.class);
+        return http2ConnectionHandler != null && http2ConnectionHandler.connection().remote().allowPushTo();
     }
 
     @Override

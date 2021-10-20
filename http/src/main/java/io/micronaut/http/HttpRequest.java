@@ -198,6 +198,10 @@ public interface HttpRequest<B> extends HttpMessage<B> {
         return this.getAttribute(HttpAttributes.X509_CERTIFICATE, Certificate.class);
     }
 
+    default boolean isServerPushSupported() {
+        return false;
+    }
+
     /**
      * Return a {@link MutableHttpRequest} for a {@link HttpMethod#GET} request for the given URI.
      *
