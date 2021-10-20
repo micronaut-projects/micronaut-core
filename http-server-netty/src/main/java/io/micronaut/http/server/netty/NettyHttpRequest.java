@@ -49,6 +49,7 @@ import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
@@ -57,7 +58,9 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import io.netty.handler.codec.http.multipart.AbstractHttpData;
+import io.netty.handler.codec.http2.DefaultHttp2Headers;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
+import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCounted;
@@ -383,6 +386,30 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     public boolean isServerPushSupported() {
         Http2ConnectionHandler http2ConnectionHandler = channelHandlerContext.pipeline().get(Http2ConnectionHandler.class);
         return http2ConnectionHandler != null && http2ConnectionHandler.connection().remote().allowPushTo();
+    }
+
+    @Override
+    public void serverPush(HttpRequest<?> request) {
+        ChannelHandlerContext connectionHandlerContext = channelHandlerContext.pipeline().context(Http2ConnectionHandler.class);
+        if (connectionHandlerContext != null) {
+            Http2ConnectionHandler connectionHandler = (Http2ConnectionHandler) connectionHandlerContext.handler();
+            int newStream = connectionHandler.connection().local().incrementAndGetNextStreamId();
+
+            io.netty.handler.codec.http.HttpRequest newNettyRequest = NettyHttpRequestBuilder.toHttpRequest(request);
+
+            connectionHandler.encoder().frameWriter().writePushPromise(
+                    connectionHandlerContext,
+                    this.nettyRequest.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text()),
+                    newStream,
+                    HttpConversionUtil.toHttp2Headers(newNettyRequest.headers(), false),
+                    0,
+                    connectionHandlerContext.voidPromise()
+            );
+
+            newNettyRequest.headers().add(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), newStream);
+            // delay until our handling is complete
+            connectionHandlerContext.executor().execute(() -> connectionHandlerContext.fireChannelRead(newNettyRequest));
+        }
     }
 
     @Override

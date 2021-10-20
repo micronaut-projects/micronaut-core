@@ -202,6 +202,9 @@ public interface HttpRequest<B> extends HttpMessage<B> {
         return false;
     }
 
+    default void serverPush(HttpRequest<?> request) {
+    }
+
     /**
      * Return a {@link MutableHttpRequest} for a {@link HttpMethod#GET} request for the given URI.
      *

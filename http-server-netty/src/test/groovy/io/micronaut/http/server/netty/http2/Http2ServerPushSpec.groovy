@@ -53,7 +53,7 @@ class Http2ServerPushSpec extends Specification {
     @Inject
     EmbeddedServer embeddedServer
 
-    private def request(boolean pushEnabled) {
+    private def request(boolean pushEnabled, String path) {
         int expectedResponses = pushEnabled ? 3 : 1
         def responses = new ArrayList()
         def sslContext = SslContextBuilder.forClient()
@@ -117,7 +117,7 @@ class Http2ServerPushSpec extends Specification {
                                                 })
 
 
-                                        def requestIndex = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/serverPush/index')
+                                        def requestIndex = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, path)
                                         requestIndex.headers().add(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), 'https')
                                         ctx.channel().writeAndFlush(requestIndex)
                                     }
@@ -132,7 +132,27 @@ class Http2ServerPushSpec extends Specification {
 
     def 'with push enabled'() {
         given:
-        def responses = request(true)
+        def responses = request(true, '/serverPush/manual')
+
+        expect:
+        responses.size() == 3
+
+        responses[0] instanceof FullHttpResponse
+        responses[0].content().toString(StandardCharsets.UTF_8) == 'push supported: true'
+
+        responses[1] instanceof FullHttpResponse
+        responses[1].content().toString(StandardCharsets.UTF_8) == 'bar' ||
+                responses[1].content().toString(StandardCharsets.UTF_8) == 'baz'
+
+        responses[2] instanceof FullHttpResponse
+        responses[2].content().toString(StandardCharsets.UTF_8) == 'bar' ||
+                responses[2].content().toString(StandardCharsets.UTF_8) == 'baz'
+        responses[1].content().toString(StandardCharsets.UTF_8) != responses[2].content().toString(StandardCharsets.UTF_8)
+    }
+
+    def 'with push enabled: automatic'() {
+        given:
+        def responses = request(true, '/serverPush/automatic')
 
         expect:
         responses.size() == 3
@@ -152,7 +172,7 @@ class Http2ServerPushSpec extends Specification {
 
     def 'with push disabled'() {
         given:
-        def responses = request(false)
+        def responses = request(false, '/serverPush/manual')
 
         expect:
         responses.size() == 1
@@ -165,11 +185,28 @@ class Http2ServerPushSpec extends Specification {
     @Requires(property = "spec.name", value = "Http2ServerPushSpec")
     @Controller("/serverPush")
     static class SameSiteController {
-        @Get("/index")
-        HttpResponse<String> index(HttpRequest<?> request) {
+        @Get("/manual")
+        HttpResponse<String> manual(HttpRequest<?> request) {
             return HttpResponse.ok('push supported: ' + request.isServerPushSupported())
-                    .serverPush(URI.create("/serverPush/resource1"), HttpResponse.ok(Unpooled.wrappedBuffer('bar'.getBytes(StandardCharsets.UTF_8))))
-                    .serverPush(URI.create("/serverPush/resource2"), HttpResponse.ok(Unpooled.wrappedBuffer('baz'.getBytes(StandardCharsets.UTF_8))))
+                    .serverPush(URI.create("/serverPush/resource1"), resource1())
+                    .serverPush(URI.create("/serverPush/resource2"), resource2())
+        }
+
+        @Get("/automatic")
+        HttpResponse<String> automatic(HttpRequest<?> request) {
+            request.serverPush(HttpRequest.GET('/serverPush/resource1'))
+            request.serverPush(HttpRequest.GET('/serverPush/resource2'))
+            return HttpResponse.ok('push supported: ' + request.isServerPushSupported())
+        }
+
+        @Get("/resource1")
+        HttpResponse<?> resource1() {
+            return HttpResponse.ok(Unpooled.wrappedBuffer('bar'.getBytes(StandardCharsets.UTF_8)))
+        }
+
+        @Get("/resource2")
+        HttpResponse<?> resource2() {
+            return HttpResponse.ok(Unpooled.wrappedBuffer('baz'.getBytes(StandardCharsets.UTF_8)))
         }
     }
 }
