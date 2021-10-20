@@ -41,11 +41,23 @@ public interface WebSocketBean<T> {
     T getTarget();
 
     /**
-     * Returns the method annotated with {@link io.micronaut.websocket.annotation.OnMessage}.
+     * Returns the method annotated with {@link io.micronaut.websocket.annotation.OnMessage} responsible for regular
+     * messages.
      *
      * @return the method
      */
     Optional<MethodExecutionHandle<T, ?>> messageMethod();
+
+    /**
+     * Returns the method annotated with {@link io.micronaut.websocket.annotation.OnMessage} responsible for pong
+     * messages.
+     *
+     * @return the method
+     * @since 3.1
+     */
+    default Optional<MethodExecutionHandle<T, ?>> pongMethod() {
+        return Optional.empty();
+    }
 
     /**
      * Returns the method annotated with {@link io.micronaut.websocket.annotation.OnClose}.
