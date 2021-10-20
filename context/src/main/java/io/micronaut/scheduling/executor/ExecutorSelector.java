@@ -37,4 +37,12 @@ public interface ExecutorSelector {
      * {@link Optional#empty()} is returned
      */
     Optional<ExecutorService> select(MethodReference method, ThreadSelection threadSelection);
+
+    /**
+     * Obtain executor for the given name.
+     * @param name The name of the executor
+     * @return An executor if it exists
+     * @since 3.1.0
+     */
+    Optional<ExecutorService> select(String name);
 }

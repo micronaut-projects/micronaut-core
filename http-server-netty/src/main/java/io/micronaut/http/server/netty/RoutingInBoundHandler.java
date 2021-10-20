@@ -160,43 +160,33 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private final RouteExecutor routeExecutor;
 
     /**
-     * @param router                                  The router
-     * @param mediaTypeCodecRegistry                  The media type codec registry
      * @param customizableResponseTypeHandlerRegistry The customizable response type handler registry
-     * @param staticResourceResolver                  The static resource resolver
      * @param serverConfiguration                     The Netty HTTP server configuration
-     * @param requestArgumentSatisfier                The Request argument satisfier
+     * @param embeddedServerContext                   The embedded server context
      * @param ioExecutor                              The IO executor
      * @param httpContentProcessorResolver            The http content processor resolver
-     * @param errorResponseProcessor                  The factory to create error responses
      * @param terminateEventPublisher                 The terminate event publisher
-     * @param routeExecutor                           The route executor
      */
     RoutingInBoundHandler(
-            Router router,
-            MediaTypeCodecRegistry mediaTypeCodecRegistry,
-            NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry,
-            StaticResourceResolver staticResourceResolver,
             NettyHttpServerConfiguration serverConfiguration,
-            RequestArgumentSatisfier requestArgumentSatisfier,
+            NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry,
+            NettyEmbeddedServices embeddedServerContext,
             Supplier<ExecutorService> ioExecutor,
             HttpContentProcessorResolver httpContentProcessorResolver,
-            ErrorResponseProcessor<?> errorResponseProcessor,
-            ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher,
-            RouteExecutor routeExecutor) {
-        this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
+            ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher) {
+        this.mediaTypeCodecRegistry = embeddedServerContext.getMediaTypeCodecRegistry();
         this.customizableResponseTypeHandlerRegistry = customizableResponseTypeHandlerRegistry;
-        this.staticResourceResolver = staticResourceResolver;
+        this.staticResourceResolver = embeddedServerContext.getStaticResourceResolver();
         this.ioExecutorSupplier = ioExecutor;
-        this.router = router;
-        this.requestArgumentSatisfier = requestArgumentSatisfier;
+        this.router = embeddedServerContext.getRouter();
+        this.requestArgumentSatisfier = embeddedServerContext.getRequestArgumentSatisfier();
         this.serverConfiguration = serverConfiguration;
         this.httpContentProcessorResolver = httpContentProcessorResolver;
-        this.errorResponseProcessor = errorResponseProcessor;
+        this.errorResponseProcessor = embeddedServerContext.getRouteExecutor().getErrorResponseProcessor();
         this.terminateEventPublisher = terminateEventPublisher;
         Optional<Boolean> multipartEnabled = serverConfiguration.getMultipart().getEnabled();
         this.multipartEnabled = !multipartEnabled.isPresent() || multipartEnabled.get();
-        this.routeExecutor = routeExecutor;
+        this.routeExecutor = embeddedServerContext.getRouteExecutor();
     }
 
     @Override
@@ -582,7 +572,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 encodeHttpResponse(
                         context,
                         request,
-                        toNettyResponse(message),
+                        toMutableResponse(message),
                         message.body()
                 );
                 subscription.request(1);
@@ -590,11 +580,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             @Override
             protected void doOnError(Throwable throwable) {
-                final MutableHttpResponse<?> defaultErrorResponse = routeExecutor.createDefaultErrorResponse(request, throwable);
+                final MutableHttpResponse<?> defaultErrorResponse = routeExecutor
+                        .createDefaultErrorResponse(request, throwable);
                 encodeHttpResponse(
                         context,
                         request,
-                        toNettyResponse(defaultErrorResponse),
+                        defaultErrorResponse,
                         defaultErrorResponse.body()
                 );
             }
@@ -940,7 +931,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             } else if (body instanceof Publisher) {
                 response.body(null);
                 DelegateStreamedHttpResponse streamedResponse = new DelegateStreamedHttpResponse(
-                        toNettyResponse(response).toHttpResponse(),
+                        toNettyResponse(response),
                         mapToHttpContent(nettyRequest, response, body, context)
                 );
                 context.writeAndFlush(streamedResponse);
@@ -1221,23 +1212,35 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     @NonNull
-    private NettyMutableHttpResponse<?> toNettyResponse(HttpResponse<?> message) {
-        NettyMutableHttpResponse<?> nettyHttpResponse;
-        if (message instanceof NettyMutableHttpResponse) {
-            nettyHttpResponse = (NettyMutableHttpResponse<?>) message;
+    private io.netty.handler.codec.http.HttpResponse toNettyResponse(HttpResponse<?> message) {
+        if (message instanceof NettyHttpResponseBuilder) {
+            return ((NettyHttpResponseBuilder) message).toHttpResponse();
         } else {
-            HttpStatus httpStatus = message.status();
-            Object body = message.body();
-            io.netty.handler.codec.http.HttpHeaders nettyHeaders = new DefaultHttpHeaders(serverConfiguration.isValidateHeaders());
-            message.getHeaders().forEach((BiConsumer<String, List<String>>) nettyHeaders::set);
-            nettyHttpResponse = new NettyMutableHttpResponse<>(
-                    HttpVersion.HTTP_1_1,
-                    HttpResponseStatus.valueOf(httpStatus.getCode(), httpStatus.getReason()),
-                    body instanceof ByteBuf ? body : null,
-                    ConversionService.SHARED
-            );
+            return createNettyResponse(message).toHttpResponse();
         }
-        return nettyHttpResponse;
+    }
+
+    @NonNull
+    private MutableHttpResponse<?> toMutableResponse(HttpResponse<?> message) {
+        if (message instanceof MutableHttpResponse) {
+            return (MutableHttpResponse<?>) message;
+        } else {
+            return createNettyResponse(message);
+        }
+    }
+
+    @NonNull
+    private NettyMutableHttpResponse<?> createNettyResponse(HttpResponse<?> message) {
+        HttpStatus httpStatus = message.status();
+        Object body = message.body();
+        io.netty.handler.codec.http.HttpHeaders nettyHeaders = new DefaultHttpHeaders(serverConfiguration.isValidateHeaders());
+        message.getHeaders().forEach((BiConsumer<String, List<String>>) nettyHeaders::set);
+        return new NettyMutableHttpResponse<>(
+                HttpVersion.HTTP_1_1,
+                HttpResponseStatus.valueOf(httpStatus.getCode(), httpStatus.getReason()),
+                body instanceof ByteBuf ? body : null,
+                ConversionService.SHARED
+        );
     }
 
     private MutableHttpResponse<?> encodeBodyWithCodec(MutableHttpResponse<?> response,

@@ -32,6 +32,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -1163,6 +1164,16 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             return Optional.of(tAnnotationValue);
         }
         return Optional.empty();
+    }
+
+    @Override
+    public String toString() {
+        if (values.isEmpty()) {
+            return "@" + annotationName;
+        } else {
+            return "@" + annotationName + "(" + values.entrySet().stream().map(entry -> entry.getKey() + "=" + entry.getValue()).collect(
+                    Collectors.joining(", ")) + ")";
+        }
     }
 
     @Override

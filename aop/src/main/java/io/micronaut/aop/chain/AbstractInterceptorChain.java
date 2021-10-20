@@ -20,6 +20,7 @@ import io.micronaut.aop.InvocationContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
@@ -122,7 +123,7 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
                             }
 
                             @Override
-                            public boolean equalsType(Argument<?> other) {
+                            public boolean equalsType(@Nullable Argument<?> other) {
                                 return argument.equalsType(other);
                             }
 

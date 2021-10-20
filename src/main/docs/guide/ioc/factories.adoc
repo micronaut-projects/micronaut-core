@@ -59,3 +59,23 @@ snippet::io.micronaut.docs.factories.VehicleMockSpec[tags="imports, class",inden
 <3> The code asserts that the mock implementation is called.
 
 Note that only public or package protected fields are supported on non-primitive types. If the field is `static`, `private`, or `protected` a compilation error will occur.
+
+==== Primitive Beans and Arrays
+
+Since Micronaut 3.1 it is possible to define and inject primitive types and array types from factories.
+
+For example:
+
+snippet::io.micronaut.docs.factories.primitive.CylinderFactory[tags="imports, class",indent=0]
+
+<1> Two primitive integer beans are defined with different names
+
+Primitive beans can be injected like any other bean:
+
+snippet::io.micronaut.docs.factories.primitive.V8Engine[tags="imports, class",indent=0]
+
+Note that primitive beans and primitive array beans have the following limitations:
+
+* <<aop, AOP advice>> cannot be applied to primitives or wrapper types
+* Due to the above custom scopes that proxy are not supported
+* The `@Bean(preDestroy=..)` member is not supported

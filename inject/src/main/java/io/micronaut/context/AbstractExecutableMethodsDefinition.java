@@ -135,7 +135,9 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
      * @return The result
      */
     @UsedByGeneratedCode
-    protected abstract Object dispatch(int index, T target, Object[] args);
+    protected Object dispatch(int index, T target, Object[] args) {
+        throw unknownDispatchAtIndexException(index);
+    }
 
     /**
      * Find {@link Method} representation at the method by index. Used by {@link ExecutableMethod#getTargetMethod()}.
@@ -155,6 +157,17 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     @UsedByGeneratedCode
     protected final Throwable unknownMethodAtIndexException(int index) {
         return new IllegalStateException("Unknown method at index: " + index);
+    }
+
+    /**
+     * Creates a new exception when the dispatch at index is not found.
+     *
+     * @param index The method index
+     * @return The exception
+     */
+    @UsedByGeneratedCode
+    protected final RuntimeException unknownDispatchAtIndexException(int index) {
+        return new IllegalStateException("Unknown dispatch at index: " + index);
     }
 
     /**

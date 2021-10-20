@@ -17,6 +17,8 @@ package io.micronaut.http.server;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.exceptions.BeanCreationException;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ReferenceCounted;
@@ -43,6 +45,7 @@ import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,6 +77,7 @@ import static io.micronaut.inject.util.KotlinExecutableMethodUtils.isKotlinFunct
  * @author James Kleeh
  * @since 3.0.0
  */
+@Singleton
 public final class RouteExecutor {
 
     private static final Logger LOG = LoggerFactory.getLogger(RouteExecutor.class);
@@ -109,6 +113,35 @@ public final class RouteExecutor {
         this.serverConfiguration = serverConfiguration;
         this.errorResponseProcessor = errorResponseProcessor;
         this.executorSelector = executorSelector;
+    }
+
+    /**
+     * @return The router
+     */
+    public @NonNull Router getRouter() {
+        return router;
+    }
+
+    /**
+     * @return The request argument satisfier
+     */
+    @Internal
+    public @NonNull RequestArgumentSatisfier getRequestArgumentSatisfier() {
+        return requestArgumentSatisfier;
+    }
+
+    /**
+     * @return The error response processor
+     */
+    public @NonNull ErrorResponseProcessor<?> getErrorResponseProcessor() {
+        return errorResponseProcessor;
+    }
+
+    /**
+     * @return The executor selector
+     */
+    public @NonNull ExecutorSelector getExecutorSelector() {
+        return executorSelector;
     }
 
     /**
@@ -295,12 +328,11 @@ public final class RouteExecutor {
             boolean executeFilters,
             Flux<RouteMatch<?>> routePublisher) {
         AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(request);
-        final Flux<MutableHttpResponse<?>> resultEmitter = buildResultEmitter(
+        return buildResultEmitter(
                 requestReference,
                 executeFilters,
                 routePublisher
         );
-        return resultEmitter;
     }
 
     /**
@@ -585,7 +617,7 @@ public final class RouteExecutor {
     private Flux<MutableHttpResponse<?>> executeRoute(AtomicReference<HttpRequest<?>> requestReference,
                                                       RouteMatch<?> routeMatch) {
 
-        return Flux.defer(() -> {
+        return Flux.deferContextual(contextView -> {
             try {
                 final RouteMatch<?> finalRoute;
 
@@ -596,6 +628,9 @@ public final class RouteExecutor {
                             .fulfillArgumentRequirements(routeMatch, httpRequest, true);
                 } else {
                     finalRoute = routeMatch;
+                }
+                if (finalRoute.isSuspended()) {
+                    ContinuationArgumentBinder.setupCoroutineContext(httpRequest, contextView);
                 }
 
                 Object body = ServerRequestContext.with(httpRequest, (Supplier<Object>) finalRoute::execute);
@@ -757,16 +792,20 @@ public final class RouteExecutor {
     private MutableHttpResponse<?> processPublisherBody(HttpRequest<?> request,
                                                         MutableHttpResponse<?> response,
                                                         RouteInfo<?> routeInfo) {
-        MediaType mediaType = response.getContentType().orElseGet(() -> resolveDefaultResponseContentType(request, routeInfo));
+        if (response.body() == null) {
+            return response;
+        } else {
+            MediaType mediaType = response.getContentType().orElseGet(() -> resolveDefaultResponseContentType(request, routeInfo));
 
-        Flux<Object> bodyPublisher = applyExecutorToPublisher(
-                Publishers.convertPublisher(response.body(), Publisher.class),
-                findExecutor(routeInfo));
+            Flux<Object> bodyPublisher = applyExecutorToPublisher(
+                    Publishers.convertPublisher(response.body(), Publisher.class),
+                    findExecutor(routeInfo));
 
-        return response
-                .header(HttpHeaders.TRANSFER_ENCODING, "chunked")
-                .header(HttpHeaders.CONTENT_TYPE, mediaType)
-                .body(bodyPublisher);
+            return response
+                    .header(HttpHeaders.TRANSFER_ENCODING, "chunked")
+                    .header(HttpHeaders.CONTENT_TYPE, mediaType)
+                    .body(bodyPublisher);
+        }
     }
 
     private void applyConfiguredHeaders(MutableHttpHeaders headers) {

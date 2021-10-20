@@ -19,6 +19,7 @@ import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.filter.FilterChain
+import io.micronaut.http.filter.FilterPatternStyle
 import io.micronaut.http.filter.HttpFilter
 import org.reactivestreams.Publisher
 import spock.lang.Specification
@@ -71,5 +72,28 @@ class DefaultFilterRouteSpec extends Specification {
         !route.match(HttpMethod.GET, URI.create('/foo')).isPresent()
         route.match(HttpMethod.POST, URI.create('/foo')).isPresent()
         route.match(HttpMethod.PUT, URI.create('/foo')).isPresent()
+    }
+
+    void "test filter route matching with regex pattern style specified"() {
+        given:
+        def filter = new HttpFilter() {
+            @Override
+            Publisher<? extends HttpResponse<?>> doFilter(HttpRequest<?> request, FilterChain chain) {
+                return null
+            }
+        }
+
+        when:
+        def route = new DefaultFilterRoute('/fo(a|o)$', new Supplier<HttpFilter>() {
+            @Override
+            HttpFilter get() {
+                return filter
+            }
+        }).patternStyle(FilterPatternStyle.REGEX)
+
+        then: //get does not match
+        route.match(HttpMethod.GET, URI.create('/foo')).isPresent()
+        !route.match(HttpMethod.POST, URI.create('/foe')).isPresent()
+        route.match(HttpMethod.PUT, URI.create('/foa')).isPresent()
     }
 }

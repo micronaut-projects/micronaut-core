@@ -29,6 +29,7 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.multipart.CompletedFileUpload
+import io.micronaut.json.tree.JsonObject
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import reactor.core.publisher.Flux
@@ -376,6 +377,14 @@ class HttpPostSpec extends Specification {
 
         then:
         res.status == HttpStatus.NO_CONTENT
+    }
+
+    void "test http post getBody should return right type"() {
+        when:
+        def request = HttpRequest.POST('/', JsonObject.createObjectNode([:]))
+
+        then:
+        request.getBody(String).get() == '{}'
     }
 
     @Requires(property = 'spec.name', value = 'HttpPostSpec')

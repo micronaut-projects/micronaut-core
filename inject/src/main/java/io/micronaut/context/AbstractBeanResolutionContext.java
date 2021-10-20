@@ -15,7 +15,9 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.annotation.InjectScope;
 import io.micronaut.context.exceptions.CircularDependencyException;
+import io.micronaut.context.scope.CustomScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -37,12 +39,12 @@ import java.util.*;
 @Internal
 public abstract class AbstractBeanResolutionContext implements BeanResolutionContext {
 
-    private final BeanContext context;
-    private final BeanDefinition rootDefinition;
+    protected final BeanContext context;
+    protected final BeanDefinition rootDefinition;
     private final Path path;
-    private final Map<CharSequence, Object> attributes = new LinkedHashMap<>(2);
+    private Map<CharSequence, Object> attributes;
     private Qualifier<?> qualifier;
-    private final List<BeanRegistration<?>> dependentBeans = new ArrayList<>(3);
+    private List<BeanRegistration<?>> dependentBeans;
 
     /**
      * @param context        The bean context
@@ -55,14 +57,42 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         this.path = new DefaultPath();
     }
 
+    /**
+     * Copy the state from a previous resolution context.
+     * @param context The previous context
+     */
+    public void copyStateFrom(@NonNull AbstractBeanResolutionContext context) {
+        path.addAll(context.path);
+        qualifier = context.qualifier;
+        if (context.attributes != null) {
+            getAttributesOrCreate().putAll(context.attributes);
+        }
+    }
+
     @Override
     public <T> void addDependentBean(BeanIdentifier identifier, BeanDefinition<T> definition, T bean) {
+        if (dependentBeans == null) {
+            dependentBeans = new ArrayList<>(3);
+        }
         dependentBeans.add(new BeanRegistration<>(identifier, definition, bean));
+    }
+
+    @Override
+    public void destroyInjectScopedBeans() {
+        final CustomScope<?> injectScope = ((DefaultBeanContext) context).getCustomScopeRegistry()
+                .findScope(InjectScope.class.getName())
+                .orElse(null);
+        if (injectScope instanceof LifeCycle<?>) {
+            ((LifeCycle<?>) injectScope).stop();
+        }
     }
 
     @NonNull
     @Override
     public List<BeanRegistration<?>> getAndResetDependentBeans() {
+        if (dependentBeans == null) {
+            return Collections.emptyList();
+        }
         final List<BeanRegistration<?>> registrations = Collections.unmodifiableList(new ArrayList<>(dependentBeans));
         dependentBeans.clear();
         return registrations;
@@ -85,7 +115,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     @Override
     public final Object setAttribute(CharSequence key, Object value) {
-        return attributes.put(key, value);
+        return getAttributesOrCreate().put(key, value);
     }
 
     /**
@@ -94,12 +124,15 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      */
     @Override
     public final Object getAttribute(CharSequence key) {
+        if (attributes == null) {
+            return null;
+        }
         return attributes.get(key);
     }
 
     @Override
     public final Object removeAttribute(CharSequence key) {
-        if (key != null) {
+        if (attributes != null && key != null) {
             return attributes.remove(key);
         }
         return null;
@@ -118,6 +151,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
+        if (attributes == null) {
+            return Optional.empty();
+        }
         Object value = attributes.get(name);
         if (value != null && conversionContext.getArgument().getType().isInstance(value)) {
             return Optional.of((T) value);
@@ -127,11 +163,22 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     @Override
     public <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
+        if (attributes == null) {
+            return Optional.empty();
+        }
         Object value = attributes.get(name);
         if (requiredType.isInstance(value)) {
             return Optional.of((T) value);
         }
         return Optional.empty();
+    }
+
+    @NonNull
+    private Map<CharSequence, Object> getAttributesOrCreate() {
+        if (attributes == null) {
+            attributes = new LinkedHashMap<>(2);
+        }
+        return attributes;
     }
 
     /**

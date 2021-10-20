@@ -32,6 +32,7 @@ import jakarta.inject.Qualifier;
 import jakarta.inject.Scope;
 import jakarta.inject.Singleton;
 
+import javax.validation.constraints.NotNull;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationHandler;
@@ -52,6 +53,7 @@ import java.util.function.Function;
 public final class AnnotationMetadataSupport {
 
     private static final Map<String, Map<String, Object>> ANNOTATION_DEFAULTS = new ConcurrentHashMap<>(20);
+    private static final Map<String, String> REPEATABLE_ANNOTATIONS = new ConcurrentHashMap<>(20);
 
     private static final Map<Class<? extends Annotation>, Optional<Constructor<InvocationHandler>>> ANNOTATION_PROXY_CACHE = new ConcurrentHashMap<>(20);
     private static final Map<String, Class<? extends Annotation>> ANNOTATION_TYPES = new ConcurrentHashMap<>(20);
@@ -91,6 +93,23 @@ public final class AnnotationMetadataSupport {
                 Factory.class).forEach(ann ->
                 ANNOTATION_TYPES.put(ann.getName(), ann)
         );
+
+        for (Map.Entry<Class<? extends Annotation>, Class<? extends Annotation>> e : getCoreRepeatableAnnotations()) {
+            REPEATABLE_ANNOTATIONS.put(e.getKey().getName(), e.getValue().getName());
+        }
+    }
+
+    /**
+     * @return core repeatable annotations
+     */
+    @Internal
+    public static List<Map.Entry<Class<? extends Annotation>, Class<? extends Annotation>>> getCoreRepeatableAnnotations() {
+        return Arrays.asList(
+                new AbstractMap.SimpleEntry<>(Indexed.class, Indexes.class),
+                new AbstractMap.SimpleEntry<>(Requires.class, Requirements.class),
+                new AbstractMap.SimpleEntry<>(AliasFor.class, Aliases.class),
+                new AbstractMap.SimpleEntry<>(Property.class, PropertySource.class)
+        );
     }
 
     /**
@@ -100,6 +119,15 @@ public final class AnnotationMetadataSupport {
     @UsedByGeneratedCode
     public static Map<String, Object> getDefaultValues(String annotation) {
         return ANNOTATION_DEFAULTS.getOrDefault(annotation, Collections.emptyMap());
+    }
+
+    /**
+     * @param annotation The annotation
+     * @return The repeatable annotation container.
+     */
+    @Internal
+    public static String getRepeatableAnnotation(String annotation) {
+        return REPEATABLE_ANNOTATIONS.get(annotation);
     }
 
     /**
@@ -115,7 +143,7 @@ public final class AnnotationMetadataSupport {
     /**
      * Gets a registered annotation type.
      *
-     * @param name The name of the annotation type
+     * @param name        The name of the annotation type
      * @param classLoader The classloader to retrieve the type
      * @return The annotation
      */
@@ -173,7 +201,7 @@ public final class AnnotationMetadataSupport {
     /**
      * Registers default values for the given annotation and values.
      *
-     * @param annotation The annotation
+     * @param annotation    The annotation
      * @param defaultValues The default values
      */
     static void registerDefaultValues(String annotation, Map<String, Object> defaultValues) {
@@ -185,7 +213,7 @@ public final class AnnotationMetadataSupport {
     /**
      * Registers default values for the given annotation and values.
      *
-     * @param annotation The annotation
+     * @param annotation    The annotation
      * @param defaultValues The default values
      */
     static void registerDefaultValues(AnnotationClassValue<?> annotation, Map<String, Object> defaultValues) {
@@ -194,7 +222,6 @@ public final class AnnotationMetadataSupport {
         }
         registerAnnotationType(annotation);
     }
-
 
     /**
      * Registers a annotation type.
@@ -214,6 +241,28 @@ public final class AnnotationMetadataSupport {
     }
 
     /**
+     * Registers repeatable annotations.
+     *
+     * @param repeatableAnnotations the repeatable annotations
+     */
+    @Internal
+    static void registerRepeatableAnnotations(Map<String, String> repeatableAnnotations) {
+        REPEATABLE_ANNOTATIONS.putAll(repeatableAnnotations);
+    }
+
+    /**
+     * Remove Core repeatable annotations.
+     *
+     * @param repeatableAnnotations the repeatable annotations
+     */
+    @Internal
+    static void removeCoreRepeatableAnnotations(@NotNull Map<String, String> repeatableAnnotations) {
+        for (Map.Entry<Class<? extends Annotation>, Class<? extends Annotation>> e : getCoreRepeatableAnnotations()) {
+            repeatableAnnotations.remove(e.getKey().getName());
+        }
+    }
+
+    /**
      * @param annotation The annotation
      * @return The proxy class
      */
@@ -226,9 +275,9 @@ public final class AnnotationMetadataSupport {
     }
 
     /**
-     * @param annotationClass  The annotation class
+     * @param annotationClass The annotation class
      * @param annotationValue The annotation value
-     * @param <T>              The type
+     * @param <T>             The type
      * @return The annotation
      */
     static <T extends Annotation> T buildAnnotation(Class<T> annotationClass, @Nullable AnnotationValue<T> annotationValue) {

@@ -16,6 +16,7 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
@@ -23,8 +24,15 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 
+import java.lang.reflect.GenericArrayType;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
+import java.lang.reflect.WildcardType;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import static io.micronaut.inject.writer.BeanDefinitionVisitor.PROXY_SUFFIX;
 
@@ -36,12 +44,17 @@ import static io.micronaut.inject.writer.BeanDefinitionVisitor.PROXY_SUFFIX;
  * @since 1.0
  */
 public interface ClassElement extends TypedElement {
+    /**
+     * Constant for an empty class element array.
+     * @since 3.1.0
+     */
+    ClassElement[] ZERO_CLASS_ELEMENTS = new ClassElement[0];
 
     /**
      * Tests whether one type is assignable to another.
      *
      * @param type The type to check
-     * @return {@code true} if and only if the this type is assignable to the second
+     * @return {@code true} if and only if this type is assignable to the second
      */
     boolean isAssignable(String type);
 
@@ -57,10 +70,29 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * @see GenericPlaceholderElement
+     * @return Whether this is a generic placeholder.
+     * @since 3.1.0
+     */
+    @Experimental
+    default boolean isGenericPlaceholder() {
+        return this instanceof GenericPlaceholderElement;
+    }
+
+    /**
+     * @see WildcardElement
+     * @return Whether this is a wildcard.
+     */
+    @Experimental
+    default boolean isWildcard() {
+        return this instanceof WildcardElement;
+    }
+
+    /**
      * Tests whether one type is assignable to another.
      *
      * @param type The type to check
-     * @return {@code true} if and only if the this type is assignable to the second
+     * @return {@code true} if and only if this type is assignable to the second
      * @since 2.3.0
      */
     default boolean isAssignable(ClassElement type) {
@@ -272,10 +304,101 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
-     * @return Whether the type is iterable (either an array or an Iterable)
+     * @return Whether the type is iterable (either an array or an {@link Iterable})
      */
     default boolean isIterable() {
         return isArray() || isAssignable(Iterable.class);
+    }
+
+    /**
+     * The list of type arguments bound to this type, or an empty list if there are no type arguments or this is a raw
+     * type.
+     * <p>
+     * Note that for compatibility reasons, this method is inconsistent with {@link #getTypeArguments()}. In particular,
+     * this method reflects the <i>declaration</i> type: If there is a {@code class Test<T> { T field; }}, this method
+     * will return {@code T} as the field type, even if the field type was obtained through a {@code Test<String>}.
+     *
+     * @return The list of type arguments, in the same order as {@link #getDeclaredGenericPlaceholders()}. Must be empty or
+     * of the same length as {@link #getDeclaredGenericPlaceholders()}.
+     * @since 3.1.0
+     */
+    @NonNull
+    @Experimental
+    default List<? extends ClassElement> getBoundGenericTypes() {
+        return new ArrayList<>(getTypeArguments().values());
+    }
+
+    /**
+     * The type arguments declared on the raw class. Independent of the actual
+     * {@link #getBoundGenericTypes() bound type arguments}.
+     *
+     * <p>This method will resolve the generic placeholders defined of the declaring class, if any.
+     * </p>
+     *
+     * <p>For example {@code List<String>} will result a single placeholder called {@code E} of type {@link Object}.</p>
+     *
+     * @return The type arguments declared on this class.
+     * @since 3.1.0
+     */
+    @NonNull
+    @Experimental
+    default List<? extends GenericPlaceholderElement> getDeclaredGenericPlaceholders() {
+        return Collections.emptyList();
+    }
+
+    /**
+     * Get a {@link ClassElement} instance corresponding to this type, but without any type arguments bound. For
+     * {@code List<String>}, this returns {@code List}.
+     *
+     * @return The raw class of this potentially parameterized type.
+     * @since 3.1.0
+     */
+    @NonNull
+    @Experimental
+    default ClassElement getRawClassElement() {
+        return withBoundGenericTypes(Collections.emptyList());
+    }
+
+    /**
+     * Get a {@link ClassElement} instance corresponding to this type, but with the given type arguments. This is best
+     * effort – implementations may only support {@link ClassElement}s that come from the same visitor context, and
+     * other {@link ClassElement}s only to a limited degree.
+     *
+     * @param typeArguments The new type arguments.
+     * @return A {@link ClassElement} of the same raw class with the new type arguments.
+     * @throws UnsupportedOperationException If any of the given type arguments are unsupported.
+     */
+    @NonNull
+    @Experimental
+    default ClassElement withBoundGenericTypes(@NonNull List<? extends ClassElement> typeArguments) {
+        return this;
+    }
+
+    /**
+     * Perform a fold operation on the type arguments (type arguments, wildcard bounds, resolved via {@link #getBoundGenericTypes()}), and then on this
+     * type. For {@code List<? extends String>}, this returns {@code f(List<f(? extends f(String))>)}. The bounds of
+     * type variables are not folded.
+     *
+     * <p>
+     * {@code null} has special meaning here. Returning {@code null} from a fold operation will try to make the
+     * surrounding type a raw type. For example, for {@code Map<String, Object>}, returning {@code null} for the fold
+     * on {@code Object} will lead to the parameterized {@code Map<String, null>} type being replaced by {@code Map}.
+     * <p>
+     *
+     * <p>This also means that this method may return {@code null} if the top-level fold operation returned {@code null}.</p>
+     *
+     *
+     * @param fold The fold operation to apply recursively to all component types.
+     * @return The folded type.
+     * @since 3.1.0
+     */
+    @Experimental
+    default ClassElement foldBoundGenericTypes(@NonNull Function<ClassElement, ClassElement> fold) {
+        List<ClassElement> typeArgs = getBoundGenericTypes().stream().map(arg -> arg.foldBoundGenericTypes(fold)).collect(Collectors.toList());
+        if (typeArgs.contains(null)) {
+            typeArgs = Collections.emptyList();
+        }
+        return fold.apply(withBoundGenericTypes(typeArgs));
     }
 
     /**
@@ -376,6 +499,43 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * Create a class element for the given complex type.
+     *
+     * @param type The type
+     * @return The class element
+     */
+    @Experimental
+    @NonNull
+    static ClassElement of(@NonNull Type type) {
+        Objects.requireNonNull(type, "Type cannot be null");
+        if (type instanceof Class) {
+            return new ReflectClassElement((Class<?>) type);
+        } else if (type instanceof TypeVariable<?>) {
+            return new ReflectGenericPlaceholderElement((TypeVariable<?>) type, 0);
+        } else if (type instanceof WildcardType) {
+            return new ReflectWildcardElement((WildcardType) type);
+        } else if (type instanceof ParameterizedType) {
+            ParameterizedType pType = (ParameterizedType) type;
+            if (pType.getOwnerType() != null) {
+                throw new UnsupportedOperationException("Owner types are not supported");
+            }
+            return new ReflectClassElement(ReflectTypeElement.getErasure(type)) {
+                @NonNull
+                @Override
+                public List<? extends ClassElement> getBoundGenericTypes() {
+                    return Arrays.stream(pType.getActualTypeArguments())
+                            .map(ClassElement::of)
+                            .collect(Collectors.toList());
+                }
+            };
+        } else if (type instanceof GenericArrayType) {
+            return of(((GenericArrayType) type).getGenericComponentType()).toArray();
+        } else {
+            throw new IllegalArgumentException("Bad type: " + type.getClass().getName());
+        }
+    }
+
+    /**
      * Create a class element for the given simple type.
      * @param type The type
      * @param annotationMetadata The annotation metadata
@@ -400,6 +560,14 @@ public interface ClassElement extends TypedElement {
             @Override
             public Map<String, ClassElement> getTypeArguments() {
                 return Collections.unmodifiableMap(typeArguments);
+            }
+
+            @NonNull
+            @Override
+            public List<? extends ClassElement> getBoundGenericTypes() {
+                return getDeclaredGenericPlaceholders().stream()
+                        .map(tv -> typeArguments.get(tv.getVariableName()))
+                        .collect(Collectors.toList());
             }
         };
     }

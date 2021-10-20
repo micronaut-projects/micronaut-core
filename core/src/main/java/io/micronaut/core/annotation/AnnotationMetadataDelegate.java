@@ -621,4 +621,23 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
         return getAnnotationMetadata().getDeclaredAnnotationValuesByType(annotationType);
     }
 
+    @Override
+    default boolean isRepeatableAnnotation(Class<? extends Annotation> annotation) {
+        return getAnnotationMetadata().isRepeatableAnnotation(annotation);
+    }
+
+    @Override
+    default boolean isRepeatableAnnotation(String annotation) {
+        return getAnnotationMetadata().isRepeatableAnnotation(annotation);
+    }
+
+    @Override
+    default Optional<String> findRepeatableAnnotation(Class<? extends Annotation> annotation) {
+        return getAnnotationMetadata().findRepeatableAnnotation(annotation);
+    }
+
+    @Override
+    default Optional<String> findRepeatableAnnotation(String annotation) {
+        return getAnnotationMetadata().findRepeatableAnnotation(annotation);
+    }
 }

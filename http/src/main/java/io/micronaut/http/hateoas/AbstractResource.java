@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.hateoas;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.ReflectiveAccess;
@@ -121,11 +122,13 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
         return (Impl) this;
     }
 
+    @JsonProperty(LINKS)
     @Override
     public OptionalMultiValues<Link> getLinks() {
         return OptionalMultiValues.of(linkMap);
     }
 
+    @JsonProperty(EMBEDDED)
     @Override
     public OptionalMultiValues<Resource> getEmbedded() {
         return OptionalMultiValues.of(embeddedMap);
@@ -139,7 +142,8 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
     @SuppressWarnings("unchecked")
     @Internal
     @ReflectiveAccess
-    protected final void setLinks(Map<String, Object> links) {
+    @JsonProperty(LINKS)
+    public final void setLinks(Map<String, Object> links) {
         for (Map.Entry<String, Object> entry : links.entrySet()) {
             String name = entry.getKey();
             Object value = entry.getValue();
@@ -159,37 +163,9 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
     @SuppressWarnings("unchecked")
     @Internal
     @ReflectiveAccess
-    protected final void setEmbedded(Map<String, List<Resource>> embedded) {
-        int x = 1;
-/*        for (Map.Entry<String, Object> entry : embedded.entrySet()) {
-            String name = entry.getKey();
-            Object value = entry.getValue();
-            if (value instanceof Collection) {
-                List<Resource> resources = new ArrayList<>();
-                for (Object obj: (Collection) value) {
-                    Resource resource = createResource(obj);
-                    if (resource != null) {
-                        resources.add(resource);
-                    }
-                }
-                embedded(name, resources);
-            } else {
-                Resource resource = createResource(value);
-                if (resource != null) {
-                    embedded(name, resource);
-                }
-            }
-        }*/
+    @JsonProperty(EMBEDDED)
+    public final void setEmbedded(Map<String, Object> embedded) {
     }
-
-//    private Resource createResource(Object resource) {
-//        if (resource instanceof Map) {
-//            Map<Object, Object> map = (Map<Object, Object>) resource;
-//            if (map.containsKey("message")) {
-//                JsonError jsonError = new JsonError("")
-//            }
-//        }
-//    }
 
     private void link(String name, Map<String, Object> linkMap) {
         ConvertibleValues<Object> values = ConvertibleValues.of(linkMap);

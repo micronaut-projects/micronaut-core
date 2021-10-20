@@ -437,7 +437,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 indexedAnnotation.get("annotation", String.class).ifPresent(annotationName -> {
                     if (beanProperty.hasStereotype(annotationName)) {
                         writer.indexProperty(
-                                new AnnotationValue<>(annotationName),
+                                annotationName,
                                 name,
                                 indexedAnnotation.get("member", String.class)
                                         .flatMap(m -> beanProperty.getValue(annotationName, m, String.class)).orElse(null)

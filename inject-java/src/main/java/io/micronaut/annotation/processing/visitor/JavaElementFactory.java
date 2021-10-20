@@ -48,18 +48,25 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
             @NonNull TypeElement type,
             @NonNull AnnotationMetadata annotationMetadata) {
         ElementKind kind = type.getKind();
-        if (kind == ElementKind.ENUM) {
-            return new JavaEnumElement(
-                    type,
-                    annotationMetadata,
-                    visitorContext
-            );
-        } else {
-            return new JavaClassElement(
-                    type,
-                    annotationMetadata,
-                    visitorContext
-            );
+        switch (kind) {
+            case ENUM:
+                return new JavaEnumElement(
+                        type,
+                        annotationMetadata,
+                        visitorContext
+                );
+            case ANNOTATION_TYPE:
+                return new JavaAnnotationElement(
+                        type,
+                        annotationMetadata,
+                        visitorContext
+                );
+            default:
+                return new JavaClassElement(
+                        type,
+                        annotationMetadata,
+                        visitorContext
+                );
         }
     }
 
@@ -67,36 +74,39 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
     @Override
     public ClassElement newClassElement(@NonNull TypeElement type, @NonNull AnnotationMetadata annotationMetadata, @NonNull Map<String, ClassElement> resolvedGenerics) {
         ElementKind kind = type.getKind();
-        if (kind == ElementKind.ENUM) {
-            return new JavaEnumElement(
-                    type,
-                    annotationMetadata,
-                    visitorContext
-            ) {
-                @NonNull
-                @Override
-                public Map<String, ClassElement> getTypeArguments() {
-                    if (resolvedGenerics != null) {
-                        return resolvedGenerics;
+        switch (kind) {
+            case ENUM:
+                return new JavaEnumElement(
+                        type,
+                        annotationMetadata,
+                        visitorContext
+                ) {
+                    @NonNull
+                    @Override
+                    public Map<String, ClassElement> getTypeArguments() {
+                        if (resolvedGenerics != null) {
+                            return resolvedGenerics;
+                        }
+                        return super.getTypeArguments();
                     }
-                    return super.getTypeArguments();
-                }
-            };
-        } else {
-            return new JavaClassElement(
-                    type,
-                    annotationMetadata,
-                    visitorContext
-            ) {
-                @NonNull
-                @Override
-                public Map<String, ClassElement> getTypeArguments() {
-                    if (resolvedGenerics != null) {
-                        return resolvedGenerics;
+                };
+            case ANNOTATION_TYPE:
+                return new JavaAnnotationElement(type, annotationMetadata, visitorContext);
+            default:
+                return new JavaClassElement(
+                        type,
+                        annotationMetadata,
+                        visitorContext
+                ) {
+                    @NonNull
+                    @Override
+                    public Map<String, ClassElement> getTypeArguments() {
+                        if (resolvedGenerics != null) {
+                            return resolvedGenerics;
+                        }
+                        return super.getTypeArguments();
                     }
-                    return super.getTypeArguments();
-                }
-            };
+                };
         }
     }
 
