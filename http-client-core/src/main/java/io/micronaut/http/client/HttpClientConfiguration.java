@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
@@ -559,7 +560,7 @@ public abstract class HttpClientConfiguration {
      */
     public Optional<String> getProxyUsername() {
         String type = proxyType.name().toLowerCase();
-        return proxyUsername != null ? Optional.of(proxyUsername) : Optional.ofNullable(System.getProperty(type + ".proxyUser"));
+        return proxyUsername != null ? Optional.of(proxyUsername) : Optional.ofNullable(CachedEnvironment.getProperty(type + ".proxyUser"));
     }
 
     /**
@@ -577,7 +578,7 @@ public abstract class HttpClientConfiguration {
     @SuppressWarnings("WeakerAccess")
     public Optional<String> getProxyPassword() {
         String type = proxyType.name().toLowerCase();
-        return proxyPassword != null ? Optional.of(proxyPassword) : Optional.ofNullable(System.getProperty(type + ".proxyPassword"));
+        return proxyPassword != null ? Optional.of(proxyPassword) : Optional.ofNullable(CachedEnvironment.getProperty(type + ".proxyPassword"));
     }
 
     /**

@@ -17,6 +17,8 @@ package io.micronaut.context.env;
 
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -24,18 +26,31 @@ import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.StringConvention;
+import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.EnvironmentProperties;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.MapPropertyResolver;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.core.value.ValueException;
 import org.slf4j.Logger;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Properties;
+import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -52,12 +67,14 @@ import java.util.stream.Collectors;
 public class PropertySourcePropertyResolver implements PropertyResolver {
 
     private static final Logger LOG = ClassUtils.getLogger(PropertySourcePropertyResolver.class);
+
+    private static final EnvironmentProperties CURRENT_ENV = StaticOptimizations.get(EnvironmentProperties.class)
+            .orElseGet(EnvironmentProperties::empty);
     private static final Pattern DOT_PATTERN = Pattern.compile("\\.");
     private static final String RANDOM_PREFIX = "\\s?random\\.(\\S+?)";
     private static final String RANDOM_UPPER_LIMIT = "(\\(-?\\d+(\\.\\d+)?\\))";
     private static final String RANDOM_RANGE = "(\\[-?\\d+(\\.\\d+)?,\\s?-?\\d+(\\.\\d+)?])";
     private static final Pattern RANDOM_PATTERN = Pattern.compile("\\$\\{" + RANDOM_PREFIX + "(" + RANDOM_UPPER_LIMIT + "|" + RANDOM_RANGE + ")?\\}");
-    private static final char[] DOT_DASH = new char[] {'.', '-'};
     private static final Object NO_VALUE = new Object();
     private static final PropertyCatalog[] CONVENTIONS = {PropertyCatalog.GENERATED, PropertyCatalog.RAW};
     protected final ConversionService<?> conversionService;
@@ -72,6 +89,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     private final Random random = new Random();
     private final Map<String, Boolean> containsCache = new ConcurrentHashMap<>(20);
     private final Map<String, Object> resolvedValueCache = new ConcurrentHashMap<>(20);
+    private final EnvironmentProperties environmentProperties = EnvironmentProperties.fork(CURRENT_ENV);
 
     /**
      * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}.
@@ -822,65 +840,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
 
     private List<String> resolvePropertiesForConvention(String property, PropertySource.PropertyConvention convention) {
         if (convention == PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE) {
-            property = property.toLowerCase(Locale.ENGLISH);
-
-            List<Integer> separatorIndexList = new ArrayList<>();
-            char[] propertyArr = property.toCharArray();
-            for (int i = 0; i < propertyArr.length; i++) {
-                if (propertyArr[i] == '_') {
-                    separatorIndexList.add(i);
-                }
-            }
-
-            if (!separatorIndexList.isEmpty()) {
-                //store the index in the array where each separator is
-                int[] separatorIndexes = separatorIndexList.stream().mapToInt(Integer::intValue).toArray();
-
-                int separatorCount = separatorIndexes.length;
-                //halves is used to determine when to flip the separator
-                int[] halves = new int[separatorCount];
-                //stores the separator per half
-                byte[] separator = new byte[separatorCount];
-                //the total number of permutations. 2 to the power of the number of separators
-                int permutations = (int) Math.pow(2, separatorCount);
-
-                //initialize the halves
-                //ex 4, 2, 1 for A_B_C_D
-                for (int i = 0; i < halves.length; i++) {
-                    int start = (i == 0) ? permutations : halves[i - 1];
-                    halves[i] = start / 2;
-                }
-
-                String[] properties = new String[permutations];
-
-                for (int i = 0; i < permutations; i++) {
-                    int round = i + 1;
-                    for (int s = 0; s < separatorCount; s++) {
-                        //mutate the array with the separator
-                        propertyArr[separatorIndexes[s]] = DOT_DASH[separator[s]];
-                        if (round % halves[s] == 0) {
-                            separator[s] ^= 1;
-                        }
-                    }
-                    properties[i] = new String(propertyArr);
-                }
-
-                return Arrays.asList(properties);
-            } else {
-                return Collections.singletonList(property);
-            }
+            return environmentProperties.findPropertyNamesForEnvironmentVariable(property);
         }
         return Collections.singletonList(
                 NameUtils.hyphenate(property, true)
         );
-    }
-
-    private String trimIndex(String name) {
-        int i = name.lastIndexOf('[');
-        if (i > -1 && name.endsWith("]")) {
-            name = name.substring(0, i);
-        }
-        return name;
     }
 
     private void fill(List list, Integer toIndex, Object value) {

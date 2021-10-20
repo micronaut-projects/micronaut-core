@@ -110,8 +110,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      */
     private static final MediaType[] DEFAULT_ACCEPT_TYPES = {MediaType.APPLICATION_JSON_TYPE};
 
-    private static final int HEADERS_INITIAL_CAPACITY = 3;
-    private static final int ATTRIBUTES_INITIAL_CAPACITY = 1;
     private final List<ReactiveClientResultTransformer> transformers;
     private final HttpClientBinderRegistry binderRegistry;
     private final JsonMediaTypeCodec jsonMediaTypeCodec;

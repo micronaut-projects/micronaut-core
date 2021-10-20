@@ -21,6 +21,7 @@ import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.context.condition.OperatingSystem;
 import io.micronaut.context.condition.TrueCondition;
+import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -408,7 +409,7 @@ public class RequiresCondition implements Condition {
                         }
                         return isSupported;
                     case JAVA:
-                        String javaVersion = System.getProperty("java.version");
+                        String javaVersion = CachedEnvironment.getProperty("java.version");
                         try {
                             boolean result = SemanticVersion.isAtLeast(javaVersion, version);
                             if (!result) {

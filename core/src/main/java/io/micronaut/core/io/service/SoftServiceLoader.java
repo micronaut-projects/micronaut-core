@@ -17,14 +17,21 @@ package io.micronaut.core.io.service;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.reflect.ClassUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -36,7 +43,13 @@ import java.util.Optional;
 import java.util.ServiceConfigurationError;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * <p>Variation of {@link java.util.ServiceLoader} that allows soft loading and conditional loading of
@@ -47,8 +60,14 @@ import java.util.function.Predicate;
  * @since 1.0
  */
 public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>> {
-
     public static final String META_INF_SERVICES = "META-INF/services";
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(SoftServiceLoader.class);
+
+    private static final Map<String, SoftServiceLoader.StaticServiceLoader<?>> STATIC_SERVICES =
+            StaticOptimizations.get(Optimizations.class)
+                    .map(Optimizations::getServiceLoaders)
+                    .orElse(Collections.emptyMap());
 
     private final Class<S> serviceType;
     private final ClassLoader classLoader;
@@ -63,7 +82,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     private SoftServiceLoader(Class<S> serviceType, ClassLoader classLoader, Predicate<String> condition) {
         this.serviceType = serviceType;
         this.classLoader = classLoader == null ? ClassLoader.getSystemClassLoader() : classLoader;
-        this.unloadedServices = new ServiceLoaderIterator();
+        this.unloadedServices = STATIC_SERVICES.containsKey(serviceType.getName()) ? new StaticServicesLoaderIterator() : new ServiceLoaderIterator();
         this.condition = condition == null ? (String name) -> true : condition;
     }
 
@@ -71,7 +90,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * Creates a new {@link SoftServiceLoader} using the thread context loader by default.
      *
      * @param service The service type
-     * @param <S>     The service generic type
+     * @param <S> The service generic type
      * @return A new service loader
      */
     public static <S> SoftServiceLoader<S> load(Class<S> service) {
@@ -82,8 +101,8 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * Creates a new {@link SoftServiceLoader} using the given type and class loader.
      *
      * @param service The service type
-     * @param loader  The class loader
-     * @param <S>     The service generic type
+     * @param loader The class loader
+     * @param <S> The service generic type
      * @return A new service loader
      */
     public static <S> SoftServiceLoader<S> load(Class<S> service,
@@ -94,10 +113,10 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     /**
      * Creates a new {@link SoftServiceLoader} using the given type and class loader.
      *
-     * @param service   The service type
-     * @param loader    The class loader to use
+     * @param service The service type
+     * @param loader The class loader to use
      * @param condition A {@link Predicate} to use to conditionally load the service. The predicate is passed the service class name
-     * @param <S>       The service generic type
+     * @param <S> The service generic type
      * @return A new service loader
      */
     public static <S> SoftServiceLoader<S> load(Class<S> service,
@@ -135,16 +154,57 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         return Optional.empty();
     }
 
+    private static void measure(String label, Runnable op) {
+        long sd = System.nanoTime();
+        try {
+            op.run();
+        } finally {
+            long dur = System.nanoTime() - sd;
+            LOGGER.debug(label + " took " + TimeUnit.MILLISECONDS.convert(dur, TimeUnit.NANOSECONDS) + "ms");
+        }
+    }
+
     /**
      * Collects all initialized instances.
      *
      * @param values The collection to be populated.
      * @param predicate The predicated to filter the instances or null if not needed.
      */
+    @SuppressWarnings("unchecked")
     public void collectAll(@NonNull Collection<S> values, @Nullable Predicate<S> predicate) {
-        ServicesLoader<S> servicesLoader = new ServicesLoader<>(serviceType.getName(), condition, classLoader, predicate);
-        ForkJoinPool.commonPool().invoke(servicesLoader);
-        servicesLoader.collect(values);
+        String name = serviceType.getName();
+        measure("Loading " + name + " services", () -> {
+            SoftServiceLoader.StaticServiceLoader<?> serviceLoader = STATIC_SERVICES.get(name);
+            if (serviceLoader != null) {
+                collectStaticServices(values, predicate, (StaticServiceLoader<S>) serviceLoader);
+            } else {
+                collectDynamicServices(values, predicate, name);
+            }
+            LOGGER.debug("Loaded {} services of type {}", values.size(), name);
+        });
+    }
+
+    private void collectDynamicServices(Collection<S> values, Predicate<S> predicate, String name) {
+        ServiceCollector<S> collector = newCollector(name, condition, classLoader, className -> {
+            try {
+                final Class<?> loadedClass = Class.forName(className, false, classLoader);
+                S result = (S) loadedClass.getDeclaredConstructor().newInstance();
+                if (predicate != null && !predicate.test(result)) {
+                    return null;
+                }
+                return result;
+            } catch (NoClassDefFoundError | ClassNotFoundException | NoSuchMethodException e) {
+                // Ignore
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
+            return null;
+        });
+        collector.collect(values);
+    }
+
+    private void collectStaticServices(Collection<S> values, Predicate<S> predicate, StaticServiceLoader<S> loader) {
+        values.addAll(loader.load(predicate));
     }
 
     /**
@@ -193,13 +253,94 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     }
 
     /**
-     * @param name        The name
+     * @param name The name
      * @param loadedClass The loaded class
      * @return The service definition
      */
     @SuppressWarnings("unchecked")
     protected ServiceDefinition<S> newService(String name, Optional<Class> loadedClass) {
         return new DefaultServiceDefinition(name, loadedClass);
+    }
+
+    public static <S> ServiceCollector<S> newCollector(String serviceName,
+                                                       Predicate<String> lineCondition,
+                                                       ClassLoader classLoader,
+                                                       Function<String, S> transformer) {
+        return new DefaultServiceCollector<>(serviceName, lineCondition, classLoader, transformer);
+    }
+
+    public static final class StaticDefinition<S> implements ServiceDefinition<S> {
+        private static final MethodHandles.Lookup LOOKUP = MethodHandles.publicLookup();
+        private static final MethodType VOID_TYPE = MethodType.methodType(void.class);
+
+        private final String name;
+        private final Supplier<S> value;
+
+        private StaticDefinition(String name, Supplier<S> value) {
+            this.name = name;
+            this.value = value;
+        }
+
+        public static <S> StaticDefinition<S> of(String name, Class<S> value) {
+            return new StaticDefinition<>(name, () -> doCreate(value));
+        }
+
+        public static <S> StaticDefinition<S> of(String name, Supplier<S> value) {
+            return new StaticDefinition<>(name, value);
+        }
+
+        @Override
+        public boolean isPresent() {
+            return true;
+        }
+
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public S load() {
+            return value.get();
+        }
+
+        @SuppressWarnings({"unchecked"})
+        private static <S> S doCreate(Class<S> clazz) {
+            try {
+                return (S) LOOKUP.findConstructor(clazz, VOID_TYPE).invoke();
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    private final class StaticServicesLoaderIterator implements Iterator<ServiceDefinition<S>> {
+
+        Iterator<StaticDefinition<S>> iterator;
+
+        @SuppressWarnings("unchecked")
+        private void ensureIterator() {
+            if (iterator == null) {
+                StaticServiceLoader<S> staticServiceLoader = (StaticServiceLoader<S>) STATIC_SERVICES.get(serviceType.getName());
+                iterator = staticServiceLoader.findAll(s -> condition == null || condition.test(s.getClass().getName()))
+                        .iterator();
+            }
+        }
+
+        @Override
+        public boolean hasNext() {
+            ensureIterator();
+            return iterator.hasNext();
+        }
+
+        @Override
+        public ServiceDefinition<S> next() {
+            ensureIterator();
+            if (!hasNext()) {
+                throw new NoSuchElementException();
+            }
+            return iterator.next();
+        }
     }
 
     /**
@@ -270,24 +411,38 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         }
     }
 
+    public interface ServiceCollector<S> {
+        void collect(Collection<S> values);
+
+        default void collect(Consumer<? super S> consumer) {
+            List<S> values = new ArrayList<>();
+            collect(values);
+            values.forEach(e -> {
+                if (e != null) {
+                    consumer.accept(e);
+                }
+            });
+        }
+    }
+
     /**
      * Fork-join recursive services loader.
      *
      * @param <S> The type
      */
-    private static class ServicesLoader<S> extends RecursiveActionValuesCollector<S> {
+    private static class DefaultServiceCollector<S> extends RecursiveActionValuesCollector<S> implements ServiceCollector<S> {
 
         private final String serviceName;
         private final Predicate<String> lineCondition;
         private final ClassLoader classLoader;
-        private final Predicate<S> predicate;
+        private final Function<String, S> transformer;
         private final List<RecursiveActionValuesCollector<S>> tasks = new LinkedList<>();
 
-        public ServicesLoader(String serviceName, Predicate<String> lineCondition, ClassLoader classLoader, Predicate<S> predicate) {
+        public DefaultServiceCollector(String serviceName, Predicate<String> lineCondition, ClassLoader classLoader, Function<String, S> transformer) {
             this.serviceName = serviceName;
             this.lineCondition = lineCondition;
             this.classLoader = classLoader;
-            this.predicate = predicate;
+            this.transformer = transformer;
         }
 
         @Override
@@ -296,7 +451,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                 Enumeration<URL> serviceConfigs = classLoader.getResources(META_INF_SERVICES + '/' + serviceName);
                 while (serviceConfigs.hasMoreElements()) {
                     URL url = serviceConfigs.nextElement();
-                    UrlServicesLoader<S> task = new UrlServicesLoader<>(url, lineCondition, classLoader, predicate);
+                    UrlServicesLoader<S> task = new UrlServicesLoader<>(url, lineCondition, transformer);
                     tasks.add(task);
                     task.fork();
                 }
@@ -306,6 +461,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         }
 
         public void collect(Collection<S> values) {
+            ForkJoinPool.commonPool().invoke(this);
             for (RecursiveActionValuesCollector<S> task : tasks) {
                 task.join();
                 task.collect(values);
@@ -322,15 +478,13 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
 
         private final URL url;
         private final Predicate<String> lineCondition;
-        private final ClassLoader classLoader;
-        private final Predicate<S> predicate;
+        private final Function<String, S> transformer;
         private final List<ServiceInstanceLoader<S>> tasks = new LinkedList<>();
 
-        public UrlServicesLoader(URL url, Predicate<String> lineCondition, ClassLoader classLoader, Predicate<S> predicate) {
+        public UrlServicesLoader(URL url, Predicate<String> lineCondition, Function<String, S> transformer) {
             this.url = url;
             this.lineCondition = lineCondition;
-            this.classLoader = classLoader;
-            this.predicate = predicate;
+            this.transformer = transformer;
         }
 
         @Override
@@ -352,7 +506,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                         if (i > -1) {
                             line = line.substring(0, i);
                         }
-                        ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(line, classLoader, predicate);
+                        ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(line, transformer);
                         tasks.add(task);
                         task.fork();
                     }
@@ -379,27 +533,19 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     private static class ServiceInstanceLoader<S> extends RecursiveActionValuesCollector<S> {
 
         private final String className;
-        private final ClassLoader classLoader;
-        private final Predicate<S> predicate;
+        private final Function<String, S> transformer;
         private S result;
         private Throwable throwable;
 
-        public ServiceInstanceLoader(String className, ClassLoader classLoader, Predicate<S> predicate) {
+        public ServiceInstanceLoader(String className, Function<String, S> transformer) {
             this.className = className;
-            this.classLoader = classLoader;
-            this.predicate = predicate;
+            this.transformer = transformer;
         }
 
         @Override
         protected void compute() {
             try {
-                final Class<?> loadedClass = Class.forName(className, false, classLoader);
-                result = (S) loadedClass.getDeclaredConstructor().newInstance();
-                if (predicate != null && !predicate.test(result)) {
-                    result = null;
-                }
-            } catch (NoClassDefFoundError | ClassNotFoundException e) {
-                // Ignore
+                result = transformer.apply(className);
             } catch (Throwable e) {
                 throwable = e;
             }
@@ -430,4 +576,32 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         public abstract void collect(Collection<S> values);
 
     }
+
+    public interface StaticServiceLoader<S> {
+        Stream<StaticDefinition<S>> findAll(Predicate<String> predicate);
+
+        default List<S> load(Predicate<S> predicate) {
+            return load(n -> true, predicate);
+        }
+
+        default List<S> load(Predicate<String> condition, Predicate<S> predicate) {
+            return findAll(condition)
+                    .map(ServiceDefinition::load)
+                    .filter(s -> predicate == null || predicate.test(s))
+                    .collect(Collectors.toList());
+        }
+    }
+
+    public static final class Optimizations {
+        private final Map<String, SoftServiceLoader.StaticServiceLoader<?>> serviceLoaders;
+
+        public Optimizations(Map<String, StaticServiceLoader<?>> serviceLoaders) {
+            this.serviceLoaders = serviceLoaders;
+        }
+
+        public Map<String, StaticServiceLoader<?>> getServiceLoaders() {
+            return serviceLoaders;
+        }
+    }
+
 }

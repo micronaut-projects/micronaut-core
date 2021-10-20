@@ -20,6 +20,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.BeanContextConfiguration
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.TestCachePuts
@@ -169,11 +170,32 @@ class Foo {}
 
 class Bar {}
 ''')
+        when:
         def bean = getBean(context, 'test.Test')
 
-        expect:
+        then:
         bean.provider.isPresent()
         !bean.barProvider.isPresent()
+        bean.provider.find(null).isPresent()
+        !bean.barProvider.find(null).isPresent()
+
+        when:
+        bean.barProvider.get()
+
+        then:
+        thrown(NoSuchBeanException)
+
+        when:
+        bean.barProvider.getDefinition()
+
+        then:
+        thrown(NoSuchBeanException)
+
+        when:
+        BeanDefinition definition = bean.provider.getDefinition()
+
+        then:
+        definition != null
 
         cleanup:
         context.close()

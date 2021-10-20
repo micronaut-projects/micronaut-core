@@ -78,11 +78,11 @@ import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
-import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.netty.stream.DefaultHttp2Content;
+import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
 import io.micronaut.http.netty.stream.Http2Content;
 import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
 import io.micronaut.http.netty.stream.JsonSubscriber;
@@ -1343,7 +1343,7 @@ public class DefaultHttpClient implements
             // if the request URI includes a scheme then it is fully qualified so use the direct server
             return Flux.just(requestURI);
         } else {
-            if (parentRequest == null) {
+            if (parentRequest == null || parentRequest.getUri().getHost() == null) {
                 return resolveURI(request, false);
             } else {
                 URI parentURI = parentRequest.getUri();
@@ -2028,7 +2028,6 @@ public class DefaultHttpClient implements
         ChannelPipeline pipeline = channel.pipeline();
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL, new SimpleChannelInboundHandlerInstrumented<FullHttpResponse>() {
             final AtomicBoolean received = new AtomicBoolean(false);
-            final AtomicBoolean emitted = new AtomicBoolean(false);
 
             @Override
             public boolean acceptInboundMessage(Object msg) {
@@ -2053,10 +2052,28 @@ public class DefaultHttpClient implements
             @Override
             protected void channelReadInstrumented(ChannelHandlerContext ctx, FullHttpResponse msg) {
                 if (received.compareAndSet(false, true)) {
-                    NettyMutableHttpResponse<Object> response = new NettyMutableHttpResponse<>(
-                            msg,
-                            ConversionService.SHARED
+                    HttpResponseStatus status = msg.status();
+                    int statusCode = status.code();
+                    HttpStatus httpStatus;
+                    try {
+                        httpStatus = HttpStatus.valueOf(statusCode);
+                    } catch (IllegalArgumentException e) {
+                        emitter.error(e);
+                        return;
+                    }
+                    Publisher<HttpContent> bodyPublisher;
+                    if (msg.content() instanceof EmptyByteBuf) {
+                        bodyPublisher = Publishers.empty();
+                    } else {
+                        bodyPublisher = Publishers.just(new DefaultLastHttpContent(msg.content()));
+                    }
+                    DefaultStreamedHttpResponse nettyResponse = new DefaultStreamedHttpResponse(
+                            msg.protocolVersion(),
+                            msg.status(),
+                            msg.headers(),
+                            bodyPublisher
                     );
+                    NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(nettyResponse, httpStatus);
                     HttpHeaders headers = msg.headers();
                     if (log.isTraceEnabled()) {
                         log.trace("HTTP Client Streaming Response Received ({}) for Request: {} {}", msg.status(), nettyRequest.method().name(), nettyRequest.uri());
@@ -2125,13 +2142,11 @@ public class DefaultHttpClient implements
                                 @Override
                                 public void onNext(io.micronaut.http.HttpResponse<Object> objectHttpResponse) {
                                     emitter.next(objectHttpResponse);
-                                    sub.cancel();
                                 }
 
                                 @Override
                                 public void onError(Throwable t) {
                                     emitter.error(t);
-                                    sub.cancel();
                                 }
 
                                 @Override

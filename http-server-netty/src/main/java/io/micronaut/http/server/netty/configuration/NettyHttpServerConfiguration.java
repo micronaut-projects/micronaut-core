@@ -122,6 +122,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private int maxInitialLineLength = DEFAULT_MAXINITIALLINELENGTH;
     private int maxHeaderSize = DEFAULT_MAXHEADERSIZE;
     private int maxChunkSize = DEFAULT_MAXCHUNKSIZE;
+    private int maxH2cUpgradeRequestSize = DEFAULT_MAXCHUNKSIZE; // same default as maxChunkSize, we don't want to buffer super long bodies
     private boolean chunkedSupported = DEFAULT_CHUNKSUPPORTED;
     private boolean validateHeaders = DEFAULT_VALIDATEHEADERS;
     private int initialBufferSize = DEFAULT_INITIALBUFFERSIZE;
@@ -256,6 +257,21 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public int getMaxChunkSize() {
         return maxChunkSize;
+    }
+
+    /**
+     * The maximum size of the body of the HTTP1.1 request used to upgrade a connection to HTTP2 clear-text (h2c).
+     * This initial request cannot be streamed and is instead buffered in full, so the default value
+     * ({@value #DEFAULT_MAXCHUNKSIZE}) is relatively small. <i>If this value is too small for your use case,
+     * instead consider using an empty initial "upgrade request" (e.g. {@code OPTIONS /}), or switch to normal
+     * HTTP2.</i>
+     * <p>
+     * <i>Does not affect normal HTTP2 (TLS).</i>
+     *
+     * @return The maximum content length of the request.
+     */
+    public int getMaxH2cUpgradeRequestSize() {
+        return maxH2cUpgradeRequestSize;
     }
 
     /**
@@ -424,6 +440,20 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setMaxChunkSize(@ReadableBytes int maxChunkSize) {
         this.maxChunkSize = maxChunkSize;
+    }
+
+    /**
+     * Sets the maximum size of the body of the HTTP1.1 request used to upgrade a connection to HTTP2 clear-text (h2c).
+     * This initial request cannot be streamed and is instead buffered in full, so the default value
+     * ({@value #DEFAULT_MAXCHUNKSIZE}) is relatively small. <i>If this value is too small for your use case,
+     * instead consider using an empty initial "upgrade request" (e.g. {@code OPTIONS /}), or switch to normal
+     * HTTP2.</i>
+     * <p>
+     * <i>Does not affect normal HTTP2 (TLS).</i>
+     * @param maxH2cUpgradeRequestSize The maximum content length of the request.
+     */
+    public void setMaxH2cUpgradeRequestSize(int maxH2cUpgradeRequestSize) {
+        this.maxH2cUpgradeRequestSize = maxH2cUpgradeRequestSize;
     }
 
     /**

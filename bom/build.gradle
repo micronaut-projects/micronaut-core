@@ -57,6 +57,12 @@ tasks.named("generateCatalogAsToml") {
     modelConverter.populateModel()
 }
 
+def bomPropertyName = { String alias ->
+    alias = alias - 'managed.'
+    String baseName = legacyVersionNames[alias] ?: toPropertyName(alias)
+    "${baseName}.version"
+}
+
 publishing {
     publications {
         maven(MavenPublication) {
@@ -69,14 +75,26 @@ publishing {
                     xml.children().find {
                         it.name().localPart == 'packaging'
                     } + project.ext.pomInfo
+                    modelConverter.model.librariesTable.each { library ->
+                        def alias = library.version.reference.replaceAll('-', '.')
+                        if (alias != null && library.alias.replaceAll('-', '.').startsWith("managed.")) {
+                            def pomDep = xml.dependencyManagement.dependencies.dependency.find {
+                                it.artifactId.text() == library.name
+                                        && it.groupId.text() == library.group
+                            }
+                            if (pomDep != null) {
+                                pomDep.version.first().setValue("\${${bomPropertyName(alias)}}")
+                            } else {
+                                println "[WARNING] Didn't find dependency ${library.group}:${library.name} in BOM file"
+                            }
+                        }
+                    }
                 }
             }
             libsCatalog.versionAliases.each { alias ->
                 if (alias.startsWith('managed.')) {
                     libsCatalog.findVersion(alias).ifPresent { version ->
-                        alias = alias - 'managed.'
-                        String baseName = legacyVersionNames[alias] ?: toPropertyName(alias)
-                        String propertyName = "${baseName}.version"
+                        String propertyName = bomPropertyName(alias)
                         pom.properties.put(propertyName, version.requiredVersion)
                     }
                 }

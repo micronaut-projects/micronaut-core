@@ -15,33 +15,8 @@
  */
 package io.micronaut.http.server.netty;
 
-import java.io.File;
-import java.net.BindException;
-import java.net.InetSocketAddress;
-import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.channels.ClosedChannelException;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.BiConsumer;
-import java.util.function.Supplier;
-
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.context.exceptions.ConfigurationException;
@@ -135,6 +110,31 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.net.BindException;
+import java.net.InetSocketAddress;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.channels.ClosedChannelException;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 
 /**
  * Implements the bootstrap and configuration logic for the Netty implementation of {@link io.micronaut.runtime.server.EmbeddedServer}.
@@ -384,7 +384,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     @Override
     public String getHost() {
         return serverConfiguration.getHost()
-                .orElseGet(() -> Optional.ofNullable(System.getenv(Environment.HOSTNAME)).orElse(SocketUtils.LOCALHOST));
+                .orElseGet(() -> Optional.ofNullable(CachedEnvironment.getenv(Environment.HOSTNAME)).orElse(SocketUtils.LOCALHOST));
     }
 
     @Override
@@ -904,7 +904,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     final HttpServerCodec sourceCodec = http2OrHttpHandler.createServerCodec();
                     final HttpServerUpgradeHandler upgradeHandler = new HttpServerUpgradeHandler(
                             sourceCodec,
-                            upgradeCodecFactory
+                            upgradeCodecFactory,
+                            serverConfiguration.getMaxH2cUpgradeRequestSize()
                     );
                     final CleartextHttp2ServerUpgradeHandler cleartextHttp2ServerUpgradeHandler =
                             new CleartextHttp2ServerUpgradeHandler(sourceCodec, upgradeHandler, connectionHandler);

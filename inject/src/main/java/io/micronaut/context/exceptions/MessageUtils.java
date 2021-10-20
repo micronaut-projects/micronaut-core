@@ -17,6 +17,7 @@ package io.micronaut.context.exceptions;
 
 import io.micronaut.context.AbstractBeanResolutionContext;
 import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 
@@ -45,7 +46,7 @@ class MessageUtils {
         } else {
             declaringType = resolutionContext.getRootDefinition();
         }
-        String ls = System.getProperty("line.separator");
+        String ls = CachedEnvironment.getProperty("line.separator");
         StringBuilder builder = new StringBuilder("Error instantiating bean of type  [");
         builder
             .append(declaringType.getName())
@@ -90,7 +91,7 @@ class MessageUtils {
      */
     static String buildMessageForMethod(BeanResolutionContext resolutionContext, BeanDefinition declaringType, String methodName, Argument argument, String message, boolean circular) {
         StringBuilder builder = new StringBuilder("Failed to inject value for parameter [");
-        String ls = System.getProperty("line.separator");
+        String ls = CachedEnvironment.getProperty("line.separator");
         builder
             .append(argument.getName()).append("] of method [")
             .append(methodName)
@@ -118,7 +119,7 @@ class MessageUtils {
      */
     static String buildMessageForField(BeanResolutionContext resolutionContext, BeanDefinition declaringType, String fieldName, String message, boolean circular) {
         StringBuilder builder = new StringBuilder("Failed to inject value for field [");
-        String ls = System.getProperty("line.separator");
+        String ls = CachedEnvironment.getProperty("line.separator");
         builder
             .append(fieldName).append("] of class: ")
             .append(declaringType.getName())
@@ -143,7 +144,7 @@ class MessageUtils {
      */
     static String buildMessage(BeanResolutionContext resolutionContext, Argument argument, String message, boolean circular) {
         StringBuilder builder = new StringBuilder("Failed to inject value for parameter [");
-        String ls = System.getProperty("line.separator");
+        String ls = CachedEnvironment.getProperty("line.separator");
         BeanResolutionContext.Path path = resolutionContext.getPath();
         builder
             .append(argument.getName()).append("] of class: ")
