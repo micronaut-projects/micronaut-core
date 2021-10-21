@@ -36,6 +36,14 @@ abstract class AbstractKotlinElement(private val declaration: KSNode,
         }
     }
 
+    override fun isPrivate(): Boolean {
+        return if (declaration is KSModifierListOwner) {
+            declaration.modifiers.contains(Modifier.PRIVATE)
+        } else {
+            false
+        }
+    }
+
     override fun getAnnotationMetadata(): AnnotationMetadata {
         return annotationMetadata
     }
