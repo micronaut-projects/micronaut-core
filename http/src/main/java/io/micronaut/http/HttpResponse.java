@@ -15,7 +15,6 @@
  */
 package io.micronaut.http;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.exceptions.UriSyntaxException;
@@ -23,8 +22,6 @@ import io.micronaut.http.exceptions.UriSyntaxException;
 import io.micronaut.core.annotation.Nullable;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Collections;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -420,10 +417,5 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      */
     default Optional<Cookie> getCookie(String name) {
         throw new UnsupportedOperationException("Operation not supported on a " + this.getClass() + " response.");
-    }
-
-    @NonNull
-    default Map<URI, HttpResponse<?>> getServerPushResponses() {
-        return Collections.emptyMap();
     }
 }

@@ -130,26 +130,6 @@ class Http2ServerPushSpec extends Specification {
         return responses
     }
 
-    def 'with push enabled'() {
-        given:
-        def responses = request(true, '/serverPush/manual')
-
-        expect:
-        responses.size() == 3
-
-        responses[0] instanceof FullHttpResponse
-        responses[0].content().toString(StandardCharsets.UTF_8) == 'push supported: true'
-
-        responses[1] instanceof FullHttpResponse
-        responses[1].content().toString(StandardCharsets.UTF_8) == 'bar' ||
-                responses[1].content().toString(StandardCharsets.UTF_8) == 'baz'
-
-        responses[2] instanceof FullHttpResponse
-        responses[2].content().toString(StandardCharsets.UTF_8) == 'bar' ||
-                responses[2].content().toString(StandardCharsets.UTF_8) == 'baz'
-        responses[1].content().toString(StandardCharsets.UTF_8) != responses[2].content().toString(StandardCharsets.UTF_8)
-    }
-
     def 'with push enabled: automatic'() {
         given:
         def responses = request(true, '/serverPush/automatic')
@@ -172,7 +152,7 @@ class Http2ServerPushSpec extends Specification {
 
     def 'with push disabled'() {
         given:
-        def responses = request(false, '/serverPush/manual')
+        def responses = request(false, '/serverPush/automatic')
 
         expect:
         responses.size() == 1
@@ -185,17 +165,12 @@ class Http2ServerPushSpec extends Specification {
     @Requires(property = "spec.name", value = "Http2ServerPushSpec")
     @Controller("/serverPush")
     static class SameSiteController {
-        @Get("/manual")
-        HttpResponse<String> manual(HttpRequest<?> request) {
-            return HttpResponse.ok('push supported: ' + request.isServerPushSupported())
-                    .serverPush(URI.create("/serverPush/resource1"), resource1())
-                    .serverPush(URI.create("/serverPush/resource2"), resource2())
-        }
-
         @Get("/automatic")
         HttpResponse<String> automatic(HttpRequest<?> request) {
-            request.serverPush(HttpRequest.GET('/serverPush/resource1'))
-            request.serverPush(HttpRequest.GET('/serverPush/resource2'))
+            if (request.isServerPushSupported()) {
+                request.serverPush(HttpRequest.GET('/serverPush/resource1'))
+                request.serverPush(HttpRequest.GET('/serverPush/resource2'))
+            }
             return HttpResponse.ok('push supported: ' + request.isServerPushSupported())
         }
 

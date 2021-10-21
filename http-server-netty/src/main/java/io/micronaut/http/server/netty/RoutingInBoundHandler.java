@@ -90,12 +90,8 @@ import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
-import io.netty.handler.codec.http2.DefaultHttp2Headers;
-import io.netty.handler.codec.http2.Http2ConnectionHandler;
 import io.netty.handler.codec.http2.Http2Error;
 import io.netty.handler.codec.http2.Http2Exception;
-import io.netty.handler.codec.http2.Http2FrameWriter;
-import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.concurrent.Future;
@@ -113,17 +109,14 @@ import reactor.core.publisher.UnicastProcessor;
 import javax.net.ssl.SSLException;
 import java.io.File;
 import java.io.IOException;
-import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.channels.ClosedChannelException;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -1117,19 +1110,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             io.netty.handler.codec.http.HttpResponse nettyResponse = NettyHttpResponseBuilder.toHttpResponse(message);
             io.netty.handler.codec.http.HttpHeaders nettyHeaders = nettyResponse.headers();
 
-            Map<URI, io.netty.handler.codec.http.HttpResponse> serverPushResponses;
-            if (isHttp2) {
-                Map<URI, HttpResponse<?>> responsesOriginal = message.getServerPushResponses();
-                if (responsesOriginal.isEmpty()) {
-                    serverPushResponses = Collections.emptyMap();
-                } else {
-                    serverPushResponses = responsesOriginal.entrySet().stream()
-                            .collect(Collectors.toMap(Map.Entry::getKey, e -> NettyHttpResponseBuilder.toHttpResponse(e.getValue())));
-                }
-            } else {
-                serverPushResponses = Collections.emptyMap();
-            }
-
             // default Connection header if not set explicitly
             if (!isHttp2) {
                 if (!nettyHeaders.contains(HttpHeaderNames.CONNECTION)) {
@@ -1200,16 +1180,16 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                     @Override
                     public void onError(Throwable t) {
-                        syncWriteAndFlushNettyResponse(context, request, nettyResponse, serverPushResponses, requestCompletor);
+                        syncWriteAndFlushNettyResponse(context, request, nettyResponse, requestCompletor);
                     }
 
                     @Override
                     public void onComplete() {
-                        syncWriteAndFlushNettyResponse(context, request, nettyResponse, serverPushResponses, requestCompletor);
+                        syncWriteAndFlushNettyResponse(context, request, nettyResponse, requestCompletor);
                     }
                 });
             } else {
-                syncWriteAndFlushNettyResponse(context, request, nettyResponse, serverPushResponses, requestCompletor);
+                syncWriteAndFlushNettyResponse(context, request, nettyResponse, requestCompletor);
             }
         }
     }
@@ -1218,46 +1198,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             ChannelHandlerContext context,
             HttpRequest<?> request,
             io.netty.handler.codec.http.HttpResponse nettyResponse,
-            Map<URI, io.netty.handler.codec.http.HttpResponse> serverPushResponses,
             GenericFutureListener<Future<? super Void>> requestCompletor
     ) {
-        List<Object> pushMessages = Collections.emptyList();
-        if (!serverPushResponses.isEmpty()) {
-            if (request.isServerPushSupported()) {
-                pushMessages = new ArrayList<>();
-                Http2ConnectionHandler connectionHandler = context.pipeline().get(Http2ConnectionHandler.class);
-                Http2FrameWriter frameWriter = connectionHandler.encoder().frameWriter();
-                int requestStreamId = Integer.parseInt(request.getHeaders().get(AbstractNettyHttpRequest.STREAM_ID));
-                for (Map.Entry<URI, io.netty.handler.codec.http.HttpResponse> serverPushResponse : serverPushResponses.entrySet()) {
-                    DefaultHttp2Headers pushRequestHeaders = new DefaultHttp2Headers();
-                    String authority = serverPushResponse.getKey().getAuthority();
-                    if (authority == null) {
-                        authority = ""; // TODO
-                    }
-                    pushRequestHeaders.authority(authority);
-                    pushRequestHeaders.path(serverPushResponse.getKey().getPath());
-                    int newStream = connectionHandler.connection().local().incrementAndGetNextStreamId();
-                    frameWriter.writePushPromise(context, requestStreamId, newStream, pushRequestHeaders, 0, context.voidPromise());
-
-                    io.netty.handler.codec.http.HttpResponse response = serverPushResponse.getValue();
-                    response.headers().add(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), newStream);
-                    pushMessages.add(response);
-                }
-            } else {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Discarding {} HTTP2 server push responses because they are not supported by the client. You can check HttpRequest.isServerPushSupported() before adding responses to avoid doing unnecessary computations.",
-                            serverPushResponses.size());
-                }
-            }
-        }
-
-        context.write(nettyResponse).addListener(requestCompletor);
-
-        for (Object pushMessage : pushMessages) {
-            context.write(pushMessage);
-        }
-
-        context.flush();
+        context.writeAndFlush(nettyResponse).addListener(requestCompletor);
 
         if (LOG.isDebugEnabled()) {
             LOG.debug("Response {} - {} {}",

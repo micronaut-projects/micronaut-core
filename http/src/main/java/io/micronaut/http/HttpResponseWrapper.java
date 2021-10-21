@@ -15,11 +15,6 @@
  */
 package io.micronaut.http;
 
-import io.micronaut.core.annotation.NonNull;
-
-import java.net.URI;
-import java.util.Map;
-
 /**
  * A wrapper around a {@link HttpResponse}.
  *
@@ -38,12 +33,6 @@ public class HttpResponseWrapper<B> extends HttpMessageWrapper<B> implements Htt
     @Override
     public HttpStatus getStatus() {
         return getDelegate().getStatus();
-    }
-
-    @NonNull
-    @Override
-    public Map<URI, HttpResponse<?>> getServerPushResponses() {
-        return getDelegate().getServerPushResponses();
     }
 
     @Override

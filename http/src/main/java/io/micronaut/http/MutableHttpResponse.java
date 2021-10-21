@@ -15,12 +15,10 @@
  */
 package io.micronaut.http;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.cookie.Cookie;
 
 import io.micronaut.core.annotation.Nullable;
 
-import java.net.URI;
 import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.Locale;
@@ -187,10 +185,5 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
      */
     default MutableHttpResponse<B> attribute(CharSequence name, Object value) {
         return (MutableHttpResponse<B>) setAttribute(name, value);
-    }
-
-    @NonNull
-    default MutableHttpResponse<B> serverPush(@NonNull URI uri, @NonNull HttpResponse<?> pushResponse) {
-        return this;
     }
 }
