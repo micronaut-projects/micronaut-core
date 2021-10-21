@@ -18,7 +18,6 @@ package io.micronaut.http;
 import io.micronaut.http.cookie.Cookie;
 
 import io.micronaut.core.annotation.Nullable;
-
 import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.Locale;

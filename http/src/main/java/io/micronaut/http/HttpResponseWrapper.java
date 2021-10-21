@@ -39,4 +39,5 @@ public class HttpResponseWrapper<B> extends HttpMessageWrapper<B> implements Htt
     public HttpResponse<B> getDelegate() {
         return (HttpResponse<B>) super.getDelegate();
     }
+
 }
