@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.cli.CommandLine;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.StringUtils;
 
 import java.lang.annotation.Annotation;
@@ -385,6 +386,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         if (customizers.size() == 1) {
             return customizers.get(0);
         }
+        OrderUtil.sort(customizers);
         return new ApplicationContextCustomizer() {
 
             @Override

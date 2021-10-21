@@ -15,6 +15,8 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.core.annotation.NonNull;
+
 /**
  * An application context customizer is responsible
  * for configuring an application context before the
@@ -42,7 +44,7 @@ public interface ApplicationContextCustomizer {
      * Customizes the application context builder.
      * @param builder the builder to customize
      */
-    default void customize(ApplicationContextBuilder builder) {
+    default void customize(@NonNull ApplicationContextBuilder builder) {
 
     }
 }
