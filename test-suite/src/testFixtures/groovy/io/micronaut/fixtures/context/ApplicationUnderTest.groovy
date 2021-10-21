@@ -96,7 +96,7 @@ class ApplicationUnderTest {
         String cp = compileClasspath.collect { it.absolutePath }.join(File.pathSeparator)
         options.add(cp)
         if (annotationProcessorPath) {
-            options.add("--processor-path")
+            options.add("-processorpath")
             cp = annotationProcessorPath.collect { it.absolutePath }.join(File.pathSeparator)
             options.add(cp)
         }
