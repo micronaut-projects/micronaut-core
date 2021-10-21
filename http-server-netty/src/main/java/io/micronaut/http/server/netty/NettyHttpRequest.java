@@ -391,6 +391,11 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         ChannelHandlerContext connectionHandlerContext = channelHandlerContext.pipeline().context(Http2ConnectionHandler.class);
         if (connectionHandlerContext != null) {
             Http2ConnectionHandler connectionHandler = (Http2ConnectionHandler) connectionHandlerContext.handler();
+
+            if (!connectionHandler.connection().remote().allowPushTo()) {
+                throw new UnsupportedOperationException("Server push not supported by this client: Client is HTTP2 but does not report support for this feature");
+            }
+
             int newStream = connectionHandler.connection().local().incrementAndGetNextStreamId();
 
             io.netty.handler.codec.http.HttpRequest newNettyRequest = NettyHttpRequestBuilder.toHttpRequest(request);
@@ -407,6 +412,8 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             newNettyRequest.headers().add(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), newStream);
             // delay until our handling is complete
             connectionHandlerContext.executor().execute(() -> connectionHandlerContext.fireChannelRead(newNettyRequest));
+        } else {
+            throw new UnsupportedOperationException("Server push not supported by this client: Not a HTTP2 client");
         }
     }
 

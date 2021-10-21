@@ -203,6 +203,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     default void serverPush(HttpRequest<?> request) {
+        throw new UnsupportedOperationException("Server push not supported by this client");
     }
 
     /**

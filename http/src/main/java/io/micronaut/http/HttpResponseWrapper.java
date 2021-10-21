@@ -15,7 +15,7 @@
  */
 package io.micronaut.http;
 
-import org.jetbrains.annotations.NotNull;
+import io.micronaut.core.annotation.NonNull;
 
 import java.net.URI;
 import java.util.Map;
@@ -40,7 +40,7 @@ public class HttpResponseWrapper<B> extends HttpMessageWrapper<B> implements Htt
         return getDelegate().getStatus();
     }
 
-    @NotNull
+    @NonNull
     @Override
     public Map<URI, HttpResponse<?>> getServerPushResponses() {
         return getDelegate().getServerPushResponses();
