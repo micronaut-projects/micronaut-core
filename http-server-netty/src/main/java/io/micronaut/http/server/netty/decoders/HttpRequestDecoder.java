@@ -28,7 +28,6 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageDecoder;
 import io.netty.handler.codec.http.DefaultHttpRequest;
-import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,9 +77,6 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
         }
         try {
             NettyHttpRequest<Object> request = new NettyHttpRequest<>(msg, ctx, conversionService, configuration);
-            if (msg instanceof HttpContent && ((HttpContent) msg).content().readableBytes() > 0) {
-                request.addContent(((HttpContent) msg).retain());
-            }
             if (httpRequestReceivedEventPublisher != ApplicationEventPublisher.NO_OP) {
                 try {
                     ctx.executor().execute(() -> {
