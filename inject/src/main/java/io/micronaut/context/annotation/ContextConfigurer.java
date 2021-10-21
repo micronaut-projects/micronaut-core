@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.annotation;
 
+import io.micronaut.core.annotation.Experimental;
+
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Inherited;
@@ -47,5 +49,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target(ElementType.TYPE)
 @Inherited
+@Experimental
 public @interface ContextConfigurer {
 }

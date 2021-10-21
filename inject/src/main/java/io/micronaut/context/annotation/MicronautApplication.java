@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 package io.micronaut.context.annotation;
+import io.micronaut.core.annotation.Experimental;
+
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -46,5 +48,6 @@ import static java.lang.annotation.RetentionPolicy.SOURCE;
 @Retention(SOURCE)
 @Target(ElementType.TYPE)
 @ContextConfigurer
+@Experimental
 public @interface MicronautApplication {
 }

@@ -15,6 +15,7 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 
 /**
@@ -32,6 +33,7 @@ import io.micronaut.core.annotation.NonNull;
  *
  * @since 3.2
  */
+@Experimental
 public interface ApplicationContextCustomizer {
 
     /**
