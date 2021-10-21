@@ -51,6 +51,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
@@ -66,6 +67,7 @@ import io.netty.util.ReferenceCounted;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -398,20 +400,52 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
             int newStream = connectionHandler.connection().local().incrementAndGetNextStreamId();
 
-            io.netty.handler.codec.http.HttpRequest newNettyRequest = NettyHttpRequestBuilder.toHttpRequest(request);
+            URI configuredUri = request.getUri();
+            String scheme = configuredUri.getScheme();
+            if (scheme == null) {
+                scheme = channelHandlerContext.pipeline().get(SslHandler.class) == null ? SCHEME_HTTP : SCHEME_HTTPS;
+            }
+            String authority = configuredUri.getAuthority();
+            if (authority == null) {
+                // this is potentially user-controlled.
+                authority = this.getHeaders().get("Host");
+            }
+            String path = configuredUri.getPath();
+            if (path == null || !path.startsWith("/")) {
+                throw new IllegalArgumentException("Request must have an absolute path");
+            }
+            String query = configuredUri.getQuery();
+            String fragment = configuredUri.getFragment();
+
+            URI fixedUri;
+            try {
+                fixedUri = new URI(scheme, authority, path, query, fragment);
+            } catch (URISyntaxException e) {
+                throw new IllegalArgumentException("Illegal URI", e);
+            }
+
+            // request used to trigger our handlers
+            io.netty.handler.codec.http.HttpRequest inboundRequest = NettyHttpRequestBuilder.toHttpRequest(request);
+            // request used to compute the headers for the PUSH_PROMISE frame
+            io.netty.handler.codec.http.HttpRequest outboundRequest = new DefaultHttpRequest(
+                    inboundRequest.protocolVersion(),
+                    inboundRequest.method(),
+                    fixedUri.toString(),
+                    inboundRequest.headers()
+            );
 
             connectionHandler.encoder().frameWriter().writePushPromise(
                     connectionHandlerContext,
                     this.nettyRequest.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text()),
                     newStream,
-                    HttpConversionUtil.toHttp2Headers(newNettyRequest.headers(), false),
+                    HttpConversionUtil.toHttp2Headers(outboundRequest, false),
                     0,
                     connectionHandlerContext.voidPromise()
             );
 
-            newNettyRequest.headers().add(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), newStream);
+            inboundRequest.headers().add(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), newStream);
             // delay until our handling is complete
-            connectionHandlerContext.executor().execute(() -> connectionHandlerContext.fireChannelRead(newNettyRequest));
+            connectionHandlerContext.executor().execute(() -> connectionHandlerContext.fireChannelRead(inboundRequest));
         } else {
             throw new UnsupportedOperationException("Server push not supported by this client: Not a HTTP2 client");
         }
