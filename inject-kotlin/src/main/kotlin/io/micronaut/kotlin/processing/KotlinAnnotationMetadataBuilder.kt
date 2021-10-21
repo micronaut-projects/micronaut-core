@@ -4,15 +4,9 @@ import com.google.devtools.ksp.closestClassDeclaration
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
-import io.micronaut.inject.processing.JavaModelUtils
 import io.micronaut.inject.visitor.VisitorContext
 import java.lang.annotation.RetentionPolicy
 import java.util.*
-import javax.lang.model.element.Element
-import javax.lang.model.element.ElementKind
-import javax.lang.model.element.TypeElement
-import javax.lang.model.type.DeclaredType
-import javax.lang.model.util.Types
 
 class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSDeclaration, KSAnnotation>() {
 
@@ -87,14 +81,20 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSDecla
     }
 
     override fun readAnnotationRawValues(
-        originatingElement: KSDeclaration?,
-        annotationName: String?,
-        member: KSDeclaration?,
-        memberName: String?,
-        annotationValue: Any?,
-        annotationValues: MutableMap<CharSequence, Any>?
+        originatingElement: KSDeclaration,
+        annotationName: String,
+        member: KSDeclaration,
+        memberName: String,
+        annotationValue: Any,
+        annotationValues: MutableMap<CharSequence, Any>
     ) {
-        TODO("Not yet implemented")
+        if (!annotationValues.containsKey(memberName)) {
+            val value = readAnnotationValue(originatingElement, member, memberName, annotationValue)
+            if (value != null) {
+                validateAnnotationValue(originatingElement, annotationName, member, memberName, value)
+                annotationValues[memberName] = value
+            }
+        }
     }
 
     override fun isValidationRequired(member: KSDeclaration?): Boolean {
@@ -110,12 +110,12 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSDecla
     }
 
     override fun readAnnotationValue(
-        originatingElement: KSDeclaration?,
-        member: KSDeclaration?,
-        memberName: String?,
-        annotationValue: Any?
-    ): Any {
-        TODO("Not yet implemented")
+        originatingElement: KSDeclaration,
+        member: KSDeclaration,
+        memberName: String,
+        annotationValue: Any
+    ): Any? {
+        return annotationValue
     }
 
     override fun readAnnotationDefaultValues(annotationMirror: KSAnnotation): MutableMap<out KSDeclaration, *> {
@@ -130,27 +130,65 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSDecla
     }
 
     override fun readAnnotationRawValues(annotationMirror: KSAnnotation): MutableMap<out KSDeclaration, *> {
-        TODO("Not yet implemented")
+        val map = mutableMapOf<KSDeclaration, Any>()
+        val declaration = annotationMirror.annotationType.resolve().declaration as KSClassDeclaration
+        declaration.getAllProperties().forEach { prop ->
+            val argument = annotationMirror.arguments.find { it.name == prop.simpleName }
+            if (argument?.value != null) {
+                map[prop] = argument.value!!
+            }
+        }
+        return map
     }
 
     override fun getAnnotationValues(
-        originatingElement: KSDeclaration?,
-        member: KSDeclaration?,
-        annotationType: Class<*>?
+        originatingElement: KSDeclaration,
+        member: KSDeclaration,
+        annotationType: Class<*>
     ): OptionalValues<*> {
-        TODO("Not yet implemented")
+        val annotationMirrors: List<KSAnnotation> = member.annotations.toList()
+        val annotationName = annotationType.name
+        for (annotationMirror in annotationMirrors) {
+            if (annotationMirror.annotationType.resolve().declaration.qualifiedName?.asString() == annotationName) {
+                val values: Map<out KSDeclaration, *> = readAnnotationRawValues(annotationMirror)
+                val converted: MutableMap<CharSequence, Any> = mutableMapOf()
+                for ((key, value1) in values) {
+                    val value = value1!!
+                    readAnnotationRawValues(
+                        originatingElement,
+                        annotationName,
+                        member,
+                        key.simpleName.toString(),
+                        value,
+                        converted
+                    )
+                }
+                return OptionalValues.of(Any::class.java, converted)
+            }
+        }
+        return OptionalValues.empty<Any>()
     }
 
-    override fun getAnnotationMemberName(member: KSDeclaration?): String {
-        TODO("Not yet implemented")
+    override fun getAnnotationMemberName(member: KSDeclaration): String {
+        return member.simpleName.asString()
     }
 
     override fun getRepeatableName(annotationMirror: KSAnnotation?): String? {
         TODO("Not yet implemented")
     }
 
-    override fun getRepeatableNameForType(annotationType: KSDeclaration?): String? {
-        TODO("Not yet implemented")
+    override fun getRepeatableNameForType(annotationType: KSDeclaration): String? {
+        val name = java.lang.annotation.Repeatable::class.java.name
+        val repeatable = annotationType.annotations.find {
+            it.annotationType.resolve().declaration.qualifiedName?.asString() == name
+        }
+        if (repeatable != null) {
+            val value = repeatable.arguments.find { it.name?.asString() == "value" }?.value
+            if (value != null) {
+                return (value as Class<*>).name
+            }
+        }
+        return null
     }
 
     override fun getAnnotationMirror(annotationName: String?): Optional<KSDeclaration> {
@@ -166,14 +204,16 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSDecla
     }
 
     override fun getRetentionPolicy(annotation: KSDeclaration): RetentionPolicy {
-        val retentionPolicy = annotation.annotations.find {
-            getAnnotationTypeName(it) == RetentionPolicy::class.java.name
+        val retention = annotation.annotations.find {
+            getAnnotationTypeName(it) == java.lang.annotation.Retention::class.java.name
         }
-        if (retentionPolicy == null) {
-            return RetentionPolicy.RUNTIME
-        } else {
-            TODO("get value from annotation")
+        if (retention != null) {
+            val value = retention.arguments.find { it.name?.asString() == "value" }?.value
+            if (value != null) {
+                return value as RetentionPolicy
+            }
         }
+        return RetentionPolicy.RUNTIME
     }
 
     override fun isInheritedAnnotation(annotationMirror: KSAnnotation): Boolean {

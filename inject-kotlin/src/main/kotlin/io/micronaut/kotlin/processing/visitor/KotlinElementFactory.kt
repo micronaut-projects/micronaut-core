@@ -10,7 +10,7 @@ import io.micronaut.kotlin.processing.AnnotationUtils
 class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): ElementFactory<KSDeclaration, KSClassDeclaration, KSFunctionDeclaration, KSPropertyDeclaration> {
 
     override fun newClassElement(type: KSClassDeclaration, annotationMetadata: AnnotationMetadata): ClassElement {
-        TODO("Not yet implemented")
+        return KotlinClassElement(type, annotationMetadata, visitorContext)
     }
 
     override fun newClassElement(

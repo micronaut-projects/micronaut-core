@@ -85,7 +85,7 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
                             continue
                         }
                         val className = typeElement.qualifiedName.toString()
-                        typeElement.accept(ElementVisitor(), className)
+                        typeElement.accept(ElementVisitor(loadedVisitor), className)
                     }
                 }
             }
@@ -169,18 +169,52 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
         return typeElementVisitors.values
     }
 
-    private class ElementVisitor() : KSDefaultVisitor<Any, Any>() {
+    private class ElementVisitor(private val loadedVisitor: LoadedVisitor) : KSDefaultVisitor<Any, Any>() {
 
         override fun visitClassDeclaration(classDeclaration: KSClassDeclaration, data: Any): Any {
-            TODO("Not yet implemented")
+            val visitorContext = loadedVisitor.visitorContext
+            val annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(classDeclaration)
+            val classElement = visitorContext.elementFactory.newClassElement(classDeclaration, annotationMetadata)
+            loadedVisitor.visitor.visitClass(classElement, visitorContext)
+            return data
         }
 
         override fun visitFunctionDeclaration(function: KSFunctionDeclaration, data: Any): Any {
-            TODO("Not yet implemented")
+            val visitorContext = loadedVisitor.visitorContext
+            var parentDeclaration = function.parentDeclaration
+            while (parentDeclaration !is KSClassDeclaration) {
+                parentDeclaration = parentDeclaration?.parentDeclaration
+            }
+            val classAnnotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(parentDeclaration)
+            val classElement = visitorContext.elementFactory.newClassElement(parentDeclaration, classAnnotationMetadata)
+            val annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(function)
+
+            val methodElement = visitorContext.elementFactory.newMethodElement(classElement, function, annotationMetadata)
+            loadedVisitor.visitor.visitMethod(methodElement, visitorContext)
+            return data
         }
 
         override fun visitPropertyDeclaration(property: KSPropertyDeclaration, data: Any): Any {
-            return super.visitPropertyDeclaration(property, data)
+            val visitorContext = loadedVisitor.visitorContext
+            var parentDeclaration = property.parentDeclaration
+            while (parentDeclaration !is KSClassDeclaration) {
+                parentDeclaration = parentDeclaration?.parentDeclaration
+            }
+            val classAnnotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(parentDeclaration)
+            val classElement = visitorContext.elementFactory.newClassElement(parentDeclaration, classAnnotationMetadata)
+            val annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(property)
+
+            if (property.getter != null) {
+                val methodElement =
+                    visitorContext.elementFactory.newMethodElement(classElement, property.getter!!, annotationMetadata)
+                loadedVisitor.visitor.visitMethod(methodElement, visitorContext)
+            }
+            if (property.setter != null) {
+                val methodElement =
+                    visitorContext.elementFactory.newMethodElement(classElement, property.setter!!, annotationMetadata)
+                loadedVisitor.visitor.visitMethod(methodElement, visitorContext)
+            }
+            return data
         }
 
         override fun defaultHandler(node: KSNode, data: Any): Any {
