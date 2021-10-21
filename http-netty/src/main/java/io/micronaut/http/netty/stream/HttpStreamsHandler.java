@@ -27,6 +27,7 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.FullHttpMessage;
+import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -202,7 +203,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
             if (inMsg instanceof FullHttpMessage) {
                 FullHttpMessage fullMessage = (FullHttpMessage) inMsg;
-                if (fullMessage.content().readableBytes() == 0) {
+                if (!(fullMessage instanceof FullHttpRequest) || fullMessage.content().readableBytes() == 0) {
                     // Forward as is
                     ctx.fireChannelRead(inMsg);
                 } else {
