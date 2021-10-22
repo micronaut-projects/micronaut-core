@@ -30,6 +30,7 @@ import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import org.jetbrains.annotations.NotNull;
 
 import java.lang.annotation.Annotation;
 import java.util.*;
@@ -309,7 +310,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         }
     }
 
-    private static class PushCapableFullHttpRequest<B> extends FullHttpRequest<B> implements PushCapableHttpRequest<B> {
+    private static final class PushCapableFullHttpRequest<B> extends FullHttpRequest<B> implements PushCapableHttpRequest<B> {
         /**
          * @param delegate The Http Request
          * @param bodyType The Body Type
@@ -329,8 +330,9 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         }
 
         @Override
-        public void serverPush(HttpRequest<?> request) {
+        public PushCapableHttpRequest<B> serverPush(@NotNull HttpRequest<?> request) {
             getDelegate().serverPush(request);
+            return this;
         }
     }
 }

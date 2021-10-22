@@ -1,5 +1,7 @@
 package io.micronaut.http;
 
+import io.micronaut.core.annotation.NonNull;
+
 /**
  * A {@link HttpRequest} that is potentially capable of HTTP2 server push. Code should check
  * {@link #isServerPushSupported()} before attempting to send any server push.
@@ -23,8 +25,9 @@ public interface PushCapableHttpRequest<B> extends HttpRequest<B> {
      * will be handled as if it was initiated by the client, and the response will be passed back to the client.
      *
      * @param request The request to respond to using a server push.
+     * @return This request.
      * @throws UnsupportedOperationException if the client does not support server push. Check beforehand using
      * {@link #isServerPushSupported()}.
      */
-    void serverPush(HttpRequest<?> request);
+    PushCapableHttpRequest<B> serverPush(@NonNull HttpRequest<?> request);
 }

@@ -64,6 +64,7 @@ import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCounted;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -390,7 +391,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     }
 
     @Override
-    public void serverPush(HttpRequest<?> request) {
+    public PushCapableHttpRequest<T> serverPush(@NotNull HttpRequest<?> request) {
         ChannelHandlerContext connectionHandlerContext = channelHandlerContext.pipeline().context(Http2ConnectionHandler.class);
         if (connectionHandlerContext != null) {
             Http2ConnectionHandler connectionHandler = (Http2ConnectionHandler) connectionHandlerContext.handler();
@@ -447,6 +448,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             inboundRequest.headers().add(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), newStream);
             // delay until our handling is complete
             connectionHandlerContext.executor().execute(() -> connectionHandlerContext.fireChannelRead(inboundRequest));
+            return this;
         } else {
             throw new UnsupportedOperationException("Server push not supported by this client: Not a HTTP2 client");
         }
