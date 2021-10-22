@@ -19,7 +19,9 @@ import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.codec.http.DefaultFullHttpRequest
+import io.netty.handler.codec.http.DefaultHttpHeaders
 import io.netty.handler.codec.http.FullHttpResponse
+import io.netty.handler.codec.http.HttpHeaders
 import io.netty.handler.codec.http.HttpMethod
 import io.netty.handler.codec.http.HttpVersion
 import io.netty.handler.codec.http2.DefaultHttp2Connection
@@ -77,6 +79,37 @@ class Http2ServerPushSpec extends Specification {
         runner.responses.any { it.content().toString(StandardCharsets.UTF_8) == 'baz' }
     }
 
+    def 'check headers'() {
+        given:
+        def runner = new Runner()
+        runner.run(true, '/serverPush/automatic', new DefaultHttpHeaders()
+                .add("authorization", "myauthtoken") // copied, but overwritten for resource1
+                .add("x-someotherheader", "someothervalue") // copied
+                .add("proxy-authorization", "proxyauthtoken") // not copied
+                .add("referer", "https://micronaut.io/")) // overwritten
+
+        expect:
+        runner.responses.size() == 3
+
+        runner.pushPromiseHeaders.any {
+            it.scheme() == 'https' &&
+                    it.path() == '/serverPush/resource1' &&
+                    it.get("authorization") == 'bla' &&
+                    it.get("x-someotherheader") == 'someothervalue' &&
+                    it.get("proxy-authorization") == null &&
+                    it.get("referer") == 'abc'
+        }
+
+        runner.pushPromiseHeaders.any {
+            it.scheme() == 'https' &&
+                    it.path() == '/serverPush/resource2'
+                    it.get("authorization") == 'myauthtoken' &&
+                    it.get("x-someotherheader") == 'someothervalue' &&
+                    it.get("proxy-authorization") == null &&
+                    it.get("referer") == '/serverPush/automatic'
+        }
+    }
+
     def 'with push disabled'() {
         given:
         def runner = new Runner()
@@ -94,7 +127,7 @@ class Http2ServerPushSpec extends Specification {
         def pushPromiseHeaders = new ArrayList<Http2Headers>()
         int expectedResponses
 
-        def run(boolean pushEnabled, String path) {
+        def run(boolean pushEnabled, String path, HttpHeaders headers = new DefaultHttpHeaders()) {
             expectedResponses = pushEnabled ? 3 : 1
             def sslContext = SslContextBuilder.forClient()
                     .ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE)
@@ -143,6 +176,7 @@ class Http2ServerPushSpec extends Specification {
 
 
                                             def requestIndex = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, path)
+                                            requestIndex.headers().setAll(headers)
                                             requestIndex.headers().add(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), 'https')
                                             ctx.channel().writeAndFlush(requestIndex)
                                         }
@@ -195,7 +229,7 @@ class Http2ServerPushSpec extends Specification {
         @Get("/automatic")
         HttpResponse<String> automatic(PushCapableHttpRequest<?> request) {
             if (request.isServerPushSupported()) {
-                request.serverPush(HttpRequest.GET('/serverPush/resource1'))
+                request.serverPush(HttpRequest.GET('/serverPush/resource1').header("Referer", "abc").header("Authorization", "bla"))
                 request.serverPush(HttpRequest.GET('/serverPush/resource2'))
             }
             return HttpResponse.ok('push supported: ' + request.isServerPushSupported())

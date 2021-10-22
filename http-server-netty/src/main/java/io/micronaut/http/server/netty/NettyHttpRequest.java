@@ -52,6 +52,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
@@ -74,6 +75,7 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -93,6 +95,50 @@ import java.util.function.Supplier;
 public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T> {
 
     private static final AttributeKey<NettyHttpRequest> KEY = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
+
+    /**
+     * Headers to exclude from the push promise sent to the client. We use
+     * {@link io.netty.handler.codec.http.HttpHeaders} to store this set, so that the semantics (e.g. case
+     * insensitivity) are the same as for the actual header storage, so that we don't accidentally copy headers we're
+     * not supposed to.
+     */
+    private static final io.netty.handler.codec.http.HttpHeaders SERVER_PUSH_EXCLUDE_HEADERS;
+
+    static {
+        SERVER_PUSH_EXCLUDE_HEADERS = new DefaultHttpHeaders();
+        // from JavaEE PushBuilder javadoc: "The existing request headers of the current HttpServletRequest are added to the builder, except for: "
+        // "Conditional headers (defined in RFC 7232)"
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.ETAG, "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.IF_MATCH, "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.IF_MODIFIED_SINCE, "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.IF_NONE_MATCH, "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.IF_UNMODIFIED_SINCE, "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.LAST_MODIFIED, "");
+        // "Range headers" (RFC 7233)
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.ACCEPT_RANGES, "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.CONTENT_RANGE, "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.IF_RANGE, "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.RANGE, "");
+        // "Expect headers"
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.EXPECT, "");
+        // "Referrer headers"
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.REFERER, "");
+        // "Authorization headers"
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.PROXY_AUTHENTICATE, "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.PROXY_AUTHORIZATION, "");
+        // we do copy other authorization headers and cookies. This is a potential security risk, e.g. if there's an
+        // intermediate HTTP proxy that adds auth headers that the client isn't supposed to see – the client will
+        // receive a copy of those headers in the PUSH_PROMISE. However, I'm not sure if the client will utilize the
+        // pushed response properly if we don't send the authorization headers. It might also depend on the Vary
+        // header. This behavior is documented in PushCapableHttpRequest.
+
+        // some netty headers we won't copy
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpConversionUtil.ExtensionHeaderNames.PATH.text(), "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpConversionUtil.ExtensionHeaderNames.STREAM_PROMISE_ID.text(), "");
+        // we do copy the weight and dependency id
+    }
 
     private final NettyHttpHeaders headers;
     private final ChannelHandlerContext channelHandlerContext;
@@ -400,8 +446,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
                 throw new UnsupportedOperationException("Server push not supported by this client: Client is HTTP2 but does not report support for this feature");
             }
 
-            int newStream = connectionHandler.connection().local().incrementAndGetNextStreamId();
-
             URI configuredUri = request.getUri();
             String scheme = configuredUri.getScheme();
             if (scheme == null) {
@@ -428,6 +472,18 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
             // request used to trigger our handlers
             io.netty.handler.codec.http.HttpRequest inboundRequest = NettyHttpRequestBuilder.toHttpRequest(request);
+
+            // copy headers from our request
+            for (Iterator<Map.Entry<CharSequence, CharSequence>> itr = headers.getNettyHeaders().iteratorCharSequence(); itr.hasNext(); ) {
+                Map.Entry<CharSequence, CharSequence> entry = itr.next();
+                if (!inboundRequest.headers().contains(entry.getKey()) && !SERVER_PUSH_EXCLUDE_HEADERS.contains(entry.getKey())) {
+                    inboundRequest.headers().add(entry.getKey(), entry.getValue());
+                }
+            }
+            if (!inboundRequest.headers().contains(HttpHeaderNames.REFERER)) {
+                inboundRequest.headers().add(HttpHeaderNames.REFERER, getUri().toString());
+            }
+
             // request used to compute the headers for the PUSH_PROMISE frame
             io.netty.handler.codec.http.HttpRequest outboundRequest = new DefaultHttpRequest(
                     inboundRequest.protocolVersion(),
@@ -436,16 +492,20 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
                     inboundRequest.headers()
             );
 
+            int ourStream = this.nettyRequest.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text());
+            int newStream = connectionHandler.connection().local().incrementAndGetNextStreamId();
+
             connectionHandler.encoder().frameWriter().writePushPromise(
                     connectionHandlerContext,
-                    this.nettyRequest.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text()),
+                    ourStream,
                     newStream,
                     HttpConversionUtil.toHttp2Headers(outboundRequest, false),
                     0,
                     connectionHandlerContext.voidPromise()
             );
 
-            inboundRequest.headers().add(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), newStream);
+            inboundRequest.headers().setInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), newStream);
+            inboundRequest.headers().setInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_PROMISE_ID.text(), ourStream);
             // delay until our handling is complete
             connectionHandlerContext.executor().execute(() -> connectionHandlerContext.fireChannelRead(inboundRequest));
             return this;
