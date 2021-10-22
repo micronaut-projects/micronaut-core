@@ -406,12 +406,18 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                     }
 
                     private void configureDeclaringType(TypeElement declaringTypeElement, BeanPropertyData beanPropertyData) {
-                        if (beanPropertyData.declaringType == null) {
+                        if (beanPropertyData.declaringType == null && !classElement.equals(declaringTypeElement)) {
                             beanPropertyData.declaringType = mirrorToClassElement(
                                     declaringTypeElement.asType(),
                                     visitorContext,
                                     genericTypeInfo,
                                     true);
+                        } else if (beanPropertyData.declaringType == null) {
+                            beanPropertyData.declaringType = mirrorToClassElement(
+                                    declaringTypeElement.asType(),
+                                    visitorContext,
+                                    genericTypeInfo,
+                                    false);
                         }
                     }
                 }, null);
