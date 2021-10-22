@@ -1,3 +1,9 @@
+
+internalSanityChecks {
+    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 38)
+    expectedServiceCount.put('io.micronaut.inject.BeanConfiguration', 2)
+}           
+
 dependencies {
     annotationProcessor project(":inject-java")
     api libs.managed.opentracing
