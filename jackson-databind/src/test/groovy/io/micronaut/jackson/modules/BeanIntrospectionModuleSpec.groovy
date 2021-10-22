@@ -10,13 +10,13 @@ import com.fasterxml.jackson.annotation.JsonUnwrapped
 import com.fasterxml.jackson.annotation.JsonView
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
-import com.fasterxml.jackson.databind.PropertyNamingStrategy
 import com.fasterxml.jackson.databind.annotation.JsonNaming
 import groovy.transform.EqualsAndHashCode
 import groovy.transform.PackageScope
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.hateoas.JsonError
+import io.micronaut.http.hateoas.Link
 import io.micronaut.jackson.JacksonConfiguration
 import io.micronaut.jackson.modules.testcase.EmailTemplate
 import io.micronaut.jackson.modules.testcase.Notification
@@ -125,6 +125,27 @@ class BeanIntrospectionModuleSpec extends Specification {
 
         cleanup:
         ctx.close()
+    }
+
+    void "Bean introspection with empty optional"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        def value = new OptionalAuthor(name: Optional.<String>empty())
+        String json = objectMapper.writeValueAsString(value)
+
+        then:
+        noExceptionThrown()
+        json == '{}'
+
+        cleanup:
+        ctx.close()
+
+        where:
+        ignoreReflectiveProperties << [true, false]
     }
 
     void "test that introspected serialization works"() {
@@ -492,6 +513,11 @@ class BeanIntrospectionModuleSpec extends Specification {
     @Introspected
     static class Author {
         String name
+    }
+
+    @Introspected
+    static class OptionalAuthor {
+        Optional<String> name
     }
 
     @Introspected

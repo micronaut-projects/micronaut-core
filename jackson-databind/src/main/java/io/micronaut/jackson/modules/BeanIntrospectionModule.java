@@ -34,6 +34,7 @@ import com.fasterxml.jackson.databind.deser.ValueInstantiator;
 import com.fasterxml.jackson.databind.deser.impl.MethodProperty;
 import com.fasterxml.jackson.databind.deser.std.StdValueInstantiator;
 import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
+import com.fasterxml.jackson.databind.introspect.AnnotationCollector;
 import com.fasterxml.jackson.databind.introspect.TypeResolutionContext;
 import com.fasterxml.jackson.databind.introspect.VirtualAnnotatedMember;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
@@ -43,6 +44,7 @@ import com.fasterxml.jackson.databind.ser.BeanSerializerBuilder;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
 import com.fasterxml.jackson.databind.ser.impl.PropertySerializerMap;
 import com.fasterxml.jackson.databind.type.TypeFactory;
+import com.fasterxml.jackson.databind.util.SimpleBeanPropertyDefinition;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
@@ -126,6 +128,44 @@ public class BeanIntrospectionModule extends SimpleModule {
         );
     }
 
+    private VirtualAnnotatedMember createVirtualMember(TypeResolutionContext typeResolutionContext, Class<?> beanClass, String name, JavaType javaType, AnnotationMetadata annotationMetadata) {
+        return new VirtualAnnotatedMember(
+                typeResolutionContext,
+                beanClass,
+                name,
+                javaType
+        ) {
+            @Override
+            public boolean hasOneOf(Class<? extends Annotation>[] annoClasses) {
+                return Arrays.stream(annoClasses).anyMatch(annotationMetadata::hasAnnotation);
+            }
+        };
+    }
+
+    // copied from VirtualBeanPropertyWriter
+    private static boolean _suppressNulls(JsonInclude.Value inclusion) {
+        if (inclusion == null) {
+            return false;
+        }
+        JsonInclude.Include incl = inclusion.getValueInclusion();
+        return (incl != JsonInclude.Include.ALWAYS) && (incl != JsonInclude.Include.USE_DEFAULTS);
+    }
+
+
+    // copied from VirtualBeanPropertyWriter
+    private static Object _suppressableValue(JsonInclude.Value inclusion) {
+        if (inclusion == null) {
+            return false; // [sic]
+        }
+        JsonInclude.Include incl = inclusion.getValueInclusion();
+        if ((incl == JsonInclude.Include.ALWAYS)
+                || (incl == JsonInclude.Include.NON_NULL)
+                || (incl == JsonInclude.Include.USE_DEFAULTS)) {
+            return null;
+        }
+        return BeanPropertyWriter.MARKER_FOR_EMPTY;
+    }
+
     /**
      * Modifies bean serialization.
      */
@@ -162,6 +202,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Bean {} has no properties, while BeanIntrospection does. Recreating from introspection.", beanClass);
                     }
+                    TypeResolutionContext typeResolutionContext = new TypeResolutionContext.Empty(config.getTypeFactory());
                     final List<BeanPropertyWriter> newProperties = new ArrayList<>(beanProperties.size());
                     for (BeanProperty<Object, Object> beanProperty : beanProperties) {
                         if (beanProperty.hasAnnotation(JsonIgnore.class)) {
@@ -181,6 +222,13 @@ public class BeanIntrospectionModule extends SimpleModule {
                             propertyName = beanProperty.stringValue(JsonProperty.class).orElse(beanProperty.getName());
                         }
                         BeanPropertyWriter writer = new BeanIntrospectionPropertyWriter(
+                                createVirtualMember(
+                                        typeResolutionContext,
+                                        beanProperty.getDeclaringType(),
+                                        propertyName,
+                                        newType(beanProperty.asArgument(), config.getTypeFactory()),
+                                        beanProperty
+                                ),
                                 config,
                                 propertyName,
                                 beanProperty,
@@ -364,17 +412,7 @@ public class BeanIntrospectionModule extends SimpleModule {
 
                                     @Override
                                     public AnnotatedMember getMember() {
-                                        return new VirtualAnnotatedMember(
-                                                beanDesc.getClassInfo(),
-                                                beanClass,
-                                                argument.getName(),
-                                                javaType
-                                        ) {
-                                            @Override
-                                            public boolean hasOneOf(Class<? extends Annotation>[] annoClasses) {
-                                                return Arrays.stream(annoClasses).anyMatch(annotationMetadata::hasAnnotation);
-                                            }
-                                        };
+                                        return createVirtualMember(beanDesc.getClassInfo(), beanClass, argument.getName(), javaType, annotationMetadata);
                                     }
 
                                     @Override
@@ -587,17 +625,13 @@ public class BeanIntrospectionModule extends SimpleModule {
 
         @Override
         public AnnotatedMember getMember() {
-            return new VirtualAnnotatedMember(
+            return createVirtualMember(
                     typeResolutionContext,
                     beanProperty.getDeclaringType(),
                     _propName.getSimpleName(),
-                    _type
-            ) {
-                @Override
-                public boolean hasOneOf(Class<? extends Annotation>[] annoClasses) {
-                    return Arrays.stream(annoClasses).anyMatch(beanProperty::hasAnnotation);
-                }
-            };
+                    _type,
+                    beanProperty
+            );
         }
 
         @Override
@@ -637,7 +671,6 @@ public class BeanIntrospectionModule extends SimpleModule {
         final BeanProperty<Object, Object> beanProperty;
         final SerializableString fastName;
         private final JavaType type;
-        private final boolean shouldSuppressNulls;
         private final boolean unwrapping;
 
         BeanIntrospectionPropertyWriter(BeanPropertyWriter src,
@@ -663,23 +696,30 @@ public class BeanIntrospectionModule extends SimpleModule {
             this.type = JacksonConfiguration.constructType(beanProperty.asArgument(), typeFactory);
             _dynamicSerializers = (ser == null) ? PropertySerializerMap
                     .emptyForProperties() : null;
-            shouldSuppressNulls = shouldSuppressNulls(_suppressNulls);
             this.unwrapping = introspection.hasAnnotation(JsonUnwrapped.class);
         }
 
         BeanIntrospectionPropertyWriter(
+                VirtualAnnotatedMember virtualMember,
                 SerializationConfig config,
                 String name,
                 BeanProperty<Object, Object> introspection,
                 TypeFactory typeFactory) {
+            super(
+                    SimpleBeanPropertyDefinition.construct(config, virtualMember),
+                    virtualMember,
+                    AnnotationCollector.emptyAnnotations(),
+                    null, null, null, null,
+                    _suppressNulls(config.getDefaultPropertyInclusion()),
+                    _suppressableValue(config.getDefaultPropertyInclusion()),
+                    null
+            );
             beanProperty = introspection;
             fastName = new SerializedString(name);
             _views = null;
             this.type = JacksonConfiguration.constructType(beanProperty.asArgument(), typeFactory);
             _dynamicSerializers = PropertySerializerMap
                     .emptyForProperties();
-            // can't use super._suppressNulls here, because it's not set to the config value in this constructor
-            shouldSuppressNulls = shouldSuppressNulls(config.getDefaultPropertyInclusion().getValueInclusion() != JsonInclude.Include.ALWAYS);
             this.unwrapping = introspection.hasAnnotation(JsonUnwrapped.class);
         }
 
@@ -691,11 +731,6 @@ public class BeanIntrospectionModule extends SimpleModule {
         @Override
         public String getName() {
             return fastName.getValue();
-        }
-
-        @Override
-        public boolean willSuppressNulls() {
-            return shouldSuppressNulls || super.willSuppressNulls();
         }
 
         @Override
