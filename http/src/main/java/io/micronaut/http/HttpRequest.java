@@ -199,29 +199,6 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
-     * Check whether HTTP2 server push is supported by the remote client. Only HTTP2 clients that indicate support
-     * through HTTP2 settings have this method return {@code true}.
-     *
-     * @return {@code true} iff server push is supported.
-     */
-    default boolean isServerPushSupported() {
-        return false;
-    }
-
-    /**
-     * Initiate a HTTP2 server push for the given request. The information from the given request (i.e. path, headers)
-     * will be passed on to the client immediately so that it does not send the request itself. Then, the given request
-     * will be handled as if it was initiated by the client, and the response will be passed back to the client.
-     *
-     * @param request The request to respond to using a server push.
-     * @throws UnsupportedOperationException if the client does not support server push. Check beforehand using
-     * {@link #isServerPushSupported()}.
-     */
-    default void serverPush(HttpRequest<?> request) {
-        throw new UnsupportedOperationException("Server push not supported by this client");
-    }
-
-    /**
      * Return a {@link MutableHttpRequest} for a {@link HttpMethod#GET} request for the given URI.
      *
      * @param uri The URI

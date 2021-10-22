@@ -4,6 +4,7 @@ import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.PushCapableHttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
@@ -192,7 +193,7 @@ class Http2ServerPushSpec extends Specification {
         @Inject EmbeddedServer embeddedServer
 
         @Get("/automatic")
-        HttpResponse<String> automatic(HttpRequest<?> request) {
+        HttpResponse<String> automatic(PushCapableHttpRequest<?> request) {
             if (request.isServerPushSupported()) {
                 request.serverPush(HttpRequest.GET('/serverPush/resource1'))
                 request.serverPush(HttpRequest.GET('/serverPush/resource2'))
@@ -214,7 +215,7 @@ class Http2ServerPushSpec extends Specification {
          * This can be used for testing in a browser, it's not used by this spec directly
          */
         @Get(value = '/html', produces = 'text/html')
-        String html(HttpRequest<?> request) {
+        String html(PushCapableHttpRequest<?> request) {
             if (request.isServerPushSupported()) {
                 request.serverPush(HttpRequest.GET("/serverPush/resource1"))
                 request.serverPush(HttpRequest.GET("/serverPush/resource2"))

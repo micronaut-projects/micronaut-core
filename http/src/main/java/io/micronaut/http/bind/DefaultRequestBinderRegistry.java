@@ -93,6 +93,24 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                 return () -> Optional.of(source);
             }
         });
+        byType.put(Argument.of(PushCapableHttpRequest.class).typeHashCode(), (RequestArgumentBinder<PushCapableHttpRequest>) (argument, source) -> {
+            if (source instanceof PushCapableHttpRequest) {
+                Optional<Argument<?>> typeVariable = argument.getFirstTypeVariable()
+                        .filter(arg -> arg.getType() != Object.class)
+                        .filter(arg -> arg.getType() != Void.class);
+                if (typeVariable.isPresent() && HttpMethod.permitsRequestBody(source.getMethod())) {
+                    if (source.getBody().isPresent()) {
+                        return () -> Optional.of(new PushCapableFullHttpRequest((PushCapableHttpRequest) source, typeVariable.get()));
+                    } else {
+                        return ArgumentBinder.BindingResult.UNSATISFIED;
+                    }
+                } else {
+                    return () -> Optional.of((PushCapableHttpRequest) source);
+                }
+            } else {
+                return ArgumentBinder.BindingResult.UNSATISFIED;
+            }
+        });
         byType.put(Argument.of(HttpParameters.class).typeHashCode(), (RequestArgumentBinder<HttpParameters>) (argument, source) -> () -> Optional.of(source.getParameters()));
         byType.put(Argument.of(Cookies.class).typeHashCode(), (RequestArgumentBinder<Cookies>) (argument, source) -> () -> Optional.of(source.getCookies()));
         byType.put(Argument.of(Cookie.class).typeHashCode(), (RequestArgumentBinder<Cookie>) (context, source) -> {
@@ -288,6 +306,31 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
             int result = type.typeHashCode();
             result = 31 * result + annotation.hashCode();
             return result;
+        }
+    }
+
+    private static class PushCapableFullHttpRequest<B> extends FullHttpRequest<B> implements PushCapableHttpRequest<B> {
+        /**
+         * @param delegate The Http Request
+         * @param bodyType The Body Type
+         */
+        public PushCapableFullHttpRequest(PushCapableHttpRequest<B> delegate, Argument<B> bodyType) {
+            super(delegate, bodyType);
+        }
+
+        @Override
+        public PushCapableHttpRequest<B> getDelegate() {
+            return (PushCapableHttpRequest<B>) super.getDelegate();
+        }
+
+        @Override
+        public boolean isServerPushSupported() {
+            return getDelegate().isServerPushSupported();
+        }
+
+        @Override
+        public void serverPush(HttpRequest<?> request) {
+            getDelegate().serverPush(request);
         }
     }
 }

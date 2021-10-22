@@ -31,6 +31,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpParameters;
 import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.PushCapableHttpRequest;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
@@ -88,7 +89,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Internal
-public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T> {
+public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T> {
 
     private static final AttributeKey<NettyHttpRequest> KEY = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
 
