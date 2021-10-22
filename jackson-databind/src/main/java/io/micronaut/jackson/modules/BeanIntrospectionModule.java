@@ -143,7 +143,7 @@ public class BeanIntrospectionModule extends SimpleModule {
     }
 
     // copied from VirtualBeanPropertyWriter
-    private static boolean _suppressNulls(JsonInclude.Value inclusion) {
+    private static boolean suppressNulls(JsonInclude.Value inclusion) {
         if (inclusion == null) {
             return false;
         }
@@ -151,9 +151,8 @@ public class BeanIntrospectionModule extends SimpleModule {
         return (incl != JsonInclude.Include.ALWAYS) && (incl != JsonInclude.Include.USE_DEFAULTS);
     }
 
-
     // copied from VirtualBeanPropertyWriter
-    private static Object _suppressableValue(JsonInclude.Value inclusion) {
+    private static Object suppressableValue(JsonInclude.Value inclusion) {
         if (inclusion == null) {
             return false; // [sic]
         }
@@ -710,8 +709,8 @@ public class BeanIntrospectionModule extends SimpleModule {
                     virtualMember,
                     AnnotationCollector.emptyAnnotations(),
                     null, null, null, null,
-                    _suppressNulls(config.getDefaultPropertyInclusion()),
-                    _suppressableValue(config.getDefaultPropertyInclusion()),
+                    suppressNulls(config.getDefaultPropertyInclusion()),
+                    suppressableValue(config.getDefaultPropertyInclusion()),
                     null
             );
             beanProperty = introspection;
