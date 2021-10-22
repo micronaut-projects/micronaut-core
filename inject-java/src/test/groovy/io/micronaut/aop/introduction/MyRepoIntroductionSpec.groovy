@@ -44,8 +44,85 @@ class MyRepoIntroductionSpec extends Specification {
             bean.findAll()
         then:
             MyRepoIntroducer.EXECUTED_METHODS.size() == 3
-            MyRepoIntroducer.EXECUTED_METHODS.contains repoDeclaredMethods.find {method -> method.name == "aBefore" }
-            MyRepoIntroducer.EXECUTED_METHODS.contains repoDeclaredMethods.find {method -> method.name == "xAfter" }
-            MyRepoIntroducer.EXECUTED_METHODS.contains repoDeclaredMethods.find {method -> method.name == "findAll" && method.returnType == List.class }
+            MyRepoIntroducer.EXECUTED_METHODS.contains repoDeclaredMethods.find { method -> method.name == "aBefore" }
+            MyRepoIntroducer.EXECUTED_METHODS.contains repoDeclaredMethods.find { method -> method.name == "xAfter" }
+            MyRepoIntroducer.EXECUTED_METHODS.contains repoDeclaredMethods.find { method -> method.name == "findAll" && method.returnType == List.class }
+            MyRepoIntroducer.EXECUTED_METHODS.clear()
     }
+
+    void "test interface overridden method"() {
+        when:
+            def bean = applicationContext.getBean(CustomCrudRepo)
+            def beanDef = applicationContext.getBeanDefinition(CustomCrudRepo)
+            def findByIdMethods = beanDef.getExecutableMethods().findAll(m -> m.getName() == "findById")
+        then:
+            MyRepoIntroducer.EXECUTED_METHODS.size() == 0
+            findByIdMethods.size() == 1
+            findByIdMethods[0].hasAnnotation(Marker)
+        when:
+            bean.findById(111)
+        then:
+            MyRepoIntroducer.EXECUTED_METHODS.size() == 1
+            MyRepoIntroducer.EXECUTED_METHODS.clear()
+        when:
+            CrudRepo<Object, Object> crudRepo = bean
+            crudRepo.findById(111)
+        then:
+            MyRepoIntroducer.EXECUTED_METHODS.size() == 1
+            MyRepoIntroducer.EXECUTED_METHODS.clear()
+    }
+
+    void "test interface abstract overridden method"() {
+        when:
+            def bean = applicationContext.getBean(AbstractCustomCrudRepo)
+            def beanDef = applicationContext.getBeanDefinition(AbstractCustomCrudRepo)
+            def findByIdMethods = beanDef.getExecutableMethods().findAll(m -> m.getName() == "findById")
+        then:
+            MyRepoIntroducer.EXECUTED_METHODS.size() == 0
+            findByIdMethods.size() == 1
+            findByIdMethods[0].hasAnnotation(Marker)
+        when:
+            bean.findById(111)
+        then:
+            MyRepoIntroducer.EXECUTED_METHODS.size() == 1
+            MyRepoIntroducer.EXECUTED_METHODS.clear()
+        when:
+            CrudRepo<Object, Object> crudRepo = bean
+            crudRepo.findById(111)
+        then:
+            MyRepoIntroducer.EXECUTED_METHODS.size() == 1
+            MyRepoIntroducer.EXECUTED_METHODS.clear()
+    }
+
+    void "test abstract overridden method"() {
+        when:
+            def bean = applicationContext.getBean(AbstractCustomAbstractCrudRepo)
+            def beanDef = applicationContext.getBeanDefinition(AbstractCustomAbstractCrudRepo)
+            def findByIdMethods = beanDef.getExecutableMethods().findAll(m -> m.getName() == "findById")
+        then:
+            MyRepoIntroducer.EXECUTED_METHODS.size() == 0
+            findByIdMethods.size() == 1
+            findByIdMethods[0].hasAnnotation(Marker)
+        when:
+            bean.findById(111)
+        then:
+            MyRepoIntroducer.EXECUTED_METHODS.size() == 1
+            MyRepoIntroducer.EXECUTED_METHODS.clear()
+        when:
+            AbstractCrudRepo<Object, Object> crudRepo = bean
+            crudRepo.findById(111)
+        then:
+            MyRepoIntroducer.EXECUTED_METHODS.size() == 1
+            MyRepoIntroducer.EXECUTED_METHODS.clear()
+    }
+
+    void "test overridden void methods"() {
+        when:
+            def bean = applicationContext.getBean(MyRepo2)
+            bean.deleteById(1)
+        then:
+            MyRepoIntroducer.EXECUTED_METHODS.size() == 1
+            MyRepoIntroducer.EXECUTED_METHODS.clear()
+    }
+
 }

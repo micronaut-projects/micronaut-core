@@ -56,7 +56,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
      * @param interceptors       The method interceptors to be passed to the final object to be constructed
      * @param originalParameters The parameters
      */
-    public ConstructorInterceptorChain(
+    private ConstructorInterceptorChain(
             @NonNull BeanConstructor<T> beanConstructor,
             @NonNull Interceptor<T, T>[] interceptors,
             Object... originalParameters) {
@@ -67,19 +67,21 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
     /**
      * Default constructor.
      *
-     * @param beanDefinition     The bean constructor
-     * @param beanConstructor    The bean constructor
-     * @param interceptors       The interceptors
-     * @param originalParameters The parameters
+     * @param beanDefinition                       The bean constructor
+     * @param beanConstructor                      The bean constructor
+     * @param interceptors                         The interceptors
+     * @param originalParameters                   The parameters
+     * @param additionalInterceptorParametersCount The additional interceptor parameters count
      */
     @UsedByGeneratedCode
-    public ConstructorInterceptorChain(
+    private ConstructorInterceptorChain(
             @NonNull BeanDefinition<T> beanDefinition,
             @NonNull BeanConstructor<T> beanConstructor,
             @NonNull Interceptor<T, T>[] interceptors,
+            int additionalInterceptorParametersCount,
             Object... originalParameters) {
-        this(beanConstructor, interceptors, resolveConcreteSubset(beanDefinition, originalParameters));
-        internalParameters = resolveInterceptorArguments(beanDefinition, originalParameters);
+        this(beanConstructor, interceptors, resolveConcreteSubset(beanDefinition, originalParameters, additionalInterceptorParametersCount));
+        internalParameters = resolveInterceptorArguments(beanDefinition, originalParameters, additionalInterceptorParametersCount);
     }
 
     @Override
@@ -147,12 +149,42 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
     @Internal
     @UsedByGeneratedCode
     @NonNull
+    @Deprecated
     public static <T1> T1 instantiate(
             @NonNull BeanResolutionContext resolutionContext,
             @NonNull BeanContext beanContext,
             @Nullable List<BeanRegistration<Interceptor<T1, T1>>> interceptors,
             @NonNull BeanDefinition<T1> definition,
             @NonNull BeanConstructor<T1> constructor,
+            @NonNull Object... parameters) {
+        int micronaut3additionalProxyConstructorParametersCount = 3;
+        return instantiate(resolutionContext, beanContext, interceptors, definition, constructor, micronaut3additionalProxyConstructorParametersCount, parameters);
+    }
+
+    /**
+     * Internal methods that handles the logic of instantiating a bean that has constructor interception applied.
+     *
+     * @param resolutionContext                         The resolution context
+     * @param beanContext                               The bean context
+     * @param interceptors                              The interceptors. Can be null and if so should be resolved from the context.
+     * @param definition                                The definition
+     * @param constructor                               The bean constructor
+     * @param additionalProxyConstructorParametersCount The additional proxy constructor parameters count
+     * @param parameters                                The resolved parameters
+     * @param <T1>                                      The bean type
+     * @return The instantiated bean
+     * @since 3.0.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    @NonNull
+    public static <T1> T1 instantiate(
+            @NonNull BeanResolutionContext resolutionContext,
+            @NonNull BeanContext beanContext,
+            @Nullable List<BeanRegistration<Interceptor<T1, T1>>> interceptors,
+            @NonNull BeanDefinition<T1> definition,
+            @NonNull BeanConstructor<T1> constructor,
+            int additionalProxyConstructorParametersCount,
             @NonNull Object... parameters) {
 
         if (interceptors == null) {
@@ -173,42 +205,47 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
                 definition,
                 constructor,
                 resolvedInterceptors,
+                additionalProxyConstructorParametersCount,
                 parameters
         ).proceed(), "Constructor interceptor chain illegally returned null for constructor: " + constructor.getDescription());
     }
 
-    private static Object[] resolveConcreteSubset(BeanDefinition<?> beanDefinition, Object[] originalParameters) {
+    private static Object[] resolveConcreteSubset(BeanDefinition<?> beanDefinition,
+                                                  Object[] originalParameters,
+                                                  int additionalProxyConstructorParametersCount) {
 
         if (beanDefinition instanceof AdvisedBeanType) {
 
-            // intercepted bean constructors include 3 additional arguments in
+            // intercepted bean constructors include additional arguments in
             // addition to the arguments declared in the bean
             // Here we subtract these from the parameters made visible to the interceptor consumer
-            if (originalParameters.length < 3) {
+            if (originalParameters.length < additionalProxyConstructorParametersCount) {
                 throw new IllegalStateException("Invalid intercepted bean constructor. This should never happen. Report an issue to the project maintainers.");
             }
             return Arrays.copyOfRange(
                     originalParameters,
                     0,
-                    originalParameters.length - 3
+                    originalParameters.length - additionalProxyConstructorParametersCount
             );
         }
         return originalParameters;
     }
 
-    private static Object[] resolveInterceptorArguments(BeanDefinition<?> beanDefinition, Object[] originalParameters) {
+    private static Object[] resolveInterceptorArguments(BeanDefinition<?> beanDefinition,
+                                                        Object[] originalParameters,
+                                                        int additionalProxyConstructorParametersCount) {
 
         if (beanDefinition instanceof AdvisedBeanType) {
 
-            // intercepted bean constructors include 3 additional arguments in
+            // intercepted bean constructors include additional arguments in
             // addition to the arguments declared in the bean
             // Here we subtract these from the parameters made visible to the interceptor consumer
-            if (originalParameters.length < 3) {
+            if (originalParameters.length < additionalProxyConstructorParametersCount) {
                 throw new IllegalStateException("Invalid intercepted bean constructor. This should never happen. Report an issue to the project maintainers.");
             }
             return Arrays.copyOfRange(
                     originalParameters,
-                    originalParameters.length - 3,
+                    originalParameters.length - additionalProxyConstructorParametersCount,
                     originalParameters.length
             );
         }

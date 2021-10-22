@@ -24,12 +24,24 @@ Route arguments of type rs:Publisher[Publisher<PartData>] are treated as intende
 
 If you need knowledge about the metadata of an uploaded file, the api:http.multipart.StreamingFileUpload[] class is a rs:Publisher[Publisher<PartData>] that also has file information such as the content type and file name.
 
-snippet::io.micronaut.docs.server.upload.UploadController[tags="class", indent=0, title="Streaming file upload"]
+snippet::io.micronaut.docs.server.upload.UploadController[tags="class,file", indent=0, title="Streaming file upload"]
 
 <1> The method consumes api:http.MediaType#MULTIPART_FORM_DATA[]
 <2> The method parameters match form attribute names. In this case `file` will match for example an `<input type="file" name="file">`
-<3> The api:http.multipart.StreamingFileUpload.transferTo(java.lang.String)[] method transfers the file to the server. The method returns a rs:Publisher[]
+<3> The api:http.multipart.StreamingFileUpload.transferTo(File)[] method transfers the file to the server. The method returns a rs:Publisher[]
 <4> The returned reactor:Mono[] subscribes to the rs:Publisher[] and outputs a response once the upload is complete, without blocking.
+
+It is also possible to pass an output stream with the `transferTo` method.
+
+NOTE: The reading of the file or stream will be offloaded to the IO thread pool to prevent the possibility of blocking the event loop.
+
+snippet::io.micronaut.docs.server.upload.UploadController[tags="class,outputStream", indent=0, title="Streaming file upload"]
+
+<1> The method consumes api:http.MediaType#MULTIPART_FORM_DATA[]
+<2> The method parameters match form attribute names. In this case `file` will match for example an `<input type="file" name="file">`
+<3> A stream is created to output the data to. In real world scenarios this would come from some other source.
+<4> The api:http.multipart.StreamingFileUpload.transferTo(OutputStream)[] method transfers the file to the server. The method returns a rs:Publisher[]
+<5> The returned reactor:Mono[] subscribes to the rs:Publisher[] and outputs a response once the upload is complete, without blocking.
 
 === Whole Data Types
 

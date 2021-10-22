@@ -1,4 +1,91 @@
-Micronaut {version} includes the following changes:
+//Micronaut {version} includes the following changes:
+== 3.1.0
+
+=== Core Features
+
+==== Primitive Beans
+
+<<factories, Factory Beans>> can now create beans that are primitive types or primitive array types.
+
+See the section on <<factories, Primitive Beans and Arrays>> in the documentation for more information.
+
+==== Repeatable Qualifiers
+
+<<qualifiers, Qualifiers>> can now be repeatable (an annotation annotated with `java.lang.annotation.Repeatable`) allowing narrowing bean resolution by a complete or partial match of the qualifiers declared on the injection point.
+
+==== InjectScope
+
+A new ann:context.annotation.InjectScope[] annotation has been added which destroys any beans with no defined scope and injected into a method or constructor annotated with `@Inject` after the method or constructor completes.
+
+==== More Build Time Optimizations
+
+Further build time metadata optimizations have been added included reducing the number and size of the classes generated to support <<introspection, Bean Introspection>> and including knowledge of repeatable annotations in generated metadata avoiding further reflective calls and optimizing Micronaut's memory usage, in particular with GraalVM.
+
+==== Improvements to Context Propagation
+
+Support for <<context,Reactive context propagation>> has been further improved by inclusion of request context information in the https://projectreactor.io/docs/core/release/reference/#context[Reactor context] and <<kotlinContextPropagation, documentation on how to effectively propagate the context across reactive flows>> when using Kotlin coroutines.
+
+==== Improvements to the Element API
+
+The build-time api:inject.ast.Element[] API has been improved in a number of ways:
+
+* New methods were added to the api:inject.ast.MethodElement[] API to resolve the retriever type and throws declaration
+* A new experimental API has been added to the api:inject.ast.ClassElement[] API  to resolve generic placeholders and resolve the generic bound to the element
+
+=== HTTP Features
+
+==== Filter By Regex
+
+HTTP filters now support matching URLs by a regular expression. Set the `patternStyle` member of the annotation to `REGEX` and the value will be treated as a regular expression.
+
+==== Random Port Binding
+
+The way the server binds to random ports has improved and should result in fewer port binding exceptions in tests.
+
+==== Client Data Formatting
+
+The ann:core.convert.format.Format[] annotation now supports several new values that can be used in conjunction with the declarative HTTP client to support formatting data in several new ways. See the <<clientParameters, client parameters>> documentation for more information.
+
+==== StreamingFileUpload
+
+The api:http.multipart.StreamingFileUpload[] API has been improved to support streaming directly to an output stream. As with the other `transferTo` methods, the write to the stream is offloaded to the IO pool automatically.
+
+==== Server SSL Configuration
+
+The SSL configuration for the Netty server now responds to refresh events. This allows for swapping out certificates without having to restart the server. See the <<https, https documentation>> for information on how to trigger the refresh.
+
+==== New Netty Server API
+
+If you wish to programmatically start additional Netty servers on different ports with potentially different configurations, new APIs have been added to do so including a new api:http.server.netty.NettyEmbeddedServerFactory[] interface.
+
+See the documentation on <<secondaryServers, Starting Secondary Servers>> for more information.
+
+=== Deprecations
+
+The `netty.responses.file.\*` configuration is deprecated in favor of `micronaut.server.netty.responses.file.*`. The old configuration key will be removed in the next major version of the framework.
+
+=== Module Upgrades
+
+==== Micronaut Data 3.1.0
+
+- Kotlin's coroutines support. New repository interface `CoroutineCrudRepository`.
+- Support for `AttributeConverter`
+- R2DBC upgraded to `Arabba-SR11`
+- JPA Criteria specifications
+
+==== Micronaut JAX-RS 3.1
+
+The https://micronaut-projects.github.io/micronaut-jaxrs/latest/guide/[JAX-RS module] now integrated with Micronaut Security allowing binding of the JAX-RS `SecurityContext`
+
+==== Micronaut Kubernetes 3.1.0
+
+Micronaut Kubernetes 3.1 introduces new annotation https://micronaut-projects.github.io/micronaut-kubernetes/latest/api/io/micronaut/kubernetes/client/informer/Informer.html[@Informer]. By using the annotation on the https://javadoc.io/doc/io.kubernetes/client-java/latest/io/kubernetes/client/informer/ResourceEventHandler.html[ResourceEventHandler] the Micronaut will instantiate the https://javadoc.io/doc/io.kubernetes/client-java/latest/io/kubernetes/client/informer/SharedIndexInformer.html[SharedInformer] from the official https://github.com/kubernetes-client/java[Kubernetes Java SDK]. Then you only need to take care of handling the changes of the watched Kubernetes resource. See more on https://micronaut-projects.github.io/micronaut-kubernetes/latest/guide/#kubernetes-informer[Kubernetes Informer].
+
+==== Micronaut Oracle Coherence 3.0.0
+
+The https://micronaut-projects.github.io/micronaut-coherence/latest/guide/[Micronaut Oracle Coherence] module is now out of preview status and includes broad integration with Oracle Coherence including support for caching, messaging and Micronaut Data.
+
+== 3.0.0
 
 === Core Features
 
@@ -110,17 +197,12 @@ Micronaut 3 to simplify instrumentation, thanks to https://projectreactor.io/doc
 
 === Module Upgrades
 
-==== Micronaut Data 3.0.0
+==== Micronaut Data 3.1.0
 
-Huge https://micronaut-projects.github.io/micronaut-data/latest/guide/[Micronaut Data] update including many new features including:
-
-- Full support for immutable entities. You can use Java 16 records or Kotlin immutable data classes
-- Integrated support for R2DBC, now the `data-r2dbc` module is a part of the data project and shares the same code with JDBC
-- Optimistic locking for JDBC/R2DBC
-- Repositories now support batch insert/update/delete even with a custom query
-- Rewritten entity mapper allows more complex mapping for JDBC/R2DBC entities
-- Support for `@JoinTable` and `@JoinColumn` annotations
-- A lot of bugfixes!
+- Kotlin's coroutines support. New repository interface `CoroutineCrudRepository`.
+- Support for `AttributeConverter`
+- R2DBC upgraded to `Arabba-SR11`
+- JPA Criteria specifications
 
 ==== Micronaut Micrometer 4.0.0
 

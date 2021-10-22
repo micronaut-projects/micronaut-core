@@ -1657,6 +1657,7 @@ class Test {
         bi.getConstructorArguments()[1].getAnnotationMetadata().hasAnnotation(Size)
         bi.getIndexedProperties(Id).size() == 1
         bi.getIndexedProperty(Id).isPresent()
+        !bi.getIndexedProperty(Column, null).isPresent()
         bi.getIndexedProperty(Column, "test_name").isPresent()
         bi.getIndexedProperty(Column, "test_name").get().name == 'name'
         bi.getProperty("version").get().hasAnnotation(Version)
@@ -2786,6 +2787,48 @@ abstract class Test {
         expect:
         beanIntrospection != null
         beanIntrospection.getBeanProperties().size() == 3
+    }
+
+    void "test class loading is not shared between the introspection and the ref"() {
+        when:
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+import java.util.Set;
+
+@Introspected(excludedAnnotations = Deprecated.class)
+public class Test {
+
+    private Set<Author> authors;
+    
+    public Set<Author> getAuthors() {
+        return authors;
+    }
+
+    public void setAuthors(Set<Author> authors) {
+        this.authors = authors;
+    }
+}
+@Introspected(excludedAnnotations = Deprecated.class)
+class Author {
+    private String name;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 1
     }
 
     @Override

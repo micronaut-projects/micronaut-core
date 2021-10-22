@@ -18,6 +18,8 @@ package io.micronaut.http.server.netty.ssl;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceResolver;
+import io.micronaut.core.order.Ordered;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.ssl.ClientAuthentication;
@@ -25,6 +27,8 @@ import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.http.ssl.SslBuilder;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.http.ssl.SslConfigurationException;
+import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
+import io.micronaut.runtime.context.scope.refresh.RefreshEventListener;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ApplicationProtocolNames;
@@ -39,6 +43,7 @@ import javax.net.ssl.SSLException;
 import java.security.KeyStore;
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.Set;
 
 import static io.micronaut.core.util.StringUtils.FALSE;
 import static io.micronaut.core.util.StringUtils.TRUE;
@@ -51,7 +56,7 @@ import static io.micronaut.core.util.StringUtils.TRUE;
 @Requires(property = SslConfiguration.PREFIX + ".build-self-signed", value = FALSE, defaultValue = FALSE)
 @Singleton
 @Internal
-public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implements ServerSslBuilder {
+public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implements ServerSslBuilder, RefreshEventListener, Ordered {
 
     private final ServerSslConfiguration ssl;
     private final HttpServerConfiguration httpServerConfiguration;
@@ -145,5 +150,25 @@ public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implem
             super.getKeyStore(ssl).ifPresent(keyStore -> keyStoreCache = keyStore);
         }
         return Optional.ofNullable(keyStoreCache);
+    }
+
+    @Override
+    public Set<String> getObservedConfigurationPrefixes() {
+        return CollectionUtils.setOf(
+                SslConfiguration.PREFIX,
+                ServerSslConfiguration.PREFIX
+        );
+    }
+
+    @Override
+    public void onApplicationEvent(RefreshEvent event) {
+        // clear caches
+        keyStoreCache = null;
+        trustStoreCache = null;
+    }
+
+    @Override
+    public int getOrder() {
+        return RefreshEventListener.DEFAULT_POSITION - 10;
     }
 }

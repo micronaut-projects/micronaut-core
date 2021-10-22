@@ -21,6 +21,13 @@ jobs:
       matrix:
         java: ['8', '11', '15']
     steps:
+      # https://github.com/actions/virtual-environments/issues/709
+      - name: Free disk space
+        run: |
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo apt-get clean
+          df -h
       - uses: actions/checkout@v2
       - uses: actions/cache@v2.1.6
         with:
@@ -34,17 +41,21 @@ jobs:
           distribution: 'adopt'
           java-version: ${{ matrix.java }}
       - name: Optional setup step
+        env:
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
         run: |
           [ -f ./setup.sh ] && ./setup.sh || true
       - name: Build with Gradle
         run: ./gradlew dependencyUpdates check --parallel --continue
         env:
           TESTCONTAINERS_RYUK_DISABLED: true
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
       - name: Publish to Sonatype Snapshots
         if: success() && github.event_name == 'push' && matrix.java == '8'
         env:
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
         run: ./gradlew publishToSonatype docs --no-daemon
       - name: Determine docs target repository
         uses: haya14busa/action-cond@v1

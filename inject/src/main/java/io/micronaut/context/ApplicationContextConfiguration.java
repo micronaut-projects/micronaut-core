@@ -110,4 +110,9 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
     default boolean isBannerEnabled() {
         return true;
     }
+
+    @Nullable
+    default Boolean isBootstrapEnvironmentEnabled() {
+        return null;
+    }
 }

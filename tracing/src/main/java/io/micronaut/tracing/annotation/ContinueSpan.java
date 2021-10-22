@@ -36,7 +36,7 @@ import java.lang.annotation.Target;
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Inherited
-@Target(value = { ElementType.METHOD })
+@Target(value = { ElementType.METHOD, ElementType.ANNOTATION_TYPE })
 @Around
 @Type(TraceInterceptor.class)
 public @interface ContinueSpan {

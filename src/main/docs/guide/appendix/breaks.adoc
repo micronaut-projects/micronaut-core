@@ -1,4 +1,10 @@
-This section documents breaking changes between Micronaut 2.x and Micronaut 3.x
+This section documents breaking changes between Micronaut versions
+
+== 3.1.0
+
+Retrieving the port from the Netty embedded server is no longer supported if the server is configured to bind to a random port and the server has not been started.
+
+== 3.0.0
 
 === Core Changes
 

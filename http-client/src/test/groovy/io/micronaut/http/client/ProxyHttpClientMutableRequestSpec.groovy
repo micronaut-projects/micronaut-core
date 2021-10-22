@@ -30,14 +30,12 @@ class ProxyHttpClientMutableRequestSpec extends Specification {
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/6073")
     void "ProxyHttpClient will mutate a request if necessary"() {
         given:
-        int helloServerPort = SocketUtils.findAvailableTcpPort()
         EmbeddedServer helloEmbeddedServer = ApplicationContext.run(EmbeddedServer.class, [
-                'micronaut.server.port': helloServerPort,
                 'spec.name': 'ProxyHttpClientMutableRequestSpec.hello',
         ])
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class, [
                 'spec.name': 'ProxyHttpClientMutableRequestSpec',
-                'proxies.hello.url': "http://localhost:$helloServerPort".toString(),
+                'proxies.hello.url': "http://localhost:${helloEmbeddedServer.getPort()}".toString(),
         ])
 
         HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.URL)

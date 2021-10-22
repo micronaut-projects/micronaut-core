@@ -18,7 +18,6 @@ package io.micronaut.context.scope;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.LifeCycle;
 import io.micronaut.context.exceptions.BeanDestructionException;
-import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
@@ -140,9 +139,12 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
                         r.lock();
                         return (T) createdBean.bean();
                     } else {
-                        createdBean = doCreate(creationContext);
-                        scopeMap.put(id, createdBean);
-                        r.lock();
+                        try {
+                            createdBean = doCreate(creationContext);
+                            scopeMap.put(id, createdBean);
+                        } finally {
+                            r.lock();
+                        }
                         return (T) createdBean.bean();
                     }
                 } finally {

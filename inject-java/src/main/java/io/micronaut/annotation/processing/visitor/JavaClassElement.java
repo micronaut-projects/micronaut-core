@@ -53,6 +53,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     protected final TypeElement classElement;
     protected final JavaVisitorContext visitorContext;
+    final List<? extends TypeMirror> typeArguments;
     private final int arrayDimensions;
     private final boolean isTypeVariable;
     private List<PropertyElement> beanProperties;
@@ -69,24 +70,12 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
      */
     @Internal
     public JavaClassElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
-        this(classElement, annotationMetadata, visitorContext, null, 0, false);
+        this(classElement, annotationMetadata, visitorContext, Collections.emptyList(), null, 0, false);
     }
 
     /**
-     * @param classElement       The {@link TypeElement}
-     * @param annotationMetadata The annotation metadata
-     * @param visitorContext     The visitor context
-     * @param genericsInfo       The generic type info
-     */
-    JavaClassElement(
-            TypeElement classElement,
-            AnnotationMetadata annotationMetadata,
-            JavaVisitorContext visitorContext,
-            Map<String, Map<String, TypeMirror>> genericsInfo) {
-        this(classElement, annotationMetadata, visitorContext, genericsInfo, 0, false);
-    }
-
-    /**
+     * Used by OpenAPI.
+     *
      * @param classElement       The {@link TypeElement}
      * @param annotationMetadata The annotation metadata
      * @param visitorContext     The visitor context
@@ -99,13 +88,48 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             JavaVisitorContext visitorContext,
             Map<String, Map<String, TypeMirror>> genericsInfo,
             int arrayDimensions) {
-        this(classElement, annotationMetadata, visitorContext, genericsInfo, arrayDimensions, false);
+        this(classElement, annotationMetadata, visitorContext, Collections.emptyList(), genericsInfo, arrayDimensions, false);
     }
 
     /**
      * @param classElement       The {@link TypeElement}
      * @param annotationMetadata The annotation metadata
      * @param visitorContext     The visitor context
+     * @param typeArguments      The declared type arguments
+     * @param genericsInfo       The generic type info
+     */
+    JavaClassElement(
+            TypeElement classElement,
+            AnnotationMetadata annotationMetadata,
+            JavaVisitorContext visitorContext,
+            List<? extends TypeMirror> typeArguments,
+            Map<String, Map<String, TypeMirror>> genericsInfo) {
+        this(classElement, annotationMetadata, visitorContext, typeArguments, genericsInfo, 0, false);
+    }
+
+    /**
+     * @param classElement       The {@link TypeElement}
+     * @param annotationMetadata The annotation metadata
+     * @param visitorContext     The visitor context
+     * @param typeArguments      The declared type arguments
+     * @param genericsInfo       The generic type info
+     * @param arrayDimensions    The number of array dimensions
+     */
+    JavaClassElement(
+            TypeElement classElement,
+            AnnotationMetadata annotationMetadata,
+            JavaVisitorContext visitorContext,
+            List<? extends TypeMirror> typeArguments,
+            Map<String, Map<String, TypeMirror>> genericsInfo,
+            int arrayDimensions) {
+        this(classElement, annotationMetadata, visitorContext, typeArguments, genericsInfo, arrayDimensions, false);
+    }
+
+    /**
+     * @param classElement       The {@link TypeElement}
+     * @param annotationMetadata The annotation metadata
+     * @param visitorContext     The visitor context
+     * @param typeArguments      The declared type arguments
      * @param genericsInfo       The generic type info
      * @param isTypeVariable     Is the class element a type variable
      */
@@ -113,15 +137,17 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             TypeElement classElement,
             AnnotationMetadata annotationMetadata,
             JavaVisitorContext visitorContext,
+            List<? extends TypeMirror> typeArguments,
             Map<String, Map<String, TypeMirror>> genericsInfo,
             boolean isTypeVariable) {
-        this(classElement, annotationMetadata, visitorContext, genericsInfo, 0, isTypeVariable);
+        this(classElement, annotationMetadata, visitorContext, typeArguments, genericsInfo, 0, isTypeVariable);
     }
 
     /**
      * @param classElement       The {@link TypeElement}
      * @param annotationMetadata The annotation metadata
      * @param visitorContext     The visitor context
+     * @param typeArguments      The declared type arguments
      * @param genericsInfo       The generic type info
      * @param arrayDimensions    The number of array dimensions
      * @param isTypeVariable     Is the type a type variable
@@ -130,12 +156,14 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             TypeElement classElement,
             AnnotationMetadata annotationMetadata,
             JavaVisitorContext visitorContext,
+            List<? extends TypeMirror> typeArguments,
             Map<String, Map<String, TypeMirror>> genericsInfo,
             int arrayDimensions,
             boolean isTypeVariable) {
         super(classElement, annotationMetadata, visitorContext);
         this.classElement = classElement;
         this.visitorContext = visitorContext;
+        this.typeArguments = typeArguments;
         this.genericTypeInfo = genericsInfo;
         this.arrayDimensions = arrayDimensions;
         this.isTypeVariable = isTypeVariable;
@@ -384,6 +412,12 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                                     visitorContext,
                                     genericTypeInfo,
                                     true);
+                        } else if (beanPropertyData.declaringType == null) {
+                            beanPropertyData.declaringType = mirrorToClassElement(
+                                    declaringTypeElement.asType(),
+                                    visitorContext,
+                                    genericTypeInfo,
+                                    false);
                         }
                     }
                 }, null);
@@ -787,7 +821,10 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new JavaClassElement(classElement, getAnnotationMetadata(), visitorContext, getGenericTypeInfo(), arrayDimensions, false);
+        if (arrayDimensions == this.arrayDimensions) {
+            return this;
+        }
+        return new JavaClassElement(classElement, getAnnotationMetadata(), visitorContext, typeArguments, getGenericTypeInfo(), arrayDimensions, false);
     }
 
     @Override
@@ -915,6 +952,93 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 return new JavaMethodElement(this, executableElement, annotationMetadata, visitorContext);
             }
         });
+    }
+
+    @NonNull
+    @Override
+    public List<ClassElement> getBoundGenericTypes() {
+        return typeArguments.stream()
+                //return getGenericTypeInfo().getOrDefault(classElement.getQualifiedName().toString(), Collections.emptyMap()).values().stream()
+                .map(tm -> mirrorToClassElement(tm, visitorContext, getGenericTypeInfo()))
+                .collect(Collectors.toList());
+    }
+
+    @NonNull
+    @Override
+    public List<? extends GenericPlaceholderElement> getDeclaredGenericPlaceholders() {
+        return classElement.getTypeParameters().stream()
+                // we want the *declared* variables, so we don't pass in our genericsInfo.
+                .map(tpe -> (GenericPlaceholderElement) mirrorToClassElement(tpe.asType(), visitorContext))
+                .collect(Collectors.toList());
+    }
+
+    @NonNull
+    @Override
+    public ClassElement getRawClassElement() {
+        return visitorContext.getElementFactory().newClassElement(classElement, visitorContext.getAnnotationUtils().getAnnotationMetadata(classElement))
+                .withArrayDimensions(getArrayDimensions());
+    }
+
+    private static TypeMirror toTypeMirror(JavaVisitorContext visitorContext, ClassElement element) {
+        if (element.isArray()) {
+            return visitorContext.getTypes().getArrayType(toTypeMirror(visitorContext, element.fromArray()));
+        } else if (element.isWildcard()) {
+            WildcardElement wildcardElement = (WildcardElement) element;
+            List<? extends ClassElement> upperBounds = wildcardElement.getUpperBounds();
+            if (upperBounds.size() != 1) {
+                throw new UnsupportedOperationException("Multiple upper bounds not supported");
+            }
+            TypeMirror upperBound = toTypeMirror(visitorContext, upperBounds.get(0));
+            if (upperBound.toString().equals("java.lang.Object")) {
+                upperBound = null;
+            }
+            List<? extends ClassElement> lowerBounds = wildcardElement.getLowerBounds();
+            if (lowerBounds.size() > 1) {
+                throw new UnsupportedOperationException("Multiple upper bounds not supported");
+            }
+            TypeMirror lowerBound = lowerBounds.isEmpty() ? null : toTypeMirror(visitorContext, lowerBounds.get(0));
+            return visitorContext.getTypes().getWildcardType(upperBound, lowerBound);
+        } else if (element.isGenericPlaceholder()) {
+            if (!(element instanceof JavaGenericPlaceholderElement)) {
+                throw new UnsupportedOperationException("Free type variable on non-java class");
+            }
+            return ((JavaGenericPlaceholderElement) element).realTypeVariable;
+        } else {
+            if (element instanceof JavaClassElement) {
+                return visitorContext.getTypes().getDeclaredType(
+                        ((JavaClassElement) element).classElement,
+                        ((JavaClassElement) element).typeArguments.toArray(new TypeMirror[0]));
+            } else {
+                return visitorContext.getTypes().getDeclaredType(
+                        ((JavaClassElement) visitorContext.getClassElement(element.getName()).get()).classElement,
+                        element.getBoundGenericTypes().stream().map(ce -> toTypeMirror(visitorContext, ce)).toArray(TypeMirror[]::new));
+            }
+        }
+    }
+
+    @NonNull
+    @Override
+    public ClassElement withBoundGenericTypes(@NonNull List<? extends ClassElement> typeArguments) {
+        if (typeArguments.isEmpty() && this.typeArguments.isEmpty()) {
+            return this;
+        }
+
+        List<TypeMirror> typeMirrors = typeArguments.stream()
+                .map(ce -> toTypeMirror(visitorContext, ce))
+                .collect(Collectors.toList());
+        if (typeMirrors.equals(this.typeArguments)) {
+            return this;
+        }
+
+        Map<String, TypeMirror> boundByName = new LinkedHashMap<>();
+        Iterator<? extends TypeParameterElement> tpes = classElement.getTypeParameters().iterator();
+        Iterator<TypeMirror> args = typeMirrors.iterator();
+        while (tpes.hasNext() && args.hasNext()) {
+            boundByName.put(tpes.next().getSimpleName().toString(), args.next());
+        }
+
+        Map<String, Map<String, TypeMirror>> genericsInfo = visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement, null, boundByName);
+        return new JavaClassElement(classElement, getAnnotationMetadata(), visitorContext, typeMirrors, genericsInfo, arrayDimensions);
     }
 
     @Override

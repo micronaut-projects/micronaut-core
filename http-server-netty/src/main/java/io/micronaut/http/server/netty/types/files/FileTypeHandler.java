@@ -22,6 +22,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
+import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
@@ -29,7 +30,6 @@ import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.http.server.types.files.SystemFile;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpResponse;
-import jakarta.inject.Singleton;
 
 import java.io.File;
 import java.time.LocalDateTime;
@@ -43,7 +43,6 @@ import java.util.Arrays;
  * @author James Kleeh
  * @since 1.0
  */
-@Singleton
 @Internal
 public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Object> {
 
@@ -51,12 +50,12 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
     // https://tools.ietf.org/html/rfc2616#section-7.1
     private static final String[] ENTITY_HEADERS = new String[] {HttpHeaders.ALLOW, HttpHeaders.CONTENT_ENCODING, HttpHeaders.CONTENT_LANGUAGE, HttpHeaders.CONTENT_LENGTH, HttpHeaders.CONTENT_LOCATION, HttpHeaders.CONTENT_MD5, HttpHeaders.CONTENT_RANGE, HttpHeaders.CONTENT_TYPE, HttpHeaders.EXPIRES, HttpHeaders.LAST_MODIFIED};
     private static final Class<?>[] SUPPORTED_TYPES = new Class[]{File.class, StreamedFile.class, NettyFileCustomizableResponseType.class, SystemFile.class};
-    private final FileTypeHandlerConfiguration configuration;
+    private final NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration;
 
     /**
      * @param configuration The file type handler configuration
      */
-    public FileTypeHandler(FileTypeHandlerConfiguration configuration) {
+    public FileTypeHandler(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration) {
         this.configuration = configuration;
     }
 
@@ -126,7 +125,7 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
         }
 
         if (response.header(HttpHeaders.CACHE_CONTROL) == null) {
-            FileTypeHandlerConfiguration.CacheControlConfiguration cacheConfig = configuration.getCacheControl();
+            NettyHttpServerConfiguration.FileTypeHandlerConfiguration.CacheControlConfiguration cacheConfig = configuration.getCacheControl();
             StringBuilder header = new StringBuilder(cacheConfig.getPublic() ? "public" : "private")
                     .append(", max-age=")
                     .append(configuration.getCacheSeconds());

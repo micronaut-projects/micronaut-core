@@ -131,7 +131,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             AnnotatedNode beanClassNode = entry.key
             try {
                 BeanDefinitionReferenceWriter beanReferenceWriter = new BeanDefinitionReferenceWriter(
-                        beanTypeName,
                         beanDefWriter
                 )
 

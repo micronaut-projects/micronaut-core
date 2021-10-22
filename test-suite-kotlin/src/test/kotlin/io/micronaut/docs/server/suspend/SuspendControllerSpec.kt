@@ -242,5 +242,12 @@ class SuspendControllerSpec : StringSpec() {
             body shouldBe "/suspend/requestContext"
             response.status shouldBe HttpStatus.OK
         }
+
+        "test request context is available2" {
+            val response = client.exchange(GET<String>("/suspend/requestContext2"), String::class.java).awaitSingle()
+            val body = response.body.get()
+            body shouldBe "test"
+            response.status shouldBe HttpStatus.OK
+        }
     }
 }

@@ -882,4 +882,46 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         }
         return true;
     }
+
+    @Override
+    public boolean isRepeatableAnnotation(Class<? extends Annotation> annotation) {
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (metadata.isRepeatableAnnotation(annotation)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isRepeatableAnnotation(String annotation) {
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (metadata.isRepeatableAnnotation(annotation)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public Optional<String> findRepeatableAnnotation(Class<? extends Annotation> annotation) {
+        for (AnnotationMetadata metadata : hierarchy) {
+            Optional<String> repeatable = metadata.findRepeatableAnnotation(annotation);
+            if (repeatable.isPresent()) {
+                return repeatable;
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<String> findRepeatableAnnotation(String annotation) {
+        for (AnnotationMetadata metadata : hierarchy) {
+            Optional<String> repeatable = metadata.findRepeatableAnnotation(annotation);
+            if (repeatable.isPresent()) {
+                return repeatable;
+            }
+        }
+        return Optional.empty();
+    }
 }

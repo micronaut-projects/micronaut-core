@@ -17,6 +17,7 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpClientFactory;
@@ -53,7 +54,7 @@ public class NettyHttpClientFactory implements
 
     @NonNull
     @Override
-    public HttpClient createClient(URL url, HttpClientConfiguration configuration) {
+    public HttpClient createClient(URL url, @NonNull HttpClientConfiguration configuration) {
         return createNettyClient(url, configuration);
     }
 
@@ -65,19 +66,19 @@ public class NettyHttpClientFactory implements
 
     @NonNull
     @Override
-    public ProxyHttpClient createProxyClient(URL url, HttpClientConfiguration configuration) {
+    public ProxyHttpClient createProxyClient(URL url, @NonNull HttpClientConfiguration configuration) {
         return createNettyClient(url, configuration);
     }
 
     @NonNull
     @Override
-    public SseClient createSseClient(URL url) {
+    public SseClient createSseClient(@Nullable URL url) {
         return createNettyClient(url);
     }
 
     @NonNull
     @Override
-    public SseClient createSseClient(URL url, HttpClientConfiguration configuration) {
+    public SseClient createSseClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
         return createNettyClient(url, configuration);
     }
 
@@ -89,7 +90,7 @@ public class NettyHttpClientFactory implements
 
     @NonNull
     @Override
-    public StreamingHttpClient createStreamingClient(URL url, HttpClientConfiguration configuration) {
+    public StreamingHttpClient createStreamingClient(URL url, @NonNull HttpClientConfiguration configuration) {
         return createNettyClient(url, configuration);
     }
 
@@ -101,7 +102,7 @@ public class NettyHttpClientFactory implements
 
     @NonNull
     @Override
-    public WebSocketClient createWebSocketClient(URL url, HttpClientConfiguration configuration) {
+    public WebSocketClient createWebSocketClient(URL url, @NonNull HttpClientConfiguration configuration) {
         return createNettyClient(url, configuration);
     }
 

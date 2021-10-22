@@ -73,6 +73,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     protected final ClassNode classNode;
     private final int arrayDimensions;
     private final boolean isTypeVar;
+    private List<? extends ClassElement> overrideBoundGenericTypes;
     private Map<String, Map<String, ClassNode>> genericInfo;
 
     /**
@@ -449,7 +450,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     @Override
     public Optional<ClassElement> getSuperType() {
-        final ClassNode superClass = classNode.getSuperClass();
+        final ClassNode superClass = classNode.getUnresolvedSuperClass(false);
         if (superClass != null && !superClass.equals(ClassHelper.OBJECT_TYPE)) {
             return Optional.of(
                     visitorContext.getElementFactory().newClassElement(
@@ -972,6 +973,70 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     @Override
     public boolean isAssignable(ClassElement type) {
         return AstClassUtils.isSubclassOfOrImplementsInterface(classNode, type.getName());
+    }
+
+    @NonNull
+    @Override
+    public List<? extends ClassElement> getBoundGenericTypes() {
+        if (overrideBoundGenericTypes == null) {
+            overrideBoundGenericTypes = getBoundGenericTypes(classNode);
+        }
+        return overrideBoundGenericTypes;
+    }
+
+    @NonNull
+    private List<? extends ClassElement> getBoundGenericTypes(ClassNode classNode) {
+        GenericsType[] genericsTypes = classNode.getGenericsTypes();
+        if (genericsTypes == null) {
+            return Collections.emptyList();
+        } else {
+            return Arrays.stream(genericsTypes)
+                    .map(cn -> {
+                        if (cn.isWildcard()) {
+                            List<GroovyClassElement> upperBounds;
+                            if (cn.getUpperBounds() != null && cn.getUpperBounds().length > 0) {
+                                upperBounds = Arrays.stream(cn.getUpperBounds())
+                                        .map(bound -> (GroovyClassElement) toClassElement(bound))
+                                        .collect(Collectors.toList());
+                            } else {
+                                upperBounds = Collections.singletonList((GroovyClassElement) visitorContext.getClassElement(Object.class).get());
+                            }
+                            List<GroovyClassElement> lowerBounds;
+                            if (cn.getLowerBound() == null) {
+                                lowerBounds = Collections.emptyList();
+                            } else {
+                                lowerBounds = Collections.singletonList((GroovyClassElement) toClassElement(cn.getLowerBound()));
+                            }
+                            return new GroovyWildcardElement(
+                                    upperBounds,
+                                    lowerBounds
+                            );
+                        } else {
+                            return toClassElement(cn.getType());
+                        }
+                    })
+                    .collect(Collectors.toList());
+        }
+    }
+
+    @NonNull
+    @Override
+    public List<? extends GenericPlaceholderElement> getDeclaredGenericPlaceholders() {
+        //noinspection unchecked
+        return (List<? extends GenericPlaceholderElement>) getBoundGenericTypes(classNode.redirect());
+    }
+
+    protected final ClassElement toClassElement(ClassNode classNode) {
+        return visitorContext.getElementFactory().newClassElement(classNode, AnnotationMetadata.EMPTY_METADATA);
+    }
+
+    @NonNull
+    @Override
+    public ClassElement withBoundGenericTypes(@NonNull List<? extends ClassElement> typeArguments) {
+        // we can't create a new ClassNode, so we have to go this route.
+        GroovyClassElement copy = (GroovyClassElement) visitorContext.getElementFactory().newClassElement(classNode, getAnnotationMetadata());
+        copy.overrideBoundGenericTypes = typeArguments;
+        return copy;
     }
 
     private MethodNode findConcreteConstructor() {
