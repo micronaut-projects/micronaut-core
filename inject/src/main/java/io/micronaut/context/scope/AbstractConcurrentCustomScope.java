@@ -218,7 +218,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
             final Map<BeanIdentifier, CreatedBean<?>> scopeMap;
             try {
                 scopeMap = getScopeMap(false);
-            } catch (IllegalStateException e) {
+            } catch (Exception e) {
                 return Optional.empty();
             }
             for (CreatedBean<?> createdBean : scopeMap.values()) {

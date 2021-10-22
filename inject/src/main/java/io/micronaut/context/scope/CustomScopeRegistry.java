@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.scope;
 
+import io.micronaut.context.BeanRegistration;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanType;
@@ -68,5 +69,16 @@ public interface CustomScopeRegistry {
      */
     default Optional<CustomScope<?>> findScope(Class<? extends Annotation> scopeAnnotation) {
         return findScope(scopeAnnotation.getName());
+    }
+
+    /**
+     * Finds A bean registration amongst the active scopes.
+     * @param bean The bean
+     * @param <T> The bean type
+     * @return An optional bean registration
+     * @since 3.1.2
+     */
+    default <T> Optional<BeanRegistration<T>> findBeanRegistration(T bean) {
+        return Optional.empty();
     }
 }

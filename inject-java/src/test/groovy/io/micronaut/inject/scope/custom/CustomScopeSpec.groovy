@@ -1,6 +1,7 @@
 package io.micronaut.inject.scope.custom
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.BeanRegistration
 import io.micronaut.context.exceptions.BeanCreationException
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -38,5 +39,19 @@ class CustomScopeSpec extends Specification {
 
         then:
         def e = thrown(BeanCreationException)
+    }
+
+    void "test custom scope with bean registration resolution"() {
+        when:
+        def registration = context.findBeanRegistration(new NonFaultyBean())
+
+        then:
+        !registration.isPresent()
+
+        when:
+        def bean = context.getBean(NonFaultyBean)
+
+        then:
+        context.findBeanRegistration(bean).isPresent()
     }
 }
