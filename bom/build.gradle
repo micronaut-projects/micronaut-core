@@ -1,6 +1,7 @@
 import io.micronaut.build.internal.pom.VersionCatalogConverter
 import org.gradle.api.plugins.catalog.CatalogPluginExtension
 import org.gradle.api.plugins.catalog.VersionCatalogPlugin
+import io.micronaut.build.internal.pom.PomChecker
 
 plugins {
     id 'java-platform'
@@ -46,7 +47,7 @@ def legacyVersionNames = [
 ]
 
 String toPropertyName(String alias) {
-    alias.split("(?=[A-Z])").collect { it.toLowerCase(Locale.US) }.join("-").replace((char)'-', (char)'.')
+    alias.split("(?=[A-Z])").collect { it.toLowerCase(Locale.US) }.join("-").replace((char) '-', (char) '.')
 }
 
 components.javaPlatform.addVariantsFromConfiguration(
@@ -66,7 +67,7 @@ tasks.named("generateCatalogAsToml") {
 }
 
 def bomPropertyName = { String alias ->
-    alias = alias - 'managed.'
+    alias = alias - 'managed.' - 'boms.'
     String baseName = legacyVersionNames[alias] ?: toPropertyName(alias)
     "${baseName}.version"
 }
@@ -85,7 +86,8 @@ publishing {
                     } + project.ext.pomInfo
                     modelConverter.model.librariesTable.each { library ->
                         def alias = library.version.reference.replaceAll('-', '.')
-                        if (alias != null && library.alias.replaceAll('-', '.').startsWith("managed.")) {
+                        def libraryAlias = library.alias?.replaceAll('-', '.')
+                        if (alias != null && libraryAlias.startsWith("managed.") || libraryAlias.startsWith('boms.')) {
                             def pomDep = xml.dependencyManagement.dependencies.dependency.find {
                                 it.artifactId.text() == library.name
                                         && it.groupId.text() == library.group
@@ -95,6 +97,28 @@ publishing {
                             } else {
                                 println "[WARNING] Didn't find dependency ${library.group}:${library.name} in BOM file"
                             }
+                        }
+                    }
+                    // Add individual module versions as properties
+                    for (Project p : rootProject.subprojects) {
+                        if (!p.subprojects.empty) {
+                            continue
+                        }
+                        if (p.name.contains("bom")) {
+                            continue
+                        }
+                        if (excludedProjects.contains(p.name)) {
+                            continue
+                        }
+                        String propertyName = "micronaut.${p.name.replace((char) '-', (char) '.')}"
+                        def pomDep = xml.dependencyManagement.dependencies.dependency.find {
+                            it.artifactId.text() == "micronaut-${p.name}"
+                                    && it.groupId.text() == group
+                        }
+                        if (pomDep != null) {
+                            pomDep.version.first().setValue("\${${propertyName}}")
+                        } else {
+                            println "[WARNING] Didn't find dependency ${group}:micronaut-${p.name} in BOM file"
                         }
                     }
                 }
@@ -107,6 +131,21 @@ publishing {
                     }
                 }
             }
+            // Add individual module versions as properties
+            for (Project p : rootProject.subprojects) {
+                if (!p.subprojects.empty) {
+                    continue
+                }
+                if (p.name.contains("bom")) {
+                    continue
+                }
+                if (excludedProjects.contains(p.name)) {
+                    continue
+                }
+                String propertyName = "micronaut.${p.name.replace((char) '-', (char) '.')}"
+                pom.properties.put(propertyName, p.version)
+            }
+
         }
     }
 }
@@ -156,4 +195,19 @@ dependencies {
         }
 
     }
+}
+
+def checkBom = tasks.register("checkBom", PomChecker) {
+    String repoUrl = publishing.repositories.findByName("Build").url.toString()
+    repositories.add(repoUrl)
+    pomFile.fileProvider(tasks.named('generatePomFileForMavenPublication', GenerateMavenPom).map { it.destination })
+    pomCoordinates.set("${project.group}:micronaut-${project.name}:$version")
+    checkBomContents = false
+    report = layout.buildDirectory.file("reports/boms/micronaut-bom.txt")
+    failOnSnapshots = !project.version.endsWith('-SNAPSHOT')
+    failOnError = true
+}
+
+tasks.named("check") {
+    dependsOn(checkBom)
 }
