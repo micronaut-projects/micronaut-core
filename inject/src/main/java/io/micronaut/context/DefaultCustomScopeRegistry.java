@@ -59,6 +59,20 @@ public class DefaultCustomScopeRegistry implements CustomScopeRegistry {
     }
 
     @Override
+    public <T> Optional<BeanRegistration<T>> findBeanRegistration(T bean) {
+        for (Optional<CustomScope<?>> value : scopes.values()) {
+            if (value.isPresent()) {
+                final CustomScope<?> customScope = value.get();
+                final Optional<BeanRegistration<T>> beanRegistration = customScope.findBeanRegistration(bean);
+                if (beanRegistration.isPresent()) {
+                    return beanRegistration;
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
     public Optional<CustomScope<?>> findDeclaredScope(@NonNull Argument<?> argument) {
         final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
         if (annotationMetadata.hasStereotype(AnnotationUtil.SCOPE)) {
