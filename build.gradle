@@ -75,11 +75,11 @@ subprojects { Project subproject ->
         shadowJarEnabled = false
     }
 
+    group projectGroupId
+
     if (subproject.name.contains("bom") || subproject.name.contains("parent")) {
         return
     }
-
-    group projectGroupId
 
     apply plugin: "io.micronaut.build.internal.common"
     if (!subproject.name.startsWith('test-') &&
