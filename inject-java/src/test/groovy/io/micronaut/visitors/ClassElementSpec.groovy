@@ -15,12 +15,10 @@
  */
 package io.micronaut.visitors
 
-import io.micronaut.annotation.processing.visitor.JavaClassElement
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-import io.micronaut.context.ApplicationContext
+import io.micronaut.annotation.processing.visitor.JavaClassElement
 import io.micronaut.context.exceptions.BeanContextException
 import io.micronaut.core.annotation.AnnotationUtil
-import io.micronaut.core.annotation.NonNull
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ConstructorElement
 import io.micronaut.inject.ast.ElementModifier
@@ -881,5 +879,57 @@ class MyBean {}
         superType.getTypeArguments().get('Q').getName() == 'test.Time'
         superType.getTypeArguments().get('U').getName() == 'test.TimeUnit'
 
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-openapi/issues/593')
+    void 'test declaringType is the implementation and not the interface'() {
+        given:
+        def element = buildClassElement('''
+package test;
+
+import java.util.List;
+import java.time.Instant;
+
+class MyDtoImpl implements MyDto<Long> {
+
+    private Long id;
+    private Instant version;
+
+    @Override
+    public Long getId() {
+        return id;
+    }
+
+    @Override
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    @Override
+    public Instant getVersion() {
+        return version;
+    }
+
+    public void setVersion(Instant version) {
+        this.version = version;
+    }
+}
+
+interface MyDto<ID> {
+    ID getId();
+    void setId(ID id);
+
+    Instant getVersion();
+    void setVersion(Instant version);
+}
+''')
+
+        when:
+        def beanProperties = element.getBeanProperties()
+
+        then: 'the declaring type is the implementation, not the interface'
+        beanProperties
+        beanProperties.size() == 2
+        beanProperties*.declaringType*.name.every { it == 'test.MyDtoImpl' }
     }
 }
