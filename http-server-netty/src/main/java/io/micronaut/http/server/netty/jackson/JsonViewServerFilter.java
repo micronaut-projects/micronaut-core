@@ -17,7 +17,6 @@ package io.micronaut.http.server.netty.jackson;
 
 import com.fasterxml.jackson.annotation.JsonView;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.type.Argument;
