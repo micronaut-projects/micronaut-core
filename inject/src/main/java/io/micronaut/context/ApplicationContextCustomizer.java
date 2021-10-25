@@ -17,6 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.order.Ordered;
 
 /**
  * An application context customizer is responsible
@@ -34,7 +35,7 @@ import io.micronaut.core.annotation.NonNull;
  * @since 3.2
  */
 @Experimental
-public interface ApplicationContextCustomizer {
+public interface ApplicationContextCustomizer extends Ordered {
 
     /**
      * A default customizer which does nothing.

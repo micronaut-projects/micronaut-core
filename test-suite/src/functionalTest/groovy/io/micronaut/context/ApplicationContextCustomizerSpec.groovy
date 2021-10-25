@@ -10,9 +10,9 @@ import io.micronaut.inject.BeanDefinitionReference
 class ApplicationContextCustomizerSpec extends MicronautApplicationTest {
     def "no service file is generated if application doesn't provide a customizer"() {
         javaSourceFile("Application.java", """
-import io.micronaut.context.annotation.MicronautApplication;
+import io.micronaut.context.annotation.ContextConfigurer;
 
-@MicronautApplication
+@ContextConfigurer
 class Application {}
 """)
         when:
@@ -24,10 +24,10 @@ class Application {}
 
     def "generates a service file"() {
         javaSourceFile("Application.java", """
-import io.micronaut.context.annotation.MicronautApplication;
+import io.micronaut.context.annotation.ContextConfigurer;
 import io.micronaut.context.ApplicationContextCustomizer;
 
-@MicronautApplication
+@ContextConfigurer
 class Application implements ApplicationContextCustomizer {}
 """)
         when:
