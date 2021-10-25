@@ -54,7 +54,7 @@ abstract class PomChecker extends DefaultTask {
         group = VERIFICATION_GROUP
         getFailOnError().convention(true)
         getFailOnSnapshots().convention(getPomCoordinates().map(v -> !v.endsWith("-SNAPSHOT")))
-        getFailOnBomContents().convention(false)
+        getFailOnBomContents().convention(getPomCoordinates().map(v -> !v.startsWith("io.micronaut")))
     }
 
     @TaskAction
@@ -117,13 +117,15 @@ abstract class PomChecker extends DefaultTask {
 
     @CompileDynamic
     private void assertDependencyManagementConfinedToGroup(GPathResult pom, String group, String name, List<String> errors) {
+        boolean failOnError = failOnBomContents.get()
+        String prefix = failOnError ? 'Error validating' : 'Warning:'
         pom.dependencyManagement.dependencies.dependency.each {
             String depGroup = it.groupId.text().replace('${project.groupId}', group)
             if (!depGroup.startsWith(group)) {
                 def scope = it.scope.text()
                 if (scope != 'import') {
-                    String message = "Error validating BOM [${name}]: includes the dependency [${it.groupId}:${it.artifactId}:${it.version}] which doesn't start with the group id of the BOM: [${group}]"
-                    if (failOnBomContents.get()) {
+                    String message = "$prefix BOM [${name}]: includes the dependency [${it.groupId}:${it.artifactId}:${it.version}] which doesn't start with the group id of the BOM: [${group}]"
+                    if (failOnError) {
                         errors << message
                     } else {
                         logger.warn(message)
