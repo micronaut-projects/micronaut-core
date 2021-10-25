@@ -15,18 +15,31 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.env.CommandLinePropertySource;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.cli.CommandLine;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.StringUtils;
 
 import java.lang.annotation.Annotation;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.ServiceLoader;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 /**
  * Implementation of {@link ApplicationContextBuilder}.
@@ -60,6 +73,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
      * Default constructor.
      */
     protected DefaultApplicationContextBuilder() {
+        loadApplicationContextCustomizer().customize(this);
     }
 
     @Override
@@ -299,7 +313,6 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         if (!configurationExcludes.isEmpty()) {
             environment.addConfigurationExcludes(configurationExcludes.toArray(StringUtils.EMPTY_STRING_ARRAY));
         }
-
         return applicationContext;
     }
 
@@ -353,5 +366,36 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     public @NonNull ApplicationContextBuilder allowEmptyProviders(boolean shouldAllow) {
         this.allowEmptyProviders = shouldAllow;
         return this;
+    }
+
+    /**
+     * Returns a customizer which is the aggregation of all
+     * customizers found on classpath via service loading.
+     * @return an application customizer
+     */
+    @NonNull
+    private static ApplicationContextCustomizer loadApplicationContextCustomizer() {
+        ServiceLoader<ApplicationContextCustomizer> loader = ServiceLoader.load(
+                ApplicationContextCustomizer.class
+        );
+        List<ApplicationContextCustomizer> customizers = StreamSupport.stream(loader.spliterator(), false)
+                .collect(Collectors.toList());
+        if (customizers.isEmpty()) {
+            return ApplicationContextCustomizer.NO_OP;
+        }
+        if (customizers.size() == 1) {
+            return customizers.get(0);
+        }
+        OrderUtil.sort(customizers);
+        return new ApplicationContextCustomizer() {
+
+            @Override
+            public void customize(ApplicationContextBuilder builder) {
+                for (ApplicationContextCustomizer customizer : customizers) {
+                    customizer.customize(builder);
+                }
+            }
+
+        };
     }
 }

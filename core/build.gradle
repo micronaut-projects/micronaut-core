@@ -38,3 +38,5 @@ task micronautVersionInfo(type: WriteProperties) {
     outputFile = "${buildDir}/resources/main/micronaut-version.properties"
     property 'micronaut.version', projectVersion
 }
+
+
