@@ -15,18 +15,18 @@
  */
 package io.micronaut.context.env;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.ApplicationContextConfiguration;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.io.file.DefaultFileSystemResourceLoader;
 import io.micronaut.core.io.file.FileSystemResourceLoader;
-import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.scan.BeanIntrospectionScanner;
+import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.order.OrderUtil;
@@ -36,15 +36,28 @@ import io.micronaut.inject.BeanConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.lang.annotation.Annotation;
-import java.net.HttpURLConnection;
+import java.net.InetAddress;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -74,7 +87,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final int DEFAULT_READ_TIMEOUT = 500;
     private static final int DEFAULT_CONNECT_TIMEOUT = 500;
     // CHECKSTYLE:OFF
-    private static final String GOOGLE_COMPUTE_METADATA = "http://metadata.google.internal";
+    private static final String GOOGLE_COMPUTE_METADATA = "metadata.google.internal";
     // CHECKSTYLE:ON
     private static final String ORACLE_CLOUD_ASSET_TAG_FILE = "/sys/devices/virtual/dmi/id/chassis_asset_tag";
     private static final String ORACLE_CLOUD_WINDOWS_ASSET_TAG_CMD = "wmic systemenclosure get smbiosassettag";
@@ -835,24 +848,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @SuppressWarnings("MagicNumber")
     private static boolean isGoogleCompute() {
         try {
-            final HttpURLConnection con = createConnection(GOOGLE_COMPUTE_METADATA);
-            con.setRequestMethod("GET");
-            con.setDoOutput(true);
-            BufferedReader in = new BufferedReader(
-                new InputStreamReader(con.getInputStream()));
-            String inputLine;
-            StringBuilder response = new StringBuilder();
-
-            while ((inputLine = in.readLine()) != null) {
-                response.append(inputLine);
-            }
-            in.close();
-            if (con.getHeaderField("Metadata-Flavor") != null &&
-                con.getHeaderField("Metadata-Flavor").equalsIgnoreCase("Google")) {
-                return true;
-            }
-
-        } catch (IOException e) {
+            InetAddress.getByName(GOOGLE_COMPUTE_METADATA);
+            return true;
+        } catch (Exception e) {
             // well not google then
         }
         return false;
@@ -955,14 +953,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             // test negative
         }
         return false;
-    }
-
-    private static HttpURLConnection createConnection(String spec) throws IOException {
-        final URL url = new URL(spec);
-        final HttpURLConnection con = (HttpURLConnection) url.openConnection();
-        con.setReadTimeout(DEFAULT_READ_TIMEOUT);
-        con.setConnectTimeout(DEFAULT_CONNECT_TIMEOUT);
-        return con;
     }
 
     private static boolean isDigitalOcean() {

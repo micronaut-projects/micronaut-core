@@ -6,6 +6,7 @@ import io.micronaut.docs.server.json.Person
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.HttpVersion
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
@@ -13,6 +14,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.sse.Event
@@ -21,6 +23,7 @@ import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.SynchronousSink
 import spock.lang.AutoCleanup
+import spock.lang.Issue
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -151,6 +154,51 @@ class Http2RequestSpec extends Specification {
                 "micronaut.server.netty.log-level" : "TRACE"
         ])
         HttpClient client = server.getApplicationContext().getBean(HttpClient)
+        String result = client.toBlocking().retrieve("${server.URL}/http2")
+
+        expect:
+        result == 'Version: HTTP_1_1'
+
+        cleanup:
+        server.close()
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6344')
+    void "test creating a client with a null URL and httpVersion set in HttpClientConfiguration"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.ssl.enabled': true,
+                "micronaut.server.http-version" : "2.0",
+                'micronaut.ssl.buildSelfSigned': true,
+                'micronaut.ssl.port': -1,
+                "micronaut.http.client.log-level" : "TRACE",
+                "micronaut.server.netty.log-level" : "TRACE"
+        ])
+        HttpClientConfiguration configuration = server.getApplicationContext().getBean(HttpClientConfiguration);
+        configuration.setHttpVersion(HttpVersion.HTTP_2_0);
+        HttpClient client = HttpClient.create(null, configuration);
+        String result = client.toBlocking().retrieve("${server.URL}/http2")
+
+        expect:
+        result == 'Version: HTTP_2_0'
+
+        cleanup:
+        server.close()
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6344')
+    void "test HTTP/2 server with HTTP/1 client  created outside with a null URL and default httpVersion set in HttpClientConfiguration"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.ssl.enabled': true,
+                "micronaut.server.http-version" : "2.0",
+                'micronaut.ssl.buildSelfSigned': true,
+                'micronaut.ssl.port': -1,
+                "micronaut.http.client.log-level" : "TRACE",
+                "micronaut.server.netty.log-level" : "TRACE"
+        ])
+        HttpClientConfiguration configuration = server.getApplicationContext().getBean(HttpClientConfiguration);
+        HttpClient client = HttpClient.create(null, configuration);
         String result = client.toBlocking().retrieve("${server.URL}/http2")
 
         expect:

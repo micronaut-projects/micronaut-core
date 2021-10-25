@@ -139,9 +139,12 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
                         r.lock();
                         return (T) createdBean.bean();
                     } else {
-                        createdBean = doCreate(creationContext);
-                        scopeMap.put(id, createdBean);
-                        r.lock();
+                        try {
+                            createdBean = doCreate(creationContext);
+                            scopeMap.put(id, createdBean);
+                        } finally {
+                            r.lock();
+                        }
                         return (T) createdBean.bean();
                     }
                 } finally {
@@ -215,7 +218,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
             final Map<BeanIdentifier, CreatedBean<?>> scopeMap;
             try {
                 scopeMap = getScopeMap(false);
-            } catch (IllegalStateException e) {
+            } catch (Exception e) {
                 return Optional.empty();
             }
             for (CreatedBean<?> createdBean : scopeMap.values()) {

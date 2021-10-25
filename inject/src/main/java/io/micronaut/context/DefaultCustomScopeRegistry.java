@@ -20,9 +20,11 @@ import io.micronaut.context.scope.BeanCreationContext;
 import io.micronaut.context.scope.CreatedBean;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -57,21 +59,44 @@ public class DefaultCustomScopeRegistry implements CustomScopeRegistry {
     }
 
     @Override
+    public <T> Optional<BeanRegistration<T>> findBeanRegistration(T bean) {
+        for (Optional<CustomScope<?>> value : scopes.values()) {
+            if (value.isPresent()) {
+                final CustomScope<?> customScope = value.get();
+                final Optional<BeanRegistration<T>> beanRegistration = customScope.findBeanRegistration(bean);
+                if (beanRegistration.isPresent()) {
+                    return beanRegistration;
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
     public Optional<CustomScope<?>> findDeclaredScope(@NonNull Argument<?> argument) {
-        return argument.getAnnotationMetadata().getAnnotationNameByStereotype(AnnotationUtil.SCOPE).flatMap(this::findScope);
+        final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+        if (annotationMetadata.hasStereotype(AnnotationUtil.SCOPE)) {
+            return annotationMetadata.getAnnotationNameByStereotype(AnnotationUtil.SCOPE).flatMap(this::findScope);
+        }
+        return Optional.empty();
     }
 
     @Override
     public Optional<CustomScope<?>> findDeclaredScope(@NonNull BeanType<?> beanType) {
-        final List<String> scopeHierarchy = beanType.getAnnotationMetadata().getAnnotationNamesByStereotype(AnnotationUtil.SCOPE);
-        Optional<CustomScope<?>> registeredScope = Optional.empty();
-        for (String scope : scopeHierarchy) {
-            registeredScope = findScope(scope);
-            if (registeredScope.isPresent()) {
-                break;
+        if (beanType.getAnnotationMetadata().hasStereotype(AnnotationUtil.SCOPE)) {
+            final List<String> scopeHierarchy = beanType.getAnnotationMetadata().getAnnotationNamesByStereotype(AnnotationUtil.SCOPE);
+            if (CollectionUtils.isNotEmpty(scopeHierarchy)) {
+                Optional<CustomScope<?>> registeredScope = Optional.empty();
+                for (String scope : scopeHierarchy) {
+                    registeredScope = findScope(scope);
+                    if (registeredScope.isPresent()) {
+                        break;
+                    }
+                }
+                return registeredScope;
             }
         }
-        return registeredScope;
+        return Optional.empty();
     }
 
     @SuppressWarnings("unchecked")

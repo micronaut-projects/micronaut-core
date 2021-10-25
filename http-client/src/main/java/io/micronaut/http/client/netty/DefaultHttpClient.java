@@ -78,6 +78,7 @@ import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
+import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
@@ -271,7 +272,7 @@ public class DefaultHttpClient implements
             @Nullable AnnotationMetadataResolver annotationMetadataResolver,
             List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
             HttpClientFilter... filters) {
-        this(loadBalancer, io.micronaut.http.HttpVersion.HTTP_1_1, configuration, contextPath, new DefaultHttpClientFilterResolver(annotationMetadataResolver, Arrays.asList(filters)), null, threadFactory, nettyClientSslBuilder, codecRegistry, WebSocketBeanRegistry.EMPTY, new DefaultRequestBinderRegistry(ConversionService.SHARED), null, NioSocketChannel::new, Collections.emptySet(), invocationInstrumenterFactories);
+        this(loadBalancer, configuration.getHttpVersion(), configuration, contextPath, new DefaultHttpClientFilterResolver(annotationMetadataResolver, Arrays.asList(filters)), null, threadFactory, nettyClientSslBuilder, codecRegistry, WebSocketBeanRegistry.EMPTY, new DefaultRequestBinderRegistry(ConversionService.SHARED), null, NioSocketChannel::new, Collections.emptySet(), invocationInstrumenterFactories);
     }
 
     /**
@@ -289,7 +290,7 @@ public class DefaultHttpClient implements
      * @param requestBinderRegistry           The request binder registry
      * @param eventLoopGroup                  The event loop group to use
      * @param socketChannelFactory            The socket channel factory
-     * @param pipelineListeners
+     * @param pipelineListeners               The listeners to call for pipeline customization
      * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument netty handlers execution with
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,

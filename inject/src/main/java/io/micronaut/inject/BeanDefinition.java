@@ -16,6 +16,8 @@
 package io.micronaut.inject;
 
 import io.micronaut.context.annotation.DefaultScope;
+import io.micronaut.context.annotation.EachBean;
+import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Provided;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
@@ -160,7 +162,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * {@link io.micronaut.context.annotation.EachBean}
      */
     default boolean isIterable() {
-        return false;
+        return hasDeclaredStereotype(EachProperty.class) || hasDeclaredStereotype(EachBean.class);
     }
 
     /**
