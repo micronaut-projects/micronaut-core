@@ -95,6 +95,6 @@ class Application {
 
         then:
         RuntimeException ex = thrown()
-        ex.cause.message == 'demo.app.Application is annotated with @ContextConfigurer but has at least one constructor with arguments, which isn\'t supported.'
+        ex.cause.message == 'demo.app.Application is annotated with @ContextConfigurer but has at least one constructor with arguments, which isn\'t supported. To resolve this create a separate class with no constructor arguments annotated with @ContextConfigurer, which sole role is configuring the application context.'
     }
 }

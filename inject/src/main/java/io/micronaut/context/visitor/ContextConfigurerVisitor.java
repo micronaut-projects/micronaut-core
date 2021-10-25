@@ -68,6 +68,6 @@ public class ContextConfigurerVisitor implements TypeElementVisitor<ContextConfi
 
     @NotNull
     private static RuntimeException typeShouldNotHaveConstructorsWithArgs(String type) {
-        return new IllegalStateException(type + " is annotated with @ContextConfigurer but has at least one constructor with arguments, which isn't supported.");
+        return new IllegalStateException(type + " is annotated with @ContextConfigurer but has at least one constructor with arguments, which isn't supported. To resolve this create a separate class with no constructor arguments annotated with @ContextConfigurer, which sole role is configuring the application context.");
     }
 }
