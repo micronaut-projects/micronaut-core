@@ -104,6 +104,11 @@ public final class JacksonDatabindMapper implements JsonMapper {
     }
 
     @Override
+    public <T> JsonNode writeValueToTree(Argument<T> type, T value) throws IOException {
+        return writeValueToTree(value);
+    }
+
+    @Override
     public <T> T readValue(@NonNull InputStream inputStream, @NonNull Argument<T> type) throws IOException {
         return objectMapper.readValue(inputStream, JacksonConfiguration.constructType(type, objectMapper.getTypeFactory()));
     }
@@ -119,8 +124,18 @@ public final class JacksonDatabindMapper implements JsonMapper {
     }
 
     @Override
+    public <T> void writeValue(OutputStream outputStream, Argument<T> type, T object) throws IOException {
+        writeValue(outputStream, object);
+    }
+
+    @Override
     public byte[] writeValueAsBytes(@Nullable Object object) throws IOException {
         return objectMapper.writeValueAsBytes(object);
+    }
+
+    @Override
+    public <T> byte[] writeValueAsBytes(Argument<T> type, T object) throws IOException {
+        return writeValueAsBytes(object);
     }
 
     @Override

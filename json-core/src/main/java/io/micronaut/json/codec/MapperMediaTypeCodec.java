@@ -213,12 +213,34 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
     }
 
     @Override
+    public <T> void encode(Argument<T> type, T object, OutputStream outputStream) throws CodecException {
+        try {
+            getJsonMapper().writeValue(outputStream, type, object);
+        } catch (IOException e) {
+            throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
     public <T> byte[] encode(T object) throws CodecException {
         try {
             if (object instanceof byte[]) {
                 return (byte[]) object;
             } else {
                 return getJsonMapper().writeValueAsBytes(object);
+            }
+        } catch (IOException e) {
+            throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public <T> byte[] encode(Argument<T> type, T object) throws CodecException {
+        try {
+            if (object instanceof byte[]) {
+                return (byte[]) object;
+            } else {
+                return getJsonMapper().writeValueAsBytes(type, object);
             }
         } catch (IOException e) {
             throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
@@ -233,6 +255,17 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
         ByteBuffer<B> buffer = allocator.buffer();
         OutputStream outputStream = buffer.toOutputStream();
         encode(object, outputStream);
+        return buffer;
+    }
+
+    @Override
+    public <T, B> ByteBuffer<B> encode(Argument<T> type, T object, ByteBufferFactory<?, B> allocator) throws CodecException {
+        if (object instanceof byte[]) {
+            return allocator.copiedBuffer((byte[]) object);
+        }
+        ByteBuffer<B> buffer = allocator.buffer();
+        OutputStream outputStream = buffer.toOutputStream();
+        encode(type, object, outputStream);
         return buffer;
     }
 }

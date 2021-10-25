@@ -1630,6 +1630,7 @@ public class DefaultHttpClient implements
      * @param requestURI             The URI of the request
      * @param requestContentType     The request content type
      * @param permitsBody            Whether permits body
+     * @param bodyType               The body type
      * @param onError                Called when the body publisher encounters an error
      * @param closeChannelAfterWrite Whether to close the channel. For stream requests we don't close the channel until disposed of.
      * @return A {@link NettyRequestWriter}
@@ -1640,6 +1641,7 @@ public class DefaultHttpClient implements
             URI requestURI,
             MediaType requestContentType,
             boolean permitsBody,
+            @Nullable Argument<?> bodyType,
             Consumer<? super Throwable> onError,
             boolean closeChannelAfterWrite) throws HttpPostRequestEncoder.ErrorDataEncoderException {
 
@@ -1705,7 +1707,13 @@ public class DefaultHttpClient implements
                                 }
                             } else if (mediaTypeCodecRegistry != null) {
                                 Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
-                                ByteBuf encoded = registeredCodec.map(codec -> codec.encode(o, byteBufferFactory).asNativeBuffer())
+                                ByteBuf encoded = registeredCodec.map(codec -> {
+                                            if (bodyType != null) {
+                                                return codec.encode((Argument<Object>) bodyType, o, byteBufferFactory).asNativeBuffer();
+                                            } else {
+                                                return codec.encode(o, byteBufferFactory).asNativeBuffer();
+                                            }
+                                        })
                                         .orElse(null);
                                 if (encoded != null) {
                                     if (log.isTraceEnabled()) {
@@ -1735,7 +1743,13 @@ public class DefaultHttpClient implements
                         bodyContent = charSequenceToByteBuf((CharSequence) bodyValue, requestContentType);
                     } else if (mediaTypeCodecRegistry != null) {
                         Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
-                        bodyContent = registeredCodec.map(codec -> codec.encode(bodyValue, byteBufferFactory).asNativeBuffer())
+                        bodyContent = registeredCodec.map(codec -> {
+                                    if (bodyType != null) {
+                                        return codec.encode((Argument<Object>) bodyType, bodyValue, byteBufferFactory).asNativeBuffer();
+                                    } else {
+                                        return codec.encode(bodyValue, byteBufferFactory).asNativeBuffer();
+                                    }
+                                })
                                 .orElse(null);
                     }
                     if (bodyContent == null) {
@@ -1997,6 +2011,7 @@ public class DefaultHttpClient implements
                 requestURI,
                 requestContentType,
                 permitsBody,
+                bodyType,
                 throwable -> {
                     if (!emitter.isCancelled()) {
                         emitter.error(throwable);
@@ -2808,6 +2823,7 @@ public class DefaultHttpClient implements
                 requestURI,
                 requestContentType,
                 permitsBody,
+                null,
                 throwable -> {
                     if (!emitter.isCancelled()) {
                         emitter.error(throwable);
