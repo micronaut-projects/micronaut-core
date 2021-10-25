@@ -18,6 +18,7 @@ package io.micronaut.annotation.processing;
 import io.micronaut.annotation.processing.visitor.JavaClassElement;
 import io.micronaut.context.ApplicationContextCustomizer;
 import io.micronaut.context.annotation.ContextConfigurer;
+import io.micronaut.context.visitor.ContextConfigurerVisitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Generated;
@@ -86,7 +87,7 @@ public class ServiceDescriptionProcessor extends AbstractInjectAnnotationProcess
                     TypeElement typeElement = (TypeElement) element;
                     String name = typeElement.getQualifiedName().toString();
                     if (!processGeneratedAnnotation(originatingElements, element, typeElement, name)) {
-                        processStartupAnnotation(originatingElements, element, typeElement, name);
+                        processContextConfigurerAnnotation(originatingElements, element, typeElement);
                     }
                 }
             }
@@ -102,9 +103,12 @@ public class ServiceDescriptionProcessor extends AbstractInjectAnnotationProcess
         return true;
     }
 
-    private void processStartupAnnotation(List<io.micronaut.inject.ast.Element> originatingElements, Element element, TypeElement typeElement, String name) {
-        Optional<AnnotationValue<ContextConfigurer>> ann = annotationUtils.getAnnotationMetadata(element).findAnnotation(ContextConfigurer.class);
+    private void processContextConfigurerAnnotation(List<io.micronaut.inject.ast.Element> originatingElements, Element element, TypeElement typeElement) {
+        AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(element);
+        Optional<AnnotationValue<ContextConfigurer>> ann = annotationMetadata.findAnnotation(ContextConfigurer.class);
         if (ann.isPresent()) {
+            JavaClassElement javaClassElement = javaVisitorContext.getElementFactory().newClassElement(typeElement, annotationMetadata);
+            ContextConfigurerVisitor.assertNoConstructorForContextAnnotation(javaClassElement);
             List<? extends TypeMirror> interfaces = typeElement.getInterfaces();
             for (TypeMirror interfaceType : interfaces) {
                 if (interfaceType instanceof DeclaredType) {

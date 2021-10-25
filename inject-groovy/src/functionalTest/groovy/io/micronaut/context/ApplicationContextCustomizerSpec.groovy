@@ -2,6 +2,7 @@ package io.micronaut.context
 
 import io.micronaut.fixtures.context.MicronautApplicationTest
 import io.micronaut.inject.BeanDefinitionReference
+import org.codehaus.groovy.GroovyBugError
 
 class ApplicationContextCustomizerSpec extends MicronautApplicationTest {
     def "no service file is generated if application doesn't provide a customizer"() {
@@ -72,5 +73,25 @@ class Application {
 
         then:
         ctx.environment.activeNames == ['dummy'] as Set<String>
+    }
+
+    def "reasonable error message if @ContextConfigurer is used on a type with constructor with args"() {
+        groovySourceFile("demo/app/Application.groovy", """package demo.app
+
+import io.micronaut.context.annotation.ContextConfigurer
+
+@ContextConfigurer
+class Application {
+    public Application(String param) {
+        // should fail
+    }
+}
+""")
+        when:
+        compile()
+
+        then:
+        GroovyBugError ex = thrown()
+        ex.cause.message == 'demo.app.Application is annotated with @ContextConfigurer but has at least one constructor with arguments, which isn\'t supported.'
     }
 }

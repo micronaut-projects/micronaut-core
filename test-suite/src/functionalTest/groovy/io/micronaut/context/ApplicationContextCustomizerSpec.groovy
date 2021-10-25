@@ -77,4 +77,24 @@ class Application {
         then:
         ctx.environment.activeNames == ['dummy'] as Set<String>
     }
+
+    def "reasonable error message if @ContextConfigurer is used on a type with constructor with args"() {
+        javaSourceFile("demo/app/Application.java", """package demo.app;
+
+import io.micronaut.context.annotation.ContextConfigurer;
+
+@ContextConfigurer
+class Application {
+    public Application(String param) {
+        // should fail
+    }
+}
+""")
+        when:
+        compile()
+
+        then:
+        RuntimeException ex = thrown()
+        ex.cause.message == 'demo.app.Application is annotated with @ContextConfigurer but has at least one constructor with arguments, which isn\'t supported.'
+    }
 }

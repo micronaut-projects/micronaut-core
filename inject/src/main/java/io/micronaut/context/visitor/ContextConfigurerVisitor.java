@@ -19,15 +19,17 @@ import io.micronaut.context.ApplicationContextCustomizer;
 import io.micronaut.context.annotation.ContextConfigurer;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
 import java.util.Set;
 
 /**
  * This visitor is responsible for generating service files for classes
- * annotated with {@link ContextConfigurer} or {@link io.micronaut.context.annotation.MicronautApplication}.
+ * annotated with {@link ContextConfigurer}.
  *
  * @since 3.2
  */
@@ -43,6 +45,7 @@ public class ContextConfigurerVisitor implements TypeElementVisitor<ContextConfi
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
+        assertNoConstructorForContextAnnotation(element);
         element.getInterfaces()
                 .stream()
                 .map(Element::getName)
@@ -50,4 +53,21 @@ public class ContextConfigurerVisitor implements TypeElementVisitor<ContextConfi
                 .forEach(serviceType -> context.visitServiceDescriptor(serviceType, element.getName()));
     }
 
+    /**
+     * Checks that a class annotated with {@link ContextConfigurer} doesn't have any constructor
+     * with parameters, which is unsupported.
+     * @param element the class to check
+     */
+    public static void assertNoConstructorForContextAnnotation(ClassElement element) {
+        element.getEnclosedElements(ElementQuery.CONSTRUCTORS)
+                .stream()
+                .filter(e -> e.getParameters().length > 0)
+                .findAny()
+                .ifPresent(e -> { throw typeShouldNotHaveConstructorsWithArgs(element.getName()); });
+    }
+
+    @NotNull
+    private static RuntimeException typeShouldNotHaveConstructorsWithArgs(String type) {
+        return new IllegalStateException(type + " is annotated with @ContextConfigurer but has at least one constructor with arguments, which isn't supported.");
+    }
 }
