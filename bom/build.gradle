@@ -116,7 +116,7 @@ publishing {
                                     && it.groupId.text() == group
                         }
                         if (pomDep != null) {
-                            pomDep.version.first().setValue("\${${propertyName}}")
+                            pomDep.version.first().setValue("\${${propertyName}.version}")
                         } else {
                             println "[WARNING] Didn't find dependency ${group}:micronaut-${p.name} in BOM file"
                         }
@@ -142,7 +142,7 @@ publishing {
                 if (excludedProjects.contains(p.name)) {
                     continue
                 }
-                String propertyName = "micronaut.${p.name.replace((char) '-', (char) '.')}"
+                String propertyName = "micronaut.${p.name.replace((char) '-', (char) '.')}.version"
                 pom.properties.put(propertyName, p.version)
             }
 
