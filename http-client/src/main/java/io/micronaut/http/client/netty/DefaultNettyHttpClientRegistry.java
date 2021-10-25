@@ -390,7 +390,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             AnnotationMetadata annotationMetadata) {
 
         EventLoopGroup eventLoopGroup = resolveEventLoopGroup(configuration, beanContext);
-        DefaultHttpClient defaultHttpClient = new DefaultHttpClient(
+        return new DefaultHttpClient(
                 loadBalancer,
                 httpVersion,
                 configuration,
@@ -409,12 +409,9 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 ),
                 eventLoopGroup,
                 resolveSocketChannelFactory(configuration, beanContext),
+                pipelineListeners,
                 invocationInstrumenterFactories
         );
-        for (ChannelPipelineListener pipelineListener : pipelineListeners) {
-            defaultHttpClient.doOnConnect(pipelineListener);
-        }
-        return defaultHttpClient;
     }
 
     private EventLoopGroup resolveEventLoopGroup(HttpClientConfiguration configuration, BeanContext beanContext) {
