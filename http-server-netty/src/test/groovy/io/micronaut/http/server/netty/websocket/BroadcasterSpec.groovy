@@ -34,6 +34,7 @@ import spock.lang.Issue
 import spock.lang.Specification
 
 import java.util.concurrent.Phaser
+import java.util.concurrent.TimeUnit
 
 class BroadcasterSpec extends Specification {
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6269')
@@ -101,7 +102,7 @@ class BroadcasterSpec extends Specification {
         }
 
         def server = ctx.getBean(Server)
-        server.connectionPhaser.arriveAndAwaitAdvance()
+        server.connectionPhaser.awaitAdvanceInterruptibly(server.connectionPhaser.arrive(), 10, TimeUnit.SECONDS)
 
         expect:
         server.errors.isEmpty()
