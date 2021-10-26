@@ -123,13 +123,9 @@ class BroadcasterSpec extends Specification {
         @OnMessage
         def onMessage(String msg) {}
 
-        @OnOpen
-        def onOpen() {
-            connectionPhaser.register()
-        }
-
         @OnClose
         def onClose() {
+            connectionPhaser.register()
             broadcaster.broadcast('foo').subscribe(new Subscriber<String>() {
                 @Override
                 void onSubscribe(Subscription s) {
