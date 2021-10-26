@@ -268,7 +268,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-        handleCloseReason(ctx, CloseReason.ABNORMAL_CLOSURE);
+        // don't write this close reason, only call the @OnClose handler.
+        // ABNORMAL_CLOSURE isn't allowed on the wire anyway
+        handleCloseReason(ctx, CloseReason.ABNORMAL_CLOSURE, false);
     }
 
     /**
@@ -464,8 +466,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * Used to close thee session with a given reason.
      * @param ctx The context
      * @param cr The reason
+     * @param writeCloseReason Whether to allow writing the close reason to the remote
      */
-    private void handleCloseReason(ChannelHandlerContext ctx, CloseReason cr) {
+    private void handleCloseReason(ChannelHandlerContext ctx, CloseReason cr, boolean writeCloseReason) {
         cleanupBuffer();
         if (closed.compareAndSet(false, true)) {
             if (LOG.isDebugEnabled()) {
@@ -491,14 +494,16 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     }
                 }
             } else {
-                writeCloseFrameAndTerminate(ctx, cr);
+                if (writeCloseReason) {
+                    writeCloseFrameAndTerminate(ctx, cr);
+                }
             }
         }
     }
 
     private void handleCloseFrame(ChannelHandlerContext ctx, CloseWebSocketFrame cwsf) {
         CloseReason cr = new CloseReason(cwsf.statusCode(), cwsf.reasonText());
-        handleCloseReason(ctx, cr);
+        handleCloseReason(ctx, cr, true);
     }
 
     private void invokeAndClose(ChannelHandlerContext ctx, Object target, BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> methodExecutionHandle, boolean isClose) {
