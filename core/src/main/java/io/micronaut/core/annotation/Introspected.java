@@ -193,7 +193,7 @@ public @interface Introspected {
     }
 
     /**
-     * The access type for bean properties and fields.
+     * Visibility policy for bean properties and fields.
      *
      * @since 3.2.0
      */
