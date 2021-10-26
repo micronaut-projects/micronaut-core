@@ -102,7 +102,7 @@ class BroadcasterSpec extends Specification {
         }
 
         def server = ctx.getBean(Server)
-        server.connectionPhaser.awaitAdvanceInterruptibly(server.connectionPhaser.arrive(), 10, TimeUnit.SECONDS)
+        eventLoopGroup.shutdownGracefully().sync()
 
         expect:
         server.errors.isEmpty()
@@ -118,14 +118,12 @@ class BroadcasterSpec extends Specification {
         @Inject
         WebSocketBroadcaster broadcaster
         List<Throwable> errors = Collections.synchronizedList(new ArrayList<>())
-        Phaser connectionPhaser = new Phaser(1) // one party for waiting
 
         @OnMessage
         def onMessage(String msg) {}
 
         @OnClose
         def onClose() {
-            connectionPhaser.register()
             broadcaster.broadcast('foo').subscribe(new Subscriber<String>() {
                 @Override
                 void onSubscribe(Subscription s) {
@@ -140,12 +138,10 @@ class BroadcasterSpec extends Specification {
                 void onError(Throwable t) {
                     t.printStackTrace()
                     errors.add(t)
-                    connectionPhaser.arrive()
                 }
 
                 @Override
                 void onComplete() {
-                    connectionPhaser.arrive()
                 }
             })
         }
