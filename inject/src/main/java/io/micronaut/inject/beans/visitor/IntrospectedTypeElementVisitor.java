@@ -344,7 +344,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             );
             abstractIntrospections.add(currentAbstractIntrospection);
         } else {
-            final Set<Introspected.AccessKind> accessKindSet = CollectionUtils.setOf(accessKinds);
+            final List<Introspected.AccessKind> accessKindSet = Arrays.asList(accessKinds);
             final Set<Introspected.Visibility> visibilitySet = CollectionUtils.setOf(visibilities);
             List<PropertyElement> beanProperties = accessKindSet.contains(Introspected.AccessKind.METHOD) ? ce.getBeanProperties() : Collections.emptyList();
 
