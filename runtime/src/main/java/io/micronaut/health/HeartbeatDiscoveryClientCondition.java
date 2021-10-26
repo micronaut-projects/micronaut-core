@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.discovery.CompositeDiscoveryClient;
+import io.micronaut.discovery.DiscoveryClient;
 
 import static java.lang.Boolean.FALSE;
 
@@ -35,8 +36,11 @@ import static java.lang.Boolean.FALSE;
 public final class HeartbeatDiscoveryClientCondition implements Condition {
     @Override
     public boolean matches(ConditionContext context) {
-        final CompositeDiscoveryClient compositeDiscoveryClient = context.getBean(CompositeDiscoveryClient.class);
-        final boolean hasDiscovery = compositeDiscoveryClient.getDiscoveryClients().length > 0;
+        final boolean hasDiscovery = context.getBeanContext().getBeanDefinitions(DiscoveryClient.class)
+                .stream()
+                .filter(bd -> bd.getBeanType() != (Class<?>) CompositeDiscoveryClient.class)
+                .findFirst()
+                .isPresent();
         if (hasDiscovery) {
             return true;
         } else {
