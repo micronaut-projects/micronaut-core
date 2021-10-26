@@ -167,6 +167,44 @@ class Test {
         two.get(instance) == 20
     }
 
+    void 'test field access only - public only'() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
+package fieldaccess;
+
+import io.micronaut.core.annotation.*;
+
+
+@Introspected(
+    accessKind=Introspected.AccessKind.FIELD,
+    visibility = Introspected.Visibility.PUBLIC
+)
+class Test {
+    public String one; // read/write
+    public final int two; // read-only
+    String three; // package protected
+    protected String four; // not included since protected
+    private String five; // not included since private
+    
+    Test(int two) {
+        this.two = two;
+    }
+}
+''');
+        when:
+        def properties = introspection.getBeanProperties()
+
+        then:
+        properties.size() == 2
+
+        def one = introspection.getRequiredProperty("one", String)
+        one.isReadWrite()
+
+        def two = introspection.getRequiredProperty("two", int.class)
+        two.isReadOnly()
+
+    }
+
     void 'test bean constructor'() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('beanctor.Test','''\
