@@ -23,8 +23,11 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -94,7 +97,7 @@ public abstract class AbstractClassWriterOutputVisitor implements ClassWriterOut
     public void writeServiceEntries(Map<String, Set<String>> serviceEntries, Element... originatingElements) {
         for (Map.Entry<String, Set<String>> entry : serviceEntries.entrySet()) {
             String serviceName = entry.getKey();
-            Set<String> serviceTypes = entry.getValue();
+            List<String> serviceTypes = new ArrayList<>(entry.getValue());
 
             Optional<GeneratedFile> serviceFile = visitMetaInfFile("services/" + serviceName, originatingElements);
             if (serviceFile.isPresent()) {
@@ -124,6 +127,7 @@ public abstract class AbstractClassWriterOutputVisitor implements ClassWriterOut
 
                 // write out new definitions
                 try (BufferedWriter writer = new BufferedWriter(generatedFile.openWriter())) {
+                    Collections.sort(serviceTypes);
                     for (String serviceType : serviceTypes) {
                         writer.write(serviceType);
                         writer.newLine();
