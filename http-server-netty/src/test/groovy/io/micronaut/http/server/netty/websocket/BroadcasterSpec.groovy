@@ -2,6 +2,9 @@ package io.micronaut.http.server.netty.websocket
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.context.event.BeanCreatedEvent
+import io.micronaut.context.event.BeanCreatedEventListener
+import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.websocket.WebSocketBroadcaster
 import io.micronaut.websocket.annotation.OnClose
@@ -14,6 +17,8 @@ import io.netty.channel.ChannelFuture
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelInitializer
 import io.netty.channel.SimpleChannelInboundHandler
+import io.netty.channel.group.ChannelGroup
+import io.netty.channel.group.DefaultChannelGroup
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioSocketChannel
@@ -25,6 +30,7 @@ import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory
 import io.netty.handler.codec.http.websocketx.WebSocketCloseStatus
 import io.netty.handler.codec.http.websocketx.WebSocketVersion
+import io.netty.util.concurrent.Promise
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import org.jetbrains.annotations.NotNull
@@ -102,7 +108,7 @@ class BroadcasterSpec extends Specification {
         }
 
         def server = ctx.getBean(Server)
-        eventLoopGroup.shutdownGracefully().sync()
+        ctx.getBean(WaitForClients).sync()
 
         expect:
         server.errors.isEmpty()
@@ -144,6 +150,32 @@ class BroadcasterSpec extends Specification {
                 void onComplete() {
                 }
             })
+        }
+    }
+
+    @Singleton
+    @Requires(property = 'spec.name', value = 'BroadcasterSpec')
+    static class WaitForClients implements BeanCreatedEventListener<ChannelPipelineCustomizer> {
+        List<Channel> channels = Collections.synchronizedList(new ArrayList<>())
+
+        @Override
+        ChannelPipelineCustomizer onCreated(BeanCreatedEvent<ChannelPipelineCustomizer> event) {
+            if (event.bean.isServerChannel()) {
+                event.bean.doOnConnect {
+                    channels.add(it.channel())
+                    return it
+                }
+            }
+            return event.bean
+        }
+
+        def sync() {
+            channels.forEach {
+                it.closeFuture().sync()
+            }
+            channels.forEach {
+                it.eventLoop().shutdownGracefully().sync()
+            }
         }
     }
 }
