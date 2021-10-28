@@ -1,0 +1,29 @@
+Micronaut supports tracing context propagation. If you use `suspend` functions all the way from your controller actions down to all your services,
+you don't have to do anything special. However, when you create coroutines within a regular function, tracing propagation won't happen automatically.
+You have to use a `Supplier<CoroutineTracingDispatcher>` to create a new `CoroutineTracingDispatcher` and use it as a `CoroutineContext`.
+
+Following example shows how this might look like:
+
+[source,kotlin]
+----
+@Controller
+class SimpleController(
+    private val coroutineTracingDispatcherFactory: Supplier<CoroutineTracingDispatcher>
+) {
+    @Get("/runParallelly")
+    fun runParallelly(): String = runBlocking {
+        val a = async(Dispatchers.Default + coroutineTracingDispatcherFactory.get()) {
+            val traceId = MDC.get("traceId")
+            println("$traceId: Calculating sth...")
+            calculateSth()
+        }
+        val b = async(Dispatchers.Default + coroutineTracingDispatcherFactory.get()) {
+            val traceId = MDC.get("traceId")
+            println("$traceId: Calculating sth else...")
+            calculateSthElse()
+        }
+
+        a.await() + b.await()
+    }
+}
+----
