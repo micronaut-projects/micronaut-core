@@ -236,6 +236,7 @@ languageSupport:
     openandaop: Kotlin and AOP Advice
     kotlinretainparamnames: Kotlin and Retaining Parameter Names
     coroutines: Coroutines Support
+    coroutineTracingContextPropagation: Coroutine Tracing Context Propagation
     kotlinContextPropagation: Reactive Context Propagation
   graal:
     title: Micronaut for GraalVM
