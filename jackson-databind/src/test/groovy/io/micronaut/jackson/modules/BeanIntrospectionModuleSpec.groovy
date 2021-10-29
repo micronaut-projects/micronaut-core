@@ -8,9 +8,18 @@ import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonUnwrapped
 import com.fasterxml.jackson.annotation.JsonView
+import com.fasterxml.jackson.core.JsonGenerator
+import com.fasterxml.jackson.core.JsonParser
+import com.fasterxml.jackson.core.JsonProcessingException
+import com.fasterxml.jackson.databind.DeserializationContext
+import com.fasterxml.jackson.databind.JsonDeserializer
+import com.fasterxml.jackson.databind.JsonSerializer
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
+import com.fasterxml.jackson.databind.SerializerProvider
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.fasterxml.jackson.databind.annotation.JsonNaming
+import com.fasterxml.jackson.databind.annotation.JsonSerialize
 import groovy.transform.EqualsAndHashCode
 import groovy.transform.PackageScope
 import io.micronaut.context.ApplicationContext
@@ -463,6 +472,21 @@ class BeanIntrospectionModuleSpec extends Specification {
         outerArray.wrapper.inner.length == 0
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/6309")
+    void "@JsonSerialize annotation"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        expect:
+        objectMapper.readValue('{"foo":"Bar"}', JsonSerializeAnnotated.class).foo == 'bar'
+        objectMapper.writeValueAsString(new JsonSerializeAnnotated(foo: 'Bar')) == '{"foo":"BAR"}'
+
+        where:
+        ignoreReflectiveProperties << [true, false]
+    }
+
     @Introspected
     static class Book {
         @JsonProperty("book_title")
@@ -684,6 +708,29 @@ class BeanIntrospectionModuleSpec extends Specification {
         @JsonCreator
         OuterArray(WrapperArray wrapper) {
             this.wrapper = wrapper
+        }
+    }
+
+    @Introspected
+    static class JsonSerializeAnnotated {
+        @JsonSerialize(using = UpperCaseSerializer)
+        @JsonDeserialize(using = LowerCaseDeserializer)
+        String foo
+
+        @Introspected
+        static class UpperCaseSerializer extends JsonSerializer<String> {
+            @Override
+            void serialize(String value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+                gen.writeString(value.toUpperCase(Locale.ENGLISH))
+            }
+        }
+
+        @Introspected
+        static class LowerCaseDeserializer extends JsonDeserializer<String> {
+            @Override
+            String deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JsonProcessingException {
+                return p.valueAsString.toLowerCase(Locale.ENGLISH)
+            }
         }
     }
 }

@@ -25,6 +25,8 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.SerializableString;
 import com.fasterxml.jackson.core.io.SerializedString;
 import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerBuilder;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
 import com.fasterxml.jackson.databind.deser.CreatorProperty;
@@ -47,6 +49,7 @@ import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.databind.util.SimpleBeanPropertyDefinition;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
@@ -166,6 +169,28 @@ public class BeanIntrospectionModule extends SimpleModule {
     }
 
     /**
+     * Parse a {@link JsonSerialize} or {@link JsonDeserialize} annotation.
+     */
+    private <T> T findSerializerFromAnnotation(BeanProperty<?, ?> beanProperty, Class<? extends Annotation> annotationType) {
+        AnnotationValue<?> jsonSerializeAnnotation = beanProperty.getAnnotation(annotationType);
+        if (jsonSerializeAnnotation != null) {
+            // ideally, we'd use SerializerProvider here, but it's not exposed to the BeanSerializerModifier
+            Class using = jsonSerializeAnnotation.get("using", Class.class).orElse(null);
+            if (using != null) {
+                BeanIntrospection<Object> usingIntrospection = findIntrospection(using);
+                if (usingIntrospection != null) {
+                    return (T) usingIntrospection.instantiate();
+                } else {
+                    if (LOG.isWarnEnabled()) {
+                        LOG.warn("Cannot construct {}, please enable introspection for that class", using.getName());
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
      * Modifies bean serialization.
      */
     private class BeanIntrospectionSerializerModifier extends BeanSerializerModifier {
@@ -231,7 +256,10 @@ public class BeanIntrospectionModule extends SimpleModule {
                                 config,
                                 propertyName,
                                 beanProperty,
-                                config.getTypeFactory()
+                                config.getTypeFactory(),
+                                findSerializerFromAnnotation(beanProperty, JsonSerialize.class)
+                                // would be nice to add the TypeSerializer here too, but we don't have access to the
+                                // SerializerFactory for findPropertyTypeSerializer
                         );
 
                         newProperties.add(writer);
@@ -327,14 +355,15 @@ public class BeanIntrospectionModule extends SimpleModule {
                 return builder;
             } else {
                 final Iterator<SettableBeanProperty> properties = builder.getProperties();
-                if (!properties.hasNext() && introspection.getPropertyNames().length > 0) {
+                if ((!properties.hasNext() || ignoreReflectiveProperties) && introspection.getPropertyNames().length > 0) {
                     // mismatch, probably GraalVM reflection not enabled for bean. Try recreate
                     for (BeanProperty<Object, Object> beanProperty : introspection.getBeanProperties()) {
                         builder.addOrReplaceProperty(new VirtualSetter(
-                                beanDesc.getClassInfo(),
-                                config.getTypeFactory(),
-                                beanProperty),
-                            true);
+                                        beanDesc.getClassInfo(),
+                                        config.getTypeFactory(),
+                                        beanProperty,
+                                        findSerializerFromAnnotation(beanProperty, JsonDeserialize.class)),
+                                true);
                     }
                 } else {
                     while (properties.hasNext()) {
@@ -580,11 +609,11 @@ public class BeanIntrospectionModule extends SimpleModule {
         final BeanProperty beanProperty;
         final TypeResolutionContext typeResolutionContext;
 
-        VirtualSetter(TypeResolutionContext typeResolutionContext, TypeFactory typeFactory, BeanProperty beanProperty) {
+        VirtualSetter(TypeResolutionContext typeResolutionContext, TypeFactory typeFactory, BeanProperty beanProperty, JsonDeserializer<Object> valueDeser) {
             super(
                     new PropertyName(beanProperty.getName()),
                     newType(beanProperty.asArgument(), typeFactory),
-                    newPropertyMetadata(beanProperty.asArgument(), beanProperty.getAnnotationMetadata()), null);
+                    newPropertyMetadata(beanProperty.asArgument(), beanProperty.getAnnotationMetadata()), valueDeser);
             this.beanProperty = beanProperty;
             this.typeResolutionContext = typeResolutionContext;
         }
@@ -703,12 +732,13 @@ public class BeanIntrospectionModule extends SimpleModule {
                 SerializationConfig config,
                 String name,
                 BeanProperty<Object, Object> introspection,
-                TypeFactory typeFactory) {
+                TypeFactory typeFactory,
+                JsonSerializer<?> ser) {
             super(
                     SimpleBeanPropertyDefinition.construct(config, virtualMember),
                     virtualMember,
                     AnnotationCollector.emptyAnnotations(),
-                    null, null, null, null,
+                    null, ser, null, null,
                     suppressNulls(config.getDefaultPropertyInclusion()),
                     suppressableValue(config.getDefaultPropertyInclusion()),
                     null
