@@ -175,14 +175,14 @@ public class BeanIntrospectionModule extends SimpleModule {
         AnnotationValue<?> jsonSerializeAnnotation = beanProperty.getAnnotation(annotationType);
         if (jsonSerializeAnnotation != null) {
             // ideally, we'd use SerializerProvider here, but it's not exposed to the BeanSerializerModifier
-            Class using = jsonSerializeAnnotation.get("using", Class.class).orElse(null);
+            Class using = jsonSerializeAnnotation.classValue("using").orElse(null);
             if (using != null) {
                 BeanIntrospection<Object> usingIntrospection = findIntrospection(using);
                 if (usingIntrospection != null) {
                     return (T) usingIntrospection.instantiate();
                 } else {
                     if (LOG.isWarnEnabled()) {
-                        LOG.warn("Cannot construct {}, please enable introspection for that class", using.getName());
+                        LOG.warn("Cannot construct {}, please add the @Introspected annotation to the class declaration", using.getName());
                     }
                 }
             }
