@@ -25,6 +25,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -97,7 +98,7 @@ public abstract class AbstractClassWriterOutputVisitor implements ClassWriterOut
     public void writeServiceEntries(Map<String, Set<String>> serviceEntries, Element... originatingElements) {
         for (Map.Entry<String, Set<String>> entry : serviceEntries.entrySet()) {
             String serviceName = entry.getKey();
-            List<String> serviceTypes = new ArrayList<>(entry.getValue());
+            Set<String> serviceTypes = new HashSet<>(entry.getValue());
 
             Optional<GeneratedFile> serviceFile = visitMetaInfFile("services/" + serviceName, originatingElements);
             if (serviceFile.isPresent()) {
@@ -127,8 +128,9 @@ public abstract class AbstractClassWriterOutputVisitor implements ClassWriterOut
 
                 // write out new definitions
                 try (BufferedWriter writer = new BufferedWriter(generatedFile.openWriter())) {
-                    Collections.sort(serviceTypes);
-                    for (String serviceType : serviceTypes) {
+                    List<String> sortedServices = new ArrayList<>(serviceTypes);
+                    Collections.sort(sortedServices);
+                    for (String serviceType : sortedServices) {
                         writer.write(serviceType);
                         writer.newLine();
                     }
