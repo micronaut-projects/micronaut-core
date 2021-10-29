@@ -39,7 +39,7 @@ class ReactorContextPropagationSpec {
         )
         val client = embeddedServer.applicationContext.getBean(HttpClient::class.java)
 
-        val result: MutableList<Tuple2<String, String>> = Flux.range(1, 1000)
+        val result: MutableList<Tuple2<String, String>> = Flux.range(1, 1)
                 .flatMap {
                     val tracingId = UUID.randomUUID().toString()
                     val get = HttpRequest.POST<Any>("http://localhost:${embeddedServer.port}/trigger", NameRequestBody("sss-" + tracingId)).header("X-TrackingId", tracingId)
@@ -115,6 +115,10 @@ class ReactorHttpServerFilter : HttpServerFilter {
         }
     }
 
+    override fun getOrder(): Int {
+        return 1
+    }
+
 }
 
 // end::simplefilter[]
@@ -129,6 +133,10 @@ class SuspendHttpServerFilter : CoroutineHttpServerFilter {
         return withContext(Context.of("suspendTrackingId", trackingId).asCoroutineContext()) {
             chain.next(request)
         }
+    }
+
+    override fun getOrder(): Int {
+        return 2
     }
 
 }
