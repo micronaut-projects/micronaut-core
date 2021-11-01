@@ -15,10 +15,14 @@
  */
 package io.micronaut.jackson.databind;
 
+import com.fasterxml.jackson.annotation.JsonView;
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -80,7 +84,14 @@ public final class JacksonDatabindMapper implements JsonMapper {
 
     @Override
     public <T> T readValueFromTree(@NonNull JsonNode tree, @NonNull Argument<T> type) throws IOException {
-        return objectMapper.readValue(treeCodec.treeAsTokens(tree), JacksonConfiguration.constructType(type, objectMapper.getTypeFactory()));
+        JsonParser tokens = treeCodec.treeAsTokens(tree);
+        JavaType javaType = JacksonConfiguration.constructType(type, objectMapper.getTypeFactory());
+        Optional<Class<?>> view = type.findAnnotation(JsonView.class).flatMap(AnnotationValue::classValue);
+        if (view.isPresent()) {
+            return objectMapper.readerWithView(view.get()).readValue(tokens, javaType);
+        } else {
+            return objectMapper.readValue(tokens, javaType);
+        }
     }
 
     @Override
