@@ -12,6 +12,14 @@ import io.micronaut.inject.configuration.Engine
 
 class ConfigPropertiesParseSpec extends AbstractTypeElementSpec {
 
+    def setup() {
+        System.setProperty("micronaut.keep-conf-prop-inject-points", "true")
+    }
+
+    def cleanup() {
+        System.clearProperty("micronaut.keep-conf-prop-inject-points")
+    }
+
     void "test inner class paths - pojo inheritance"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig$ChildConfig', '''

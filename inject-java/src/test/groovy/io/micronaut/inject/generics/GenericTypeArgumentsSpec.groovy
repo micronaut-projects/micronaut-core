@@ -31,6 +31,14 @@ import java.util.function.Supplier
 
 class GenericTypeArgumentsSpec extends AbstractTypeElementSpec {
 
+    def setup() {
+        System.setProperty("micronaut.keep-conf-prop-inject-points", "true")
+    }
+
+    def cleanup() {
+        System.clearProperty("micronaut.keep-conf-prop-inject-points")
+    }
+
     void "test generic type arguments with inner classes resolve"() {
         given:
         def definition = buildBeanDefinition('innergenerics.Outer$FooImpl', '''
