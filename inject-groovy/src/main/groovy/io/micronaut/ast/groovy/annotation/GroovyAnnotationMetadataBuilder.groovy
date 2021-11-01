@@ -361,29 +361,56 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
         if (annotationType instanceof ClassNode) {
             ClassNode classNode = (ClassNode)annotationType
             List<MethodNode> methods = new ArrayList<>(classNode.getMethods())
-            for (MethodNode method: methods) {
-                Statement stmt = method.code
-                def expression = null
-                if (stmt instanceof ReturnStatement) {
-                    expression = ((ReturnStatement) stmt).expression
-                } else if (stmt instanceof ExpressionStatement) {
-                    expression = ((ExpressionStatement) stmt).expression
-                }
-                if (expression instanceof ConstantExpression) {
-                    ConstantExpression ce = (ConstantExpression) expression
-                    def v = ce.value
-                    if (v != null) {
-                        if (v instanceof String) {
-                            if (StringUtils.isNotEmpty((String)v)) {
-                                defaultValues.put(method, new ConstantExpression(v))
+
+            // TODO: Remove this branch of the code after upgrading to Groovy 3.0
+            // https://issues.apache.org/jira/browse/GROOVY-8696
+            if (classNode.isResolved()) {
+                Class resolved = classNode.getTypeClass()
+                for (MethodNode method: methods) {
+                    try {
+                        def defaultValue = resolved.getDeclaredMethod(method.getName()).defaultValue
+                        if (defaultValue != null) {
+                            if (defaultValue instanceof Class) {
+                                defaultValues.put(method, new ClassExpression(ClassHelper.makeCached((Class)defaultValue)))
+                            } else {
+                                if (defaultValue instanceof String) {
+                                    if (StringUtils.isNotEmpty((String)defaultValue)) {
+                                        defaultValues.put(method, new ConstantExpression(defaultValue))
+                                    }
+                                } else {
+                                    defaultValues.put(method, new ConstantExpression(defaultValue))
+                                }
                             }
-                        } else {
-                            defaultValues.put(method, (Expression)expression)
+                        }
+                    } catch (NoSuchMethodError e) {
+                        // method no longer exists alias annotation
+                        // ignore and continue
+                    }
+                }
+            } else {
+                for (MethodNode method : methods) {
+                    Statement stmt = method.code
+                    def expression = null
+                    if (stmt instanceof ReturnStatement) {
+                        expression = ((ReturnStatement) stmt).expression
+                    } else if (stmt instanceof ExpressionStatement) {
+                        expression = ((ExpressionStatement) stmt).expression
+                    }
+                    if (expression instanceof ConstantExpression) {
+                        ConstantExpression ce = (ConstantExpression) expression
+                        def v = ce.value
+                        if (v != null) {
+                            if (v instanceof String) {
+                                if (StringUtils.isNotEmpty((String) v)) {
+                                    defaultValues.put(method, new ConstantExpression(v))
+                                }
+                            } else {
+                                defaultValues.put(method, (Expression) expression)
+                            }
                         }
                     }
                 }
             }
-
         }
         return defaultValues
     }
