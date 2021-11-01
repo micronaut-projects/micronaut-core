@@ -213,6 +213,9 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
                     Argument<?> argument = null;
                     if (context instanceof ArgumentConversionContext) {
                         argument = ((ArgumentConversionContext<?>) context).getArgument();
+                        if (targetType != argument.getType()) {
+                            argument = null;
+                        }
                     }
                     if (argument == null) {
                         argument = Argument.of(targetType);
