@@ -392,7 +392,8 @@ public class BeanIntrospectionModule extends SimpleModule {
                         builder.addOrReplaceProperty(new VirtualSetter(
                                         beanDesc.getClassInfo(),
                                         config.getTypeFactory(),
-                                        entry.getValue()),
+                                        entry.getValue(),
+                                        findSerializerFromAnnotation(entry.getValue(), JsonDeserialize.class)),
                                 true);
                     }
                 }
