@@ -18,12 +18,11 @@ package io.micronaut.tracing.instrument
 import io.micronaut.context.annotation.Context
 import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Requires
-import io.micronaut.http.bind.binders.ContinuationArgumentBinder
+import io.micronaut.http.bind.binders.ContinuationArgumentBinderCoroutineContextFactory
 import io.micronaut.scheduling.instrument.Instrumentation
 import io.micronaut.scheduling.instrument.InvocationInstrumenter
 import io.micronaut.tracing.instrument.util.TracingInvocationInstrumenterFactory
 import kotlinx.coroutines.ThreadContextElement
-import java.util.function.Supplier
 import kotlin.coroutines.CoroutineContext
 
 @Factory
@@ -31,11 +30,10 @@ import kotlin.coroutines.CoroutineContext
 @Requires(classes = [ThreadContextElement::class])
 class CoroutineTracingDispatcherSupplierFactory {
     @Context
-    fun coroutineTracingDispatcherSupplier(tiifs: List<TracingInvocationInstrumenterFactory>): Supplier<CoroutineTracingDispatcher> =
-        Supplier<CoroutineTracingDispatcher> {
-            CoroutineTracingDispatcher(tiifs.mapNotNull(TracingInvocationInstrumenterFactory::newTracingInvocationInstrumenter))
+    fun coroutineTracingDispatcherSupplier(tiifs: List<TracingInvocationInstrumenterFactory>): ContinuationArgumentBinderCoroutineContextFactory<CoroutineTracingDispatcher> =
+        object: ContinuationArgumentBinderCoroutineContextFactory<CoroutineTracingDispatcher> {
+            override fun create() = CoroutineTracingDispatcher(tiifs.mapNotNull(TracingInvocationInstrumenterFactory::newTracingInvocationInstrumenter))
         }
-        .also { ContinuationArgumentBinder.tracingCoroutineContextFactory = it }
 }
 
 internal class CoroutineTracingDispatcherContextKey : CoroutineContext.Key<CoroutineTracingDispatcher>
