@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -86,7 +85,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
     public <T> T readValueFromTree(@NonNull JsonNode tree, @NonNull Argument<T> type) throws IOException {
         JsonParser tokens = treeCodec.treeAsTokens(tree);
         JavaType javaType = JacksonConfiguration.constructType(type, objectMapper.getTypeFactory());
-        Optional<Class<?>> view = type.findAnnotation(JsonView.class).flatMap(AnnotationValue::classValue);
+        Optional<Class> view = type.getAnnotationMetadata().classValue(JsonView.class);
         if (view.isPresent()) {
             return objectMapper.readerWithView(view.get()).readValue(tokens, javaType);
         } else {
