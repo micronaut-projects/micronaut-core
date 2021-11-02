@@ -387,14 +387,6 @@ class HttpPostSpec extends Specification {
         request.getBody(String).get() == '{}'
     }
 
-    void "test redirect uses GET"() {
-        when:
-        def res = client.toBlocking().exchange(HttpRequest.POST('/post/redirect', 'abc'), String)
-
-        then:
-        res.getBody(String).get() == 'foo'
-    }
-
     @Requires(property = 'spec.name', value = 'HttpPostSpec')
     @Controller('/post')
     static class PostController {
