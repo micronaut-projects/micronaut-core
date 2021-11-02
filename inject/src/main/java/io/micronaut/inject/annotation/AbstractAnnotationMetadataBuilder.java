@@ -34,6 +34,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -675,7 +676,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         String annotationName = getAnnotationTypeName(annotationMirror);
 
         if (retentionPolicy == RetentionPolicy.RUNTIME) {
-            processAnnotationDefaults(originatingElement, annotationMirror, metadata, annotationName);
+            processAnnotationDefaults(originatingElement, metadata, annotationName, () -> readAnnotationDefaultValues(annotationMirror));
         }
 
         List<String> parentAnnotations = new ArrayList<>();
@@ -813,9 +814,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                         );
                                     }
                                 });
-                                final Map<? extends T, ?> defaultValues = readAnnotationDefaultValues(mappedAnnotationName, annMirror);
                                 if (finalRetentionPolicy == RetentionPolicy.RUNTIME) {
-                                    processAnnotationDefaults(originatingElement, metadata, mappedAnnotationName, defaultValues);
+                                    processAnnotationDefaults(originatingElement, metadata, mappedAnnotationName, () -> readAnnotationDefaultValues(mappedAnnotationName, annMirror));
                                 }
                                 final ArrayList<String> parents = new ArrayList<>();
                                 processAnnotationStereotype(
@@ -910,21 +910,25 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     protected abstract VisitorContext createVisitorContext();
 
-    private void processAnnotationDefaults(T originatingElement, A annotationMirror, DefaultAnnotationMetadata metadata, String annotationName) {
-        Map<? extends T, ?> elementDefaultValues = readAnnotationDefaultValues(annotationMirror);
-        processAnnotationDefaults(originatingElement, metadata, annotationName, elementDefaultValues);
-    }
-
-    private void processAnnotationDefaults(T originatingElement, DefaultAnnotationMetadata metadata, String annotationName, Map<? extends T, ?> elementDefaultValues) {
-        final Map<String, Object> annotationDefaults = getAnnotationDefaults(originatingElement, metadata, annotationName, elementDefaultValues);
-        if (annotationDefaults != null) {
-            DefaultAnnotationMetadata.registerAnnotationDefaults(annotationName, annotationDefaults);
+    private void processAnnotationDefaults(T originatingElement, DefaultAnnotationMetadata metadata, String annotationName, Supplier<Map<? extends T, ?>> elementDefaultValues) {
+        if (AnnotationMetadataSupport.hasDefaultValues(annotationName)) {
+            Map<CharSequence, Object> defaultValues = new LinkedHashMap<>(AnnotationMetadataSupport.getDefaultValues(annotationName));
+            metadata.addDefaultAnnotationValues(annotationName, defaultValues);
         } else {
-            metadata.addDefaultAnnotationValues(annotationName, Collections.emptyMap());
+            final Map<CharSequence, Object> annotationDefaults = getAnnotationDefaults(originatingElement, annotationName, elementDefaultValues.get());
+            if (annotationDefaults != null) {
+                metadata.addDefaultAnnotationValues(annotationName, annotationDefaults);
+                DefaultAnnotationMetadata.registerAnnotationDefaults(annotationName, annotationDefaults.entrySet().stream()
+                        .collect(Collectors.toMap(
+                                (entry) -> entry.getKey().toString(),
+                                Map.Entry::getValue)));
+            } else {
+                metadata.addDefaultAnnotationValues(annotationName, Collections.emptyMap());
+            }
         }
     }
 
-    private Map<String, Object> getAnnotationDefaults(T originatingElement, DefaultAnnotationMetadata metadata, String annotationName, Map<? extends T, ?> elementDefaultValues) {
+    private Map<CharSequence, Object> getAnnotationDefaults(T originatingElement, String annotationName, Map<? extends T, ?> elementDefaultValues) {
         if (elementDefaultValues != null) {
             Map<CharSequence, Object> defaultValues = new LinkedHashMap<>();
             for (Map.Entry<? extends T, ?> entry : elementDefaultValues.entrySet()) {
@@ -935,12 +939,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     readAnnotationRawValues(originatingElement, annotationName, member, memberName, annotationValue, defaultValues);
                 }
             }
-            metadata.addDefaultAnnotationValues(annotationName, defaultValues);
-            Map<String, Object> annotationDefaults = new HashMap<>(defaultValues.size());
-            for (Map.Entry<CharSequence, Object> entry : defaultValues.entrySet()) {
-                annotationDefaults.put(entry.getKey().toString(), entry.getValue());
-            }
-            return annotationDefaults;
+            return defaultValues;
         } else {
             return null;
         }
@@ -984,8 +983,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         String repeatableName = null;
                         if (annotationMirror.isPresent()) {
                             final T annotationTypeMirror = annotationMirror.get();
-                            final Map<? extends T, ?> defaultValues = readAnnotationDefaultValues(aliasedAnnotationName, annotationTypeMirror);
-                            processAnnotationDefaults(originatingElement, metadata, aliasedAnnotationName, defaultValues);
+                            processAnnotationDefaults(originatingElement, metadata, aliasedAnnotationName, () -> readAnnotationDefaultValues(aliasedAnnotationName, annotationTypeMirror));
                             retentionPolicy = getRetentionPolicy(annotationTypeMirror);
                             repeatableName = getRepeatableNameForType(annotationTypeMirror);
                         }
@@ -1998,12 +1996,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         defaultMetadata::addDeclaredRepeatable,
                         defaultMetadata::addDeclaredAnnotation
                 );
-                final Map<? extends T, ?> defaultValues = readAnnotationDefaultValues(annotationName, annotationMirror);
                 processAnnotationDefaults(
                         annotationMirror,
                         defaultMetadata,
                         annotationName,
-                        defaultValues
+                        () -> readAnnotationDefaultValues(annotationName, annotationMirror)
                 );
                 processAnnotationStereotypes(
                         defaultMetadata,
