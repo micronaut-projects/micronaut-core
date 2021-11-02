@@ -6,6 +6,19 @@
 
 Micronaut has been updated to support the latest GraalVM 21.3.0 release. Please keep in mind that starting with 21.3.0 GraalVM doesn't release a version based on JDK 8. If you still use Java 8 use the GraalVM JDK 11 distribution.
 
+The official GraalVM Maven plugin has new GAV coordinates so if you have declared it in your `pom.xml` update the coordinates to:
+
+[source,xml]
+----
+<plugin>
+    <groupId>org.graalvm.buildtools</groupId>
+    <artifactId>native-maven-plugin</artifactId>
+...
+</plugin>
+----
+
+Please check https://graalvm.github.io/native-build-tools/0.9.7.1/maven-plugin.html[the official documentation] about how to customize the plugin.
+
 == 3.1.0
 
 === Core Features

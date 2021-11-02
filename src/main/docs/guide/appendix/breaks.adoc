@@ -1,5 +1,18 @@
 This section documents breaking changes between Micronaut versions
 
+== 3.2.0
+
+Maven GraalVM Native Image plugin has new GAV coordinates. If you have declared it in your `pom.xml` please update the coordinates to:
+
+[source,xml]
+----
+<plugin>
+    <groupId>org.graalvm.buildtools</groupId>
+    <artifactId>native-maven-plugin</artifactId>
+...
+</plugin>
+----
+
 == 3.1.0
 
 Retrieving the port from the Netty embedded server is no longer supported if the server is configured to bind to a random port and the server has not been started.
