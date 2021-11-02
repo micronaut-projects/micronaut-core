@@ -208,10 +208,11 @@ ext.extraPomInfo = {
                     }
                 }
                 delegate.plugin {
-                    groupId "org.graalvm.nativeimage"
-                    artifactId "native-image-maven-plugin"
-                    delegate.version '${graal.version}'
-                    delegate.configuration {
+                    groupId "org.graalvm.buildtools"
+                    artifactId "native-maven-plugin"
+                    delegate.version '${maven.native.plugin.version}'
+                    delegate.extensions true
+                    delegate.configuration('combine.self':'override') {
                         imageName '${project.artifactId}'
                         mainClass '${exec.mainClass}'
                         buildArgs {
