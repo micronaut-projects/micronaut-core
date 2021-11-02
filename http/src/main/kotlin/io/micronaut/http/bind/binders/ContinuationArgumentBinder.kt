@@ -47,9 +47,14 @@ class ContinuationArgumentBinder : TypedRequestArgumentBinder<Continuation<*>> {
 
     companion object {
 
-        lateinit var tracingCoroutineContextFactory: Supplier<out CoroutineContext>
+        private var continuationArgumentBinderCoroutineContextFactories: Collection<ContinuationArgumentBinderCoroutineContextFactory<*>> = emptyList()
 
         private val reactorContextPresent: Boolean = ClassUtils.isPresent("kotlinx.coroutines.reactor.ReactorContext", null);
+
+        @JvmStatic
+        fun intialize(factories: Collection<ContinuationArgumentBinderCoroutineContextFactory<*>>) {
+            continuationArgumentBinderCoroutineContextFactories = factories
+        }
 
         @JvmStatic
         fun setupCoroutineContext(source: HttpRequest<*>, contextView: ContextView) {
@@ -59,8 +64,8 @@ class ContinuationArgumentBinder : TypedRequestArgumentBinder<Continuation<*>> {
                 if (reactorContextPresent) {
                     coroutineContext += propagateReactorContext(contextView)
                 }
-                if (this::tracingCoroutineContextFactory.isInitialized) {
-                    coroutineContext += tracingCoroutineContextFactory.get()
+                continuationArgumentBinderCoroutineContextFactories.forEach {
+                    coroutineContext += it.create()
                 }
                 customContinuation.context.delegatingCoroutineContext = coroutineContext
             }

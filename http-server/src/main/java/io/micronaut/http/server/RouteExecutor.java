@@ -26,6 +26,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.*;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
+import io.micronaut.http.bind.binders.ContinuationArgumentBinderInitializer;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.HttpFilter;
@@ -113,6 +114,7 @@ public final class RouteExecutor {
         this.serverConfiguration = serverConfiguration;
         this.errorResponseProcessor = errorResponseProcessor;
         this.executorSelector = executorSelector;
+        ContinuationArgumentBinderInitializer.initialize(beanContext);
     }
 
     /**
