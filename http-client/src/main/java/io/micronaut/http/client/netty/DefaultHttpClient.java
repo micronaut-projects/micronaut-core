@@ -2148,11 +2148,14 @@ public class DefaultHttpClient implements
                         String location = headers.get(HttpHeaderNames.LOCATION);
                         Flux<io.micronaut.http.HttpResponse<Object>> redirectedExchange;
                         try {
-                            MutableHttpRequest<Object> redirectRequest = io.micronaut.http.HttpRequest.create(
-                                    finalRequest.getMethod(),
-                                    location
-                            );
-                            finalRequest.getBody().ifPresent(redirectRequest::body);
+                            MutableHttpRequest<Object> redirectRequest;
+                            if (statusCode == 307) {
+                                redirectRequest = io.micronaut.http.HttpRequest.create(finalRequest.getMethod(), location);
+                                finalRequest.getBody().ifPresent(redirectRequest::body);
+                            } else {
+                                redirectRequest = io.micronaut.http.HttpRequest.GET(location);
+                            }
+
 
                             setRedirectHeaders(nettyRequest, redirectRequest);
                             redirectedExchange = Flux.from(resolveRedirectURI(parentRequest, redirectRequest))
@@ -2346,8 +2349,14 @@ public class DefaultHttpClient implements
                         // it is a redirect
                         if (statusCode > 300 && statusCode < 400 && configuration.isFollowRedirects() && headers.contains(HttpHeaderNames.LOCATION)) {
                             String location = headers.get(HttpHeaderNames.LOCATION);
-                            final MutableHttpRequest<Object> redirectRequest = io.micronaut.http.HttpRequest.create(request.getMethod(), location);
-                            request.getBody().ifPresent(redirectRequest::body);
+                            final MutableHttpRequest<Object> redirectRequest;
+                            if (statusCode == 307) {
+                                redirectRequest = io.micronaut.http.HttpRequest.create(request.getMethod(), location);
+                                request.getBody().ifPresent(redirectRequest::body);
+                            } else {
+                                redirectRequest = io.micronaut.http.HttpRequest.GET(location);
+                            }
+
                             setRedirectHeaders(request, redirectRequest);
                             Flux<io.micronaut.http.HttpResponse<O>> redirectExchange = Flux.from(resolveRedirectURI(request, redirectRequest))
                                     .switchMap(buildExchangePublisher(request, redirectRequest, bodyType, errorType));

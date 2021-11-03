@@ -101,10 +101,10 @@ class ServerRedirectSpec extends Specification {
 
         where:
         type        | result
-        'permanent' | 'permanent hello good'
+        'permanent' | 'good'
         'temporary' | 'temporary hello good'
-        'moved'     | 'moved hello good'
-        'seeOther'  | 'seeOther hello good'
+        'moved'     | 'good'
+        'seeOther'  | 'good'
     }
 
     @Unroll
@@ -142,10 +142,10 @@ class ServerRedirectSpec extends Specification {
 
         where:
         type        | result
-        'permanent' | 'permanent The Stand'
+        'permanent' | 'The Stand'
         'temporary' | 'temporary The Stand'
-        'moved'     | 'moved The Stand'
-        'seeOther'  | 'seeOther The Stand'
+        'moved'     | 'The Stand'
+        'seeOther'  | 'The Stand'
     }
 
     void "test stream redirect headers"() {
