@@ -211,8 +211,11 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
                     return Optional.of(new String(objectCodec.get().writeValueAsBytes(node), StandardCharsets.UTF_8));
                 } else {
                     Argument<?> argument = null;
-                    if (context instanceof ArgumentConversionContext && targetType.getTypeParameters().length != 0) {
+                    if (context instanceof ArgumentConversionContext) {
                         argument = ((ArgumentConversionContext<?>) context).getArgument();
+                        if (targetType != argument.getType()) {
+                            argument = null;
+                        }
                     }
                     if (argument == null) {
                         argument = Argument.of(targetType);
