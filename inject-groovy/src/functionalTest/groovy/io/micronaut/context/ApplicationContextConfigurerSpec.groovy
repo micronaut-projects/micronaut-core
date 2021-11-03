@@ -4,8 +4,8 @@ import io.micronaut.fixtures.context.MicronautApplicationTest
 import io.micronaut.inject.BeanDefinitionReference
 import org.codehaus.groovy.GroovyBugError
 
-class ApplicationContextCustomizerSpec extends MicronautApplicationTest {
-    def "no service file is generated if application doesn't provide a customizer"() {
+class ApplicationContextConfigurerSpec extends MicronautApplicationTest {
+    def "no service file is generated if application doesn't provide a configurer"() {
         groovySourceFile("Application.groovy", """
 import io.micronaut.context.annotation.ContextConfigurer
 
@@ -22,16 +22,16 @@ class Application {}
     def "generates a service file"() {
         groovySourceFile("Application.groovy", """
 import io.micronaut.context.annotation.ContextConfigurer
-import io.micronaut.context.ApplicationContextCustomizer
+import io.micronaut.context.ApplicationContextConfigurer
 
 @ContextConfigurer
-class Application implements ApplicationContextCustomizer {}
+class Application implements ApplicationContextConfigurer {}
 """)
         when:
         compile()
 
         then:
-        hasServiceFileFor(ApplicationContextCustomizer) {
+        hasServiceFileFor(ApplicationContextConfigurer) {
             withImplementations 'Application'
         }
     }
@@ -40,7 +40,7 @@ class Application implements ApplicationContextCustomizer {}
         groovySourceFile("demo/app/Application.groovy", """package demo.app;
 
 import io.micronaut.context.annotation.ContextConfigurer;
-import io.micronaut.context.ApplicationContextCustomizer;
+import io.micronaut.context.ApplicationContextConfigurer;
 import io.micronaut.context.ApplicationContextBuilder;
 import jakarta.inject.Singleton;
 import java.util.Collections;
@@ -48,9 +48,9 @@ import java.util.Collections;
 @Singleton
 class Application {
     @ContextConfigurer
-    static class Configurer implements ApplicationContextCustomizer {
+    static class Configurer implements ApplicationContextConfigurer {
         @Override
-        void customize(ApplicationContextBuilder builder) {
+        void configure(ApplicationContextBuilder builder) {
             builder.deduceEnvironment(false)
             builder.environments("dummy")
         }
@@ -61,7 +61,7 @@ class Application {
         compile()
 
         then:
-        hasServiceFileFor(ApplicationContextCustomizer) {
+        hasServiceFileFor(ApplicationContextConfigurer) {
             withImplementations 'demo.app.Application$Configurer'
         }
         hasServiceFileFor(BeanDefinitionReference) {
