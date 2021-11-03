@@ -3,7 +3,7 @@ package io.micronaut.health
 import io.micronaut.context.BeanContext
 import io.micronaut.context.condition.ConditionContext
 import io.micronaut.core.convert.ArgumentConversionContext
-import io.micronaut.discovery.CompositeDiscoveryClient
+import io.micronaut.discovery.DefaultCompositeDiscoveryClient
 import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.inject.BeanDefinition
 import spock.lang.IgnoreIf
@@ -31,7 +31,7 @@ class HeartbeatDiscoveryClientConditionSpec extends Specification {
         1 * conditionContext.getProperty(HeartbeatConfiguration.ENABLED, ArgumentConversionContext.BOOLEAN) >> Optional.empty()
         1 * conditionContext.getBeanContext() >> Stub(BeanContext) {
             getBeanDefinitions(DiscoveryClient.class) >> [Stub(BeanDefinition) {
-                getBeanType() >> CompositeDiscoveryClient
+                getBeanType() >> DefaultCompositeDiscoveryClient
             }]
         }
     }
@@ -48,7 +48,7 @@ class HeartbeatDiscoveryClientConditionSpec extends Specification {
         1 * conditionContext.getProperty(HeartbeatConfiguration.ENABLED, ArgumentConversionContext.BOOLEAN) >> Optional.of(FALSE)
         1 * conditionContext.getBeanContext() >> Stub(BeanContext) {
             getBeanDefinitions(DiscoveryClient.class) >> [Stub(BeanDefinition) {
-                getBeanType() >> CompositeDiscoveryClient
+                getBeanType() >> DefaultCompositeDiscoveryClient
             }]
         }
     }
@@ -64,7 +64,7 @@ class HeartbeatDiscoveryClientConditionSpec extends Specification {
         matches
         1 * conditionContext.getBeanContext() >> Stub(BeanContext) {
             getBeanDefinitions(DiscoveryClient.class) >> [Stub(BeanDefinition) {
-                getBeanType() >> CompositeDiscoveryClient
+                getBeanType() >> DefaultCompositeDiscoveryClient
             }, Stub(BeanDefinition) {
                 getBeanType() >> DiscoveryClient
             }]

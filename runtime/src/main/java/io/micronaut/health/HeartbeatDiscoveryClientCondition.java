@@ -38,7 +38,7 @@ public final class HeartbeatDiscoveryClientCondition implements Condition {
     public boolean matches(ConditionContext context) {
         final boolean hasDiscovery = context.getBeanContext().getBeanDefinitions(DiscoveryClient.class)
                 .stream()
-                .filter(bd -> bd.getBeanType() != (Class<?>) CompositeDiscoveryClient.class)
+                .filter(bd -> !CompositeDiscoveryClient.class.isAssignableFrom(bd.getBeanType()))
                 .findFirst()
                 .isPresent();
         if (hasDiscovery) {
