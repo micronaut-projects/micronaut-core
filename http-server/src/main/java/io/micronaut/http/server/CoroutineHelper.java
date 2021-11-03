@@ -16,13 +16,10 @@
 package io.micronaut.http.server;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.condition.Condition;
-import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.util.KotlinUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
-import io.micronaut.http.bind.binders.ContinuationArgumentBinderCoroutineContextFactory;
+import io.micronaut.http.bind.binders.CoroutineContextFactory;
 import jakarta.inject.Singleton;
 import reactor.util.context.ContextView;
 
@@ -36,24 +33,16 @@ import java.util.List;
  */
 @Internal
 @Singleton
-@Requires(condition = CoroutineHelper.KotlinCoroutineCondition.class)
+@Requires(classes = kotlin.coroutines.CoroutineContext.class)
 final class CoroutineHelper {
 
-    private final List<ContinuationArgumentBinderCoroutineContextFactory<?>> coroutineContextFactories;
+    private final List<CoroutineContextFactory<?>> coroutineContextFactories;
 
-    CoroutineHelper(List<ContinuationArgumentBinderCoroutineContextFactory<?>> coroutineContextFactories) {
+    CoroutineHelper(List<CoroutineContextFactory<?>> coroutineContextFactories) {
         this.coroutineContextFactories = coroutineContextFactories;
     }
 
     void setupCoroutineContext(HttpRequest<?> httpRequest, ContextView contextView) {
         ContinuationArgumentBinder.setupCoroutineContext(httpRequest, contextView, coroutineContextFactories);
-    }
-
-    static final class KotlinCoroutineCondition implements Condition {
-
-        @Override
-        public boolean matches(ConditionContext context) {
-            return KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
-        }
     }
 }

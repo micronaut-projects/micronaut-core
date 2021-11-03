@@ -20,5 +20,3 @@ import kotlin.coroutines.CoroutineContext
 interface CoroutineContextFactory<out T: CoroutineContext> {
     fun create(): T
 }
-
-interface ContinuationArgumentBinderCoroutineContextFactory<out T: CoroutineContext>: CoroutineContextFactory<T>
