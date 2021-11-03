@@ -50,7 +50,7 @@ class ContinuationArgumentBinder : TypedRequestArgumentBinder<Continuation<*>> {
         private val reactorContextPresent: Boolean = ClassUtils.isPresent("kotlinx.coroutines.reactor.ReactorContext", null);
 
         @JvmStatic
-        fun setupCoroutineContext(source: HttpRequest<*>, contextView: ContextView, continuationArgumentBinderCoroutineContextFactories: Collection<ContinuationArgumentBinderCoroutineContextFactory<*>>) {
+        fun setupCoroutineContext(source: HttpRequest<*>, contextView: ContextView, continuationArgumentBinderCoroutineContextFactories: Collection<CoroutineContextFactory<*>>) {
             val customContinuation = source.getAttribute(CONTINUATION_ARGUMENT_ATTRIBUTE_KEY, CustomContinuation::class.java).orElse(null)
             if (customContinuation != null) {
                 var coroutineContext: CoroutineContext = Dispatchers.Default + ServerRequestScopeHandler(source)
