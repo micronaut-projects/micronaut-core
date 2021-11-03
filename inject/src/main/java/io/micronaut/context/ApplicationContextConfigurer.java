@@ -20,11 +20,11 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.order.Ordered;
 
 /**
- * An application context customizer is responsible
+ * An application context configurer is responsible
  * for configuring an application context before the
  * application/function is started.
  *
- * Application context customizers must be registered
+ * Application context configurers must be registered
  * as services. Those services are automatically called
  * whenever a new application context builder is created.
  *
@@ -35,19 +35,19 @@ import io.micronaut.core.order.Ordered;
  * @since 3.2
  */
 @Experimental
-public interface ApplicationContextCustomizer extends Ordered {
+public interface ApplicationContextConfigurer extends Ordered {
 
     /**
-     * A default customizer which does nothing.
+     * A default configurer which does nothing.
      */
-    ApplicationContextCustomizer NO_OP = new ApplicationContextCustomizer() {
+    ApplicationContextConfigurer NO_OP = new ApplicationContextConfigurer() {
     };
 
     /**
-     * Customizes the application context builder.
-     * @param builder the builder to customize
+     * Configures the application context builder.
+     * @param builder the builder to configure
      */
-    default void customize(@NonNull ApplicationContextBuilder builder) {
+    default void configure(@NonNull ApplicationContextBuilder builder) {
 
     }
 }

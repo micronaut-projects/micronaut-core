@@ -16,7 +16,7 @@
 package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaClassElement;
-import io.micronaut.context.ApplicationContextCustomizer;
+import io.micronaut.context.ApplicationContextConfigurer;
 import io.micronaut.context.annotation.ContextConfigurer;
 import io.micronaut.context.visitor.ContextConfigurerVisitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -62,7 +62,7 @@ public class ServiceDescriptionProcessor extends AbstractInjectAnnotationProcess
             }}
     );
     private static final Set<String> SUPPORTED_SERVICE_TYPES = Collections.singleton(
-            ApplicationContextCustomizer.class.getName()
+            ApplicationContextConfigurer.class.getName()
     );
 
     private final Map<String, Set<String>> serviceDescriptors = new HashMap<>();

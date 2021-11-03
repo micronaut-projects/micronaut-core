@@ -15,7 +15,7 @@
  */
 package io.micronaut.context.visitor;
 
-import io.micronaut.context.ApplicationContextCustomizer;
+import io.micronaut.context.ApplicationContextConfigurer;
 import io.micronaut.context.annotation.ContextConfigurer;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
@@ -35,7 +35,7 @@ import java.util.Set;
  */
 public class ContextConfigurerVisitor implements TypeElementVisitor<ContextConfigurer, Object> {
     private static final Set<String> SUPPORTED_SERVICE_TYPES = Collections.singleton(
-            ApplicationContextCustomizer.class.getName()
+            ApplicationContextConfigurer.class.getName()
     );
 
     @Override

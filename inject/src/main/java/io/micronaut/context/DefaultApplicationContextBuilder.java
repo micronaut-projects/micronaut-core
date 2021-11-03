@@ -73,7 +73,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
      * Default constructor.
      */
     protected DefaultApplicationContextBuilder() {
-        loadApplicationContextCustomizer().customize(this);
+        loadApplicationContextCustomizer().configure(this);
     }
 
     @Override
@@ -374,25 +374,25 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
      * @return an application customizer
      */
     @NonNull
-    private static ApplicationContextCustomizer loadApplicationContextCustomizer() {
-        ServiceLoader<ApplicationContextCustomizer> loader = ServiceLoader.load(
-                ApplicationContextCustomizer.class
+    private static ApplicationContextConfigurer loadApplicationContextCustomizer() {
+        ServiceLoader<ApplicationContextConfigurer> loader = ServiceLoader.load(
+                ApplicationContextConfigurer.class
         );
-        List<ApplicationContextCustomizer> customizers = StreamSupport.stream(loader.spliterator(), false)
+        List<ApplicationContextConfigurer> configurers = StreamSupport.stream(loader.spliterator(), false)
                 .collect(Collectors.toList());
-        if (customizers.isEmpty()) {
-            return ApplicationContextCustomizer.NO_OP;
+        if (configurers.isEmpty()) {
+            return ApplicationContextConfigurer.NO_OP;
         }
-        if (customizers.size() == 1) {
-            return customizers.get(0);
+        if (configurers.size() == 1) {
+            return configurers.get(0);
         }
-        OrderUtil.sort(customizers);
-        return new ApplicationContextCustomizer() {
+        OrderUtil.sort(configurers);
+        return new ApplicationContextConfigurer() {
 
             @Override
-            public void customize(ApplicationContextBuilder builder) {
-                for (ApplicationContextCustomizer customizer : customizers) {
-                    customizer.customize(builder);
+            public void configure(ApplicationContextBuilder builder) {
+                for (ApplicationContextConfigurer customizer : configurers) {
+                    customizer.configure(builder);
                 }
             }
 

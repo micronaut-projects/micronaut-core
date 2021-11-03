@@ -7,8 +7,8 @@ import io.micronaut.inject.BeanDefinitionReference
  * NOTE: If you edit this test case it's likely that you also want to
  * edit its Groovy counterpart found in `inject-groovy`.
  */
-class ApplicationContextCustomizerSpec extends MicronautApplicationTest {
-    def "no service file is generated if application doesn't provide a customizer"() {
+class ApplicationContextConfigurerSpec extends MicronautApplicationTest {
+    def "no service file is generated if application doesn't provide a configurer"() {
         javaSourceFile("Application.java", """
 import io.micronaut.context.annotation.ContextConfigurer;
 
@@ -25,25 +25,25 @@ class Application {}
     def "generates a service file"() {
         javaSourceFile("Application.java", """
 import io.micronaut.context.annotation.ContextConfigurer;
-import io.micronaut.context.ApplicationContextCustomizer;
+import io.micronaut.context.ApplicationContextConfigurer;
 
 @ContextConfigurer
-class Application implements ApplicationContextCustomizer {}
+class Application implements ApplicationContextConfigurer {}
 """)
         when:
         compile()
 
         then:
-        hasServiceFileFor(ApplicationContextCustomizer) {
+        hasServiceFileFor(ApplicationContextConfigurer) {
             withImplementations 'Application'
         }
     }
 
-    def "can configure application via an inner customizer"() {
+    def "can configure application via an inner configurer"() {
         javaSourceFile("demo/app/Application.java", """package demo.app;
 
 import io.micronaut.context.annotation.ContextConfigurer;
-import io.micronaut.context.ApplicationContextCustomizer;
+import io.micronaut.context.ApplicationContextConfigurer;
 import io.micronaut.context.ApplicationContextBuilder;
 import jakarta.inject.Singleton;
 import java.util.Collections;
@@ -51,9 +51,9 @@ import java.util.Collections;
 @Singleton
 class Application {
     @ContextConfigurer
-    public static class Configurer implements ApplicationContextCustomizer {
+    public static class Configurer implements ApplicationContextConfigurer {
         @Override
-        public void customize(ApplicationContextBuilder builder) {
+        public void configure(ApplicationContextBuilder builder) {
             builder.deduceEnvironment(false);
             builder.environments("dummy");
         }
@@ -64,7 +64,7 @@ class Application {
         compile()
 
         then:
-        hasServiceFileFor(ApplicationContextCustomizer) {
+        hasServiceFileFor(ApplicationContextConfigurer) {
             withImplementations 'demo.app.Application$Configurer'
         }
         hasServiceFileFor(BeanDefinitionReference) {
