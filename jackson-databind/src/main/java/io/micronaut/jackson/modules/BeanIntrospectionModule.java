@@ -355,7 +355,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                 return builder;
             } else {
                 final Iterator<SettableBeanProperty> properties = builder.getProperties();
-                if ((!properties.hasNext() || ignoreReflectiveProperties) && introspection.getPropertyNames().length > 0) {
+                if ((ignoreReflectiveProperties || !properties.hasNext()) && introspection.getPropertyNames().length > 0) {
                     // mismatch, probably GraalVM reflection not enabled for bean. Try recreate
                     for (BeanProperty<Object, Object> beanProperty : introspection.getBeanProperties()) {
                         builder.addOrReplaceProperty(new VirtualSetter(
@@ -366,24 +366,35 @@ public class BeanIntrospectionModule extends SimpleModule {
                                 true);
                     }
                 } else {
+                    Map<String, BeanProperty<Object, Object>> remainingProperties = new LinkedHashMap<>();
+                    for (BeanProperty<Object, Object> beanProperty : introspection.getBeanProperties()) {
+                        remainingProperties.put(beanProperty.getName(), beanProperty);
+                    }
                     while (properties.hasNext()) {
                         final SettableBeanProperty settableBeanProperty = properties.next();
                         if (settableBeanProperty instanceof MethodProperty) {
                             MethodProperty methodProperty = (MethodProperty) settableBeanProperty;
-                            final Optional<BeanProperty<Object, Object>> beanProperty =
-                                    introspection.getProperty(settableBeanProperty.getName());
+                            final BeanProperty<Object, Object> beanProperty =
+                                    remainingProperties.remove(settableBeanProperty.getName());
 
-                            if (beanProperty.isPresent()) {
-                                BeanProperty<Object, Object> bp = beanProperty.get();
-                                if (!bp.isReadOnly()) {
-                                    SettableBeanProperty newProperty = new BeanIntrospectionSetter(
-                                            methodProperty,
-                                            bp
-                                    );
-                                    builder.addOrReplaceProperty(newProperty, true);
-                                }
+                            if (beanProperty != null && !beanProperty.isReadOnly()) {
+                                SettableBeanProperty newProperty = new BeanIntrospectionSetter(
+                                        methodProperty,
+                                        beanProperty
+                                );
+                                builder.addOrReplaceProperty(newProperty, true);
                             }
                         }
+                    }
+                    // add any remaining properties. This can happen if the supertype has reflection-visible properties
+                    // so `properties` isn't empty, but the subtype doesn't have reflection enabled.
+                    for (Map.Entry<String, BeanProperty<Object, Object>> entry : remainingProperties.entrySet()) {
+                        builder.addOrReplaceProperty(new VirtualSetter(
+                                        beanDesc.getClassInfo(),
+                                        config.getTypeFactory(),
+                                        entry.getValue(),
+                                        findSerializerFromAnnotation(entry.getValue(), JsonDeserialize.class)),
+                                true);
                     }
                 }
 
