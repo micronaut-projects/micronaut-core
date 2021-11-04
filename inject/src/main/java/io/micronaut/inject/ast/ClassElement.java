@@ -237,16 +237,6 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
-     * Returns the fluent bean properties (getters and setters) for this class element.
-     * These are the getter and setters typically created with tools like Lombok.
-     *
-     * @return The fluent bean properties for this class element
-     */
-    default List<PropertyElement> getFluentBeanProperties() {
-        return Collections.emptyList();
-    }
-
-    /**
      * Return all the fields of this class element.
      *
      * @return The fields
