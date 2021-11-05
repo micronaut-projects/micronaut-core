@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize
 import groovy.transform.EqualsAndHashCode
 import groovy.transform.PackageScope
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.Creator
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.hateoas.Link
@@ -506,6 +507,23 @@ class BeanIntrospectionModuleSpec extends Specification {
         ignoreReflectiveProperties << [true, false]
     }
 
+    void "introspection creator property that doesn't have a getter"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        expect:
+        objectMapper.writeValueAsString(new IntrospectionCreator('baz')) == '{"label":"BAZ"}'
+        objectMapper.readValue('{"name":"baz","label":"foo"}', IntrospectionCreator).name == 'baz'
+
+        cleanup:
+        ctx.close()
+
+        where:
+        ignoreReflectiveProperties << [true, false]
+    }
+
     @Introspected
     static class Book {
         @JsonProperty("book_title")
@@ -764,6 +782,20 @@ class BeanIntrospectionModuleSpec extends Specification {
 
         public String getFooBar() {
             return fooBar;
+        }
+    }
+
+    @Introspected
+    static class IntrospectionCreator {
+        private final String name
+
+        @Creator
+        public IntrospectionCreator(String name) {
+            this.name = name
+        }
+
+        public String getLabel() {
+            name.toUpperCase()
         }
     }
 }
