@@ -28,14 +28,6 @@ import java.util.function.Supplier
 
 class GenericTypeArgumentsSpec extends AbstractBeanDefinitionSpec {
 
-    def setup() {
-        System.setProperty("micronaut.keep-conf-prop-inject-points", "true")
-    }
-
-    def cleanup() {
-        System.clearProperty("micronaut.keep-conf-prop-inject-points")
-    }
-
     void "test type arguments for exception handler"() {
         given:
         BeanDefinition definition = buildBeanDefinition('exceptionhandler.Test', '''\

@@ -515,11 +515,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private final boolean keepConfPropInjectPoints;
 
-    {
-        String property = System.getProperty("micronaut.keep-conf-prop-inject-points");
-        keepConfPropInjectPoints = property != null && property.toLowerCase(Locale.ROOT).equals("true");
-    }
-
     /**
      * Creates a bean definition writer.
      *
@@ -651,6 +646,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 .filter(this::isConfigurationProperties)
                 .map(Element::getName)
                 .collect(Collectors.toList());
+        String prop = visitorContext.getOptions().get("micronaut.omit.confprop.injectpoints");
+        keepConfPropInjectPoints = prop == null || !prop.equals("true");
     }
 
     @Override

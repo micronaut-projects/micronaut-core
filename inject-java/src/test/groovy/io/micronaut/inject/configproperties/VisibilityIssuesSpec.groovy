@@ -22,14 +22,6 @@ import io.micronaut.inject.BeanFactory
 
 class VisibilityIssuesSpec extends AbstractTypeElementSpec {
 
-    def setup() {
-        System.setProperty("micronaut.keep-conf-prop-inject-points", "true")
-    }
-
-    def cleanup() {
-        System.clearProperty("micronaut.keep-conf-prop-inject-points")
-    }
-
     void "test extending a class with protected method in a different package fails compilation"() {
         given:
         BeanDefinition beanDefinition = buildBeanDefinition("io.micronaut.inject.configproperties.ChildConfigProperties", """

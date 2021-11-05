@@ -21,14 +21,6 @@ import io.micronaut.inject.BeanDefinition
 
 class InheritedConfigurationReaderPrefixSpec extends AbstractBeanDefinitionSpec {
 
-    def setup() {
-        System.setProperty("micronaut.keep-conf-prop-inject-points", "true")
-    }
-
-    def cleanup() {
-        System.clearProperty("micronaut.keep-conf-prop-inject-points")
-    }
-
     void "test property paths are correct"() {
         given:
         BeanDefinition beanDefinition = buildBeanDefinition('io.micronaut.inject.configproperties.MyBean', '''
