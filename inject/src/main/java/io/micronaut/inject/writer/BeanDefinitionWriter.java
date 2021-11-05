@@ -161,6 +161,8 @@ import static io.micronaut.inject.visitor.BeanElementVisitor.VISITORS;
  */
 @Internal
 public class BeanDefinitionWriter extends AbstractClassFileWriter implements BeanDefinitionVisitor, BeanElement, Toggleable {
+    public static final String OMIT_CONFPROP_INJECTION_POINTS = "micronaut.processing.omit.confprop.injectpoints";
+
     public static final String CLASS_SUFFIX = "$Definition";
     private static final String ANN_CONSTRAINT = "javax.validation.Constraint";
 
@@ -646,7 +648,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 .filter(this::isConfigurationProperties)
                 .map(Element::getName)
                 .collect(Collectors.toList());
-        String prop = visitorContext.getOptions().get("micronaut.omit.confprop.injectpoints");
+        String prop = visitorContext.getOptions().get(OMIT_CONFPROP_INJECTION_POINTS);
         keepConfPropInjectPoints = prop == null || !prop.equals("true");
     }
 
