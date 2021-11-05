@@ -358,12 +358,14 @@ public class BeanIntrospectionModule extends SimpleModule {
                 if ((ignoreReflectiveProperties || !properties.hasNext()) && introspection.getPropertyNames().length > 0) {
                     // mismatch, probably GraalVM reflection not enabled for bean. Try recreate
                     for (BeanProperty<Object, Object> beanProperty : introspection.getBeanProperties()) {
-                        builder.addOrReplaceProperty(new VirtualSetter(
-                                        beanDesc.getClassInfo(),
-                                        config.getTypeFactory(),
-                                        beanProperty,
-                                        findSerializerFromAnnotation(beanProperty, JsonDeserialize.class)),
-                                true);
+                        if (!beanProperty.isReadOnly()) {
+                            builder.addOrReplaceProperty(new VirtualSetter(
+                                            beanDesc.getClassInfo(),
+                                            config.getTypeFactory(),
+                                            beanProperty,
+                                            findSerializerFromAnnotation(beanProperty, JsonDeserialize.class)),
+                                    true);
+                        }
                     }
                 } else {
                     Map<String, BeanProperty<Object, Object>> remainingProperties = new LinkedHashMap<>();
