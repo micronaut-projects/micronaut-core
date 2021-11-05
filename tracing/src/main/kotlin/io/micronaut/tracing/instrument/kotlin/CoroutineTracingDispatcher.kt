@@ -13,27 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.tracing.instrument
+package io.micronaut.tracing.instrument.kotlin
 
-import io.micronaut.context.annotation.Context
-import io.micronaut.context.annotation.Factory
-import io.micronaut.context.annotation.Requires
-import io.micronaut.http.bind.binders.CoroutineContextFactory
 import io.micronaut.scheduling.instrument.Instrumentation
 import io.micronaut.scheduling.instrument.InvocationInstrumenter
-import io.micronaut.tracing.instrument.util.TracingInvocationInstrumenterFactory
 import kotlinx.coroutines.ThreadContextElement
 import kotlin.coroutines.CoroutineContext
-
-@Factory
-@Context
-@Requires(classes = [ThreadContextElement::class])
-class CoroutineTracingDispatcherSupplierFactory {
-    @Context
-    fun coroutineTracingDispatcherSupplier(tiifs: List<TracingInvocationInstrumenterFactory>) = object : CoroutineContextFactory<CoroutineTracingDispatcher> {
-        override fun create() = CoroutineTracingDispatcher(tiifs.mapNotNull(TracingInvocationInstrumenterFactory::newTracingInvocationInstrumenter))
-    }
-}
 
 internal class CoroutineTracingDispatcherContextKey : CoroutineContext.Key<CoroutineTracingDispatcher>
 

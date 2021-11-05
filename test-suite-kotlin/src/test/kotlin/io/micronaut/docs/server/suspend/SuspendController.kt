@@ -20,7 +20,7 @@ import io.micronaut.http.annotation.*
 import io.micronaut.http.bind.binders.CoroutineContextFactory
 import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.scheduling.TaskExecutors
-import io.micronaut.tracing.instrument.CoroutineTracingDispatcher
+import io.micronaut.tracing.instrument.kotlin.CoroutineTracingDispatcher
 import kotlinx.coroutines.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicInteger
