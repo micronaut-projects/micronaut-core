@@ -932,4 +932,97 @@ interface MyDto<ID> {
         beanProperties.size() == 2
         beanProperties*.declaringType*.name.every { it == 'test.MyDtoImpl' }
     }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-openapi/issues/593')
+    void 'test bean properties defined with accessors style none'() {
+        given: 'a POJO with Lombok accessors annotated with @AccessorsStyle NONE'
+        def element = buildClassElement('''
+package test;
+
+import io.micronaut.core.annotation.AccessorsStyle;
+
+@AccessorsStyle(style = AccessorsStyle.Style.NONE)
+class Person {
+
+    private String name;
+    private Integer debtValue;
+    private Integer totalGoals;
+
+    public Person(String name, Integer debtValue, Integer totalGoals) {
+        this.name = name;
+        this.debtValue = debtValue;
+        this.totalGoals = totalGoals;
+    }
+
+    public String name() {
+        return name;
+    }
+    public Integer debtValue() {
+        return debtValue;
+    }
+    public Integer totalGoals() {
+        return totalGoals;
+    }
+
+    public void name(String name) {
+        this.name = name;
+    }
+    public void debtValue(Integer debtValue) {
+        this.debtValue = debtValue;
+    }
+    public void totalGoals(Integer totalGoals) {
+        this.totalGoals = totalGoals;
+    }
+}
+''')
+
+        when: 'getting the bean properties'
+        def beanProperties = element.getBeanProperties()
+
+        then: 'the bean properties are found'
+        beanProperties
+        beanProperties.size() == 3
+
+        when: 'defining the class without @AccessorsStyle annotation'
+        element = buildClassElement('''
+package test;
+
+class Person {
+
+    private String name;
+    private Integer debtValue;
+    private Integer totalGoals;
+
+    public Person(String name, Integer debtValue, Integer totalGoals) {
+        this.name = name;
+        this.debtValue = debtValue;
+        this.totalGoals = totalGoals;
+    }
+
+    public String name() {
+        return name;
+    }
+    public Integer debtValue() {
+        return debtValue;
+    }
+    public Integer totalGoals() {
+        return totalGoals;
+    }
+
+    public void name(String name) {
+        this.name = name;
+    }
+    public void debtValue(Integer debtValue) {
+        this.debtValue = debtValue;
+    }
+    public void totalGoals(Integer totalGoals) {
+        this.totalGoals = totalGoals;
+    }
+}
+''')
+
+        then: 'no bean properties are found'
+        !element.getBeanProperties()
+    }
+
 }
