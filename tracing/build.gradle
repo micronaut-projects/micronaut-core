@@ -3,7 +3,7 @@ plugins {
 }
 
 internalSanityChecks {
-    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 40)
+    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 39)
     expectedServiceCount.put('io.micronaut.inject.BeanConfiguration', 2)
 }
 
@@ -26,6 +26,7 @@ dependencies {
 
     compileOnly libs.managed.jaeger
     compileOnly libs.kotlinx.coroutines.core
+    compileOnly libs.kotlinx.coroutines.reactor
 
     testImplementation project(":inject-groovy")
     testImplementation project(":inject-java")
