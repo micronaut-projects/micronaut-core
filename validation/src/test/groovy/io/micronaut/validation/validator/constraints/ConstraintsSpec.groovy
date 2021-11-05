@@ -11,6 +11,7 @@ import spock.lang.Unroll
 import javax.validation.constraints.*
 import java.time.Instant
 import java.time.LocalDateTime
+import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 
 import static java.math.BigInteger.ONE
@@ -239,6 +240,8 @@ class ConstraintsSpec extends AbstractTypeElementSpec {
         Past           | Instant.now().plus(1, ChronoUnit.DAYS)        | false   | constraintMetadata(constraint, /@Past/)
         Past           | LocalDateTime.now().minus(1, ChronoUnit.DAYS) | true    | constraintMetadata(constraint, /@Past/)
         Past           | LocalDateTime.now().plus(1, ChronoUnit.DAYS)  | false   | constraintMetadata(constraint, /@Past/)
+        Past           | Date.from(LocalDateTime.now().minus(1, ChronoUnit.DAYS).toInstant(ZoneOffset.UTC)) | true | constraintMetadata(constraint, /@Past/)
+        Past           | Date.from(LocalDateTime.now().plus(1, ChronoUnit.DAYS).toInstant(ZoneOffset.UTC)) | false | constraintMetadata(constraint, /@Past/)
 
         // Future
         Future         | null                                          | true    | constraintMetadata(constraint, /@Past/)
@@ -246,6 +249,9 @@ class ConstraintsSpec extends AbstractTypeElementSpec {
         Future         | Instant.now().plus(1, ChronoUnit.DAYS)        | true    | constraintMetadata(constraint, /@Past/)
         Future         | LocalDateTime.now().minus(1, ChronoUnit.DAYS) | false   | constraintMetadata(constraint, /@Past/)
         Future         | LocalDateTime.now().plus(1, ChronoUnit.DAYS)  | true    | constraintMetadata(constraint, /@Past/)
+        Future         | LocalDateTime.now().plus(1, ChronoUnit.DAYS)  | true    | constraintMetadata(constraint, /@Past/)
+        Future         | Date.from(LocalDateTime.now().minus(1, ChronoUnit.DAYS).toInstant(ZoneOffset.UTC)) | false | constraintMetadata(constraint, /@Future/)
+        Future         | Date.from(LocalDateTime.now().plus(1, ChronoUnit.DAYS).toInstant(ZoneOffset.UTC)) | true | constraintMetadata(constraint, /@Future/)
 
         // Email
         Email          | null                                          | true    | constraintMetadata(constraint, /@Email/)
