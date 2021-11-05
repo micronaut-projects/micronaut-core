@@ -15,7 +15,9 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.annotation.processing.AnnotationUtils;
 import io.micronaut.annotation.processing.ModelUtils;
@@ -274,11 +276,23 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
             Map<String, BeanPropertyData> props = new LinkedHashMap<>();
             Map<String, VariableElement> fields = new LinkedHashMap<>();
-            if (isRecord()) {
+
+            if (isRecord() || hasDeclaredAnnotation(AccessorsStyle.class)) {
                 classElement.asType().accept(new SuperclassAwareTypeVisitor<Object, Object>(visitorContext) {
+
+                    boolean noneAccessorsStyle = false;
+                    {
+                        AnnotationValue<AccessorsStyle> accessorsAnn = getDeclaredAnnotation(AccessorsStyle.class);
+                        if (accessorsAnn != null) {
+                            noneAccessorsStyle = accessorsAnn.enumValue("style", AccessorsStyle.Style.class)
+                                    .filter(style -> style.equals(AccessorsStyle.Style.NONE))
+                                    .isPresent();
+                        }
+                    }
+
                     @Override
                     protected boolean isAcceptable(Element element) {
-                        return JavaModelUtils.isRecord(element);
+                        return JavaModelUtils.isRecord(element) || noneAccessorsStyle;
                     }
 
                     @Override
@@ -287,7 +301,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         if (isAcceptable(element)) {
                             List<? extends Element> enclosedElements = element.getEnclosedElements();
                             for (Element enclosedElement : enclosedElements) {
-                                if (JavaModelUtils.isRecordComponent(enclosedElement) || enclosedElement instanceof ExecutableElement) {
+                                if (JavaModelUtils.isRecordComponent(enclosedElement) || enclosedElement instanceof ExecutableElement || noneAccessorsStyle) {
                                     if (enclosedElement.getKind() != ElementKind.CONSTRUCTOR) {
                                         accept(type, enclosedElement, o);
                                     }
