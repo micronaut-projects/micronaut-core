@@ -19,8 +19,10 @@ import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.*
+import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.uri.UriBuilder
@@ -86,6 +88,26 @@ class ServerRedirectSpec extends Specification {
     }
 
     @Unroll
+    void "test http client follows #type redirects for regular exchange requests keeping original request method"() {
+        given:
+        HttpClient client = HttpClient.create(embeddedServer.getURL())
+
+        expect:
+        client.toBlocking().retrieve(HttpRequest.POST("/redirect/$type", "$type hello")) == result
+
+        cleanup:
+        client.stop()
+        client.close()
+
+        where:
+        type        | result
+        'permanent' | 'good'
+        'temporary' | 'temporary hello good'
+        'moved'     | 'good'
+        'seeOther'  | 'good'
+    }
+
+    @Unroll
     void "test http client follows #type redirects for regular stream requests"() {
         given:
         StreamingHttpClient client = StreamingHttpClient.create(embeddedServer.getURL())
@@ -103,6 +125,27 @@ class ServerRedirectSpec extends Specification {
         'temporary' | 'good'
         'moved'     | 'good'
         'seeOther'  | 'good'
+    }
+
+    @Unroll
+    void "test http client follows #type redirects for regular stream requests keeping original request method"() {
+        given:
+        StreamingHttpClient client = StreamingHttpClient.create(embeddedServer.getURL())
+
+        expect:
+        HttpRequest request = HttpRequest.create(HttpMethod.POST, "/redirect/stream/$type").body(type)
+        Flux.from(client.jsonStream(request, Book)).blockFirst().title == result
+
+        cleanup:
+        client.stop()
+        client.close()
+
+        where:
+        type        | result
+        'permanent' | 'The Stand'
+        'temporary' | 'temporary The Stand'
+        'moved'     | 'The Stand'
+        'seeOther'  | 'The Stand'
     }
 
     void "test stream redirect headers"() {
@@ -156,8 +199,18 @@ class ServerRedirectSpec extends Specification {
             HttpResponse.permanentRedirect(URI.create('/redirect'))
         }
 
+        @Post("/permanent")
+        HttpResponse permanentPost() {
+            HttpResponse.permanentRedirect(URI.create('/redirect'))
+        }
+
         @Get("/temporary")
         HttpResponse temporary() {
+            HttpResponse.temporaryRedirect(URI.create('/redirect'))
+        }
+
+        @Post("/temporary")
+        HttpResponse temporaryPost() {
             HttpResponse.temporaryRedirect(URI.create('/redirect'))
         }
 
@@ -166,8 +219,18 @@ class ServerRedirectSpec extends Specification {
             HttpResponse.redirect(URI.create('/redirect'))
         }
 
+        @Post("/moved")
+        HttpResponse movedPost() {
+            HttpResponse.redirect(URI.create('/redirect'))
+        }
+
         @Get("/seeOther")
         HttpResponse seeOther() {
+            HttpResponse.seeOther(URI.create('/redirect'))
+        }
+
+        @Post("/seeOther")
+        HttpResponse seeOtherPost() {
             HttpResponse.seeOther(URI.create('/redirect'))
         }
 
@@ -180,6 +243,11 @@ class ServerRedirectSpec extends Specification {
         @Get
         String home() {
             return "good"
+        }
+
+        @Post
+        String homePost(@Body String body) {
+            return "$body good"
         }
 
         @Get("/text")
@@ -201,8 +269,18 @@ class ServerRedirectSpec extends Specification {
             HttpResponse.permanentRedirect(URI.create('/redirect/stream'))
         }
 
+        @Post("/permanent")
+        HttpResponse permanentPost() {
+            HttpResponse.permanentRedirect(URI.create('/redirect/stream'))
+        }
+
         @Get("/temporary")
         HttpResponse temporary() {
+            HttpResponse.temporaryRedirect(URI.create('/redirect/stream'))
+        }
+
+        @Post("/temporary")
+        HttpResponse temporaryPost() {
             HttpResponse.temporaryRedirect(URI.create('/redirect/stream'))
         }
 
@@ -211,8 +289,18 @@ class ServerRedirectSpec extends Specification {
             HttpResponse.redirect(URI.create('/redirect/stream'))
         }
 
+        @Post("/moved")
+        HttpResponse movedPost() {
+            HttpResponse.redirect(URI.create('/redirect/stream'))
+        }
+
         @Get("/seeOther")
         HttpResponse seeOther() {
+            HttpResponse.seeOther(URI.create('/redirect/stream'))
+        }
+
+        @Post("/seeOther")
+        HttpResponse seeOtherPost() {
             HttpResponse.seeOther(URI.create('/redirect/stream'))
         }
 
@@ -226,6 +314,12 @@ class ServerRedirectSpec extends Specification {
         @Produces(MediaType.APPLICATION_JSON_STREAM)
         Publisher<Book> home() {
             Flux.just(new Book(title: "The Stand"))
+        }
+
+        @Post
+        @Produces(MediaType.APPLICATION_JSON_STREAM)
+        Publisher<Book> homePost(@Body String body) {
+            Flux.just(new Book(title: "$body The Stand"))
         }
 
         @Get("/text")
