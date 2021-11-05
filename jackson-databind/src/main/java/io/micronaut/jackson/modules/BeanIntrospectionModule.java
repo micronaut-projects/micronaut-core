@@ -389,12 +389,15 @@ public class BeanIntrospectionModule extends SimpleModule {
                     // add any remaining properties. This can happen if the supertype has reflection-visible properties
                     // so `properties` isn't empty, but the subtype doesn't have reflection enabled.
                     for (Map.Entry<String, BeanProperty<Object, Object>> entry : remainingProperties.entrySet()) {
-                        builder.addOrReplaceProperty(new VirtualSetter(
-                                        beanDesc.getClassInfo(),
-                                        config.getTypeFactory(),
-                                        entry.getValue(),
-                                        findSerializerFromAnnotation(entry.getValue(), JsonDeserialize.class)),
-                                true);
+                        SettableBeanProperty existing = builder.findProperty(PropertyName.construct(entry.getKey()));
+                        if (existing == null) {
+                            builder.addOrReplaceProperty(new VirtualSetter(
+                                            beanDesc.getClassInfo(),
+                                            config.getTypeFactory(),
+                                            entry.getValue(),
+                                            findSerializerFromAnnotation(entry.getValue(), JsonDeserialize.class)),
+                                    true);
+                        }
                     }
                 }
 

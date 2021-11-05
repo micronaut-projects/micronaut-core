@@ -487,6 +487,25 @@ class BeanIntrospectionModuleSpec extends Specification {
         ignoreReflectiveProperties << [true, false]
     }
 
+    void "creator property that doesn't have a getter"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        expect:
+        objectMapper.writeValueAsString(new DifferentCreator('baz')) == '{"fooBar":"baz"}'
+        objectMapper.readValue('{"foo_bar":"baz"}', DifferentCreator).fooBar == 'baz'
+        // this is currently broken with ignoreReflectiveProperties
+        ignoreReflectiveProperties || objectMapper.readValue('{"fooBar":"baz"}', DifferentCreator).fooBar == 'baz'
+
+        cleanup:
+        ctx.close()
+
+        where:
+        ignoreReflectiveProperties << [true, false]
+    }
+
     @Introspected
     static class Book {
         @JsonProperty("book_title")
@@ -731,6 +750,20 @@ class BeanIntrospectionModuleSpec extends Specification {
             String deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JsonProcessingException {
                 return p.valueAsString.toLowerCase(Locale.ENGLISH)
             }
+        }
+    }
+
+    @Introspected
+    static class DifferentCreator {
+        private final String fooBar;
+
+        @JsonCreator
+        public DifferentCreator(@JsonProperty('foo_bar') String fooBar) {
+            this.fooBar = fooBar
+        }
+
+        public String getFooBar() {
+            return fooBar;
         }
     }
 }
