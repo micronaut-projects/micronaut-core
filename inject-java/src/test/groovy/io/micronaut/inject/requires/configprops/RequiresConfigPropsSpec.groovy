@@ -2,102 +2,92 @@ package io.micronaut.inject.requires.configprops
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.exceptions.ConditionalBeanException
+import io.micronaut.context.exceptions.NoSuchBeanException
 
 class RequiresConfigPropsSpec extends AbstractTypeElementSpec {
 
     void "test requires configuration property presence"() {
-        given:
+        when:
         ApplicationContext context = ApplicationContext
                 .builder('outer.outer-property': 'anyValue')
                 .build();
 
         context.start()
+        context.getBean(A.class)
 
-        expect:
-        context.containsBean(A.class)
+        then:
+        noExceptionThrown();
 
         cleanup:
         context.close()
     }
 
     void "test configuration property absence"() {
-        given:
+        when:
         ApplicationContext context = ApplicationContext
                 .builder()
                 .build();
 
         context.start()
+        context.getBean(A.class)
 
-        expect:
-        !context.containsBean(A.class)
+        then:
+        thrown(NoSuchBeanException.class)
 
         cleanup:
         context.close()
     }
 
     void "test requires inner configuration property presence"() {
-        given:
+        when:
         ApplicationContext context = ApplicationContext
                 .builder('outer.inner.inner-property': 'anyValue')
                 .build()
 
         context.start()
+        context.getBean(B.class)
 
-        expect:
-        context.containsBean(B.class)
+        then:
+        noExceptionThrown();
 
         cleanup:
         context.close()
     }
 
     void "test requires inherited configuration property presence"() {
-        given:
+        when:
         ApplicationContext context = ApplicationContext
                 .builder('outer.inherited.inherited-property': 'anyValue')
                 .build()
 
         context.start()
+        context.getBean(C.class)
 
-        expect:
-        context.containsBean(C.class)
+        then:
+        noExceptionThrown();
 
         cleanup:
         context.close()
     }
 
     void "test requires configuration property value"() {
-        given:
+        when:
         ApplicationContext context = ApplicationContext
                 .builder('outer.outer-property': 'true')
                 .build();
 
         context.start()
+        context.getBean(D.class)
 
-        expect:
-        context.containsBean(D.class)
-
-        cleanup:
-        context.close()
-    }
-
-    void "test requires configuration not equals value"() {
-        given:
-        ApplicationContext context = ApplicationContext
-                .builder('outer.outer-property': 'disabled')
-                .build();
-
-        context.start()
-
-        expect:
-        context.containsBean(E.class)
+        then:
+        noExceptionThrown()
 
         cleanup:
         context.close()
     }
 
     void "test requires different types properties"() {
-        given:
+        when:
         ApplicationContext context = ApplicationContext
                 .builder(
                         'type.int-property': '1',
@@ -107,91 +97,10 @@ class RequiresConfigPropsSpec extends AbstractTypeElementSpec {
                 .build();
 
         context.start()
-
-        expect:
-        context.containsBean(F.class)
-
-        cleanup:
-        context.close()
-    }
-
-    void "test not configuration properties class"() {
-        given:
-        ApplicationContext context = ApplicationContext
-                .builder()
-                .build();
-
-        context.start()
-
-        expect:
-        !context.containsBean(G.class)
-
-        cleanup:
-        context.close()
-    }
-
-    void "test disabled toggleable configuration properties"() {
-        given:
-        ApplicationContext context = ApplicationContext
-                .builder('toggleable.enabled': 'false')
-                .build();
-
-        context.start()
-
-        expect:
-        !context.containsBean(H.class)
-
-        cleanup:
-        context.close()
-    }
-
-    void "test disabled toggleable configuration precedence over specified property value"() {
-        given:
-        ApplicationContext context = ApplicationContext
-                .builder(
-                        'toggleable.property': 'true',
-                        'toggleable.enabled': 'false'
-                )
-                .build();
-
-        context.start()
-
-        expect:
-        !context.containsBean(I.class)
-
-        cleanup:
-        context.close()
-    }
-    
-    void "test not introspected configuration properties"() {
-        when:
-        def context = buildContext('''
-package test;
-
-import io.micronaut.context.annotation.*;import jakarta.inject.Singleton;
-
-@ConfigurationProperties("not-introspected")
-class NotIntrospectedConfig {
-    private String property;
-    
-    public String getProperty() {
-        return property;
-    }
-    
-    public void setProperty(String property) {
-        this.property = property;
-    }
-}
-
-@Singleton
-@Requires(configProperties = NotIntrospectedConfig.class, configProperty = "property")
-class ConditionalBean {}
-''')
-        getBean(context, 'test.ConditionalBean')
+        context.getBean(E.class)
 
         then:
-        def e = thrown(ConditionalBeanException)
-        e.message.contains('Bean introspection must be available for the @ConfigurationProperties class [class test.NotIntrospectedConfig]')
+        noExceptionThrown()
 
         cleanup:
         context.close()

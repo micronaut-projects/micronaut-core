@@ -16,7 +16,6 @@
 package io.micronaut.context;
 
 import groovy.lang.GroovySystem;
-import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
@@ -24,14 +23,10 @@ import io.micronaut.context.condition.OperatingSystem;
 import io.micronaut.context.condition.TrueCondition;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.Environment;
-import io.micronaut.context.exceptions.ConditionalBeanException;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.beans.BeanIntrospection;
-import io.micronaut.core.beans.BeanProperty;
-import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
@@ -43,7 +38,6 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.util.Toggleable;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.core.version.SemanticVersion;
 import io.micronaut.core.version.VersionUtils;
@@ -224,10 +218,6 @@ public class RequiresCondition implements Condition {
         }
 
         if (!matchesAbsenceOfBeans(context, requirements)) {
-            return;
-        }
-
-        if (!matchesConfigurationProperties(context, requirements)) {
             return;
         }
 
@@ -657,99 +647,6 @@ public class RequiresCondition implements Condition {
                     context.fail("The current operating system [" + currentOs.name() + "] is one of the disallowed systems [" + notOs + "]");
                     return false;
                 }
-            }
-        }
-        return true;
-    }
-
-    private boolean matchesConfigurationProperties(ConditionContext context, AnnotationValue<Requires> requirements) {
-        if (requirements.contains(MEMBER_CONFIGURATION_PROPERTIES)) {
-            Class configPropertiesClass = requirements.classValue(MEMBER_CONFIGURATION_PROPERTIES).orElse(null);
-            String configProperty = requirements.stringValue(MEMBER_CONFIGURATION_PROPERTY).orElse(null);
-
-            if (configPropertiesClass == null) {
-                return true;
-            }
-
-            BeanContext beanContext = context.getBeanContext();
-            if (!beanContext.containsBean(configPropertiesClass)) {
-                context.fail("ConfigurationProperties bean of type [" + configPropertiesClass + "] is not registered in context");
-                return false;
-            }
-
-            BeanDefinition<?> beanDefinition = beanContext.getBeanDefinition(configPropertiesClass);
-            AnnotationValue<ConfigurationProperties> configPropertiesAnnotation =
-                    beanDefinition.getAnnotationMetadata().getDeclaredAnnotation(ConfigurationProperties.class);
-
-            if (configPropertiesAnnotation == null) {
-                context.fail("ConfigurationProperties bean of type [" + configPropertiesClass + "] is not registered in context");
-                return false;
-            }
-
-            try {
-                BeanIntrospection<Object> introspection = BeanIntrospection.getIntrospection(configPropertiesClass);
-                Object configPropertiesBean = beanContext.getBean(beanDefinition);
-
-                // In case configuration properties class implements Toggleable interface, enabled property should
-                // be set to true for the conditional bean to be loaded
-                if (configPropertiesBean instanceof Toggleable) {
-                    BeanProperty<Object, Object> enabledProperty = introspection.getProperty("enabled").orElse(null);
-
-                    boolean enabled = false;
-                    if (enabledProperty != null) {
-                        try {
-                            enabled = enabledProperty.get(configPropertiesBean, boolean.class).orElse(false);
-                        } catch (NullPointerException ex) {
-                            // enabled remains false
-                        }
-                    }
-                    if (!enabled) {
-                        context.fail("Configuration properties class [" + configPropertiesClass + "] is Toggleable and [enabled] property is not set to true");
-                        return false;
-                    }
-                }
-
-                if (StringUtils.isEmpty(configProperty)) {
-                    return true;
-                }
-
-                BeanProperty<Object, Object> beanProperty = introspection.getProperty(configProperty).orElse(null);
-                if (beanProperty == null) {
-                    context.fail("Configuration property [" + configProperty + "] is not present in class [" + configPropertiesClass + "]");
-                    return false;
-                }
-
-                String requiredPropertyValue = requirements.stringValue().orElse(null);
-                String actualPropertyValue = null;
-                try {
-                    actualPropertyValue = beanProperty.get(configPropertiesBean, String.class).orElse(null);
-                } catch (NullPointerException ex) {
-                    // NPE is thrown in case wrapper types like Boolean or Integer are null
-                }
-
-                if (StringUtils.isEmpty(actualPropertyValue)) {
-                    if (requirements.contains(MEMBER_NOT_EQUALS)) {
-                        return true;
-                    } else {
-                        context.fail("Required configuration property [" + configProperty + "] is not present");
-                        return false;
-                    }
-                } else if (StringUtils.isNotEmpty(requiredPropertyValue)) {
-                    if (!actualPropertyValue.equals(requiredPropertyValue)) {
-                        context.fail("Configuration property [" + configProperty + "] with value [" + actualPropertyValue + "] does " +
-                                         "not equal required value: " + requiredPropertyValue);
-                        return false;
-                    }
-                } else if (requirements.contains(MEMBER_NOT_EQUALS)) {
-                    String notEquals = requirements.stringValue(MEMBER_NOT_EQUALS).orElse(null);
-                    if (actualPropertyValue.equals(notEquals)) {
-                        context.fail("Property [" + configProperty + "] with value [" + actualPropertyValue + "] should not equal: " + notEquals);
-                        return false;
-                    }
-                }
-            } catch (IntrospectionException ex) {
-                throw new ConditionalBeanException("Bean introspection must be available for the @ConfigurationProperties class [" + configPropertiesClass + "] " +
-                        "specified in [configProperties] member of @Requires annotation to make configuration properties accessible", ex);
             }
         }
         return true;

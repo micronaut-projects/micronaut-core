@@ -120,6 +120,8 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     @Nullable
     private final FieldReference[] fieldInjection;
     @Nullable
+    private final AnnotationReference[] annotationInjection;
+    @Nullable
     private final ExecutableMethodsDefinition<T> executableMethodsDefinition;
     @Nullable
     private final Map<String, Argument<?>[]> typeArgumentsMap;
@@ -151,6 +153,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable MethodReference[] methodInjection,
             @Nullable FieldReference[] fieldInjection,
+            @Nullable AnnotationReference[] annotationInjection,
             @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition,
             @Nullable Map<String, Argument<?>[]> typeArgumentsMap,
             Optional<String> scope,
@@ -183,6 +186,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         this.constructor = constructor;
         this.methodInjection = methodInjection;
         this.fieldInjection = fieldInjection;
+        this.annotationInjection = annotationInjection;
         this.executableMethodsDefinition = executableMethodsDefinition;
         this.typeArgumentsMap = typeArgumentsMap;
         this.isConfigurationProperties = isConfigurationProperties;
@@ -1488,6 +1492,16 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         }
     }
 
+    @Internal
+    @UsedByGeneratedCode
+    protected final Object getBeanForAnnotation(BeanResolutionContext resolutionContext, BeanContext context, int annotationBeanIndex, Qualifier qualifier) {
+        final Argument argument = resolveEnvironmentArgument(context, annotationInjection[annotationBeanIndex].argument);
+        try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+                .pushAnnotationResolve(this, argument)) {
+            return resolveBean(resolutionContext, context, argument, qualifier);
+        }
+    }
+
     /**
      * Obtains a value for the given field from the bean context
      * <p>
@@ -2201,6 +2215,17 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
             this.isPostConstructMethod = isPostConstructMethod;
             this.isPreDestroyMethod = isPreDestroyMethod;
         }
+    }
+
+    @Internal
+    @SuppressWarnings("VisibilityModifier")
+    public static final class AnnotationReference {
+        public final Argument argument;
+
+        public AnnotationReference(Argument argument) {
+            this.argument = argument;
+        }
+
     }
 
     /**

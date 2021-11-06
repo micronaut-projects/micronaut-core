@@ -1,9 +1,7 @@
 package io.micronaut.inject.requires.configprops;
 
-import groovy.lang.Singleton;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.util.Toggleable;
 
 @Introspected
 @ConfigurationProperties("inherited")
@@ -18,20 +16,6 @@ class InheritedConfig extends OuterConfig {
     public void setInheritedProperty(String inheritedProperty)
     {
         this.inheritedProperty = inheritedProperty;
-    }
-}
-
-@Introspected
-@Singleton
-class NotConfigurationProperties {
-    private String property;
-
-    public String getProperty() {
-        return property;
-    }
-
-    public void setProperty(String property) {
-        this.property = property;
     }
 }
 
@@ -76,7 +60,7 @@ class TypesConfig {
 
     private Integer intProperty;
 
-    public boolean isBoolProperty() {
+    public Boolean isBoolProperty() {
         return boolProperty;
     }
 
@@ -84,7 +68,7 @@ class TypesConfig {
         this.boolProperty = boolProperty;
     }
 
-    public int getIntProperty() {
+    public Integer getIntProperty() {
         return intProperty;
     }
 
@@ -98,30 +82,5 @@ class TypesConfig {
 
     public void setStringProperty(String stringProperty) {
         this.stringProperty = stringProperty;
-    }
-}
-
-@Introspected
-@ConfigurationProperties("toggleable")
-class ToggleableConfig implements Toggleable {
-
-    private Boolean enabled;
-    private Boolean property;
-
-    @Override
-    public boolean isEnabled() {
-        return enabled;
-    }
-
-    public void setEnabled(Boolean enabled) {
-        this.enabled = enabled;
-    }
-
-    public Boolean getProperty() {
-        return property;
-    }
-
-    public void setProperty(Boolean property) {
-        this.property = property;
     }
 }

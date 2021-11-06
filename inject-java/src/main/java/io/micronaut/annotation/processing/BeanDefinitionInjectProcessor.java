@@ -15,6 +15,10 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
+import io.micronaut.context.RequiresCondition;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.annotation.processing.visitor.JavaElementFactory;
 import io.micronaut.annotation.processing.visitor.JavaMethodElement;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
@@ -662,6 +666,45 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
             }
             return beanDefinitionWriter;
+        }
+
+        private void visitAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+            if (annotationMetadata.hasAnnotation(Requires.class)) {
+                for (io.micronaut.core.annotation.AnnotationValue<Requires> annotation: currentClassMetadata.getAnnotationValuesByType(Requires.class)) {
+                    String configProperty = annotation.stringValue(RequiresCondition.MEMBER_CONFIGURATION_PROPERTY).orElse(null);
+
+                    TypeElement typeElement =
+                        annotation.stringValue(RequiresCondition.MEMBER_CONFIGURATION_PROPERTIES)
+                            .map(name -> name.replace("$", "."))
+                            .map(elementUtils::getTypeElement)
+                            .orElse(null);
+
+                    ClassElement classElement =
+                        Optional.ofNullable(typeElement)
+                            .map(element -> elementFactory.newClassElement(element, annotationUtils.getAnnotationMetadata(element)))
+                            .orElse(null);
+
+                    if (typeElement != null && configProperty != null) {
+                        BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
+
+                        ExecutableElement propertyGetter =
+                            ElementFilter.methodsIn(elementUtils.getAllMembers(typeElement))
+                                .stream()
+                                .filter(method -> NameUtils.isGetterName(method.getSimpleName().toString()))
+                                .filter(method -> NameUtils.getPropertyNameForGetter(method.getSimpleName().toString()).equals(configProperty))
+                                .findFirst()
+                                .orElse(null);
+
+                        if (propertyGetter != null) {
+                            JavaMethodElement javaMethodElement = elementFactory.newMethodElement(classElement,
+                                propertyGetter, annotationUtils.getAnnotationMetadata(propertyGetter));
+
+                            String value = annotation.stringValue().orElse(null);
+                            writer.visitAnnotationPropertyInjectionPoint(classElement, javaMethodElement, value);
+                        }
+                    }
+                }
+            }
         }
 
         private void visitIntroductionAdviceInterface(TypeElement classElement, AnnotationMetadata typeAnnotationMetadata, AopProxyWriter aopProxyWriter) {
