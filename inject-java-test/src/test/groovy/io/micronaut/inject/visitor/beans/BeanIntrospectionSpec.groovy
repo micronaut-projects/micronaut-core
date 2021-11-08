@@ -2927,6 +2927,69 @@ public class Test {
         beanIntrospection.getBeanProperties()[0].annotationMetadata.hasAnnotation(JsonProperty)
     }
 
+    void "test getter annotation overrides setter and field"() {
+        when:
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
+package test;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+public class Test {
+    @JsonProperty("field")
+    String foo;
+    
+    @JsonProperty("getter")
+    public String getFoo() {
+        return foo;
+    }
+    
+    @JsonProperty("setter")
+    public void setFoo(String s) {
+        this.foo = s;
+    }
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 1
+        beanIntrospection.getBeanProperties()[0].annotationMetadata.getAnnotation(JsonProperty).stringValue().get() == 'getter'
+    }
+
+    void "test field annotation overrides setter"() {
+        when:
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
+package test;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+public class Test {
+    @JsonProperty("field")
+    String foo;
+    
+    public String getFoo() {
+        return foo;
+    }
+    
+    @JsonProperty("setter")
+    public void setFoo(String s) {
+        this.foo = s;
+    }
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 1
+        beanIntrospection.getBeanProperties()[0].annotationMetadata.getAnnotation(JsonProperty).stringValue().get() == 'field'
+    }
+
     @Override
     protected JavaParser newJavaParser() {
         return new JavaParser() {
