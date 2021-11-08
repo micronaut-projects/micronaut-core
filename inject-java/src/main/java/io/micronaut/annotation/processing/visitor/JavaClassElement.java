@@ -26,8 +26,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
-import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.*;
 import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.processing.JavaModelUtils;

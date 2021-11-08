@@ -678,7 +678,18 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     protected abstract Optional<T> getAnnotationMirror(String annotationName);
 
-
+    /**
+     * Populate the annotation data for the given annotation.
+     *
+     * @param originatingElement The element the annotation data originates from
+     * @param parent             The parent element
+     * @param annotationMirror   The annotation
+     * @param metadata           the metadata
+     * @param isDeclared         Is the annotation a declared annotation
+     * @param retentionPolicy    The retention policy
+     * @param allowAliases       Whether aliases are allowed
+     * @return The annotation values
+     */
     protected Map<CharSequence, Object> populateAnnotationData(
             T originatingElement,
             @Nullable T parent,
@@ -702,7 +713,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * Populate the annotation data for the given annotation.
      *
      * @param originatingElement The element the annotation data originates from
-     * @param originatingElementIsSameParent  The parent element
+     * @param originatingElementIsSameParent Whether the originating element is considered a parent element
      * @param annotationMirror   The annotation
      * @param metadata           the metadata
      * @param isDeclared         Is the annotation a declared annotation
