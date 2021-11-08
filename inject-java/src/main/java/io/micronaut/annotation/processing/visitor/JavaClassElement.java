@@ -26,6 +26,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.*;
 import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.processing.JavaModelUtils;
@@ -432,8 +434,15 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
                     if (value.getter != null) {
                         final AnnotationMetadata annotationMetadata;
+                        List<Element> parents = new ArrayList<>();
                         if (fieldElement != null) {
-                            annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(fieldElement, value.getter);
+                            parents.add(fieldElement);
+                        }
+                        if (value.setter != null) {
+                            parents.add(value.setter);
+                        }
+                        if (!parents.isEmpty()) {
+                            annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(parents, value.getter);
                         } else {
                             annotationMetadata = visitorContext
                                     .getAnnotationUtils()
