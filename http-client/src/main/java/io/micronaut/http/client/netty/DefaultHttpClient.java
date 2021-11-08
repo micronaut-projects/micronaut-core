@@ -136,6 +136,7 @@ import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
+import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketClientCompressionHandler;
 import io.netty.handler.codec.http2.*;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.proxy.HttpProxyHandler;
@@ -907,10 +908,11 @@ public class DefaultHttpClient implements
                                 request,
                                 finalWebSocketBean,
                                 WebSocketClientHandshakerFactory.newHandshaker(
-                                        webSocketURL, protocolVersion, subprotocol, false, customHeaders, maxFramePayloadLength),
+                                        webSocketURL, protocolVersion, subprotocol, true, customHeaders, maxFramePayloadLength),
                                 requestBinderRegistry,
                                 mediaTypeCodecRegistry,
                                 emitter);
+                        pipeline.addLast(WebSocketClientCompressionHandler.INSTANCE);
                         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_WEBSOCKET_CLIENT, webSocketHandler);
                     } catch (Throwable e) {
                         emitter.error(new WebSocketSessionException("Error opening WebSocket client session: " + e.getMessage(), e));
