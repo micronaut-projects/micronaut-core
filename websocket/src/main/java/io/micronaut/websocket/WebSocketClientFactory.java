@@ -76,6 +76,7 @@ public interface WebSocketClientFactory {
      *
      * @param uri The base URI
      * @return The client
+     * @since 3.2.0
      */
     @NonNull
     default WebSocketClient createWebSocketClient(@Nullable URI uri) {
@@ -93,6 +94,7 @@ public interface WebSocketClientFactory {
      * @param uri The base URI
      * @param configuration The client configuration
      * @return The client
+     * @since 3.2.0
      */
     @NonNull
     default WebSocketClient createWebSocketClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {

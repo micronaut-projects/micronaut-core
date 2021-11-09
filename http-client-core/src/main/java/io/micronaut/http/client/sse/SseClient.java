@@ -129,6 +129,7 @@ public interface SseClient {
      * @deprecated Use {@link #create(URI)} instead
      */
     @Deprecated
+    @NonNull
     static SseClient create(@Nullable URL url) {
         return SseClientFactoryResolver.getFactory().createSseClient(url);
     }
@@ -144,6 +145,7 @@ public interface SseClient {
      * @deprecated Use {@link #create(URI, HttpClientConfiguration)} instead
      */
     @Deprecated
+    @NonNull
     static SseClient create(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
         return SseClientFactoryResolver.getFactory().createSseClient(url, configuration);
     }
@@ -157,7 +159,9 @@ public interface SseClient {
      *
      * @param uri The base URI
      * @return The client
+     * @since 3.2.0
      */
+    @NonNull
     static SseClient create(@Nullable URI uri) {
         return SseClientFactoryResolver.getFactory().createSseClient(uri);
     }
@@ -169,8 +173,9 @@ public interface SseClient {
      * @param uri The base URI
      * @param configuration the client configuration
      * @return The client
-     * @since 2.2.0
+     * @since 3.2.0
      */
+    @NonNull
     static SseClient create(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {
         return SseClientFactoryResolver.getFactory().createSseClient(uri, configuration);
     }

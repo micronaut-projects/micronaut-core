@@ -77,6 +77,7 @@ public interface SseClientFactory {
      *
      * @param uri The base URI
      * @return The client
+     * @since 3.2.0
      */
     @NonNull
     default SseClient createSseClient(@Nullable URI uri) {
@@ -94,7 +95,7 @@ public interface SseClientFactory {
      * @param uri The base URI
      * @param configuration the client configuration
      * @return The client
-     * @since 2.2.0
+     * @since 3.2.0
      */
     @NonNull
     default SseClient createSseClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {

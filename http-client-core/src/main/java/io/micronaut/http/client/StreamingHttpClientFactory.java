@@ -76,6 +76,7 @@ public interface StreamingHttpClientFactory {
      *
      * @param uri The base URI
      * @return The client
+     * @since 3.2.0
      */
     @NonNull
     default StreamingHttpClient createStreamingClient(@Nullable URI uri) {
@@ -93,7 +94,7 @@ public interface StreamingHttpClientFactory {
      * @param uri The base URI
      * @param configuration The client configuration
      * @return The client
-     * @since 2.2.0
+     * @since 3.2.0
      */
     @NonNull
     default StreamingHttpClient createStreamingClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {

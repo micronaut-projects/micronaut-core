@@ -15,6 +15,7 @@
  */
 package io.micronaut.websocket;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpRequest;
@@ -115,6 +116,7 @@ public interface WebSocketClient extends AutoCloseable {
      * @deprecated Use {@link #create(URI)} instead
      */
     @Deprecated
+    @NonNull
     static WebSocketClient create(@Nullable URL url) {
         return WebSocketClientFactoryResolver.getFactory().createWebSocketClient(url);
     }
@@ -130,6 +132,7 @@ public interface WebSocketClient extends AutoCloseable {
      * @deprecated Use {@link #create(URI, HttpClientConfiguration)} instead
      */
     @Deprecated
+    @NonNull
     static WebSocketClient create(@Nullable URL url, HttpClientConfiguration configuration) {
         return WebSocketClientFactoryResolver.getFactory().createWebSocketClient(url, configuration);
     }
@@ -143,7 +146,9 @@ public interface WebSocketClient extends AutoCloseable {
      *
      * @param uri The base URI
      * @return The client
+     * @since 3.2.0
      */
+    @NonNull
     static WebSocketClient create(@Nullable URI uri) {
         return WebSocketClientFactoryResolver.getFactory().createWebSocketClient(uri);
     }
@@ -155,8 +160,9 @@ public interface WebSocketClient extends AutoCloseable {
      * @param uri The base URI
      * @param configuration the client configuration
      * @return The client
-     * @since 2.2.0
+     * @since 3.2.0
      */
+    @NonNull
     static WebSocketClient create(@Nullable URI uri, HttpClientConfiguration configuration) {
         return WebSocketClientFactoryResolver.getFactory().createWebSocketClient(uri, configuration);
     }

@@ -147,6 +147,7 @@ public interface StreamingHttpClient extends HttpClient {
      * @deprecated Use {@link #create(URI)} instead
      */
     @Deprecated
+    @NonNull
     static StreamingHttpClient create(@Nullable URL url) {
         return StreamingHttpClientFactoryResolver.getFactory().createStreamingClient(url);
     }
@@ -162,6 +163,7 @@ public interface StreamingHttpClient extends HttpClient {
      * @deprecated Use {@link #create(URI, HttpClientConfiguration)} instead
      */
     @Deprecated
+    @NonNull
     static StreamingHttpClient create(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
         return StreamingHttpClientFactoryResolver.getFactory().createStreamingClient(url, configuration);
     }
@@ -175,7 +177,9 @@ public interface StreamingHttpClient extends HttpClient {
      *
      * @param uri The base URI
      * @return The client
+     * @since 3.2.0
      */
+    @NonNull
     static StreamingHttpClient create(@Nullable URI uri) {
         return StreamingHttpClientFactoryResolver.getFactory().createStreamingClient(uri);
     }
@@ -187,8 +191,9 @@ public interface StreamingHttpClient extends HttpClient {
      * @param uri The base URI
      * @param configuration the client configuration
      * @return The client
-     * @since 2.2.0
+     * @since 3.2.0
      */
+    @NonNull
     static StreamingHttpClient create(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {
         return StreamingHttpClientFactoryResolver.getFactory().createStreamingClient(uri, configuration);
     }
