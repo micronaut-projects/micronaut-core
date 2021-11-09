@@ -135,7 +135,7 @@ class ServerRedirectSpec extends Specification {
 
     void "test redirect with no base URL client"() {
         given:
-        HttpClient client = HttpClient.create(null)
+        HttpClient client = HttpClient.create((URI) null)
         UriBuilder uriBuilder = UriBuilder.of(embeddedServer.getScheme() + "://" + embeddedServer.getHost())
                 .port(embeddedServer.getPort())
                 .path("/redirect/temporary")

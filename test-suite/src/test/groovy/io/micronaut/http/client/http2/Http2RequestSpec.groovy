@@ -176,7 +176,7 @@ class Http2RequestSpec extends Specification {
         ])
         HttpClientConfiguration configuration = server.getApplicationContext().getBean(HttpClientConfiguration);
         configuration.setHttpVersion(HttpVersion.HTTP_2_0);
-        HttpClient client = HttpClient.create(null, configuration);
+        HttpClient client = HttpClient.create((URI) null, configuration);
         String result = client.toBlocking().retrieve("${server.URL}/http2")
 
         expect:
@@ -198,7 +198,7 @@ class Http2RequestSpec extends Specification {
                 "micronaut.server.netty.log-level" : "TRACE"
         ])
         HttpClientConfiguration configuration = server.getApplicationContext().getBean(HttpClientConfiguration);
-        HttpClient client = HttpClient.create(null, configuration);
+        HttpClient client = HttpClient.create((URI) null, configuration);
         String result = client.toBlocking().retrieve("${server.URL}/http2")
 
         expect:

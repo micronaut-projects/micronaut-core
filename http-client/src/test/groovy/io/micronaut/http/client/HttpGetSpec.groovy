@@ -513,7 +513,7 @@ class HttpGetSpec extends Specification {
 
     void "test creating a client with a null URL"() {
         given:
-        BlockingHttpClient client = HttpClient.create(null).toBlocking()
+        BlockingHttpClient client = HttpClient.create((URI) null).toBlocking()
 
         when:
         String uri = UriBuilder.of(embeddedServer.getURI()).path("/get/simple").toString()
@@ -530,7 +530,7 @@ class HttpGetSpec extends Specification {
 
     void "test creating an rx client with a null URL"() {
         given:
-        BlockingHttpClient client = HttpClient.create(null).toBlocking()
+        BlockingHttpClient client = HttpClient.create((URI) null).toBlocking()
 
         when:
         String uri = UriBuilder.of(embeddedServer.getURI()).path("/get/simple").toString()
