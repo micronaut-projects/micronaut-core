@@ -1,5 +1,6 @@
 package io.micronaut.docs.inject.anninheritance
 
-//tag::class[]
+// tag::class[]
 @SqlRepository
 abstract class BaseSqlRepository
+// end::class[]

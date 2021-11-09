@@ -28,7 +28,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.file.Files;
 
 import static io.micronaut.http.HttpStatus.CONFLICT;
 import static io.micronaut.http.MediaType.MULTIPART_FORM_DATA;
@@ -36,7 +35,9 @@ import static io.micronaut.http.MediaType.TEXT_PLAIN;
 
 @Controller("/upload")
 public class UploadController {
+// end:class[]
 
+    // tag::file[]
     @Post(value = "/", consumes = MULTIPART_FORM_DATA, produces = TEXT_PLAIN) // <1>
     @SingleResult
     public Publisher<HttpResponse<String>> upload(StreamingFileUpload file) { // <2>
@@ -59,7 +60,9 @@ public class UploadController {
                 }
             });
     }
+    // end::file[]
 
+    // tag::outputStream[]
     @Post(value = "/outputStream", consumes = MULTIPART_FORM_DATA, produces = TEXT_PLAIN) // <1>
     @SingleResult
     public Mono<HttpResponse<String>> uploadOutputStream(StreamingFileUpload file) { // <2>
@@ -78,5 +81,8 @@ public class UploadController {
                     }
                 });
     }
+    // end::outputStream[]
+
+// tag::endclass[]
 }
-// end::class[]
+// end::endclass[]

@@ -23,11 +23,12 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import javax.validation.constraints.Size
 // end::imports[]
-// end::importsreactive[]
+// tag::importsreactive[]
 import org.reactivestreams.Publisher
 import io.micronaut.core.async.annotation.SingleResult
 import reactor.core.publisher.Flux
 // end::importsreactive[]
+
 // tag::class[]
 @Controller("/receive")
 open class MessageController {
