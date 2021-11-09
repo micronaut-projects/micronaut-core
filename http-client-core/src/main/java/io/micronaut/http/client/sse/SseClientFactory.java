@@ -19,6 +19,9 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.client.HttpClientConfiguration;
 
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 
 /**
@@ -36,9 +39,17 @@ public interface SseClientFactory {
      *
      * @param url The base URL
      * @return The client
+     * @deprecated Use {@link #createSseClient(URI)} instead
      */
     @NonNull
-    SseClient createSseClient(@Nullable URL url);
+    @Deprecated
+    default SseClient createSseClient(@Nullable URL url) {
+        try {
+            return createSseClient(url != null ? url.toURI() : null);
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException(e);
+        }
+    }
 
     /**
      * Create a new {@link SseClient} with the specified configuration. Note that this method should only be used
@@ -48,8 +59,50 @@ public interface SseClientFactory {
      * @param configuration the client configuration
      * @return The client
      * @since 2.2.0
+     * @deprecated Use {@link #createSseClient(URI, HttpClientConfiguration)}  instead
      */
     @NonNull
-    SseClient createSseClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration);
+    @Deprecated
+    default SseClient createSseClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
+        try {
+            return createSseClient(url != null ? url.toURI() : null, configuration);
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException(e);
+        }
+    }
+
+    /**
+     * Create a new {@link SseClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
+     * {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param uri The base URI
+     * @return The client
+     */
+    @NonNull
+    default SseClient createSseClient(@Nullable URI uri) {
+        try {
+            return createSseClient(uri != null ? uri.toURL() : null);
+        } catch (MalformedURLException e) {
+            throw new UnsupportedOperationException(e);
+        }
+    }
+
+    /**
+     * Create a new {@link SseClient} with the specified configuration. Note that this method should only be used
+     * outside of the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param uri The base URI
+     * @param configuration the client configuration
+     * @return The client
+     * @since 2.2.0
+     */
+    @NonNull
+    default SseClient createSseClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {
+        try {
+            return createSseClient(uri != null ? uri.toURL() : null, configuration);
+        } catch (MalformedURLException e) {
+            throw new UnsupportedOperationException(e);
+        }
+    }
 
 }

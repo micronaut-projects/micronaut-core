@@ -193,7 +193,7 @@ class H2cSpec extends Specification {
 
     def 'http1.1 put'() {
         given:
-        def http1Client = HttpClient.create(new URL("http://localhost:${embeddedServer.port}/"))
+        def http1Client = HttpClient.create(new URI("http://localhost:${embeddedServer.port}/"))
 
         expect:
         http1Client.toBlocking().exchange(HttpRequest.PUT("http://localhost:${embeddedServer.port}/h2c/put", "foo"), String).body() == 'Example response: foo'

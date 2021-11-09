@@ -52,7 +52,7 @@ class ServerRedirectSpec extends Specification {
 
         given:"An HTTPS URL issues an HTTPS"
         YoutubeClient youtubeClient=  embeddedServer.getApplicationContext().getBean(YoutubeClient)
-        HttpClient client = HttpClient.create(new URL("https://www.youtube.com"))
+        HttpClient client = HttpClient.create(new URI("https://www.youtube.com"))
         String declarativeResult = Mono.from(youtubeClient.test()).block()
         String response= client
                 .toBlocking().retrieve("/")
@@ -68,7 +68,7 @@ class ServerRedirectSpec extends Specification {
     @Unroll
     void "test http client follows #type redirects for regular exchange requests"() {
         given:
-        HttpClient client = HttpClient.create(embeddedServer.getURL())
+        HttpClient client = HttpClient.create(embeddedServer.getURI())
 
         expect:
         client.toBlocking().retrieve("/redirect/$type") == result
@@ -88,7 +88,7 @@ class ServerRedirectSpec extends Specification {
     @Unroll
     void "test http client follows #type redirects for regular stream requests"() {
         given:
-        StreamingHttpClient client = StreamingHttpClient.create(embeddedServer.getURL())
+        StreamingHttpClient client = StreamingHttpClient.create(embeddedServer.getURI())
 
         expect:
         Flux.from(client.jsonStream(HttpRequest.GET("/redirect/stream/$type"), Book)).blockFirst().title == "The Stand"
@@ -107,7 +107,7 @@ class ServerRedirectSpec extends Specification {
 
     void "test stream redirect headers"() {
         given:
-        StreamingHttpClient client = StreamingHttpClient.create(embeddedServer.getURL())
+        StreamingHttpClient client = StreamingHttpClient.create(embeddedServer.getURI())
 
         when:
         String response = Flux.from(client.exchangeStream(
@@ -123,7 +123,7 @@ class ServerRedirectSpec extends Specification {
 
     void "test redirect headers"() {
         given:
-        HttpClient client = HttpClient.create(embeddedServer.getURL())
+        HttpClient client = HttpClient.create(embeddedServer.getURI())
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/redirect/title").accept(MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE), String)

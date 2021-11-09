@@ -32,20 +32,20 @@ class StaticClientSpec extends Specification {
             ])
 
     void "test clients can be created outside the context"() {
-        URL url = new URL("https://foo_bar")
+        URI uri = new URI("https://foo_bar")
 
         expect:
-        HttpClient.create(url) instanceof DefaultHttpClient
-        StreamingHttpClient.create(url) instanceof DefaultHttpClient
-        SseClient.create(url) instanceof DefaultHttpClient
-        ProxyHttpClient.create(url) instanceof DefaultHttpClient
-        WebSocketClient.create(url) instanceof DefaultHttpClient
+        HttpClient.create(uri) instanceof DefaultHttpClient
+        StreamingHttpClient.create(uri) instanceof DefaultHttpClient
+        SseClient.create(uri) instanceof DefaultHttpClient
+        ProxyHttpClient.create(uri) instanceof DefaultHttpClient
+        WebSocketClient.create(uri) instanceof DefaultHttpClient
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6323')
     void "deserialization with context-less http client"() {
         given:
-        BlockingHttpClient client = HttpClient.create(embeddedServer.URL).toBlocking()
+        BlockingHttpClient client = HttpClient.create(embeddedServer.URI).toBlocking()
 
         when:
         Book book = client.retrieve(HttpRequest.GET('/book'), Book)

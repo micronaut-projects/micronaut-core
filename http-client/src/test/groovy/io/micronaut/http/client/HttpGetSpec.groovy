@@ -497,7 +497,7 @@ class HttpGetSpec extends Specification {
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/2782")
     void "test single letter uri"() {
         given:
-        HttpClient client = HttpClient.create(embeddedServer.getURL())
+        HttpClient client = HttpClient.create(embeddedServer.getURI())
 
         when:
         MutableHttpRequest request = HttpRequest.GET("/get/a")
@@ -557,7 +557,7 @@ class HttpGetSpec extends Specification {
         books[0][0].title == "The Stand"
 
         when:
-        BlockingHttpClient client = HttpClient.create(embeddedServer.getURL()).toBlocking()
+        BlockingHttpClient client = HttpClient.create(embeddedServer.getURI()).toBlocking()
         books = client.retrieve(HttpRequest.GET("/get/nestedPojoList"), Argument.listOf(Argument.listOf(Book.class)))
 
         then:

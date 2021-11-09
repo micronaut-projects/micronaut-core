@@ -18,6 +18,9 @@ package io.micronaut.http.client;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 
 /**
@@ -35,9 +38,17 @@ public interface ProxyHttpClientFactory {
      *
      * @param url The base URL
      * @return The client
+     * @deprecated Use {@link #createProxyClient(URI)} instead
      */
     @NonNull
-    ProxyHttpClient createProxyClient(@Nullable URL url);
+    @Deprecated
+    default ProxyHttpClient createProxyClient(@Nullable URL url) {
+        try {
+            return createProxyClient(url != null ? url.toURI() : null);
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException(e);
+        }
+    }
 
     /**
      * Create a new {@link ProxyHttpClient} with the specified configuration. Note that this method should only be used
@@ -47,8 +58,50 @@ public interface ProxyHttpClientFactory {
      * @param configuration the client configuration
      * @return The client
      * @since 2.2.0
+     * @deprecated Use {@link #createProxyClient(URI, HttpClientConfiguration)} instead
      */
     @NonNull
-    ProxyHttpClient createProxyClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration);
+    @Deprecated
+    default ProxyHttpClient createProxyClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
+        try {
+            return createProxyClient(url != null ? url.toURI() : null, configuration);
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException(e);
+        }
+    }
+
+    /**
+     * Create a new {@link ProxyHttpClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
+     * {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param uri The base URI
+     * @return The client
+     */
+    @NonNull
+    default ProxyHttpClient createProxyClient(@Nullable URI uri) {
+        try {
+            return createProxyClient(uri != null ? uri.toURL() : null);
+        } catch (MalformedURLException e) {
+            throw new UnsupportedOperationException(e);
+        }
+    }
+
+    /**
+     * Create a new {@link ProxyHttpClient} with the specified configuration. Note that this method should only be used
+     * outside of the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param uri           The base URI
+     * @param configuration the client configuration
+     * @return The client
+     * @since 2.2.0
+     */
+    @NonNull
+    default ProxyHttpClient createProxyClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {
+        try {
+            return createProxyClient(uri != null ? uri.toURL() : null, configuration);
+        } catch (MalformedURLException e) {
+            throw new UnsupportedOperationException(e);
+        }
+    }
 
 }

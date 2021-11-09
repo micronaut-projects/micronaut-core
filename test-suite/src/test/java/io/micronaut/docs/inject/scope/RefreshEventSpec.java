@@ -57,7 +57,7 @@ public class RefreshEventSpec {
             put("spec.name", "RefreshEventSpec");
             put("spec.lang", "java");
         }}, Environment.TEST);
-        client = HttpClient.create(embeddedServer.getURL());
+        client = HttpClient.create(embeddedServer.getURI());
     }
     @AfterClass
     public static void teardown(){

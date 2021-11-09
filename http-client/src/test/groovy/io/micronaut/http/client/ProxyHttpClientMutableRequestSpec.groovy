@@ -78,7 +78,7 @@ class ProxyHttpClientMutableRequestSpec extends Specification {
     static class ProxyClientFactory {
         @EachBean(ProxyConfig)
         ProxyHttpClient create(ProxyConfig config) {
-            ProxyHttpClient.create(config.getUrl().toURL())
+            ProxyHttpClient.create(config.getUrl())
         }
     }
 

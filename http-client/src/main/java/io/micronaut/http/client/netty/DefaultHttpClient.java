@@ -179,7 +179,6 @@ import java.net.Proxy.Type;
 import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -422,10 +421,10 @@ public class DefaultHttpClient implements
     }
 
     /**
-     * @param url The URL
+     * @param uri The URL
      */
-    public DefaultHttpClient(@Nullable URL url) {
-        this(url, new DefaultHttpClientConfiguration());
+    public DefaultHttpClient(@Nullable URI uri) {
+        this(uri, new DefaultHttpClientConfiguration());
     }
 
     /**
@@ -436,12 +435,12 @@ public class DefaultHttpClient implements
     }
 
     /**
-     * @param url           The URL
+     * @param uri           The URI
      * @param configuration The {@link HttpClientConfiguration} object
      */
-    public DefaultHttpClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
+    public DefaultHttpClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {
         this(
-                url == null ? null : LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
+                uri == null ? null : LoadBalancer.fixed(uri), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
                 new NettyClientSslBuilder(new ResourceResolver()),
                 createDefaultMediaTypeRegistry(),
                 AnnotationMetadataResolver.DEFAULT,
@@ -1483,8 +1482,7 @@ public class DefaultHttpClient implements
      */
     protected SslContext buildSslContext(URI uriObject) {
         final SslContext sslCtx;
-        if (io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(uriObject.getScheme()) ||
-            SCHEME_WSS.equalsIgnoreCase(uriObject.getScheme())) {
+        if (isSecureScheme(uriObject.getScheme())) {
             sslCtx = sslContext;
             //Allow https requests to be sent if SSL is disabled but a proxy is present
             if (sslCtx == null && !configuration.getProxyAddress().isPresent()) {
@@ -2986,6 +2984,10 @@ public class DefaultHttpClient implements
                 .collect(Collectors.toList()));
     }
 
+    private static boolean isSecureScheme(String scheme) {
+        return io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(scheme) || SCHEME_WSS.equalsIgnoreCase(scheme);
+    }
+
 
     @FunctionalInterface
     interface ThrowingBiConsumer<T1, T2> {
@@ -3339,7 +3341,7 @@ public class DefaultHttpClient implements
         private final boolean secure;
 
         public RequestKey(URI requestURI) {
-            this.secure = io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(requestURI.getScheme());
+            this.secure = isSecureScheme(requestURI.getScheme());
             String host = requestURI.getHost();
             int port;
             if (host == null) {
@@ -3435,8 +3437,7 @@ public class DefaultHttpClient implements
         protected void writeAndClose(Channel channel, ChannelPool channelPool, FluxSink<?> emitter) {
             final ChannelPipeline pipeline = channel.pipeline();
             if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
-                final boolean isSecure = sslContext != null &&
-                        io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(scheme);
+                final boolean isSecure = sslContext != null && isSecureScheme(scheme);
                 if (isSecure) {
                     nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTPS);
                 } else {

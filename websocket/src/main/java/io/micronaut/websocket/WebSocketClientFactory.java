@@ -19,6 +19,9 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.client.HttpClientConfiguration;
 
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 
 /**
@@ -36,9 +39,17 @@ public interface WebSocketClientFactory {
      *
      * @param url The base URL
      * @return The client
+     * @deprecated Use {@link #createWebSocketClient(URI)} instead
      */
     @NonNull
-    WebSocketClient createWebSocketClient(@Nullable URL url);
+    @Deprecated
+    default WebSocketClient createWebSocketClient(@Nullable URL url) {
+        try {
+            return createWebSocketClient(url != null ? url.toURI() : null);
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException(e);
+        }
+    }
 
     /**
      * Create a new {@link WebSocketClient} with the specified configuration. Note that this method should only be used outside of the context of an application. Within Micronaut use
@@ -47,8 +58,49 @@ public interface WebSocketClientFactory {
      * @param url The base URL
      * @param configuration The client configuration
      * @return The client
+     * @deprecated Use {@link #createWebSocketClient(URI, HttpClientConfiguration)} instead
      */
     @NonNull
-    WebSocketClient createWebSocketClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration);
+    @Deprecated
+    default WebSocketClient createWebSocketClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
+        try {
+            return createWebSocketClient(url != null ? url.toURI() : null, configuration);
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException(e);
+        }
+    }
+
+    /**
+     * Create a new {@link WebSocketClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
+     * {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param uri The base URI
+     * @return The client
+     */
+    @NonNull
+    default WebSocketClient createWebSocketClient(@Nullable URI uri) {
+        try {
+            return createWebSocketClient(uri != null ? uri.toURL() : null);
+        } catch (MalformedURLException e) {
+            throw new UnsupportedOperationException(e);
+        }
+    }
+
+    /**
+     * Create a new {@link WebSocketClient} with the specified configuration. Note that this method should only be used outside of the context of an application. Within Micronaut use
+     * {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param uri The base URI
+     * @param configuration The client configuration
+     * @return The client
+     */
+    @NonNull
+    default WebSocketClient createWebSocketClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {
+        try {
+            return createWebSocketClient(uri != null ? uri.toURL() : null, configuration);
+        } catch (MalformedURLException e) {
+            throw new UnsupportedOperationException(e);
+        }
+    }
 
 }
