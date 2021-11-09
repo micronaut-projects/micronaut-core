@@ -34,6 +34,7 @@ import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.websocket.CloseReason;
+import io.micronaut.websocket.WebSocketPongMessage;
 import io.micronaut.websocket.bind.WebSocketState;
 import io.micronaut.websocket.bind.WebSocketStateBinderRegistry;
 import io.micronaut.websocket.context.WebSocketBean;
@@ -87,12 +88,14 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     protected final WebSocketBean<?> webSocketBean;
     protected final HttpRequest<?> originatingRequest;
     protected final MethodExecutionHandle<?, ?> messageHandler;
+    protected final MethodExecutionHandle<?, ?> pongHandler;
     protected final NettyWebSocketSession session;
     protected final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected final WebSocketVersion webSocketVersion;
     protected final String subProtocol;
     protected final WebSocketSessionRepository webSocketSessionRepository;
     private final Argument<?> bodyArgument;
+    private final Argument<?> pongArgument;
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private AtomicReference<CompositeByteBuf> frameBuffer = new AtomicReference<>();
 
@@ -126,6 +129,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         this.webSocketBean = webSocketBean;
         this.originatingRequest = request;
         this.messageHandler = webSocketBean.messageMethod().orElse(null);
+        this.pongHandler = webSocketBean.pongMethod().orElse(null);
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.webSocketVersion = version;
         this.session = createWebSocketSession(ctx);
@@ -152,6 +156,25 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 }
             } else {
                 this.bodyArgument = null;
+            }
+
+            if (pongHandler != null) {
+                BoundExecutable<?, ?> bound = binder.tryBind(pongHandler.getExecutableMethod(), webSocketBinder, new WebSocketState(session, originatingRequest));
+                List<Argument<?>> unboundArguments = bound.getUnboundArguments();
+                if (unboundArguments.size() == 1 && unboundArguments.get(0).isAssignableFrom(WebSocketPongMessage.class)) {
+                    this.pongArgument = unboundArguments.get(0);
+                } else {
+                    this.pongArgument = null;
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("WebSocket @OnMessage pong handler method " + webSocketBean.getTarget() + "." + pongHandler.getExecutableMethod() + " should define exactly 1 message parameter assignable from a WebSocketPongMessage, but found: " + unboundArguments);
+                    }
+
+                    if (session.isOpen()) {
+                        session.close(CloseReason.INTERNAL_ERROR);
+                    }
+                }
+            } else {
+                this.pongArgument = null;
             }
 
             Optional<? extends MethodExecutionHandle<?, ?>> executionHandle = webSocketBean.openMethod();
@@ -203,6 +226,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             }
         } else {
             this.bodyArgument = null;
+            this.pongArgument = null;
         }
     }
 
@@ -211,6 +235,13 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      */
     public Argument<?> getBodyArgument() {
         return bodyArgument;
+    }
+
+    /**
+     * @return The pong argument for the pong handler
+     */
+    public Argument<?> getPongArgument() {
+        return pongArgument;
     }
 
     /**
@@ -426,7 +457,46 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             ctx.writeAndFlush(new PongWebSocketFrame(frame.content()));
 
         } else if (msg instanceof PongWebSocketFrame) {
-            return;
+            if (pongHandler != null) {
+                ByteBuf content = msg.content();
+                WebSocketPongMessage message = new WebSocketPongMessage(NettyByteBufferFactory.DEFAULT.wrap(content));
+
+                NettyWebSocketSession currentSession = getSession();
+                ExecutableBinder<WebSocketState> executableBinder = new DefaultExecutableBinder<>(
+                        Collections.singletonMap(getPongArgument(), message)
+                );
+
+                try {
+                    BoundExecutable boundExecutable = executableBinder.bind(
+                            pongHandler.getExecutableMethod(),
+                            webSocketBinder,
+                            new WebSocketState(currentSession, originatingRequest)
+                    );
+
+                    Object result = invokeExecutable(boundExecutable, pongHandler);
+                    if (Publishers.isConvertibleToPublisher(result)) {
+                        // delay the buffer release until the publisher has completed
+                        content.retain();
+                        Flux<?> flowable = Flux.from(instrumentPublisher(ctx, result));
+                        flowable.subscribe(
+                                o -> {
+                                },
+                                error -> {
+                                    if (LOG.isErrorEnabled()) {
+                                        LOG.error("Error Processing WebSocket Pong Message [" + webSocketBean + "]: " + error.getMessage(), error);
+                                    }
+                                    exceptionCaught(ctx, error);
+                                },
+                                content::release
+                        );
+                    }
+                } catch (Throwable e) {
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("Error Processing WebSocket Message [" + webSocketBean + "]: " + e.getMessage(), e);
+                    }
+                    exceptionCaught(ctx, e);
+                }
+            }
         } else if (msg instanceof CloseWebSocketFrame) {
             CloseWebSocketFrame cwsf = (CloseWebSocketFrame) msg;
             handleCloseFrame(ctx, cwsf);

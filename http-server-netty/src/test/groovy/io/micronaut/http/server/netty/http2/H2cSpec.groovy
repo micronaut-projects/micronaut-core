@@ -210,6 +210,19 @@ class H2cSpec extends Specification {
         ((FullHttpResponse) responseFuture.get(10, TimeUnit.SECONDS)).content().toString(StandardCharsets.UTF_8) == 'Example response: foo'
     }
 
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6299')
+    void 'test using direct netty http2 client: body in initial request with json parsing'() {
+        given:
+        def request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.PUT, '/h2c/putJson', Unpooled.wrappedBuffer('{"title":"foo"}'.getBytes(StandardCharsets.UTF_8)))
+        request.headers().add("Content-Length", '{"title":"foo"}'.length())
+        request.headers().add("Content-Type", 'application/json')
+
+        CompletableFuture responseFuture = requestUpgrade(request)
+
+        expect:
+        ((FullHttpResponse) responseFuture.get(10, TimeUnit.SECONDS)).content().toString(StandardCharsets.UTF_8) == 'Example response: foo'
+    }
+
     @Controller("/h2c")
     static class TestController {
         @Get("/test")
@@ -238,6 +251,15 @@ class H2cSpec extends Specification {
         @Put('/put')
         String put(@Body String body) {
             return "Example response: $body"
+        }
+
+        @Put('/putJson')
+        String putJson(@Body Book body) {
+            return "Example response: $body.title"
+        }
+
+        static class Book {
+            String title
         }
     }
 }

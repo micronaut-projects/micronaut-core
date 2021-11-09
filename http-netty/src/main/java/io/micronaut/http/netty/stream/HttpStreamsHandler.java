@@ -27,6 +27,7 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.FullHttpMessage;
+import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -37,6 +38,7 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
 
 import java.util.LinkedList;
 import java.util.Queue;
@@ -200,11 +202,15 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             final In inMsg = inClass.cast(msg);
 
             if (inMsg instanceof FullHttpMessage) {
-
-                // Forward as is
-                ctx.fireChannelRead(inMsg);
+                FullHttpMessage fullMessage = (FullHttpMessage) inMsg;
+                if (!(fullMessage instanceof FullHttpRequest) || fullMessage.content().readableBytes() == 0) {
+                    // Forward as is
+                    ctx.fireChannelRead(inMsg);
+                } else {
+                    // create streamed message with just the data from the request
+                    ctx.fireChannelRead(createStreamedMessage(inMsg, Flux.just(fullMessage)));
+                }
                 consumedInMessage(ctx);
-
             } else if (!hasBody(inMsg)) {
 
                 // Wrap in empty message

@@ -33,6 +33,7 @@ import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.websocket.CloseReason;
+import io.micronaut.websocket.WebSocketPongMessage;
 import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.bind.WebSocketState;
 import io.micronaut.websocket.bind.WebSocketStateBinderRegistry;
@@ -78,6 +79,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     private final WebSocketStateBinderRegistry webSocketStateBinderRegistry;
     private FullHttpResponse handshakeResponse;
     private Argument<?> clientBodyArgument;
+    private Argument<?> clientPongArgument;
 
     /**
      * Default constructor.
@@ -123,6 +125,11 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     @Override
     public Argument<?> getBodyArgument() {
         return clientBodyArgument;
+    }
+
+    @Override
+    public Argument<?> getPongArgument() {
+        return clientPongArgument;
     }
 
     @Override
@@ -187,6 +194,26 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                     }
                 }
                 return;
+            }
+
+            if (pongHandler != null) {
+                BoundExecutable<?, ?> boundPong = binder.tryBind(pongHandler.getExecutableMethod(), webSocketBinder, new WebSocketState(clientSession, originatingRequest));
+                List<Argument<?>> unboundPongArguments = boundPong.getUnboundArguments();
+
+                if (unboundPongArguments.size() == 1 && unboundPongArguments.get(0).isAssignableFrom(WebSocketPongMessage.class)) {
+                    this.clientPongArgument = unboundPongArguments.get(0);
+                } else {
+                    this.clientPongArgument = null;
+
+                    try {
+                        emitter.error(new WebSocketClientException("WebSocket @OnMessage pong handler method " + targetBean.getClass().getSimpleName() + "." + messageHandler.getExecutableMethod() + " should define exactly 1 pong message parameter, but found: " + unboundArguments));
+                    } finally {
+                        if (getSession().isOpen()) {
+                            getSession().close(CloseReason.INTERNAL_ERROR);
+                        }
+                    }
+                    return;
+                }
             }
 
             Optional<? extends MethodExecutionHandle<?, ?>> opt = webSocketBean.openMethod();
