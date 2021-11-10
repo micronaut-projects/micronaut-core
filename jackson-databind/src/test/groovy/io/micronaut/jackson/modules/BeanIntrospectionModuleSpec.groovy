@@ -463,6 +463,21 @@ class BeanIntrospectionModuleSpec extends Specification {
         outerArray.wrapper.inner.length == 0
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/6472")
+    void "@JsonProperty annotation on setter"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        expect:
+        objectMapper.readValue('{"bar":"baz"}', JsonPropertyOnSetter.class).foo == 'baz'
+        objectMapper.writeValueAsString(new JsonPropertyOnSetter(foo: 'baz')) == '{"bar":"baz"}'
+
+        where:
+        ignoreReflectiveProperties << [true, false]
+    }
+
     @Introspected
     static class Book {
         @JsonProperty("book_title")
@@ -684,6 +699,20 @@ class BeanIntrospectionModuleSpec extends Specification {
         @JsonCreator
         OuterArray(WrapperArray wrapper) {
             this.wrapper = wrapper
+        }
+    }
+
+    @Introspected
+    static class JsonPropertyOnSetter {
+        private String foo
+
+        public String getFoo() {
+            return foo
+        }
+
+        @JsonProperty("bar")
+        public void setFoo(String foo) {
+            this.foo = foo
         }
     }
 }
