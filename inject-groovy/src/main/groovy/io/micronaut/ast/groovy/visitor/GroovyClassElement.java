@@ -832,8 +832,15 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                     final AnnotationMetadata annotationMetadata;
                     final GroovyAnnotationMetadataBuilder groovyAnnotationMetadataBuilder = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit);
                     final FieldNode field = this.classNode.getField(propertyName);
+                    final List<AnnotatedNode> parents = new ArrayList<>();
                     if (field != null) {
-                        annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, field, value.getter);
+                        parents.add(field);
+                    }
+                    if (value.setter != null) {
+                        parents.add(value.setter);
+                    }
+                    if (!parents.isEmpty()) {
+                        annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, parents, value.getter);
                     } else {
                         annotationMetadata = groovyAnnotationMetadataBuilder.buildForMethod(value.getter);
                     }

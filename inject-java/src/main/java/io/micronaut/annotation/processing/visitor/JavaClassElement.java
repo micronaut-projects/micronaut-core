@@ -432,8 +432,15 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
                     if (value.getter != null) {
                         final AnnotationMetadata annotationMetadata;
+                        List<Element> parents = new ArrayList<>();
                         if (fieldElement != null) {
-                            annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(fieldElement, value.getter);
+                            parents.add(fieldElement);
+                        }
+                        if (value.setter != null) {
+                            parents.add(value.setter);
+                        }
+                        if (!parents.isEmpty()) {
+                            annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(parents, value.getter);
                         } else {
                             annotationMetadata = visitorContext
                                     .getAnnotationUtils()

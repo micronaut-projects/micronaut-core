@@ -228,6 +228,20 @@ public class AnnotationUtils {
     }
 
     /**
+     * Get the annotation metadata for the given element and the given parents.
+     * This method is used for cases when you need to combine annotation metadata for
+     * two elements, for example a JavaBean property where the field and the method metadata
+     * need to be combined.
+     *
+     * @param parents The parents
+     * @param element The element
+     * @return The {@link AnnotationMetadata}
+     */
+    public AnnotationMetadata getAnnotationMetadata(List<Element> parents, Element element) {
+        return newAnnotationBuilder().buildForParents(parents, element);
+    }
+
+    /**
      * Check whether the method is annotated.
      *
      * @param declaringType The declaring type

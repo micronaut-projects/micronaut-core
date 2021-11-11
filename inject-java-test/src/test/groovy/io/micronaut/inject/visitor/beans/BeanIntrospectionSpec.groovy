@@ -2,6 +2,7 @@ package io.micronaut.inject.visitor.beans
 
 import com.blazebit.persistence.impl.function.entity.ValuesEntity
 import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
@@ -2867,6 +2868,126 @@ class Author {
         noExceptionThrown()
         beanIntrospection != null
         beanIntrospection.getBeanProperties().size() == 1
+    }
+
+    void "test annotation on setter"() {
+        when:
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
+package test;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+public class Test {
+    public String getFoo() {
+        return "bar";
+    }
+    
+    @JsonProperty
+    public void setFoo(String s) {
+    }
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 1
+        beanIntrospection.getBeanProperties()[0].annotationMetadata.hasAnnotation(JsonProperty)
+    }
+
+    void "test annotation on field"() {
+        when:
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
+package test;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+public class Test {
+    @JsonProperty
+    String foo;
+    
+    public String getFoo() {
+        return foo;
+    }
+    
+    public void setFoo(String s) {
+        this.foo = s;
+    }
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 1
+        beanIntrospection.getBeanProperties()[0].annotationMetadata.hasAnnotation(JsonProperty)
+    }
+
+    void "test getter annotation overrides setter and field"() {
+        when:
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
+package test;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+public class Test {
+    @JsonProperty("field")
+    String foo;
+    
+    @JsonProperty("getter")
+    public String getFoo() {
+        return foo;
+    }
+    
+    @JsonProperty("setter")
+    public void setFoo(String s) {
+        this.foo = s;
+    }
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 1
+        beanIntrospection.getBeanProperties()[0].annotationMetadata.getAnnotation(JsonProperty).stringValue().get() == 'getter'
+    }
+
+    void "test field annotation overrides setter"() {
+        when:
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
+package test;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+public class Test {
+    @JsonProperty("field")
+    String foo;
+    
+    public String getFoo() {
+        return foo;
+    }
+    
+    @JsonProperty("setter")
+    public void setFoo(String s) {
+        this.foo = s;
+    }
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 1
+        beanIntrospection.getBeanProperties()[0].annotationMetadata.getAnnotation(JsonProperty).stringValue().get() == 'field'
     }
 
     @Override
