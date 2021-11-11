@@ -1,5 +1,8 @@
 package io.micronaut.docs.http.server.secondary;
 
+import io.micronaut.context.annotation.Property;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
@@ -13,6 +16,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 @MicronautTest
+@Property(name = "secondary.enabled", value = StringUtils.TRUE)
 public class SecondaryServerTest {
     // tag::inject[]
     @Client(path = "/", id = SecondaryNettyServer.SERVER_ID)
@@ -27,6 +31,7 @@ public class SecondaryServerTest {
     void testCallSecondaryServer() {
         final String result = httpClient.toBlocking().retrieve("/test/secondary/server");
         Assertions.assertTrue(result.endsWith(String.valueOf(embeddedServer.getPort())));
+        Assertions.assertTrue(embeddedServer.getScheme().equalsIgnoreCase("https"));
     }
 
     @Controller("/test/secondary/server")
