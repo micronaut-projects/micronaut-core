@@ -207,18 +207,7 @@ class Test {
      */
     ApplicationContext buildContext(String className, @Language("java") String cls, boolean includeAllBeans = false) {
         def files = newJavaParser().generate(className, cls)
-        ClassLoader classLoader = new ClassLoader() {
-            @Override
-            protected Class<?> findClass(String name) throws ClassNotFoundException {
-                String fileName = name.replace('.', '/') + '.class'
-                JavaFileObject generated = files.find { it.name.endsWith(fileName) }
-                if (generated != null) {
-                    def bytes = generated.openInputStream().bytes
-                    return defineClass(name, bytes, 0, bytes.length)
-                }
-                return super.findClass(name)
-            }
-        }
+        ClassLoader classLoader = new JavaFileObjectClassLoader(files)
 
         def builder = ApplicationContext.builder()
         builder.classLoader(classLoader)
@@ -445,46 +434,10 @@ class Test {
         return (BeanConfiguration)classLoader.loadClass(packageName + '.' + BeanConfigurationWriter.CLASS_SUFFIX).newInstance()
     }
 
+    @CompileStatic
     protected ClassLoader buildClassLoader(String className, @Language("java") String cls) {
-        def files = newJavaParser().generate(className, cls)
-        ClassLoader classLoader = new ClassLoader() {
-            @Override
-            protected Class<?> findClass(String name) throws ClassNotFoundException {
-                String fileName = name.replace('.', '/') + '.class'
-                JavaFileObject generated = files.find { it.name.endsWith(fileName) }
-                if (generated != null) {
-                    def bytes = generated.openInputStream().bytes
-                    return defineClass(name, bytes, 0, bytes.length)
-                }
-                return super.findClass(name)
-            }
-
-            @Override
-            protected Enumeration<URL> findResources(String name) {
-                String fileName = "/CLASS_OUTPUT/" + name
-                JavaFileObject generated = files.find { it.name == fileName }
-                if (generated == null) {
-                    return super.findResources(name)
-                } else {
-                    URL url = new URL(null, generated.toUri().toString(), new URLStreamHandler() {
-                        @Override
-                        protected URLConnection openConnection(URL u) throws IOException {
-                            return new URLConnection(u) {
-                                @Override
-                                void connect() throws IOException {
-
-                                }
-                                InputStream getInputStream() throws IOException {
-                                    return generated.openInputStream()
-                                }
-                            }
-                        }
-                    })
-                    return Collections.enumeration(Collections.singletonList(url))
-                }
-            }
-        }
-        classLoader
+        Iterable<? extends JavaFileObject> files = newJavaParser().generate(className, cls)
+        return new JavaFileObjectClassLoader(files)
     }
 
     protected AnnotationMetadata writeAndLoadMetadata(String className, AnnotationMetadata toWrite) {
