@@ -15,31 +15,55 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
-import io.micronaut.core.annotation.AccessorsStyle;
-import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.annotation.processing.AnnotationUtils;
 import io.micronaut.annotation.processing.ModelUtils;
 import io.micronaut.annotation.processing.PublicMethodVisitor;
 import io.micronaut.annotation.processing.SuperclassAwareTypeVisitor;
+import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.inject.ast.*;
+import io.micronaut.inject.ast.ArrayableClassElement;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.ElementModifier;
+import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PackageElement;
+import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.WildcardElement;
 import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.lang.model.element.Element;
-import javax.lang.model.element.*;
+import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Modifier;
+import javax.lang.model.element.Name;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.TypeParameterElement;
+import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVariable;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -277,22 +301,12 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             Map<String, BeanPropertyData> props = new LinkedHashMap<>();
             Map<String, VariableElement> fields = new LinkedHashMap<>();
 
-            if (isRecord() || hasDeclaredAnnotation(AccessorsStyle.class)) {
+            if (isRecord()) {
                 classElement.asType().accept(new SuperclassAwareTypeVisitor<Object, Object>(visitorContext) {
-
-                    boolean noneAccessorsStyle = false;
-                    {
-                        AnnotationValue<AccessorsStyle> accessorsAnn = getDeclaredAnnotation(AccessorsStyle.class);
-                        if (accessorsAnn != null) {
-                            noneAccessorsStyle = accessorsAnn.enumValue("style", AccessorsStyle.Style.class)
-                                    .filter(style -> style.equals(AccessorsStyle.Style.NONE))
-                                    .isPresent();
-                        }
-                    }
 
                     @Override
                     protected boolean isAcceptable(Element element) {
-                        return JavaModelUtils.isRecord(element) || noneAccessorsStyle;
+                        return JavaModelUtils.isRecord(element);
                     }
 
                     @Override
@@ -301,7 +315,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         if (isAcceptable(element)) {
                             List<? extends Element> enclosedElements = element.getEnclosedElements();
                             for (Element enclosedElement : enclosedElements) {
-                                if (JavaModelUtils.isRecordComponent(enclosedElement) || enclosedElement instanceof ExecutableElement || noneAccessorsStyle) {
+                                if (JavaModelUtils.isRecordComponent(enclosedElement) || enclosedElement instanceof ExecutableElement) {
                                     if (enclosedElement.getKind() != ElementKind.CONSTRUCTOR) {
                                         accept(type, enclosedElement, o);
                                     }
@@ -336,6 +350,17 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
                 classElement.asType().accept(new PublicMethodVisitor<Object, Object>(visitorContext) {
 
+                    String[] readPrefixes = {AccessorsStyle.DEFAULT_READ_PREFIX};
+                    String[] writePrefixes = {AccessorsStyle.DEFAULT_WRITE_PREFIX};
+
+                    {
+                        AnnotationValue<AccessorsStyle> accessorsAnn = getDeclaredAnnotation(AccessorsStyle.class);
+                        if (accessorsAnn != null) {
+                            readPrefixes = accessorsAnn.stringValues("readPrefixes");
+                            writePrefixes = accessorsAnn.stringValues("writePrefixes");
+                        }
+                    }
+
                     @Override
                     protected boolean isAcceptable(javax.lang.model.element.Element element) {
                         if (element.getKind() == ElementKind.FIELD) {
@@ -350,10 +375,10 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                                     return false;
                                 }
 
-                                if (NameUtils.isGetterName(methodName) && executableElement.getParameters().isEmpty()) {
+                                if (NameUtils.isReaderName(methodName, readPrefixes) && executableElement.getParameters().isEmpty()) {
                                     return true;
                                 } else {
-                                    return NameUtils.isSetterName(methodName) && executableElement.getParameters().size() == 1;
+                                    return NameUtils.isWriterName(methodName, writePrefixes) && executableElement.getParameters().size() == 1;
                                 }
                             }
                         }
@@ -368,12 +393,11 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                             return;
                         }
 
-
                         ExecutableElement executableElement = (ExecutableElement) element;
                         String methodName = executableElement.getSimpleName().toString();
                         final TypeElement declaringTypeElement = (TypeElement) executableElement.getEnclosingElement();
 
-                        if (NameUtils.isGetterName(methodName) && executableElement.getParameters().isEmpty()) {
+                        if (NameUtils.isReaderName(methodName, readPrefixes) && executableElement.getParameters().isEmpty()) {
                             String propertyName = NameUtils.getPropertyNameForGetter(methodName);
                             TypeMirror returnType = executableElement.getReturnType();
                             ClassElement getterReturnType;
@@ -401,7 +425,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                                     beanPropertyData.setter = null; // not a compatible setter
                                 }
                             }
-                        } else if (NameUtils.isSetterName(methodName) && executableElement.getParameters().size() == 1) {
+                        } else if (NameUtils.isWriterName(methodName, writePrefixes) && executableElement.getParameters().size() == 1) {
                             String propertyName = NameUtils.getPropertyNameForSetter(methodName);
                             TypeMirror typeMirror = executableElement.getParameters().get(0).asType();
                             ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext, JavaClassElement.this.genericTypeInfo, true);
