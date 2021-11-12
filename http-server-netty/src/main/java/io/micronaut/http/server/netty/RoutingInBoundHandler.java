@@ -607,7 +607,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 final AtomicBoolean executed = new AtomicBoolean(false);
                 final AtomicLong pressureRequested = new AtomicLong(0);
                 final ConcurrentHashMap<String, UnicastProcessor> subjects = new ConcurrentHashMap<>();
-                final ConcurrentHashMap<Integer, HttpDataReference> dataReferences = new ConcurrentHashMap<>();
+                final ConcurrentHashMap<IdentityWrapper, HttpDataReference> dataReferences = new ConcurrentHashMap<>();
                 final ConversionService conversionService = ConversionService.SHARED;
                 Subscription s;
                 final LongConsumer onRequest = num -> pressureRequested.updateAndGet(p -> {
@@ -620,14 +620,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     }
                 });
 
-                Flux processFlowable(Flux flowable, Integer dataKey, boolean controlsFlow) {
+                Flux processFlowable(Flux flowable, HttpDataReference dataReference, boolean controlsFlow) {
                     if (controlsFlow) {
                         flowable = flowable.doOnRequest(onRequest);
                     }
                     return flowable
                             .doAfterTerminate(() -> {
                                 if (controlsFlow) {
-                                    HttpDataReference dataReference = dataReferences.get(dataKey);
                                     dataReference.destroy();
                                 }
                             });
@@ -660,8 +659,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 boolean chunkedProcessing = false;
 
                                 if (isPublisher) {
-                                    Integer dataKey = System.identityHashCode(data);
-                                    HttpDataReference dataReference = dataReferences.computeIfAbsent(dataKey, key -> new HttpDataReference(data));
+                                    HttpDataReference dataReference = dataReferences.computeIfAbsent(new IdentityWrapper(data), key -> new HttpDataReference(data));
                                     Argument typeVariable;
 
                                     if (StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
@@ -687,7 +685,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         dataReference.subject.getAndUpdate(subject -> {
                                             if (subject == null) {
                                                 UnicastProcessor childSubject = UnicastProcessor.create();
-                                                Flux flowable = processFlowable(childSubject, dataKey, true);
+                                                Flux flowable = processFlowable(childSubject, dataReference, true);
                                                 if (streamingFileUpload && data instanceof FileUpload) {
                                                     namedSubject.onNext(new NettyStreamingFileUpload(
                                                             (FileUpload) data,
@@ -739,7 +737,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                         (FileUpload) data,
                                                         serverConfiguration.getMultipart(),
                                                         getIoExecutor(),
-                                                        (Flux<PartData>) processFlowable(subject, dataKey, true));
+                                                        (Flux<PartData>) processFlowable(subject, dataReference, true));
                                             }
                                             return upload;
                                         });
@@ -758,7 +756,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         if (upload != null) {
                                             return upload;
                                         } else {
-                                            return processFlowable(namedSubject, dataKey, dataReference.subject.get() == null);
+                                            return processFlowable(namedSubject, dataReference, dataReference.subject.get() == null);
                                         }
                                     };
 
