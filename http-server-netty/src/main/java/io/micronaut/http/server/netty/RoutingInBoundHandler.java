@@ -781,7 +781,14 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 if (!executed) {
                                     String argumentName = argument.getName();
                                     if (!routeMatch.isSatisfied(argumentName)) {
-                                        routeMatch = routeMatch.fulfill(Collections.singletonMap(argumentName, value.get()));
+                                        Object fulfillParamter = value.get();
+                                        routeMatch = routeMatch.fulfill(Collections.singletonMap(argumentName, fulfillParamter));
+                                        // we need to release the data here. However, if the route argument is a
+                                        // ByteBuffer, we need to retain the data until the route is executed. Adding
+                                        // the data to the request ensures it is cleaned up after the route completes.
+                                        if (!alwaysAddContent && fulfillParamter instanceof ByteBufHolder) {
+                                            request.addContent((ByteBufHolder) fulfillParamter);
+                                        }
                                     }
                                     if (isPublisher && chunkedProcessing) {
                                         //accounting for the previous request
