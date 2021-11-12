@@ -25,10 +25,10 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Annotate a class (typically a Java Bean) to make it explicit the style of its accessors when not using the standard
- * getter/setters. This is helpful for example when using Lombok and it creates fluent accessors.
+ * getter/setters. This is necessary, for example when using Lombok fluent accessors:
  *
  * <pre class="code">
- * &#064;AccessorsStyle(AccessorsStyle.Style.NONE)
+ * &#064;AccessorsStyle(readPrefixes = {""}, writePrefixes = {""})
  * &#064;Accessors(fluent = true)
  * &#064;Getter
  * &#064;Setter
@@ -42,10 +42,10 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *         this.age = age;
  *     }
  * }</pre>
- *
+ * <p>
  * Give the previous class, Lombok will generate getters and setter: {@code name()}, {@code age()}, {@code name(String)}
- * and {@code age(int)}. Using {@code AnnotationStyle(AccessorsStyle.Style.NONE)} Micronaut is aware that the style of the
- * getters/setters is not the standard and can find them and expose when using other modules like Micronaut OpenAPI.
+ * and {@code age(int)}. Defining the {@code readPrefixes} and {@code writePrefixes} as empty strings makes Micronaut
+ * aware of them.
  *
  * @author Iván López
  * @since 3.2.0
@@ -58,22 +58,22 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 public @interface AccessorsStyle {
 
     /**
-     * @return The accessors style.
+     * The default read prefix.
      */
-    Style style() default Style.GETTER_SETTER;
+    String DEFAULT_READ_PREFIX = "get";
 
     /**
-     * The accessors style.
+     * The default write prefix.
      */
-    enum Style {
-        /**
-         * Standard getters and setters.
-         */
-        GETTER_SETTER,
+    String DEFAULT_WRITE_PREFIX = "set";
 
-        /**
-         * No prefix defined for getters and setters, just the property name.
-         */
-        NONE
-    }
+    /**
+     * @return The valid read prefixes.
+     */
+    String[] readPrefixes() default {DEFAULT_READ_PREFIX};
+
+    /**
+     * @return The valid write prefixes.
+     */
+    String[] writePrefixes() default {DEFAULT_WRITE_PREFIX};
 }
