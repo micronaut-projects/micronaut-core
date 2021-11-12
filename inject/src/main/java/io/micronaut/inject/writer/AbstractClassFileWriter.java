@@ -338,10 +338,13 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         generatorAdapter.push(getTypeReference(objectType));
         // 2nd argument: the name
         generatorAdapter.push(argumentName);
-
-        if (objectType instanceof GenericPlaceholderElement) {
-            GenericPlaceholderElement gpe = (GenericPlaceholderElement) objectType;
-            String variableName = gpe.getVariableName();
+        boolean isTypeVariable = objectType instanceof GenericPlaceholderElement || objectType.isTypeVariable();
+        if (isTypeVariable) {
+            String variableName = argumentName;
+            if (objectType instanceof GenericPlaceholderElement) {
+                GenericPlaceholderElement gpe = (GenericPlaceholderElement) objectType;
+                variableName = gpe.getVariableName();
+            }
             boolean hasVariable = !variableName.equals(argumentName);
             if (hasVariable) {
                 generatorAdapter.push(variableName);
@@ -607,9 +610,10 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
         boolean hasAnnotations = !annotationMetadata.isEmpty() && annotationMetadata instanceof DefaultAnnotationMetadata;
         boolean hasTypeArguments = typeArguments != null && !typeArguments.isEmpty();
-        boolean isTypeVariable = typedElement instanceof GenericPlaceholderElement;
+        boolean isGenericPlaceholder = typedElement instanceof GenericPlaceholderElement;
+        boolean isTypeVariable = isGenericPlaceholder || ((typedElement instanceof ClassElement) && ((ClassElement) typedElement).isTypeVariable());
         String variableName = argumentName;
-        if (isTypeVariable) {
+        if (isGenericPlaceholder) {
             variableName = ((GenericPlaceholderElement) typedElement).getVariableName();
         }
         boolean hasVariableName = !variableName.equals(argumentName);
