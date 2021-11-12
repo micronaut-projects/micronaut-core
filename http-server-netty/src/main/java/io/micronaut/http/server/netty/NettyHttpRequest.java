@@ -94,7 +94,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private MutableConvertibleValues<Object> attributes;
     private NettyCookies nettyCookies;
     private List<ByteBufHolder> receivedContent = new ArrayList<>();
-    private Map<Integer, AbstractHttpData> receivedData = new LinkedHashMap<>();
+    private Map<IdentityWrapper, AbstractHttpData> receivedData = new LinkedHashMap<>();
 
     private Supplier<Optional<T>> body;
     private RouteMatch<?> matchedRoute;
@@ -345,7 +345,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     @Internal
     public void addContent(ByteBufHolder httpContent) {
         if (httpContent instanceof AbstractHttpData) {
-            receivedData.computeIfAbsent(System.identityHashCode(httpContent), key -> {
+            receivedData.computeIfAbsent(new IdentityWrapper(httpContent), key -> {
                 httpContent.retain();
                 return (AbstractHttpData) httpContent;
             });
