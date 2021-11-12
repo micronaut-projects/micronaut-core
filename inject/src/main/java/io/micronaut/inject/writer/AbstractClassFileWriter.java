@@ -29,11 +29,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.ast.*;
 import io.micronaut.inject.processing.JavaModelUtils;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassVisitor;
@@ -102,6 +98,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                     Argument.class,
                     "ofTypeVariable",
                     Class.class,
+                    String.class,
                     String.class
             )
     );
@@ -120,6 +117,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                     Argument.class,
                     "ofTypeVariable",
                     Class.class,
+                    String.class,
                     String.class,
                     AnnotationMetadata.class,
                     Argument[].class
@@ -318,12 +316,23 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         // 2nd argument: the name
         generatorAdapter.push(argumentName);
 
-        // Argument.create( .. )
-        invokeInterfaceStaticMethod(
-                generatorAdapter,
-                Argument.class,
-                objectType.isTypeVariable() ? METHOD_CREATE_TYPE_VARIABLE_SIMPLE : METHOD_CREATE_ARGUMENT_SIMPLE
-        );
+        if (objectType instanceof GenericPlaceholderElement) {
+            GenericPlaceholderElement gpe = (GenericPlaceholderElement) objectType;
+            generatorAdapter.push(gpe.getVariableName());
+            // Argument.create( .. )
+            invokeInterfaceStaticMethod(
+                    generatorAdapter,
+                    Argument.class,
+                    METHOD_CREATE_TYPE_VARIABLE_SIMPLE
+            );
+        } else {
+            // Argument.create( .. )
+            invokeInterfaceStaticMethod(
+                    generatorAdapter,
+                    Argument.class,
+                    METHOD_CREATE_ARGUMENT_SIMPLE
+            );
+        }
     }
 
     /**
@@ -571,14 +580,23 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
         boolean hasAnnotations = !annotationMetadata.isEmpty() && annotationMetadata instanceof DefaultAnnotationMetadata;
         boolean hasTypeArguments = typeArguments != null && !typeArguments.isEmpty();
+        boolean isTypeVariable = typedElement instanceof GenericPlaceholderElement;
+        String variableName = argumentName;
+        if (isTypeVariable) {
+            variableName = ((GenericPlaceholderElement) typedElement).getVariableName();
+        }
 
-        if (!hasAnnotations && !hasTypeArguments) {
+        if (!hasAnnotations && !hasTypeArguments && !isTypeVariable) {
             invokeInterfaceStaticMethod(
                     generatorAdapter,
                     Argument.class,
                     METHOD_CREATE_ARGUMENT_SIMPLE
             );
             return;
+        }
+
+        if (isTypeVariable) {
+            generatorAdapter.push(variableName);
         }
 
         // 3rd argument: The annotation metadata
@@ -610,16 +628,12 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             generatorAdapter.visitInsn(ACONST_NULL);
         }
 
-        boolean typeVariable = false;
-        if (typedElement instanceof ClassElement) {
-            typeVariable = ((ClassElement) typedElement).isTypeVariable();
-        }
 
         // Argument.create( .. )
         invokeInterfaceStaticMethod(
                 generatorAdapter,
                 Argument.class,
-                typeVariable ? METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
+                isTypeVariable ? METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
         );
     }
 
