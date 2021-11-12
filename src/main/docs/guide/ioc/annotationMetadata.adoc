@@ -61,7 +61,7 @@ snippet::io.micronaut.docs.inject.anninheritance.SqlRepository[tags="imports, cl
 
 With this meta-annotation in place you can add the annotation to a super class:
 
-snippet::io.micronaut.docs.inject.anninheritance.BaseSqlRepository[tags="imports, class", indent=0, title="Using Inherited Meta Annotations on a Super Class"]
+snippet::io.micronaut.docs.inject.anninheritance.BaseSqlRepository[tags="class", indent=0, title="Using Inherited Meta Annotations on a Super Class"]
 
 And then a subclass will inherit all the annotations:
 

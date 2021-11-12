@@ -504,7 +504,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             final boolean isBindError = e instanceof BindException;
             if (LOG.isErrorEnabled()) {
                 if (isBindError) {
-                    LOG.error("Unable to start server. Port already {} in use.", port);
+                    LOG.error("Unable to start server. Port {} already in use.", port);
                 } else {
                     LOG.error("Error starting Micronaut server: " + e.getMessage(), e);
                 }

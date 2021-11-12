@@ -29,8 +29,11 @@ interface HeadlineClient {
 
     @Get(value = "/headlines", processes = [APPLICATION_JSON_STREAM]) // <1>
     fun streamHeadlines(): Flux<Headline>  // <2>
-    // end::class[]
+// end::class[]
 
     @Get(value = "/headlines", processes = [APPLICATION_JSON_STREAM]) // <1>
     fun streamFlux(): Flux<Headline>
+
+// tag::endclass[]
 }
+// end::endclass[]

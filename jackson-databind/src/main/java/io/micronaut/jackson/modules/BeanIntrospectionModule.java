@@ -25,6 +25,8 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.SerializableString;
 import com.fasterxml.jackson.core.io.SerializedString;
 import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerBuilder;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
 import com.fasterxml.jackson.databind.deser.CreatorProperty;
@@ -47,6 +49,7 @@ import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.databind.util.SimpleBeanPropertyDefinition;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
@@ -166,6 +169,28 @@ public class BeanIntrospectionModule extends SimpleModule {
     }
 
     /**
+     * Parse a {@link JsonSerialize} or {@link JsonDeserialize} annotation.
+     */
+    private <T> T findSerializerFromAnnotation(BeanProperty<?, ?> beanProperty, Class<? extends Annotation> annotationType) {
+        AnnotationValue<?> jsonSerializeAnnotation = beanProperty.getAnnotation(annotationType);
+        if (jsonSerializeAnnotation != null) {
+            // ideally, we'd use SerializerProvider here, but it's not exposed to the BeanSerializerModifier
+            Class using = jsonSerializeAnnotation.classValue("using").orElse(null);
+            if (using != null) {
+                BeanIntrospection<Object> usingIntrospection = findIntrospection(using);
+                if (usingIntrospection != null) {
+                    return (T) usingIntrospection.instantiate();
+                } else {
+                    if (LOG.isWarnEnabled()) {
+                        LOG.warn("Cannot construct {}, please add the @Introspected annotation to the class declaration", using.getName());
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
      * Modifies bean serialization.
      */
     private class BeanIntrospectionSerializerModifier extends BeanSerializerModifier {
@@ -231,7 +256,10 @@ public class BeanIntrospectionModule extends SimpleModule {
                                 config,
                                 propertyName,
                                 beanProperty,
-                                config.getTypeFactory()
+                                config.getTypeFactory(),
+                                findSerializerFromAnnotation(beanProperty, JsonSerialize.class)
+                                // would be nice to add the TypeSerializer here too, but we don't have access to the
+                                // SerializerFactory for findPropertyTypeSerializer
                         );
 
                         newProperties.add(writer);
@@ -327,32 +355,51 @@ public class BeanIntrospectionModule extends SimpleModule {
                 return builder;
             } else {
                 final Iterator<SettableBeanProperty> properties = builder.getProperties();
-                if (!properties.hasNext() && introspection.getPropertyNames().length > 0) {
+                if ((ignoreReflectiveProperties || !properties.hasNext()) && introspection.getPropertyNames().length > 0) {
                     // mismatch, probably GraalVM reflection not enabled for bean. Try recreate
                     for (BeanProperty<Object, Object> beanProperty : introspection.getBeanProperties()) {
-                        builder.addOrReplaceProperty(new VirtualSetter(
-                                beanDesc.getClassInfo(),
-                                config.getTypeFactory(),
-                                beanProperty),
-                            true);
+                        if (!beanProperty.isReadOnly()) {
+                            builder.addOrReplaceProperty(new VirtualSetter(
+                                            beanDesc.getClassInfo(),
+                                            config.getTypeFactory(),
+                                            beanProperty,
+                                            findSerializerFromAnnotation(beanProperty, JsonDeserialize.class)),
+                                    true);
+                        }
                     }
                 } else {
+                    Map<String, BeanProperty<Object, Object>> remainingProperties = new LinkedHashMap<>();
+                    for (BeanProperty<Object, Object> beanProperty : introspection.getBeanProperties()) {
+                        remainingProperties.put(beanProperty.getName(), beanProperty);
+                    }
                     while (properties.hasNext()) {
                         final SettableBeanProperty settableBeanProperty = properties.next();
                         if (settableBeanProperty instanceof MethodProperty) {
                             MethodProperty methodProperty = (MethodProperty) settableBeanProperty;
-                            final Optional<BeanProperty<Object, Object>> beanProperty =
-                                    introspection.getProperty(settableBeanProperty.getName());
+                            final BeanProperty<Object, Object> beanProperty =
+                                    remainingProperties.remove(settableBeanProperty.getName());
 
-                            if (beanProperty.isPresent()) {
-                                BeanProperty<Object, Object> bp = beanProperty.get();
-                                if (!bp.isReadOnly()) {
-                                    SettableBeanProperty newProperty = new BeanIntrospectionSetter(
-                                            methodProperty,
-                                            bp
-                                    );
-                                    builder.addOrReplaceProperty(newProperty, true);
-                                }
+                            if (beanProperty != null && !beanProperty.isReadOnly()) {
+                                SettableBeanProperty newProperty = new BeanIntrospectionSetter(
+                                        methodProperty,
+                                        beanProperty
+                                );
+                                builder.addOrReplaceProperty(newProperty, true);
+                            }
+                        }
+                    }
+                    // add any remaining properties. This can happen if the supertype has reflection-visible properties
+                    // so `properties` isn't empty, but the subtype doesn't have reflection enabled.
+                    for (Map.Entry<String, BeanProperty<Object, Object>> entry : remainingProperties.entrySet()) {
+                        if (!entry.getValue().isReadOnly()) {
+                            SettableBeanProperty existing = builder.findProperty(PropertyName.construct(entry.getKey()));
+                            if (existing == null) {
+                                builder.addOrReplaceProperty(new VirtualSetter(
+                                                beanDesc.getClassInfo(),
+                                                config.getTypeFactory(),
+                                                entry.getValue(),
+                                                findSerializerFromAnnotation(entry.getValue(), JsonDeserialize.class)),
+                                        true);
                             }
                         }
                     }
@@ -580,11 +627,11 @@ public class BeanIntrospectionModule extends SimpleModule {
         final BeanProperty beanProperty;
         final TypeResolutionContext typeResolutionContext;
 
-        VirtualSetter(TypeResolutionContext typeResolutionContext, TypeFactory typeFactory, BeanProperty beanProperty) {
+        VirtualSetter(TypeResolutionContext typeResolutionContext, TypeFactory typeFactory, BeanProperty beanProperty, JsonDeserializer<Object> valueDeser) {
             super(
                     new PropertyName(beanProperty.getName()),
                     newType(beanProperty.asArgument(), typeFactory),
-                    newPropertyMetadata(beanProperty.asArgument(), beanProperty.getAnnotationMetadata()), null);
+                    newPropertyMetadata(beanProperty.asArgument(), beanProperty.getAnnotationMetadata()), valueDeser);
             this.beanProperty = beanProperty;
             this.typeResolutionContext = typeResolutionContext;
         }
@@ -703,12 +750,13 @@ public class BeanIntrospectionModule extends SimpleModule {
                 SerializationConfig config,
                 String name,
                 BeanProperty<Object, Object> introspection,
-                TypeFactory typeFactory) {
+                TypeFactory typeFactory,
+                JsonSerializer<?> ser) {
             super(
                     SimpleBeanPropertyDefinition.construct(config, virtualMember),
                     virtualMember,
                     AnnotationCollector.emptyAnnotations(),
-                    null, null, null, null,
+                    null, ser, null, null,
                     suppressNulls(config.getDefaultPropertyInclusion()),
                     suppressableValue(config.getDefaultPropertyInclusion()),
                     null

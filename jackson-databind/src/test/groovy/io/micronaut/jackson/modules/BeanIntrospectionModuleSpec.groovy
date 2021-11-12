@@ -8,12 +8,22 @@ import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonUnwrapped
 import com.fasterxml.jackson.annotation.JsonView
+import com.fasterxml.jackson.core.JsonGenerator
+import com.fasterxml.jackson.core.JsonParser
+import com.fasterxml.jackson.core.JsonProcessingException
+import com.fasterxml.jackson.databind.DeserializationContext
+import com.fasterxml.jackson.databind.JsonDeserializer
+import com.fasterxml.jackson.databind.JsonSerializer
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
+import com.fasterxml.jackson.databind.SerializerProvider
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.fasterxml.jackson.databind.annotation.JsonNaming
+import com.fasterxml.jackson.databind.annotation.JsonSerialize
 import groovy.transform.EqualsAndHashCode
 import groovy.transform.PackageScope
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.Creator
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.hateoas.Link
@@ -474,6 +484,64 @@ class BeanIntrospectionModuleSpec extends Specification {
         objectMapper.readValue('{"bar":"baz"}', JsonPropertyOnSetter.class).foo == 'baz'
         objectMapper.writeValueAsString(new JsonPropertyOnSetter(foo: 'baz')) == '{"bar":"baz"}'
 
+        cleanup:
+        ctx.close()
+
+        where:
+        ignoreReflectiveProperties << [true, false]
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/6309")
+    void "@JsonSerialize annotation"() {
+      given:
+      ApplicationContext ctx = ApplicationContext.run()
+      ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
+      ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+      expect:
+      objectMapper.readValue('{"foo":"Bar"}', JsonSerializeAnnotated.class).foo == 'bar'
+      objectMapper.writeValueAsString(new JsonSerializeAnnotated(foo: 'Bar')) == '{"foo":"BAR"}'
+
+      cleanup:
+      ctx.close()
+
+      where:
+      ignoreReflectiveProperties << [true, false]
+
+    }
+
+    void "creator property that doesn't have a getter"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        expect:
+        objectMapper.writeValueAsString(new DifferentCreator('baz')) == '{"fooBar":"baz"}'
+        objectMapper.readValue('{"foo_bar":"baz"}', DifferentCreator).fooBar == 'baz'
+        // this is currently broken with ignoreReflectiveProperties
+        ignoreReflectiveProperties || objectMapper.readValue('{"fooBar":"baz"}', DifferentCreator).fooBar == 'baz'
+
+        cleanup:
+        ctx.close()
+
+        where:
+        ignoreReflectiveProperties << [true, false]
+    }
+
+    void "introspection creator property that doesn't have a getter"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        expect:
+        objectMapper.writeValueAsString(new IntrospectionCreator('baz')) == '{"label":"BAZ"}'
+        objectMapper.readValue('{"name":"baz","label":"foo"}', IntrospectionCreator).name == 'baz'
+
+        cleanup:
+        ctx.close()
+
         where:
         ignoreReflectiveProperties << [true, false]
     }
@@ -713,6 +781,57 @@ class BeanIntrospectionModuleSpec extends Specification {
         @JsonProperty("bar")
         public void setFoo(String foo) {
             this.foo = foo
+        }
+    }
+
+    @Introspected
+    static class JsonSerializeAnnotated {
+        @JsonSerialize(using = UpperCaseSerializer)
+        @JsonDeserialize(using = LowerCaseDeserializer)
+        String foo
+
+        @Introspected
+        static class UpperCaseSerializer extends JsonSerializer<String> {
+            @Override
+            void serialize(String value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+                gen.writeString(value.toUpperCase(Locale.ENGLISH))
+            }
+        }
+
+        @Introspected
+        static class LowerCaseDeserializer extends JsonDeserializer<String> {
+            @Override
+            String deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JsonProcessingException {
+                return p.valueAsString.toLowerCase(Locale.ENGLISH)
+            }
+        }
+    }
+
+    @Introspected
+    static class DifferentCreator {
+        private final String fooBar;
+
+        @JsonCreator
+        public DifferentCreator(@JsonProperty('foo_bar') String fooBar) {
+            this.fooBar = fooBar
+        }
+
+        public String getFooBar() {
+            return fooBar;
+        }
+    }
+
+    @Introspected
+    static class IntrospectionCreator {
+        private final String name
+
+        @Creator
+        public IntrospectionCreator(String name) {
+            this.name = name
+        }
+
+        public String getLabel() {
+            name.toUpperCase()
         }
     }
 }

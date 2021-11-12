@@ -115,8 +115,8 @@ class ReactorHttpServerFilter : HttpServerFilter {
         }
     }
 
+    override fun getOrder(): Int = 1
 }
-
 // end::simplefilter[]
 
 @Requires(property = "mdc.reactortestpropagation.enabled")
@@ -126,11 +126,13 @@ class SuspendHttpServerFilter : CoroutineHttpServerFilter {
 
     override suspend fun filter(request: HttpRequest<*>, chain: ServerFilterChain): MutableHttpResponse<*> {
         val trackingId = request.headers["X-TrackingId"] as String
+        //withContext does not merge the current context so data may be lost
         return withContext(Context.of("suspendTrackingId", trackingId).asCoroutineContext()) {
             chain.next(request)
         }
     }
 
+    override fun getOrder(): Int = 0
 }
 
 interface CoroutineHttpServerFilter : HttpServerFilter {

@@ -57,7 +57,6 @@ import java.util.stream.Collectors;
  */
 public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<Element, AnnotationMirror> {
 
-    private static final Map<String, Map<Element, javax.lang.model.element.AnnotationValue>> ANNOTATION_DEFAULTS = new HashMap<>();
     private static final Map<ExecutableElement, List<ExecutableElement>> OVERRIDDEN_METHOD_CACHE = new ConcurrentLinkedHashMap.Builder<ExecutableElement, List<ExecutableElement>>().maximumWeightedCapacity(100).build();
 
     private final Elements elementUtils;
@@ -409,31 +408,23 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Override
     protected Map<? extends Element, ?> readAnnotationDefaultValues(String annotationTypeName, Element element) {
-        Map<String, Map<Element, AnnotationValue>> defaults = JavaAnnotationMetadataBuilder.ANNOTATION_DEFAULTS;
+        Map<Element, AnnotationValue> defaultValues = new LinkedHashMap<>();
         if (element instanceof TypeElement) {
             TypeElement annotationElement = (TypeElement) element;
-            String annotationName = annotationElement.getQualifiedName().toString();
-            if (!defaults.containsKey(annotationName)) {
-
-                Map<Element, AnnotationValue> defaultValues = new LinkedHashMap<>();
-                final List<? extends Element> allMembers = elementUtils.getAllMembers(annotationElement);
-
-                allMembers
-                        .stream()
-                        .filter(member -> member.getEnclosingElement().equals(annotationElement))
-                        .filter(ExecutableElement.class::isInstance)
-                        .map(ExecutableElement.class::cast)
-                        .filter(this::isValidDefaultValue)
-                        .forEach(executableElement -> {
-                                    final AnnotationValue defaultValue = executableElement.getDefaultValue();
-                                    defaultValues.put(executableElement, defaultValue);
-                                }
-                        );
-
-                defaults.put(annotationName, defaultValues);
-            }
+            final List<? extends Element> allMembers = elementUtils.getAllMembers(annotationElement);
+            allMembers
+                    .stream()
+                    .filter(member -> member.getEnclosingElement().equals(annotationElement))
+                    .filter(ExecutableElement.class::isInstance)
+                    .map(ExecutableElement.class::cast)
+                    .filter(this::isValidDefaultValue)
+                    .forEach(executableElement -> {
+                                final AnnotationValue defaultValue = executableElement.getDefaultValue();
+                                defaultValues.put(executableElement, defaultValue);
+                            }
+                    );
         }
-        return ANNOTATION_DEFAULTS.get(annotationTypeName);
+        return defaultValues;
     }
 
     private boolean isValidDefaultValue(ExecutableElement executableElement) {

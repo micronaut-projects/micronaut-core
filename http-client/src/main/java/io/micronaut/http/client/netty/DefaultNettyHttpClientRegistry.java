@@ -49,9 +49,9 @@ import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.client.sse.SseClientRegistry;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
-import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpClientFilterResolver;
-import io.micronaut.http.filter.HttpFilterResolver;
+import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
+import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupFactory;
@@ -72,11 +72,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ThreadFactory;
 
 /**
@@ -94,7 +96,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         SseClientRegistry<SseClient>,
         StreamingHttpClientRegistry<StreamingHttpClient>,
         WebSocketClientRegistry<WebSocketClient>,
-        ProxyHttpClientRegistry<ProxyHttpClient> {
+        ProxyHttpClientRegistry<ProxyHttpClient>,
+        ChannelPipelineCustomizer {
     private static final Logger LOG = LoggerFactory.getLogger(DefaultNettyHttpClientRegistry.class);
     private final Map<ClientKey, DefaultHttpClient> clients = new ConcurrentHashMap<>(10);
     private final LoadBalancerResolver loadBalancerResolver;
@@ -107,6 +110,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     private final List<InvocationInstrumenterFactory> invocationInstrumenterFactories;
     private final EventLoopGroupFactory eventLoopGroupFactory;
     private final HttpClientFilterResolver<ClientFilterResolutionContext> clientFilterResolver;
+    private final Collection<ChannelPipelineListener> pipelineListeners = new CopyOnWriteArrayList<>();
 
     /**
      * Default constructor.
@@ -281,6 +285,17 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
 
+    @Override
+    public boolean isClientChannel() {
+        return true;
+    }
+
+    @Override
+    public void doOnConnect(@NonNull ChannelPipelineListener listener) {
+        Objects.requireNonNull(listener, "listener");
+        pipelineListeners.add(listener);
+    }
+
     private DefaultHttpClient getClient(ClientKey key, BeanContext beanContext, AnnotationMetadata annotationMetadata) {
         return clients.computeIfAbsent(key, clientKey -> {
             DefaultHttpClient clientBean = null;
@@ -382,8 +397,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 contextPath,
                 clientFilterResolver,
                 clientFilterResolver.resolveFilterEntries(new ClientFilterResolutionContext(
-                    clientIdentifiers,
-                    annotationMetadata
+                        clientIdentifiers,
+                        annotationMetadata
                 )),
                 threadFactory,
                 nettyClientSslBuilder,
@@ -394,6 +409,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 ),
                 eventLoopGroup,
                 resolveSocketChannelFactory(configuration, beanContext),
+                pipelineListeners,
                 invocationInstrumenterFactories
         );
     }
@@ -416,30 +432,17 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             @Nullable HttpClientConfiguration configuration,
             @NonNull BeanContext beanContext) {
         if (loadBalancer != null) {
-            // direct creation via createBean
-            List<HttpFilterResolver.FilterEntry<HttpClientFilter>> filterEntries = clientFilterResolver
-                    .resolveFilterEntries(new ClientFilterResolutionContext(null, AnnotationMetadata.EMPTY_METADATA));
             if (configuration == null) {
                 configuration = defaultHttpClientConfiguration;
             }
-            EventLoopGroup eventLoopGroup = resolveEventLoopGroup(configuration, beanContext);
-            return new DefaultHttpClient(
+            return buildClient(
                     loadBalancer,
                     null,
                     configuration,
+                    null,
                     loadBalancer.getContextPath().orElse(null),
-                    clientFilterResolver,
-                    filterEntries,
-                    threadFactory,
-                    nettyClientSslBuilder,
-                    codecRegistry,
-                    WebSocketBeanRegistry.forClient(beanContext),
-                    beanContext.findBean(RequestBinderRegistry.class).orElseGet(() ->
-                            new DefaultRequestBinderRegistry(ConversionService.SHARED)
-                    ),
-                    eventLoopGroup,
-                    resolveSocketChannelFactory(configuration, beanContext),
-                    invocationInstrumenterFactories
+                    beanContext,
+                    AnnotationMetadata.EMPTY_METADATA
             );
         } else {
             return getClient(injectionPoint != null ? injectionPoint.getAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA);
