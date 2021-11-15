@@ -74,7 +74,7 @@ import static javax.lang.model.element.ElementKind.*;
  * @since 1.0
  */
 @Internal
-@SupportedOptions({AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_INCREMENTAL, AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_ANNOTATIONS})
+@SupportedOptions({AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_INCREMENTAL, AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_ANNOTATIONS, BeanDefinitionWriter.OMIT_CONFPROP_INJECTION_POINTS})
 public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProcessor {
 
     private static final String AROUND_TYPE = AnnotationUtil.ANN_AROUND;

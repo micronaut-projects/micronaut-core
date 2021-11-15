@@ -104,6 +104,7 @@ subprojects { Project subproject ->
     tasks.withType(JavaCompile).configureEach {
        options.compilerArgs.add("-Amicronaut.processing.group=$project.group")
        options.compilerArgs.add("-Amicronaut.processing.module=micronaut-$project.name")
+       options.compilerArgs.add("-Amicronaut.processing.omit.confprop.injectpoints=true")
        options.forkOptions.memoryMaximumSize = "2g"
     }
     tasks.withType(GroovyCompile).configureEach {
