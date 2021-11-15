@@ -100,6 +100,7 @@ import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslHandshakeCompletionEvent;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateHandler;
@@ -863,7 +864,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             int port = ch.localAddress().getPort();
             boolean ssl = sslContext != null && sslConfiguration != null && port == serverPort;
             if (ssl) {
-                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslContext.newHandler(ch.alloc()));
+                SslHandler sslHandler = sslContext.newHandler(ch.alloc());
+                sslHandler.setHandshakeTimeoutMillis(sslConfiguration.getHandshakeTimeout().toMillis());
+                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler);
             }
 
             if (loggingHandler != null) {

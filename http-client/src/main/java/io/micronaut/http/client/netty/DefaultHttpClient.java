@@ -3146,11 +3146,8 @@ public class DefaultHttpClient implements
                 });
 
                 if (sslContext != null) {
-                    SslHandler sslHandler = sslContext.newHandler(
-                            ch.alloc(),
-                            host,
-                            port
-                    );
+                    SslHandler sslHandler = sslContext.newHandler(ch.alloc(), host, port);
+                    sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
                     p.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler);
                 }
 

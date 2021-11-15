@@ -15,9 +15,12 @@
  */
 package io.micronaut.http.ssl;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 
+import java.time.Duration;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -66,6 +69,7 @@ public class SslConfiguration implements Toggleable {
     private String[] ciphers;
     private String[] protocols;
     private String protocol = DEFAULT_PROTOCOL;
+    private Duration handshakeTimeout = Duration.ofSeconds(10);
 
     /**
      * @return Whether SSL is enabled.
@@ -145,6 +149,14 @@ public class SslConfiguration implements Toggleable {
      */
     public Optional<String> getProtocol() {
         return Optional.ofNullable(protocol);
+    }
+
+    /**
+     * @return The timeout for the SSL handshake
+     */
+    @NonNull
+    public Duration getHandshakeTimeout() {
+        return handshakeTimeout;
     }
 
     /**
@@ -234,6 +246,13 @@ public class SslConfiguration implements Toggleable {
     }
 
     /**
+     * @param handshakeTimeout The timeout for the SSL handshake
+     */
+    public void setHandshakeTimeout(@NonNull Duration handshakeTimeout) {
+        this.handshakeTimeout = Objects.requireNonNull(handshakeTimeout, "handshakeTimeout");
+    }
+
+    /**
      * Reads an existing config.
      *
      * @param defaultSslConfiguration The default SSL config
@@ -263,6 +282,7 @@ public class SslConfiguration implements Toggleable {
             defaultSslConfiguration.getProtocol().ifPresent(protocol -> this.protocol = protocol);
             defaultSslConfiguration.getCiphers().ifPresent(ciphers -> this.ciphers = ciphers);
             defaultSslConfiguration.getClientAuthentication().ifPresent(ca -> this.clientAuthentication = ca);
+            this.handshakeTimeout = defaultSslConfiguration.getHandshakeTimeout();
         }
     }
 
