@@ -34,6 +34,7 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.processing.JavaModelUtils;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassVisitor;
@@ -97,6 +98,15 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                     String.class
             )
     );
+    protected static final Method METHOD_GENERIC_PLACEHOLDER_SIMPLE = Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(
+                    Argument.class,
+                    "ofTypeVariable",
+                    Class.class,
+                    String.class,
+                    String.class
+            )
+    );
     protected static final Method METHOD_CREATE_TYPE_VARIABLE_SIMPLE = Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(
                     Argument.class,
@@ -120,6 +130,17 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                     Argument.class,
                     "ofTypeVariable",
                     Class.class,
+                    String.class,
+                    AnnotationMetadata.class,
+                    Argument[].class
+            )
+    );
+    private static final Method METHOD_CREATE_GENERIC_PLACEHOLDER_WITH_ANNOTATION_METADATA_GENERICS = Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(
+                    Argument.class,
+                    "ofTypeVariable",
+                    Class.class,
+                    String.class,
                     String.class,
                     AnnotationMetadata.class,
                     Argument[].class
@@ -317,13 +338,31 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         generatorAdapter.push(getTypeReference(objectType));
         // 2nd argument: the name
         generatorAdapter.push(argumentName);
-
-        // Argument.create( .. )
-        invokeInterfaceStaticMethod(
-                generatorAdapter,
-                Argument.class,
-                objectType.isTypeVariable() ? METHOD_CREATE_TYPE_VARIABLE_SIMPLE : METHOD_CREATE_ARGUMENT_SIMPLE
-        );
+        boolean isTypeVariable = objectType instanceof GenericPlaceholderElement || objectType.isTypeVariable();
+        if (isTypeVariable) {
+            String variableName = argumentName;
+            if (objectType instanceof GenericPlaceholderElement) {
+                GenericPlaceholderElement gpe = (GenericPlaceholderElement) objectType;
+                variableName = gpe.getVariableName();
+            }
+            boolean hasVariable = !variableName.equals(argumentName);
+            if (hasVariable) {
+                generatorAdapter.push(variableName);
+            }
+            // Argument.create( .. )
+            invokeInterfaceStaticMethod(
+                    generatorAdapter,
+                    Argument.class,
+                    hasVariable ? METHOD_GENERIC_PLACEHOLDER_SIMPLE : METHOD_CREATE_TYPE_VARIABLE_SIMPLE
+            );
+        } else {
+            // Argument.create( .. )
+            invokeInterfaceStaticMethod(
+                    generatorAdapter,
+                    Argument.class,
+                    METHOD_CREATE_ARGUMENT_SIMPLE
+            );
+        }
     }
 
     /**
@@ -571,14 +610,25 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
         boolean hasAnnotations = !annotationMetadata.isEmpty() && annotationMetadata instanceof DefaultAnnotationMetadata;
         boolean hasTypeArguments = typeArguments != null && !typeArguments.isEmpty();
+        boolean isGenericPlaceholder = typedElement instanceof GenericPlaceholderElement;
+        boolean isTypeVariable = isGenericPlaceholder || ((typedElement instanceof ClassElement) && ((ClassElement) typedElement).isTypeVariable());
+        String variableName = argumentName;
+        if (isGenericPlaceholder) {
+            variableName = ((GenericPlaceholderElement) typedElement).getVariableName();
+        }
+        boolean hasVariableName = !variableName.equals(argumentName);
 
-        if (!hasAnnotations && !hasTypeArguments) {
+        if (!hasAnnotations && !hasTypeArguments && !isTypeVariable) {
             invokeInterfaceStaticMethod(
                     generatorAdapter,
                     Argument.class,
                     METHOD_CREATE_ARGUMENT_SIMPLE
             );
             return;
+        }
+
+        if (isTypeVariable && hasVariableName) {
+            generatorAdapter.push(variableName);
         }
 
         // 3rd argument: The annotation metadata
@@ -610,17 +660,22 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             generatorAdapter.visitInsn(ACONST_NULL);
         }
 
-        boolean typeVariable = false;
-        if (typedElement instanceof ClassElement) {
-            typeVariable = ((ClassElement) typedElement).isTypeVariable();
-        }
+        if (isTypeVariable) {
+            // Argument.create( .. )
+            invokeInterfaceStaticMethod(
+                    generatorAdapter,
+                    Argument.class,
+                    hasVariableName ? METHOD_CREATE_GENERIC_PLACEHOLDER_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS
+            );
+        } else {
 
-        // Argument.create( .. )
-        invokeInterfaceStaticMethod(
-                generatorAdapter,
-                Argument.class,
-                typeVariable ? METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
-        );
+            // Argument.create( .. )
+            invokeInterfaceStaticMethod(
+                    generatorAdapter,
+                    Argument.class,
+                    METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
+            );
+        }
     }
 
     /**
