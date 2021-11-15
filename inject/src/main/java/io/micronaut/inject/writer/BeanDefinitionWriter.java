@@ -1283,6 +1283,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     this.annotationMetadata,
                     parameterElement.getAnnotationMetadata()
             );
+            DefaultAnnotationMetadata.contributeRepeatable(
+                    this.annotationMetadata,
+                    parameterElement.getGenericType()
+            );
         }
 
         if (executableMethodsDefinitionWriter == null) {
@@ -1661,6 +1665,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         AnnotationMetadata annotationMetadata = fieldElement.getAnnotationMetadata();
         autoApplyNamedIfPresent(fieldElement, annotationMetadata);
         DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, annotationMetadata);
+        DefaultAnnotationMetadata.contributeRepeatable(this.annotationMetadata, fieldElement.getGenericField());
         Type declaringTypeRef = JavaModelUtils.getTypeReference(declaringType);
         GeneratorAdapter injectMethodVisitor = this.injectMethodVisitor;
 
@@ -1889,12 +1894,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         final boolean requiresReflection = methodVisitData.requiresReflection;
         final ClassElement returnType = methodElement.getReturnType();
         DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, annotationMetadata);
+        DefaultAnnotationMetadata.contributeRepeatable(this.annotationMetadata, returnType);
         boolean hasArguments = methodElement.hasParameters();
         int argCount = hasArguments ? argumentTypes.size() : 0;
         Type declaringTypeRef = JavaModelUtils.getTypeReference(declaringType);
         boolean hasInjectScope = false;
         for (ParameterElement value : argumentTypes) {
             DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, value.getAnnotationMetadata());
+            DefaultAnnotationMetadata.contributeRepeatable(this.annotationMetadata, value.getGenericType());
             if (value.hasDeclaredAnnotation(InjectScope.class)) {
                 hasInjectScope = true;
             }
@@ -2034,6 +2041,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         for (ParameterElement parameterElement : argumentTypes) {
             final AnnotationMetadata annotationMetadata = parameterElement.getAnnotationMetadata();
             DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, annotationMetadata);
+            DefaultAnnotationMetadata.contributeRepeatable(this.annotationMetadata, parameterElement.getGenericType());
             autoApplyNamedIfPresent(parameterElement, annotationMetadata);
         }
     }
@@ -3129,6 +3137,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             MethodElement methodElement = (MethodElement) constructor;
             AnnotationMetadata constructorMetadata = methodElement.getAnnotationMetadata();
             DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, constructorMetadata);
+            DefaultAnnotationMetadata.contributeRepeatable(this.annotationMetadata, methodElement.getGenericReturnType());
             ParameterElement[] parameters = methodElement.getParameters();
             List<ParameterElement> parameterList = Arrays.asList(parameters);
             applyDefaultNamedToParameters(parameterList);
@@ -3273,6 +3282,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                         boolean isPreDestroyMethod) {
         for (ParameterElement value : methodElement.getParameters()) {
             DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, value.getAnnotationMetadata());
+            DefaultAnnotationMetadata.contributeRepeatable(this.annotationMetadata, value.getGenericType());
         }
         staticInit.newInstance(Type.getType(AbstractInitializableBeanDefinition.MethodReference.class));
         staticInit.dup();
