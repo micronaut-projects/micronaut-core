@@ -86,6 +86,8 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     public static final String SCHEME_WEBSOCKET = "ws://";
     public static final String SCHEME_SECURE_WEBSOCKET = "wss://";
 
+    public static final String COMPRESSION_HANDLER = "WebSocketServerCompressionHandler";
+
     private static final Logger LOG = LoggerFactory.getLogger(NettyServerWebSocketUpgradeHandler.class);
     private static final AsciiString WEB_SOCKET_HEADER_VALUE = AsciiString.cached("websocket");
 
@@ -170,12 +172,6 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
 
                         try {
                             // re-configure the pipeline
-                            pipeline.remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
-                            pipeline.remove(NettyServerWebSocketUpgradeHandler.this);
-                            ChannelHandler accessLoggerHandler = pipeline.get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER);
-                            if (accessLoggerHandler !=  null) {
-                                pipeline.remove(accessLoggerHandler);
-                            }
                             NettyServerWebSocketHandler webSocketHandler = new NettyServerWebSocketHandler(
                                     nettyEmbeddedServices,
                                     webSocketSessionRepository,
@@ -185,7 +181,14 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
                                     routeMatch,
                                     ctx
                             );
-                            pipeline.addAfter("wsdecoder", NettyServerWebSocketHandler.ID, webSocketHandler);
+                            pipeline.addBefore(ctx.name(), NettyServerWebSocketHandler.ID, webSocketHandler);
+
+                            pipeline.remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
+                            pipeline.remove(NettyServerWebSocketUpgradeHandler.this);
+                            ChannelHandler accessLoggerHandler = pipeline.get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER);
+                            if (accessLoggerHandler !=  null) {
+                                pipeline.remove(accessLoggerHandler);
+                            }
 
                         } catch (Throwable e) {
                             if (LOG.isErrorEnabled()) {

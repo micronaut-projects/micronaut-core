@@ -84,6 +84,7 @@ import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
+import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
 import io.netty.handler.codec.http2.CleartextHttp2ServerUpgradeHandler;
 import io.netty.handler.codec.http2.DefaultHttp2Connection;
 import io.netty.handler.codec.http2.Http2CodecUtil;
@@ -793,6 +794,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 ));
                 handlers.put(HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
             }
+            handlers.put(NettyServerWebSocketUpgradeHandler.COMPRESSION_HANDLER, new WebSocketServerCompressionHandler());
             handlers.put(HANDLER_HTTP_STREAM, new HttpStreamsServerHandler());
             handlers.put(HANDLER_HTTP_CHUNK, new ChunkedWriteHandler());
             handlers.put(HttpRequestDecoder.ID, requestDecoder);
