@@ -30,10 +30,12 @@ import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
 import io.micronaut.core.naming.NameUtils
+import io.micronaut.core.reflect.ReflectionUtils
 import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.AnnotationMapper
+import io.micronaut.inject.annotation.AnnotationMetadataSupport
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import io.micronaut.inject.annotation.AnnotationTransformer
 import io.micronaut.inject.ast.ClassElement
@@ -55,6 +57,7 @@ import javax.lang.model.element.TypeElement
 import javax.lang.model.element.VariableElement
 import javax.tools.JavaFileObject
 import java.lang.annotation.Annotation
+import java.lang.reflect.Field
 import java.util.stream.Collectors
 import java.util.stream.StreamSupport
 /**
@@ -65,6 +68,15 @@ import java.util.stream.StreamSupport
  * @since 1.0
  */
 abstract class AbstractTypeElementSpec extends Specification {
+
+    def setup() {
+        // clear static data structures to ensure we don't get false positives in compilation tests
+        for(fieldName in ["ANNOTATION_DEFAULTS", 'REPEATABLE_ANNOTATIONS', 'ANNOTATION_TYPES']) {
+            def f = ReflectionUtils.getRequiredField(AnnotationMetadataSupport, fieldName)
+            f.setAccessible(true)
+            f.get(AnnotationMetadataSupport).clear()
+        }
+    }
 
     /**
      * Builds a class element for the given source code.
