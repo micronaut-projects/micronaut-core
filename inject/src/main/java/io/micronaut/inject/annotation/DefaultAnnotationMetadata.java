@@ -2056,9 +2056,14 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     @Internal
     public static void contributeRepeatable(AnnotationMetadata target, ClassElement classElement) {
+       contributeRepeatable(target, classElement, new HashSet<>());
+    }
+
+    private static void contributeRepeatable(AnnotationMetadata target, ClassElement classElement, Set<ClassElement> alreadySeen) {
+        alreadySeen.add(classElement);
         contributeRepeatable(target, classElement.getAnnotationMetadata());
         for (ClassElement element : classElement.getTypeArguments().values()) {
-            if (element.equals(classElement)) {
+            if (alreadySeen.contains(classElement)) {
                 continue;
             }
             contributeRepeatable(target, element);
