@@ -364,7 +364,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             ArrayType at = (ArrayType) returnType;
             TypeMirror componentType = at.getComponentType();
             ClassElement arrayType;
-            if (componentType instanceof TypeVariable) {
+            if (componentType instanceof TypeVariable && componentType.getKind() == TypeKind.TYPEVAR) {
                 TypeVariable tv = (TypeVariable) componentType;
                 arrayType = resolveTypeVariable(visitorContext, genericsInfo, includeTypeAnnotations, tv, at);
             } else {
@@ -423,10 +423,10 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             List<? extends TypeMirror> boundsUnresolved = upperBound instanceof IntersectionType ?
                     ((IntersectionType) upperBound).getBounds() :
                     Collections.singletonList(upperBound);
-            Map<String, Map<String, TypeMirror>> finalGenericsInfo = genericsInfo;
             List<JavaClassElement> bounds = boundsUnresolved.stream()
                     .map(tm -> (JavaClassElement) mirrorToClassElement(tm,
-                                                                       visitorContext, finalGenericsInfo,
+                                                                       visitorContext,
+                                                                       genericsInfo,
                                                                        includeTypeAnnotations))
                     .collect(Collectors.toList());
             return new JavaGenericPlaceholderElement(tv, bounds, 0);
