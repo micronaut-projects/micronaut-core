@@ -246,7 +246,7 @@ public class SslConfiguration implements Toggleable {
     }
 
     /**
-     * @return The timeout for the SSL handshake
+     * @param handshakeTimeout The timeout for the SSL handshake
      */
     public void setHandshakeTimeout(@NonNull Duration handshakeTimeout) {
         this.handshakeTimeout = Objects.requireNonNull(handshakeTimeout, "handshakeTimeout");
