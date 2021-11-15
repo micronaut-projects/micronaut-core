@@ -300,7 +300,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * Creates a new argument for the given type and name that is a type variable.
      *
      * @param type               The type
-     * @param name               The name
+     * @param argumentName       The name of the argumennt
      * @param variableName       The variable name
      * @param annotationMetadata The annotation metadata
      * @param typeParameters     the type parameters
@@ -312,14 +312,14 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     @NonNull
     static <T> Argument<T> ofTypeVariable(
             @NonNull Class<T> type,
-            @Nullable String name,
+            @Nullable String argumentName,
             @NonNull String variableName,
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Argument<?>... typeParameters) {
         Objects.requireNonNull(variableName, "Variable name cannot be null");
         return new DefaultGenericPlaceholder<>(
                 type,
-                name,
+                argumentName,
                 variableName,
                 annotationMetadata,
                 typeParameters
@@ -347,7 +347,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * Creates a new argument for the given type and name that is a type variable.
      *
      * @param type The type
-     * @param name The name
+     * @param argumentName The name of the argument
      * @param variableName The variable name
      * @param <T>  The generic type
      * @return The argument instance
@@ -357,9 +357,9 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     @NonNull
     static <T> Argument<T> ofTypeVariable(
             @NonNull Class<T> type,
-            @Nullable String name,
+            @Nullable String argumentName,
             @NonNull String variableName) {
-        return new DefaultGenericPlaceholder<>(type, name, variableName, AnnotationMetadata.EMPTY_METADATA);
+        return new DefaultGenericPlaceholder<>(type, argumentName, variableName, AnnotationMetadata.EMPTY_METADATA);
     }
 
     /**
