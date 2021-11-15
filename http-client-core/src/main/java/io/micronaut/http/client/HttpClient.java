@@ -29,7 +29,6 @@ import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
 import java.io.Closeable;
-import java.net.URI;
 import java.net.URL;
 import java.util.Optional;
 
@@ -240,9 +239,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      *
      * @param url The base URL
      * @return The client
-     * @deprecated Use {@link #create(URI)} instead
      */
-    @Deprecated
     static HttpClient create(@Nullable URL url) {
         return HttpClientFactoryResolver.getFactory().createClient(url);
     }
@@ -255,37 +252,8 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param configuration the client configuration
      * @return The client
      * @since 2.2.0
-     * @deprecated Use {@link #create(URI, HttpClientConfiguration)} instead
      */
-    @Deprecated
     static HttpClient create(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
         return HttpClientFactoryResolver.getFactory().createClient(url, configuration);
-    }
-
-    /**
-     * Create a new {@link HttpClient}.
-     * Note that this method should only be used outside of the context of a Micronaut application.
-     * The returned {@link HttpClient} is not subject to dependency injection.
-     * The creator is responsible for closing the client to avoid leaking connections.
-     * Within a Micronaut application use {@link jakarta.inject.Inject} to inject a client instead.
-     *
-     * @param uri The base URI
-     * @return The client
-     */
-    static HttpClient create(@Nullable URI uri) {
-        return HttpClientFactoryResolver.getFactory().createClient(uri);
-    }
-
-    /**
-     * Create a new {@link HttpClient} with the specified configuration. Note that this method should only be used
-     * outside of the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead
-     *
-     * @param uri The base URI
-     * @param configuration the client configuration
-     * @return The client
-     * @since 2.2.0
-     */
-    static HttpClient create(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {
-        return HttpClientFactoryResolver.getFactory().createClient(uri, configuration);
     }
 }

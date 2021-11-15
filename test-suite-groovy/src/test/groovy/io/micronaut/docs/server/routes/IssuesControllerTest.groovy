@@ -19,7 +19,7 @@ class IssuesControllerTest extends Specification {
 
     @Shared
     @AutoCleanup // <2>
-    HttpClient client = HttpClient.create(embeddedServer.URI) // <1>
+    HttpClient client = HttpClient.create(embeddedServer.URL) // <1>
 
     void "test issue"() {
         when:

@@ -497,7 +497,7 @@ class HttpGetSpec extends Specification {
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/2782")
     void "test single letter uri"() {
         given:
-        HttpClient client = HttpClient.create(embeddedServer.getURI())
+        HttpClient client = HttpClient.create(embeddedServer.getURL())
 
         when:
         MutableHttpRequest request = HttpRequest.GET("/get/a")
@@ -513,7 +513,7 @@ class HttpGetSpec extends Specification {
 
     void "test creating a client with a null URL"() {
         given:
-        BlockingHttpClient client = HttpClient.create((URI) null).toBlocking()
+        BlockingHttpClient client = HttpClient.create(null).toBlocking()
 
         when:
         String uri = UriBuilder.of(embeddedServer.getURI()).path("/get/simple").toString()
@@ -530,7 +530,7 @@ class HttpGetSpec extends Specification {
 
     void "test creating an rx client with a null URL"() {
         given:
-        BlockingHttpClient client = HttpClient.create((URI) null).toBlocking()
+        BlockingHttpClient client = HttpClient.create(null).toBlocking()
 
         when:
         String uri = UriBuilder.of(embeddedServer.getURI()).path("/get/simple").toString()
@@ -557,7 +557,7 @@ class HttpGetSpec extends Specification {
         books[0][0].title == "The Stand"
 
         when:
-        BlockingHttpClient client = HttpClient.create(embeddedServer.getURI()).toBlocking()
+        BlockingHttpClient client = HttpClient.create(embeddedServer.getURL()).toBlocking()
         books = client.retrieve(HttpRequest.GET("/get/nestedPojoList"), Argument.listOf(Argument.listOf(Book.class)))
 
         then:

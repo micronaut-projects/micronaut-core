@@ -21,7 +21,7 @@ class PersonControllerSpec extends Specification {
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
             ApplicationContext.run(EmbeddedServer, ["spec.name": getClass().simpleName])
 
-    @Shared @AutoCleanup HttpClient client = HttpClient.create(embeddedServer.URI)
+    @Shared @AutoCleanup HttpClient client = HttpClient.create(embeddedServer.URL)
 
     void "test global error handler"() {
         when:

@@ -30,6 +30,8 @@ import io.micronaut.http.client.sse.SseClientFactory;
 import io.micronaut.websocket.WebSocketClient;
 import io.micronaut.websocket.WebSocketClientFactory;
 
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.net.URI;
 
 /**
@@ -48,50 +50,50 @@ public class NettyHttpClientFactory implements
 
     @NonNull
     @Override
-    public HttpClient createClient(URI uri) {
-        return createNettyClient(uri);
+    public HttpClient createClient(URL url) {
+        return createNettyClient(url);
     }
 
     @NonNull
     @Override
-    public HttpClient createClient(URI uri, @NonNull HttpClientConfiguration configuration) {
-        return createNettyClient(uri, configuration);
+    public HttpClient createClient(URL url, @NonNull HttpClientConfiguration configuration) {
+        return createNettyClient(url, configuration);
     }
 
     @NonNull
     @Override
-    public ProxyHttpClient createProxyClient(URI uri) {
-        return createNettyClient(uri);
+    public ProxyHttpClient createProxyClient(URL url) {
+        return createNettyClient(url);
     }
 
     @NonNull
     @Override
-    public ProxyHttpClient createProxyClient(URI uri, @NonNull HttpClientConfiguration configuration) {
-        return createNettyClient(uri, configuration);
+    public ProxyHttpClient createProxyClient(URL url, @NonNull HttpClientConfiguration configuration) {
+        return createNettyClient(url, configuration);
     }
 
     @NonNull
     @Override
-    public SseClient createSseClient(@Nullable URI uri) {
-        return createNettyClient(uri);
+    public SseClient createSseClient(@Nullable URL url) {
+        return createNettyClient(url);
     }
 
     @NonNull
     @Override
-    public SseClient createSseClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {
-        return createNettyClient(uri, configuration);
+    public SseClient createSseClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
+        return createNettyClient(url, configuration);
     }
 
     @NonNull
     @Override
-    public StreamingHttpClient createStreamingClient(URI uri) {
-        return createNettyClient(uri);
+    public StreamingHttpClient createStreamingClient(URL url) {
+        return createNettyClient(url);
     }
 
     @NonNull
     @Override
-    public StreamingHttpClient createStreamingClient(URI uri, @NonNull HttpClientConfiguration configuration) {
-        return createNettyClient(uri, configuration);
+    public StreamingHttpClient createStreamingClient(URL url, @NonNull HttpClientConfiguration configuration) {
+        return createNettyClient(url, configuration);
     }
 
     @NonNull
@@ -106,6 +108,22 @@ public class NettyHttpClientFactory implements
         return createNettyClient(uri, configuration);
     }
 
+    private DefaultHttpClient createNettyClient(URL url) {
+        try {
+            return createNettyClient(url != null ? url.toURI() : null);
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException(e);
+        }
+    }
+
+    private DefaultHttpClient createNettyClient(URL url, HttpClientConfiguration configuration) {
+        try {
+            return createNettyClient(url != null ? url.toURI() : null, configuration);
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException(e);
+        }
+    }
+
     private DefaultHttpClient createNettyClient(URI uri) {
         return new DefaultHttpClient(uri);
     }
@@ -113,5 +131,4 @@ public class NettyHttpClientFactory implements
     private DefaultHttpClient createNettyClient(URI uri, HttpClientConfiguration configuration) {
         return new DefaultHttpClient(uri, configuration);
     }
-
 }

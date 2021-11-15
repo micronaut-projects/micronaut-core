@@ -24,7 +24,6 @@ import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.sse.Event;
 import org.reactivestreams.Publisher;
 
-import java.net.URI;
 import java.net.URL;
 
 /**
@@ -126,10 +125,7 @@ public interface SseClient {
      *
      * @param url The base URL
      * @return The client
-     * @deprecated Use {@link #create(URI)} instead
      */
-    @Deprecated
-    @NonNull
     static SseClient create(@Nullable URL url) {
         return SseClientFactoryResolver.getFactory().createSseClient(url);
     }
@@ -142,41 +138,8 @@ public interface SseClient {
      * @param configuration the client configuration
      * @return The client
      * @since 2.2.0
-     * @deprecated Use {@link #create(URI, HttpClientConfiguration)} instead
      */
-    @Deprecated
-    @NonNull
     static SseClient create(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
         return SseClientFactoryResolver.getFactory().createSseClient(url, configuration);
-    }
-
-    /**
-     * Create a new {@link SseClient}.
-     * Note that this method should only be used outside of the context of a Micronaut application.
-     * The returned {@link SseClient} is not subject to dependency injection.
-     * The creator is responsible for closing the client to avoid leaking connections.
-     * Within a Micronaut application use {@link jakarta.inject.Inject} to inject a client instead.
-     *
-     * @param uri The base URI
-     * @return The client
-     * @since 3.2.0
-     */
-    @NonNull
-    static SseClient create(@Nullable URI uri) {
-        return SseClientFactoryResolver.getFactory().createSseClient(uri);
-    }
-
-    /**
-     * Create a new {@link SseClient} with the specified configuration. Note that this method should only be used
-     * outside of the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead
-     *
-     * @param uri The base URI
-     * @param configuration the client configuration
-     * @return The client
-     * @since 3.2.0
-     */
-    @NonNull
-    static SseClient create(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {
-        return SseClientFactoryResolver.getFactory().createSseClient(uri, configuration);
     }
 }

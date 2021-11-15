@@ -45,7 +45,7 @@ class MDCReactorSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    HttpClient client = HttpClient.create(embeddedServer.URI)
+    HttpClient client = HttpClient.create(embeddedServer.URL)
 
     void "test MDC propagates"() {
         expect:

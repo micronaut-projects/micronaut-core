@@ -31,7 +31,7 @@ class MessageControllerSpec extends Specification{
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
             ApplicationContext.run(EmbeddedServer) // <1>
 
-    @Shared @AutoCleanup HttpClient client = HttpClient.create(embeddedServer.URI)
+    @Shared @AutoCleanup HttpClient client = HttpClient.create(embeddedServer.URL)
 
     void "test message response"() {
         expect:

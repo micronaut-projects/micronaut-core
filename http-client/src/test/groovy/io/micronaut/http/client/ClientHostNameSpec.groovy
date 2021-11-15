@@ -7,7 +7,7 @@ class ClientHostNameSpec extends Specification {
 
     void "test host name with underscores"() {
         when:
-        def client = HttpClient.create(new URI("https://foo_bar"))
+        def client = HttpClient.create(new URL("https://foo_bar"))
         client.toBlocking().retrieve("/")
 
         then:
@@ -20,7 +20,7 @@ class ClientHostNameSpec extends Specification {
 
     void "test host name with underscores and port"() {
         when:
-        def client = HttpClient.create(new URI("https://foo_bar:8080"))
+        def client = HttpClient.create(new URL("https://foo_bar:8080"))
         client.toBlocking().retrieve("/")
 
         then:
@@ -33,7 +33,7 @@ class ClientHostNameSpec extends Specification {
 
     void "test host name with dots and dashes and port"() {
         when:
-        def client = HttpClient.create(new URI("https://slave1-6x8-build-agent-2.0.1-5h7sl:8080"))
+        def client = HttpClient.create(new URL("https://slave1-6x8-build-agent-2.0.1-5h7sl:8080"))
         client.toBlocking().retrieve("/")
 
         then:

@@ -94,7 +94,7 @@ class StreamRequestSpec extends Specification {
 
     void "test stream get request with JSON strings"() {
         given:
-        StreamingHttpClient client = StreamingHttpClient.create(embeddedServer.getURI())
+        StreamingHttpClient client = StreamingHttpClient.create(embeddedServer.getURL())
 
         when:
         HttpResponse<?> result = Flux.from(client.exchangeStream(HttpRequest.GET('/stream/request/jsonstrings'))).blockFirst()

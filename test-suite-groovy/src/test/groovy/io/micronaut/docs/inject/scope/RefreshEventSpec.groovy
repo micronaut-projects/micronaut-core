@@ -46,7 +46,7 @@ class RefreshEventSpec extends Specification {
                     'spec.name': 'RefreshEventSpec'
             ], Environment.TEST)
 
-    @Shared @AutoCleanup HttpClient client = HttpClient.create(embeddedServer.URI)
+    @Shared @AutoCleanup HttpClient client = HttpClient.create(embeddedServer.URL)
 
     def "publishing a refresh event, destroys beans with @Refreshable Scope"() {
         when: 'requesting a forecast for the first time'

@@ -34,7 +34,7 @@ class MDCSpec extends Specification {
     ])
 
     @Shared @AutoCleanup
-    HttpClient client = HttpClient.create(embeddedServer.URI)
+    HttpClient client = HttpClient.create(embeddedServer.URL)
 
     void "test MDC doesn't leak"() {
         given:

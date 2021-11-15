@@ -18,9 +18,6 @@ package io.micronaut.http.client;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
-import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 
 /**
@@ -38,17 +35,9 @@ public interface StreamingHttpClientFactory {
      *
      * @param url The base URL
      * @return The client
-     * @deprecated Use {@link #createStreamingClient(URI)} instead
      */
     @NonNull
-    @Deprecated
-    default StreamingHttpClient createStreamingClient(@Nullable URL url) {
-        try {
-            return createStreamingClient(url != null ? url.toURI() : null);
-        } catch (URISyntaxException e) {
-            throw new IllegalArgumentException(e);
-        }
-    }
+    StreamingHttpClient createStreamingClient(@Nullable URL url);
 
     /**
      * Create a new {@link StreamingHttpClient} with the specified configuration. Note that this method should only be used
@@ -58,51 +47,8 @@ public interface StreamingHttpClientFactory {
      * @param configuration The client configuration
      * @return The client
      * @since 2.2.0
-     * @deprecated Use {@link #createStreamingClient(URI, HttpClientConfiguration)} instead
      */
     @NonNull
-    @Deprecated
-    default StreamingHttpClient createStreamingClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
-        try {
-            return createStreamingClient(url != null ? url.toURI() : null, configuration);
-        } catch (URISyntaxException e) {
-            throw new IllegalArgumentException(e);
-        }
-    }
-
-    /**
-     * Create a new {@link StreamingHttpClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
-     * {@link jakarta.inject.Inject} to inject a client instead
-     *
-     * @param uri The base URI
-     * @return The client
-     * @since 3.2.0
-     */
-    @NonNull
-    default StreamingHttpClient createStreamingClient(@Nullable URI uri) {
-        try {
-            return createStreamingClient(uri != null ? uri.toURL() : null);
-        } catch (MalformedURLException e) {
-            throw new UnsupportedOperationException(e);
-        }
-    }
-
-    /**
-     * Create a new {@link StreamingHttpClient} with the specified configuration. Note that this method should only be used
-     * outside of the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead
-     *
-     * @param uri The base URI
-     * @param configuration The client configuration
-     * @return The client
-     * @since 3.2.0
-     */
-    @NonNull
-    default StreamingHttpClient createStreamingClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {
-        try {
-            return createStreamingClient(uri != null ? uri.toURL() : null, configuration);
-        } catch (MalformedURLException e) {
-            throw new UnsupportedOperationException(e);
-        }
-    }
+    StreamingHttpClient createStreamingClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration);
 
 }

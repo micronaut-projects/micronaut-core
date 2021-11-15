@@ -45,7 +45,7 @@ class CompressedRequest extends Specification {
 
     void "test gzipped body in post request"() {
         given:
-        HttpClient client = HttpClient.create(embeddedServer.getURI())
+        HttpClient client = HttpClient.create(embeddedServer.getURL())
         byte[] body = gzip("[0, 1, 2, 3, 4]")
 
         when:
