@@ -36,9 +36,11 @@ class SimpleTextWebSocketSpec extends Specification {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.builder('micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
         PollingConditions conditions = new PollingConditions(timeout: 15    , delay: 0.5)
+        def uri = embeddedServer.getURI()
+        uri = new URI(scheme, uri.schemeSpecificPart, uri.fragment) // apply wss scheme
 
         when: "a websocket connection is established"
-        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
+        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, uri)
         ChatClientWebSocket fred = Flux.from(wsClient.connect(ChatClientWebSocket, "/chat/stuff/fred")).blockFirst()
         ChatClientWebSocket bob = Flux.from(wsClient.connect(ChatClientWebSocket, [topic:"stuff",username:"bob"])).blockFirst()
 
@@ -102,6 +104,9 @@ class SimpleTextWebSocketSpec extends Specification {
         cleanup:
         wsClient.close()
         embeddedServer.close()
+
+        where:
+        scheme << ['http', 'ws'] // test with ws as well
     }
 
     @Retry
@@ -113,9 +118,11 @@ class SimpleTextWebSocketSpec extends Specification {
                 'micronaut.ssl.build-self-signed':true
                 ]).run(EmbeddedServer)
         PollingConditions conditions = new PollingConditions(timeout: 15    , delay: 0.5)
+        def uri = embeddedServer.getURI()
+        uri = new URI(scheme, uri.schemeSpecificPart, uri.fragment) // apply wss scheme
 
         when: "a websocket connection is established"
-        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
+        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, uri)
         ChatClientWebSocket fred = Flux.from(wsClient.connect(ChatClientWebSocket, "/chat/stuff/fred")).blockFirst()
         ChatClientWebSocket bob = Flux.from(wsClient.connect(ChatClientWebSocket, [topic:"stuff",username:"bob"])).blockFirst()
         ChatServerWebSocket server = embeddedServer.applicationContext.getBean(ChatServerWebSocket)
@@ -182,6 +189,9 @@ class SimpleTextWebSocketSpec extends Specification {
         cleanup:
         wsClient.close()
         embeddedServer.close()
+
+        where:
+        scheme << ['https', 'wss'] // test with wss as well
     }
 
     void "test simple text websocket connection with query"() {
