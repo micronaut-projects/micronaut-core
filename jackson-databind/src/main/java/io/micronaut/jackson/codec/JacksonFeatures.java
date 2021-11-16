@@ -20,6 +20,8 @@ import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.json.JsonFeatures;
 
 import java.util.ArrayList;
@@ -85,11 +87,11 @@ public final class JacksonFeatures implements JsonFeatures {
             }
         }
 
-        @SuppressWarnings("unchecked")
-        Class<? extends Module>[] additionalModules = jacksonFeaturesAnn.get("additionalModules", Class[].class).orElse(null);
-        if (additionalModules != null) {
-            for (Class<? extends Module> additionalModule : additionalModules) {
-                jacksonFeatures.addModule(additionalModule);
+        Class<?>[] additionalModules = jacksonFeaturesAnn.classValues("additionalModules");
+        if (ArrayUtils.isNotEmpty(additionalModules)) {
+            for (Class<?> additionalModule : additionalModules) {
+                //noinspection unchecked
+                jacksonFeatures.addModule((Class<? extends Module>) additionalModule);
             }
         }
 
@@ -120,14 +122,16 @@ public final class JacksonFeatures implements JsonFeatures {
         return this;
     }
 
-
     /**
      * Add a jackson module feature.
      *
      * @param moduleClass The module to load
      * @return This object.
+     * @since 3.2
      */
-    public JacksonFeatures addModule(Class<? extends Module> moduleClass) {
+    @NonNull
+    public JacksonFeatures addModule(@NonNull Class<? extends Module> moduleClass) {
+        Objects.requireNonNull(moduleClass, "moduleClass");
         additionalModules.add(moduleClass);
         return this;
     }
@@ -154,7 +158,9 @@ public final class JacksonFeatures implements JsonFeatures {
      * Additional modules to load.
      *
      * @return List of additional modules to load.
+     * @since 3.2
      */
+    @NonNull
     public List<Class<? extends Module>> getAdditionalModules() {
         return additionalModules;
     }
