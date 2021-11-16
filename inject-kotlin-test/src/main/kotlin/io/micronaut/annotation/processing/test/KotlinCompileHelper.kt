@@ -95,6 +95,9 @@ object KotlinCompileHelper {
         className: String,
         code: String
     ): Result {
+        System.setProperty("idea.home.path", tmp.toAbsolutePath().toString())
+        Files.write(tmp.resolve("build.txt"), "999.SNAPSHOT".toByteArray())
+
         val outDir = tmp.resolve("out")
         Files.createDirectory(outDir)
         val stubsDir = tmp.resolve("stubs")
