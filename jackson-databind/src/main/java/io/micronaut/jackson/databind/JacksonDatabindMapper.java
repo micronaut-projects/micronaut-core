@@ -19,12 +19,15 @@ import com.fasterxml.jackson.annotation.JsonView;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.type.Argument;
 import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.jackson.ObjectMapperFactory;
@@ -44,6 +47,7 @@ import org.reactivestreams.Subscriber;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.reflect.InvocationTargetException;
 import java.util.Optional;
 import java.util.function.Consumer;
 
@@ -133,6 +137,20 @@ public final class JacksonDatabindMapper implements JsonMapper {
         ObjectMapper objectMapper = this.objectMapper.copy();
         jacksonFeatures.getDeserializationFeatures().forEach(objectMapper::configure);
         jacksonFeatures.getSerializationFeatures().forEach(objectMapper::configure);
+        for (Class<? extends Module> moduleClass : jacksonFeatures.getAdditionalModules()) {
+            Optional<? extends BeanIntrospection<? extends Module>> introspection = BeanIntrospector.SHARED.findIntrospection(moduleClass);
+            Module module;
+            if (introspection.isPresent()) {
+                module = introspection.get().instantiate();
+            } else {
+                try {
+                    module = moduleClass.getConstructor().newInstance();
+                } catch (Exception e) {
+                    throw new IllegalArgumentException("Failed to instantiate configured additional module " + moduleClass.getName());
+                }
+            }
+            objectMapper.registerModule(module);
+        }
 
         return new JacksonDatabindMapper(objectMapper);
     }
