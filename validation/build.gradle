@@ -25,6 +25,10 @@ dependencies {
     testImplementation project(":http-server-netty")
     testImplementation libs.managed.groovy.json
     testImplementation project(":inject-java-test")
+    testImplementation(libs.managed.micronaut.test.spock) {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+    }
 
 }
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
