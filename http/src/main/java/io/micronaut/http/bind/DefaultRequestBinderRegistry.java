@@ -103,7 +103,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                     if (source.getBody().isPresent()) {
                         return () -> Optional.of(new PushCapableFullHttpRequest((PushCapableHttpRequest) source, typeVariable.get()));
                     } else {
-                        return ArgumentBinder.BindingResult.UNSATISFIED;
+                        return ArgumentBinder.BindingResult.EMPTY;
                     }
                 } else {
                     return () -> Optional.of((PushCapableHttpRequest) source);
