@@ -122,7 +122,6 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
      */
     public TypeConverter<JsonArray, Iterable> arrayNodeToIterableConverter() {
         return (node, targetType, context) -> {
-            Map<String, Argument<?>> typeVariables = context.getTypeVariables();
             Collection<Object> results;
             if (targetType.isAssignableFrom(ArrayList.class)) {
                 results = new ArrayList<>();
@@ -132,6 +131,7 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
                 // don't know how to convert to that collection type
                 return Optional.empty();
             }
+            Map<String, Argument<?>> typeVariables = context.getTypeVariables();
             Class elementType = typeVariables.isEmpty() ? Map.class : typeVariables.values().iterator().next().getType();
             for (int i = 0; i < node.size(); i++) {
                 Optional<?> converted = conversionService.convert(node.get(i), elementType, context);
