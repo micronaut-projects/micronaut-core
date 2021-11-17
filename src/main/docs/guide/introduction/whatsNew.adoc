@@ -19,6 +19,10 @@ The official GraalVM Maven plugin has new GAV coordinates so if you have declare
 
 Please check https://graalvm.github.io/native-build-tools/0.9.7.1/maven-plugin.html[the official documentation] about how to customize the plugin.
 
+=== Kotlin 1.6.0
+
+Micronaut 3.2.0 includes support for Kotlin 1.6.0.
+
 == 3.1.0
 
 === Core Features
