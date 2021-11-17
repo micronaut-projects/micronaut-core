@@ -69,12 +69,12 @@ class AstAnnotationUtils {
      * Get the {@link AnnotationMetadata} for the given annotated node
      *
      * @param sourceUnit the source unit
-     * @param parent the parent
+     * @param parents the parents
      * @param annotatedNode The node
      * @return The metadata
      */
-    static AnnotationMetadata getAnnotationMetadata(SourceUnit sourceUnit, CompilationUnit compilationUnit, AnnotatedNode parent, AnnotatedNode annotatedNode) {
-        new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).buildForParent(parent, annotatedNode)
+    static AnnotationMetadata getAnnotationMetadata(SourceUnit sourceUnit, CompilationUnit compilationUnit, List<AnnotatedNode> parents, AnnotatedNode annotatedNode) {
+        new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).buildForParents(parents, annotatedNode)
     }
 
 

@@ -26,6 +26,7 @@ import org.neo4j.driver.v1.Config
  * @since 1.0
  */
 class ConfigurationPropertiesBuilderSpec extends AbstractTypeElementSpec {
+
     void "test configuration builder on method"() {
         given:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''

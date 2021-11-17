@@ -1,5 +1,21 @@
 This section documents breaking changes between Micronaut versions
 
+== 3.2.0
+
+- Maven GraalVM Native Image plugin has new GAV coordinates. If you have declared it in your `pom.xml` please update the coordinates to:
+
+[source,xml]
+----
+<plugin>
+    <groupId>org.graalvm.buildtools</groupId>
+    <artifactId>native-maven-plugin</artifactId>
+...
+</plugin>
+----
+
+- `WebSocketClient.create` has been modified to accept a `URI` parameter instead of `URL`. The old `URL` methods still exist, but when called with `null` like `WebSocketClient.create(null)`, the method call is now ambiguous. Please insert a cast to `URI`: `WebSocketClient.create((URI) null)`.
+  The same applies for the `create` method that accepts an additional `HttpClientConfiguration` parameter.
+
 == 3.1.0
 
 Retrieving the port from the Netty embedded server is no longer supported if the server is configured to bind to a random port and the server has not been started.

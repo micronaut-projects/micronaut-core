@@ -71,6 +71,14 @@ public @interface Introspected {
     AccessKind[] accessKind() default { AccessKind.METHOD };
 
     /**
+     * Allows specifying the visibility policy to use to control which fields and methods are included.
+     *
+     * @return The visibility policies
+     * @since 3.2.0
+     */
+    Visibility[] visibility() default  { Visibility.DEFAULT };
+
+    /**
      * <p>By default {@link Introspected} applies to the class it is applied on. However if packages are specified
      * introspections will instead be generated for each classes in the given package. Note this only applies to already compiled
      * classes, and classpath scanning will be used to find them. If the class is not compiled then apply the annotation directly
@@ -182,5 +190,24 @@ public @interface Introspected {
          * The default behaviour which is to favour public getters for bean properties.
          */
         METHOD
+    }
+
+    /**
+     * Visibility policy for bean properties and fields.
+     *
+     * @since 3.2.0
+     */
+    enum Visibility {
+
+        /**
+         * Only public methods and/or fields are included.
+         */
+        PUBLIC,
+
+        /**
+         * The default behaviour which in addition to public getters and setters will also include package protected fields if an {@link io.micronaut.core.annotation.Introspected.AccessKind} of {@link io.micronaut.core.annotation.Introspected.AccessKind#FIELD} is specified.
+         *
+         */
+        DEFAULT
     }
 }

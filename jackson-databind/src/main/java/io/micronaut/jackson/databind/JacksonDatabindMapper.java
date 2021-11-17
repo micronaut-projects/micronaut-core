@@ -15,13 +15,18 @@
  */
 package io.micronaut.jackson.databind;
 
+import com.fasterxml.jackson.annotation.JsonView;
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.jackson.ObjectMapperFactory;
@@ -80,7 +85,14 @@ public final class JacksonDatabindMapper implements JsonMapper {
 
     @Override
     public <T> T readValueFromTree(@NonNull JsonNode tree, @NonNull Argument<T> type) throws IOException {
-        return objectMapper.readValue(treeCodec.treeAsTokens(tree), JacksonConfiguration.constructType(type, objectMapper.getTypeFactory()));
+        JsonParser tokens = treeAsTokens(tree);
+        JavaType javaType = JacksonConfiguration.constructType(type, objectMapper.getTypeFactory());
+        Optional<Class> view = type.getAnnotationMetadata().classValue(JsonView.class);
+        if (view.isPresent()) {
+            return objectMapper.readerWithView(view.get()).readValue(tokens, javaType);
+        } else {
+            return objectMapper.readValue(tokens, javaType);
+        }
     }
 
     @Override
@@ -113,7 +125,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
 
     @Override
     public void updateValueFromTree(Object value, @NonNull JsonNode tree) throws IOException {
-        objectMapper.readerForUpdating(value).readValue(treeCodec.treeAsTokens(tree));
+        objectMapper.readerForUpdating(value).readValue(treeAsTokens(tree));
     }
 
     @Override
@@ -123,6 +135,9 @@ public final class JacksonDatabindMapper implements JsonMapper {
         ObjectMapper objectMapper = this.objectMapper.copy();
         jacksonFeatures.getDeserializationFeatures().forEach(objectMapper::configure);
         jacksonFeatures.getSerializationFeatures().forEach(objectMapper::configure);
+        for (Class<? extends Module> moduleClass : jacksonFeatures.getAdditionalModules()) {
+            objectMapper.registerModule(InstantiationUtils.instantiate(moduleClass));
+        }
 
         return new JacksonDatabindMapper(objectMapper);
     }
@@ -159,5 +174,11 @@ public final class JacksonDatabindMapper implements JsonMapper {
     public Optional<JsonFeatures> detectFeatures(@NonNull AnnotationMetadata annotations) {
         return Optional.ofNullable(annotations.getAnnotation(io.micronaut.jackson.annotation.JacksonFeatures.class))
                 .map(JacksonFeatures::fromAnnotation);
+    }
+
+    private JsonParser treeAsTokens(@NonNull JsonNode tree) {
+        JsonParser parser = treeCodec.treeAsTokens(tree);
+        parser.setCodec(objectMapper);
+        return parser;
     }
 }

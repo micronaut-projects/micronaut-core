@@ -55,4 +55,9 @@ public @interface JacksonFeatures {
      * @return The disabled serialization features
      */
     DeserializationFeature[] disabledDeserializationFeatures() default {};
+
+    /**
+     * @return Additional modules to add to the jackson mapper
+     */
+    Class<? extends com.fasterxml.jackson.databind.Module>[] additionalModules() default {};
 }

@@ -24,6 +24,7 @@ import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.EnumElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PackageElement
+import spock.lang.Issue
 import spock.lang.Unroll
 import spock.util.environment.RestoreSystemProperties
 
@@ -537,5 +538,25 @@ class Foo {}
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters.size() == 1
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.name == 'java.util.Set'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.typeArguments.get("E").name == 'clselem8.Foo'
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/6430")
+    void "test property inheritance type annotation metadata"() {
+        given:
+        def classElement = buildClassElement("""
+package io.micronaut.inject.visitor
+
+@SomeAnn
+class DiscountEO {
+}
+abstract class TransactionPO {
+    DiscountEO discount
+}
+class InvoicePO extends TransactionPO {
+}
+""")
+
+        expect:
+        classElement.getBeanProperties().find { it.name == "discount" }.getType().hasAnnotation(SomeAnn)
     }
 }

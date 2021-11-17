@@ -32,6 +32,7 @@ import java.io.OutputStream
 
 @Controller("/upload")
 class UploadController {
+// end::class[]
 
     // tag::file[]
     @Post(value = "/", consumes = [MULTIPART_FORM_DATA], produces = [TEXT_PLAIN]) // <1>
@@ -70,5 +71,7 @@ class UploadController {
             }
     }
     // end::outputStream[]
+
+// tag::endclass[]
 }
-// end::class[]
+// end::endclass]

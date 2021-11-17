@@ -8,9 +8,34 @@ buildscript {
         classpath "gradle.plugin.com.energizedwork.webdriver-binaries:webdriver-binaries-gradle-plugin:$webdriverBinariesVersion"
     }
 }
-
+apply plugin: 'java-test-fixtures'
 apply from: "${rootProject.projectDir}/gradle/geb.gradle"
 apply from: "${rootProject.projectDir}/gradle/webdriverbinaries.gradle"
+
+sourceSets {
+    functionalTest
+}
+
+configurations {
+    functionalTestImplementation {
+        extendsFrom(testImplementation)
+    }
+}
+
+def functionalTest = tasks.register("functionalTest", Test) {
+    inputs.files(configurations.testCompileClasspath)
+    inputs.files(configurations.testAnnotationProcessor)
+    testClassesDirs = sourceSets.functionalTest.output.classesDirs
+    classpath = sourceSets.functionalTest.runtimeClasspath
+    doFirst {
+        systemProperty("testapp.compile.classpath", configurations.testCompileClasspath.asPath)
+        systemProperty("testapp.annotationprocessor.path", configurations.testAnnotationProcessor.asPath)
+    }
+}
+
+tasks.named("check") {
+    dependsOn functionalTest
+}
 
 dependencies {
     annotationProcessor project(":inject-java")
@@ -77,6 +102,9 @@ dependencies {
     }
 
     testImplementation libs.managed.reactor
+
+    testFixturesApi libs.managed.spock
+    testFixturesApi libs.managed.groovy
 }
 
 //tasks.withType(Test) {

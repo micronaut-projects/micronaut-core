@@ -31,7 +31,9 @@ import static io.micronaut.http.MediaType.TEXT_PLAIN
 
 @Controller("/upload")
 class UploadController {
+// end::class[]
 
+    // tag::file[]
     @Post(value = "/", consumes = MULTIPART_FORM_DATA, produces = TEXT_PLAIN) // <1>
     Mono<HttpResponse<String>> upload(StreamingFileUpload file) { // <2>
 
@@ -48,7 +50,9 @@ class UploadController {
                 }
             })
     }
+    // end::file[]
 
+    // tag::outputStream[]
     @Post(value = "/outputStream", consumes = MULTIPART_FORM_DATA, produces = TEXT_PLAIN) // <1>
     @SingleResult
     Mono<HttpResponse<String>> uploadOutputStream(StreamingFileUpload file) { // <2>
@@ -67,5 +71,8 @@ class UploadController {
                     }
                 })
     }
+    // end::outputStream[]
+
+// tag::endclass[]
 }
-// end::class[]
+// end::endclass[]

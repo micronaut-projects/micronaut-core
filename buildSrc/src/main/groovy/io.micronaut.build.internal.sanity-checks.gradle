@@ -1,0 +1,17 @@
+import io.micronaut.build.internal.sanity.InternalSanityChecks
+import io.micronaut.build.internal.sanity.VerifyServiceCountTask
+
+def sanity = extensions.create('internalSanityChecks', InternalSanityChecks)
+sanity.failOnMismatch.convention(true)
+
+def verifyServiceCount = tasks.register("verifyServiceCount", VerifyServiceCountTask) {
+    classesDirectory = tasks.named('compileJava', JavaCompile).flatMap { it.destinationDirectory }
+    expectedServiceCount = sanity.expectedServiceCount
+    failOnMismatch = sanity.failOnMismatch
+    outputFile = layout.buildDirectory.file("sanity-checks/$name")
+    gradleEnterprise = gradle.settings.gradleEnterprise
+}
+
+tasks.named("compileJava") {
+    finalizedBy(verifyServiceCount)
+}

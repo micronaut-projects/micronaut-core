@@ -33,4 +33,7 @@ public interface HeadlineClient {
 
     @Get(value = "/headlines", processes = APPLICATION_JSON_STREAM) // <1>
     Publisher<Headline> streamFlux();
+
+// tag::endclass[]
 }
+// end::endclass[]

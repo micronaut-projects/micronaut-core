@@ -212,7 +212,7 @@ class ManualHttpServiceDefinitionSpec extends Specification {
 
 
         when:
-        def client = new DefaultHttpClient(embeddedServer.getURL(), ctx.getBean(HttpClientConfiguration, Qualifiers.byName("client1")))
+        def client = new DefaultHttpClient(embeddedServer.getURI(), ctx.getBean(HttpClientConfiguration, Qualifiers.byName("client1")))
 
         then:
         client.toBlocking().retrieve(HttpRequest.GET("/ssl-test"), String) == DN

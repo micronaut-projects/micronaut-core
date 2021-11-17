@@ -14,7 +14,7 @@ pluginManagement {
 }
 
 plugins {
-    id 'io.micronaut.build.shared.settings' version '4.2.2'
+    id 'io.micronaut.build.shared.settings' version '4.2.6'
 }
 
 enableFeaturePreview("VERSION_CATALOGS")
@@ -72,3 +72,9 @@ include "test-utils"
 
 // benchmarks
 include "benchmarks"
+
+gradle.beforeProject { p ->
+    p.pluginManager.withPlugin('java-library') {
+        p.plugins.apply('io.micronaut.build.internal.sanity-checks')
+    }
+}

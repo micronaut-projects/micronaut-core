@@ -25,6 +25,8 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.SerializableString;
 import com.fasterxml.jackson.core.io.SerializedString;
 import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerBuilder;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
 import com.fasterxml.jackson.databind.deser.CreatorProperty;
@@ -34,6 +36,7 @@ import com.fasterxml.jackson.databind.deser.ValueInstantiator;
 import com.fasterxml.jackson.databind.deser.impl.MethodProperty;
 import com.fasterxml.jackson.databind.deser.std.StdValueInstantiator;
 import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
+import com.fasterxml.jackson.databind.introspect.AnnotationCollector;
 import com.fasterxml.jackson.databind.introspect.TypeResolutionContext;
 import com.fasterxml.jackson.databind.introspect.VirtualAnnotatedMember;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
@@ -43,8 +46,10 @@ import com.fasterxml.jackson.databind.ser.BeanSerializerBuilder;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
 import com.fasterxml.jackson.databind.ser.impl.PropertySerializerMap;
 import com.fasterxml.jackson.databind.type.TypeFactory;
+import com.fasterxml.jackson.databind.util.SimpleBeanPropertyDefinition;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
@@ -126,6 +131,65 @@ public class BeanIntrospectionModule extends SimpleModule {
         );
     }
 
+    private VirtualAnnotatedMember createVirtualMember(TypeResolutionContext typeResolutionContext, Class<?> beanClass, String name, JavaType javaType, AnnotationMetadata annotationMetadata) {
+        return new VirtualAnnotatedMember(
+                typeResolutionContext,
+                beanClass,
+                name,
+                javaType
+        ) {
+            @Override
+            public boolean hasOneOf(Class<? extends Annotation>[] annoClasses) {
+                return Arrays.stream(annoClasses).anyMatch(annotationMetadata::hasAnnotation);
+            }
+        };
+    }
+
+    // copied from VirtualBeanPropertyWriter
+    private static boolean suppressNulls(JsonInclude.Value inclusion) {
+        if (inclusion == null) {
+            return false;
+        }
+        JsonInclude.Include incl = inclusion.getValueInclusion();
+        return (incl != JsonInclude.Include.ALWAYS) && (incl != JsonInclude.Include.USE_DEFAULTS);
+    }
+
+    // copied from VirtualBeanPropertyWriter
+    private static Object suppressableValue(JsonInclude.Value inclusion) {
+        if (inclusion == null) {
+            return false; // [sic]
+        }
+        JsonInclude.Include incl = inclusion.getValueInclusion();
+        if ((incl == JsonInclude.Include.ALWAYS)
+                || (incl == JsonInclude.Include.NON_NULL)
+                || (incl == JsonInclude.Include.USE_DEFAULTS)) {
+            return null;
+        }
+        return BeanPropertyWriter.MARKER_FOR_EMPTY;
+    }
+
+    /**
+     * Parse a {@link JsonSerialize} or {@link JsonDeserialize} annotation.
+     */
+    private <T> T findSerializerFromAnnotation(BeanProperty<?, ?> beanProperty, Class<? extends Annotation> annotationType) {
+        AnnotationValue<?> jsonSerializeAnnotation = beanProperty.getAnnotation(annotationType);
+        if (jsonSerializeAnnotation != null) {
+            // ideally, we'd use SerializerProvider here, but it's not exposed to the BeanSerializerModifier
+            Class using = jsonSerializeAnnotation.classValue("using").orElse(null);
+            if (using != null) {
+                BeanIntrospection<Object> usingIntrospection = findIntrospection(using);
+                if (usingIntrospection != null) {
+                    return (T) usingIntrospection.instantiate();
+                } else {
+                    if (LOG.isWarnEnabled()) {
+                        LOG.warn("Cannot construct {}, please add the @Introspected annotation to the class declaration", using.getName());
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
     /**
      * Modifies bean serialization.
      */
@@ -162,6 +226,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Bean {} has no properties, while BeanIntrospection does. Recreating from introspection.", beanClass);
                     }
+                    TypeResolutionContext typeResolutionContext = new TypeResolutionContext.Empty(config.getTypeFactory());
                     final List<BeanPropertyWriter> newProperties = new ArrayList<>(beanProperties.size());
                     for (BeanProperty<Object, Object> beanProperty : beanProperties) {
                         if (beanProperty.hasAnnotation(JsonIgnore.class)) {
@@ -181,10 +246,20 @@ public class BeanIntrospectionModule extends SimpleModule {
                             propertyName = beanProperty.stringValue(JsonProperty.class).orElse(beanProperty.getName());
                         }
                         BeanPropertyWriter writer = new BeanIntrospectionPropertyWriter(
+                                createVirtualMember(
+                                        typeResolutionContext,
+                                        beanProperty.getDeclaringType(),
+                                        propertyName,
+                                        newType(beanProperty.asArgument(), config.getTypeFactory()),
+                                        beanProperty
+                                ),
                                 config,
                                 propertyName,
                                 beanProperty,
-                                config.getTypeFactory()
+                                config.getTypeFactory(),
+                                findSerializerFromAnnotation(beanProperty, JsonSerialize.class)
+                                // would be nice to add the TypeSerializer here too, but we don't have access to the
+                                // SerializerFactory for findPropertyTypeSerializer
                         );
 
                         newProperties.add(writer);
@@ -280,32 +355,51 @@ public class BeanIntrospectionModule extends SimpleModule {
                 return builder;
             } else {
                 final Iterator<SettableBeanProperty> properties = builder.getProperties();
-                if (!properties.hasNext() && introspection.getPropertyNames().length > 0) {
+                if ((ignoreReflectiveProperties || !properties.hasNext()) && introspection.getPropertyNames().length > 0) {
                     // mismatch, probably GraalVM reflection not enabled for bean. Try recreate
                     for (BeanProperty<Object, Object> beanProperty : introspection.getBeanProperties()) {
-                        builder.addOrReplaceProperty(new VirtualSetter(
-                                beanDesc.getClassInfo(),
-                                config.getTypeFactory(),
-                                beanProperty),
-                            true);
+                        if (!beanProperty.isReadOnly()) {
+                            builder.addOrReplaceProperty(new VirtualSetter(
+                                            beanDesc.getClassInfo(),
+                                            config.getTypeFactory(),
+                                            beanProperty,
+                                            findSerializerFromAnnotation(beanProperty, JsonDeserialize.class)),
+                                    true);
+                        }
                     }
                 } else {
+                    Map<String, BeanProperty<Object, Object>> remainingProperties = new LinkedHashMap<>();
+                    for (BeanProperty<Object, Object> beanProperty : introspection.getBeanProperties()) {
+                        remainingProperties.put(beanProperty.getName(), beanProperty);
+                    }
                     while (properties.hasNext()) {
                         final SettableBeanProperty settableBeanProperty = properties.next();
                         if (settableBeanProperty instanceof MethodProperty) {
                             MethodProperty methodProperty = (MethodProperty) settableBeanProperty;
-                            final Optional<BeanProperty<Object, Object>> beanProperty =
-                                    introspection.getProperty(settableBeanProperty.getName());
+                            final BeanProperty<Object, Object> beanProperty =
+                                    remainingProperties.remove(settableBeanProperty.getName());
 
-                            if (beanProperty.isPresent()) {
-                                BeanProperty<Object, Object> bp = beanProperty.get();
-                                if (!bp.isReadOnly()) {
-                                    SettableBeanProperty newProperty = new BeanIntrospectionSetter(
-                                            methodProperty,
-                                            bp
-                                    );
-                                    builder.addOrReplaceProperty(newProperty, true);
-                                }
+                            if (beanProperty != null && !beanProperty.isReadOnly()) {
+                                SettableBeanProperty newProperty = new BeanIntrospectionSetter(
+                                        methodProperty,
+                                        beanProperty
+                                );
+                                builder.addOrReplaceProperty(newProperty, true);
+                            }
+                        }
+                    }
+                    // add any remaining properties. This can happen if the supertype has reflection-visible properties
+                    // so `properties` isn't empty, but the subtype doesn't have reflection enabled.
+                    for (Map.Entry<String, BeanProperty<Object, Object>> entry : remainingProperties.entrySet()) {
+                        if (!entry.getValue().isReadOnly()) {
+                            SettableBeanProperty existing = builder.findProperty(PropertyName.construct(entry.getKey()));
+                            if (existing == null) {
+                                builder.addOrReplaceProperty(new VirtualSetter(
+                                                beanDesc.getClassInfo(),
+                                                config.getTypeFactory(),
+                                                entry.getValue(),
+                                                findSerializerFromAnnotation(entry.getValue(), JsonDeserialize.class)),
+                                        true);
                             }
                         }
                     }
@@ -364,17 +458,7 @@ public class BeanIntrospectionModule extends SimpleModule {
 
                                     @Override
                                     public AnnotatedMember getMember() {
-                                        return new VirtualAnnotatedMember(
-                                                beanDesc.getClassInfo(),
-                                                beanClass,
-                                                argument.getName(),
-                                                javaType
-                                        ) {
-                                            @Override
-                                            public boolean hasOneOf(Class<? extends Annotation>[] annoClasses) {
-                                                return Arrays.stream(annoClasses).anyMatch(annotationMetadata::hasAnnotation);
-                                            }
-                                        };
+                                        return createVirtualMember(beanDesc.getClassInfo(), beanClass, argument.getName(), javaType, annotationMetadata);
                                     }
 
                                     @Override
@@ -543,11 +627,11 @@ public class BeanIntrospectionModule extends SimpleModule {
         final BeanProperty beanProperty;
         final TypeResolutionContext typeResolutionContext;
 
-        VirtualSetter(TypeResolutionContext typeResolutionContext, TypeFactory typeFactory, BeanProperty beanProperty) {
+        VirtualSetter(TypeResolutionContext typeResolutionContext, TypeFactory typeFactory, BeanProperty beanProperty, JsonDeserializer<Object> valueDeser) {
             super(
                     new PropertyName(beanProperty.getName()),
                     newType(beanProperty.asArgument(), typeFactory),
-                    newPropertyMetadata(beanProperty.asArgument(), beanProperty.getAnnotationMetadata()), null);
+                    newPropertyMetadata(beanProperty.asArgument(), beanProperty.getAnnotationMetadata()), valueDeser);
             this.beanProperty = beanProperty;
             this.typeResolutionContext = typeResolutionContext;
         }
@@ -587,17 +671,13 @@ public class BeanIntrospectionModule extends SimpleModule {
 
         @Override
         public AnnotatedMember getMember() {
-            return new VirtualAnnotatedMember(
+            return createVirtualMember(
                     typeResolutionContext,
                     beanProperty.getDeclaringType(),
                     _propName.getSimpleName(),
-                    _type
-            ) {
-                @Override
-                public boolean hasOneOf(Class<? extends Annotation>[] annoClasses) {
-                    return Arrays.stream(annoClasses).anyMatch(beanProperty::hasAnnotation);
-                }
-            };
+                    _type,
+                    beanProperty
+            );
         }
 
         @Override
@@ -637,7 +717,6 @@ public class BeanIntrospectionModule extends SimpleModule {
         final BeanProperty<Object, Object> beanProperty;
         final SerializableString fastName;
         private final JavaType type;
-        private final boolean shouldSuppressNulls;
         private final boolean unwrapping;
 
         BeanIntrospectionPropertyWriter(BeanPropertyWriter src,
@@ -663,23 +742,31 @@ public class BeanIntrospectionModule extends SimpleModule {
             this.type = JacksonConfiguration.constructType(beanProperty.asArgument(), typeFactory);
             _dynamicSerializers = (ser == null) ? PropertySerializerMap
                     .emptyForProperties() : null;
-            shouldSuppressNulls = shouldSuppressNulls(_suppressNulls);
             this.unwrapping = introspection.hasAnnotation(JsonUnwrapped.class);
         }
 
         BeanIntrospectionPropertyWriter(
+                VirtualAnnotatedMember virtualMember,
                 SerializationConfig config,
                 String name,
                 BeanProperty<Object, Object> introspection,
-                TypeFactory typeFactory) {
+                TypeFactory typeFactory,
+                JsonSerializer<?> ser) {
+            super(
+                    SimpleBeanPropertyDefinition.construct(config, virtualMember),
+                    virtualMember,
+                    AnnotationCollector.emptyAnnotations(),
+                    null, ser, null, null,
+                    suppressNulls(config.getDefaultPropertyInclusion()),
+                    suppressableValue(config.getDefaultPropertyInclusion()),
+                    null
+            );
             beanProperty = introspection;
             fastName = new SerializedString(name);
             _views = null;
             this.type = JacksonConfiguration.constructType(beanProperty.asArgument(), typeFactory);
             _dynamicSerializers = PropertySerializerMap
                     .emptyForProperties();
-            // can't use super._suppressNulls here, because it's not set to the config value in this constructor
-            shouldSuppressNulls = shouldSuppressNulls(config.getDefaultPropertyInclusion().getValueInclusion() != JsonInclude.Include.ALWAYS);
             this.unwrapping = introspection.hasAnnotation(JsonUnwrapped.class);
         }
 
@@ -691,11 +778,6 @@ public class BeanIntrospectionModule extends SimpleModule {
         @Override
         public String getName() {
             return fastName.getValue();
-        }
-
-        @Override
-        public boolean willSuppressNulls() {
-            return shouldSuppressNulls || super.willSuppressNulls();
         }
 
         @Override

@@ -5,7 +5,6 @@ buildscript {
     }
     dependencies {
         classpath "gradle.plugin.com.github.jengelman.gradle.plugins:shadow:7.0.0"
-        classpath "io.micronaut.build.internal:micronaut-gradle-plugins:4.2.1"
         classpath "org.aim42:htmlSanityCheck:${libs.versions.htmlSanityCheck.get()}"
         classpath 'javax.xml.bind:jaxb-api:2.3.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${libs.versions.managed.kotlin.asProvider().get()}"
@@ -75,11 +74,11 @@ subprojects { Project subproject ->
         shadowJarEnabled = false
     }
 
+    group projectGroupId
+
     if (subproject.name.contains("bom") || subproject.name.contains("parent")) {
         return
     }
-
-    group projectGroupId
 
     apply plugin: "io.micronaut.build.internal.common"
     if (!subproject.name.startsWith('test-') &&
@@ -105,6 +104,7 @@ subprojects { Project subproject ->
     tasks.withType(JavaCompile).configureEach {
        options.compilerArgs.add("-Amicronaut.processing.group=$project.group")
        options.compilerArgs.add("-Amicronaut.processing.module=micronaut-$project.name")
+       options.compilerArgs.add("-Amicronaut.processing.omit.confprop.injectpoints=true")
        options.forkOptions.memoryMaximumSize = "2g"
     }
     tasks.withType(GroovyCompile).configureEach {

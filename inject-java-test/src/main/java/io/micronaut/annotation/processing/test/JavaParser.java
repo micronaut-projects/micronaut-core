@@ -282,11 +282,12 @@ public class JavaParser implements Closeable {
 
     private Set<String> getCompilerOptions() {
         Set<String> options;
-        if (Jvm.getCurrent().isJava15Compatible()) {
+        final Jvm jvm = Jvm.getCurrent();
+        if (jvm.isJava15Compatible() && !jvm.isJava17Compatible()) {
             options = CollectionUtils.setOf(
                     "--enable-preview",
                     "-source",
-                    Jvm.getCurrent().getJavaSpecificationVersion()
+                    jvm.getJavaSpecificationVersion()
             );
         } else {
             options = Collections.emptySet();

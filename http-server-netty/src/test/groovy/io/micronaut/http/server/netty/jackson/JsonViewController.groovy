@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonView
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 
@@ -66,5 +67,11 @@ class JsonViewController {
     @Get("/reactive/multiple")
     Flux<TestModel> publicReactiveViewMultiple() {
         return Flux.just(TEST_MODEL, TEST_MODEL)
+    }
+
+    @JsonView(Views.Admin)
+    @Post("/asBody")
+    HttpResponse<TestModel> asBody(@JsonView(Views.Public) TestModel model) {
+        return HttpResponse.ok(model)
     }
 }

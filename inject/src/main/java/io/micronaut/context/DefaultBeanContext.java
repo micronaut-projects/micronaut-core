@@ -500,20 +500,15 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public <T> Optional<BeanRegistration<T>> findBeanRegistration(T bean) {
+        if (bean == null) {
+            return Optional.empty();
+        }
         for (BeanRegistration beanRegistration : singletonObjects.values()) {
             if (bean == beanRegistration.getBean()) {
                 return Optional.of(beanRegistration);
             }
         }
-
-        Collection<CustomScope> scopes = getBeansOfType(CustomScope.class);
-        for (CustomScope<?> scope : scopes) {
-            Optional<BeanRegistration<T>> beanRegistration = scope.findBeanRegistration(bean);
-            if (beanRegistration.isPresent()) {
-                return beanRegistration;
-            }
-        }
-        return Optional.empty();
+        return customScopeRegistry.findBeanRegistration(bean);
     }
 
     @Override
