@@ -46,6 +46,10 @@ public final class JsonStreamConfig {
     }
 
     /**
+     * Whether all normal floating point literals should be represented as {@link java.math.BigDecimal}. Note that
+     * {@link Float#NaN}, {@link Float#POSITIVE_INFINITY} and {@link Float#NEGATIVE_INFINITY} may still be represented
+     * as float, if the input supports those literals.
+     *
      * @param useBigDecimalForFloats The new value for {@link #useBigDecimalForFloats}
      * @return A copy of this config instance, with {@link #useBigDecimalForFloats} set to the new value.
      */
