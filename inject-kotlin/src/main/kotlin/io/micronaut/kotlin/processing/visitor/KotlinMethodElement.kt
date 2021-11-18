@@ -8,7 +8,7 @@ import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.ParameterElement
 
-class KotlinMethodElement(
+open class KotlinMethodElement(
     private val method: KSDeclaration,
     private val declaringType: ClassElement,
     annotationMetadata: AnnotationMetadata,

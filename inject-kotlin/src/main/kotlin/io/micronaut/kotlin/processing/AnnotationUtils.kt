@@ -2,6 +2,7 @@ package io.micronaut.kotlin.processing
 
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
+import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import io.micronaut.core.annotation.AnnotationMetadata
@@ -23,8 +24,8 @@ class AnnotationUtils(private val environment: SymbolProcessorEnvironment,
 
     companion object {
         const val CACHE_SIZE = 100
-        val annotationMetadataCache: ConcurrentLinkedHashMap<KSDeclaration, AnnotationMetadata> =
-            ConcurrentLinkedHashMap.Builder<KSDeclaration, AnnotationMetadata>().maximumWeightedCapacity(CACHE_SIZE.toLong())
+        val annotationMetadataCache: ConcurrentLinkedHashMap<KSAnnotated, AnnotationMetadata> =
+            ConcurrentLinkedHashMap.Builder<KSAnnotated, AnnotationMetadata>().maximumWeightedCapacity(CACHE_SIZE.toLong())
                 .build()
     }
 
@@ -104,7 +105,7 @@ class AnnotationUtils(private val environment: SymbolProcessorEnvironment,
      * @param element The element
      * @return The [AnnotationMetadata]
      */
-    fun getAnnotationMetadata(element: KSDeclaration): AnnotationMetadata {
+    fun getAnnotationMetadata(element: KSAnnotated): AnnotationMetadata {
         var metadata: AnnotationMetadata? = annotationMetadataCache[element]
         if (metadata == null) {
             metadata = annotationMetadataBuilder.buildOverridden(element)
@@ -119,7 +120,7 @@ class AnnotationUtils(private val environment: SymbolProcessorEnvironment,
      * @param element The element
      * @return The [AnnotationMetadata]
      */
-    fun getDeclaredAnnotationMetadata(element: KSDeclaration): AnnotationMetadata {
+    fun getDeclaredAnnotationMetadata(element: KSAnnotated): AnnotationMetadata {
         return annotationMetadataBuilder.buildDeclared(element)
     }
 
@@ -133,7 +134,7 @@ class AnnotationUtils(private val environment: SymbolProcessorEnvironment,
      * @param element The element
      * @return The [AnnotationMetadata]
      */
-    fun getAnnotationMetadata(parent: KSDeclaration, element: KSDeclaration): AnnotationMetadata {
+    fun getAnnotationMetadata(parent: KSAnnotated, element: KSAnnotated): AnnotationMetadata {
         return newAnnotationBuilder().buildForParent(parent, element)
     }
 

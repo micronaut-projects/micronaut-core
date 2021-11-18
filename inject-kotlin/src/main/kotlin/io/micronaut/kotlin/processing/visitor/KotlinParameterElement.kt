@@ -6,7 +6,7 @@ import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ParameterElement
 
 class KotlinParameterElement(
-    private val classElement: KotlinClassElement,
+    private val classElement: ClassElement,
     private val parameter: KSValueParameter,
     annotationMetadata: AnnotationMetadata,
     visitorContext: KotlinVisitorContext

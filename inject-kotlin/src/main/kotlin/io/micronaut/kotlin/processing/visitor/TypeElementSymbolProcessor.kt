@@ -101,6 +101,7 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
                 environment.logger.error("Error finalizing type visitor  [${loadedVisitor.visitor}]: ${e.message}")
             }
         }
+        visitorContext.finish()
     }
 
     override fun onError() {
