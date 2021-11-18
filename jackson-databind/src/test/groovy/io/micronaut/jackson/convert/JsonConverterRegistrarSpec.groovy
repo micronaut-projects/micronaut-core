@@ -17,7 +17,7 @@ class JsonConverterRegistrarSpec extends Specification {
         converter.convert(JsonNode.createArrayNode([JsonNode.createStringNode("foo")]), Argument.of(List, String)).get() == ['foo']
         converter.convert(JsonNode.createArrayNode([JsonNode.createStringNode("foo")]), Argument.of(Set, String)).get() == new HashSet(['foo'])
         // SortedSet not supported
-        converter.convert(JsonNode.createArrayNode([JsonNode.createStringNode("foo")]), Argument.of(SortedSet, String)).isEmpty()
+        !converter.convert(JsonNode.createArrayNode([JsonNode.createStringNode("foo")]), Argument.of(SortedSet, String)).isPresent()
     }
 
     def 'json node to ConvertibleValues'() {
@@ -26,8 +26,8 @@ class JsonConverterRegistrarSpec extends Specification {
         def converter = ctx.getBean(ConversionService)
 
         expect:
-        converter.convert(JsonNode.createArrayNode([JsonNode.createStringNode("foo")]), Argument.of(ConvertibleValues, String)).isEmpty()
+        !converter.convert(JsonNode.createArrayNode([JsonNode.createStringNode("foo")]), Argument.of(ConvertibleValues, String)).isPresent()
         converter.convert(JsonNode.createObjectNode(['bar': JsonNode.createStringNode("foo")]), Argument.of(ConvertibleValues, String)).get().asMap(String, String) == ['bar': 'foo']
-        converter.convert(JsonNode.createStringNode("foo"), Argument.of(ConvertibleValues, String)).isEmpty()
+        !converter.convert(JsonNode.createStringNode("foo"), Argument.of(ConvertibleValues, String)).isPresent()
     }
 }
