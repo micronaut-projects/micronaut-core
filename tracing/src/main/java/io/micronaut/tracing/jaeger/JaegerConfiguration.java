@@ -16,15 +16,19 @@
 package io.micronaut.tracing.jaeger;
 
 import io.jaegertracing.Configuration;
+import io.jaegertracing.internal.propagation.B3TextMapCodec;
+import io.jaegertracing.internal.propagation.BinaryCodec;
+import io.jaegertracing.internal.propagation.TextMapCodec;
+import io.jaegertracing.internal.propagation.TraceContextCodec;
 import io.jaegertracing.spi.MetricsFactory;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.runtime.ApplicationConfiguration;
+import io.opentracing.propagation.Format;
 import jakarta.inject.Inject;
 
 import static io.jaegertracing.Configuration.JAEGER_SERVICE_NAME;
@@ -62,8 +66,8 @@ public class JaegerConfiguration implements Toggleable  {
      * @param applicationConfiguration The common application configurations
      */
     public JaegerConfiguration(ApplicationConfiguration applicationConfiguration) {
-        if (StringUtils.isEmpty(CachedEnvironment.getProperty(JAEGER_SERVICE_NAME))
-                && StringUtils.isEmpty(CachedEnvironment.getenv(JAEGER_SERVICE_NAME))) {
+        if (StringUtils.isEmpty(System.getProperty(JAEGER_SERVICE_NAME))
+                && StringUtils.isEmpty(System.getenv(JAEGER_SERVICE_NAME))) {
             System.setProperty(JAEGER_SERVICE_NAME, applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME));
         }
         configuration = Configuration.fromEnv();
@@ -183,6 +187,18 @@ public class JaegerConfiguration implements Toggleable  {
     }
 
     /**
+     * Sets the codec configuration.
+     * @author Manuel Martin
+     * @param codecConfiguration The codec configuration
+     */
+    @Inject
+    public void setCodecConfiguration(@Nullable JaegerCodecConfiguration codecConfiguration) {
+        if (codecConfiguration != null) {
+            configuration.withCodec(codecConfiguration.getCodecConfiguration());
+        }
+    }
+
+    /**
      * Sets the metrics factory to use.
      *
      * @param metricsFactory The metrics factory
@@ -203,7 +219,7 @@ public class JaegerConfiguration implements Toggleable  {
         protected Configuration.SamplerConfiguration configuration = Configuration.SamplerConfiguration.fromEnv();
 
         /**
-         * @return The {@link io.jaegertracing.Configuration.SamplerConfiguration}
+         * @return The {@link Configuration.SamplerConfiguration}
          */
         public Configuration.SamplerConfiguration getSamplerConfiguration() {
             return configuration;
@@ -277,4 +293,56 @@ public class JaegerConfiguration implements Toggleable  {
             return configuration;
         }
     }
+
+    /**
+     * The codec configuration bean
+     * @author Manuel Martin
+     * @author Burt Beckwith
+     */
+    @ConfigurationProperties("codec")
+    public static class JaegerCodecConfiguration {
+
+        private String codecs;
+
+        public void setCodecs(String codecs) {
+            this.codecs = codecs;
+        }
+
+        public String getCodecs() {
+            return codecs;
+        }
+
+        /**
+         * @return The codec configuration
+         */
+        public Configuration.CodecConfiguration getCodecConfiguration() {
+            return Configuration.CodecConfiguration.fromString(codecs); // codec.codecs = "JAEGER, B3, W3C"
+        }
+        /*
+        // package io.jaegertracing;
+        [Configuration.java]
+        public Configuration.CodecConfiguration withPropagation(Configuration.Propagation propagation) {
+            switch (propagation) {
+                case JAEGER:
+                    addCodec(codecs, Format.Builtin.HTTP_HEADERS, new TextMapCodec(true));
+                    addCodec(codecs, Format.Builtin.TEXT_MAP, new TextMapCodec(false));
+                    addBinaryCodec(binaryCodecs, Format.Builtin.BINARY, new BinaryCodec());
+                    break;
+                case B3:
+                    addCodec(codecs, Format.Builtin.HTTP_HEADERS, new B3TextMapCodec.Builder().build());
+                    addCodec(codecs, Format.Builtin.TEXT_MAP, new B3TextMapCodec.Builder().build());
+                    break;
+                case W3C:
+                    addCodec(codecs, Format.Builtin.HTTP_HEADERS, new TraceContextCodec.Builder().build());
+                    addCodec(codecs, Format.Builtin.TEXT_MAP, new TraceContextCodec.Builder().build());
+                    break;
+                default:
+                    log.error("Unhandled propagation format '" + propagation + "'");
+            }
+            return this;
+        }
+        */
+
+    }
+
 }
