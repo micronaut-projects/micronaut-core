@@ -1287,6 +1287,14 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         } else if (value instanceof String[]) {
             final String[] existing = (String[]) value;
             return Arrays.copyOf(existing, existing.length);
+        } else if (value instanceof Iterable) {
+            List<String> list = new ArrayList();
+            for (Object entry: (Iterable) value) {
+                if (entry != null) {
+                    list.add(entry.toString());
+                }
+            }
+            return list.toArray(new String[0]);
         } else if (value != null) {
             if (value.getClass().isArray()) {
                 int len = Array.getLength(value);

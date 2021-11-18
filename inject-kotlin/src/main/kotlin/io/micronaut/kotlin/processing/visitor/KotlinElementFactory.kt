@@ -9,7 +9,7 @@ import io.micronaut.kotlin.processing.AnnotationUtils
 
 class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): ElementFactory<KSDeclaration, KSClassDeclaration, KSFunctionDeclaration, KSPropertyDeclaration> {
 
-    override fun newClassElement(type: KSClassDeclaration, annotationMetadata: AnnotationMetadata): ClassElement {
+    override fun newClassElement(type: KSClassDeclaration, annotationMetadata: AnnotationMetadata): KotlinClassElement {
         return KotlinClassElement(type, annotationMetadata, visitorContext)
     }
 
@@ -17,7 +17,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         type: KSClassDeclaration,
         annotationMetadata: AnnotationMetadata,
         resolvedGenerics: Map<String, ClassElement>
-    ): ClassElement {
+    ): KotlinClassElement {
         return KotlinClassElement(type, annotationMetadata, visitorContext)
     }
 
@@ -58,11 +58,14 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
     }
 
     override fun newConstructorElement(
-        declaringClass: ClassElement?,
+        declaringClass: ClassElement,
         constructor: KSFunctionDeclaration,
         annotationMetadata: AnnotationMetadata
     ): ConstructorElement {
-        TODO("Not yet implemented")
+        val annotationUtils = visitorContext.getAnnotationUtils()
+        return KotlinConstructorElement(constructor, declaringClass, annotationMetadata, visitorContext, declaringClass, constructor.parameters.map { param ->
+            KotlinParameterElement(declaringClass, param, annotationUtils.getAnnotationMetadata(param), visitorContext)
+        })
     }
 
     override fun newFieldElement(

@@ -8,29 +8,32 @@ import io.micronaut.inject.visitor.VisitorContext
 import java.lang.annotation.RetentionPolicy
 import java.util.*
 
-class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSDeclaration, KSAnnotation>() {
+class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSAnnotated, KSAnnotation>() {
 
-    override fun isMethodOrClassElement(element: KSDeclaration): Boolean {
+    override fun isMethodOrClassElement(element: KSAnnotated): Boolean {
         return element is KSClassDeclaration || element is KSFunctionDeclaration
     }
 
-    override fun getDeclaringType(element: KSDeclaration): String {
-        val closestClassDeclaration = element.closestClassDeclaration()
-        if (closestClassDeclaration != null) {
-            return closestClassDeclaration.qualifiedName!!.asString()
+    override fun getDeclaringType(element: KSAnnotated): String {
+        if (element is KSDeclaration) {
+            val closestClassDeclaration = element.closestClassDeclaration()
+            if (closestClassDeclaration != null) {
+                return closestClassDeclaration.qualifiedName!!.asString()
+            }
+            return element.simpleName.asString()
         }
-        return element.simpleName.asString()
+        TODO("Not yet implemented")
     }
 
     override fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSDeclaration {
         return annotationMirror.annotationType.resolve().declaration
     }
 
-    override fun hasAnnotation(element: KSDeclaration, annotation: Class<out Annotation>): Boolean {
+    override fun hasAnnotation(element: KSAnnotated, annotation: Class<out Annotation>): Boolean {
         return hasAnnotation(element, annotation.name)
     }
 
-    override fun hasAnnotation(element: KSDeclaration, annotation: String): Boolean {
+    override fun hasAnnotation(element: KSAnnotated, annotation: String): Boolean {
         return element.annotations.map {
             it.annotationType.resolve().declaration.qualifiedName
         }.any {
@@ -38,7 +41,7 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSDecla
         }
     }
 
-    override fun hasAnnotations(element: KSDeclaration): Boolean {
+    override fun hasAnnotations(element: KSAnnotated): Boolean {
         return element.annotations.iterator().hasNext()
     }
 
@@ -46,28 +49,31 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSDecla
         return getTypeForAnnotation(annotationMirror).qualifiedName!!.asString()
     }
 
-    override fun getElementName(element: KSDeclaration): String {
-        return if (element is KSClassDeclaration) {
-            element.qualifiedName!!.asString()
-        } else {
-            element.simpleName.asString()
+    override fun getElementName(element: KSAnnotated): String {
+        if (element is KSDeclaration) {
+            return if (element is KSClassDeclaration) {
+                element.qualifiedName!!.asString()
+            } else {
+                element.simpleName.asString()
+            }
         }
+        TODO("Not yet implemented")
     }
 
-    override fun getAnnotationsForType(element: KSDeclaration): MutableList<out KSAnnotation> {
+    override fun getAnnotationsForType(element: KSAnnotated): MutableList<out KSAnnotation> {
         return element.annotations.toMutableList()
     }
 
     override fun buildHierarchy(
-        element: KSDeclaration,
+        element: KSAnnotated,
         inheritTypeAnnotations: Boolean,
         declaredOnly: Boolean
-    ): MutableList<KSDeclaration> {
+    ): MutableList<KSAnnotated> {
         if (declaredOnly) {
             return mutableListOf(element)
         }
         if (element is KSClassDeclaration) {
-            val hierarchy = mutableListOf<KSDeclaration>()
+            val hierarchy = mutableListOf<KSAnnotated>()
             hierarchy.add(element)
             if (element.classKind == ClassKind.ANNOTATION_CLASS) {
                 return hierarchy
@@ -81,9 +87,9 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSDecla
     }
 
     override fun readAnnotationRawValues(
-        originatingElement: KSDeclaration,
+        originatingElement: KSAnnotated,
         annotationName: String,
-        member: KSDeclaration,
+        member: KSAnnotated,
         memberName: String,
         annotationValue: Any,
         annotationValues: MutableMap<CharSequence, Any>
@@ -97,21 +103,21 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSDecla
         }
     }
 
-    override fun isValidationRequired(member: KSDeclaration?): Boolean {
+    override fun isValidationRequired(member: KSAnnotated?): Boolean {
         TODO("Not yet implemented")
     }
 
-    override fun addError(originatingElement: KSDeclaration, error: String) {
+    override fun addError(originatingElement: KSAnnotated, error: String) {
         TODO("Not yet implemented")
     }
 
-    override fun addWarning(originatingElement: KSDeclaration, warning: String) {
+    override fun addWarning(originatingElement: KSAnnotated, warning: String) {
         TODO("Not yet implemented")
     }
 
     override fun readAnnotationValue(
-        originatingElement: KSDeclaration,
-        member: KSDeclaration,
+        originatingElement: KSAnnotated,
+        member: KSAnnotated,
         memberName: String,
         annotationValue: Any
     ): Any? {
@@ -124,7 +130,7 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSDecla
 
     override fun readAnnotationDefaultValues(
         annotationName: String,
-        annotationType: KSDeclaration
+        annotationType: KSAnnotated
     ): MutableMap<out KSDeclaration, *> {
         return mutableMapOf<KSDeclaration, Any>()
     }
@@ -142,8 +148,8 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSDecla
     }
 
     override fun getAnnotationValues(
-        originatingElement: KSDeclaration,
-        member: KSDeclaration,
+        originatingElement: KSAnnotated,
+        member: KSAnnotated,
         annotationType: Class<*>
     ): OptionalValues<*> {
         val annotationMirrors: List<KSAnnotation> = member.annotations.toList()
@@ -169,15 +175,18 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSDecla
         return OptionalValues.empty<Any>()
     }
 
-    override fun getAnnotationMemberName(member: KSDeclaration): String {
-        return member.simpleName.asString()
+    override fun getAnnotationMemberName(member: KSAnnotated): String {
+        if (member is KSDeclaration) {
+            return member.simpleName.asString()
+        }
+        TODO("Not yet implemented")
     }
 
     override fun getRepeatableName(annotationMirror: KSAnnotation?): String? {
         TODO("Not yet implemented")
     }
 
-    override fun getRepeatableNameForType(annotationType: KSDeclaration): String? {
+    override fun getRepeatableNameForType(annotationType: KSAnnotated): String? {
         val name = java.lang.annotation.Repeatable::class.java.name
         val repeatable = annotationType.annotations.find {
             it.annotationType.resolve().declaration.qualifiedName?.asString() == name
@@ -191,11 +200,11 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSDecla
         return null
     }
 
-    override fun getAnnotationMirror(annotationName: String?): Optional<KSDeclaration> {
+    override fun getAnnotationMirror(annotationName: String?): Optional<KSAnnotated> {
         TODO("Not yet implemented")
     }
 
-    override fun getAnnotationMember(originatingElement: KSDeclaration?, member: CharSequence?): KSDeclaration? {
+    override fun getAnnotationMember(originatingElement: KSAnnotated?, member: CharSequence?): KSDeclaration? {
         TODO("Not yet implemented")
     }
 
@@ -203,7 +212,7 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSDecla
         TODO("Not yet implemented")
     }
 
-    override fun getRetentionPolicy(annotation: KSDeclaration): RetentionPolicy {
+    override fun getRetentionPolicy(annotation: KSAnnotated): RetentionPolicy {
         val retention = annotation.annotations.find {
             getAnnotationTypeName(it) == java.lang.annotation.Retention::class.java.name
         }
@@ -220,11 +229,11 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSDecla
         TODO("Not yet implemented")
     }
 
-    override fun isInheritedAnnotationType(annotationType: KSDeclaration): Boolean {
+    override fun isInheritedAnnotationType(annotationType: KSAnnotated): Boolean {
         TODO("Not yet implemented")
     }
 
-    private fun populateTypeHierarchy(element: KSClassDeclaration, hierarchy: MutableList<KSDeclaration>) {
+    private fun populateTypeHierarchy(element: KSClassDeclaration, hierarchy: MutableList<KSAnnotated>) {
         element.superTypes.forEach {
             val declaration = it.resolve().declaration
             hierarchy.add(declaration)

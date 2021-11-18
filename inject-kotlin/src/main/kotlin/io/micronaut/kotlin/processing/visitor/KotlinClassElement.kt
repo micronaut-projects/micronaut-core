@@ -1,12 +1,14 @@
 package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.getClassDeclarationByName
+import com.google.devtools.ksp.getConstructors
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.core.annotation.NonNull
 import io.micronaut.inject.ast.*
 import java.util.*
 import java.util.function.Predicate
+import java.util.stream.Collectors
+import javax.lang.model.element.ExecutableElement
 
 class KotlinClassElement(private val classDeclaration: KSClassDeclaration,
                          annotationMetadata: AnnotationMetadata,
@@ -52,6 +54,45 @@ class KotlinClassElement(private val classDeclaration: KSClassDeclaration,
 
     override fun getAllTypeArguments(): Map<String, Map<String, ClassElement>> {
         return emptyMap()
+    }
+
+    override fun getDefaultConstructor(): Optional<MethodElement> {
+        val constructors = classDeclaration.getConstructors()
+            .filter {
+                it.parameters.isEmpty()
+            }.toList()
+
+        if (constructors.isEmpty()) {
+            return Optional.empty()
+        }
+
+        val constructor = if (constructors.size == 1) {
+           constructors.get(0)
+        } else {
+            constructors.filter {
+                it.modifiers.contains(Modifier.PUBLIC)
+            }.firstOrNull()
+        }
+
+        return Optional.ofNullable(constructor)
+            .map { ctor ->
+                visitorContext.elementFactory.newConstructorElement(
+                    this,
+                    ctor,
+                    visitorContext.getAnnotationUtils().getAnnotationMetadata(ctor)
+                )
+            }
+    }
+
+    override fun getPrimaryConstructor(): Optional<MethodElement> {
+        return Optional.ofNullable(classDeclaration.primaryConstructor)
+            .map { ctor ->
+                visitorContext.elementFactory.newConstructorElement(
+                    this,
+                    ctor,
+                    visitorContext.getAnnotationUtils().getAnnotationMetadata(ctor)
+                )
+            }
     }
 
     override fun getEnclosingType(): Optional<ClassElement> {
@@ -212,6 +253,17 @@ class KotlinClassElement(private val classDeclaration: KSClassDeclaration,
     }
 
     override fun getBeanProperties(): MutableList<PropertyElement> {
-        TODO("not yet implemented")
+        val annotationUtils = visitorContext.getAnnotationUtils()
+        val elementFactory = visitorContext.elementFactory
+
+        return classDeclaration.getAllProperties().map {
+            val type = it.type.resolve().declaration as KSClassDeclaration
+
+            KotlinPropertyElement(this,
+                elementFactory.newClassElement(type, annotationUtils.getAnnotationMetadata(type)),
+                it,
+                annotationUtils.getAnnotationMetadata(it),
+                visitorContext)
+        }.toMutableList()
     }
 }
