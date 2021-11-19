@@ -1180,27 +1180,33 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                     @Override
                     public void onError(Throwable t) {
-                        context.writeAndFlush(nettyResponse)
-                                .addListener(requestCompletor);
+                        syncWriteAndFlushNettyResponse(context, request, nettyResponse, requestCompletor);
                     }
 
                     @Override
                     public void onComplete() {
-                        context.writeAndFlush(nettyResponse)
-                                .addListener(requestCompletor);
+                        syncWriteAndFlushNettyResponse(context, request, nettyResponse, requestCompletor);
                     }
                 });
             } else {
-                context.writeAndFlush(nettyResponse)
-                        .addListener(requestCompletor);
-
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Response {} - {} {}",
-                            nettyResponse.status().code(),
-                            request.getMethodName(),
-                            request.getUri());
-                }
+                syncWriteAndFlushNettyResponse(context, request, nettyResponse, requestCompletor);
             }
+        }
+    }
+
+    private void syncWriteAndFlushNettyResponse(
+            ChannelHandlerContext context,
+            HttpRequest<?> request,
+            io.netty.handler.codec.http.HttpResponse nettyResponse,
+            GenericFutureListener<Future<? super Void>> requestCompletor
+    ) {
+        context.writeAndFlush(nettyResponse).addListener(requestCompletor);
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Response {} - {} {}",
+                    nettyResponse.status().code(),
+                    request.getMethodName(),
+                    request.getUri());
         }
     }
 
