@@ -577,13 +577,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         );
 
                         AnnotationMetadataHierarchy annotationMetadata = new AnnotationMetadataHierarchy(concreteClassMetadata, constructorAnnotationMetadata);
-                        final String[] readPrefixes = annotationMetadata.findAnnotation(AccessorsStyle.class)
-                                .filter(annotationValue -> !ArrayUtils.isEmpty(annotationValue.stringValues("readPrefixes")))
-                                .map(annotationValue -> annotationValue.stringValues("readPrefixes"))
+                        final String[] readPrefixes = annotationMetadata.getValue(AccessorsStyle.class, "readPrefixes", String[].class)
                                 .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
-                        final String[] writePrefixes = annotationMetadata.findAnnotation(AccessorsStyle.class)
-                                .filter(annotationValue -> !ArrayUtils.isEmpty(annotationValue.stringValues("writePrefixes")))
-                                .map(annotationValue -> annotationValue.stringValues("writePrefixes"))
+                        final String[] writePrefixes = annotationMetadata.getValue(AccessorsStyle.class, "writePrefixes", String[].class)
                                 .orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX});
 
                         ElementFilter.methodsIn(members).forEach(method -> {
@@ -746,9 +742,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                     aopProxyWriter.setValidated(IS_CONSTRAINT.test(annotationMetadata));
                                 }
 
-                                final String[] readPrefixes = declaringClassElement.findAnnotation(AccessorsStyle.class)
-                                        .filter(annotationValue -> !ArrayUtils.isEmpty(annotationValue.stringValues("readPrefixes")))
-                                        .map(annotationValue -> annotationValue.stringValues("readPrefixes"))
+                                final String[] readPrefixes = declaringClassElement.getValue(AccessorsStyle.class, "readPrefixes", String[].class)
                                         .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
 
                                 if (!NameUtils.isReaderName(methodName, readPrefixes)) {

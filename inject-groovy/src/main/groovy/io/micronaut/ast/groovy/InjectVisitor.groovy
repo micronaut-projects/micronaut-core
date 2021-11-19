@@ -383,9 +383,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     }
                 }
 
-                final String[] readPrefixes = annotationMetadata.findAnnotation(AccessorsStyle.class)
-                    .filter(annotationValue -> !ArrayUtils.isEmpty(annotationValue.stringValues("readPrefixes")))
-                    .map(annotationValue -> annotationValue.stringValues("readPrefixes"))
+                final String[] readPrefixes = annotationMetadata.getValue(AccessorsStyle.class, "readPrefixes", String[].class)
                     .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX})
 
                 if (isConfigurationProperties && methodNode.isAbstract()) {
@@ -597,14 +595,10 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             } else if (isConfigurationProperties && isPublic) {
                 methodAnnotationMetadata = AstAnnotationUtils.newBuilder(sourceUnit, compilationUnit).buildDeclared(methodNode)
 
-                final String[] readPrefixes = declaringElement.findAnnotation(AccessorsStyle.class)
-                    .filter(annotationValue -> !ArrayUtils.isEmpty(annotationValue.stringValues("readPrefixes")))
-                    .map(annotationValue -> annotationValue.stringValues("readPrefixes"))
-                    .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
-                final String[] writePrefixes = declaringElement.findAnnotation(AccessorsStyle.class)
-                    .filter(annotationValue -> !ArrayUtils.isEmpty(annotationValue.stringValues("writePrefixes")))
-                    .map(annotationValue -> annotationValue.stringValues("writePrefixes"))
-                    .orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX});
+                final String[] readPrefixes = declaringElement.getValue(AccessorsStyle.class, "readPrefixes", String[].class)
+                    .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX})
+                final String[] writePrefixes = declaringElement.getValue(AccessorsStyle.class, "writePrefixes", String[].class)
+                    .orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX})
 
                 if (NameUtils.isWriterName(methodNode.name, writePrefixes) && methodNode.parameters.length == 1) {
                     String propertyName = NameUtils.getPropertyNameForSetter(methodNode.name, writePrefixes)
