@@ -15,16 +15,34 @@
  */
 package io.micronaut.annotation.processing;
 
-import io.micronaut.aop.*;
-import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.annotation.processing.visitor.JavaElementFactory;
 import io.micronaut.annotation.processing.visitor.JavaMethodElement;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
+import io.micronaut.aop.Adapter;
+import io.micronaut.aop.Interceptor;
+import io.micronaut.aop.InterceptorBinding;
+import io.micronaut.aop.InterceptorKind;
+import io.micronaut.aop.Introduction;
+import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.aop.writer.AopProxyWriter;
-import io.micronaut.context.annotation.*;
-import io.micronaut.core.annotation.*;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.ConfigurationBuilder;
+import io.micronaut.context.annotation.ConfigurationInject;
+import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.context.annotation.Context;
+import io.micronaut.context.annotation.DefaultScope;
+import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Property;
+import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.AccessorsStyle;
+import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -34,34 +52,66 @@ import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
-import io.micronaut.inject.ast.*;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.configuration.ConfigurationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.BeanElementVisitor;
 import io.micronaut.inject.visitor.VisitorConfiguration;
-import io.micronaut.inject.writer.*;
+import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
+import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
+import io.micronaut.inject.writer.BeanDefinitionVisitor;
+import io.micronaut.inject.writer.BeanDefinitionWriter;
+import io.micronaut.inject.writer.OriginatingElements;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
+import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
-import javax.lang.model.element.*;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Modifier;
+import javax.lang.model.element.Name;
 import javax.lang.model.element.PackageElement;
-import javax.lang.model.type.*;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.TypeParameterElement;
+import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.PrimitiveType;
+import javax.lang.model.type.TypeKind;
+import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.TypeVariable;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.ElementScanner8;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-import static javax.lang.model.element.ElementKind.*;
+import static javax.lang.model.element.ElementKind.ANNOTATION_TYPE;
+import static javax.lang.model.element.ElementKind.CONSTRUCTOR;
+import static javax.lang.model.element.ElementKind.ENUM;
+import static javax.lang.model.element.ElementKind.FIELD;
 
 /**
  * <p>The core annotation processor used to generate bean definitions and power AOP for Micronaut.</p>
@@ -525,6 +575,17 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                     }
                                 }
                         );
+
+                        AnnotationMetadataHierarchy annotationMetadata = new AnnotationMetadataHierarchy(concreteClassMetadata, constructorAnnotationMetadata);
+                        final String[] readPrefixes = annotationMetadata.findAnnotation(AccessorsStyle.class)
+                                .filter(annotationValue -> !ArrayUtils.isEmpty(annotationValue.stringValues("readPrefixes")))
+                                .map(annotationValue -> annotationValue.stringValues("readPrefixes"))
+                                .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
+                        final String[] writePrefixes = annotationMetadata.findAnnotation(AccessorsStyle.class)
+                                .filter(annotationValue -> !ArrayUtils.isEmpty(annotationValue.stringValues("writePrefixes")))
+                                .map(annotationValue -> annotationValue.stringValues("writePrefixes"))
+                                .orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX});
+
                         ElementFilter.methodsIn(members).forEach(method -> {
                             boolean isCandidateMethod = !modelUtils.isStatic(method) &&
                                     !modelUtils.isPrivate(method) &&
@@ -533,10 +594,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 Element e = method.getEnclosingElement();
                                 if (e instanceof TypeElement && !e.equals(classElement)) {
                                     String methodName = method.getSimpleName().toString();
-                                    if (method.getParameters().size() == 1 &&
-                                            NameUtils.isSetterName(methodName)) {
+                                    if (NameUtils.isWriterName(methodName, writePrefixes) && method.getParameters().size() == 1) {
                                         visitConfigurationPropertySetter(method);
-                                    } else if (NameUtils.isGetterName(methodName)) {
+                                    } else if (NameUtils.isReaderName(methodName, readPrefixes)) {
                                         BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
                                         if (!writer.isValidated()) {
                                             writer.setValidated(IS_CONSTRAINT.test(annotationUtils.getAnnotationMetadata(method)));
@@ -686,8 +746,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                     aopProxyWriter.setValidated(IS_CONSTRAINT.test(annotationMetadata));
                                 }
 
-                                if (!NameUtils.isGetterName(methodName)) {
-                                    error(classElement, "Only getter methods are allowed on @ConfigurationProperties interfaces: " + method);
+                                final String[] readPrefixes = declaringClassElement.findAnnotation(AccessorsStyle.class)
+                                        .filter(annotationValue -> !ArrayUtils.isEmpty(annotationValue.stringValues("readPrefixes")))
+                                        .map(annotationValue -> annotationValue.stringValues("readPrefixes"))
+                                        .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
+
+                                if (!NameUtils.isReaderName(methodName, readPrefixes)) {
+                                    error(classElement, "Only getter methods are allowed on @ConfigurationProperties interfaces: " + method + ". You can change the accessors using @AccessorsStyle annotation");
                                     return;
                                 }
 
@@ -697,7 +762,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 }
 
                                 String docComment = elementUtils.getDocComment(method);
-                                final String propertyName = NameUtils.getPropertyNameForGetter(methodName);
+                                final String propertyName = NameUtils.getPropertyNameForGetter(methodName, readPrefixes);
                                 final String propertyType = javaMethodElement.getReturnType().getName();
 
                                 if ("void".equals(propertyType)) {

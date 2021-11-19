@@ -43,6 +43,7 @@ import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Value
+import io.micronaut.core.annotation.AccessorsStyle
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
@@ -382,13 +383,18 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     }
                 }
 
+                final String[] readPrefixes = annotationMetadata.findAnnotation(AccessorsStyle.class)
+                    .filter(annotationValue -> !ArrayUtils.isEmpty(annotationValue.stringValues("readPrefixes")))
+                    .map(annotationValue -> annotationValue.stringValues("readPrefixes"))
+                    .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX})
+
                 if (isConfigurationProperties && methodNode.isAbstract()) {
                     if (!aopProxyWriter.isValidated()) {
                         aopProxyWriter.setValidated(InjectTransform.IS_CONSTRAINT.test(annotationMetadata))
                     }
 
-                    if (!NameUtils.isGetterName(methodNode.name)) {
-                        error("Only getter methods are allowed on @ConfigurationProperties interfaces: " + methodNode.name, classNode)
+                    if (!NameUtils.isReaderName(methodNode.name, readPrefixes)) {
+                        error("Only getter methods are allowed on @ConfigurationProperties interfaces: " + methodNode.name + ". You can change the accessors using @AccessorsStyle annotation)", classNode)
                         return
                     }
 
@@ -396,7 +402,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         error("Only zero argument getter methods are allowed on @ConfigurationProperties interfaces: " + methodNode.name, classNode)
                         return
                     }
-                    String propertyName = NameUtils.getPropertyNameForGetter(methodNode.name)
+                    String propertyName = NameUtils.getPropertyNameForGetter(methodNode.name, readPrefixes)
                     String propertyType = methodNode.returnType.name
 
                     if ("void".equals(propertyType)) {
@@ -590,8 +596,18 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 }
             } else if (isConfigurationProperties && isPublic) {
                 methodAnnotationMetadata = AstAnnotationUtils.newBuilder(sourceUnit, compilationUnit).buildDeclared(methodNode)
-                if (NameUtils.isSetterName(methodNode.name) && methodNode.parameters.length == 1) {
-                    String propertyName = NameUtils.getPropertyNameForSetter(methodNode.name)
+
+                final String[] readPrefixes = declaringElement.findAnnotation(AccessorsStyle.class)
+                    .filter(annotationValue -> !ArrayUtils.isEmpty(annotationValue.stringValues("readPrefixes")))
+                    .map(annotationValue -> annotationValue.stringValues("readPrefixes"))
+                    .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
+                final String[] writePrefixes = declaringElement.findAnnotation(AccessorsStyle.class)
+                    .filter(annotationValue -> !ArrayUtils.isEmpty(annotationValue.stringValues("writePrefixes")))
+                    .map(annotationValue -> annotationValue.stringValues("writePrefixes"))
+                    .orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX});
+
+                if (NameUtils.isWriterName(methodNode.name, writePrefixes) && methodNode.parameters.length == 1) {
+                    String propertyName = NameUtils.getPropertyNameForSetter(methodNode.name, writePrefixes)
                     MethodElement groovyMethodElement = elementFactory.newMethodElement(
                             declaringElement,
                             methodNode,
@@ -602,7 +618,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     if (methodAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
                         getBeanWriter().visitConfigBuilderMethod(
                                 parameterElement.type,
-                                NameUtils.getterNameFor(propertyName),
+                                NameUtils.getterNameFor(propertyName, readPrefixes),
                                 methodAnnotationMetadata,
                                 configurationMetadataBuilder,
                                 parameterElement.type.interface
@@ -639,7 +655,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                                 true
                         )
                     }
-                } else if (NameUtils.isGetterName(methodNode.name)) {
+                } else if (NameUtils.isReaderName(methodNode.name, readPrefixes)) {
                     if (!getBeanWriter().isValidated()) {
                         getBeanWriter().setValidated(InjectTransform.IS_CONSTRAINT.test(methodAnnotationMetadata))
                     }

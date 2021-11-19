@@ -941,7 +941,7 @@ package test;
 
 import io.micronaut.core.annotation.AccessorsStyle;
 
-@AccessorsStyle(readPrefixes = {""}, writePrefixes = {""})
+@AccessorsStyle(readPrefixes = "", writePrefixes = "")
 class Person {
 
     private String name;
