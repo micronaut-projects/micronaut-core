@@ -102,6 +102,7 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxProcessor;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.MonoSink;
 import reactor.core.publisher.UnicastProcessor;
@@ -113,6 +114,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.channels.ClosedChannelException;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -606,7 +608,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 RouteMatch<?> routeMatch = finalRoute;
                 final AtomicBoolean executed = new AtomicBoolean(false);
                 final AtomicLong pressureRequested = new AtomicLong(0);
-                final ConcurrentHashMap<String, UnicastProcessor> subjects = new ConcurrentHashMap<>();
+                final ConcurrentHashMap<String, UnicastProcessor<Object>> subjectsByDataName = new ConcurrentHashMap<>();
+                final Collection<Subscriber<?>> downstreamSubscribers = Collections.synchronizedList(new ArrayList<>());
                 final ConcurrentHashMap<Integer, HttpDataReference> dataReferences = new ConcurrentHashMap<>();
                 final ConversionService conversionService = ConversionService.SHARED;
                 Subscription s;
@@ -671,7 +674,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     }
                                     Class typeVariableType = typeVariable.getType();
 
-                                    UnicastProcessor namedSubject = subjects.computeIfAbsent(name, key -> UnicastProcessor.create());
+                                    UnicastProcessor<Object> namedSubject = subjectsByDataName.computeIfAbsent(name, key -> makeDownstreamUnicastProcessor());
 
                                     chunkedProcessing = PartData.class.equals(typeVariableType) ||
                                             Publishers.isConvertibleToPublisher(typeVariableType) ||
@@ -686,7 +689,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         }
                                         dataReference.subject.getAndUpdate(subject -> {
                                             if (subject == null) {
-                                                UnicastProcessor childSubject = UnicastProcessor.create();
+                                                UnicastProcessor childSubject = makeDownstreamUnicastProcessor();
                                                 Flux flowable = processFlowable(childSubject, dataKey, true);
                                                 if (streamingFileUpload && data instanceof FileUpload) {
                                                     namedSubject.onNext(new NettyStreamingFileUpload(
@@ -704,7 +707,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         });
                                     }
 
-                                    UnicastProcessor subject;
+                                    UnicastProcessor<Object> subject;
 
                                     final UnicastProcessor ds = dataReference.subject.get();
                                     if (ds != null) {
@@ -818,7 +821,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 @Override
                 protected void doOnError(Throwable t) {
                     s.cancel();
-                    for (UnicastProcessor subject : subjects.values()) {
+                    for (Subscriber<?> subject : downstreamSubscribers) {
                         subject.onError(t);
                     }
                     emitter.error(t);
@@ -826,12 +829,17 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                 @Override
                 protected void doOnComplete() {
-                    for (UnicastProcessor subject : subjects.values()) {
-                        if (!subject.hasCompleted()) {
-                            subject.onComplete();
-                        }
+                    for (Subscriber<?> subject : downstreamSubscribers) {
+                        // subjects will ignore the onComplete if they're already done
+                        subject.onComplete();
                     }
                     executeRoute();
+                }
+
+                private <T> UnicastProcessor<T> makeDownstreamUnicastProcessor() {
+                    UnicastProcessor<T> processor = UnicastProcessor.create();
+                    downstreamSubscribers.add(processor);
+                    return processor;
                 }
 
                 private void executeRoute() {
