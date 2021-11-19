@@ -22,11 +22,11 @@ import io.micronaut.annotation.processing.SuperclassAwareTypeVisitor;
 import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.ClassElement;
@@ -350,16 +350,14 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
                 classElement.asType().accept(new PublicMethodVisitor<Object, Object>(visitorContext) {
 
-                    String[] readPrefixes = {AccessorsStyle.DEFAULT_READ_PREFIX};
-                    String[] writePrefixes = {AccessorsStyle.DEFAULT_WRITE_PREFIX};
-
-                    {
-                        AnnotationValue<AccessorsStyle> accessorsAnn = getDeclaredAnnotation(AccessorsStyle.class);
-                        if (accessorsAnn != null) {
-                            readPrefixes = accessorsAnn.stringValues("readPrefixes");
-                            writePrefixes = accessorsAnn.stringValues("writePrefixes");
-                        }
-                    }
+                    final String[] readPrefixes = findAnnotation(AccessorsStyle.class)
+                            .filter(annotationValue -> !ArrayUtils.isEmpty(annotationValue.stringValues("readPrefixes")))
+                            .map(annotationValue -> annotationValue.stringValues("readPrefixes"))
+                            .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
+                    final String[] writePrefixes = findAnnotation(AccessorsStyle.class)
+                            .filter(annotationValue -> !ArrayUtils.isEmpty(annotationValue.stringValues("writePrefixes")))
+                            .map(annotationValue -> annotationValue.stringValues("writePrefixes"))
+                            .orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX});
 
                     @Override
                     protected boolean isAcceptable(javax.lang.model.element.Element element) {
@@ -398,7 +396,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         final TypeElement declaringTypeElement = (TypeElement) executableElement.getEnclosingElement();
 
                         if (NameUtils.isReaderName(methodName, readPrefixes) && executableElement.getParameters().isEmpty()) {
-                            String propertyName = NameUtils.getPropertyNameForGetter(methodName);
+                            String propertyName = NameUtils.getPropertyNameForGetter(methodName, readPrefixes);
                             TypeMirror returnType = executableElement.getReturnType();
                             ClassElement getterReturnType;
                             if (returnType instanceof TypeVariable) {
@@ -426,7 +424,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                                 }
                             }
                         } else if (NameUtils.isWriterName(methodName, writePrefixes) && executableElement.getParameters().size() == 1) {
-                            String propertyName = NameUtils.getPropertyNameForSetter(methodName);
+                            String propertyName = NameUtils.getPropertyNameForSetter(methodName, writePrefixes);
                             TypeMirror typeMirror = executableElement.getParameters().get(0).asType();
                             ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext, JavaClassElement.this.genericTypeInfo, true);
 

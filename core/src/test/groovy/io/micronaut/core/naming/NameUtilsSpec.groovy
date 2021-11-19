@@ -368,4 +368,34 @@ class NameUtilsSpec extends Specification {
         "withFoo" | ["set", "with"] | "foo"
     }
 
+    void "test getterNameFor (#name, #prefixes)"() {
+        expect:
+        NameUtils.getterNameFor(name, prefixes as String[]) == getterName
+
+        where:
+        name     | prefixes        | getterName
+        "foo"    | ["get"]         | "getFoo"
+        "fooBar" | ["get"]         | "getFooBar"
+        "fooBar" | [""]            | "fooBar"
+        "fooBar" | ["is"]          | "isFooBar"
+        "fooBar" | ["with"]        | "withFooBar"
+        "fooBar" | ["set", "with"] | "setFooBar"
+        "fooBar" | ["with", "set"] | "withFooBar"
+    }
+
+    void "test setterNameFor (#name, #prefixes)"() {
+        expect:
+        NameUtils.setterNameFor(name, prefixes as String[]) == setterName
+
+        where:
+        name     | prefixes        | setterName
+        "foo"    | ["set"]         | "setFoo"
+        "fooBar" | ["set"]         | "setFooBar"
+        "fooBar" | [""]            | "fooBar"
+        "fooBar" | ["is"]          | "isFooBar"
+        "fooBar" | ["with"]        | "withFooBar"
+        "fooBar" | ["set", "with"] | "setFooBar"
+        "fooBar" | ["with", "set"] | "withFooBar"
+    }
+
 }

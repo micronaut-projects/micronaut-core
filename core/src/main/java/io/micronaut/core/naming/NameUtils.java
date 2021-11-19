@@ -289,8 +289,35 @@ public class NameUtils {
      * @return The setter name
      */
     public static @NonNull String setterNameFor(@NonNull String propertyName) {
+        return setterNameFor(propertyName, PREFIX_SET);
+    }
+
+    /**
+     * Get the equivalent setter name for the given property and a the first prefix.
+     *
+     * @param propertyName The property name
+     * @param prefixes     The prefixes
+     * @return The setter name for the first prefix
+     */
+    public static @NonNull String setterNameFor(@NonNull String propertyName, @NonNull String[] prefixes) {
+        if (prefixes.length == 0) {
+            return setterNameFor(propertyName, StringUtils.EMPTY_STRING);
+        } else {
+            return setterNameFor(propertyName, prefixes[0]);
+        }
+    }
+
+    /**
+     * Get the equivalent setter name for the given property and a prefix.
+     *
+     * @param propertyName The property name
+     * @param prefix       The prefix
+     * @return The setter name
+     */
+    public static @NonNull String setterNameFor(@NonNull String propertyName, @NonNull String prefix) {
         ArgumentUtils.requireNonNull("propertyName", propertyName);
-        return nameFor(PREFIX_SET, propertyName);
+        ArgumentUtils.requireNonNull("prefix", prefix);
+        return nameFor(prefix, propertyName);
     }
 
     /**
@@ -396,8 +423,35 @@ public class NameUtils {
      * @return The getter name
      */
     public static @NonNull String getterNameFor(@NonNull String propertyName) {
+        return getterNameFor(propertyName, PREFIX_GET);
+    }
+
+    /**
+     * Get the equivalent getter name for the given property and a the first prefix.
+     *
+     * @param propertyName The property name
+     * @param prefixes     The prefixes
+     * @return The getter name for the first prefix
+     */
+    public static @NonNull String getterNameFor(@NonNull String propertyName, @NonNull String[] prefixes) {
+        if (prefixes.length == 0) {
+            return getterNameFor(propertyName, StringUtils.EMPTY_STRING);
+        } else {
+            return getterNameFor(propertyName, prefixes[0]);
+        }
+    }
+
+    /**
+     * Get the equivalent getter name for the given property and a prefix.
+     *
+     * @param propertyName The property name
+     * @param prefix       The prefix
+     * @return The getter name for the prefix
+     */
+    public static @NonNull String getterNameFor(@NonNull String propertyName, @NonNull String prefix) {
         ArgumentUtils.requireNonNull("propertyName", propertyName);
-        return nameFor(PREFIX_GET, propertyName);
+        ArgumentUtils.requireNonNull("prefix", prefix);
+        return nameFor(prefix, propertyName);
     }
 
     /**
@@ -425,6 +479,10 @@ public class NameUtils {
     }
 
     private static String nameFor(String prefix, @NonNull String propertyName) {
+        if (prefix.length() == 0) {
+            return propertyName;
+        }
+
         final int len = propertyName.length();
         switch (len) {
             case 0:
