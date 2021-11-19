@@ -47,6 +47,36 @@ import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
+    void "test generics in arrays don't stack overflow"() {
+        given:
+        def introspection = buildBeanIntrospection('arraygenerics.Test', '''
+package arraygenerics;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected
+class Test<T extends CharSequence> {
+    private T[] array;
+    public T[] getArray() {
+        return array;
+    }
+    public void setArray(T[] array) {
+        this.array = array;
+    }
+    
+    @Executable
+    T[] myMethod() {
+        return array;
+    }
+}
+''')
+        expect:
+        introspection.getRequiredProperty("array", CharSequence[].class)
+            .type == CharSequence[].class
+        introspection.beanMethods.first().returnType.type == CharSequence[].class
+    }
+
     void 'test favor method access'() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\

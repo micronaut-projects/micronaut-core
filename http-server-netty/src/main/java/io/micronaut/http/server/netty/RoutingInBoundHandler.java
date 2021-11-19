@@ -610,7 +610,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 final AtomicLong pressureRequested = new AtomicLong(0);
                 final ConcurrentHashMap<String, UnicastProcessor<Object>> subjectsByDataName = new ConcurrentHashMap<>();
                 final Collection<Subscriber<?>> downstreamSubscribers = Collections.synchronizedList(new ArrayList<>());
-                final ConcurrentHashMap<Integer, HttpDataReference> dataReferences = new ConcurrentHashMap<>();
+                final ConcurrentHashMap<IdentityWrapper, HttpDataReference> dataReferences = new ConcurrentHashMap<>();
                 final ConversionService conversionService = ConversionService.SHARED;
                 Subscription s;
                 final LongConsumer onRequest = num -> pressureRequested.updateAndGet(p -> {
@@ -623,14 +623,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     }
                 });
 
-                Flux processFlowable(Flux flowable, Integer dataKey, boolean controlsFlow) {
+                Flux processFlowable(Flux flowable, HttpDataReference dataReference, boolean controlsFlow) {
                     if (controlsFlow) {
                         flowable = flowable.doOnRequest(onRequest);
                     }
                     return flowable
                             .doAfterTerminate(() -> {
                                 if (controlsFlow) {
-                                    HttpDataReference dataReference = dataReferences.get(dataKey);
                                     dataReference.destroy();
                                 }
                             });
@@ -663,8 +662,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 boolean chunkedProcessing = false;
 
                                 if (isPublisher) {
-                                    Integer dataKey = System.identityHashCode(data);
-                                    HttpDataReference dataReference = dataReferences.computeIfAbsent(dataKey, key -> new HttpDataReference(data));
+                                    HttpDataReference dataReference = dataReferences.computeIfAbsent(new IdentityWrapper(data), key -> new HttpDataReference(data));
                                     Argument typeVariable;
 
                                     if (StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
@@ -690,7 +688,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         dataReference.subject.getAndUpdate(subject -> {
                                             if (subject == null) {
                                                 UnicastProcessor childSubject = makeDownstreamUnicastProcessor();
-                                                Flux flowable = processFlowable(childSubject, dataKey, true);
+                                                Flux flowable = processFlowable(childSubject, dataReference, true);
                                                 if (streamingFileUpload && data instanceof FileUpload) {
                                                     namedSubject.onNext(new NettyStreamingFileUpload(
                                                             (FileUpload) data,
@@ -742,7 +740,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                         (FileUpload) data,
                                                         serverConfiguration.getMultipart(),
                                                         getIoExecutor(),
-                                                        (Flux<PartData>) processFlowable(subject, dataKey, true));
+                                                        (Flux<PartData>) processFlowable(subject, dataReference, true));
                                             }
                                             return upload;
                                         });
@@ -761,7 +759,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         if (upload != null) {
                                             return upload;
                                         } else {
-                                            return processFlowable(namedSubject, dataKey, dataReference.subject.get() == null);
+                                            return processFlowable(namedSubject, dataReference, dataReference.subject.get() == null);
                                         }
                                     };
 
@@ -784,7 +782,14 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 if (!executed) {
                                     String argumentName = argument.getName();
                                     if (!routeMatch.isSatisfied(argumentName)) {
-                                        routeMatch = routeMatch.fulfill(Collections.singletonMap(argumentName, value.get()));
+                                        Object fulfillParamter = value.get();
+                                        routeMatch = routeMatch.fulfill(Collections.singletonMap(argumentName, fulfillParamter));
+                                        // we need to release the data here. However, if the route argument is a
+                                        // ByteBuffer, we need to retain the data until the route is executed. Adding
+                                        // the data to the request ensures it is cleaned up after the route completes.
+                                        if (!alwaysAddContent && fulfillParamter instanceof ByteBufHolder) {
+                                            request.addContent((ByteBufHolder) fulfillParamter);
+                                        }
                                     }
                                     if (isPublisher && chunkedProcessing) {
                                         //accounting for the previous request

@@ -271,6 +271,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
 
             for (ParameterElement pe : argumentTypes) {
                 DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, pe.getAnnotationMetadata());
+                DefaultAnnotationMetadata.contributeRepeatable(this.annotationMetadata, pe.getGenericType());
             }
             // now invoke super(..) if no arg constructor
             invokeConstructor(
