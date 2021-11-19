@@ -46,6 +46,7 @@ import java.util.concurrent.ExecutorService;
  * @author graemerocher
  */
 @Requires(beans = JsonConfiguration.class)
+@Requires(classes = JsonView.class)
 @Requires(property = JsonViewServerFilter.PROPERTY_JSON_VIEW_ENABLED)
 @Filter("/**")
 public class JsonViewServerFilter implements HttpServerFilter {
