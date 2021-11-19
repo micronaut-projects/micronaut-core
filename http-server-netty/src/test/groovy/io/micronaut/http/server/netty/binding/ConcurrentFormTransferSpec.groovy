@@ -1,7 +1,6 @@
 package io.micronaut.http.server.netty.binding
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.MutableHttpResponse
@@ -12,17 +11,20 @@ import io.micronaut.http.multipart.StreamingFileUpload
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
+import spock.lang.Issue
+import spock.lang.Requires
 import spock.lang.Specification
 import spock.lang.Timeout
 
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.time.Duration
 import java.util.function.Supplier
 
-@Requires(sdk = Requires.Sdk.JAVA, version = "11") // java.net.http.HttpClient
+@Requires({ jvm.current.isJava11Compatible() }) // java.net.http.HttpClient
 class ConcurrentFormTransferSpec extends Specification {
+    private Class<?> loadClass(String clientName) {
+        getClass().classLoader.loadClass(clientName)
+    }
+
     def boundaryString = '----*+*+*+*+*+*+*+*+*+*+'
 
     /**
@@ -38,7 +40,7 @@ Content-Type: ${contentType}\r
         new ByteArrayInputStream(field.bytes)
     }
 
-    HttpRequest uploadRequest(URI uri) {
+    def uploadRequest(URI uri) {
         def url = "$uri/test-api/testupload2"
         def sizeInBytes = 222
         def data = new byte[sizeInBytes]
@@ -49,11 +51,11 @@ Content-Type: ${contentType}\r
                 new ByteArrayInputStream("\r\n--${boundaryString}--\r\n".bytes)
         ] as List<InputStream>
 
-        HttpRequest.newBuilder()
+        loadClass('java.net.http.HttpRequest').newBuilder()
                 .uri(URI.create(url))
                 .header('content-type', "multipart/form-data;boundary=${boundaryString}")
                 .header('accept', 'application/json')
-                .POST(HttpRequest.BodyPublishers.ofInputStream(new Supplier<InputStream>() {
+                .POST(loadClass('java.net.http.HttpRequest$BodyPublishers').ofInputStream(new Supplier<InputStream>() {
                     @Override
                     InputStream get() {
                         new SequenceInputStream(Collections.enumeration(inputStreams))
@@ -62,6 +64,7 @@ Content-Type: ${contentType}\r
                 .build()
     }
 
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6532')
     @Timeout(10)
     def uploadTest() {
         given:
@@ -72,13 +75,13 @@ Content-Type: ${contentType}\r
         embeddedServer.start()
 
         when:
-        def client = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)
+        def client = loadClass('java.net.http.HttpClient').newBuilder()
+                .version(loadClass('java.net.http.HttpClient$Version').HTTP_1_1)
                 .connectTimeout(Duration.ofSeconds(20))
                 .build()
 
         def request = uploadRequest(embeddedServer.URI)
-        def response = client.send(request, HttpResponse.BodyHandlers.ofString()) as HttpResponse<String>
+        def response = client.send(request, loadClass('java.net.http.HttpResponse$BodyHandlers').ofString())
 
         println 'status code: ' + response.statusCode()
         println response.body()
@@ -91,7 +94,7 @@ Content-Type: ${contentType}\r
     }
 
     @Controller("/test-api")
-    @Requires(property = 'spec.name', value = 'ConcurrentFormTransferSpec')
+    @io.micronaut.context.annotation.Requires(property = 'spec.name', value = 'ConcurrentFormTransferSpec')
     static class TransferController {
         @SuppressWarnings(['GrMethodMayBeStatic', 'unused'])
         @Post('/testupload2')
