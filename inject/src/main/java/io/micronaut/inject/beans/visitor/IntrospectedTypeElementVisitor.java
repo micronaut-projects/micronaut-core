@@ -108,13 +108,9 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         final ClassElement declaringType = element.getDeclaringType();
         final String methodName = element.getName();
 
-        final String[] readPrefixes = declaringType.findAnnotation(AccessorsStyle.class)
-                .filter(annotationValue -> !ArrayUtils.isEmpty(annotationValue.stringValues("readPrefixes")))
-                .map(annotationValue -> annotationValue.stringValues("readPrefixes"))
+        final String[] readPrefixes = declaringType.getValue(AccessorsStyle.class, "readPrefixes", String[].class)
                 .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
-        final String[] writePrefixes = declaringType.findAnnotation(AccessorsStyle.class)
-                .filter(annotationValue -> !ArrayUtils.isEmpty(annotationValue.stringValues("writePrefixes")))
-                .map(annotationValue -> annotationValue.stringValues("writePrefixes"))
+        final String[] writePrefixes = declaringType.getValue(AccessorsStyle.class, "writePrefixes", String[].class)
                 .orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX});
 
         if (declaringType.hasStereotype(ConfigurationReader.class) && NameUtils.isReaderName(methodName, readPrefixes) && !writers.containsKey(declaringType.getName())) {

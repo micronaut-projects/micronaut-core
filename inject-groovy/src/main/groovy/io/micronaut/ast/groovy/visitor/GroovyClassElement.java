@@ -861,13 +861,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                         propertyNode
                 ) {
 
-                    final String[] readPrefixes = GroovyClassElement.this.findAnnotation(AccessorsStyle.class)
-                            .filter(annotationValue -> !ArrayUtils.isEmpty(annotationValue.stringValues("readPrefixes")))
-                            .map(annotationValue -> annotationValue.stringValues("readPrefixes"))
+                    final String[] readPrefixes = GroovyClassElement.this.getValue(AccessorsStyle.class, "readPrefixes", String[].class)
                             .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
-                    final String[] writePrefixes = GroovyClassElement.this.findAnnotation(AccessorsStyle.class)
-                            .filter(annotationValue -> !ArrayUtils.isEmpty(annotationValue.stringValues("writePrefixes")))
-                            .map(annotationValue -> annotationValue.stringValues("writePrefixes"))
+                    final String[] writePrefixes = GroovyClassElement.this.getValue(AccessorsStyle.class, "writePrefixes", String[].class)
                             .orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX});
 
                     @NonNull
@@ -927,13 +923,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             classNode.visitContents(
                     new PublicMethodVisitor(null) {
 
-                        final String[] readPrefixes = findAnnotation(AccessorsStyle.class)
-                                .filter(annotationValue -> !ArrayUtils.isEmpty(annotationValue.stringValues("readPrefixes")))
-                                .map(annotationValue -> annotationValue.stringValues("readPrefixes"))
+                        final String[] readPrefixes = getValue(AccessorsStyle.class, "readPrefixes", String[].class)
                                 .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
-                        final String[] writePrefixes = findAnnotation(AccessorsStyle.class)
-                                .filter(annotationValue -> !ArrayUtils.isEmpty(annotationValue.stringValues("writePrefixes")))
-                                .map(annotationValue -> annotationValue.stringValues("writePrefixes"))
+                        final String[] writePrefixes = getValue(AccessorsStyle.class, "writePrefixes", String[].class)
                                 .orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX});
 
                         @Override
