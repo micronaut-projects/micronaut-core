@@ -104,7 +104,7 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.MonoSink;
-import reactor.core.publisher.UnicastProcessor;
+import reactor.core.publisher.Sinks;
 
 import javax.net.ssl.SSLException;
 import java.io.File;
@@ -607,8 +607,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 RouteMatch<?> routeMatch = finalRoute;
                 final AtomicBoolean executed = new AtomicBoolean(false);
                 final AtomicLong pressureRequested = new AtomicLong(0);
-                final ConcurrentHashMap<String, UnicastProcessor<Object>> subjectsByDataName = new ConcurrentHashMap<>();
-                final Collection<Subscriber<?>> downstreamSubscribers = Collections.synchronizedList(new ArrayList<>());
+                final ConcurrentHashMap<String, Sinks.Many<Object>> subjectsByDataName = new ConcurrentHashMap<>();
+                final Collection<Sinks.Many<Object>> downstreamSubscribers = Collections.synchronizedList(new ArrayList<>());
                 final ConcurrentHashMap<IdentityWrapper, HttpDataReference> dataReferences = new ConcurrentHashMap<>();
                 final ConversionService conversionService = ConversionService.SHARED;
                 Subscription s;
@@ -622,11 +622,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     }
                 });
 
-                Flux processFlowable(Flux flowable, HttpDataReference dataReference, boolean controlsFlow) {
+                Flux processFlowable(Sinks.Many<Object> many, HttpDataReference dataReference, boolean controlsFlow) {
+                    Flux flux = many.asFlux();
                     if (controlsFlow) {
-                        flowable = flowable.doOnRequest(onRequest);
+                        flux = flux.doOnRequest(onRequest);
                     }
-                    return flowable
+                    return flux
                             .doAfterTerminate(() -> {
                                 if (controlsFlow) {
                                     dataReference.destroy();
@@ -671,7 +672,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     }
                                     Class typeVariableType = typeVariable.getType();
 
-                                    UnicastProcessor<Object> namedSubject = subjectsByDataName.computeIfAbsent(name, key -> makeDownstreamUnicastProcessor());
+                                    Sinks.Many<Object> namedSubject = subjectsByDataName.computeIfAbsent(name, key -> makeDownstreamUnicastProcessor());
 
                                     chunkedProcessing = PartData.class.equals(typeVariableType) ||
                                             Publishers.isConvertibleToPublisher(typeVariableType) ||
@@ -686,16 +687,16 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         }
                                         dataReference.subject.getAndUpdate(subject -> {
                                             if (subject == null) {
-                                                UnicastProcessor childSubject = makeDownstreamUnicastProcessor();
+                                                Sinks.Many<Object> childSubject = makeDownstreamUnicastProcessor();
                                                 Flux flowable = processFlowable(childSubject, dataReference, true);
                                                 if (streamingFileUpload && data instanceof FileUpload) {
-                                                    namedSubject.onNext(new NettyStreamingFileUpload(
+                                                    namedSubject.tryEmitNext(new NettyStreamingFileUpload(
                                                             (FileUpload) data,
                                                             serverConfiguration.getMultipart(),
                                                             getIoExecutor(),
                                                             (Flux<PartData>) flowable));
                                                 } else {
-                                                    namedSubject.onNext(flowable);
+                                                    namedSubject.tryEmitNext(flowable);
                                                 }
 
                                                 return childSubject;
@@ -704,9 +705,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         });
                                     }
 
-                                    UnicastProcessor<Object> subject;
+                                    Sinks.Many<Object> subject;
 
-                                    final UnicastProcessor ds = dataReference.subject.get();
+                                    final Sinks.Many<Object> ds = dataReference.subject.get();
                                     if (ds != null) {
                                         subject = ds;
                                     } else {
@@ -724,7 +725,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                 return;
                                             }
                                         } catch (IOException e) {
-                                            subject.onError(e);
+                                            subject.tryEmitError(e);
                                             s.cancel();
                                             return;
                                         }
@@ -747,10 +748,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                                     Optional<?> converted = conversionService.convert(part, typeVariable);
 
-                                    converted.ifPresent(subject::onNext);
+                                    converted.ifPresent(subject::tryEmitNext);
 
                                     if (data.isCompleted() && chunkedProcessing) {
-                                        subject.onComplete();
+                                        subject.tryEmitComplete();
                                     }
 
                                     value = () -> {
@@ -825,23 +826,23 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 @Override
                 protected void doOnError(Throwable t) {
                     s.cancel();
-                    for (Subscriber<?> subject : downstreamSubscribers) {
-                        subject.onError(t);
+                    for (Sinks.Many<Object> subject : downstreamSubscribers) {
+                        subject.tryEmitError(t);
                     }
                     emitter.error(t);
                 }
 
                 @Override
                 protected void doOnComplete() {
-                    for (Subscriber<?> subject : downstreamSubscribers) {
+                    for (Sinks.Many<Object> subject : downstreamSubscribers) {
                         // subjects will ignore the onComplete if they're already done
-                        subject.onComplete();
+                        subject.tryEmitComplete();
                     }
                     executeRoute();
                 }
 
-                private <T> UnicastProcessor<T> makeDownstreamUnicastProcessor() {
-                    UnicastProcessor<T> processor = UnicastProcessor.create();
+                private Sinks.Many<Object> makeDownstreamUnicastProcessor() {
+                    Sinks.Many<Object> processor = Sinks.many().unicast().onBackpressureBuffer();
                     downstreamSubscribers.add(processor);
                     return processor;
                 }
