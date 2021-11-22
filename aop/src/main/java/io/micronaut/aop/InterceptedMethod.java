@@ -18,7 +18,6 @@ package io.micronaut.aop;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import org.reactivestreams.Publisher;
 
@@ -161,27 +160,6 @@ public interface InterceptedMethod {
      */
     default Object unsupported() {
         throw new ConfigurationException("Cannot intercept method invocation, missing '" + resultType() + "' interceptor configured");
-    }
-
-    /**
-     * Get native context from the suspension point.
-     *
-     * @return The native context from the suspension point or null
-     * @since 3.2
-     */
-    @Nullable
-    default Object getNativeContext() {
-        return null;
-    }
-
-    /**
-     * Update native context for the suspension point.
-     *
-     * @param context The native context
-     * @since 3.2
-     */
-    default void updateNativeContext(@Nullable Object context) {
-        throw new IllegalStateException("Updating native context not supported for interceptor: " + this);
     }
 
     /**

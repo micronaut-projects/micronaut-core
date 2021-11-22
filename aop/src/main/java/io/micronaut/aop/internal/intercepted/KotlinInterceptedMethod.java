@@ -15,7 +15,6 @@
  */
 package io.micronaut.aop.internal.intercepted;
 
-import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.aop.util.CompletableFutureContinuation;
@@ -26,7 +25,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.KotlinUtils;
 import kotlin.coroutines.Continuation;
 import kotlin.coroutines.CoroutineContext;
-import kotlin.coroutines.EmptyCoroutineContext;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -41,7 +39,7 @@ import java.util.function.Consumer;
  */
 @Internal
 @Experimental
-final class KotlinInterceptedMethod implements InterceptedMethod {
+final class KotlinInterceptedMethod implements io.micronaut.aop.kotlin.KotlinInterceptedMethod {
 
     private final MethodInvocationContext<?, ?> context;
     private Continuation continuation;
@@ -175,20 +173,12 @@ final class KotlinInterceptedMethod implements InterceptedMethod {
     }
 
     @Override
-    public Object getNativeContext() {
+    public CoroutineContext getCoroutineContext() {
         return continuation.getContext();
     }
 
     @Override
-    public void updateNativeContext(Object context) {
-        CoroutineContext coroutineContext;
-        if (context == null) {
-            coroutineContext = EmptyCoroutineContext.INSTANCE;
-        } else if (context instanceof CoroutineContext) {
-            coroutineContext = (CoroutineContext) context;
-        } else {
-            throw new IllegalStateException("Expected an instance of CoroutineContext. Got: " + context);
-        }
+    public void updateCoroutineContext(CoroutineContext coroutineContext) {
         continuation = new DelegatingContextContinuation(continuation, coroutineContext);
     }
 }

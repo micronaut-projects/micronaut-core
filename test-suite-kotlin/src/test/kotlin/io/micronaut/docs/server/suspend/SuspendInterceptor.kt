@@ -19,8 +19,8 @@ import io.micronaut.aop.InterceptedMethod
 import io.micronaut.aop.InterceptorBean
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
+import io.micronaut.aop.kotlin.KotlinInterceptedMethod
 import jakarta.inject.Singleton
-import kotlin.coroutines.CoroutineContext
 
 @InterceptorBean(MyContextInterceptorAnn::class)
 @Singleton
@@ -29,12 +29,10 @@ class SuspendInterceptor : MethodInterceptor<Any, Any> {
         val interceptedMethod = InterceptedMethod.of(context)
         return try {
             return if (interceptedMethod.resultType() == InterceptedMethod.ResultType.COMPLETION_STAGE) {
-                var nativeContext = interceptedMethod.nativeContext
-                if (nativeContext is CoroutineContext) {
-                    val existingContext = nativeContext[MyContext]
+                if (interceptedMethod is KotlinInterceptedMethod && interceptedMethod.coroutineContext != null) {
+                    val existingContext = interceptedMethod.coroutineContext[MyContext]
                     if (existingContext == null) {
-                        nativeContext += MyContext(context.methodName)
-                        interceptedMethod.updateNativeContext(nativeContext)
+                        interceptedMethod.updateCoroutineContext(interceptedMethod.coroutineContext + MyContext(context.methodName))
                     }
                 }
 
