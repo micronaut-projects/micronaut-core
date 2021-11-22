@@ -15,15 +15,16 @@
  */
 package io.micronaut.aop.internal.intercepted;
 
-import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.aop.util.CompletableFutureContinuation;
+import io.micronaut.aop.util.DelegatingContextContinuation;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.KotlinUtils;
 import kotlin.coroutines.Continuation;
+import kotlin.coroutines.CoroutineContext;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -38,17 +39,19 @@ import java.util.function.Consumer;
  */
 @Internal
 @Experimental
-final class KotlinInterceptedMethod implements InterceptedMethod {
+final class KotlinInterceptedMethod implements io.micronaut.aop.kotlin.KotlinInterceptedMethod {
 
     private final MethodInvocationContext<?, ?> context;
-    private final Continuation continuation;
+    private Continuation continuation;
     private final Consumer<Object> replaceContinuation;
     private final Argument<?> returnTypeValue;
     private final boolean isUnitValueType;
 
     private KotlinInterceptedMethod(MethodInvocationContext<?, ?> context,
-                                    Continuation continuation, Consumer<Object> replaceContinuation,
-                                    Argument<?> returnTypeValue, boolean isUnitValueType) {
+                                    Continuation<?> continuation,
+                                    Consumer<Object> replaceContinuation,
+                                    Argument<?> returnTypeValue,
+                                    boolean isUnitValueType) {
         this.context = context;
         this.continuation = continuation;
         this.returnTypeValue = returnTypeValue;
@@ -169,4 +172,13 @@ final class KotlinInterceptedMethod implements InterceptedMethod {
         return KotlinUtils.COROUTINE_SUSPENDED;
     }
 
+    @Override
+    public CoroutineContext getCoroutineContext() {
+        return continuation.getContext();
+    }
+
+    @Override
+    public void updateCoroutineContext(CoroutineContext coroutineContext) {
+        continuation = new DelegatingContextContinuation(continuation, coroutineContext);
+    }
 }
