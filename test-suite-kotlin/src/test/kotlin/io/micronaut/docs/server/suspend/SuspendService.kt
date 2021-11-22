@@ -70,11 +70,6 @@ open class SuspendService(
     }
 
     @MyContextInterceptorAnn
-    open fun callx(): String? {
-        return "x"
-    }
-
-    @MyContextInterceptorAnn
     open suspend fun call1(): String? {
         return findMyContextValue()
     }
