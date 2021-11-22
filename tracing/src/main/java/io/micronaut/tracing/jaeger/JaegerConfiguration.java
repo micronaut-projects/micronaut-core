@@ -183,18 +183,6 @@ public class JaegerConfiguration implements Toggleable  {
     }
 
     /**
-     * Sets the codec configuration.
-     * @author Manuel Martin
-     * @param codecConfiguration The codec configuration
-     */
-    @Inject
-    public void setCodecConfiguration(@Nullable JaegerCodecConfiguration codecConfiguration) {
-        if (codecConfiguration != null) {
-            configuration.withCodec(codecConfiguration.getCodecConfiguration());
-        }
-    }
-
-    /**
      * Sets the metrics factory to use.
      *
      * @param metricsFactory The metrics factory
@@ -291,54 +279,14 @@ public class JaegerConfiguration implements Toggleable  {
     }
 
     /**
-     * The codec configuration bean
-     * @author Manuel Martin
-     * @author Burt Beckwith
+     * Set codecs from string.
+     *
+     * @param codecs the codecs
      */
-    @ConfigurationProperties("codec")
-    public static class JaegerCodecConfiguration {
-
-        private String codecs;
-
-        public void setCodecs(String codecs) {
-            this.codecs = codecs;
+    public void setCodecs(String codecs) { // codecs = "JAEGER, B3, W3C"
+        if (codecs != null) {
+            setCodecConfiguration(Configuration.CodecConfiguration.fromString(codecs));
         }
-
-        public String getCodecs() {
-            return codecs;
-        }
-
-        /**
-         * @return The codec configuration
-         */
-        public Configuration.CodecConfiguration getCodecConfiguration() {
-            return Configuration.CodecConfiguration.fromString(codecs); // codec.codecs = "JAEGER, B3, W3C"
-        }
-        /*
-        // package io.jaegertracing;
-        [Configuration.java]
-        public Configuration.CodecConfiguration withPropagation(Configuration.Propagation propagation) {
-            switch (propagation) {
-                case JAEGER:
-                    addCodec(codecs, Format.Builtin.HTTP_HEADERS, new TextMapCodec(true));
-                    addCodec(codecs, Format.Builtin.TEXT_MAP, new TextMapCodec(false));
-                    addBinaryCodec(binaryCodecs, Format.Builtin.BINARY, new BinaryCodec());
-                    break;
-                case B3:
-                    addCodec(codecs, Format.Builtin.HTTP_HEADERS, new B3TextMapCodec.Builder().build());
-                    addCodec(codecs, Format.Builtin.TEXT_MAP, new B3TextMapCodec.Builder().build());
-                    break;
-                case W3C:
-                    addCodec(codecs, Format.Builtin.HTTP_HEADERS, new TraceContextCodec.Builder().build());
-                    addCodec(codecs, Format.Builtin.TEXT_MAP, new TraceContextCodec.Builder().build());
-                    break;
-                default:
-                    log.error("Unhandled propagation format '" + propagation + "'");
-            }
-            return this;
-        }
-        */
-
     }
 
 }
