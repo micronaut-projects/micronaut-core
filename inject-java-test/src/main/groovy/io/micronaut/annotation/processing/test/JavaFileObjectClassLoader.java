@@ -33,7 +33,9 @@ import org.codehaus.groovy.runtime.IOGroovyMethods;
  * A custom classloader that loads from JavaFileObject instances.
  */
 final class JavaFileObjectClassLoader extends ClassLoader {
+
     private final Collection<JavaFileObject> files = new ArrayList<>();
+
     public JavaFileObjectClassLoader(Iterable<? extends JavaFileObject> files) {
         for (JavaFileObject file : files) {
             this.files.add(file);
