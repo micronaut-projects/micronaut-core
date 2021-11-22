@@ -23,6 +23,13 @@ Please check https://graalvm.github.io/native-build-tools/0.9.7.1/maven-plugin.h
 
 Micronaut 3.2.0 includes support for Kotlin 1.6.0.
 
+=== Module Upgrades
+
+=== Micronaut Data 3.2.0
+
+- Repositories with JPA Criteria API specification for Micronaut JDBC/R2DBC
+- Expandable query parameters optimizations
+
 == 3.1.0
 
 === Core Features
