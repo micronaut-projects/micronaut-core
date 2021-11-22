@@ -47,6 +47,13 @@ Note: Should you be calling `WebSocketClient.create(null)`, the method call is n
 
 The SSL handshake timeout can now be configured using the `micronaut.ssl.handshakeTimeout` and `micronaut.http.client.ssl.handshakeTimeout` configurations for the server and client respectively.
 
+=== Module Upgrades
+
+==== Micronaut Data 3.2.0
+
+- Repositories with JPA Criteria API specification for Micronaut JDBC/R2DBC
+- Expandable query parameters optimizations
+
 == 3.1.0
 
 === Core Features
