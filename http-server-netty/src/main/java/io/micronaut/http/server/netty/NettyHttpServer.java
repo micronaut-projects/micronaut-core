@@ -681,7 +681,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      * Negotiates with the browser if HTTP2 or HTTP is going to be used. Once decided, the Netty
      * pipeline is setup with the correct handlers for the selected protocol.
      *
-     * @implNote Unfortunately, this handler cannot be {@link io.netty.channel.ChannelHandler.Sharable shared} because
+     * NOTE: Unfortunately, this handler cannot be {@link io.netty.channel.ChannelHandler.Sharable shared} because
      * {@link ApplicationProtocolNegotiationHandler} does not support it.
      */
     private final class Http2OrHttpHandler extends ApplicationProtocolNegotiationHandler {

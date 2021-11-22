@@ -19,6 +19,7 @@ import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
@@ -480,6 +481,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 channelContext,
                                 request,
                                 response,
+                                null,
                                 response.body()
                         );
                         subscription.request(1);
@@ -493,6 +495,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 channelContext,
                                 request,
                                 response,
+                                null,
                                 response.body()
                         );
                     }
@@ -573,6 +576,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         context,
                         request,
                         toMutableResponse(message),
+                        (Argument<Object>) route.getBodyType(),
                         message.body()
                 );
                 subscription.request(1);
@@ -586,6 +590,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         context,
                         request,
                         defaultErrorResponse,
+                        (Argument<Object>) route.getBodyType(),
                         defaultErrorResponse.body()
                 );
             }
@@ -898,6 +903,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             ChannelHandlerContext context,
             NettyHttpRequest<?> nettyRequest,
             MutableHttpResponse<?> response,
+            @Nullable Argument<Object> bodyType,
             Object body) {
         boolean isNotHead = nettyRequest.getMethod() != HttpMethod.HEAD;
 
@@ -941,6 +947,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         context,
                         nettyRequest,
                         response,
+                        bodyType,
                         body
                 );
 
@@ -965,15 +972,19 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                MutableHttpResponse<?> response,
                                                Object body,
                                                ChannelHandlerContext context) {
-        final Optional<RouteInfo> optionalRoute = response.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class);
-        MediaType mediaType = response.getContentType().orElseGet(() -> optionalRoute
-                    .map(routeInfo -> routeExecutor.resolveDefaultResponseContentType(request, routeInfo))
-                    .orElse(null));
-        boolean isJson = mediaType != null && mediaType.getExtension().equals(MediaType.EXTENSION_JSON) && isJsonFormattable(optionalRoute.map(RouteInfo::getBodyType).orElse(null));
+        final RouteInfo<?> routeInfo = response.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).orElse(null);
+        final boolean hasRouteInfo = routeInfo != null;
+        MediaType mediaType = response.getContentType().orElse(null);
+        if (mediaType == null && hasRouteInfo) {
+            mediaType = routeExecutor.resolveDefaultResponseContentType(request, routeInfo);
+        }
+        boolean isJson = mediaType != null && mediaType.getExtension().equals(MediaType.EXTENSION_JSON) &&
+                isJsonFormattable(hasRouteInfo ? routeInfo.getBodyType() : null);
         NettyByteBufferFactory byteBufferFactory = new NettyByteBufferFactory(context.alloc());
 
         Flux<Object> bodyPublisher = Flux.from(Publishers.convertPublisher(body, Publisher.class));
 
+        MediaType finalMediaType = mediaType;
         Flux<HttpContent> httpContentPublisher = bodyPublisher.map(message -> {
             HttpContent httpContent;
             if (message instanceof ByteBuf) {
@@ -992,13 +1003,24 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 httpContent = (HttpContent) message;
             } else {
 
-                MediaTypeCodec codec = mediaTypeCodecRegistry.findCodec(mediaType, message.getClass()).orElse(
+                MediaTypeCodec codec = mediaTypeCodecRegistry.findCodec(finalMediaType, message.getClass()).orElse(
                         new TextPlainCodec(serverConfiguration.getDefaultCharset()));
 
                 if (LOG.isTraceEnabled()) {
                     LOG.trace("Encoding emitted response object [{}] using codec: {}", message, codec);
                 }
-                ByteBuffer<ByteBuf> encoded = codec.encode(message, byteBufferFactory);
+                ByteBuffer<ByteBuf> encoded;
+                if (hasRouteInfo) {
+                    //noinspection unchecked
+                    final Argument<Object> bodyType = (Argument<Object>) routeInfo.getBodyType();
+                    if (bodyType.isInstance(message)) {
+                        encoded = codec.encode(bodyType, message, byteBufferFactory);
+                    } else {
+                        encoded = codec.encode(message, byteBufferFactory);
+                    }
+                } else {
+                    encoded = codec.encode(message, byteBufferFactory);
+                }
                 httpContent = new DefaultHttpContent(encoded.asNativeBuffer());
             }
             return httpContent;
@@ -1038,6 +1060,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             ChannelHandlerContext context,
             HttpRequest<?> request,
             MutableHttpResponse<?> message,
+            @Nullable Argument<Object> bodyType,
             Object body) {
         if (body == null) {
             return;
@@ -1075,10 +1098,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(mediaType, body.getClass());
                 if (registeredCodec.isPresent()) {
                     MediaTypeCodec codec = registeredCodec.get();
-                    encodeBodyWithCodec(message, body, codec, context, request);
+                    encodeBodyWithCodec(message, bodyType, body, codec, context, request);
                 } else {
                     MediaTypeCodec defaultCodec = new TextPlainCodec(serverConfiguration.getDefaultCharset());
-                    encodeBodyWithCodec(message, body, defaultCodec, context, request);
+                    encodeBodyWithCodec(message, bodyType, body, defaultCodec, context, request);
                 }
             }
         }
@@ -1250,13 +1273,14 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private MutableHttpResponse<?> encodeBodyWithCodec(MutableHttpResponse<?> response,
+                                                       @Nullable Argument<Object> bodyType,
                                                        Object body,
                                                        MediaTypeCodec codec,
                                                        ChannelHandlerContext context,
                                                        HttpRequest<?> request) {
         ByteBuf byteBuf;
         try {
-            byteBuf = encodeBodyAsByteBuf(body, codec, context, request);
+            byteBuf = encodeBodyAsByteBuf(bodyType, body, codec, context, request);
             setResponseBody(response, byteBuf);
             return response;
         } catch (LinkageError e) {
@@ -1279,7 +1303,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         return res;
     }
 
-    private ByteBuf encodeBodyAsByteBuf(Object body, MediaTypeCodec codec, ChannelHandlerContext context, HttpRequest<?> request) {
+    private ByteBuf encodeBodyAsByteBuf(
+            @Nullable Argument<Object> bodyType,
+            Object body,
+            MediaTypeCodec codec,
+            ChannelHandlerContext context,
+            HttpRequest<?> request) {
         ByteBuf byteBuf;
         if (body instanceof ByteBuf) {
             byteBuf = (ByteBuf) body;
@@ -1309,7 +1338,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Encoding emitted response object [{}] using codec: {}", body, codec);
             }
-            byteBuf = codec.encode(body, new NettyByteBufferFactory(context.alloc())).asNativeBuffer();
+            if (bodyType != null && bodyType.isInstance(body)) {
+                byteBuf = codec.encode(bodyType, body, new NettyByteBufferFactory(context.alloc())).asNativeBuffer();
+            } else {
+                byteBuf = codec.encode(body, new NettyByteBufferFactory(context.alloc())).asNativeBuffer();
+            }
         }
         return byteBuf;
     }

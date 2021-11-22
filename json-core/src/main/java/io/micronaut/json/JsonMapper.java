@@ -113,6 +113,17 @@ public interface JsonMapper {
     JsonNode writeValueToTree(@Nullable Object value) throws IOException;
 
     /**
+     * Transform an object value to a json tree.
+     *
+     * @param type The object type
+     * @param value The object value to transform.
+     * @return The json representation.
+     * @throws IOException If there are any mapping exceptions (e.g. illegal values).
+     */
+    @NonNull
+    <T> JsonNode writeValueToTree(@NonNull Argument<T> type, @Nullable T value) throws IOException;
+
+    /**
      * Write an object as json.
      *
      * @param outputStream The stream to write to.
@@ -123,10 +134,30 @@ public interface JsonMapper {
     /**
      * Write an object as json.
      *
+     * @param outputStream The stream to write to.
+     * @param type         The object type
+     * @param object       The object to serialize.
+     * @param <T>  The generic type
+     */
+    <T> void writeValue(@NonNull OutputStream outputStream, @NonNull Argument<T> type, @Nullable T object) throws IOException;
+
+    /**
+     * Write an object as json.
+     *
      * @param object The object to serialize.
      * @return The serialized encoded json.
      */
     byte[] writeValueAsBytes(@Nullable Object object) throws IOException;
+
+    /**
+     * Write an object as json.
+     *
+     * @param type   The object type
+     * @param object The object to serialize.
+     * @return The serialized encoded json.
+     * @param <T> The generidc type
+     */
+    <T> byte[] writeValueAsBytes(@NonNull Argument<T> type, @Nullable T object) throws IOException;
 
     /**
      * Update an object from json data.
