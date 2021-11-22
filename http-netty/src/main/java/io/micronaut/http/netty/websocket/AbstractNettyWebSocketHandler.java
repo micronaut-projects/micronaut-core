@@ -215,9 +215,12 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                             );
                         }
                     } catch (Throwable e) {
-                        if (LOG.isErrorEnabled()) {
-                            LOG.error("Error Opening WebSocket [" + webSocketBean + "]: " + e.getMessage(), e);
-                        }
+                        forwardErrorToUser(ctx, t -> {
+                            if (LOG.isErrorEnabled()) {
+                                LOG.error("Error Opening WebSocket [" + webSocketBean + "]: " + t.getMessage(), t);
+                            }
+                        }, e);
+                        // since we failed to call onOpen, we should always close here
                         if (session.isOpen()) {
                             session.close(CloseReason.INTERNAL_ERROR);
                         }
@@ -254,6 +257,10 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         cleanupBuffer();
+        forwardErrorToUser(ctx, e -> handleUnexpected(ctx, e), cause);
+    }
+
+    private void forwardErrorToUser(ChannelHandlerContext ctx, Consumer<Throwable> fallback, Throwable cause) {
         Optional<? extends MethodExecutionHandle<?, ?>> opt = webSocketBean.errorMethod();
 
         if (opt.isPresent()) {
@@ -275,25 +282,25 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     if (LOG.isErrorEnabled()) {
                         LOG.error("Error invoking to @OnError handler " + target.getClass().getSimpleName() + "." + errorMethod.getExecutableMethod() + ": " + e.getMessage(), e);
                     }
-                    handleUnexpected(ctx, e);
+                    fallback.accept(e);
                     return;
                 }
                 if (Publishers.isConvertibleToPublisher(result)) {
                     Flux<?> flowable = Flux.from(instrumentPublisher(ctx, result));
-                    flowable.collectList().subscribe(objects -> handleUnexpected(ctx, cause), throwable -> {
+                    flowable.collectList().subscribe(objects -> fallback.accept(cause), throwable -> {
                         if (throwable != null && LOG.isErrorEnabled()) {
                             LOG.error("Error subscribing to @OnError handler " + target.getClass().getSimpleName() + "." + errorMethod.getExecutableMethod() + ": " + throwable.getMessage(), throwable);
                         }
-                        handleUnexpected(ctx, cause);
+                        fallback.accept(cause);
                     });
                 }
 
             } catch (UnsatisfiedArgumentException e) {
-                handleUnexpected(ctx, cause);
+                fallback.accept(cause);
             }
 
         } else {
-            handleUnexpected(ctx, cause);
+            fallback.accept(cause);
         }
     }
 
