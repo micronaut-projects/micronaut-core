@@ -94,7 +94,12 @@ public final class JsonNodeTreeCodec {
                 }
             case VALUE_NUMBER_FLOAT:
                 if (config.useBigDecimalForFloats()) {
-                    return JsonNode.createNumberNode(p.getDecimalValue());
+                    // NaN and Inf can't be represented by BigDecimal. Note: isNaN returns true for Inf, too.
+                    if (p.isNaN()) {
+                        return JsonNode.createNumberNode(p.getFloatValue());
+                    } else {
+                        return JsonNode.createNumberNode(p.getDecimalValue());
+                    }
                 } else {
                     // technically, we could get an unsupported number value here.
                     return JsonNode.createNumberNodeImpl(p.getNumberValue());
