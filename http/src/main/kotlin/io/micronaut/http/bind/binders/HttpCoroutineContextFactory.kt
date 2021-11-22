@@ -15,8 +15,17 @@
  */
 package io.micronaut.http.bind.binders
 
+import io.micronaut.core.annotation.Experimental
 import kotlin.coroutines.CoroutineContext
 
-interface CoroutineContextFactory<out T: CoroutineContext> {
+/**
+ * Coroutine's context factory for HTTP controller coroutines.
+ *
+ * @author Konrad Kaminski
+ * @author Denis Stepanov
+ * @since 3.2
+ */
+@Experimental
+interface HttpCoroutineContextFactory<out T: CoroutineContext> {
     fun create(): T
 }

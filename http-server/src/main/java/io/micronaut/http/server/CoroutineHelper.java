@@ -19,7 +19,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
-import io.micronaut.http.bind.binders.CoroutineContextFactory;
+import io.micronaut.http.bind.binders.HttpCoroutineContextFactory;
 import jakarta.inject.Singleton;
 import reactor.util.context.ContextView;
 
@@ -36,9 +36,9 @@ import java.util.List;
 @Requires(classes = kotlin.coroutines.CoroutineContext.class)
 final class CoroutineHelper {
 
-    private final List<CoroutineContextFactory<?>> coroutineContextFactories;
+    private final List<HttpCoroutineContextFactory<?>> coroutineContextFactories;
 
-    CoroutineHelper(List<CoroutineContextFactory<?>> coroutineContextFactories) {
+    CoroutineHelper(List<HttpCoroutineContextFactory<?>> coroutineContextFactories) {
         this.coroutineContextFactories = coroutineContextFactories;
     }
 

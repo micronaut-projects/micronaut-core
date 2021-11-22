@@ -17,7 +17,7 @@ package io.micronaut.docs.server.suspend
 
 import io.micronaut.http.*
 import io.micronaut.http.annotation.*
-import io.micronaut.http.bind.binders.CoroutineContextFactory
+import io.micronaut.http.bind.binders.HttpCoroutineContextFactory
 import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.tracing.instrument.kotlin.CoroutineTracingDispatcher
@@ -32,7 +32,7 @@ class SuspendController(
     @Named(TaskExecutors.IO) private val executor: ExecutorService,
     private val suspendService: SuspendService,
     private val suspendRequestScopedService: SuspendRequestScopedService,
-    private val coroutineTracingDispatcherFactory: CoroutineContextFactory<CoroutineTracingDispatcher>
+    private val coroutineTracingDispatcherFactory: HttpCoroutineContextFactory<CoroutineTracingDispatcher>
 ) {
 
     private val coroutineDispatcher: CoroutineDispatcher
