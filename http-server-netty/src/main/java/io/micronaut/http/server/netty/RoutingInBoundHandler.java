@@ -1012,7 +1012,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 ByteBuffer<ByteBuf> encoded;
                 if (hasRouteInfo) {
                     //noinspection unchecked
-                    encoded = codec.encode((Argument<Object>) routeInfo.getBodyType(), message, byteBufferFactory);
+                    final Argument<Object> bodyType = (Argument<Object>) routeInfo.getBodyType();
+                    if (bodyType.isInstance(message)) {
+                        encoded = codec.encode(bodyType, message, byteBufferFactory);
+                    } else {
+                        encoded = codec.encode(message, byteBufferFactory);
+                    }
                 } else {
                     encoded = codec.encode(message, byteBufferFactory);
                 }
@@ -1333,7 +1338,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Encoding emitted response object [{}] using codec: {}", body, codec);
             }
-            if (bodyType != null) {
+            if (bodyType != null && bodyType.isInstance(body)) {
                 byteBuf = codec.encode(bodyType, body, new NettyByteBufferFactory(context.alloc())).asNativeBuffer();
             } else {
                 byteBuf = codec.encode(body, new NettyByteBufferFactory(context.alloc())).asNativeBuffer();

@@ -1708,7 +1708,7 @@ public class DefaultHttpClient implements
                             } else if (mediaTypeCodecRegistry != null) {
                                 Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
                                 ByteBuf encoded = registeredCodec.map(codec -> {
-                                            if (bodyType != null) {
+                                            if (bodyType != null && bodyType.isInstance(o)) {
                                                 return codec.encode((Argument<Object>) bodyType, o, byteBufferFactory).asNativeBuffer();
                                             } else {
                                                 return codec.encode(o, byteBufferFactory).asNativeBuffer();
@@ -1744,7 +1744,7 @@ public class DefaultHttpClient implements
                     } else if (mediaTypeCodecRegistry != null) {
                         Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
                         bodyContent = registeredCodec.map(codec -> {
-                                    if (bodyType != null) {
+                                    if (bodyType != null && bodyType.isInstance(bodyValue)) {
                                         return codec.encode((Argument<Object>) bodyType, bodyValue, byteBufferFactory).asNativeBuffer();
                                     } else {
                                         return codec.encode(bodyValue, byteBufferFactory).asNativeBuffer();
