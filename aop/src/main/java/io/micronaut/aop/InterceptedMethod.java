@@ -164,9 +164,9 @@ public interface InterceptedMethod {
     }
 
     /**
-     * Get native method context.
+     * Get native context from the suspension point.
      *
-     * @return The native context for the suspension point or null
+     * @return The native context from the suspension point or null
      * @since 3.2
      */
     @Nullable

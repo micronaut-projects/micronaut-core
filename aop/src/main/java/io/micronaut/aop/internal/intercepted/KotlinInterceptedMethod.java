@@ -187,7 +187,7 @@ final class KotlinInterceptedMethod implements InterceptedMethod {
         } else if (context instanceof CoroutineContext) {
             coroutineContext = (CoroutineContext) context;
         } else {
-            throw new IllegalStateException("Expected an instance of CoroutineContext got: " + context);
+            throw new IllegalStateException("Expected an instance of CoroutineContext. Got: " + context);
         }
         continuation = new DelegatingContextContinuation(continuation, coroutineContext);
     }
