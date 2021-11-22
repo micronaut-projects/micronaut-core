@@ -23,9 +23,33 @@ Please check https://graalvm.github.io/native-build-tools/0.9.7.1/maven-plugin.h
 
 Micronaut 3.2.0 includes support for Kotlin 1.6.0.
 
+=== HTTP Features
+
+==== WebSocket Ping API
+
+WebSocket ann:websocket.annotation.OnMessage methods can now accept a api:websocket.WebSocketPongMessage[] parameter that will receive a WebSocket pong sent as a response to a ping submitted using the new `sendPingAsync` method on api:websocket.WebSocketSession.
+
+==== HTTP2 Server Push
+
+It is now possible to send resources, e.g. stylesheets required by a HTML page, to the client alongside the request for the page using the HTTP2 server push protocol. Simply add a api:http.PushCapableHttpRequest[] parameter to your controller, check that `isServerPushSupported()`, and trigger the load using the `serverPush` method (for example: `request.serverPush(HttpRequest.GET("/static/style.css"))`). This can improve latency for the client, because they do not have to request that resource manually anymore, and can save a roundtrip.
+
+==== JsonView on request bodies
+
+You can now specify the Jackson `@JsonView` annotation on `@Body` parameters to controller methods.
+
+==== WebSocket ws/wss protocol support
+
+The WebSocket clients now support the ws/wss protocol. To implement this change, the api:websocket.WebSocketClient[] `create` methods now take a `URI` instead of a `URL`. The `URL` methods have been deprecated.
+
+Note: Should you be calling `WebSocketClient.create(null)`, the method call is now ambiguous. Insert a cast in that case: `WebSocketClient.create((URI) null)`
+
+==== SSL handshake timeout configuration
+
+The SSL handshake timeout can now be configured using the `micronaut.ssl.handshakeTimeout` and `micronaut.http.client.ssl.handshakeTimeout` configurations for the server and client respectively.
+
 === Module Upgrades
 
-=== Micronaut Data 3.2.0
+==== Micronaut Data 3.2.0
 
 - Repositories with JPA Criteria API specification for Micronaut JDBC/R2DBC
 - Expandable query parameters optimizations

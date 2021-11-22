@@ -64,7 +64,6 @@ public interface InterceptedMethod {
      */
     Object interceptResult();
 
-
     /**
      * Proceeds with invocation of {@link InvocationContext#proceed(Interceptor)} and converts result to appropriate type.
      *

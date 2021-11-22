@@ -15,11 +15,13 @@
  */
 package io.micronaut.jackson.modules;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
+import com.fasterxml.jackson.annotation.OptBoolean;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.SerializableString;
@@ -27,6 +29,7 @@ import com.fasterxml.jackson.core.io.SerializedString;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.cfg.MapperConfig;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerBuilder;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
 import com.fasterxml.jackson.databind.deser.CreatorProperty;
@@ -52,6 +55,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
@@ -131,7 +135,7 @@ public class BeanIntrospectionModule extends SimpleModule {
         );
     }
 
-    private VirtualAnnotatedMember createVirtualMember(TypeResolutionContext typeResolutionContext, Class<?> beanClass, String name, JavaType javaType, AnnotationMetadata annotationMetadata) {
+    private AnnotatedMember createVirtualMember(TypeResolutionContext typeResolutionContext, Class<?> beanClass, String name, JavaType javaType, AnnotationMetadata annotationMetadata) {
         return new VirtualAnnotatedMember(
                 typeResolutionContext,
                 beanClass,
@@ -188,6 +192,21 @@ public class BeanIntrospectionModule extends SimpleModule {
             }
         }
         return null;
+    }
+
+    @NonNull
+    private JsonFormat.Value parseJsonFormat(@NonNull AnnotationValue<JsonFormat> formatAnnotation) {
+        return new JsonFormat.Value(
+                formatAnnotation.stringValue("pattern").orElse(""),
+                formatAnnotation.enumValue("shape", JsonFormat.Shape.class).orElse(JsonFormat.Shape.ANY),
+                formatAnnotation.stringValue("locale").orElse(JsonFormat.DEFAULT_LOCALE),
+                formatAnnotation.stringValue("timezone").orElse(JsonFormat.DEFAULT_TIMEZONE),
+                JsonFormat.Features.construct(
+                        formatAnnotation.enumValues("with", JsonFormat.Feature.class),
+                        formatAnnotation.enumValues("without", JsonFormat.Feature.class)
+                ),
+                formatAnnotation.enumValue("lenient", OptBoolean.class).orElse(OptBoolean.DEFAULT).asBoolean()
+        );
     }
 
     /**
@@ -706,6 +725,20 @@ public class BeanIntrospectionModule extends SimpleModule {
             beanProperty.set(instance, value);
             return null;
         }
+
+        @Override
+        public JsonFormat.Value findPropertyFormat(MapperConfig<?> config, Class<?> baseType) {
+            JsonFormat.Value v1 = config.getDefaultPropertyFormat(baseType);
+            JsonFormat.Value v2 = null;
+            AnnotationValue<JsonFormat> formatAnnotation = beanProperty.getAnnotation(JsonFormat.class);
+            if (formatAnnotation != null) {
+                v2 = parseJsonFormat(formatAnnotation);
+            }
+            if (v1 == null) {
+                return (v2 == null) ? EMPTY_FORMAT : v2;
+            }
+            return (v2 == null) ? v1 : v1.withOverrides(v2);
+        }
     }
 
 
@@ -746,7 +779,7 @@ public class BeanIntrospectionModule extends SimpleModule {
         }
 
         BeanIntrospectionPropertyWriter(
-                VirtualAnnotatedMember virtualMember,
+                AnnotatedMember virtualMember,
                 SerializationConfig config,
                 String name,
                 BeanProperty<Object, Object> introspection,
@@ -806,29 +839,6 @@ public class BeanIntrospectionModule extends SimpleModule {
                 }
             }
             return false;
-        }
-
-        /**
-         * @see <a href="https://github.com/micronaut-projects/micronaut-core/issues/2933">Issue 2933</a>
-         */
-        private boolean shouldSuppressNulls(boolean defaultSupressNull) {
-            JsonInclude.Include include = beanProperty.enumValue(JsonInclude.class, JsonInclude.Include.class).orElse(null);
-            if (include == null) {
-                include = beanProperty.getDeclaringBean().enumValue(JsonInclude.class, JsonInclude.Include.class).orElse(null);
-            }
-            if (include != null) {
-                switch (include) {
-                    case ALWAYS:
-                        return false;
-                    case NON_NULL:
-                    case NON_ABSENT:
-                    case NON_EMPTY:
-                        return true;
-                    default:
-                        return defaultSupressNull;
-                }
-            }
-            return defaultSupressNull;
         }
 
         @Override
@@ -938,6 +948,19 @@ public class BeanIntrospectionModule extends SimpleModule {
             }
         }
 
+        @Override
+        public JsonFormat.Value findPropertyFormat(MapperConfig<?> config, Class<?> baseType) {
+            JsonFormat.Value v1 = config.getDefaultPropertyFormat(baseType);
+            JsonFormat.Value v2 = null;
+            AnnotationValue<JsonFormat> formatAnnotation = beanProperty.getAnnotation(JsonFormat.class);
+            if (formatAnnotation != null) {
+                v2 = parseJsonFormat(formatAnnotation);
+            }
+            if (v1 == null) {
+                return (v2 == null) ? EMPTY_FORMAT : v2;
+            }
+            return (v2 == null) ? v1 : v1.withOverrides(v2);
+        }
     }
 
     /**

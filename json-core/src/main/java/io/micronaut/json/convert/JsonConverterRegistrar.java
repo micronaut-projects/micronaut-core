@@ -37,7 +37,9 @@ import jakarta.inject.Singleton;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -74,14 +76,14 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
                 arrayNodeToObjectConverter()
         );
         conversionService.addConverter(
-                JsonArray.class,
-                Iterable.class,
-                arrayNodeToIterableConverter()
-        );
-        conversionService.addConverter(
                 JsonNode.class,
                 ConvertibleValues.class,
                 objectNodeToConvertibleValuesConverter()
+        );
+        conversionService.addConverter(
+                JsonArray.class,
+                Iterable.class,
+                arrayNodeToIterableConverter()
         );
         conversionService.addConverter(
                 JsonNode.class,
@@ -105,7 +107,14 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
      */
     @Internal
     public TypeConverter<JsonNode, ConvertibleValues> objectNodeToConvertibleValuesConverter() {
-        return (object, targetType, context) -> Optional.of(new JsonNodeConvertibleValues<>(object, conversionService));
+        return (object, targetType, context) -> {
+            if (object.isObject()) {
+                return Optional.of(new JsonNodeConvertibleValues<>(object, conversionService));
+            } else {
+                // ConvertibleValues only works for objects
+                return Optional.empty();
+            }
+        };
     }
 
     /**
@@ -113,14 +122,20 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
      */
     public TypeConverter<JsonArray, Iterable> arrayNodeToIterableConverter() {
         return (node, targetType, context) -> {
+            Collection<Object> results;
+            if (targetType.isAssignableFrom(ArrayList.class)) {
+                results = new ArrayList<>();
+            } else if (targetType.isAssignableFrom(LinkedHashSet.class)) {
+                results = new LinkedHashSet<>();
+            } else {
+                // don't know how to convert to that collection type
+                return Optional.empty();
+            }
             Map<String, Argument<?>> typeVariables = context.getTypeVariables();
             Class elementType = typeVariables.isEmpty() ? Map.class : typeVariables.values().iterator().next().getType();
-            List results = new ArrayList();
             for (int i = 0; i < node.size(); i++) {
-                Optional converted = conversionService.convert(node.get(i), elementType, context);
-                if (converted.isPresent()) {
-                    results.add(converted.get());
-                }
+                Optional<?> converted = conversionService.convert(node.get(i), elementType, context);
+                converted.ifPresent(results::add);
             }
             return Optional.of(results);
         };
