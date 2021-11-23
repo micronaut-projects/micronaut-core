@@ -103,9 +103,9 @@ public class ClientSslConfiguration extends SslConfiguration {
     }
 
     /**
-     * @return Whether the client should disable checking of the remote SSL certificate. <b>Note: This makes the SSL
-     * connection insecure, and should only be used for testing. If you are using a self-signed certificate, set up a
-     * trust store instead.</b>
+     * @return Whether the client should disable checking of the remote SSL certificate. Only applies if no trust store
+     * is configured. <b>Note: This makes the SSL connection insecure, and should only be used for testing. If you are
+     * using a self-signed certificate, set up a trust store instead.</b>
      */
     public boolean isInsecureTrustAllCertificates() {
         return insecureTrustAllCertificates;
@@ -113,6 +113,7 @@ public class ClientSslConfiguration extends SslConfiguration {
 
     /**
      * @param insecureTrustAllCertificates Whether the client should disable checking of the remote SSL certificate.
+     *                                     Only applies if no trust store is configured.
      *                                     <b>Note: This makes the SSL connection insecure, and should only be used for
      *                                     testing. If you are using a self-signed certificate, set up a trust store
      *                                     instead.</b>
