@@ -2,7 +2,7 @@
 
 == 3.2.0
 
-===  GraalVM 21.3.0
+=== GraalVM 21.3.0
 
 Micronaut has been updated to support the latest GraalVM 21.3.0 release. Please keep in mind that starting with 21.3.0 GraalVM doesn't release a version based on JDK 8. If you still use Java 8 use the GraalVM JDK 11 distribution.
 
@@ -19,9 +19,9 @@ The official GraalVM Maven plugin has new GAV coordinates so if you have declare
 
 Please check https://graalvm.github.io/native-build-tools/0.9.7.1/maven-plugin.html[the official documentation] about how to customize the plugin.
 
-=== Gradle plugin 3.0.0
+=== Gradle Plugin 3.0.0
 
-A new major version of the Gradle plugin has been released, including internal changes to use Gradle's lazy configuration APIs and make bugfixing simpler.
+A new major version of the Gradle plugin has been released, including internal changes to use Gradle's lazy configuration APIs.
 In the process, https://micronaut-projects.github.io/micronaut-gradle-plugin/latest/[documentation] has been rewritten.
 
 Support for GraalVM now delegates to https://graalvm.github.io/native-build-tools/0.9.7.1/gradle-plugin.html[the official GraalVM plugin].
@@ -31,7 +31,7 @@ We recommend to upgrade in order to get the latest bugfixes, but this constitute
 - native image configuration happens in the `graalvmNative` DSL extension instead of the `nativeCompile` task
 - native image building makes use of Gradle's toolchain support. Please refer to the https://micronaut-projects.github.io/micronaut-gradle-plugin/latest/[documentation] for help.
 
-NOTE: You can still build Micronaut 3.2 applications or libraries using the 2.x version of the Gradle plugin. Documentation for this version can be found https://github.com/micronaut-projects/micronaut-gradle-plugin/blob/2.0.x/README.md[here].
+NOTE: You can still build existing applications or libraries using the 2.x version of the Gradle plugin. Documentation for this version can be found https://github.com/micronaut-projects/micronaut-gradle-plugin/blob/2.0.x/README.md[here].
 
 === Kotlin 1.6.0
 
@@ -45,7 +45,7 @@ WebSocket ann:websocket.annotation.OnMessage[] methods can now accept a api:webs
 
 ==== HTTP2 Server Push
 
-It is now possible to send resources, e.g. stylesheets required by a HTML page, to the client alongside the request for the page using the HTTP2 server push protocol. Simply add a api:http.PushCapableHttpRequest[] parameter to your controller, check that `isServerPushSupported()`, and trigger the load using the `serverPush` method (for example: `request.serverPush(HttpRequest.GET("/static/style.css"))`). This can improve latency for the client, because they do not have to request that resource manually anymore, and can save a roundtrip.
+It is now possible to send resources, e.g. stylesheets required by a HTML page, to the client alongside the request for the page using the HTTP2 server push protocol. See the <<http2Server, HTTP/2 documentation>> for information on how to use this feature.
 
 ==== JsonView on request bodies
 
@@ -75,6 +75,10 @@ The SSL handshake timeout can now be configured using the `micronaut.ssl.handsha
 ==== Micronaut Micrometer 4.1.0
 
 - Adds support for metrics with gRPC
+
+==== Micronaut Security 3.2.0
+
+- The way JSON Web Key Sets are being cached has been greatly improved for scenarios where there are multiple key sets.
 
 ==== Other Module Upgrades
 

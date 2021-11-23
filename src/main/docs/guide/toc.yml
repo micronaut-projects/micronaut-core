@@ -152,6 +152,7 @@ httpClient:
     clientFallback: Client Fallbacks
     netflixHystrix: Netflix Hystrix Support
   clientFilter: HTTP Client Filters
+  clientHttp2: HTTP/2 Support
   clientSample: HTTP Client Sample
 cloud:
   title: Cloud Native Features
