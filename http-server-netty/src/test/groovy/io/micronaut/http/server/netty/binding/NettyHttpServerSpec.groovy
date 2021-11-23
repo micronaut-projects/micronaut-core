@@ -204,6 +204,7 @@ class NettyHttpServerSpec extends Specification {
                 'micronaut.server.port':httpPort,
                 'micronaut.ssl.enabled': true,
                 'micronaut.ssl.buildSelfSigned': true,
+                'micronaut.http.client.ssl.insecureTrustAllCertificates': true,
                 'micronaut.server.dualProtocol':true
         )
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, propertySource, Environment.TEST)

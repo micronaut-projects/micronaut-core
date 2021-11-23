@@ -29,14 +29,12 @@ import jakarta.inject.Inject;
  */
 @ConfigurationProperties(ClientSslConfiguration.PREFIX)
 @BootstrapContextCompatible
-public class ClientSslConfiguration extends SslConfiguration {
+public class ClientSslConfiguration extends AbstractClientSslConfiguration {
 
     /**
      * The prefix used to resolve this configuration.
      */
     public static final String PREFIX = "micronaut.http.client.ssl";
-
-    private boolean insecureTrustAllCertificates;
 
     /**
      * Overrides the default constructor and sets {@link #isEnabled()} to true.
@@ -100,26 +98,6 @@ public class ClientSslConfiguration extends SslConfiguration {
         if (trustStore != null) {
             super.setTrustStore(trustStore);
         }
-    }
-
-    /**
-     * @return Whether the client should disable checking of the remote SSL certificate. Only applies if no trust store
-     * is configured. <b>Note: This makes the SSL connection insecure, and should only be used for testing. If you are
-     * using a self-signed certificate, set up a trust store instead.</b>
-     */
-    public boolean isInsecureTrustAllCertificates() {
-        return insecureTrustAllCertificates;
-    }
-
-    /**
-     * @param insecureTrustAllCertificates Whether the client should disable checking of the remote SSL certificate.
-     *                                     Only applies if no trust store is configured.
-     *                                     <b>Note: This makes the SSL connection insecure, and should only be used for
-     *                                     testing. If you are using a self-signed certificate, set up a trust store
-     *                                     instead.</b>
-     */
-    public void setInsecureTrustAllCertificates(boolean insecureTrustAllCertificates) {
-        this.insecureTrustAllCertificates = insecureTrustAllCertificates;
     }
 
     /**

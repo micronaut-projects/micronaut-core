@@ -19,8 +19,8 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
+import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.ClientAuthentication;
-import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.http.ssl.SslBuilder;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.http.ssl.SslConfigurationException;
@@ -130,7 +130,7 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> {
             if (this.getTrustStore(ssl).isPresent()) {
                 return super.getTrustManagerFactory(ssl);
             } else {
-                if (((ClientSslConfiguration) ssl).isInsecureTrustAllCertificates()) {
+                if (ssl instanceof AbstractClientSslConfiguration && ((AbstractClientSslConfiguration) ssl).isInsecureTrustAllCertificates()) {
                     return InsecureTrustManagerFactory.INSTANCE;
                 } else {
                     // netty will use the JDK trust store

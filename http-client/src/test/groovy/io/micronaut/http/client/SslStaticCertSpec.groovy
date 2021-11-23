@@ -57,6 +57,7 @@ class SslStaticCertSpec extends Specification {
                                           'TLS_DHE_RSA_WITH_AES_256_GCM_SHA384',
                                           'TLS_DHE_DSS_WITH_AES_128_GCM_SHA256',
                                           'TLS_DHE_DSS_WITH_AES_256_GCM_SHA384'],
+                'micronaut.http.client.ssl.insecureTrustAllCertificates': true
         ])
         embeddedServer = context.getBean(EmbeddedServer).start()
         client = context.createBean(HttpClient, embeddedServer.getURL())
