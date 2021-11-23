@@ -72,6 +72,10 @@ The SSL handshake timeout can now be configured using the `micronaut.ssl.handsha
 
 - The RxJava2, RxJava3, and Reactor modules have been updated with the equivalent static `create` methods on their core counterparts.
 
+==== Micronaut Micrometer 4.1.0
+
+- Adds support for metrics with gRPC
+
 ==== Other Module Upgrades
 
 - Elasticsearch 7.15.2
