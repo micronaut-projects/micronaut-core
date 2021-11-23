@@ -41,7 +41,7 @@ Micronaut 3.2.0 includes support for Kotlin 1.6.0.
 
 ==== WebSocket Ping API
 
-WebSocket ann:websocket.annotation.OnMessage methods can now accept a api:websocket.WebSocketPongMessage[] parameter that will receive a WebSocket pong sent as a response to a ping submitted using the new `sendPingAsync` method on api:websocket.WebSocketSession.
+WebSocket ann:websocket.annotation.OnMessage[] methods can now accept a api:websocket.WebSocketPongMessage[] parameter that will receive a WebSocket pong sent as a response to a ping submitted using the new `sendPingAsync` method on api:websocket.WebSocketSession[].
 
 ==== HTTP2 Server Push
 
