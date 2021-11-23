@@ -18,7 +18,7 @@ package io.micronaut.http.ssl;
 /**
  * Base class for {@link SslConfiguration} extensions for SSL clients.
  *
- * @since 3.2
+ * @since 3.2.0
  * @author Jonas Konrad
  */
 public abstract class AbstractClientSslConfiguration extends SslConfiguration {

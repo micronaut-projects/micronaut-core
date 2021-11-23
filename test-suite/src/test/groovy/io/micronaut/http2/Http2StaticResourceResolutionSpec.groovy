@@ -49,7 +49,7 @@ class Http2StaticResourceResolutionSpec extends Specification implements TestPro
                 "micronaut.server.netty.log-level" : "TRACE",
                 'micronaut.ssl.buildSelfSigned': true,
                 'micronaut.ssl.port': -1,
-                'micronaut.http.client.ssl.insecureTrustAllCertificates': true
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true
         ]
     }
 

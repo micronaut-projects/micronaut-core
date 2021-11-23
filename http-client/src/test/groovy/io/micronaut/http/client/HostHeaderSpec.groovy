@@ -113,7 +113,7 @@ class HostHeaderSpec extends Specification {
                 'micronaut.ssl.enabled': true,
                 'micronaut.ssl.buildSelfSigned': true,
                 'micronaut.ssl.port': 443,
-                'micronaut.http.client.ssl.insecureTrustAllCertificates': true,
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
         ]).run(EmbeddedServer)
         def asyncClient = HttpClient.create(embeddedServer.getURL())
         BlockingHttpClient client = asyncClient.toBlocking()
@@ -139,7 +139,7 @@ class HostHeaderSpec extends Specification {
                 'micronaut.ssl.port': -1,
                 'micronaut.ssl.enabled': true,
                 'micronaut.ssl.buildSelfSigned': true,
-                'micronaut.http.client.ssl.insecureTrustAllCertificates': true,
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
         ]).run(EmbeddedServer)
         def asyncClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
         BlockingHttpClient client = asyncClient.toBlocking()

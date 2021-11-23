@@ -39,7 +39,7 @@ class Http2AccessLoggerSpec extends Specification {
             "micronaut.http.client.log-level" : "TRACE",
             "micronaut.server.netty.log-level" : "TRACE",
             'micronaut.server.netty.access-logger.enabled': true,
-            'micronaut.http.client.ssl.insecureTrustAllCertificates': true
+            'micronaut.http.client.ssl.insecure-trust-all-certificates': true
     ])
     HttpClient client = server.getApplicationContext().getBean(HttpClient)
     static MemoryAppender appender = new MemoryAppender()
@@ -146,7 +146,7 @@ class Http2AccessLoggerSpec extends Specification {
                 "micronaut.http.client.log-level" : "TRACE",
                 "micronaut.server.netty.log-level" : "TRACE",
                 'micronaut.server.netty.access-logger.enabled': true,
-                'micronaut.http.client.ssl.insecureTrustAllCertificates': true
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true
         ])
         HttpClient client = server.getApplicationContext().getBean(HttpClient)
         appender.events.clear()

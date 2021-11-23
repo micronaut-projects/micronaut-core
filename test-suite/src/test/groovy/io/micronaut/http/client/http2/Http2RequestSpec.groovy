@@ -44,7 +44,7 @@ class Http2RequestSpec extends Specification {
             'micronaut.ssl.port': -1,
             "micronaut.http.client.log-level" : "TRACE",
             "micronaut.server.netty.log-level" : "TRACE",
-            'micronaut.http.client.ssl.insecureTrustAllCertificates': true
+            'micronaut.http.client.ssl.insecure-trust-all-certificates': true
     ])
     HttpClient client = server.getApplicationContext().getBean(HttpClient)
 
@@ -154,7 +154,7 @@ class Http2RequestSpec extends Specification {
                 'micronaut.ssl.port': -1,
                 "micronaut.http.client.log-level" : "TRACE",
                 "micronaut.server.netty.log-level" : "TRACE",
-                'micronaut.http.client.ssl.insecureTrustAllCertificates': true
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true
         ])
         HttpClient client = server.getApplicationContext().getBean(HttpClient)
         String result = client.toBlocking().retrieve("${server.URL}/http2")
