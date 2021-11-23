@@ -1,26 +1,5 @@
-sourceSets {
-    functionalTest
-}
-
-configurations {
-    functionalTestImplementation {
-        extendsFrom(testImplementation)
-    }
-}
-
-def functionalTest = tasks.register("functionalTest", Test) {
-    inputs.files(configurations.testCompileClasspath)
-    inputs.files(configurations.testAnnotationProcessor)
-    testClassesDirs = sourceSets.functionalTest.output.classesDirs
-    classpath = sourceSets.functionalTest.runtimeClasspath
-    doFirst {
-        systemProperty("testapp.compile.classpath", configurations.testCompileClasspath.asPath)
-        systemProperty("testapp.annotationprocessor.path", configurations.testAnnotationProcessor.asPath)
-    }
-}
-
-tasks.named("check") {
-    dependsOn functionalTest
+plugins {
+    id 'io.micronaut.build.internal.functional-test'
 }
 
 dependencies {
