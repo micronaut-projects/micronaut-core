@@ -38,7 +38,6 @@ import jakarta.inject.Singleton;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
-import java.security.KeyStore;
 import java.util.Arrays;
 import java.util.Optional;
 
@@ -134,9 +133,8 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> {
                 if (((ClientSslConfiguration) ssl).isInsecureTrustAllCertificates()) {
                     return InsecureTrustManagerFactory.INSTANCE;
                 } else {
-                    TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-                    tmf.init(KeyStore.getInstance(KeyStore.getDefaultType()));
-                    return tmf;
+                    // netty will use the JDK trust store
+                    return null;
                 }
             }
         } catch (Exception ex) {
