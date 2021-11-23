@@ -2,6 +2,8 @@ This section documents breaking changes between Micronaut versions
 
 == 3.2.0
 
+- The HTTP client now does SSL certificate verification by default. The old insecure behavior can be re-enabled by setting the `micronaut.http.client.ssl.insecureTrustAllCertificates` property to `true`, but consider using a trust store instead if you're using self-signed certificates.
+
 - Maven GraalVM Native Image plugin has new GAV coordinates. If you have declared it in your `pom.xml` please update the coordinates to:
 
 [source,xml]

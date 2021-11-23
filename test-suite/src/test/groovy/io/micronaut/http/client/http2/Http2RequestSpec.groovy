@@ -18,6 +18,7 @@ import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.sse.Event
+import io.micronaut.http.ssl.AbstractClientSslConfiguration
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
@@ -42,7 +43,8 @@ class Http2RequestSpec extends Specification {
             'micronaut.ssl.buildSelfSigned': true,
             'micronaut.ssl.port': -1,
             "micronaut.http.client.log-level" : "TRACE",
-            "micronaut.server.netty.log-level" : "TRACE"
+            "micronaut.server.netty.log-level" : "TRACE",
+            'micronaut.http.client.ssl.insecure-trust-all-certificates': true
     ])
     HttpClient client = server.getApplicationContext().getBean(HttpClient)
 
@@ -151,7 +153,8 @@ class Http2RequestSpec extends Specification {
                 'micronaut.ssl.buildSelfSigned': true,
                 'micronaut.ssl.port': -1,
                 "micronaut.http.client.log-level" : "TRACE",
-                "micronaut.server.netty.log-level" : "TRACE"
+                "micronaut.server.netty.log-level" : "TRACE",
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true
         ])
         HttpClient client = server.getApplicationContext().getBean(HttpClient)
         String result = client.toBlocking().retrieve("${server.URL}/http2")
@@ -176,6 +179,7 @@ class Http2RequestSpec extends Specification {
         ])
         HttpClientConfiguration configuration = server.getApplicationContext().getBean(HttpClientConfiguration);
         configuration.setHttpVersion(HttpVersion.HTTP_2_0);
+        ((AbstractClientSslConfiguration) configuration.sslConfiguration).insecureTrustAllCertificates = true
         HttpClient client = HttpClient.create(null, configuration);
         String result = client.toBlocking().retrieve("${server.URL}/http2")
 
@@ -198,6 +202,7 @@ class Http2RequestSpec extends Specification {
                 "micronaut.server.netty.log-level" : "TRACE"
         ])
         HttpClientConfiguration configuration = server.getApplicationContext().getBean(HttpClientConfiguration);
+        ((AbstractClientSslConfiguration) configuration.sslConfiguration).insecureTrustAllCertificates = true
         HttpClient client = HttpClient.create(null, configuration);
         String result = client.toBlocking().retrieve("${server.URL}/http2")
 
