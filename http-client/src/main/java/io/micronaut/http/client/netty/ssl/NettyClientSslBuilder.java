@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.ssl.ClientAuthentication;
+import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.http.ssl.SslBuilder;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.http.ssl.SslConfigurationException;
@@ -37,6 +38,7 @@ import jakarta.inject.Singleton;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
+import java.security.KeyStore;
 import java.util.Arrays;
 import java.util.Optional;
 
@@ -129,7 +131,13 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> {
             if (this.getTrustStore(ssl).isPresent()) {
                 return super.getTrustManagerFactory(ssl);
             } else {
-                return InsecureTrustManagerFactory.INSTANCE;
+                if (((ClientSslConfiguration) ssl).isInsecureTrustAllCertificates()) {
+                    return InsecureTrustManagerFactory.INSTANCE;
+                } else {
+                    TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+                    tmf.init(KeyStore.getInstance(KeyStore.getDefaultType()));
+                    return tmf;
+                }
             }
         } catch (Exception ex) {
             throw new SslConfigurationException(ex);
