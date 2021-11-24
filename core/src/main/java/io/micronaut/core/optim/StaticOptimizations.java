@@ -35,8 +35,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @SuppressWarnings("unchecked")
 @Internal
 public abstract class StaticOptimizations {
-    private static final Logger LOGGER = LoggerFactory.getLogger(StaticOptimizations.class);
-
     private static final Map<Class<?>, Object> OPTIMIZATIONS = new ConcurrentHashMap<>();
     private static boolean cacheEnvironment = false;
 
@@ -60,11 +58,6 @@ public abstract class StaticOptimizations {
     @NonNull
     public static <T> Optional<T> get(@NonNull Class<T> optimizationClass) {
         T value = (T) OPTIMIZATIONS.get(optimizationClass);
-        if (value != null) {
-            LOGGER.debug("Found optimizations {}", optimizationClass);
-        } else {
-            LOGGER.debug("No optimizations {} found", optimizationClass);
-        }
         return Optional.ofNullable(value);
     }
 
@@ -77,7 +70,6 @@ public abstract class StaticOptimizations {
      */
     public static <T> void set(@NonNull T value) {
         Class<?> optimizationClass = value.getClass();
-        LOGGER.debug("Setting optimizations for {}", optimizationClass);
         OPTIMIZATIONS.put(optimizationClass, value);
     }
 
