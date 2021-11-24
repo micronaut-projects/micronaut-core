@@ -15,6 +15,7 @@ import spock.lang.Specification
 
 @MicronautTest
 @Property(name = "secondary.enabled", value = StringUtils.TRUE)
+@Property(name = "micronaut.http.client.ssl.insecure-trust-all-certificates", value = StringUtils.TRUE)
 class SecondaryServerTest extends Specification {
     // tag::inject[]
     @Client(path = "/", id = SecondaryNettyServer.SERVER_ID)

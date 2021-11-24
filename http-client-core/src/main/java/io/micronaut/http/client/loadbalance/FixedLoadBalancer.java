@@ -49,14 +49,6 @@ public class FixedLoadBalancer implements LoadBalancer  {
         this(toUriUnchecked(url));
     }
 
-    private static URI toUriUnchecked(URL url) {
-        try {
-            return url.toURI();
-        } catch (URISyntaxException e) {
-            throw new IllegalArgumentException("Illegal URI", e);
-        }
-    }
-
     /**
      * Constructs a new FixedLoadBalancer.
      *
@@ -95,5 +87,13 @@ public class FixedLoadBalancer implements LoadBalancer  {
     @Override
     public Optional<String> getContextPath() {
         return Optional.ofNullable(getUri().getPath());
+    }
+
+    private static URI toUriUnchecked(URL url) {
+        try {
+            return url.toURI();
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException("Illegal URI", e);
+        }
     }
 }
