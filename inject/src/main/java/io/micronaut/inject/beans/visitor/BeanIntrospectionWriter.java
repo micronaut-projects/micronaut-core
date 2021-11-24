@@ -207,6 +207,14 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 this.annotationMetadata,
                 annotationMetadata
         );
+        if (typeArguments != null) {
+            for (ClassElement element : typeArguments.values()) {
+                DefaultAnnotationMetadata.contributeRepeatable(
+                        this.annotationMetadata,
+                        element
+                );
+            }
+        }
 
         int readMethodIndex = -1;
         if (readMethod != null) {

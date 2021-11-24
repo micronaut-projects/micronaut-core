@@ -1,3 +1,4 @@
+
 Micronaut supports the programmatic creation of additional Netty servers through the api:http.server.netty.NettyEmbeddedServerFactory[] interface.
 
 This is useful in cases where you, for example, need to expose distinct servers over different ports with potentially differing configurations (HTTPS, thread resources etc.).
@@ -10,10 +11,11 @@ snippet::io.micronaut.docs.http.server.secondary.SecondaryNettyServer[tags="impo
 <2> Define a ann:annotation.annotation.Context[] scoped bean using the server name and including `preDestroy="close"` to ensure the server is shutdown when the context is closed
 <3> Inject the api:http.server.netty.NettyEmbeddedServerFactory[] into a <<factories, Factory Bean>>
 <4> Programmatically create the api:http.server.netty.configuration.NettyHttpServerConfiguration[]
-<5> Use the `build` method to build the server instance
-<6> Start the server with the `start` method
-<7> Return the server instance as a managed bean
-<8> Optionally define an instance of api:discovery.ServiceInstanceList[] if you wish to inject <<httpClient, HTTP Clients>> by the server name
+<5> Optionally create the api:http.ssl.ServerSslConfiguration[]
+<6> Use the `build` method to build the server instance
+<7> Start the server with the `start` method
+<8> Return the server instance as a managed bean
+<9> Optionally define an instance of api:discovery.ServiceInstanceList[] if you wish to inject <<httpClient, HTTP Clients>> by the server name
 
 With this class in place when the api:context.ApplicationContext[] starts the server will also be started with the appropriate configuration.
 
