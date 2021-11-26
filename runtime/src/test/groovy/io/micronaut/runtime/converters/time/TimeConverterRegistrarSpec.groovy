@@ -21,6 +21,10 @@ import spock.lang.Specification
 import spock.lang.Unroll
 
 import java.time.Duration
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 
 class TimeConverterRegistrarSpec extends Specification {
 
@@ -42,6 +46,45 @@ class TimeConverterRegistrarSpec extends Specification {
         '10d'  | Duration.ofDays(10)
         '10h'  | Duration.ofHours(10)
         '10ns' | Duration.ofNanos(10)
+
+    }
+
+    void "test convert offsetdatetime"() {
+        given:
+        ConversionService conversionService = new DefaultConversionService()
+        new TimeConverterRegistrar().register(conversionService)
+
+        when:
+        OffsetDateTime result = conversionService.convert('2021-11-26T21:19+01:00', OffsetDateTime).get();
+
+        then:
+        result == OffsetDateTime.of(LocalDateTime.of(2021, 11, 26, 21, 19), ZoneOffset.ofHours(1))
+
+    }
+
+    void "test convert localdatetime"() {
+        given:
+        ConversionService conversionService = new DefaultConversionService()
+        new TimeConverterRegistrar().register(conversionService)
+
+        when:
+        LocalDateTime result = conversionService.convert('2021-11-26T21:19', LocalDateTime).get();
+
+        then:
+        result == LocalDateTime.of(2021, 11, 26, 21, 19)
+
+    }
+
+    void "test convert localdate"() {
+        given:
+        ConversionService conversionService = new DefaultConversionService()
+        new TimeConverterRegistrar().register(conversionService)
+
+        when:
+        LocalDate result = conversionService.convert('2021-11-26', LocalDate).get();
+
+        then:
+        result == LocalDate.of(2021, 11, 26)
 
     }
 }
