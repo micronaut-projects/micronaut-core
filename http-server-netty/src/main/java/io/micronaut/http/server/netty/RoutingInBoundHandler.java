@@ -330,6 +330,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         RouteMatch<?> route;
 
         if (routeMatch == null) {
+
+            //Check if there is a file for the route before returning route not found
+            Optional<? extends FileCustomizableResponseType> optionalFile = matchFile(requestPath);
+
+            if (optionalFile.isPresent()) {
+                filterAndEncodeResponse(ctx, nettyHttpRequest, Flux.just(HttpResponse.ok(optionalFile.get())));
+                return;
+            }
+
             if (LOG.isDebugEnabled()) {
                 LOG.debug("No matching route: {} {}", httpMethod, request.getUri());
             }
@@ -397,13 +406,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         HttpResponse.notAllowedGeneric(allowedMethods),
                         "Method [" + requestMethodName + "] not allowed for URI [" + request.getUri() + "]. Allowed methods: " + allowedMethods);
                 return;
-            }
-
-            Optional<? extends FileCustomizableResponseType> optionalFile = matchFile(requestPath);
-
-            if (optionalFile.isPresent()) {
-                filterAndEncodeResponse(ctx, nettyHttpRequest, Flux.just(HttpResponse.ok(optionalFile.get())));
-            } else {
+            }else {
                 handleStatusError(ctx, nettyHttpRequest, HttpResponse.status(HttpStatus.NOT_FOUND), "Page Not Found");
             }
             return;
