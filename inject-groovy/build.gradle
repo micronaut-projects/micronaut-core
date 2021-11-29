@@ -6,6 +6,7 @@ dependencies {
     api project(":inject")
     api project(':aop')
     api libs.managed.groovy
+    implementation(libs.managed.slf4j.simple)
 
 //    testImplementation 'javax.validation:validation-api:1.1.0.Final'
     testImplementation project(":context")
