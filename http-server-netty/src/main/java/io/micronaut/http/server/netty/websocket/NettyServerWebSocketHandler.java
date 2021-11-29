@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.websocket;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.BoundExecutable;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -77,7 +78,8 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     public static final String ID = "websocket-handler";
 
     private final NettyEmbeddedServices nettyEmbeddedServices;
-    private final Optional<CoroutineHelper> coroutineHelper;
+    @Nullable
+    private final CoroutineHelper coroutineHelper;
 
     /**
      * Default constructor.
@@ -99,7 +101,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             HttpRequest<?> request,
             UriRouteMatch<Object, Object> routeMatch,
             ChannelHandlerContext ctx,
-            Optional<CoroutineHelper> coroutineHelper) {
+            @Nullable CoroutineHelper coroutineHelper) {
         super(
                 ctx,
                 nettyEmbeddedServices.getRequestArgumentSatisfier().getBinderRegistry(),
@@ -242,14 +244,14 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
     @Override
     protected Object invokeExecutable(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
-        if (coroutineHelper.isPresent()) {
+        if (coroutineHelper != null) {
             Executable<?, ?> target = boundExecutable.getTarget();
             if (target instanceof ExecutableMethod<?, ?>) {
                 ExecutableMethod<?, ?> executableMethod = (ExecutableMethod<?, ?>) target;
                 if (executableMethod.isSuspend()) {
                     return Flux.deferContextual(ctx -> {
                         try {
-                            coroutineHelper.get().setupCoroutineContext(originatingRequest, ctx);
+                            coroutineHelper.setupCoroutineContext(originatingRequest, ctx);
 
                             Object immediateReturnValue = invokeExecutable0(boundExecutable, messageHandler);
 

@@ -158,6 +158,13 @@ public final class RouteExecutor {
     }
 
     /**
+     * @return The kotlin coroutine helper
+     */
+    public Optional<CoroutineHelper> getCoroutineHelper() {
+        return coroutineHelper;
+    }
+
+    /**
      * Creates a response publisher to represent the response after being handled
      * by any available error route or exception handler.
      *
