@@ -104,13 +104,15 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
 
     /**
      * Default constructor.
-     *  @param embeddedServices The embedded server services
+     *
+     * @param embeddedServices The embedded server services
      * @param webSocketSessionRepository The websocket session repository
      * @param coroutineHelper Helper for kotlin coroutines
      */
     public NettyServerWebSocketUpgradeHandler(
             NettyEmbeddedServices embeddedServices,
-            WebSocketSessionRepository webSocketSessionRepository, Optional<CoroutineHelper> coroutineHelper) {
+            WebSocketSessionRepository webSocketSessionRepository,
+            Optional<CoroutineHelper> coroutineHelper) {
         this.router = embeddedServices.getRouter();
         this.binderRegistry = embeddedServices.getRequestArgumentSatisfier().getBinderRegistry();
         this.webSocketBeanRegistry = embeddedServices.getWebSocketBeanRegistry();
