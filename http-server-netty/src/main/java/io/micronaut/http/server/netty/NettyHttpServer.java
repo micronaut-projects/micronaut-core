@@ -42,6 +42,7 @@ import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
 import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
 import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
+import io.micronaut.http.server.CoroutineHelper;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
@@ -808,8 +809,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             handlers.put(HttpResponseEncoder.ID, responseEncoder);
             handlers.put(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
                     nettyEmbeddedServices,
-                    getWebSocketSessionRepository()
-            ));
+                    getWebSocketSessionRepository(),
+                    getApplicationContext().findBean(CoroutineHelper.class)));
             handlers.put(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, routingHandler);
             return handlers;
         }

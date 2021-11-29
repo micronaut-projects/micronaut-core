@@ -20,13 +20,18 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.BoundExecutable;
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.type.Executable;
+import io.micronaut.core.util.KotlinUtils;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.netty.websocket.AbstractNettyWebSocketHandler;
 import io.micronaut.http.netty.websocket.NettyWebSocketSession;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
+import io.micronaut.http.server.CoroutineHelper;
 import io.micronaut.http.server.netty.NettyEmbeddedServices;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.websocket.CloseReason;
@@ -46,6 +51,7 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.security.Principal;
@@ -71,16 +77,19 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     public static final String ID = "websocket-handler";
 
     private final NettyEmbeddedServices nettyEmbeddedServices;
+    private final Optional<CoroutineHelper> coroutineHelper;
 
     /**
      * Default constructor.
-     * @param nettyEmbeddedServices The netty embedded services
+     *
+     * @param nettyEmbeddedServices      The netty embedded services
      * @param webSocketSessionRepository The web socket sessions repository
-     * @param handshaker     The handshaker
-     * @param request        The request used to create the websocket
-     * @param routeMatch     The route match
-     * @param webSocketBean  The web socket bean
-     * @param ctx            The channel handler context
+     * @param handshaker                 The handshaker
+     * @param webSocketBean              The web socket bean
+     * @param request                    The request used to create the websocket
+     * @param routeMatch                 The route match
+     * @param ctx                        The channel handler context
+     * @param coroutineHelper            Helper for kotlin coroutines
      */
     NettyServerWebSocketHandler(
             NettyEmbeddedServices nettyEmbeddedServices,
@@ -89,7 +98,8 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             WebSocketBean<?> webSocketBean,
             HttpRequest<?> request,
             UriRouteMatch<Object, Object> routeMatch,
-            ChannelHandlerContext ctx) {
+            ChannelHandlerContext ctx,
+            Optional<CoroutineHelper> coroutineHelper) {
         super(
                 ctx,
                 nettyEmbeddedServices.getRequestArgumentSatisfier().getBinderRegistry(),
@@ -102,6 +112,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                 webSocketSessionRepository);
 
         this.nettyEmbeddedServices = nettyEmbeddedServices;
+        this.coroutineHelper = coroutineHelper;
         request.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
         request.setAttribute(HttpAttributes.ROUTE, routeMatch.getRoute());
         ApplicationEventPublisher<WebSocketSessionOpenEvent> eventPublisher =
@@ -228,8 +239,35 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
     @Override
     protected Object invokeExecutable(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
+        if (coroutineHelper.isPresent()) {
+            Executable<?, ?> target = boundExecutable.getTarget();
+            if (target instanceof ExecutableMethod<?, ?>) {
+                ExecutableMethod<?, ?> executableMethod = (ExecutableMethod<?, ?>) target;
+                if (executableMethod.isSuspend()) {
+                    return Flux.deferContextual(ctx -> {
+                        try {
+                            coroutineHelper.get().setupCoroutineContext(originatingRequest, ctx);
+
+                            Object immediateReturnValue = invokeExecutable0(boundExecutable, messageHandler);
+
+                            if (KotlinUtils.isKotlinCoroutineSuspended(immediateReturnValue)) {
+                                return Mono.fromCompletionStage(ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(originatingRequest));
+                            } else {
+                                return Mono.empty();
+                            }
+                        } catch (Exception e) {
+                            return Flux.error(e);
+                        }
+                    });
+                }
+            }
+        }
+        return invokeExecutable0(boundExecutable, messageHandler);
+    }
+
+    private Object invokeExecutable0(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
         return ServerRequestContext.with(originatingRequest,
-                                         (Supplier<Object>) () -> boundExecutable.invoke(messageHandler.getTarget()));
+                (Supplier<Object>) () -> boundExecutable.invoke(messageHandler.getTarget()));
     }
 
     @Override

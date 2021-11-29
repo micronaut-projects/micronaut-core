@@ -33,6 +33,7 @@ import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
+import io.micronaut.http.server.CoroutineHelper;
 import io.micronaut.http.server.netty.NettyEmbeddedServices;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.RouteExecutor;
@@ -98,17 +99,18 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     private final WebSocketSessionRepository webSocketSessionRepository;
     private final RouteExecutor routeExecutor;
     private final NettyEmbeddedServices nettyEmbeddedServices;
+    private final Optional<CoroutineHelper> coroutineHelper;
     private WebSocketServerHandshaker handshaker;
 
     /**
      * Default constructor.
-     *
-     * @param embeddedServices The embedded server services
+     *  @param embeddedServices The embedded server services
      * @param webSocketSessionRepository The websocket session repository
+     * @param coroutineHelper Helper for kotlin coroutines
      */
     public NettyServerWebSocketUpgradeHandler(
             NettyEmbeddedServices embeddedServices,
-            WebSocketSessionRepository webSocketSessionRepository) {
+            WebSocketSessionRepository webSocketSessionRepository, Optional<CoroutineHelper> coroutineHelper) {
         this.router = embeddedServices.getRouter();
         this.binderRegistry = embeddedServices.getRequestArgumentSatisfier().getBinderRegistry();
         this.webSocketBeanRegistry = embeddedServices.getWebSocketBeanRegistry();
@@ -116,6 +118,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
         this.webSocketSessionRepository = webSocketSessionRepository;
         this.routeExecutor = embeddedServices.getRouteExecutor();
         this.nettyEmbeddedServices = embeddedServices;
+        this.coroutineHelper = coroutineHelper;
     }
 
     @Override
@@ -179,8 +182,8 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
                                     webSocketBean,
                                     msg,
                                     routeMatch,
-                                    ctx
-                            );
+                                    ctx,
+                                    coroutineHelper);
                             pipeline.addBefore(ctx.name(), NettyServerWebSocketHandler.ID, webSocketHandler);
 
                             pipeline.remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
