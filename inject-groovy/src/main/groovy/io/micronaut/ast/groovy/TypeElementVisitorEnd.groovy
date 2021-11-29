@@ -53,7 +53,7 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
 
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
-        Map<String, LoadedVisitor> loadedVisitors = TypeElementVisitorTransform.loadedVisitors
+        Map<String, LoadedVisitor> loadedVisitors = TypeElementVisitorTransform.loadedVisitors.get()
 
         ClassWriterOutputVisitor classWriterOutputVisitor = null
         if (source.classLoader instanceof InMemoryByteCodeGroovyClassLoader) {
@@ -78,7 +78,7 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
             }
         }
 
-        final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = TypeElementVisitorTransform.beanDefinitionBuilders
+        final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = TypeElementVisitorTransform.beanDefinitionBuilders.get()
         if (beanDefinitionBuilders) {
             File classesDir = compilationUnit.configuration.targetDirectory
             if (classWriterOutputVisitor == null) {
@@ -102,8 +102,8 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
             classWriterOutputVisitor.finish()
         }
 
-        TypeElementVisitorTransform.loadedVisitors = null
-        TypeElementVisitorTransform.beanDefinitionBuilders.clear()
+        TypeElementVisitorTransform.loadedVisitors.remove()
+        TypeElementVisitorTransform.beanDefinitionBuilders.remove()
         AstAnnotationUtils.invalidateCache()
         AbstractAnnotationMetadataBuilder.clearMutated()
     }

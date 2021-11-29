@@ -52,7 +52,7 @@ class TypeElementVisitorStart implements ASTTransformation, CompilationUnitAware
 
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
-        Map<String, LoadedVisitor> loadedVisitors = TypeElementVisitorTransform.loadedVisitors
+        Map<String, LoadedVisitor> loadedVisitors = TypeElementVisitorTransform.loadedVisitors.get()
 
         if (loadedVisitors == null) {
             loadedVisitors = [:]
@@ -120,7 +120,7 @@ class TypeElementVisitorStart implements ASTTransformation, CompilationUnitAware
             }
         }
 
-        TypeElementVisitorTransform.loadedVisitors = loadedVisitors
+        TypeElementVisitorTransform.loadedVisitors.set(loadedVisitors)
     }
 
     @Override

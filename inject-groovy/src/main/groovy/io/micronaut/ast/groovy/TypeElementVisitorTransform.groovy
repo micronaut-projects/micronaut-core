@@ -68,21 +68,21 @@ import static org.codehaus.groovy.ast.ClassHelper.makeCached
 class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitAware {
 
     private static ClassNode generatedNode = new ClassNode(Generated)
-    protected static Map<String, LoadedVisitor> loadedVisitors = null
-    protected static List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = []
+    protected static ThreadLocal<Map<String, LoadedVisitor>> loadedVisitors = new ThreadLocal<>()
+    protected static ThreadLocal<List<AbstractBeanDefinitionBuilder>> beanDefinitionBuilders = ThreadLocal.withInitial({ -> [] })
     private CompilationUnit compilationUnit
 
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
         ModuleNode moduleNode = source.getAST()
         List<ClassNode> classes = moduleNode.getClasses()
-
-        if (loadedVisitors == null) return
+        Map<String, LoadedVisitor> visitors = loadedVisitors.get()
+        if (visitors == null) return
 
         GroovyVisitorContext visitorContext = new GroovyVisitorContext(source, compilationUnit)
         for (ClassNode classNode in classes) {
             if (!(classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers())) && classNode.getAnnotations(generatedNode).empty) {
-                Collection<LoadedVisitor> matchedVisitors = loadedVisitors.values().findAll { v ->
+                Collection<LoadedVisitor> matchedVisitors = visitors.values().findAll { v ->
                     v.matches(classNode)
                 }
 
@@ -105,7 +105,7 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
             }
         }
 
-        beanDefinitionBuilders.addAll(visitorContext.getBeanElementBuilders())
+        beanDefinitionBuilders.get().addAll(visitorContext.getBeanElementBuilders())
     }
 
     @Override
