@@ -115,6 +115,9 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         this.coroutineHelper = coroutineHelper;
         request.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
         request.setAttribute(HttpAttributes.ROUTE, routeMatch.getRoute());
+
+        callOpenMethod(ctx);
+
         ApplicationEventPublisher<WebSocketSessionOpenEvent> eventPublisher =
                 nettyEmbeddedServices.getEventPublisher(WebSocketSessionOpenEvent.class);
 

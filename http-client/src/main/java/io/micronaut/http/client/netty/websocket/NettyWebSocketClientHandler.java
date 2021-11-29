@@ -108,6 +108,8 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
         String clientPath = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class).orElse("");
         UriMatchTemplate matchTemplate = UriMatchTemplate.of(clientPath);
         this.matchInfo = matchTemplate.match(request.getPath()).orElse(null);
+
+        callOpenMethod(null);
     }
 
     @Override
