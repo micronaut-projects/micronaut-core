@@ -3716,7 +3716,7 @@ public class DefaultBeanContext implements BeanContext {
                 }
             } else {
                 try (BeanResolutionContext context = newResolutionContext(candidate, resolutionContext)) {
-                    bean = getScopedBeanForDefinition(context, beanType, qualifier, true, candidate);
+                    bean = getScopedBeanForDefinition(context, candidate.asArgument(), qualifier, true, candidate);
                 }
             }
         } catch (DisabledBeanException e) {
