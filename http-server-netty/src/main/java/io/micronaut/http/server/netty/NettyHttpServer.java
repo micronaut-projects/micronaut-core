@@ -808,8 +808,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             handlers.put(HttpResponseEncoder.ID, responseEncoder);
             handlers.put(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
                     nettyEmbeddedServices,
-                    getWebSocketSessionRepository()
-            ));
+                    getWebSocketSessionRepository()));
             handlers.put(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, routingHandler);
             return handlers;
         }

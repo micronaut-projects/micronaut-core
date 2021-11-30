@@ -176,60 +176,66 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             } else {
                 this.pongArgument = null;
             }
+        } else {
+            this.bodyArgument = null;
+            this.pongArgument = null;
+        }
+    }
 
-            Optional<? extends MethodExecutionHandle<?, ?>> executionHandle = webSocketBean.openMethod();
-            if (executionHandle.isPresent()) {
-                MethodExecutionHandle<?, ?> openMethod = executionHandle.get();
-                BoundExecutable boundExecutable = null;
+    protected void callOpenMethod(ChannelHandlerContext ctx) {
+        if (session == null) {
+            return;
+        }
+
+        Optional<? extends MethodExecutionHandle<?, ?>> executionHandle = webSocketBean.openMethod();
+        if (executionHandle.isPresent()) {
+            MethodExecutionHandle<?, ?> openMethod = executionHandle.get();
+            BoundExecutable boundExecutable = null;
+            try {
+                boundExecutable = bindMethod(originatingRequest, webSocketBinder, openMethod, Collections.emptyList());
+            } catch (Throwable e) {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Error Binding method @OnOpen for WebSocket [" + webSocketBean + "]: " + e.getMessage(), e);
+                }
+
+                if (session.isOpen()) {
+                    session.close(CloseReason.INTERNAL_ERROR);
+                }
+            }
+
+            if (boundExecutable != null) {
                 try {
-                    boundExecutable = bindMethod(request, webSocketBinder, openMethod, Collections.emptyList());
-                } catch (Throwable e) {
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error("Error Binding method @OnOpen for WebSocket [" + webSocketBean + "]: " + e.getMessage(), e);
+                    BoundExecutable finalBoundExecutable = boundExecutable;
+                    Object result = invokeExecutable(finalBoundExecutable, openMethod);
+                    if (Publishers.isConvertibleToPublisher(result)) {
+                        Flux<?> flowable = Flux.from(instrumentPublisher(ctx, result));
+                        flowable.subscribe(
+                                o -> {
+                                },
+                                error -> {
+                                    if (LOG.isErrorEnabled()) {
+                                        LOG.error("Error Opening WebSocket [" + webSocketBean + "]: " + error.getMessage(), error);
+                                    }
+                                    if (session.isOpen()) {
+                                        session.close(CloseReason.INTERNAL_ERROR);
+                                    }
+                                },
+                                () -> {
+                                }
+                        );
                     }
-
+                } catch (Throwable e) {
+                    forwardErrorToUser(ctx, t -> {
+                        if (LOG.isErrorEnabled()) {
+                            LOG.error("Error Opening WebSocket [" + webSocketBean + "]: " + t.getMessage(), t);
+                        }
+                    }, e);
+                    // since we failed to call onOpen, we should always close here
                     if (session.isOpen()) {
                         session.close(CloseReason.INTERNAL_ERROR);
                     }
                 }
-
-                if (boundExecutable != null) {
-                    try {
-                        BoundExecutable finalBoundExecutable = boundExecutable;
-                        Object result = invokeExecutable(finalBoundExecutable, openMethod);
-                        if (Publishers.isConvertibleToPublisher(result)) {
-                            Flux<?> flowable = Flux.from(instrumentPublisher(ctx, result));
-                            flowable.subscribe(
-                                    o -> {
-                                    },
-                                    error -> {
-                                        if (LOG.isErrorEnabled()) {
-                                            LOG.error("Error Opening WebSocket [" + webSocketBean + "]: " + error.getMessage(), error);
-                                        }
-                                        if (session.isOpen()) {
-                                            session.close(CloseReason.INTERNAL_ERROR);
-                                        }
-                                    },
-                                    () -> {
-                                    }
-                            );
-                        }
-                    } catch (Throwable e) {
-                        forwardErrorToUser(ctx, t -> {
-                            if (LOG.isErrorEnabled()) {
-                                LOG.error("Error Opening WebSocket [" + webSocketBean + "]: " + t.getMessage(), t);
-                            }
-                        }, e);
-                        // since we failed to call onOpen, we should always close here
-                        if (session.isOpen()) {
-                            session.close(CloseReason.INTERNAL_ERROR);
-                        }
-                    }
-                }
             }
-        } else {
-            this.bodyArgument = null;
-            this.pongArgument = null;
         }
     }
 

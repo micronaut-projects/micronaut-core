@@ -33,6 +33,7 @@ import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
+import io.micronaut.http.server.CoroutineHelper;
 import io.micronaut.http.server.netty.NettyEmbeddedServices;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.RouteExecutor;
@@ -179,8 +180,8 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
                                     webSocketBean,
                                     msg,
                                     routeMatch,
-                                    ctx
-                            );
+                                    ctx,
+                                    routeExecutor.getCoroutineHelper().orElse(null));
                             pipeline.addBefore(ctx.name(), NettyServerWebSocketHandler.ID, webSocketHandler);
 
                             pipeline.remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
