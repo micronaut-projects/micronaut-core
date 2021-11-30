@@ -1634,7 +1634,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                                            ClassElement classNode,
                                            BeanDefinitionVisitor writer) {
         Boolean allowZeroArgs = annotationMetadata.getValue(ConfigurationBuilder.class, "allowZeroArgs", Boolean.class).orElse(false)
-        List<String> prefixes = Arrays.asList(annotationMetadata.getValue(ConfigurationBuilder.class, "prefixes", String[].class).orElse(["set"] as String[]))
+        List<String> prefixes = Arrays.asList(annotationMetadata.getValue(AccessorsStyle.class, "writePrefixes", String[].class).orElse(["set"] as String[]))
         String configurationPrefix = annotationMetadata.getValue(ConfigurationBuilder.class, String.class)
                 .map({ value -> value + "."}).orElse("")
         Set<String> includes = annotationMetadata.getValue(ConfigurationBuilder.class, "includes", Set.class).orElse(Collections.emptySet())

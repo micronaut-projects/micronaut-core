@@ -43,16 +43,18 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *     }
  * }</pre>
  * <p>
- * Give the previous class, Lombok will generate getters and setter: {@code name()}, {@code age()}, {@code name(String)}
+ * Given the previous class, Lombok will generate getters and setter: {@code name()}, {@code age()}, {@code name(String)}
  * and {@code age(int)}. Defining the {@code readPrefixes} and {@code writePrefixes} as empty strings makes Micronaut
  * aware of them.
  *
+ * It is also possible to annotate fields with this annotation but the usage is only limited when using it with @ConfigurationBuilder.
+ *
  * @author Iván López
- * @since 3.2.0
+ * @since 3.3.0
  */
 @Documented
 @Retention(RUNTIME)
-@Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE})
+@Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE, ElementType.FIELD})
 @Inherited
 @Experimental
 public @interface AccessorsStyle {
