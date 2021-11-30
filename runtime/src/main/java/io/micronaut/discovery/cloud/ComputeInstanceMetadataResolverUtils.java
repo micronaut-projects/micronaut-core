@@ -20,8 +20,10 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.jackson.core.tree.JsonNodeTreeCodec;
+import io.micronaut.json.JsonMapper;
 import io.micronaut.json.tree.JsonNode;
 
 import java.io.IOException;
@@ -75,6 +77,24 @@ public class ComputeInstanceMetadataResolverUtils {
         try (InputStream in = openMetadataUrl(url, connectionTimeoutMs, readTimeoutMs, requestProperties);
              JsonParser parser = jsonFactory.createParser(in)) {
             return treeCodec.readTree(parser);
+        }
+    }
+
+    /**
+     * Reads the result of a URL and parses it using the given {@link JsonMapper}.
+     *
+     * @param url                 the URL to read
+     * @param connectionTimeoutMs connection timeout, in milliseconds
+     * @param readTimeoutMs       read timeout, in milliseconds
+     * @param jsonMapper          JSON mapper to use for parsing
+     * @param requestProperties   any request properties to pass
+     * @return a {@link JsonNode} instance
+     * @throws IOException if any I/O error occurs
+     */
+    @Experimental
+    public static JsonNode readMetadataUrl(URL url, int connectionTimeoutMs, int readTimeoutMs, JsonMapper jsonMapper, Map<String, String> requestProperties) throws IOException {
+        try (InputStream in = openMetadataUrl(url, connectionTimeoutMs, readTimeoutMs, requestProperties)) {
+            return jsonMapper.readValue(in, Argument.of(JsonNode.class));
         }
     }
 
