@@ -36,6 +36,41 @@ For the cases where the configuration properties class inherits properties from 
 
 The names supplied to the includes/excludes list must be the "property" name. For example if a setter method is injected, the property name is the de-capitalized setter name (`setConnectionTimeout` -> `connectionTimeout`).
 
+[[configurationPropertiesAccessorsStyle]]
+== Change accessors style
+
+Since 3.3, Micronaut supports defining different accessors prefixes for getters and setter other than the default `get` and `set` defined for Java Beans. Annotate your POJO or `@ConfigurationProperties` class with the link:{api}/io/micronaut/core/annotation/AccessorsStyle.html[@AccessorsStyle] annotation.
+
+This is useful when you write the getters and setters in a fluent way or when using libraries like Lombok that can generate those fluent accessors. For example:
+
+.Using `@AccessorsStyle`
+[source,java]
+----
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.annotation.AccessorsStyle;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.experimental.Accessors;
+
+@Accessors(fluent = true) // <1>
+@Getter // <2>
+@Setter // <3>
+@AccessorsStyle(readPrefixes = "", writePrefixes = "") // <4>
+@ConfigurationProperties("my.engine")
+public class EngineConfig {
+
+    private String manufacturer;
+    private int cylinders;
+
+}
+----
+<1> Configure Lombok to create fluent accessors.
+<2> Configure Lombok to create getters automatically.
+<3> Configure Lombok to create setters automatically.
+<4> Micronaut will use an empty prefix for getters and setters, so it can use Lombok's fluent getters and setters.
+
+Now you can inject `EngineConfig` and use it with `engineConfig.manufacturer()` and `engineConfig.cylinders() to retrieve the values from configuration.
+
 == Property Type Conversion
 
 Micronaut uses the api:io.micronaut.core.convert.ConversionService[] bean to convert values when resolving properties. You can register additional converters for types not supported by Micronaut by defining beans that implement the api:io.micronaut.core.convert.TypeConverter[] interface.
