@@ -69,17 +69,7 @@ tracing:
     reporter:
       flushInterval: 2000
       maxQueueSize: 200
-----
-
-Furthermore, you can set codecs as configuration property to allow propagation. Refer to the Javadoc for available option and more details.
-
-.Setting Jaeger Codec Configuration
-[source, yaml]
-----
-tracing:
-  jaeger:
-    enabled: true
-    codecs: W3C
+    codecs: W3C,B3,JAEGER
 ----
 
 You can also optionally dependency-inject common configuration classes into api:tracing.jaeger.JaegerConfiguration[] such as `io.jaegertracing.Configuration.SamplerConfiguration` just by defining them as beans. See the API for api:tracing.jaeger.JaegerConfiguration[] for available injection points.
