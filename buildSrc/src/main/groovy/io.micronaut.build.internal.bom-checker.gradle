@@ -1,10 +1,15 @@
 import io.micronaut.build.internal.pom.PomChecker
 
+plugins {
+    // used to get the "clean" task
+    id 'base'
+}
+
 def catalog = project.extensions.findByType(VersionCatalogsExtension).named("libs")
 
 def checkBoms = tasks.register("checkBom")
 
-tasks.register("check") {
+tasks.named("check") {
     dependsOn(checkBoms)
 }
 

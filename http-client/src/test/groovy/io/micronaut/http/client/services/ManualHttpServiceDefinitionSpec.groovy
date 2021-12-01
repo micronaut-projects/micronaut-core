@@ -205,7 +205,8 @@ class ManualHttpServiceDefinitionSpec extends Specification {
                 'micronaut.http.services.client1.ssl.enabled': true,
                 'micronaut.http.services.client1.ssl.client-authentication': 'NEED',
                 'micronaut.http.services.client1.ssl.key-store.path': 'classpath:certs/client1.p12',
-                'micronaut.http.services.client1.ssl.key-store.password': 'secret'
+                'micronaut.http.services.client1.ssl.key-store.password': 'secret',
+                'micronaut.http.services.client1.ssl.insecure-trust-all-certificates': true,
         )
         SslClient client1 = ctx.getBean(SslClient)
         final String DN = "CN=client1.test.example.com, OU=IT, O=Whatever, L=Munich, ST=Bavaria, C=DE, EMAILADDRESS=info@example.com"

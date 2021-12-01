@@ -176,57 +176,66 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             } else {
                 this.pongArgument = null;
             }
+        } else {
+            this.bodyArgument = null;
+            this.pongArgument = null;
+        }
+    }
 
-            Optional<? extends MethodExecutionHandle<?, ?>> executionHandle = webSocketBean.openMethod();
-            if (executionHandle.isPresent()) {
-                MethodExecutionHandle<?, ?> openMethod = executionHandle.get();
-                BoundExecutable boundExecutable = null;
+    protected void callOpenMethod(ChannelHandlerContext ctx) {
+        if (session == null) {
+            return;
+        }
+
+        Optional<? extends MethodExecutionHandle<?, ?>> executionHandle = webSocketBean.openMethod();
+        if (executionHandle.isPresent()) {
+            MethodExecutionHandle<?, ?> openMethod = executionHandle.get();
+            BoundExecutable boundExecutable = null;
+            try {
+                boundExecutable = bindMethod(originatingRequest, webSocketBinder, openMethod, Collections.emptyList());
+            } catch (Throwable e) {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Error Binding method @OnOpen for WebSocket [" + webSocketBean + "]: " + e.getMessage(), e);
+                }
+
+                if (session.isOpen()) {
+                    session.close(CloseReason.INTERNAL_ERROR);
+                }
+            }
+
+            if (boundExecutable != null) {
                 try {
-                    boundExecutable = bindMethod(request, webSocketBinder, openMethod, Collections.emptyList());
-                } catch (Throwable e) {
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error("Error Binding method @OnOpen for WebSocket [" + webSocketBean + "]: " + e.getMessage(), e);
+                    BoundExecutable finalBoundExecutable = boundExecutable;
+                    Object result = invokeExecutable(finalBoundExecutable, openMethod);
+                    if (Publishers.isConvertibleToPublisher(result)) {
+                        Flux<?> flowable = Flux.from(instrumentPublisher(ctx, result));
+                        flowable.subscribe(
+                                o -> {
+                                },
+                                error -> {
+                                    if (LOG.isErrorEnabled()) {
+                                        LOG.error("Error Opening WebSocket [" + webSocketBean + "]: " + error.getMessage(), error);
+                                    }
+                                    if (session.isOpen()) {
+                                        session.close(CloseReason.INTERNAL_ERROR);
+                                    }
+                                },
+                                () -> {
+                                }
+                        );
                     }
-
+                } catch (Throwable e) {
+                    forwardErrorToUser(ctx, t -> {
+                        if (LOG.isErrorEnabled()) {
+                            LOG.error("Error Opening WebSocket [" + webSocketBean + "]: " + t.getMessage(), t);
+                        }
+                    }, e);
+                    // since we failed to call onOpen, we should always close here
                     if (session.isOpen()) {
                         session.close(CloseReason.INTERNAL_ERROR);
                     }
                 }
-
-                if (boundExecutable != null) {
-                    try {
-                        BoundExecutable finalBoundExecutable = boundExecutable;
-                        Object result = invokeExecutable(finalBoundExecutable, openMethod);
-                        if (Publishers.isConvertibleToPublisher(result)) {
-                            Flux<?> flowable = Flux.from(instrumentPublisher(ctx, result));
-                            flowable.subscribe(
-                                    o -> {
-                                    },
-                                    error -> {
-                                        if (LOG.isErrorEnabled()) {
-                                            LOG.error("Error Opening WebSocket [" + webSocketBean + "]: " + error.getMessage(), error);
-                                        }
-                                        if (session.isOpen()) {
-                                            session.close(CloseReason.INTERNAL_ERROR);
-                                        }
-                                    },
-                                    () -> {
-                                    }
-                            );
-                        }
-                    } catch (Throwable e) {
-                        if (LOG.isErrorEnabled()) {
-                            LOG.error("Error Opening WebSocket [" + webSocketBean + "]: " + e.getMessage(), e);
-                        }
-                        if (session.isOpen()) {
-                            session.close(CloseReason.INTERNAL_ERROR);
-                        }
-                    }
-                }
             }
-        } else {
-            this.bodyArgument = null;
-            this.pongArgument = null;
         }
     }
 
@@ -254,6 +263,10 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         cleanupBuffer();
+        forwardErrorToUser(ctx, e -> handleUnexpected(ctx, e), cause);
+    }
+
+    private void forwardErrorToUser(ChannelHandlerContext ctx, Consumer<Throwable> fallback, Throwable cause) {
         Optional<? extends MethodExecutionHandle<?, ?>> opt = webSocketBean.errorMethod();
 
         if (opt.isPresent()) {
@@ -275,25 +288,25 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     if (LOG.isErrorEnabled()) {
                         LOG.error("Error invoking to @OnError handler " + target.getClass().getSimpleName() + "." + errorMethod.getExecutableMethod() + ": " + e.getMessage(), e);
                     }
-                    handleUnexpected(ctx, e);
+                    fallback.accept(e);
                     return;
                 }
                 if (Publishers.isConvertibleToPublisher(result)) {
                     Flux<?> flowable = Flux.from(instrumentPublisher(ctx, result));
-                    flowable.collectList().subscribe(objects -> handleUnexpected(ctx, cause), throwable -> {
+                    flowable.collectList().subscribe(objects -> fallback.accept(cause), throwable -> {
                         if (throwable != null && LOG.isErrorEnabled()) {
                             LOG.error("Error subscribing to @OnError handler " + target.getClass().getSimpleName() + "." + errorMethod.getExecutableMethod() + ": " + throwable.getMessage(), throwable);
                         }
-                        handleUnexpected(ctx, cause);
+                        fallback.accept(cause);
                     });
                 }
 
             } catch (UnsatisfiedArgumentException e) {
-                handleUnexpected(ctx, cause);
+                fallback.accept(cause);
             }
 
         } else {
-            handleUnexpected(ctx, cause);
+            fallback.accept(cause);
         }
     }
 

@@ -681,7 +681,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      * Negotiates with the browser if HTTP2 or HTTP is going to be used. Once decided, the Netty
      * pipeline is setup with the correct handlers for the selected protocol.
      *
-     * @implNote Unfortunately, this handler cannot be {@link io.netty.channel.ChannelHandler.Sharable shared} because
+     * This handler cannot be {@link io.netty.channel.ChannelHandler.Sharable shared} because
      * {@link ApplicationProtocolNegotiationHandler} does not support it.
      */
     private final class Http2OrHttpHandler extends ApplicationProtocolNegotiationHandler {
@@ -808,8 +808,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             handlers.put(HttpResponseEncoder.ID, responseEncoder);
             handlers.put(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
                     nettyEmbeddedServices,
-                    getWebSocketSessionRepository()
-            ));
+                    getWebSocketSessionRepository()));
             handlers.put(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, routingHandler);
             return handlers;
         }

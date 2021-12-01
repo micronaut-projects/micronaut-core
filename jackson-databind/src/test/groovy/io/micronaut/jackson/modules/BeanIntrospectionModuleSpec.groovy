@@ -3,6 +3,7 @@ package io.micronaut.jackson.modules
 import com.fasterxml.jackson.annotation.JsonAnyGetter
 import com.fasterxml.jackson.annotation.JsonAnySetter
 import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonFormat
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -35,6 +36,7 @@ import spock.lang.Issue
 import spock.lang.Specification
 
 import java.beans.ConstructorProperties
+import java.time.LocalDateTime
 
 class BeanIntrospectionModuleSpec extends Specification {
 
@@ -832,6 +834,38 @@ class BeanIntrospectionModuleSpec extends Specification {
 
         public String getLabel() {
             name.toUpperCase()
+        }
+    }
+
+    void "JsonFormat"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        def ldt = LocalDateTime.of(2021, 11, 22, 10, 37)
+
+        expect:
+        objectMapper.writeValueAsString(new FormatBean(ldt: ldt)) == '{"ldt":"2021-11-22 10:37:00"}'
+        objectMapper.readValue('{"ldt":"2021-11-22 10:37:00"}', FormatBean).ldt == ldt
+
+        cleanup:
+        ctx.close()
+
+        where:
+        ignoreReflectiveProperties << [true, false]
+    }
+
+    @Introspected
+    static class FormatBean {
+        private LocalDateTime ldt
+
+        @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+        public LocalDateTime getLdt() {
+            return ldt
+        }
+
+        public void setLdt(LocalDateTime ldt) {
+            this.ldt = ldt
         }
     }
 }

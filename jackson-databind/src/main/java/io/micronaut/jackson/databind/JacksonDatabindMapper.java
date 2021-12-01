@@ -103,6 +103,12 @@ public final class JacksonDatabindMapper implements JsonMapper {
         return treeGenerator.getCompletedValue();
     }
 
+    @NonNull
+    @Override
+    public <T> JsonNode writeValueToTree(@NonNull Argument<T> type, T value) throws IOException {
+        return writeValueToTree(value);
+    }
+
     @Override
     public <T> T readValue(@NonNull InputStream inputStream, @NonNull Argument<T> type) throws IOException {
         return objectMapper.readValue(inputStream, JacksonConfiguration.constructType(type, objectMapper.getTypeFactory()));
@@ -119,8 +125,18 @@ public final class JacksonDatabindMapper implements JsonMapper {
     }
 
     @Override
+    public <T> void writeValue(@NonNull OutputStream outputStream, @NonNull Argument<T> type, T object) throws IOException {
+        writeValue(outputStream, object);
+    }
+
+    @Override
     public byte[] writeValueAsBytes(@Nullable Object object) throws IOException {
         return objectMapper.writeValueAsBytes(object);
+    }
+
+    @Override
+    public <T> byte[] writeValueAsBytes(@NonNull Argument<T> type, T object) throws IOException {
+        return writeValueAsBytes(object);
     }
 
     @Override
@@ -159,7 +175,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
     }
 
     @Override
-    public @NonNull Processor<byte[], JsonNode> createReactiveParser(Consumer<Processor<byte[], JsonNode>> onSubscribe, boolean streamArray) {
+    public @NonNull Processor<byte[], JsonNode> createReactiveParser(@NonNull Consumer<Processor<byte[], JsonNode>> onSubscribe, boolean streamArray) {
         return new JacksonCoreProcessor(streamArray, objectMapper.getFactory(), config) {
             @Override
             public void subscribe(Subscriber<? super JsonNode> downstreamSubscriber) {

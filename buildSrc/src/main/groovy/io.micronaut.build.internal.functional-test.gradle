@@ -1,0 +1,44 @@
+import groovy.transform.CompileStatic
+
+plugins {
+    id 'java-library'
+}
+
+sourceSets {
+    functionalTest
+}
+
+configurations {
+    functionalTestImplementation {
+        extendsFrom(testImplementation)
+    }
+}
+
+def functionalTest = tasks.register("functionalTest", FunctionalTest) {
+    appUnderTestCompileClasspath.from(configurations.testCompileClasspath)
+    appUnderTestAnnotationProcessor.from(configurations.testAnnotationProcessor)
+    testClassesDirs = sourceSets.functionalTest.output.classesDirs
+    classpath = sourceSets.functionalTest.runtimeClasspath
+}
+
+tasks.named("check") {
+    dependsOn functionalTest
+}
+
+@CacheableTask
+@CompileStatic
+abstract class FunctionalTest extends Test {
+    @CompileClasspath
+    abstract ConfigurableFileCollection getAppUnderTestCompileClasspath()
+
+    @CompileClasspath
+    abstract ConfigurableFileCollection getAppUnderTestAnnotationProcessor()
+
+    @Override
+    @TaskAction
+    void executeTests() {
+        systemProperty("testapp.compile.classpath", appUnderTestCompileClasspath.asPath)
+        systemProperty("testapp.annotationprocessor.path", appUnderTestAnnotationProcessor.asPath)
+        super.executeTests()
+    }
+}

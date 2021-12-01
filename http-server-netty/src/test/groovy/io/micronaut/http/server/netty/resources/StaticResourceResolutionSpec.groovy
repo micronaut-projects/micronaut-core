@@ -341,4 +341,28 @@ info:
         embeddedServer.close()
     }
 
+    void 'test static file on same path as controller'() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': 'StaticResourceResolutionSpec.test static file on same path as controller',
+                'micronaut.router.static-resources.default.paths': ['classpath:public'],
+                'micronaut.router.static-resources.default.mapping': '/static/**'], Environment.TEST)
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
+
+        when:
+        def staticResponse = client.toBlocking().exchange(HttpRequest.GET('/static/index.html'), String)
+        then:
+        staticResponse.status() == HttpStatus.OK
+        staticResponse.body().startsWith('<html>')
+
+        when:
+        def dynamicResponse = client.toBlocking().exchange(HttpRequest.POST('/static/index.html', 'foo'), String)
+        then:
+        dynamicResponse.status() == HttpStatus.OK
+        dynamicResponse.body() == 'foo'
+
+        cleanup:
+        embeddedServer.close()
+    }
+
 }

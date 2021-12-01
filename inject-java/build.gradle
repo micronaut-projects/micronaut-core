@@ -2,6 +2,7 @@ dependencies {
     api project(":inject")
     api project(':aop')
 
+    implementation(libs.managed.slf4j.simple)
     if (!JavaVersion.current().isJava9Compatible()) {
         compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
