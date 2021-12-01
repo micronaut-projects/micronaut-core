@@ -1,5 +1,7 @@
 package io.micronaut.docs.http.server.secondary
 
+import io.micronaut.context.annotation.Property
+import io.micronaut.core.util.StringUtils
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -13,7 +15,8 @@ import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 
 @MicronautTest
-
+@Property(name = "secondary.enabled", value = StringUtils.TRUE)
+@Property(name = "micronaut.http.client.ssl.insecure-trust-all-certificates", value = StringUtils.TRUE)
 class SecondaryServerTest {
     // tag::inject[]
     @Inject

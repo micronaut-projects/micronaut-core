@@ -21,6 +21,7 @@ import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.context.ClientContextPathProvider;
+import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Inject;
@@ -258,7 +259,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      * The default connection pool configuration.
      */
     @ConfigurationProperties("ssl")
-    public static class ServiceSslClientConfiguration extends SslConfiguration {
+    public static class ServiceSslClientConfiguration extends AbstractClientSslConfiguration {
 
         /**
          * Sets the key configuration.

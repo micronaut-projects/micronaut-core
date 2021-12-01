@@ -115,7 +115,8 @@ class SimpleTextWebSocketSpec extends Specification {
         EmbeddedServer embeddedServer = ApplicationContext.builder([
                 'micronaut.server.netty.log-level':'TRACE',
                 'micronaut.ssl.enabled':true,
-                'micronaut.ssl.build-self-signed':true
+                'micronaut.ssl.build-self-signed':true,
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
                 ]).run(EmbeddedServer)
         PollingConditions conditions = new PollingConditions(timeout: 15    , delay: 0.5)
         def uri = embeddedServer.getURI()

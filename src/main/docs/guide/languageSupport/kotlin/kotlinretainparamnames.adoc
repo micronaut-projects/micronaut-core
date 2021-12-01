@@ -13,6 +13,8 @@ compileTestKotlin {
 }
 ----
 
+NOTE: If you use interfaces with default methods add `freeCompilerArgs = ["-Xjvm-default=all"]` for Micronaut to recognize them.
+
 Or if using Maven configure the Micronaut Maven Plugin accordingly:
 
 .configuration in Maven

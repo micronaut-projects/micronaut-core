@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.bind.binders
 
+import io.micronaut.core.annotation.Internal
 import io.micronaut.core.bind.ArgumentBinder
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.reflect.ClassUtils
@@ -33,6 +34,7 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.jvm.internal.CoroutineStackFrame
 
+@Internal
 class ContinuationArgumentBinder : TypedRequestArgumentBinder<Continuation<*>> {
     override fun bind(
         context: ArgumentConversionContext<Continuation<*>>?,
@@ -50,12 +52,25 @@ class ContinuationArgumentBinder : TypedRequestArgumentBinder<Continuation<*>> {
         private val reactorContextPresent: Boolean = ClassUtils.isPresent("kotlinx.coroutines.reactor.ReactorContext", null);
 
         @JvmStatic
+        @Deprecated("Use the new method that takes a collection of coroutine context factories", ReplaceWith(
+            "setupCoroutineContext(source, contextView, emptyList())",
+            "io.micronaut.http.bind.binders.ContinuationArgumentBinder.Companion.setupCoroutineContext"
+        )
+        )
         fun setupCoroutineContext(source: HttpRequest<*>, contextView: ContextView) {
+            setupCoroutineContext(source, contextView, emptyList())
+        }
+
+        @JvmStatic
+        fun setupCoroutineContext(source: HttpRequest<*>, contextView: ContextView, continuationArgumentBinderCoroutineContextFactories: Collection<HttpCoroutineContextFactory<*>>) {
             val customContinuation = source.getAttribute(CONTINUATION_ARGUMENT_ATTRIBUTE_KEY, CustomContinuation::class.java).orElse(null)
             if (customContinuation != null) {
                 var coroutineContext: CoroutineContext = Dispatchers.Default + ServerRequestScopeHandler(source)
                 if (reactorContextPresent) {
                     coroutineContext += propagateReactorContext(contextView)
+                }
+                continuationArgumentBinderCoroutineContextFactories.forEach {
+                    coroutineContext += it.create()
                 }
                 customContinuation.context.delegatingCoroutineContext = coroutineContext
             }

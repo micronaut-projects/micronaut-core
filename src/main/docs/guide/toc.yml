@@ -152,6 +152,7 @@ httpClient:
     clientFallback: Client Fallbacks
     netflixHystrix: Netflix Hystrix Support
   clientFilter: HTTP Client Filters
+  clientHttp2: HTTP/2 Support
   clientSample: HTTP Client Sample
 cloud:
   title: Cloud Native Features
@@ -236,6 +237,7 @@ languageSupport:
     openandaop: Kotlin and AOP Advice
     kotlinretainparamnames: Kotlin and Retaining Parameter Names
     coroutines: Coroutines Support
+    coroutineTracingContextPropagation: Coroutine Tracing Context Propagation
     kotlinContextPropagation: Reactive Context Propagation
   graal:
     title: Micronaut for GraalVM

@@ -24,7 +24,15 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
-import io.micronaut.http.*;
+import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.exceptions.HttpStatusException;
@@ -61,7 +69,10 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -90,6 +101,7 @@ public final class RouteExecutor {
     private final HttpServerConfiguration serverConfiguration;
     private final ErrorResponseProcessor<?> errorResponseProcessor;
     private final ExecutorSelector executorSelector;
+    private final Optional<CoroutineHelper> coroutineHelper;
 
     /**
      * Default constructor.
@@ -113,6 +125,7 @@ public final class RouteExecutor {
         this.serverConfiguration = serverConfiguration;
         this.errorResponseProcessor = errorResponseProcessor;
         this.executorSelector = executorSelector;
+        this.coroutineHelper = beanContext.findBean(CoroutineHelper.class);
     }
 
     /**
@@ -142,6 +155,13 @@ public final class RouteExecutor {
      */
     public @NonNull ExecutorSelector getExecutorSelector() {
         return executorSelector;
+    }
+
+    /**
+     * @return The kotlin coroutine helper
+     */
+    public Optional<CoroutineHelper> getCoroutineHelper() {
+        return coroutineHelper;
     }
 
     /**
@@ -629,8 +649,8 @@ public final class RouteExecutor {
                 } else {
                     finalRoute = routeMatch;
                 }
-                if (finalRoute.isSuspended()) {
-                    ContinuationArgumentBinder.setupCoroutineContext(httpRequest, contextView);
+                if (finalRoute.isSuspended() && coroutineHelper.isPresent()) {
+                    coroutineHelper.get().setupCoroutineContext(httpRequest, contextView);
                 }
 
                 Object body = ServerRequestContext.with(httpRequest, (Supplier<Object>) finalRoute::execute);

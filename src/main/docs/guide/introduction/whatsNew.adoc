@@ -19,9 +19,80 @@ The official GraalVM Maven plugin has new GAV coordinates so if you have declare
 
 Please check https://graalvm.github.io/native-build-tools/0.9.7.1/maven-plugin.html[the official documentation] about how to customize the plugin.
 
+=== Gradle Plugin 3.0.0
+
+A new major version of the Gradle plugin has been released, including internal changes to use Gradle's lazy configuration APIs.
+In the process, https://micronaut-projects.github.io/micronaut-gradle-plugin/latest/[documentation] has been rewritten.
+
+Support for GraalVM now delegates to https://graalvm.github.io/native-build-tools/0.9.7.1/gradle-plugin.html[the official GraalVM plugin].
+We recommend to upgrade in order to get the latest bugfixes, but this constitutes a breaking change for some users:
+
+- the `nativeImage` task is now replaced with `nativeCompile`
+- native image configuration happens in the `graalvmNative` DSL extension instead of the `nativeCompile` task
+- native image building makes use of Gradle's toolchain support. Please refer to the https://micronaut-projects.github.io/micronaut-gradle-plugin/latest/[documentation] for help.
+
+NOTE: You can still build existing applications or libraries using the 2.x version of the Gradle plugin. Documentation for this version can be found https://github.com/micronaut-projects/micronaut-gradle-plugin/blob/2.0.x/README.md[here].
+
 === Kotlin 1.6.0
 
 Micronaut 3.2.0 includes support for Kotlin 1.6.0.
+
+=== HTTP Features
+
+==== WebSocket Ping API
+
+WebSocket ann:websocket.annotation.OnMessage[] methods can now accept a api:websocket.WebSocketPongMessage[] parameter that will receive a WebSocket pong sent as a response to a ping submitted using the new `sendPingAsync` method on api:websocket.WebSocketSession[].
+
+==== HTTP2 Server Push
+
+It is now possible to send resources, e.g. stylesheets required by a HTML page, to the client alongside the request for the page using the HTTP2 server push protocol. See the <<http2Server, HTTP/2 documentation>> for information on how to use this feature.
+
+==== JsonView on request bodies
+
+You can now specify the Jackson `@JsonView` annotation on `@Body` parameters to controller methods.
+
+==== WebSocket ws/wss protocol support
+
+The WebSocket clients now support the ws/wss protocol. To implement this change, the api:websocket.WebSocketClient[] `create` methods now take a `URI` instead of a `URL`. The `URL` methods have been deprecated.
+
+Note: Should you be calling `WebSocketClient.create(null)`, the method call is now ambiguous. Insert a cast in that case: `WebSocketClient.create((URI) null)`
+
+==== SSL handshake timeout configuration
+
+The SSL handshake timeout can now be configured using the `micronaut.ssl.handshakeTimeout` and `micronaut.http.client.ssl.handshakeTimeout` configurations for the server and client respectively.
+
+=== Module Upgrades
+
+==== Micronaut Data 3.2.0
+
+- Repositories with JPA Criteria API specification for Micronaut JDBC/R2DBC
+- Expandable query parameters optimizations
+
+==== Reactive Modules
+
+- The RxJava2, RxJava3, and Reactor modules have been updated with the equivalent static `create` methods on their core counterparts.
+
+==== Micronaut Micrometer 4.1.0
+
+- Adds support for metrics with gRPC
+
+==== Micronaut Security 3.2.0
+
+- The way JSON Web Key Sets are being cached has been greatly improved for scenarios where there are multiple key sets.
+
+==== Other Module Upgrades
+
+- Elasticsearch 7.15.2
+- Flyway 8.0.2
+- gRPC 1.39.0
+- Liquibase 4.6.1
+- Micronaut Elasticsearch 4.0.0
+- Micronaut Flyway 5.0.0
+- Micronaut gRPC 3.1.1
+- Micronaut Liquibase 5.0.0
+- Micronaut OpenAPI 3.2.0
+- Micronaut Redis 5.1.0
+- Testcontainers 1.16.1
 
 == 3.1.0
 

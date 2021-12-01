@@ -1,8 +1,11 @@
+plugins {
+    id "org.jetbrains.kotlin.jvm"
+}
 
 internalSanityChecks {
-    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 38)
+    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 39)
     expectedServiceCount.put('io.micronaut.inject.BeanConfiguration', 2)
-}           
+}
 
 dependencies {
     annotationProcessor project(":inject-java")
@@ -22,6 +25,8 @@ dependencies {
     compileOnly libs.managed.brave.opentracing
 
     compileOnly libs.managed.jaeger
+    compileOnly libs.kotlinx.coroutines.core
+    compileOnly libs.kotlinx.coroutines.reactor
 
     testImplementation project(":inject-groovy")
     testImplementation project(":inject-java")

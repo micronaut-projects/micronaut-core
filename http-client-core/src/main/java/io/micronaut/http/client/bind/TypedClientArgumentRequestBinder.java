@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.client.bind;
 
-import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
 
@@ -29,7 +28,6 @@ import java.util.List;
  * @author James Kleeh
  * @since 2.1.0
  */
-@Experimental
 public interface TypedClientArgumentRequestBinder<T> extends ClientArgumentRequestBinder<T> {
 
     /**

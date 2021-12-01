@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.ssl.ClientSslConfiguration
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.bootstrap.Bootstrap
 import io.netty.bootstrap.ServerBootstrap
@@ -33,6 +34,9 @@ import reactor.core.publisher.Flux
 import spock.lang.Ignore
 import spock.lang.Specification
 
+import javax.net.ssl.SSLHandshakeException
+import java.security.GeneralSecurityException
+import java.security.InvalidAlgorithmParameterException
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 
@@ -106,5 +110,68 @@ class SslSpec extends Specification {
                 }
             })
         }
+    }
+
+    void 'bad server ssl cert'() {
+        given:
+        def client = HttpClient.create(new URL(url))
+
+        when:
+        client.toBlocking().exchange('/')
+        then:
+        def e = thrown RuntimeException
+        e.cause instanceof GeneralSecurityException || e.cause instanceof SSLHandshakeException
+
+        cleanup:
+        client.stop()
+
+        where:
+        url << [
+                'https://expired.badssl.com/',
+                //'https://wrong.host.badssl.com/', cert is for *.badssl.com, we accept that
+                'https://self-signed.badssl.com/',
+                'https://untrusted-root.badssl.com/',
+                //'https://revoked.badssl.com/', not implemented
+                //'https://pinning-test.badssl.com/', not implemented
+                'https://no-subject.badssl.com/',
+                'https://reversed-chain.badssl.com/',
+                'https://rc4-md5.badssl.com/',
+                'https://rc4.badssl.com/',
+                'https://3des.badssl.com/',
+                'https://null.badssl.com/',
+                'https://dh480.badssl.com/',
+                'https://dh512.badssl.com/',
+                'https://dh1024.badssl.com/',
+                'https://dh-small-subgroup.badssl.com/',
+                'https://dh-composite.badssl.com/',
+        ]
+    }
+
+    void 'self-signed allowed with config'() {
+        given:
+        def cfg = new DefaultHttpClientConfiguration()
+        ((ClientSslConfiguration) cfg.getSslConfiguration()).setInsecureTrustAllCertificates(true)
+        def client = HttpClient.create(new URL('https://self-signed.badssl.com/'), cfg)
+
+        when:
+        client.toBlocking().exchange('/')
+        then:
+        noExceptionThrown()
+
+        cleanup:
+        client.stop()
+    }
+
+    void 'normal ssl host allowed'() {
+        given:
+        def client = HttpClient.create(new URL('https://www.google.com/'))
+
+        when:
+        client.toBlocking().exchange('/')
+        then:
+        noExceptionThrown()
+
+        cleanup:
+        client.stop()
     }
 }

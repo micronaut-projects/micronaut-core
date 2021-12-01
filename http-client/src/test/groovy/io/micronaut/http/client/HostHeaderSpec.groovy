@@ -24,6 +24,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
+import io.micronaut.http.ssl.AbstractClientSslConfiguration
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.IgnoreIf
 import spock.lang.Requires
@@ -112,9 +113,10 @@ class HostHeaderSpec extends Specification {
                 'spec.name': 'HostHeaderSpec',
                 'micronaut.ssl.enabled': true,
                 'micronaut.ssl.buildSelfSigned': true,
-                'micronaut.ssl.port': 443
+                'micronaut.ssl.port': 443,
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
         ]).run(EmbeddedServer)
-        def asyncClient = HttpClient.create(embeddedServer.getURL())
+        def asyncClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
         BlockingHttpClient client = asyncClient.toBlocking()
 
         when:
@@ -137,9 +139,10 @@ class HostHeaderSpec extends Specification {
                 'spec.name': 'HostHeaderSpec',
                 'micronaut.ssl.port': -1,
                 'micronaut.ssl.enabled': true,
-                'micronaut.ssl.buildSelfSigned': true
+                'micronaut.ssl.buildSelfSigned': true,
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
         ]).run(EmbeddedServer)
-        def asyncClient = HttpClient.create(embeddedServer.getURL())
+        def asyncClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
         BlockingHttpClient client = asyncClient.toBlocking()
 
         when:

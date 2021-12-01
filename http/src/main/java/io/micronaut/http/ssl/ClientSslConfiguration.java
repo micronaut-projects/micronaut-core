@@ -29,7 +29,7 @@ import jakarta.inject.Inject;
  */
 @ConfigurationProperties(ClientSslConfiguration.PREFIX)
 @BootstrapContextCompatible
-public class ClientSslConfiguration extends SslConfiguration {
+public class ClientSslConfiguration extends AbstractClientSslConfiguration {
 
     /**
      * The prefix used to resolve this configuration.
