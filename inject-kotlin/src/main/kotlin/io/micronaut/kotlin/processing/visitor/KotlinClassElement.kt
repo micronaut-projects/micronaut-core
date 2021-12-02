@@ -7,12 +7,10 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.*
 import java.util.*
 import java.util.function.Predicate
-import java.util.stream.Collectors
-import javax.lang.model.element.ExecutableElement
 
 class KotlinClassElement(private val classDeclaration: KSClassDeclaration,
                          annotationMetadata: AnnotationMetadata,
-                         private val visitorContext: KotlinVisitorContext,
+                         visitorContext: KotlinVisitorContext,
                          private val arrayDimensions: Int = 0): AbstractKotlinElement(classDeclaration, annotationMetadata, visitorContext), ArrayableClassElement {
 
     override fun getName(): String {
@@ -37,7 +35,7 @@ class KotlinClassElement(private val classDeclaration: KSClassDeclaration,
     }
 
     override fun withArrayDimensions(arrayDimensions: Int): ClassElement {
-        return KotlinClassElement(classDeclaration, annotationMetadata, visitorContext, arrayDimensions);
+        return KotlinClassElement(classDeclaration, annotationMetadata, visitorContext, arrayDimensions)
     }
 
     override fun isInner(): Boolean {

@@ -1,15 +1,17 @@
 package io.micronaut.kotlin.processing.visitor
 
-import com.google.devtools.ksp.processing.Resolver
-import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.*
-import io.micronaut.kotlin.processing.AnnotationUtils
 
 class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): ElementFactory<KSDeclaration, KSClassDeclaration, KSFunctionDeclaration, KSPropertyDeclaration> {
 
-    override fun newClassElement(type: KSClassDeclaration, annotationMetadata: AnnotationMetadata): KotlinClassElement {
+    override fun newClassElement(type: KSClassDeclaration, annotationMetadata: AnnotationMetadata): ClassElement {
+        if (type.qualifiedName!!.asString() == "kotlin.Array") {
+            val component = type.typeParameters[0].bounds.first()
+            val componentElement = newClassElement(component.resolve().declaration as KSClassDeclaration, annotationMetadata)
+            return componentElement.toArray()
+        }
         return KotlinClassElement(type, annotationMetadata, visitorContext)
     }
 
@@ -17,7 +19,12 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         type: KSClassDeclaration,
         annotationMetadata: AnnotationMetadata,
         resolvedGenerics: Map<String, ClassElement>
-    ): KotlinClassElement {
+    ): ClassElement {
+        if (type.qualifiedName!!.asString() == "kotlin.Array") {
+            val component = type.typeParameters[0].bounds.first()
+            val componentElement = newClassElement(component.resolve().declaration as KSClassDeclaration, annotationMetadata)
+            return componentElement.toArray()
+        }
         return KotlinClassElement(type, annotationMetadata, visitorContext)
     }
 
@@ -34,27 +41,40 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
     }
 
     override fun newMethodElement(
-        declaringClass: ClassElement?,
+        declaringClass: ClassElement,
         method: KSFunctionDeclaration,
         annotationMetadata: AnnotationMetadata
     ): MethodElement {
-        TODO("Not yet implemented")
+        val annotationUtils = visitorContext.getAnnotationUtils()
+        val returnType = method.returnType!!.resolve().declaration as KSClassDeclaration
+        return KotlinMethodElement(
+            method,
+            declaringClass,
+            newClassElement(returnType, annotationUtils.getAnnotationMetadata(returnType)),
+            method.parameters.map { param ->
+                KotlinParameterElement(declaringClass, param, annotationUtils.getAnnotationMetadata(param), visitorContext)
+            },
+            annotationMetadata,
+            visitorContext)
     }
 
     fun newMethodElement(
-        declaringClass: ClassElement?,
+        declaringClass: ClassElement,
         method: KSPropertyGetter,
         annotationMetadata: AnnotationMetadata
     ): MethodElement {
-        TODO("Not yet implemented")
+        val annotationUtils = visitorContext.getAnnotationUtils()
+        val returnType = method.returnType!!.resolve().declaration as KSClassDeclaration
+        return KotlinMethodElement(method, declaringClass, newClassElement(returnType, annotationUtils.getAnnotationMetadata(returnType)), annotationMetadata, visitorContext)
     }
 
     fun newMethodElement(
-        declaringClass: ClassElement?,
+        declaringClass: ClassElement,
         method: KSPropertySetter,
         annotationMetadata: AnnotationMetadata
     ): MethodElement {
-        TODO("Not yet implemented")
+        val annotationUtils = visitorContext.getAnnotationUtils()
+        return KotlinMethodElement(method, declaringClass, annotationMetadata, visitorContext, KotlinParameterElement(declaringClass, method.parameter, annotationUtils.getAnnotationMetadata(method.parameter), visitorContext))
     }
 
     override fun newConstructorElement(

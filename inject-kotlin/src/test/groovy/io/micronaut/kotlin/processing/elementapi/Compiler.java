@@ -26,6 +26,7 @@ public class Compiler {
         }
 
         KotlinCompilation kspCompilation = new KotlinCompilation();
+        kspCompilation.setJavacArguments(Collections.singletonList("-Xopt-in=kotlin.RequiresOptIn"));
         kspCompilation.setSources(compilation.getSources());
         kspCompilation.setInheritClassPath(true);
         kspCompilation.setClasspaths(Arrays.asList(

@@ -12,14 +12,9 @@ class KotlinConstructorElement(method: KSDeclaration,
                                visitorContext: KotlinVisitorContext,
                                returnType: ClassElement,
                                parameters: List<ParameterElement>
-): ConstructorElement, KotlinMethodElement(method, declaringType, annotationMetadata, visitorContext, returnType, parameters) {
+): ConstructorElement, KotlinMethodElement(method, "<init>", declaringType, annotationMetadata, visitorContext, returnType, parameters) {
 
-    override fun getName(): String {
-        return "<init>"
-    }
+    override fun getName() = "<init>"
 
-    override fun getReturnType(): ClassElement {
-        return declaringType
-    }
-
+    override fun getReturnType(): ClassElement = declaringType
 }

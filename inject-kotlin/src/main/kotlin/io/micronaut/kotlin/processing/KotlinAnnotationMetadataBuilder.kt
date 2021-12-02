@@ -1,10 +1,12 @@
 package io.micronaut.kotlin.processing
 
 import com.google.devtools.ksp.closestClassDeclaration
+import com.google.devtools.ksp.isAnnotationPresent
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.visitor.VisitorContext
+import java.lang.annotation.Inherited
 import java.lang.annotation.RetentionPolicy
 import java.util.*
 
@@ -21,6 +23,15 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSAnnot
                 return closestClassDeclaration.qualifiedName!!.asString()
             }
             return element.simpleName.asString()
+        }
+        if (element is KSValueParameter) {
+            val parent = element.parent
+            if (parent is KSPropertyAccessor) {
+                val closestClassDeclaration = parent.receiver.closestClassDeclaration()
+                if (closestClassDeclaration != null) {
+                    return closestClassDeclaration.qualifiedName!!.asString()
+                }
+            }
         }
         TODO("Not yet implemented")
     }
@@ -226,11 +237,15 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSAnnot
     }
 
     override fun isInheritedAnnotation(annotationMirror: KSAnnotation): Boolean {
-        TODO("Not yet implemented")
+        return annotationMirror.annotationType.annotations.any {
+            it.annotationType.resolve().declaration.qualifiedName?.asString() == Inherited::class.qualifiedName
+        }
     }
 
     override fun isInheritedAnnotationType(annotationType: KSAnnotated): Boolean {
-        TODO("Not yet implemented")
+        return annotationType.annotations.any {
+            it.annotationType.resolve().declaration.qualifiedName?.asString() == Inherited::class.qualifiedName
+        }
     }
 
     private fun populateTypeHierarchy(element: KSClassDeclaration, hierarchy: MutableList<KSAnnotated>) {
