@@ -1,5 +1,6 @@
 package io.micronaut.kotlin.processing.visitor
 
+import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import io.micronaut.core.annotation.AnnotationMetadata
@@ -12,13 +13,13 @@ import java.util.*
 class KotlinPropertyElement: AbstractKotlinElement, PropertyElement {
 
     private val name: String
-    private val classElement: KotlinClassElement
-    private val type: KotlinClassElement
+    private val classElement: ClassElement
+    private val type: ClassElement
     private val setter: Optional<MethodElement>
     private val getter: Optional<MethodElement>
 
-    constructor(classElement: KotlinClassElement,
-                type: KotlinClassElement,
+    constructor(classElement: ClassElement,
+                type: ClassElement,
                 property: KSPropertyDeclaration,
                 annotationMetadata: AnnotationMetadata,
                 visitorContext: KotlinVisitorContext) : super(property, annotationMetadata, visitorContext) {

@@ -12,9 +12,9 @@ import io.micronaut.inject.ast.Element
 import java.util.function.Consumer
 import java.util.function.Predicate
 
-abstract class AbstractKotlinElement(private val declaration: KSNode,
+abstract class AbstractKotlinElement(protected val declaration: KSNode,
                                      private var annotationMetadata: AnnotationMetadata,
-                                     private val visitorContext: KotlinVisitorContext) : Element {
+                                     protected val visitorContext: KotlinVisitorContext) : Element {
 
     override fun getNativeType(): KSNode {
         return declaration

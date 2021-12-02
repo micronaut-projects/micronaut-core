@@ -12,6 +12,7 @@ dependencies {
         api files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
     testImplementation("com.github.tschuchortdev:kotlin-compile-testing-ksp:1.4.6")
+    testImplementation libs.kotlin.stdlib
 }
 
 afterEvaluate {
