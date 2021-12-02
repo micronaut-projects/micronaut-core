@@ -40,7 +40,7 @@ dependencies {
     functionalTestImplementation(testFixtures(project(":test-suite")))
 }
 
-test {
+tasks.named("test") {
     exclude '**/*$_closure*'
 }
 
