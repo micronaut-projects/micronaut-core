@@ -91,6 +91,12 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     private boolean sendLastHttpContent;
 
     /**
+     * Whether a {@link StreamedHttpMessage} is currently being written, and further messages should be held back until
+     * complete. Used for HTTP pipelining.
+     */
+    private boolean outgoingInFlight;
+
+    /**
      * @param inClass  The in class
      * @param outClass The out class
      */
@@ -343,11 +349,8 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
         if (isValidOutMessage(msg)) {
 
             receivedOutMessage(ctx);
-            if (ctx.channel().isWritable()) {
-                unbufferedWrite(ctx, (Out) msg, promise);
-            } else {
-                outgoing.add(new Outgoing<>((Out) msg, promise));
-            }
+            outgoing.add(new Outgoing<>((Out) msg, promise));
+            proceedWriteOutgoing(ctx);
 
         } else if (msg instanceof LastHttpContent) {
 
@@ -361,7 +364,11 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
     @Override
     public void channelWritabilityChanged(ChannelHandlerContext ctx) {
-        while (ctx.channel().isWritable() && !outgoing.isEmpty()) {
+        proceedWriteOutgoing(ctx);
+    }
+
+    private void proceedWriteOutgoing(ChannelHandlerContext ctx) {
+        while (!outgoingInFlight && ctx.channel().isWritable() && !outgoing.isEmpty()) {
             Outgoing<Out> out = outgoing.remove();
             unbufferedWrite(ctx, out.message, out.promise);
         }
@@ -379,6 +386,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             ctx.writeAndFlush(message, promise);
             sentOutMessage(ctx);
         } else if (message instanceof StreamedHttpMessage) {
+            outgoingInFlight = true;
 
             StreamedHttpMessage streamed = (StreamedHttpMessage) message;
             HandlerSubscriber<HttpContent> subscriber = new HandlerSubscriber<HttpContent>(ctx.executor()) {
@@ -443,11 +451,15 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT, promise).addListener((f) -> {
                 sentOutMessage(ctx);
                 ctx.read();
+                outgoingInFlight = false;
+                proceedWriteOutgoing(ctx);
             });
         } else {
             promise.setSuccess();
             sentOutMessage(ctx);
             ctx.read();
+            outgoingInFlight = false;
+            proceedWriteOutgoing(ctx);
         }
     }
 
