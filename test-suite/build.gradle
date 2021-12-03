@@ -87,7 +87,7 @@ dependencies {
     testFixturesApi libs.managed.groovy
 }
 
-//tasks.withType(Test) {
+//tasks.withType(Test).configureEach {
 //    useJUnitPlatform()
 //
 //    jvmArgs('-Dio.netty.leakDetection.level=paranoid')

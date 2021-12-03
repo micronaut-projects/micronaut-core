@@ -68,7 +68,7 @@ dependencies {
     testImplementation libs.junit.jupiter.api
 }
 
-//tasks.withType(Test) {
+//tasks.withType(Test).configureEach {
 //    testLogging {
 //        showStandardStreams = true
 //        exceptionFormat = 'full'

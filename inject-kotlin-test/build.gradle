@@ -27,18 +27,18 @@ dependencies {
     implementation libs.kotlin.stdlib
 }
 
-afterEvaluate {
-    sourcesJar {
-        from "$projectDir/src/main/groovy"
-        from "$projectDir/src/main/kotlin"
-    }
+tasks.named("sourcesJar") {
+    from "$projectDir/src/main/groovy"
+    from "$projectDir/src/main/kotlin"
 }
-compileKotlin {
+
+tasks.named("compileKotlin") {
     kotlinOptions {
         jvmTarget = "1.8"
     }
 }
-compileGroovy {
+
+tasks.named("compileGroovy") {
     // this allows groovy to access kotlin classes.
     dependsOn tasks.getByPath('compileKotlin')
     classpath += files(compileKotlin.destinationDir)

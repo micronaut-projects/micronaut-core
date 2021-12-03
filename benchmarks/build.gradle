@@ -27,9 +27,12 @@ jmh {
     fork = 1
 //    jvmArgs = ["-agentpath:/Applications/YourKit-Java-Profiler-2018.04.app/Contents/Resources/bin/mac/libyjpagent.jnilib"]
 }
-processJmhResources {
+
+tasks.named("processJmhResources") {
     duplicatesStrategy = DuplicatesStrategy.WARN
 }
-spotlessJavaCheck.enabled = false
-checkstyleMain.enabled = false
-checkstyleJmh.enabled = false
+['spotlessJavaCheck', 'checkstyleMain', 'checkstyleJmh'].each {
+    tasks.named(it) {
+        enabled = false
+    }
+}

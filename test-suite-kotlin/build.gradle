@@ -60,10 +60,10 @@ dependencies {
     testImplementation libs.managed.reactor
 }
 
-compileTestKotlin {
+tasks.named("compileTestKotlin") {
     kotlinOptions.jvmTarget = "1.8"
 }
 
-test {
+tasks.named("test") {
     useJUnitPlatform()
 }
