@@ -330,6 +330,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                     removeHandlerIfActive(ctx, HANDLER_BODY_PUBLISHER);
                 }
                 currentlyStreamedMessage = null;
+                ctx.read();
             }
         }
     }

@@ -4,6 +4,7 @@ import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
@@ -39,19 +40,25 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 @MicronautTest
 @Property(name = 'spec.name', value = 'HttpPipeliningSpec')
+@Issue('https://github.com/micronaut-projects/micronaut-core/issues/4336')
 class HttpPipeliningSpec extends Specification {
     @Inject
     EmbeddedServer embeddedServer
 
-    private def makeRequest(String s) {
-        def request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, '/block', Unpooled.wrappedBuffer(s.getBytes(StandardCharsets.UTF_8)))
-        request.headers().add(HttpHeaderNames.CONTENT_LENGTH, s.length())
+    private def makeBlockRequest(String body) {
+        def request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, '/block', Unpooled.wrappedBuffer(body.getBytes(StandardCharsets.UTF_8)))
+        request.headers().add(HttpHeaderNames.CONTENT_LENGTH, body.length())
         request.headers().add(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE)
         return request
     }
 
-    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/4336')
-    def 'test pipelining'() {
+    private def makeSimpleRequest() {
+        def request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/plain')
+        request.headers().add(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE)
+        return request
+    }
+
+    def 'interleaved response'() {
         given:
         def eventLoopGroup = new NioEventLoopGroup(1)
         def responses = new CopyOnWriteArrayList<FullHttpResponse>()
@@ -77,8 +84,8 @@ class HttpPipeliningSpec extends Specification {
         when:
         def channel = bootstrap.connect().sync().channel()
         // send two requests in one tcp packet
-        channel.write(makeRequest('foo'))
-        channel.write(makeRequest('bar'))
+        channel.write(makeBlockRequest('foo'))
+        channel.write(makeBlockRequest('bar'))
         channel.flush()
 
         then:
@@ -92,17 +99,65 @@ class HttpPipeliningSpec extends Specification {
         eventLoopGroup.shutdownGracefully()
     }
 
+    def 'simple get requests'() {
+        given:
+        def eventLoopGroup = new NioEventLoopGroup(1)
+        def responses = new CopyOnWriteArrayList<FullHttpResponse>()
+        Bootstrap bootstrap = new Bootstrap()
+                .group(eventLoopGroup)
+                .channel(NioSocketChannel)
+                .handler(new ChannelInitializer<Channel>() {
+                    @Override
+                    protected void initChannel(@NotNull Channel ch) throws Exception {
+                        ch.pipeline()
+                                .addLast(new HttpClientCodec())
+                                .addLast(new HttpObjectAggregator(1024))
+                                .addLast(new ChannelInboundHandlerAdapter() {
+                                    @Override
+                                    void channelRead(@NotNull ChannelHandlerContext ctx, @NotNull Object msg) throws Exception {
+                                        responses.add(msg)
+                                    }
+                                })
+                    }
+                })
+                .remoteAddress(embeddedServer.host, embeddedServer.port)
+
+        when:
+        def channel = bootstrap.connect().sync().channel()
+        // send many requests in one tcp packet
+        for (int i = 0; i < 10; i++) {
+            channel.write(makeSimpleRequest())
+        }
+        channel.flush()
+
+        then:
+        new PollingConditions(timeout: 5).eventually {
+            responses.size() == 10
+        }
+        for (def r : responses) {
+            r.content().toString(StandardCharsets.UTF_8) == 'foo'
+        }
+
+        cleanup:
+        eventLoopGroup.shutdownGracefully()
+    }
+
     @Singleton
     @Controller
     @Requires(property = 'spec.name', value = 'HttpPipeliningSpec')
     static class BlockingController {
         @Post('/block')
         Publisher<String> block(@Body String msg) {
-            println 'controller called'
             return Flux.concat(
                     Mono.just(msg + '1'),
                     Mono.just(msg + '2').delayElement(Duration.ofSeconds(1))
             )
+        }
+
+        @Get('/plain')
+        String plain() {
+            println 'plain'
+            return 'foo'
         }
     }
 }
