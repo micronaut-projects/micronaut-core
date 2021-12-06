@@ -1052,6 +1052,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             }
         } finally {
             context.removeLast();
+            context.messageTemplate(null);
         }
     }
 
