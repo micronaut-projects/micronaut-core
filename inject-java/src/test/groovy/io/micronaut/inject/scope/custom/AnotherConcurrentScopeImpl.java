@@ -10,7 +10,9 @@ import jakarta.inject.Singleton;
 
 @Singleton
 public class AnotherConcurrentScopeImpl extends AbstractConcurrentCustomScope<AnotherConcurrentScope> {
+
     private Map<BeanIdentifier, CreatedBean<?>> scope;
+
     public AnotherConcurrentScopeImpl() {
         super(AnotherConcurrentScope.class);
     }

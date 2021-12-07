@@ -30,7 +30,7 @@ dependencies {
     testImplementation project(":runtime")
 }
 
-compileKotlin {
+tasks.named("compileKotlin") {
     kotlinOptions.jvmTarget = "1.8"
 }
 
