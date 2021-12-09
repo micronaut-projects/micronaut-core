@@ -88,16 +88,14 @@ public class HttpNettyFeature implements Feature {
         } catch (NoSuchMethodException e) {
             throw new RuntimeException(e);
         }
-        @SuppressWarnings("unchecked")
-        Class<sun.misc.Unsafe> unsafeOld = (Class<sun.misc.Unsafe>) access.findClassByName("sun.misc.Unsafe");
+        Class<?> unsafeOld = access.findClassByName("sun.misc.Unsafe");
         if (unsafeOld != null) {
             try {
                 RuntimeReflection.register(unsafeOld.getDeclaredMethod("allocateUninitializedArray", Class.class, int.class));
             } catch (NoSuchMethodException ignored) {
             }
         }
-        @SuppressWarnings("unchecked")
-        Class<jdk.internal.misc.Unsafe> unsafeNew = (Class<jdk.internal.misc.Unsafe>) access.findClassByName("jdk.internal.misc.Unsafe");
+        Class<?> unsafeNew = access.findClassByName("jdk.internal.misc.Unsafe");
         if (unsafeNew != null) {
             try {
                 RuntimeReflection.register(unsafeNew.getDeclaredMethod("allocateUninitializedArray", Class.class, int.class));
