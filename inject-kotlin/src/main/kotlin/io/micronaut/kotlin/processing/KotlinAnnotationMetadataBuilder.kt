@@ -1,16 +1,21 @@
 package io.micronaut.kotlin.processing
 
 import com.google.devtools.ksp.closestClassDeclaration
+import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.isAnnotationPresent
+import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
+import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.visitor.VisitorContext
+import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import java.lang.annotation.Inherited
 import java.lang.annotation.RetentionPolicy
 import java.util.*
 
-class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSAnnotated, KSAnnotation>() {
+class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUtils,
+                                      private val resolver: Resolver): AbstractAnnotationMetadataBuilder<KSAnnotated, KSAnnotation>() {
 
     override fun isMethodOrClassElement(element: KSAnnotated): Boolean {
         return element is KSClassDeclaration || element is KSFunctionDeclaration
@@ -26,11 +31,15 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSAnnot
         }
         if (element is KSValueParameter) {
             val parent = element.parent
+            var closestClassDeclaration: KSClassDeclaration? = null
             if (parent is KSPropertyAccessor) {
-                val closestClassDeclaration = parent.receiver.closestClassDeclaration()
-                if (closestClassDeclaration != null) {
-                    return closestClassDeclaration.qualifiedName!!.asString()
-                }
+                closestClassDeclaration = parent.receiver.closestClassDeclaration()
+            }
+            if (parent is KSFunctionDeclaration) {
+                closestClassDeclaration = parent.closestClassDeclaration()
+            }
+            if (closestClassDeclaration != null) {
+                return closestClassDeclaration.qualifiedName!!.asString()
             }
         }
         TODO("Not yet implemented")
@@ -132,7 +141,12 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSAnnot
         memberName: String,
         annotationValue: Any
     ): Any? {
-        return annotationValue
+        if (annotationValue is Collection<*>) {
+            return annotationValue.map {
+                readAnnotationValue(it)
+            }
+        }
+        return readAnnotationValue(annotationValue)
     }
 
     override fun readAnnotationDefaultValues(annotationMirror: KSAnnotation): MutableMap<out KSDeclaration, *> {
@@ -211,8 +225,8 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSAnnot
         return null
     }
 
-    override fun getAnnotationMirror(annotationName: String?): Optional<KSAnnotated> {
-        TODO("Not yet implemented")
+    override fun getAnnotationMirror(annotationName: String): Optional<KSAnnotated> {
+        return Optional.ofNullable(resolver.getClassDeclarationByName(annotationName))
     }
 
     override fun getAnnotationMember(originatingElement: KSAnnotated?, member: CharSequence?): KSDeclaration? {
@@ -220,7 +234,7 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSAnnot
     }
 
     override fun createVisitorContext(): VisitorContext {
-        TODO("Not yet implemented")
+        return annotationUtils.newVisitorContext()
     }
 
     override fun getRetentionPolicy(annotation: KSAnnotated): RetentionPolicy {
@@ -254,5 +268,20 @@ class KotlinAnnotationMetadataBuilder: AbstractAnnotationMetadataBuilder<KSAnnot
             hierarchy.add(declaration)
             populateTypeHierarchy(declaration as KSClassDeclaration, hierarchy)
         }
+    }
+
+    private fun readAnnotationValue(value: Any?): Any? {
+        if (value == null) {
+            return null
+        }
+        if (value is KSType) {
+            val declaration = value.declaration
+            if (declaration is KSClassDeclaration) {
+                if (declaration.classKind == ClassKind.ENUM_ENTRY) {
+                    return declaration.qualifiedName?.getShortName()
+                }
+            }
+        }
+        return null
     }
 }

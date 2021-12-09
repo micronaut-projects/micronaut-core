@@ -175,7 +175,7 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
         override fun visitClassDeclaration(classDeclaration: KSClassDeclaration, data: Any): Any {
             val visitorContext = loadedVisitor.visitorContext
             val annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(classDeclaration)
-            val classElement = visitorContext.elementFactory.newClassElement(classDeclaration, annotationMetadata)
+            val classElement = visitorContext.elementFactory.newClassElement(classDeclaration.asStarProjectedType(), annotationMetadata)
             loadedVisitor.visitor.visitClass(classElement, visitorContext)
             return data
         }
@@ -187,7 +187,7 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
                 parentDeclaration = parentDeclaration?.parentDeclaration
             }
             val classAnnotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(parentDeclaration)
-            val classElement = visitorContext.elementFactory.newClassElement(parentDeclaration, classAnnotationMetadata)
+            val classElement = visitorContext.elementFactory.newClassElement(parentDeclaration.asStarProjectedType(), classAnnotationMetadata)
             val annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(function)
 
             val methodElement = visitorContext.elementFactory.newMethodElement(classElement, function, annotationMetadata)
@@ -202,7 +202,7 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
                 parentDeclaration = parentDeclaration?.parentDeclaration
             }
             val classAnnotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(parentDeclaration)
-            val classElement = visitorContext.elementFactory.newClassElement(parentDeclaration, classAnnotationMetadata)
+            val classElement = visitorContext.elementFactory.newClassElement(parentDeclaration.asStarProjectedType(), classAnnotationMetadata)
             val annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(property)
 
             if (property.getter != null) {

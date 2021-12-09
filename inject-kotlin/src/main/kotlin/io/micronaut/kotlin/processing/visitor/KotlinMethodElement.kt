@@ -55,12 +55,12 @@ open class KotlinMethodElement: AbstractKotlinElement, MethodElement {
     }
 
     protected constructor(method: KSNode,
-                        name: String,
-                        declaringType: ClassElement,
-                        annotationMetadata: AnnotationMetadata,
-                        visitorContext: KotlinVisitorContext,
-                        returnType: ClassElement,
-                        parameters: List<ParameterElement>
+                          name: String,
+                          declaringType: ClassElement,
+                          annotationMetadata: AnnotationMetadata,
+                          visitorContext: KotlinVisitorContext,
+                          returnType: ClassElement,
+                          parameters: List<ParameterElement>
     ) : super(method, annotationMetadata, visitorContext) {
         this.name = name
         this.declaringType = declaringType

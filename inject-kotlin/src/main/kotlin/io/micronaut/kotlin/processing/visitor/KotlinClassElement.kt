@@ -1,25 +1,31 @@
 package io.micronaut.kotlin.processing.visitor
 
+import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.getConstructors
+import com.google.devtools.ksp.outerType
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.*
 import java.util.*
 import java.util.function.Predicate
 
-class KotlinClassElement(private val classDeclaration: KSClassDeclaration,
+open class KotlinClassElement(protected val classType: KSType,
                          annotationMetadata: AnnotationMetadata,
                          visitorContext: KotlinVisitorContext,
-                         private val arrayDimensions: Int = 0): AbstractKotlinElement(classDeclaration, annotationMetadata, visitorContext), ArrayableClassElement {
+                         private val arrayDimensions: Int = 0): AbstractKotlinElement(classType.declaration, annotationMetadata, visitorContext), ArrayableClassElement {
 
+    val classDeclaration: KSDeclaration = classType.declaration
+
+    @OptIn(KspExperimental::class)
     override fun getName(): String {
-        return classDeclaration.qualifiedName!!.asString()
+        val qualifiedName = classDeclaration.qualifiedName!!
+        return (visitorContext.resolver.mapKotlinNameToJava(qualifiedName) ?: qualifiedName).asString()
     }
 
     override fun isAssignable(type: String): Boolean {
         val ksType = visitorContext.resolver.getClassDeclarationByName(type)?.asStarProjectedType()
-        return if (ksType != null) {
+        return if (ksType != null && classDeclaration is KSClassDeclaration) {
             classDeclaration.asStarProjectedType().isAssignableFrom(ksType)
         } else {
             false
@@ -35,15 +41,20 @@ class KotlinClassElement(private val classDeclaration: KSClassDeclaration,
     }
 
     override fun withArrayDimensions(arrayDimensions: Int): ClassElement {
-        return KotlinClassElement(classDeclaration, annotationMetadata, visitorContext, arrayDimensions)
+        return KotlinClassElement(classType, annotationMetadata, visitorContext, arrayDimensions)
     }
 
     override fun isInner(): Boolean {
-        return classDeclaration.parentDeclaration is KSClassDeclaration
+        return classType.outerType != null
     }
 
     override fun getTypeArguments(): Map<String, ClassElement> {
-        return emptyMap()
+        val typeArguments = mutableMapOf<String, ClassElement>()
+        val elementFactory = visitorContext.elementFactory
+        classType.declaration.typeParameters.forEach {
+            typeArguments[it.name.asString()] = elementFactory.newClassElement(it.bounds.first().resolve())
+        }
+        return typeArguments
     }
 
     override fun getTypeArguments(type: String): Map<String, ClassElement> {
@@ -55,6 +66,9 @@ class KotlinClassElement(private val classDeclaration: KSClassDeclaration,
     }
 
     override fun getDefaultConstructor(): Optional<MethodElement> {
+        if (classDeclaration !is KSClassDeclaration) {
+            return Optional.empty()
+        }
         val constructors = classDeclaration.getConstructors()
             .filter {
                 it.parameters.isEmpty()
@@ -83,7 +97,7 @@ class KotlinClassElement(private val classDeclaration: KSClassDeclaration,
     }
 
     override fun getPrimaryConstructor(): Optional<MethodElement> {
-        return Optional.ofNullable(classDeclaration.primaryConstructor)
+        return Optional.ofNullable((classDeclaration as KSClassDeclaration).primaryConstructor)
             .map { ctor ->
                 visitorContext.elementFactory.newConstructorElement(
                     this,
@@ -98,7 +112,7 @@ class KotlinClassElement(private val classDeclaration: KSClassDeclaration,
             val parentDeclaration = classDeclaration.parentDeclaration as KSClassDeclaration
             return Optional.of(
                 visitorContext.elementFactory.newClassElement(
-                    parentDeclaration,
+                    classType.outerType!!,
                     visitorContext.getAnnotationUtils().getAnnotationMetadata(parentDeclaration)
                 )
             )
@@ -109,7 +123,7 @@ class KotlinClassElement(private val classDeclaration: KSClassDeclaration,
     override fun <T : Element> getEnclosedElements(query: ElementQuery<T>): MutableList<T> {
         val result = query.result()
         val kind = getElementKind(result.elementType)
-        var enclosedElements = classDeclaration.declarations.filter { kind.test(it) }
+        var enclosedElements = (classDeclaration as KSClassDeclaration).declarations.filter { kind.test(it) }
 
         if (result.isOnlyDeclared) {
             enclosedElements = enclosedElements.filter { declaration ->  declaration.parentDeclaration == classDeclaration }
@@ -143,16 +157,21 @@ class KotlinClassElement(private val classDeclaration: KSClassDeclaration,
         elementLoop@ for (enclosingElement in enclosedElements) {
 
             if (result.isOnlyAccessible) {
+                if (enclosingElement is KSPropertyDeclaration) {
+                    // the backing fields of properties are always private
+                    if (result.elementType == FieldElement::class.java) {
+                        continue
+                    }
+                }
                 if (enclosingElement.modifiers.contains(Modifier.PRIVATE)) {
                     continue
-                } else {
-                    val onlyAccessibleFrom = result.onlyAccessibleFromType.orElse(this)
-                    val accessibleFrom = onlyAccessibleFrom.nativeType
-                    // if the outer element of the enclosed element is not the current class
-                    // we need to check if it package private and within a different package so it can be excluded
-                    if (enclosingElement !== accessibleFrom && enclosingElement.modifiers.contains(Modifier.INTERNAL)) {
-                        TODO("how to determine if element is in module")
-                    }
+                }
+                val onlyAccessibleFrom = result.onlyAccessibleFromType.orElse(this)
+                val accessibleFrom = onlyAccessibleFrom.nativeType
+                // if the outer element of the enclosed element is not the current class
+                // we need to check if it package private and within a different package so it can be excluded
+                if (enclosingElement !== accessibleFrom && enclosingElement.modifiers.contains(Modifier.INTERNAL)) {
+                    TODO("how to determine if element is in module")
                 }
             }
 
@@ -217,7 +236,7 @@ class KotlinClassElement(private val classDeclaration: KSClassDeclaration,
                 ) as T
             } else if (enclosingElement is KSClassDeclaration) {
                 element = elementFactory.newClassElement(
-                    enclosingElement,
+                    enclosingElement.asType(classDeclaration.asStarProjectedType().arguments),
                     metadata
                 ) as T
             } else {
@@ -238,7 +257,7 @@ class KotlinClassElement(private val classDeclaration: KSClassDeclaration,
                 Predicate { declaration ->  declaration is KSFunctionDeclaration }
             }
             FieldElement::class.java -> {
-                Predicate { declaration ->  declaration is KSPropertyDeclaration }
+                Predicate { declaration ->  declaration is KSPropertyDeclaration && declaration.hasBackingField }
             }
             ConstructorElement::class.java -> {
                 Predicate { declaration ->  declaration is KSFunctionDeclaration && declaration.functionKind == FunctionKind.TOP_LEVEL }
@@ -253,12 +272,12 @@ class KotlinClassElement(private val classDeclaration: KSClassDeclaration,
     override fun getBeanProperties(): MutableList<PropertyElement> {
         val annotationUtils = visitorContext.getAnnotationUtils()
         val elementFactory = visitorContext.elementFactory
-
-        return classDeclaration.getAllProperties().map {
-            val type = it.type.resolve().declaration as KSClassDeclaration
+        val typeArguments = typeArguments
+        return (classDeclaration as KSClassDeclaration).getAllProperties().map {
+            val type = it.type.resolve()
 
             KotlinPropertyElement(this,
-                elementFactory.newClassElement(type, annotationUtils.getAnnotationMetadata(type)),
+                elementFactory.newClassElement(type, typeArguments),
                 it,
                 annotationUtils.getAnnotationMetadata(it),
                 visitorContext)
