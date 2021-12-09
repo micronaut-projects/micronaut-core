@@ -16,6 +16,7 @@
 package io.micronaut.http.netty.graal;
 
 import com.oracle.svm.core.annotate.AutomaticFeature;
+import com.oracle.svm.core.jdk.SystemPropertiesSupport;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.graal.AutomaticFeatureUtils;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
@@ -25,6 +26,7 @@ import io.micronaut.http.netty.channel.converters.KQueueChannelOptionFactory;
 import io.micronaut.http.netty.websocket.NettyWebSocketSession;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 import io.netty.util.internal.logging.Slf4JLoggerFactory;
+import org.graalvm.nativeimage.ImageSingletons;
 import org.graalvm.nativeimage.hosted.Feature;
 import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
 import org.graalvm.nativeimage.hosted.RuntimeReflection;
@@ -69,6 +71,7 @@ public class HttpNettyFeature implements Feature {
                 "io.netty.util.internal.logging.Slf4JLoggerFactory",
                 "io.netty.util.internal.logging.LocationAwareSlf4JLogger"
         );
+        // force netty to use slf4j logging
         InternalLoggerFactory.setDefaultFactory(Slf4JLoggerFactory.INSTANCE);
 
         registerClasses(access,
@@ -77,6 +80,30 @@ public class HttpNettyFeature implements Feature {
         registerMethods(access, "io.netty.buffer.AbstractByteBufAllocator", "toLeakAwareBuffer");
         registerMethods(access, "io.netty.buffer.AdvancedLeakAwareByteBuf", "touch", "recordLeakNonRefCountingOperation");
         registerMethods(access, "io.netty.util.ReferenceCountUtil", "touch");
+
+        System.setProperty("io.netty.tryReflectionSetAccessible", "true");
+        ImageSingletons.lookup(SystemPropertiesSupport.class).initializeProperty("io.netty.tryReflectionSetAccessible", "true");
+        try {
+            RuntimeReflection.register(access.findClassByName("java.nio.DirectByteBuffer").getDeclaredConstructor(long.class, int.class));
+        } catch (NoSuchMethodException e) {
+            throw new RuntimeException(e);
+        }
+        @SuppressWarnings("unchecked")
+        Class<sun.misc.Unsafe> unsafeOld = (Class<sun.misc.Unsafe>) access.findClassByName("sun.misc.Unsafe");
+        if (unsafeOld != null) {
+            try {
+                RuntimeReflection.register(unsafeOld.getDeclaredMethod("allocateUninitializedArray", Class.class, int.class));
+            } catch (NoSuchMethodException ignored) {
+            }
+        }
+        @SuppressWarnings("unchecked")
+        Class<jdk.internal.misc.Unsafe> unsafeNew = (Class<jdk.internal.misc.Unsafe>) access.findClassByName("jdk.internal.misc.Unsafe");
+        if (unsafeNew != null) {
+            try {
+                RuntimeReflection.register(unsafeNew.getDeclaredMethod("allocateUninitializedArray", Class.class, int.class));
+            } catch (NoSuchMethodException ignored) {
+            }
+        }
     }
 
     private void registerClasses(BeforeAnalysisAccess access, String... classes) {
