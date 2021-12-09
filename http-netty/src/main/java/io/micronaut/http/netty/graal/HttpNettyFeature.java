@@ -23,6 +23,8 @@ import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.netty.channel.converters.EpollChannelOptionFactory;
 import io.micronaut.http.netty.channel.converters.KQueueChannelOptionFactory;
 import io.micronaut.http.netty.websocket.NettyWebSocketSession;
+import io.netty.util.internal.logging.InternalLoggerFactory;
+import io.netty.util.internal.logging.Slf4JLoggerFactory;
 import org.graalvm.nativeimage.hosted.Feature;
 import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
 import org.graalvm.nativeimage.hosted.RuntimeReflection;
@@ -61,6 +63,13 @@ public class HttpNettyFeature implements Feature {
                 ContinuationArgumentBinder.Companion.class
         );
         RuntimeClassInitialization.initializeAtBuildTime("io.netty.util.internal.shaded.org.jctools");
+
+        RuntimeClassInitialization.initializeAtBuildTime(
+                "io.netty.util.internal.logging.InternalLoggerFactory",
+                "io.netty.util.internal.logging.Slf4JLoggerFactory",
+                "io.netty.util.internal.logging.LocationAwareSlf4JLogger"
+        );
+        InternalLoggerFactory.setDefaultFactory(Slf4JLoggerFactory.INSTANCE);
 
         registerClasses(access,
                 "io.netty.channel.kqueue.KQueueChannelOption", "io.netty.channel.epoll.EpollChannelOption");
