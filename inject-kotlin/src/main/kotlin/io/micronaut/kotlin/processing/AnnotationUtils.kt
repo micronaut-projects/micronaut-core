@@ -165,7 +165,7 @@ class AnnotationUtils(private val environment: SymbolProcessorEnvironment,
      * @return The builder
      */
     fun newAnnotationBuilder(): KotlinAnnotationMetadataBuilder {
-        return KotlinAnnotationMetadataBuilder()
+        return KotlinAnnotationMetadataBuilder(this, resolver)
     }
 
     /**
