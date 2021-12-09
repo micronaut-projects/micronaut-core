@@ -147,7 +147,7 @@ managed-spring = "5.3.9"
 managed-springboot = "2.5.3"
 managed-swagger = "2.1.10"
 managed-validation = "2.0.1.Final"
-managed-testcontainers = "1.16.1"
+managed-testcontainers = "1.16.2"
 managed-snakeyaml = "1.29"
 managed-zipkin-reporter = "2.16.3"
 
