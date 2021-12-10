@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
-import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.cookie.Cookie;
 import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
@@ -39,18 +38,18 @@ final class CookiesElement extends AbstractHttpMessageLogElement {
      */
     public static final String RESPONSE_COOKIES = CookieElement.RESPONSE_COOKIE;
 
-    private static final CookiesElement REQUEST_COOKIES_ELEMENT = new CookiesElement(HttpHeaderNames.COOKIE.toString());
-    private static final CookiesElement RESPONSE_COOKIES_ELEMENT = new CookiesElement(HttpHeaderNames.SET_COOKIE.toString());
+    private static final CookiesElement REQUEST_COOKIES_ELEMENT = new CookiesElement(io.micronaut.http.HttpHeaders.COOKIE);
+    private static final CookiesElement RESPONSE_COOKIES_ELEMENT = new CookiesElement(io.micronaut.http.HttpHeaders.SET_COOKIE);
 
     private final String headerName;
 
     private CookiesElement(String headerName) {
-        if (HttpHeaderNames.COOKIE.toString().equals(headerName) || HttpHeaderNames.SET_COOKIE.toString().equals(headerName)) {
+        if (io.micronaut.http.HttpHeaders.COOKIE.equals(headerName) || io.micronaut.http.HttpHeaders.SET_COOKIE.equals(headerName)) {
             this.headerName = headerName;
         } else {
-            this.headerName = HttpHeaderNames.COOKIE.toString();
+            this.headerName = io.micronaut.http.HttpHeaders.COOKIE;
         }
-        this.events = HttpHeaderNames.COOKIE.toString().equals(this.headerName) ? Event.REQUEST_HEADERS_EVENTS : Event.RESPONSE_HEADERS_EVENTS;
+        this.events = io.micronaut.http.HttpHeaders.COOKIE.equals(this.headerName) ? Event.REQUEST_HEADERS_EVENTS : Event.RESPONSE_HEADERS_EVENTS;
     }
 
     /**
@@ -94,7 +93,7 @@ final class CookiesElement extends AbstractHttpMessageLogElement {
 
     @Override
     public String toString() {
-        return '%' + (HttpHeaderNames.COOKIE.toString().equals(this.headerName) ? CookieElement.REQUEST_COOKIE :  CookieElement.RESPONSE_COOKIE);
+        return '%' + (io.micronaut.http.HttpHeaders.COOKIE.equals(this.headerName) ? CookieElement.REQUEST_COOKIE :  CookieElement.RESPONSE_COOKIE);
     }
 
 }
