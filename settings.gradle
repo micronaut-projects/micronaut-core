@@ -1,3 +1,5 @@
+import io.micronaut.build.BuildEnvironment
+
 pluginManagement {
     plugins {
 //        id 'io.micronaut.application' version getProperty("micronautGradlePluginVersion")
@@ -78,12 +80,14 @@ gradle.beforeProject { p ->
     }
 }
 
+def buildEnv = new BuildEnvironment(providers)
+
 buildCache {
     local {
         enabled = false
     }
     remote(HttpBuildCache) {
-        push = true
+        push = buildEnv.isGithubAction().getOrElse(false)
         enabled = true
         url = 'https://ge.micronaut.io/cache/'
     }
@@ -91,6 +95,6 @@ buildCache {
 
 gradleEnterprise {
     buildScan {
-        tag "exp4"
+        tag "exp5"
     }
 }
