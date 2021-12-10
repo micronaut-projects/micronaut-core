@@ -32,7 +32,6 @@ import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
-import io.micronaut.http.server.CoroutineHelper;
 import io.micronaut.http.server.netty.NettyEmbeddedServices;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.RouteExecutor;
@@ -68,7 +67,6 @@ import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -126,7 +124,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
 
     private boolean isWebSocketUpgrade(@NonNull NettyHttpRequest<?> request) {
         HttpHeaders headers = request.getNativeRequest().headers();
-        if (headers.contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.UPGRADE, true)) {
+        if (headers.containsValue(HttpHeaderNames.CONNECTION, HttpHeaderValues.UPGRADE, true)) {
             return headers.containsValue(HttpHeaderNames.UPGRADE, WEB_SOCKET_HEADER_VALUE, true);
         }
         return false;
