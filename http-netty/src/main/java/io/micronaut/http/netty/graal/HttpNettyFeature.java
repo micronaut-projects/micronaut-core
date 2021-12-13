@@ -71,8 +71,13 @@ public class HttpNettyFeature implements Feature {
                 "io.netty.util.internal.logging.Slf4JLoggerFactory",
                 "io.netty.util.internal.logging.LocationAwareSlf4JLogger"
         );
+
         // force netty to use slf4j logging
-        InternalLoggerFactory.setDefaultFactory(Slf4JLoggerFactory.INSTANCE);
+        try {
+            InternalLoggerFactory.setDefaultFactory(Slf4JLoggerFactory.INSTANCE);
+        } catch (Throwable e) {
+            // can fail if no-op logger is on the classpath
+        }
 
         registerClasses(access,
                 "io.netty.channel.kqueue.KQueueChannelOption", "io.netty.channel.epoll.EpollChannelOption");
