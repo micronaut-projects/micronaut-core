@@ -305,6 +305,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                                 routeAdded = true;
                             }
                         }
+                        // acceptList is sorted, so this match was the type with the highest precedence.
                         break;
                     }
                 }
@@ -312,7 +313,6 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         }
         return bestMatches;
     }
-
 
     @NonNull
     @Override
