@@ -1,31 +1,39 @@
 package io.micronaut.kotlin.processing.visitor
 
-import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSTypeParameter
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.inject.ast.ArrayableClassElement
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.GenericPlaceholderElement
 import java.util.*
 
 class KotlinGenericPlaceholderElement(
-    classType: KSType,
+    classType: KSTypeParameter,
     annotationMetadata: AnnotationMetadata,
     visitorContext: KotlinVisitorContext,
     arrayDimensions: Int = 0
-) : KotlinClassElement(classType, annotationMetadata, visitorContext, arrayDimensions), GenericPlaceholderElement {
+) : AbstractKotlinElement<KSTypeParameter>(classType, annotationMetadata, visitorContext), ArrayableClassElement, GenericPlaceholderElement {
+
+    override fun getName(): String = variableName
+
+    override fun isAssignable(type: String?): Boolean = false
+
+    override fun withArrayDimensions(arrayDimensions: Int): ClassElement {
+        return KotlinGenericPlaceholderElement(declaration, annotationMetadata, visitorContext, arrayDimensions)
+    }
 
     override fun getBounds(): MutableList<out ClassElement> {
         val annotationUtils = visitorContext.getAnnotationUtils()
         val elementFactory = visitorContext.elementFactory
-        return (classDeclaration as KSTypeParameter).bounds.map {
+        return declaration.bounds.map {
             val argumentType = it.resolve()
             elementFactory.newClassElement(argumentType, annotationUtils.getAnnotationMetadata(argumentType.declaration))
         }.toMutableList()
     }
 
     override fun getVariableName(): String {
-        return (classDeclaration as KSTypeParameter).name.asString()
+        return declaration.name.asString()
     }
 
     override fun getDeclaringElement(): Optional<Element> {

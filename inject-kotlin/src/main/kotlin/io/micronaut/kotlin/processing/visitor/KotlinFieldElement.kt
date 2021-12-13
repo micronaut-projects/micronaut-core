@@ -11,10 +11,10 @@ class KotlinFieldElement(declaration: KSPropertyDeclaration,
                          private val declaringType: ClassElement,
                          annotationMetadata: AnnotationMetadata,
                          visitorContext: KotlinVisitorContext
-) : AbstractKotlinElement(declaration, annotationMetadata, visitorContext), FieldElement {
+) : AbstractKotlinElement<KSPropertyDeclaration>(declaration, annotationMetadata, visitorContext), FieldElement {
 
     override fun getName(): String {
-        return (declaration as KSPropertyDeclaration).simpleName.asString()
+        return declaration.simpleName.asString()
     }
 
     override fun getType(): ClassElement {

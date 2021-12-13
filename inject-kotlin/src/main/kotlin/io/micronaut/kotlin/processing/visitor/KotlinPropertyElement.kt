@@ -1,10 +1,8 @@
 package io.micronaut.kotlin.processing.visitor
 
-import com.google.devtools.ksp.KspExperimental
-import com.google.devtools.ksp.isPrivate
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.google.devtools.ksp.symbol.KSNode
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
-import com.google.devtools.ksp.symbol.Modifier
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.ast.ClassElement
@@ -12,7 +10,7 @@ import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PropertyElement
 import java.util.*
 
-class KotlinPropertyElement: AbstractKotlinElement, PropertyElement {
+class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
 
     private val name: String
     private val classElement: ClassElement

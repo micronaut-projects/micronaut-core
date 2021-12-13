@@ -10,7 +10,7 @@ class KotlinParameterElement(
     private val parameter: KSValueParameter,
     annotationMetadata: AnnotationMetadata,
     visitorContext: KotlinVisitorContext
-) : AbstractKotlinElement(parameter, annotationMetadata, visitorContext), ParameterElement {
+) : AbstractKotlinElement<KSValueParameter>(parameter, annotationMetadata, visitorContext), ParameterElement {
 
     override fun getName(): String {
         return parameter.name!!.asString()
