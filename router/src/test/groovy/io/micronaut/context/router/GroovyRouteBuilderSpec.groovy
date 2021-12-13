@@ -226,6 +226,27 @@ class GroovyRouteBuilderSpec extends Specification {
         'text/*;q=0.5, */*'        | ['image/svg', 'application/json']
     }
 
+    def 'content negotiation on accept header: wildcard'() {
+        given:
+        def context = new DefaultApplicationContext("test").start()
+        Router router = context.getBean(Router)
+
+        def request = HttpRequest.GET('/accept/wildcard').header('Accept', accept)
+
+        expect:
+        router.findAllClosest(request).collectMany { it.produces }.collect { it.toString() }.toSet() == produced.toSet()
+
+        cleanup:
+        context.stop()
+
+        where:
+        accept             | produced
+        'application/json' | ['application/json', '*/*']
+        'application/xml'  | ['application/xml']
+        'application/*'    | ['application/json', '*/*', 'application/xml']
+        '*/*'              | ['application/json', '*/*']
+    }
+
     @Controller('/accept')
     @Executable
     static class AcceptController {
@@ -240,6 +261,12 @@ class GroovyRouteBuilderSpec extends Specification {
 
         @Get(produces = 'image/svg')
         def svg() {}
+
+        @Get(value = '/wildcard', produces = ['application/json', '*/*'])
+        def wildcardProducesJson() {}
+
+        @Get(value = '/wildcard', produces = ['application/xml'])
+        def wildcardProducesXml() {}
     }
 
 }

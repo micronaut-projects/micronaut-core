@@ -274,6 +274,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
         double minReturnedQuality = 0;
         MediaType minAcceptPrecedence = MediaType.ALL_TYPE;
+        MediaType maxProducePrecedence = null;
         List<M> bestMatches = new ArrayList<>();
         // for each route...
         for (M route : candidates) {
@@ -281,24 +282,44 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
             // ... for each type the route can produce...
             for (MediaType produceType : route.getProduces()) {
+                int producePrecedenceCmp = maxProducePrecedence == null ? 1 : MediaType.PRECEDENCE_COMPARATOR.compare(produceType, maxProducePrecedence);
 
                 // ... find the most specific match in the `Accept` header
                 for (MediaType acceptType : acceptList) {
                     if (acceptType.matches(produceType)) {
-                        // compare precedence with previous matches. <0 means higher precedence, >0 means lower
+                        // compare accept precedence with previous matches. <0 means higher precedence, >0 means lower
                         // precedence
-                        int precedenceCmp = MediaType.PRECEDENCE_COMPARATOR.compare(acceptType, minAcceptPrecedence);
+                        int acceptPrecedenceCmp = MediaType.PRECEDENCE_COMPARATOR.compare(acceptType, minAcceptPrecedence);
                         // find the quality specified in the `Accept`
                         double quality = acceptType.getQualityAsNumber().doubleValue();
-                        // if this match has better quality or higher precedence with the same quality, compared to
-                        // previous matches, this match is better. This raises the bar for future matches
-                        if (quality > minReturnedQuality || (quality == minReturnedQuality && precedenceCmp < 0)) {
+
+                        // is this match strictly better than previous matches?
+                        boolean better = false;
+                        if (quality >= minReturnedQuality) {
+                            // higher explicit quality always wins
+                            if (quality > minReturnedQuality) {
+                                better = true;
+                            } else if (acceptPrecedenceCmp <= 0) {
+                                // next, try to match more specific accept headers, i.e. `Accept: text/html, text/*`
+                                // should try to match text/html first
+                                if (acceptPrecedenceCmp < 0) {
+                                    better = true;
+                                } else if (producePrecedenceCmp > 0) {
+                                    // finally, try to select the controller with the most generic `produces`: For
+                                    // `Accept: */*`, the controller with `produces = */*` should match over
+                                    // `produces = text/html`.
+                                    better = true;
+                                }
+                            }
+                        }
+                        if (better) {
                             minReturnedQuality = quality;
                             minAcceptPrecedence = acceptType;
+                            maxProducePrecedence = produceType;
                             bestMatches.clear();
                             bestMatches.add(route);
                             routeAdded = true;
-                        } else if (quality == minReturnedQuality && precedenceCmp == 0) {
+                        } else if (quality == minReturnedQuality && acceptPrecedenceCmp == 0 && producePrecedenceCmp == 0) {
                             // if it's a similar match, add it to the candidates
                             if (!routeAdded) {
                                 bestMatches.add(route);
