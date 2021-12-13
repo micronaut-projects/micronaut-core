@@ -204,19 +204,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             return uriRoutes;
         }
 
-        if (CollectionUtils.isNotEmpty(acceptedProducedTypes)) {
-            // take the highest priority accepted type
-            final MediaType mediaType = acceptedProducedTypes.iterator().next();
-            List<UriRouteMatch<T, R>> mostSpecific = new ArrayList<>(uriRoutes.size());
-            for (UriRouteMatch<T, R> routeMatch : uriRoutes) {
-                if (routeMatch.explicitlyProduces(mediaType)) {
-                    mostSpecific.add(routeMatch);
-                }
-            }
-            if (!mostSpecific.isEmpty() || !acceptedProducedTypes.contains(MediaType.ALL_TYPE)) {
-                uriRoutes = mostSpecific;
-            }
-        }
+        uriRoutes = contentNegotiate(request, uriRoutes);
         routeCount = uriRoutes.size();
         if (routeCount > 1 && permitsBody) {
 
@@ -264,6 +252,67 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
         return uriRoutes;
     }
+
+    /**
+     * Perform <a href='https://developer.mozilla.org/en-US/docs/Web/HTTP/Content_negotiation'>content negotiation</a>
+     * based on the {@code Accept} headers we support.
+     *
+     * @param request    The request
+     * @param candidates The route candidates that could match the request
+     * @return The subset of candidates that are the "best match" for the request.
+     */
+    private static <M extends UriRouteMatch<?, ?>> List<M> contentNegotiate(HttpRequest<?> request, List<M> candidates) {
+        Collection<MediaType> acceptCollection = request.accept();
+        if (acceptCollection.isEmpty()) {
+            return candidates;
+        }
+        // "The media type quality factor associated with a given type is determined by finding the media range
+        // with the highest precedence that matches the type."
+        // sort the `Accept` header by precedence.
+        List<MediaType> acceptList = new ArrayList<>(acceptCollection);
+        acceptList.sort(MediaType.PRECEDENCE_COMPARATOR);
+
+        double minReturnedQuality = 0;
+        MediaType minAcceptPrecedence = MediaType.ALL_TYPE;
+        List<M> bestMatches = new ArrayList<>();
+        // for each route...
+        for (M route : candidates) {
+            boolean routeAdded = false; // whether this route is in `bestMatches`
+
+            // ... for each type the route can produce...
+            for (MediaType produceType : route.getProduces()) {
+
+                // ... find the most specific match in the `Accept` header
+                for (MediaType acceptType : acceptList) {
+                    if (acceptType.matches(produceType)) {
+                        // compare precedence with previous matches. <0 means higher precedence, >0 means lower
+                        // precedence
+                        int precedenceCmp = MediaType.PRECEDENCE_COMPARATOR.compare(acceptType, minAcceptPrecedence);
+                        // find the quality specified in the `Accept`
+                        double quality = acceptType.getQualityAsNumber().doubleValue();
+                        // if this match has better quality or higher precedence with the same quality, compared to
+                        // previous matches, this match is better. This raises the bar for future matches
+                        if (quality > minReturnedQuality || (quality == minReturnedQuality && precedenceCmp < 0)) {
+                            minReturnedQuality = quality;
+                            minAcceptPrecedence = acceptType;
+                            bestMatches.clear();
+                            bestMatches.add(route);
+                            routeAdded = true;
+                        } else if (quality == minReturnedQuality && precedenceCmp == 0) {
+                            // if it's a similar match, add it to the candidates
+                            if (!routeAdded) {
+                                bestMatches.add(route);
+                                routeAdded = true;
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        return bestMatches;
+    }
+
 
     @NonNull
     @Override

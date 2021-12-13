@@ -336,16 +336,29 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
     @Override
     public boolean doesProduce(@Nullable MediaType acceptableType) {
-        return abstractRoute.producesMediaTypesContainsAll || acceptableType == null || acceptableType.equals(MediaType.ALL_TYPE) || producedMediaTypes.contains(acceptableType);
+        if (acceptableType == null || acceptableType.equals(MediaType.ALL_TYPE) || producedMediaTypes.contains(acceptableType)) {
+            return true;
+        }
+        for (MediaType producedType : producedMediaTypes) {
+            if (acceptableType.matches(producedType)) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    private boolean anyMediaTypesMatch(List<MediaType> producedMediaTypes, Collection<MediaType> acceptableTypes) {
+    private static boolean anyMediaTypesMatch(List<MediaType> producedMediaTypes, Collection<MediaType> acceptableTypes) {
         if (CollectionUtils.isEmpty(acceptableTypes)) {
             return true;
         }
         for (MediaType acceptableType : acceptableTypes) {
             if (acceptableType.equals(MediaType.ALL_TYPE) || producedMediaTypes.contains(acceptableType)) {
                 return true;
+            }
+            for (MediaType producedType : producedMediaTypes) {
+                if (acceptableType.matches(producedType)) {
+                    return true;
+                }
             }
         }
         return false;

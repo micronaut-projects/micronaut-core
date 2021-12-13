@@ -370,6 +370,13 @@ public class MediaType implements CharSequence {
      */
     public static final String V_PARAMETER = "v";
 
+    /**
+     * Comparator that sorts media types by their match precedence, highest precedence first. For example,
+     * {@code text/*} has higher precedence that {@code *}{@code /*}, but {@code text/plain} has higher precedence than
+     * either.
+     */
+    public static final Comparator<MediaType> PRECEDENCE_COMPARATOR = Comparator.comparing((MediaType mt) -> -mt.matchWeight);
+
     @Internal
     static final Argument<MediaType> ARGUMENT = Argument.of(MediaType.class);
 
@@ -389,7 +396,9 @@ public class MediaType implements CharSequence {
     protected final String type;
     protected final String extension;
     protected final Map<CharSequence, String> parameters;
+    private final Map<String, String> paramsWithoutQuality;
     private final String strRepr;
+    private final int matchWeight;
 
     private BigDecimal qualityNumberField = BigDecimal.ONE;
 
@@ -448,13 +457,13 @@ public class MediaType implements CharSequence {
         if (name == null) {
             throw new IllegalArgumentException("Argument [name] cannot be null");
         }
+        Map<String, String> computedParams = null;
         name = name.trim();
         String withoutArgs;
         Iterator<String> splitIt = StringUtils.splitOmitEmptyStringsIterator(name, SEMICOLON);
         if (splitIt.hasNext()) {
             withoutArgs = splitIt.next();
             if (splitIt.hasNext()) {
-                Map<CharSequence, String> parameters = null;
                 while (splitIt.hasNext()) {
                     String paramExpression = splitIt.next();
                     int i = paramExpression.indexOf('=');
@@ -464,29 +473,33 @@ public class MediaType implements CharSequence {
                         if ("q".equals(paramName)) {
                             qualityNumberField = new BigDecimal(paramValue);
                         }
-                        if (parameters == null) {
-                            parameters = new LinkedHashMap<>();
+                        if (computedParams == null) {
+                            computedParams = new LinkedHashMap<>();
                         }
-                        parameters.put(paramName, paramValue);
+                        computedParams.put(paramName, paramValue);
                     }
                 }
-                if (parameters == null) {
-                    parameters = Collections.emptyMap();
-                }
-                this.parameters = parameters;
-            } else if (params == null) {
-                this.parameters = Collections.emptyMap();
-            } else {
-                this.parameters = (Map) params;
             }
         } else {
-            if (params == null) {
-                this.parameters = Collections.emptyMap();
-            } else {
-                this.parameters = (Map) params;
-            }
             withoutArgs = name;
         }
+        if (computedParams == null) {
+            computedParams = params;
+            if (computedParams == null) {
+                computedParams = Collections.emptyMap();
+            }
+        }
+        // compat :( can't change type of parameters field.
+        //noinspection unchecked,rawtypes
+        this.parameters = (Map) computedParams;
+
+        if (computedParams.containsKey("q")) {
+            paramsWithoutQuality = new LinkedHashMap<>(computedParams);
+            paramsWithoutQuality.remove("q");
+        } else {
+            paramsWithoutQuality = computedParams;
+        }
+
         this.name = withoutArgs;
         int i = withoutArgs.indexOf('/');
         if (i > -1) {
@@ -507,6 +520,19 @@ public class MediaType implements CharSequence {
             }
         }
         this.strRepr = toString0();
+
+        boolean anyType = this.type.equals("*");
+        boolean anySubtype = this.subtype.equals("*");
+        boolean anyParams = paramsWithoutQuality.isEmpty();
+        if (anyType) {
+            matchWeight = 1;
+        } else if (anySubtype) {
+            matchWeight = 2;
+        } else if (anyParams) {
+            matchWeight = 3;
+        } else {
+            matchWeight = 4;
+        }
     }
 
     /**
@@ -586,11 +612,10 @@ public class MediaType implements CharSequence {
         if (expectedContentType == this) {
             return true;
         }
-        String expectedType = expectedContentType.getType();
-        String expectedSubtype = expectedContentType.getSubtype();
-        boolean typeMatch = type.equals("*") || type.equalsIgnoreCase(expectedType);
-        boolean subtypeMatch = subtype.equals("*") || subtype.equalsIgnoreCase(expectedSubtype);
-        return typeMatch && subtypeMatch;
+        boolean typeMatch = type.equals("*") || type.equalsIgnoreCase(expectedContentType.getType());
+        boolean subtypeMatch = subtype.equals("*") || subtype.equalsIgnoreCase(expectedContentType.getSubtype());
+        boolean paramsMatch = paramsWithoutQuality.isEmpty() || paramsWithoutQuality.equals(expectedContentType.paramsWithoutQuality);
+        return typeMatch && subtypeMatch && paramsMatch;
     }
 
     /**
