@@ -148,7 +148,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @SuppressWarnings("MagicNumber")
-public class DefaultBeanContext implements IntrospectableBeanContext {
+public class DefaultBeanContext implements InitializableBeanContext {
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");

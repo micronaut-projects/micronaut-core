@@ -25,7 +25,7 @@ import io.micronaut.core.annotation.Internal;
  * @since 3.2.2
  */
 @Internal
-public interface IntrospectableBeanContext extends BeanContext {
+public interface InitializableBeanContext extends BeanContext {
     /**
      * Performs operations required before starting the application
      * context, such as reading bean configurations.
