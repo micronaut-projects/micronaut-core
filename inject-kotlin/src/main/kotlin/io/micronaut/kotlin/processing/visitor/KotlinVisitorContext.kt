@@ -159,7 +159,7 @@ class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment,
 
     private fun printMessage(message: String, logger: BiConsumer<String, KSNode?>, element: Element?) {
         if (StringUtils.isNotEmpty(message)) {
-            if (element is AbstractKotlinElement) {
+            if (element is AbstractKotlinElement<*>) {
                 val el = element.nativeType
                 logger.accept(message, el)
             } else {

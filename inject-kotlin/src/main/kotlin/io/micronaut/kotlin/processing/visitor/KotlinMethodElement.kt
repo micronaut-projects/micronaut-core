@@ -10,7 +10,7 @@ import io.micronaut.inject.ast.ParameterElement
 import io.micronaut.inject.ast.PrimitiveElement
 
 @OptIn(KspExperimental::class)
-open class KotlinMethodElement: AbstractKotlinElement, MethodElement {
+open class KotlinMethodElement: AbstractKotlinElement<KSNode>, MethodElement {
 
     private val name: String
     private val declaringType: ClassElement

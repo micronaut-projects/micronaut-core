@@ -1,7 +1,10 @@
 package io.micronaut.kotlin.processing.elementapi
 
+import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
+import io.micronaut.core.beans.BeanMethod
+import io.micronaut.inject.ExecutableMethod
 import spock.lang.Specification
 
 class BeanIntrospectionSpec extends Specification {
@@ -170,5 +173,74 @@ class Test @com.fasterxml.jackson.annotation.JsonCreator constructor(private val
         !constructor.getAnnotationMetadata().hasStereotype(Introspected)
         constructor.arguments.length == 1
         constructor.arguments[0].type == String
+    }
+
+    void "test generate bean method for introspected class"() {
+        given:
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.MethodTest', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.context.annotation.Executable
+
+@Introspected
+class MethodTest : SuperType(), SomeInt {
+
+    fun nonAnnotated() = true
+
+    @Executable
+    override fun invokeMe(str: String): String {
+        return str
+    }
+    
+    @Executable
+    fun invokePrim(i: Integer): Integer {
+        return i
+    }
+}
+
+open class SuperType {
+
+    @Executable
+    fun superMethod(str: String): String {
+        return str
+    }
+    
+    @Executable
+    open fun invokeMe(str: String): String {
+        return str
+    }
+}
+
+interface SomeInt {
+
+    @Executable
+    fun ok() = true
+    
+    fun getName() = "ok"
+}
+''')
+        when:
+        def properties = introspection.getBeanProperties()
+        Collection<BeanMethod> beanMethods = introspection.getBeanMethods()
+
+        then:
+        properties.size() == 1
+        beanMethods*.name as Set == ['invokeMe', 'invokePrim', 'superMethod', 'ok'] as Set
+        beanMethods.every({it.annotationMetadata.hasAnnotation(Executable)})
+        beanMethods.every { it.declaringBean == introspection}
+
+        when:
+
+        def invokeMe = beanMethods.find { it.name == 'invokeMe' }
+        def invokePrim = beanMethods.find { it.name == 'invokePrim' }
+        def itfeMethod = beanMethods.find { it.name == 'ok' }
+        def bean = introspection.instantiate()
+
+        then:
+        invokeMe instanceof ExecutableMethod
+        invokeMe.invoke(bean, "test") == 'test'
+        invokePrim.invoke(bean, 10) == 10
+        itfeMethod.invoke(bean) == true
     }
 }

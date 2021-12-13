@@ -26,7 +26,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
             val componentElement = newClassElement(component, annotationMetadata)
             return componentElement.toArray()
         } else if (declaration is KSTypeParameter) {
-            return KotlinGenericPlaceholderElement(type, annotationMetadata, visitorContext)
+            return KotlinGenericPlaceholderElement(type as KSTypeParameter, annotationMetadata, visitorContext)
         }
         return KotlinClassElement(type, annotationMetadata, visitorContext)
     }
@@ -71,7 +71,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
             declaringClass,
             newClassElement(returnType, annotationUtils.getAnnotationMetadata(returnType.declaration), declaringClass.typeArguments),
             method.parameters.map { param ->
-                KotlinParameterElement(declaringClass, param, annotationUtils.getAnnotationMetadata(param), visitorContext)
+                KotlinParameterElement(newClassElement(param.type.resolve()), param, annotationUtils.getAnnotationMetadata(param), visitorContext)
             },
             annotationMetadata,
             visitorContext)
