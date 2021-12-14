@@ -3331,7 +3331,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             final boolean hasAroundConstruct;
             final AnnotationValue<Annotation> interceptorBindings
                     = annotationMetadata.getAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
-            final List<AnnotationValue<Annotation>> interceptorBindingAnnotations;
+            List<AnnotationValue<Annotation>> interceptorBindingAnnotations;
             if (interceptorBindings != null) {
                 interceptorBindingAnnotations = interceptorBindings.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
                 hasAroundConstruct = interceptorBindingAnnotations
@@ -3345,6 +3345,17 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             if (isConstructorInterceptionCandidate) {
                 return hasAroundConstruct;
             } else if (hasAroundConstruct) {
+                AnnotationMetadata typeMetadata = annotationMetadata;
+                if (typeMetadata instanceof AnnotationMetadataHierarchy) {
+                    typeMetadata = ((AnnotationMetadataHierarchy) typeMetadata).getRootMetadata();
+                    final AnnotationValue<Annotation> av =
+                            typeMetadata.getAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
+                    if (av != null) {
+                        interceptorBindingAnnotations = av.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
+                    } else {
+                        interceptorBindingAnnotations = Collections.emptyList();
+                    }
+                }
                 // if no other AOP advice is applied
                 return interceptorBindingAnnotations
                         .stream()

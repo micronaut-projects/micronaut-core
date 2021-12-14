@@ -277,6 +277,67 @@ class AnotherInterceptor implements Interceptor {
 
     }
 
+    void 'test around construct declared on constructor only'() {
+        given:
+        ApplicationContext context = buildContext("""
+package annbinding1;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import jakarta.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Singleton
+class MyBean {
+    @TestAnn
+    MyBean(io.micronaut.context.env.Environment env) {}
+    
+    void test() {
+    }
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.CONSTRUCTOR})
+@AroundConstruct
+@Around
+@interface TestAnn {
+}
+
+@Singleton
+@InterceptorBean(TestAnn.class)
+class TestConstructInterceptor implements ConstructorInterceptor<Object> {
+    boolean invoked = false;
+    Object[] parameters;
+    
+    @Override
+    public Object intercept(ConstructorInvocationContext<Object> context) {
+        invoked = true;
+        parameters = context.getParameterValues();
+        return context.proceed();
+    }
+} 
+
+""")
+        when:
+        def constructorInterceptor = getBean(context, 'annbinding1.TestConstructInterceptor')
+
+        then:
+        !constructorInterceptor.invoked
+
+        when:"A bean that features constructor injection is instantiated"
+        def instance = getBean(context, 'annbinding1.MyBean')
+
+        then:"The constructor interceptor is invoked"
+        !(instance instanceof Intercepted)
+        constructorInterceptor.invoked
+        constructorInterceptor.parameters.size() == 1
+
+
+        cleanup:
+        context.close()
+
+    }
+
     void 'test around construct without around interception - interceptors from factory'() {
         given:
         ApplicationContext context = buildContext("""
