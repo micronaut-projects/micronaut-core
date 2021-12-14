@@ -20,6 +20,64 @@ import java.lang.annotation.Annotation
 
 class AroundCompileSpec extends AbstractTypeElementSpec {
 
+    void 'test stereotype method level interceptor matching'() {
+        given:
+        ApplicationContext context = buildContext('''
+package annbinding2;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import jakarta.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import io.micronaut.aop.simple.*;
+
+@Singleton
+class MyBean {
+    @TestAnn2
+    void test() {
+        
+    }
+    
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Around
+@interface TestAnn {
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@TestAnn
+@interface TestAnn2 {
+}
+
+@InterceptorBean(TestAnn.class)
+class TestInterceptor implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+} 
+
+''')
+        def instance = getBean(context, 'annbinding2.MyBean')
+        def interceptor = getBean(context, 'annbinding2.TestInterceptor')
+
+        when:
+        instance.test()
+
+        then:"the interceptor was invoked"
+        instance instanceof Intercepted
+        interceptor.invoked
+
+
+        cleanup:
+        context.close()
+    }
+
     void 'test apply interceptor binder with annotation mapper'() {
         given:
         ApplicationContext context = buildContext('''

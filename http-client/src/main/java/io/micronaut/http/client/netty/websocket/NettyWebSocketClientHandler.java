@@ -46,6 +46,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.ssl.SslHandler;
@@ -107,6 +108,8 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
         String clientPath = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class).orElse("");
         UriMatchTemplate matchTemplate = UriMatchTemplate.of(clientPath);
         this.matchInfo = matchTemplate.match(request.getPath()).orElse(null);
+
+        callOpenMethod(null);
     }
 
     @Override
@@ -160,9 +163,9 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                 try {
                     emitter.error(new WebSocketClientException("Error finishing WebSocket handshake: " + e.getMessage(), e));
                 } finally {
-                    if (getSession().isOpen()) {
-                        getSession().close(CloseReason.INTERNAL_ERROR);
-                    }
+                    // clientSession isn't set yet, so we do the close manually instead of through session.close
+                    ch.writeAndFlush(new CloseWebSocketFrame(CloseReason.INTERNAL_ERROR.getCode(), CloseReason.INTERNAL_ERROR.getReason()));
+                    ch.close();
                 }
                 return;
             }

@@ -352,28 +352,24 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             }
         } else if (returnType instanceof TypeVariable) {
             TypeVariable tv = (TypeVariable) returnType;
-            TypeMirror upperBound = tv.getUpperBound();
-            Map<String, TypeMirror> boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
-
-            TypeMirror bound = boundGenerics.get(tv.toString());
-            if (bound != null && bound != tv) {
-                return mirrorToClassElement(bound, visitorContext, genericsInfo, includeTypeAnnotations, true);
-            } else {
-                // type variable is still free.
-                List<? extends TypeMirror> boundsUnresolved = upperBound instanceof IntersectionType ?
-                        ((IntersectionType) upperBound).getBounds() :
-                        Collections.singletonList(upperBound);
-                Map<String, Map<String, TypeMirror>> finalGenericsInfo = genericsInfo;
-                List<JavaClassElement> bounds = boundsUnresolved.stream()
-                        .map(tm -> (JavaClassElement) mirrorToClassElement(tm, visitorContext, finalGenericsInfo, includeTypeAnnotations))
-                        .collect(Collectors.toList());
-                return new JavaGenericPlaceholderElement(tv, bounds, 0);
-            }
+            return resolveTypeVariable(
+                    visitorContext,
+                    genericsInfo,
+                    includeTypeAnnotations,
+                    tv,
+                    tv
+            );
 
         } else if (returnType instanceof ArrayType) {
             ArrayType at = (ArrayType) returnType;
             TypeMirror componentType = at.getComponentType();
-            ClassElement arrayType = mirrorToClassElement(componentType, visitorContext, genericsInfo, includeTypeAnnotations);
+            ClassElement arrayType;
+            if (componentType instanceof TypeVariable && componentType.getKind() == TypeKind.TYPEVAR) {
+                TypeVariable tv = (TypeVariable) componentType;
+                arrayType = resolveTypeVariable(visitorContext, genericsInfo, includeTypeAnnotations, tv, at);
+            } else {
+                arrayType = mirrorToClassElement(componentType, visitorContext, genericsInfo, includeTypeAnnotations);
+            }
             return arrayType.toArray();
         } else if (returnType instanceof PrimitiveType) {
             PrimitiveType pt = (PrimitiveType) returnType;
@@ -409,6 +405,32 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             );
         }
         return PrimitiveElement.VOID;
+    }
+
+    private ClassElement resolveTypeVariable(JavaVisitorContext visitorContext,
+                                         Map<String, Map<String, TypeMirror>> genericsInfo,
+                                         boolean includeTypeAnnotations,
+                                         TypeVariable tv,
+                                         TypeMirror declaration) {
+        TypeMirror upperBound = tv.getUpperBound();
+        Map<String, TypeMirror> boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
+
+        TypeMirror bound = boundGenerics.get(tv.toString());
+        if (bound != null && bound != declaration) {
+            return mirrorToClassElement(bound, visitorContext, genericsInfo, includeTypeAnnotations, true);
+        } else {
+            // type variable is still free.
+            List<? extends TypeMirror> boundsUnresolved = upperBound instanceof IntersectionType ?
+                    ((IntersectionType) upperBound).getBounds() :
+                    Collections.singletonList(upperBound);
+            List<JavaClassElement> bounds = boundsUnresolved.stream()
+                    .map(tm -> (JavaClassElement) mirrorToClassElement(tm,
+                                                                       visitorContext,
+                                                                       genericsInfo,
+                                                                       includeTypeAnnotations))
+                    .collect(Collectors.toList());
+            return new JavaGenericPlaceholderElement(tv, bounds, 0);
+        }
     }
 
     private Map<String, TypeMirror> resolveBoundGenerics(JavaVisitorContext visitorContext, Map<String, Map<String, TypeMirror>> genericsInfo) {

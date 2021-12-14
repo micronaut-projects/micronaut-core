@@ -36,7 +36,7 @@ dependencies {
     }
 }
 
-//tasks.withType(Test) {
+//tasks.withType(Test).configureEach {
 //    jvmArgs('-Dio.netty.leakDetection.level=paranoid')
 //    testLogging {
 //        showStandardStreams = true

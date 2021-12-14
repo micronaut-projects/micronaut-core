@@ -148,7 +148,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @SuppressWarnings("MagicNumber")
-public class DefaultBeanContext implements BeanContext {
+public class DefaultBeanContext implements InitializableBeanContext {
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
@@ -326,8 +326,7 @@ public class DefaultBeanContext implements BeanContext {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Starting BeanContext");
                 }
-                readAllBeanConfigurations();
-                readAllBeanDefinitionClasses();
+                finalizeConfiguration();
                 if (LOG.isDebugEnabled()) {
                     String activeConfigurations = beanConfigurations
                             .values()
@@ -3716,7 +3715,7 @@ public class DefaultBeanContext implements BeanContext {
                 }
             } else {
                 try (BeanResolutionContext context = newResolutionContext(candidate, resolutionContext)) {
-                    bean = getScopedBeanForDefinition(context, beanType, qualifier, true, candidate);
+                    bean = getScopedBeanForDefinition(context, candidate.asArgument(), qualifier, true, candidate);
                 }
             }
         } catch (DisabledBeanException e) {
@@ -3876,6 +3875,12 @@ public class DefaultBeanContext implements BeanContext {
             return Optional.of((T) o);
         }
         return Optional.empty();
+    }
+
+    @Override
+    public void finalizeConfiguration() {
+        readAllBeanConfigurations();
+        readAllBeanDefinitionClasses();
     }
 
     /**

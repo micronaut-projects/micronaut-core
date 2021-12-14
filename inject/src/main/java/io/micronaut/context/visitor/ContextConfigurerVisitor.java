@@ -63,7 +63,9 @@ public class ContextConfigurerVisitor implements TypeElementVisitor<ContextConfi
                 .stream()
                 .filter(e -> e.getParameters().length > 0)
                 .findAny()
-                .ifPresent(e -> { throw typeShouldNotHaveConstructorsWithArgs(element.getName()); });
+                .ifPresent(e -> {
+                    throw typeShouldNotHaveConstructorsWithArgs(element.getName());
+                });
     }
 
     @NotNull

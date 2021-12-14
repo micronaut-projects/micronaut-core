@@ -9,9 +9,7 @@ dependencies {
     api project(":context")
 }
 
-afterEvaluate {
-    sourcesJar {
-        from "$projectDir/src/main/groovy"
-        duplicatesStrategy(DuplicatesStrategy.EXCLUDE)
-    }
+tasks.named("sourcesJar") {
+    from "$projectDir/src/main/groovy"
+    duplicatesStrategy(DuplicatesStrategy.EXCLUDE)
 }

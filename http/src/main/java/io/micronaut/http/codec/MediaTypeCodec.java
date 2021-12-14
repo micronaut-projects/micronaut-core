@@ -83,7 +83,6 @@ public interface MediaTypeCodec {
      */
     <T, B> ByteBuffer<B> encode(T object, ByteBufferFactory<?, B> allocator) throws CodecException;
 
-
     /**
      * Encode the given type to the given {@link OutputStream}.
      *
