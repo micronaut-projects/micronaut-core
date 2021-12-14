@@ -47,7 +47,6 @@ public class HttpNettyFeature implements Feature {
     @Override
     public void beforeAnalysis(BeforeAnalysisAccess access) {
         RuntimeClassInitialization.initializeAtRunTime(
-                "io.netty",
                 "io.micronaut.http.server.netty.ServerAttributeKeys",
                 "io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler",
                 "io.micronaut.session.http.SessionLogElement",
@@ -64,64 +63,6 @@ public class HttpNettyFeature implements Feature {
                 ContinuationArgumentBinder.class,
                 ContinuationArgumentBinder.Companion.class
         );
-        RuntimeClassInitialization.initializeAtBuildTime("io.netty.util.internal.shaded.org.jctools");
-
-        RuntimeClassInitialization.initializeAtBuildTime(
-                "io.netty.util.internal.logging.InternalLoggerFactory",
-                "io.netty.util.internal.logging.Slf4JLoggerFactory",
-                "io.netty.util.internal.logging.LocationAwareSlf4JLogger"
-        );
-
-        // force netty to use slf4j logging
-        try {
-            InternalLoggerFactory.setDefaultFactory(Slf4JLoggerFactory.INSTANCE);
-        } catch (Throwable e) {
-            // can fail if no-op logger is on the classpath
-        }
-
-        registerClasses(access,
-                "io.netty.channel.kqueue.KQueueChannelOption", "io.netty.channel.epoll.EpollChannelOption");
-
-        registerMethods(access, "io.netty.buffer.AbstractByteBufAllocator", "toLeakAwareBuffer");
-        registerMethods(access, "io.netty.buffer.AdvancedLeakAwareByteBuf", "touch", "recordLeakNonRefCountingOperation");
-        registerMethods(access, "io.netty.util.ReferenceCountUtil", "touch");
-
-        System.setProperty("io.netty.tryReflectionSetAccessible", "true");
-        ImageSingletons.lookup(SystemPropertiesSupport.class).initializeProperty("io.netty.tryReflectionSetAccessible", "true");
-        try {
-            RuntimeReflection.register(access.findClassByName("java.nio.DirectByteBuffer").getDeclaredConstructor(long.class, int.class));
-        } catch (NoSuchMethodException e) {
-            throw new RuntimeException(e);
-        }
-        Class<?> unsafeOld = access.findClassByName("sun.misc.Unsafe");
-        if (unsafeOld != null) {
-            try {
-                RuntimeReflection.register(unsafeOld.getDeclaredMethod("allocateUninitializedArray", Class.class, int.class));
-            } catch (NoSuchMethodException ignored) {
-            }
-        }
-        Class<?> unsafeNew = access.findClassByName("jdk.internal.misc.Unsafe");
-        if (unsafeNew != null) {
-            try {
-                RuntimeReflection.register(unsafeNew.getDeclaredMethod("allocateUninitializedArray", Class.class, int.class));
-            } catch (NoSuchMethodException ignored) {
-            }
-        }
-    }
-
-    private void registerClasses(BeforeAnalysisAccess access, String... classes) {
-        for (String clazz : classes) {
-            AutomaticFeatureUtils.registerClassForRuntimeReflection(access, clazz);
-            AutomaticFeatureUtils.registerFieldsForRuntimeReflection(access, clazz);
-        }
-    }
-
-    private void registerMethods(BeforeAnalysisAccess access, String clz, String... methods) {
-        for (Method declaredMethod : access.findClassByName(clz).getDeclaredMethods()) {
-            if (Arrays.asList(methods).contains(declaredMethod.getName())) {
-                RuntimeReflection.register(declaredMethod);
-            }
-        }
     }
 
 }

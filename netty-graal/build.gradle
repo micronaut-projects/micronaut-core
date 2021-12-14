@@ -1,0 +1,5 @@
+dependencies {
+    implementation project(':core')
+    api libs.managed.netty.common
+    compileOnly libs.managed.graal
+}
