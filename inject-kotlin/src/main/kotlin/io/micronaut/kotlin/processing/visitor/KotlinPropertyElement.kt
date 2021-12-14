@@ -8,6 +8,7 @@ import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PropertyElement
+import java.lang.RuntimeException
 import java.util.*
 
 class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
@@ -37,11 +38,12 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
     }
     constructor(classElement: KotlinClassElement,
                 type: KotlinClassElement,
+                name: String,
                 getter: KSFunctionDeclaration,
                 setter: KSFunctionDeclaration?,
                 annotationMetadata: AnnotationMetadata,
                 visitorContext: KotlinVisitorContext) : super(getter, annotationMetadata, visitorContext) {
-        this.name = NameUtils.getPropertyNameForGetter(getter.simpleName.asString())
+        this.name = name
         this.type = type
         this.classElement = classElement
         this.setter = Optional.ofNullable(setter)
