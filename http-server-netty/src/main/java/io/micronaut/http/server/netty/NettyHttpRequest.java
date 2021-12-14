@@ -63,7 +63,6 @@ import io.netty.handler.codec.http.multipart.AbstractHttpData;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.ssl.SslHandler;
-import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCounted;
 import org.jetbrains.annotations.NotNull;
 
@@ -93,8 +92,6 @@ import java.util.function.Supplier;
  */
 @Internal
 public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T> {
-
-    private static final AttributeKey<NettyHttpRequest> KEY = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
 
     /**
      * Headers to exclude from the push promise sent to the client. We use
@@ -171,7 +168,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         Objects.requireNonNull(environment, "Environment cannot be null");
         Channel channel = ctx.channel();
         if (channel != null) {
-            channel.attr(KEY).set(this);
+            channel.attr(ServerAttributeKeys.REQUEST_KEY).set(this);
         }
         this.serverConfiguration = serverConfiguration;
         this.channelHandlerContext = ctx;
@@ -545,7 +542,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     static NettyHttpRequest get(ChannelHandlerContext ctx) {
         Channel channel = ctx.channel();
-        io.netty.util.Attribute<NettyHttpRequest> attr = channel.attr(KEY);
+        io.netty.util.Attribute<NettyHttpRequest> attr = channel.attr(ServerAttributeKeys.REQUEST_KEY);
         return attr.get();
     }
 
@@ -558,7 +555,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     static NettyHttpRequest remove(ChannelHandlerContext ctx) {
         Channel channel = ctx.channel();
 
-        io.netty.util.Attribute<NettyHttpRequest> attr = channel.attr(KEY);
+        io.netty.util.Attribute<NettyHttpRequest> attr = channel.attr(ServerAttributeKeys.REQUEST_KEY);
         return attr.getAndSet(null);
     }
 

@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
-import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -33,7 +32,6 @@ import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
-import io.micronaut.http.server.CoroutineHelper;
 import io.micronaut.http.server.netty.NettyEmbeddedServices;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.RouteExecutor;
@@ -54,6 +52,7 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory;
@@ -68,7 +67,6 @@ import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -125,10 +123,11 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     }
 
     private boolean isWebSocketUpgrade(@NonNull NettyHttpRequest<?> request) {
-        HttpHeaders headers = request.getHeaders();
-        String connectValue = headers.get(HttpHeaderNames.CONNECTION, String.class).orElse("").toLowerCase(Locale.ENGLISH);
-        return connectValue.contains(HttpHeaderValues.UPGRADE) &&
-                WEB_SOCKET_HEADER_VALUE.toString().equalsIgnoreCase(headers.get(HttpHeaderNames.UPGRADE));
+        HttpHeaders headers = request.getNativeRequest().headers();
+        if (headers.containsValue(HttpHeaderNames.CONNECTION, HttpHeaderValues.UPGRADE, true)) {
+            return headers.containsValue(HttpHeaderNames.UPGRADE, WEB_SOCKET_HEADER_VALUE, true);
+        }
+        return false;
     }
 
     @Override
