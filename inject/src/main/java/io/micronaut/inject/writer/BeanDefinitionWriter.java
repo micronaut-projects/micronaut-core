@@ -3346,7 +3346,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 return hasAroundConstruct;
             } else if (hasAroundConstruct) {
                 AnnotationMetadata typeMetadata = annotationMetadata;
-                if (typeMetadata instanceof AnnotationMetadataHierarchy) {
+                if (!isSuperFactory && typeMetadata instanceof AnnotationMetadataHierarchy) {
                     typeMetadata = ((AnnotationMetadataHierarchy) typeMetadata).getRootMetadata();
                     final AnnotationValue<Annotation> av =
                             typeMetadata.getAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
