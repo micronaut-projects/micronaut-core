@@ -16,23 +16,14 @@
 package io.micronaut.http.netty.graal;
 
 import com.oracle.svm.core.annotate.AutomaticFeature;
-import com.oracle.svm.core.jdk.SystemPropertiesSupport;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.graal.AutomaticFeatureUtils;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.netty.channel.converters.EpollChannelOptionFactory;
 import io.micronaut.http.netty.channel.converters.KQueueChannelOptionFactory;
 import io.micronaut.http.netty.websocket.NettyWebSocketSession;
-import io.netty.util.internal.logging.InternalLoggerFactory;
-import io.netty.util.internal.logging.Slf4JLoggerFactory;
-import org.graalvm.nativeimage.ImageSingletons;
 import org.graalvm.nativeimage.hosted.Feature;
 import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
-import org.graalvm.nativeimage.hosted.RuntimeReflection;
-
-import java.lang.reflect.Method;
-import java.util.Arrays;
 
 /**
  * An HTTP Netty feature that configures the native channels.
