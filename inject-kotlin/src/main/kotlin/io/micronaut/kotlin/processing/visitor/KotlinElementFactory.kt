@@ -6,6 +6,13 @@ import io.micronaut.inject.ast.*
 
 class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): ElementFactory<Any, KSType, KSFunctionDeclaration, KSPropertyDeclaration> {
 
+    companion object {
+        val primitives = mapOf(
+            "kotlin.Boolean" to PrimitiveElement.BOOLEAN,
+            "kotlin.Int" to PrimitiveElement.INT
+        )
+    }
+
     fun newClassElement(
         type: KSType
     ): ClassElement {
@@ -21,12 +28,17 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
 
     override fun newClassElement(type: KSType, annotationMetadata: AnnotationMetadata): ClassElement {
         val declaration = type.declaration
-        if (declaration.qualifiedName!!.asString() == "kotlin.Array") {
+        val qualifiedName = declaration.qualifiedName!!.asString()
+        if (qualifiedName == "kotlin.Array") {
             val component = type.arguments[0].type!!.resolve()
             val componentElement = newClassElement(component, annotationMetadata)
             return componentElement.toArray()
         } else if (declaration is KSTypeParameter) {
             return KotlinGenericPlaceholderElement(type as KSTypeParameter, annotationMetadata, visitorContext)
+        }
+        val element = primitives[qualifiedName]
+        if (element != null) {
+            return element
         }
         return KotlinClassElement(type, annotationMetadata, visitorContext)
     }
@@ -43,6 +55,12 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
             return componentElement.toArray()
         } else if (declaration is KSTypeParameter) {
             return resolvedGenerics[declaration.name.asString()]!!
+        }
+        if (declaration.qualifiedName!!.asString() == "kotlin.Boolean") {
+            return PrimitiveElement.BOOLEAN
+        }
+        if (declaration.qualifiedName!!.asString() == "kotlin.Int") {
+            return PrimitiveElement.INT
         }
         return KotlinClassElement(type, annotationMetadata, visitorContext)
     }
@@ -93,7 +111,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         annotationMetadata: AnnotationMetadata
     ): MethodElement {
         val annotationUtils = visitorContext.getAnnotationUtils()
-        return KotlinMethodElement(method, declaringClass, annotationMetadata, visitorContext, KotlinParameterElement(declaringClass, method.parameter, annotationUtils.getAnnotationMetadata(method.parameter), visitorContext))
+        return KotlinMethodElement(method, declaringClass, annotationMetadata, visitorContext, KotlinParameterElement(newClassElement(method.parameter.type.resolve()), method.parameter, annotationUtils.getAnnotationMetadata(method.parameter), visitorContext))
     }
 
     override fun newConstructorElement(

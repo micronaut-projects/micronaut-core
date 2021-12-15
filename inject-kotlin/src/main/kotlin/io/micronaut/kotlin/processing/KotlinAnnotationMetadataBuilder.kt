@@ -282,6 +282,6 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
                 }
             }
         }
-        return null
+        return value
     }
 }

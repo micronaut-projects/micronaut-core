@@ -194,7 +194,7 @@ class MethodTest : SuperType(), SomeInt {
     }
     
     @Executable
-    fun invokePrim(i: Integer): Integer {
+    fun invokePrim(i: Int): Int {
         return i
     }
 }
@@ -242,5 +242,144 @@ interface SomeInt {
         invokeMe.invoke(bean, "test") == 'test'
         invokePrim.invoke(bean, 10) == 10
         itfeMethod.invoke(bean) == true
+    }
+
+    void "test custom with prefix"() {
+        given:
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('customwith.CopyMe', '''\
+package customwith
+
+import java.net.URL
+import java.util.Locale
+
+@io.micronaut.core.annotation.Introspected(withPrefix = "alter")
+class CopyMe(val another: String) {
+    
+    fun alterAnother(another: String): CopyMe {
+        return if (another == this.another) {
+            this
+        } else {
+            CopyMe(another.uppercase(Locale.getDefault()))   
+        }
+    }
+}
+''')
+        when:
+        def another = introspection.getRequiredProperty("another", String)
+        def newInstance = introspection.instantiate("test")
+
+        then:
+        newInstance.another == "test"
+
+        when:"An explicit with method is used"
+        def result = another.withValue(newInstance, "changed")
+
+        then:"It was invoked"
+        !result.is(newInstance)
+        result.another == 'CHANGED'
+    }
+
+    void "test copy constructor via mutate method"() {
+        given:
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.CopyMe','''\
+package test
+
+import java.net.URL
+import java.util.Locale
+
+@io.micronaut.core.annotation.Introspected
+class CopyMe(val name: String,
+             val another: String) {
+
+    var url: URL? = null
+
+    fun withAnother(a: String): CopyMe {
+        return if (this.another == a) {
+            this
+        } else {
+            CopyMe(this.name, a.uppercase(Locale.getDefault()))
+        }
+    }
+}
+''')
+        when:
+        def copyMe = introspection.instantiate("Test", "Another")
+        def expectUrl = new URL("http://test.com")
+        copyMe.url = expectUrl
+
+        then:
+        copyMe.name == 'Test'
+        copyMe.another == "Another"
+        copyMe.url == expectUrl
+
+
+        when:
+        def property = introspection.getRequiredProperty("name", String)
+        def another = introspection.getRequiredProperty("another", String)
+        def newInstance = property.withValue(copyMe, "Changed")
+
+        then:
+        !newInstance.is(copyMe)
+        newInstance.name == 'Changed'
+        newInstance.url == expectUrl
+        newInstance.another == "Another"
+
+        when:"the instance is changed with the same value"
+        def result = property.withValue(newInstance, "Changed")
+
+        then:"The existing instance is returned"
+        newInstance.is(result)
+
+        when:"An explicit with method is used"
+        result = another.withValue(newInstance, "changed")
+
+        then:"It was invoked"
+        !result.is(newInstance)
+        result.another == 'CHANGED'
+    }
+
+    void "test secondary constructor for data classes"() {
+        given:
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Foo', '''
+package test
+
+@io.micronaut.core.annotation.Introspected
+data class Foo(val x: Int, val y: Int) {
+    
+    constructor(x: Int) : this(x, 20)
+    
+    constructor() : this(20, 20)
+}
+''')
+        when:
+        def obj = introspection.instantiate(5, 10)
+
+        then:
+        obj.getX() == 5
+        obj.getY() == 10
+    }
+
+    void "test secondary constructor with @Creator for data classes"() {
+        given:
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Foo', '''
+package test
+
+import io.micronaut.core.annotation.Creator
+
+@io.micronaut.core.annotation.Introspected
+data class Foo(val x: Int, val y: Int) {
+
+    @Creator
+    constructor(x: Int) : this(x, 20)
+    
+    constructor() : this(20, 20)
+}
+''')
+        when:
+        def obj = introspection.instantiate(5)
+
+        then:
+        obj.getX() == 5
+        obj.getY() == 20
     }
 }
