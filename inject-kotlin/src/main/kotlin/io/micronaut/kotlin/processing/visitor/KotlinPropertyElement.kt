@@ -36,8 +36,8 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 return@map visitorContext.elementFactory.newMethodElement(classElement, method, annotationMetadata)
             }
     }
-    constructor(classElement: KotlinClassElement,
-                type: KotlinClassElement,
+    constructor(classElement: ClassElement,
+                type: ClassElement,
                 name: String,
                 getter: KSFunctionDeclaration,
                 setter: KSFunctionDeclaration?,

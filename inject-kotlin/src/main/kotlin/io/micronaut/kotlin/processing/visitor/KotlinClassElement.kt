@@ -3,13 +3,15 @@ package io.micronaut.kotlin.processing.visitor
 import com.google.devtools.ksp.*
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.core.annotation.Creator
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.ast.*
 import java.util.*
 import java.util.function.Consumer
 import java.util.function.Predicate
 
-open class KotlinClassElement(protected val classType: KSType,
+open class KotlinClassElement(val classType: KSType,
                               annotationMetadata: AnnotationMetadata,
                               visitorContext: KotlinVisitorContext,
                               private val arrayDimensions: Int = 0): AbstractKotlinElement<KSClassDeclaration>(classType.declaration as KSClassDeclaration, annotationMetadata, visitorContext), ArrayableClassElement {
@@ -24,10 +26,17 @@ open class KotlinClassElement(protected val classType: KSType,
     override fun isAssignable(type: String): Boolean {
         val ksType = visitorContext.resolver.getClassDeclarationByName(type)?.asStarProjectedType()
         return if (ksType != null) {
-            declaration.asStarProjectedType().isAssignableFrom(ksType)
+            classType.isAssignableFrom(ksType)
         } else {
             false
         }
+    }
+
+    override fun isAssignable(type: ClassElement): Boolean {
+        if (type is KotlinClassElement) {
+            return classType.isAssignableFrom(type.classType)
+        }
+        return super.isAssignable(type)
     }
 
     override fun isArray(): Boolean {
@@ -92,7 +101,19 @@ open class KotlinClassElement(protected val classType: KSType,
     }
 
     override fun getPrimaryConstructor(): Optional<MethodElement> {
-        return Optional.ofNullable(declaration.primaryConstructor)
+        val nonPrivateConstructors = declaration.getConstructors()
+            .filter { ctor -> !ctor.isPrivate() }
+            .toList()
+        val constructor = if (nonPrivateConstructors.size == 1) {
+            nonPrivateConstructors[0]
+        } else {
+            nonPrivateConstructors.filter { ctor ->
+                val annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(ctor)
+                return@filter annotationMetadata.hasAnnotation(AnnotationUtil.INJECT) ||
+                        annotationMetadata.hasAnnotation(Creator::class.java)
+            }.firstOrNull() ?: declaration.primaryConstructor
+        }
+        return Optional.ofNullable(constructor)
             .map { ctor ->
                 visitorContext.elementFactory.newConstructorElement(
                     this,
@@ -118,10 +139,12 @@ open class KotlinClassElement(protected val classType: KSType,
     override fun <T : Element> getEnclosedElements(query: ElementQuery<T>): MutableList<T> {
         val result = query.result()
         val kind = getElementKind(result.elementType)
-        var enclosedElements = declaration.declarations.filter { kind.test(it) }
+        val classDeclarationElements = mutableMapOf<KSClassDeclaration, ClassElement>(declaration to this)
+
+        var enclosedElements = getAllDeclarations().filter { kind.test(it) }
 
         if (result.isOnlyDeclared) {
-            enclosedElements = enclosedElements.filter { declaration ->  declaration.parentDeclaration == declaration }
+            enclosedElements = enclosedElements.filter { declaration ->  declaration.parentDeclaration == this.declaration }
         }
         if (result.isOnlyAbstract) {
             enclosedElements = enclosedElements.filter { declaration -> declaration.modifiers.contains(Modifier.ABSTRACT) }
@@ -131,7 +154,7 @@ open class KotlinClassElement(protected val classType: KSType,
             enclosedElements = enclosedElements.filter { declaration ->
                 val parent = declaration.parentDeclaration
                 return@filter if (parent is KSClassDeclaration) {
-                    parent.isCompanionObject
+                    !parent.isCompanionObject
                 } else {
                     false
                 }
@@ -210,22 +233,34 @@ open class KotlinClassElement(protected val classType: KSType,
             val elementFactory = visitorContext.elementFactory
 
             if (enclosingElement is KSFunctionDeclaration) {
+                val declaringDeclaration = enclosingElement.closestClassDeclaration()!!
+                var declaringClass = classDeclarationElements[declaringDeclaration]
+                if (declaringClass == null) {
+                    declaringClass = elementFactory.newClassElement(declaringDeclaration.asStarProjectedType())
+                    classDeclarationElements[declaringDeclaration] = declaringClass
+                }
                 if (result.elementType == ConstructorElement::class) {
                     element = elementFactory.newConstructorElement(
-                        this,
+                        declaringClass,
                         enclosingElement,
                         metadata
                     ) as T
                 } else {
                     element = elementFactory.newMethodElement(
-                        this,
+                        declaringClass,
                         enclosingElement,
                         metadata
                     ) as T
                 }
             } else if (enclosingElement is KSPropertyDeclaration) {
+                val declaringDeclaration = enclosingElement.closestClassDeclaration()!!
+                var declaringClass = classDeclarationElements[declaringDeclaration]
+                if (declaringClass == null) {
+                    declaringClass = elementFactory.newClassElement(declaringDeclaration.asStarProjectedType())
+                    classDeclarationElements[declaringDeclaration] = declaringClass
+                }
                 element =  elementFactory.newFieldElement(
-                    this,
+                    declaringClass,
                     enclosingElement,
                     metadata
                 ) as T
@@ -244,6 +279,34 @@ open class KotlinClassElement(protected val classType: KSType,
         }
 
         return elements
+    }
+
+    private fun getAllDeclarations(): Set<KSDeclaration>  {
+        val declarations = declaration.declarations.toMutableSet()
+        val excluded = mutableListOf<KSDeclaration>()
+        declarations.forEach {
+            if (it is KSFunctionDeclaration) {
+                var overridee = it.findOverridee()
+                while (overridee != null) {
+                    excluded.add(overridee)
+                    overridee = (overridee as KSFunctionDeclaration).findOverridee()
+                }
+            } else if (it is KSPropertyDeclaration) {
+                var overridee = it.findOverridee()
+                while (overridee != null) {
+                    excluded.add(overridee)
+                    overridee = overridee.findOverridee()
+                }
+            }
+        }
+        declaration.getAllSuperTypes().forEach { superType ->
+            (superType.declaration as KSClassDeclaration).declarations.forEach { declaration ->
+                if (!excluded.contains(declaration)) {
+                    declarations.add(declaration)
+                }
+            }
+        }
+        return declarations
     }
 
     private fun <T : Element?> getElementKind(elementType: Class<T>): Predicate<KSDeclaration> {
@@ -323,12 +386,12 @@ open class KotlinClassElement(protected val classType: KSType,
                                       apply: Consumer<GetterAndSetter>) {
         val elementFactory = visitorContext.elementFactory
 
-        val type = elementFactory.newClassElement(func.returnType!!.resolve(), typeArguments) as KotlinClassElement
+        val type = elementFactory.newClassElement(func.returnType!!.resolve(), typeArguments)
         val classDeclaration = func.closestClassDeclaration()!!
         val declaringType = if (declaration == classDeclaration) {
             this
         } else {
-            elementFactory.newClassElement(classDeclaration.asStarProjectedType())  as KotlinClassElement
+            elementFactory.newClassElement(classDeclaration.asStarProjectedType())
         }
         var getterAndSetter = functionBasedProperties[propertyName]
         if (getterAndSetter == null) {
@@ -338,8 +401,8 @@ open class KotlinClassElement(protected val classType: KSType,
         apply.accept(getterAndSetter)
     }
 
-    private class GetterAndSetter(val type: KotlinClassElement,
-                                  val declaringType: KotlinClassElement) {
+    private class GetterAndSetter(val type: ClassElement,
+                                  val declaringType: ClassElement) {
         var getter: KSFunctionDeclaration? = null
         var setter: KSFunctionDeclaration? = null
     }

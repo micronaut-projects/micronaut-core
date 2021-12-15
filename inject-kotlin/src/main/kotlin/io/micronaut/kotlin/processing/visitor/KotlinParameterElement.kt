@@ -17,4 +17,6 @@ class KotlinParameterElement(
     }
 
     override fun getType(): ClassElement = classElement
+
+    override fun isPrimitive(): Boolean = classElement.isPrimitive
 }
