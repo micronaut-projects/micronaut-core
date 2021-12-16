@@ -99,6 +99,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final String DO_SYS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/sys_vendor";
     private static final Boolean DEDUCE_ENVIRONMENT_DEFAULT = true;
     private static final List<String> DEFAULT_CONFIG_LOCATIONS = Arrays.asList("classpath:/", "file:config/");
+    private static final String DEFAULT_ENVIRONMENT_NAME = "default";
     protected final ClassPathResourceLoader resourceLoader;
     protected final List<PropertySource> refreshablePropertySources = new ArrayList<>(10);
 
@@ -163,7 +164,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         // Search config locations in reverse order
         Collections.reverse(configLocations);
         this.configLocations = configLocations;
-        CONSTANT_PROPERTY_SOURCES.forEach(p -> propertySources.put(p.getName(), p));
     }
 
     @Override
@@ -417,6 +417,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             propertySources.addAll(readPropertySourceListFromFiles(propertySourcesEnv));
         }
         refreshablePropertySources.addAll(propertySources);
+        readConstantPropertySources(name, propertySources);
 
         propertySources.addAll(this.propertySources.values());
         OrderUtil.sort(propertySources);
@@ -426,6 +427,20 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
             processPropertySource(propertySource, propertySource.getConvention());
         }
+    }
+
+    private void readConstantPropertySources(String name, List<PropertySource> propertySources) {
+        Set<String> propertySourceNames = Stream.concat(Stream.of(DEFAULT_ENVIRONMENT_NAME), getActiveNames().stream())
+                .map(env -> {
+                    if (DEFAULT_ENVIRONMENT_NAME.equals(env)) {
+                        return name;
+                    }
+                    return name + "-" + env;
+                })
+                .collect(Collectors.toSet());
+        CONSTANT_PROPERTY_SOURCES.stream()
+                .filter(p -> propertySourceNames.contains(p.getName()))
+                .forEach(propertySources::add);
     }
 
     /**
