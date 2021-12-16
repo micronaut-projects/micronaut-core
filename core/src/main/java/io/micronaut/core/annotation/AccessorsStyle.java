@@ -25,13 +25,10 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Annotate a class (typically a Java Bean) to make it explicit the style of its accessors when not using the standard
- * getter/setters. This is necessary, for example when using Lombok fluent accessors:
+ * getter and setters:
  *
  * <pre class="code">
  * &#064;AccessorsStyle(readPrefixes = {""}, writePrefixes = {""})
- * &#064;Accessors(fluent = true)
- * &#064;Getter
- * &#064;Setter
  * public class Person {
  *
  *     private String name;
@@ -41,11 +38,25 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *         this.name = name;
  *         this.age = age;
  *     }
+ *
+ *     public String name() {
+ *         return this.name;
+ *     }
+ *
+ *     public void name(String name) {
+ *         this.name = name;
+ *     }
+ *
+ *     public int age() {
+ *         return this.age;
+ *     }
+ *
+ *     public void age(int age) {
+ *         this.age = age;
+ *     }
  * }</pre>
  * <p>
- * Given the previous class, Lombok will generate getters and setter: {@code name()}, {@code age()}, {@code name(String)}
- * and {@code age(int)}. Defining the {@code readPrefixes} and {@code writePrefixes} as empty strings makes Micronaut
- * aware of them.
+ * Defining the {@code readPrefixes} and {@code writePrefixes} as empty strings makes Micronaut aware of those accessors.
  *
  * It is also possible to annotate fields with this annotation but the usage is only limited when using it with @ConfigurationBuilder.
  *
