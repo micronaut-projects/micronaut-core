@@ -23,6 +23,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
+import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import io.micronaut.core.annotation.NonNull;
@@ -793,9 +794,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             if (!nonBindingMembers.isEmpty()) {
                 T annotationType = getTypeForAnnotation(annotationMirror);
                 if (!hasAnnotation(annotationType, AnnotationUtil.QUALIFIER) &&
-                        !hasAnnotation(annotationType, Qualifier.class)) {
-                    addError(originatingElement, "@NonBinding annotation is only applicable to annotations that are annotated with @Qualifier");
-                } else {
+                        !hasAnnotation(annotationType, Qualifier.class) && !hasAnnotation(annotationType, AnnotationUtil.ANN_INTERCEPTOR_BINDING)) {
+                    addError(originatingElement, "@NonBinding annotation is only applicable to annotations that are annotated with @Qualifier or @InterceptorBinding");
+                } else if (!hasAnnotation(annotationType, AnnotationUtil.ANN_INTERCEPTOR_BINDING)){
                     metadata.addDeclaredStereotype(
                             Collections.singletonList(getAnnotationTypeName(annotationMirror)),
                             AnnotationUtil.QUALIFIER,
@@ -1424,6 +1425,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
         final boolean hasInterceptorBinding = !interceptorBindings.isEmpty();
         if (hasInterceptorBinding && AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(annotationName)) {
+            handleMemberBinding(metadata, lastParent, data);
             interceptorBindings.getLast().members(data);
             return;
         }
@@ -1456,6 +1458,49 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         } else {
             if (listIterator != null) {
                 listIterator.remove();
+            }
+        }
+    }
+
+    private void handleMemberBinding(DefaultAnnotationMetadata metadata, String lastParent, Map<CharSequence, Object> data) {
+        if (data.containsKey(InterceptorBindingQualifier.META_MEMBER_MEMBERS)) {
+            final Object o = data.remove(InterceptorBindingQualifier.META_MEMBER_MEMBERS);
+            if (o instanceof Boolean && ((Boolean) o)) {
+                Map<CharSequence, Object> values = metadata.getValues(lastParent);
+                if (!values.isEmpty()) {
+                    Set<String> nonBinding = new HashSet<>(5);
+                    final T parentAnn = getAnnotationMirror(lastParent).orElse(null);
+                    if (parentAnn != null) {
+                        values = new HashMap<>(values);
+                        final Iterator<Map.Entry<CharSequence, Object>> i = values.entrySet().iterator();
+                        while (i.hasNext()) {
+                            final Map.Entry<CharSequence, Object> entry = i.next();
+                            final T member = getAnnotationMember(parentAnn, entry.getKey());
+                            if (member != null) {
+                                final AnnotationMetadata memberMetadata = buildDeclared(member);
+                                if (memberMetadata.hasAnnotation(NonBinding.class)) {
+                                    nonBinding.add(entry.getKey().toString());
+                                    i.remove();
+                                }
+                            }
+                        }
+                    }
+                    final AnnotationValueBuilder<Annotation> builder =
+                            AnnotationValue
+                                .builder(lastParent)
+                                .members(values);
+                    if (!nonBinding.isEmpty()) {
+                        builder.member(
+                                InterceptorBindingQualifier.META_MEMBER_NON_BINDING,
+                                nonBinding.toArray(StringUtils.EMPTY_STRING_ARRAY)
+                        );
+                    }
+                    data.put(
+                            InterceptorBindingQualifier.META_MEMBER_MEMBERS,
+                            builder.build()
+                    );
+
+                }
             }
         }
     }
@@ -1522,6 +1567,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
                     final boolean hasInterceptorBinding = !interceptorBindings.isEmpty();
                     if (hasInterceptorBinding && AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(annotationName)) {
+                        handleMemberBinding(metadata, lastParent, data);
                         interceptorBindings.getLast().members(data);
                         continue;
                     }

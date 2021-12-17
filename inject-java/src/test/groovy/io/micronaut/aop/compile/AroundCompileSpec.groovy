@@ -262,6 +262,70 @@ class AnotherInterceptor implements Interceptor {
         context.close()
     }
 
+    void 'test annotation with just interceptor binding - member binding'() {
+        given:
+        ApplicationContext context = buildContext('''
+package memberbinding;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.NonBinding;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import jakarta.inject.Singleton;
+
+@Singleton
+@TestAnn(num=1, debug = false)
+class MyBean {
+    void test() {
+    }
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@InterceptorBinding(bindMembers = true)
+@interface TestAnn {
+    int num();
+    
+    @NonBinding
+    boolean debug() default false;
+}
+
+@InterceptorBean(TestAnn.class)
+@TestAnn(num = 1, debug = true)
+class TestInterceptor implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+} 
+
+@InterceptorBean(TestAnn.class)
+@TestAnn(num = 2)
+class AnotherInterceptor implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+} 
+''')
+        def instance = getBean(context, 'memberbinding.MyBean')
+        def interceptor = getBean(context, 'memberbinding.TestInterceptor')
+        def anotherInterceptor = getBean(context, 'memberbinding.AnotherInterceptor')
+        instance.test()
+
+        expect:"the interceptor was invoked"
+        instance instanceof Intercepted
+        interceptor.invoked
+        !anotherInterceptor.invoked
+
+        cleanup:
+        context.close()
+    }
+
     void 'test annotation with just around'() {
         given:
         ApplicationContext context = buildContext('''

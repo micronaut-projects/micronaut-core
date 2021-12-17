@@ -44,4 +44,18 @@ public @interface InterceptorBinding {
      * @return The kind of interceptor.
      */
     InterceptorKind kind() default InterceptorKind.AROUND;
+
+    /**
+     * By default annotation members are not used when resolving interceptors. The value of
+     * {@code members()} can be set to {@code true} to indicate that annotation members
+     * should be used when binding interceptors to an annotation declaration.
+     *
+     * <p>The {@link io.micronaut.context.annotation.NonBinding} annotation should
+     * then be used on any annotation members that should not be included in this binding computation.</p>
+     *
+     * @since 3.3.0
+     * @return Whether members should be included in interceptor binding
+     * @see io.micronaut.context.annotation.NonBinding
+     */
+    boolean bindMembers() default false;
 }
