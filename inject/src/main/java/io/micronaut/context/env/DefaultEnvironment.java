@@ -438,9 +438,13 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                     return name + "-" + env;
                 })
                 .collect(Collectors.toSet());
-        CONSTANT_PROPERTY_SOURCES.stream()
+        getConstantPropertySources().stream()
                 .filter(p -> propertySourceNames.contains(p.getName()))
                 .forEach(propertySources::add);
+    }
+
+    protected List<PropertySource> getConstantPropertySources() {
+        return CONSTANT_PROPERTY_SOURCES;
     }
 
     /**
