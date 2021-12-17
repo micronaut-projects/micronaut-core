@@ -47,7 +47,7 @@ public @interface InterceptorBinding {
 
     /**
      * By default annotation members are not used when resolving interceptors. The value of
-     * {@code members()} can be set to {@code true} to indicate that annotation members
+     * {@code bindMembers()} can be set to {@code true} to indicate that annotation members
      * should be used when binding interceptors to an annotation declaration.
      *
      * <p>The {@link io.micronaut.context.annotation.NonBinding} annotation should
