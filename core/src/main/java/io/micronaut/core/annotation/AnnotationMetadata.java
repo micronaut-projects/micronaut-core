@@ -186,7 +186,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotationType The annotation type
      * @param <T> The annotation type
      * @return A list of values
-     * @since 3.3.0
+     * @since 3.2.4
      */
     default @NonNull <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByName(@NonNull String annotationType) {
         return Collections.emptyList();
@@ -209,7 +209,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotationType The annotation type
      * @param <T> The annotation type
      * @return A list of values
-     * @since 3.3.0
+     * @since 3.2.4
      */
     default @NonNull <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByName(@NonNull String annotationType) {
         return Collections.emptyList();
