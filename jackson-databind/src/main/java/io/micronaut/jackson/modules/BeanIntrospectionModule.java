@@ -306,7 +306,9 @@ public class BeanIntrospectionModule extends SimpleModule {
                         } else {
                             property = introspection.getProperty(existingName);
                         }
-                        if (property.isPresent()) {
+                        // ignore properties that are @JsonIgnore, so that we don't replace other properties of the
+                        // same name
+                        if (property.isPresent() && !property.get().isAnnotationPresent(JsonIgnore.class)) {
                             final BeanProperty<Object, Object> beanProperty = property.get();
                             if (isResource) {
                                 if ("embedded".equals(beanProperty.getName())) {
@@ -389,6 +391,12 @@ public class BeanIntrospectionModule extends SimpleModule {
                 } else {
                     Map<String, BeanProperty<Object, Object>> remainingProperties = new LinkedHashMap<>();
                     for (BeanProperty<Object, Object> beanProperty : introspection.getBeanProperties()) {
+                        // ignore properties that are @JsonIgnore, so that we don't replace other properties of the
+                        // same name
+                        if (beanProperty.isAnnotationPresent(JsonIgnore.class)) {
+                            continue;
+                        }
+
                         remainingProperties.put(beanProperty.getName(), beanProperty);
                     }
                     while (properties.hasNext()) {

@@ -94,7 +94,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     Map<String, Map<CharSequence, Object>> annotationDefaultValues;
     Map<String, String> repeated = null;
 
-    private Map<Class, List> annotationValuesByType = new ConcurrentHashMap<>(2);
+    private Map<String, List> annotationValuesByType = new ConcurrentHashMap<>(2);
     private Set<String> sourceRetentionAnnotations;
     private final boolean hasPropertyExpressions;
     // This should be removed in the next major version
@@ -999,16 +999,50 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     public @NonNull
     <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(@Nullable Class<T> annotationType) {
         if (annotationType != null) {
-            List<AnnotationValue<T>> results = annotationValuesByType.get(annotationType);
+            final String annotationTypeName = annotationType.getName();
+            List<AnnotationValue<T>> results = annotationValuesByType.get(annotationTypeName);
             if (results == null) {
 
                 results = resolveAnnotationValuesByType(annotationType, allAnnotations, allStereotypes);
                 if (results != null) {
                     return results;
                 } else if (allAnnotations != null) {
-                    final Map<CharSequence, Object> values = allAnnotations.get(annotationType.getName());
+                    final Map<CharSequence, Object> values = allAnnotations.get(annotationTypeName);
                     if (values != null) {
-                        results = Collections.singletonList(new AnnotationValue<>(annotationType.getName(), values));
+                        results = Collections.singletonList(new AnnotationValue<>(annotationTypeName, values));
+                    }
+                }
+
+                if (results == null) {
+                    results = Collections.emptyList();
+                }
+                annotationValuesByType.put(annotationTypeName, results);
+            }
+            return results;
+        }
+        return Collections.emptyList();
+    }
+
+    @Override
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByName(String annotationType) {
+        if (annotationType != null) {
+            String repeatableTypeName = getRepeatedName(annotationType);
+            if (repeatableTypeName == null) {
+                repeatableTypeName = AnnotationMetadataSupport.getRepeatableAnnotation(annotationType);
+            }
+            if (repeatableTypeName != null) {
+
+                List<AnnotationValue<T>> results =
+                        resolveRepeatableAnnotations(repeatableTypeName,
+                                                     allAnnotations,
+                                                     allStereotypes
+                );
+                if (results != null) {
+                    return results;
+                } else if (allAnnotations != null) {
+                    final Map<CharSequence, Object> values = allAnnotations.get(annotationType);
+                    if (values != null) {
+                        results = Collections.singletonList(new AnnotationValue<>(annotationType, values));
                     }
                 }
 
@@ -1017,7 +1051,6 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 }
                 annotationValuesByType.put(annotationType, results);
             }
-            return results;
         }
         return Collections.emptyList();
     }
@@ -1030,6 +1063,27 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             Map<String, Map<CharSequence, Object>> sourceStereotypes = this.declaredStereotypes;
 
             List<AnnotationValue<T>> results = resolveAnnotationValuesByType(annotationType, sourceAnnotations, sourceStereotypes);
+            if (results != null) {
+                return results;
+            }
+        }
+        return Collections.emptyList();
+    }
+
+    @Override
+    public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByName(String annotationType) {
+        if (annotationType != null) {
+            Map<String, Map<CharSequence, Object>> sourceAnnotations = this.declaredAnnotations;
+            Map<String, Map<CharSequence, Object>> sourceStereotypes = this.declaredStereotypes;
+            String repeatableTypeName = getRepeatedName(annotationType);
+            if (repeatableTypeName == null) {
+                repeatableTypeName = AnnotationMetadataSupport.getRepeatableAnnotation(annotationType);
+            }
+            List<AnnotationValue<T>> results =
+                    resolveRepeatableAnnotations(repeatableTypeName,
+                                                 sourceAnnotations,
+                                                 sourceStereotypes
+                    );
             if (results != null) {
                 return results;
             }
@@ -1756,20 +1810,32 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         Repeatable repeatable = annotationType.getAnnotation(Repeatable.class);
         if (repeatable != null) {
             Class<? extends Annotation> repeatableType = repeatable.value();
-            if (hasStereotype(repeatableType)) {
-                List<io.micronaut.core.annotation.AnnotationValue<T>> results = new ArrayList<>();
-                if (sourceAnnotations != null) {
-                    Map<CharSequence, Object> values = sourceAnnotations.get(repeatableType.getName());
-                    addAnnotationValuesFromData(results, values);
-                }
+            final String repeatableTypeName = repeatableType.getName();
+            return resolveRepeatableAnnotations(repeatableTypeName,
+                                                sourceStereotypes,
+                                                sourceAnnotations
+            );
+        }
+        return null;
+    }
 
-                if (sourceStereotypes != null) {
-                    Map<CharSequence, Object> values = sourceStereotypes.get(repeatableType.getName());
-                    addAnnotationValuesFromData(results, values);
-                }
-
-                return results;
+    @Nullable
+    private <T extends Annotation> List<AnnotationValue<T>> resolveRepeatableAnnotations(String repeatableTypeName,
+                                                                                         Map<String, Map<CharSequence, Object>> sourceStereotypes,
+                                                                                         Map<String, Map<CharSequence, Object>> sourceAnnotations) {
+        if (hasStereotype(repeatableTypeName)) {
+            List<AnnotationValue<T>> results = new ArrayList<>();
+            if (sourceAnnotations != null) {
+                Map<CharSequence, Object> values = sourceAnnotations.get(repeatableTypeName);
+                addAnnotationValuesFromData(results, values);
             }
+
+            if (sourceStereotypes != null) {
+                Map<CharSequence, Object> values = sourceStereotypes.get(repeatableTypeName);
+                addAnnotationValuesFromData(results, values);
+            }
+
+            return results;
         }
         return null;
     }

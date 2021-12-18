@@ -112,12 +112,6 @@ subprojects { Project subproject ->
         options.compilerArgs.add("-Amicronaut.processing.module=micronaut-$project.name")
         groovyOptions.forkOptions.memoryMaximumSize = "2g"
     }
-    tasks.withType(Checkstyle).configureEach {
-        reports {
-            xml.required = !System.getenv("GITHUB_ACTIONS")
-            html.required = !System.getenv("GITHUB_ACTIONS")
-        }
-    }
 
     configurations {
         shadowCompile

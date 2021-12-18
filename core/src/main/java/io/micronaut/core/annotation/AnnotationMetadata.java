@@ -181,6 +181,18 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
+     * Gets all the annotation values by the given repeatable type name.
+     *
+     * @param annotationType The annotation type
+     * @param <T> The annotation type
+     * @return A list of values
+     * @since 3.2.4
+     */
+    default @NonNull <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByName(@NonNull String annotationType) {
+        return Collections.emptyList();
+    }
+
+    /**
      * Gets only declared annotation values by the given repeatable type.
      *
      * @param annotationType The annotation type
@@ -188,6 +200,18 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return A list of values
      */
     default @NonNull <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(@NonNull Class<T> annotationType) {
+        return Collections.emptyList();
+    }
+
+    /**
+     * Gets only declared annotation values by the given repeatable type name.
+     *
+     * @param annotationType The annotation type
+     * @param <T> The annotation type
+     * @return A list of values
+     * @since 3.2.4
+     */
+    default @NonNull <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByName(@NonNull String annotationType) {
         return Collections.emptyList();
     }
 
