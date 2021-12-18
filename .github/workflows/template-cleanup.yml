@@ -1,0 +1,41 @@
+# GitHub Actions Workflow responsible for template-clean like updating CLA contract url. This workflow is supposed to be triggered automatically
+# when a new template-based repository has been created.
+
+name: Template Clean Up
+on:
+  push:
+
+jobs:
+
+  # Run cleaning process only if workflow is triggered by the non micronaut-project/micronaut-project-template repository.
+  template-cleanup:
+    name: Template Cleanup
+    runs-on: ubuntu-latest
+    if: github.event.repository.name != 'micronaut-project-template'
+    steps:
+
+      # Check out current repository
+      - name: Fetch Sources
+        uses: actions/checkout@v2.3.4
+
+      # Cleanup project
+      - name: Cleanup
+        run: |
+          # Update CLA url in CONTRIBUTING.md
+          sed -i "s|micronaut-projects/micronaut-project-template|$GITHUB_REPOSITORY|" CONTRIBUTING.md
+
+          # Remove clean up template
+          rm -rf  .github/workflows/template-cleanup.yml 
+      # Commit modified files
+      - name: Commit files
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git commit -m "Template cleanup"
+      # Push changes
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          branch: ${{ github.ref }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
