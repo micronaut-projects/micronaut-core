@@ -1,1 +1,2 @@
 io.micronaut.inject.beanbuilder.TestInterceptorBindingTransformer
+io.micronaut.aop.compile.AroundCompileSpec$TestStereotypeAnnTransformer

@@ -12,6 +12,7 @@ import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.NamedAnnotationMapper
+import io.micronaut.inject.annotation.NamedAnnotationTransformer
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Issue
@@ -122,6 +123,73 @@ class TestInterceptor implements Interceptor {
         then:"the interceptor was invoked"
         instance instanceof Intercepted
         interceptor.invoked
+
+    }
+
+    void 'test apply interceptor binder with annotation mapper - plus members'() {
+        given:
+        ApplicationContext context = buildContext('''
+package mapperbindingmembers;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import jakarta.inject.*;
+import jakarta.inject.Singleton;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Singleton
+class MyBean {
+    @TestAnn(num=1)
+    void test() {
+    }
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.ANNOTATION_TYPE})
+@interface MyInterceptorBinding {
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@MyInterceptorBinding
+@interface TestAnn {
+    int num();
+}
+
+@Singleton
+@TestAnn(num=1)
+class TestInterceptor implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+} 
+
+@Singleton
+@TestAnn(num=2)
+class TestInterceptor2 implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+} 
+
+''')
+        def instance = getBean(context, 'mapperbindingmembers.MyBean')
+        def interceptor = getBean(context, 'mapperbindingmembers.TestInterceptor')
+        def interceptor2 = getBean(context, 'mapperbindingmembers.TestInterceptor2')
+
+        when:
+        instance.test()
+
+        then:"the interceptor was invoked"
+        instance instanceof Intercepted
+        interceptor.invoked
+        !interceptor2.invoked
 
     }
 
@@ -714,6 +782,22 @@ interface IBeanValidator<T> {
         List<AnnotationValue<?>> map(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
             return Collections.singletonList(AnnotationValue.builder(InterceptorBinding)
                     .value(getName())
+                    .build())
+        }
+    }
+
+    static class TestStereotypeAnnTransformer implements NamedAnnotationTransformer {
+
+        @Override
+        String getName() {
+            return 'mapperbindingmembers.MyInterceptorBinding'
+        }
+
+        @Override
+        List<AnnotationValue<?>> transform(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
+            return Collections.singletonList(AnnotationValue.builder(InterceptorBinding)
+                    .member("kind", InterceptorKind.AROUND)
+                    .member("bindMembers", true)
                     .build())
         }
     }

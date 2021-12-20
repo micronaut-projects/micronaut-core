@@ -48,9 +48,11 @@ public final class InterceptorBindingQualifier<T> implements Qualifier<T> {
         this.supportedAnnotationNames = new HashMap<>(annotationValues.size());
         for (AnnotationValue<Annotation> annotationValue : annotationValues) {
             final String name = annotationValue.stringValue().orElse(null);
-            final AnnotationValue<Annotation> members =
-                    annotationValue.getAnnotation(META_MEMBER_MEMBERS).orElse(null);
-            supportedAnnotationNames.putIfAbsent(name, members);
+            if (name != null) {
+                final AnnotationValue<Annotation> members =
+                        annotationValue.getAnnotation(META_MEMBER_MEMBERS).orElse(null);
+                supportedAnnotationNames.putIfAbsent(name, members);
+            }
         }
         this.supportedInterceptorTypes = annotationValues
                 .stream()
