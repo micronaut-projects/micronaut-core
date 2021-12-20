@@ -87,4 +87,5 @@ open class KotlinMethodElement: AbstractKotlinElement<KSNode>, MethodElement {
     override fun withNewParameters(vararg newParameters: ParameterElement): MethodElement {
         return KotlinMethodElement(declaration, name, declaringType, annotationMetadata, visitorContext, returnType, newParameters.toList())
     }
+
 }

@@ -14,6 +14,7 @@ dependencies {
     testImplementation("com.github.tschuchortdev:kotlin-compile-testing-ksp:1.4.6")
     testImplementation libs.kotlin.stdlib
     testImplementation libs.managed.jackson.annotations
+    testImplementation libs.managed.validation
 }
 
 afterEvaluate {

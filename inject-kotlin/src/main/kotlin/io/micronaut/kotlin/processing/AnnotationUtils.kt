@@ -114,6 +114,17 @@ class AnnotationUtils(private val environment: SymbolProcessorEnvironment,
         return metadata!!
     }
 
+
+    /**
+     * Get the annotation metadata for the given element.
+     *
+     * @param element The element
+     * @return The [AnnotationMetadata]
+     */
+    fun getAnnotationMetadata(declaringType: String, element: KSAnnotated): AnnotationMetadata {
+        return annotationMetadataBuilder.build(declaringType, element)
+    }
+
     /**
      * Get the declared annotation metadata for the given element.
      *
