@@ -21,12 +21,20 @@ import io.micronaut.context.env.PropertySource
 import io.micronaut.context.env.PropertySourceLoader
 import io.micronaut.core.io.service.ServiceDefinition
 import io.micronaut.core.io.service.SoftServiceLoader
+import io.micronaut.core.version.SemanticVersion
+import spock.lang.Requires
 import spock.lang.Specification
+import spock.util.environment.Jvm
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
+// fails due to https://issues.apache.org/jira/browse/GROOVY-10145
+@Requires({
+    SemanticVersion.isAtLeastMajorMinor(GroovySystem.version, 4, 0) ||
+            !Jvm.current.isJava16Compatible()
+})
 class JsonPropertySourceLoaderSpec extends Specification {
     void "test json env property source loader"() {
         given:
