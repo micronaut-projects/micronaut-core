@@ -27,20 +27,11 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
     }
 
     override fun newClassElement(type: KSType, annotationMetadata: AnnotationMetadata): ClassElement {
-        val declaration = type.declaration
-        val qualifiedName = declaration.qualifiedName!!.asString()
-        if (qualifiedName == "kotlin.Array") {
-            val component = type.arguments[0].type!!.resolve()
-            val componentElement = newClassElement(component, annotationMetadata)
-            return componentElement.toArray()
-        } else if (declaration is KSTypeParameter) {
-            return KotlinGenericPlaceholderElement(type as KSTypeParameter, annotationMetadata, visitorContext)
-        }
-        val element = primitives[qualifiedName]
-        if (element != null) {
-            return element
-        }
-        return KotlinClassElement(type, annotationMetadata, visitorContext)
+        return newClassElement(type, annotationMetadata, false)
+    }
+
+    private fun newClassElement(type: KSType, annotationMetadata: AnnotationMetadata, typeVariable: Boolean): ClassElement {
+        return newClassElement(type, annotationMetadata, emptyMap(), typeVariable)
     }
 
     override fun newClassElement(
@@ -48,19 +39,32 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         annotationMetadata: AnnotationMetadata,
         resolvedGenerics: Map<String, ClassElement>
     ): ClassElement {
+        return newClassElement(type, annotationMetadata, resolvedGenerics, false)
+    }
+
+    fun newClassElement(type: KSType,
+                                annotationMetadata: AnnotationMetadata,
+                                resolvedGenerics: Map<String, ClassElement>,
+                                typeVariable: Boolean): ClassElement {
         val declaration = type.declaration
-        if (declaration.qualifiedName!!.asString() == "kotlin.Array") {
+        val qualifiedName = declaration.qualifiedName!!.asString()
+        if (qualifiedName == "kotlin.Array") {
             val component = type.arguments[0].type!!.resolve()
             val componentElement = newClassElement(component, annotationMetadata, resolvedGenerics)
             return componentElement.toArray()
         } else if (declaration is KSTypeParameter) {
-            return resolvedGenerics[declaration.name.asString()]!!
+            val name = declaration.name.asString()
+            return if (resolvedGenerics.containsKey(name)) {
+                resolvedGenerics[name]!!
+            } else {
+                KotlinGenericPlaceholderElement(type as KSTypeParameter, annotationMetadata, visitorContext)
+            }
         }
-        if (declaration.qualifiedName!!.asString() == "kotlin.Boolean") {
-            return PrimitiveElement.BOOLEAN
-        }
-        if (declaration.qualifiedName!!.asString() == "kotlin.Int") {
-            return PrimitiveElement.INT
+        if (!typeVariable) {
+            val element = primitives[qualifiedName]
+            if (element != null) {
+                return element
+            }
         }
         return KotlinClassElement(type, annotationMetadata, visitorContext)
     }
@@ -111,7 +115,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         annotationMetadata: AnnotationMetadata
     ): MethodElement {
         val annotationUtils = visitorContext.getAnnotationUtils()
-        return KotlinMethodElement(method, declaringClass, annotationMetadata, visitorContext, KotlinParameterElement(newClassElement(method.parameter.type.resolve()), method.parameter, annotationUtils.getAnnotationMetadata(method.parameter), visitorContext))
+        return KotlinMethodElement(method, declaringClass, annotationMetadata, visitorContext, KotlinParameterElement(newClassElement(method.parameter.type.resolve(), declaringClass.typeArguments), method.parameter, annotationUtils.getAnnotationMetadata(method.parameter), visitorContext))
     }
 
     override fun newConstructorElement(
@@ -121,7 +125,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
     ): ConstructorElement {
         val annotationUtils = visitorContext.getAnnotationUtils()
         return KotlinConstructorElement(constructor, declaringClass, annotationMetadata, visitorContext, declaringClass, constructor.parameters.map { param ->
-            KotlinParameterElement(newClassElement(param.type.resolve()), param, annotationUtils.getAnnotationMetadata(param), visitorContext)
+            KotlinParameterElement(newClassElement(param.type.resolve(), declaringClass.typeArguments), param, annotationUtils.getAnnotationMetadata(param), visitorContext)
         })
     }
 

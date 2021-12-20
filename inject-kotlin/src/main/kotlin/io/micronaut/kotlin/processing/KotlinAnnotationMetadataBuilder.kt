@@ -10,6 +10,7 @@ import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
+import java.lang.StringBuilder
 import java.lang.annotation.Inherited
 import java.lang.annotation.RetentionPolicy
 import java.util.*
@@ -207,8 +208,8 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
         TODO("Not yet implemented")
     }
 
-    override fun getRepeatableName(annotationMirror: KSAnnotation?): String? {
-        TODO("Not yet implemented")
+    override fun getRepeatableName(annotationMirror: KSAnnotation): String? {
+        return getRepeatableNameForType(annotationMirror.annotationType)
     }
 
     override fun getRepeatableNameForType(annotationType: KSAnnotated): String? {
@@ -219,7 +220,8 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
         if (repeatable != null) {
             val value = repeatable.arguments.find { it.name?.asString() == "value" }?.value
             if (value != null) {
-                return (value as Class<*>).name
+                val declaration = (value as KSType).declaration as KSClassDeclaration
+                return toClassName(declaration)
             }
         }
         return null
@@ -229,8 +231,11 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
         return Optional.ofNullable(resolver.getClassDeclarationByName(annotationName))
     }
 
-    override fun getAnnotationMember(originatingElement: KSAnnotated?, member: CharSequence?): KSDeclaration? {
-        TODO("Not yet implemented")
+    override fun getAnnotationMember(originatingElement: KSAnnotated, member: CharSequence): KSAnnotated? {
+        if (originatingElement is KSAnnotation) {
+            return originatingElement.arguments.find { it.name == member }
+        }
+        return null
     }
 
     override fun createVisitorContext(): VisitorContext {
@@ -283,5 +288,17 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
             }
         }
         return value
+    }
+
+    private fun toClassName(declaration: KSClassDeclaration): String {
+        val className = StringBuilder(declaration.packageName.asString())
+        val hierarchy = mutableListOf(declaration)
+        var parentDeclaration = declaration.parentDeclaration
+        while (parentDeclaration is KSClassDeclaration) {
+            hierarchy.add(0, parentDeclaration)
+            parentDeclaration = parentDeclaration.parentDeclaration
+        }
+        hierarchy.joinTo(className, "$", ".")
+        return className.toString()
     }
 }

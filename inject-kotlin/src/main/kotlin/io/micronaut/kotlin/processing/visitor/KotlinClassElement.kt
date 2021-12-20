@@ -14,14 +14,16 @@ import java.util.function.Predicate
 open class KotlinClassElement(val classType: KSType,
                               annotationMetadata: AnnotationMetadata,
                               visitorContext: KotlinVisitorContext,
-                              private val arrayDimensions: Int = 0): AbstractKotlinElement<KSClassDeclaration>(classType.declaration as KSClassDeclaration, annotationMetadata, visitorContext), ArrayableClassElement {
-
+                              private val arrayDimensions: Int = 0,
+                              private val typeVariable: Boolean = false): AbstractKotlinElement<KSClassDeclaration>(classType.declaration as KSClassDeclaration, annotationMetadata, visitorContext), ArrayableClassElement {
 
     @OptIn(KspExperimental::class)
     override fun getName(): String {
         val qualifiedName = declaration.qualifiedName!!
         return (visitorContext.resolver.mapKotlinNameToJava(qualifiedName) ?: qualifiedName).asString()
     }
+
+    override fun isTypeVariable(): Boolean = typeVariable
 
     override fun isAssignable(type: String): Boolean {
         val ksType = visitorContext.resolver.getClassDeclarationByName(type)?.asStarProjectedType()
@@ -58,8 +60,22 @@ open class KotlinClassElement(val classType: KSType,
     override fun getTypeArguments(): Map<String, ClassElement> {
         val typeArguments = mutableMapOf<String, ClassElement>()
         val elementFactory = visitorContext.elementFactory
-        classType.declaration.typeParameters.forEach {
-            typeArguments[it.name.asString()] = elementFactory.newClassElement(it.bounds.first().resolve())
+        val annotationUtils = visitorContext.getAnnotationUtils()
+        val typeParameters = classType.declaration.typeParameters
+        if (classType.arguments.isEmpty()) {
+            typeParameters.forEach {
+                typeArguments[it.name.asString()] = KotlinGenericPlaceholderElement(it, annotationUtils.getAnnotationMetadata(it), visitorContext)
+            }
+        } else {
+            classType.arguments.forEachIndexed { i, argument ->
+                val type = argument.type!!
+                val typeElement = elementFactory.newClassElement(
+                    type.resolve(),
+                    annotationUtils.getAnnotationMetadata(name, type),
+                    emptyMap(),
+                    true)
+                typeArguments[typeParameters[i].name.asString()] = typeElement
+            }
         }
         return typeArguments
     }

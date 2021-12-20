@@ -4,8 +4,12 @@ import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanMethod
+import io.micronaut.core.beans.BeanProperty
 import io.micronaut.inject.ExecutableMethod
 import spock.lang.Specification
+
+import javax.validation.Constraint
+import javax.validation.constraints.Min
 
 class BeanIntrospectionSpec extends Specification {
 
@@ -381,5 +385,28 @@ data class Foo(val x: Int, val y: Int) {
         then:
         obj.getX() == 5
         obj.getY() == 20
+    }
+
+    void "test annotations on generic type arguments for data classes"() {
+        given:
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Foo', '''
+package test
+
+import io.micronaut.core.annotation.Creator
+import javax.validation.constraints.Min
+
+@io.micronaut.core.annotation.Introspected
+data class Foo(val value: List<@Min(10) Long>)
+''')
+
+        when:
+        BeanProperty<?, ?> property = introspection.getRequiredProperty("value", List)
+        def genericTypeArg = property.asArgument().getTypeParameters()[0]
+
+        then:
+        property != null
+        genericTypeArg.annotationMetadata.hasStereotype(Constraint)
+        genericTypeArg.annotationMetadata.hasAnnotation(Min)
+        genericTypeArg.annotationMetadata.intValue(Min).getAsInt() == 10
     }
 }
