@@ -52,7 +52,11 @@ public final class InterceptorBindingQualifier<T> implements Qualifier<T> {
             if (name != null) {
                 final AnnotationValue<Annotation> members =
                         annotationValue.getAnnotation(META_MEMBER_MEMBERS).orElse(null);
-                supportedAnnotationNames.putIfAbsent(name, members);
+                if (members != null) {
+                    supportedAnnotationNames.put(name, members);
+                } else {
+                    supportedAnnotationNames.putIfAbsent(name, null);
+                }
             }
         }
         this.supportedInterceptorTypes = annotationValues
@@ -73,7 +77,11 @@ public final class InterceptorBindingQualifier<T> implements Qualifier<T> {
                 if (name != null) {
                     final AnnotationValue<Annotation> members =
                             bindingAnnotation.getAnnotation(META_MEMBER_MEMBERS).orElse(null);
-                    supportedAnnotationNames.putIfAbsent(name, members);
+                    if (members != null) {
+                        supportedAnnotationNames.put(name, members);
+                    } else {
+                        supportedAnnotationNames.putIfAbsent(name, null);
+                    }
                 }
             }
         } else {
