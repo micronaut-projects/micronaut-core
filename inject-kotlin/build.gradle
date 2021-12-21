@@ -22,3 +22,7 @@ afterEvaluate {
         from "$projectDir/src/main/kotlin"
     }
 }
+
+tasks.named("test") {
+    classpath += files(tasks.compileTestKotlin)
+}

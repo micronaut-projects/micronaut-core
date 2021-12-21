@@ -10,7 +10,7 @@ import io.micronaut.inject.ast.ParameterElement
 import io.micronaut.inject.ast.PrimitiveElement
 
 @OptIn(KspExperimental::class)
-open class KotlinMethodElement: AbstractKotlinElement<KSNode>, MethodElement {
+open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElement {
 
     private val name: String
     private val declaringType: ClassElement
@@ -54,7 +54,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSNode>, MethodElement {
         this.returnType = returnType
     }
 
-    protected constructor(method: KSNode,
+    protected constructor(method: KSAnnotated,
                           name: String,
                           declaringType: ClassElement,
                           annotationMetadata: AnnotationMetadata,

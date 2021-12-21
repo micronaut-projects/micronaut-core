@@ -12,12 +12,15 @@ class KotlinGenericPlaceholderElement(
     classType: KSTypeParameter,
     annotationMetadata: AnnotationMetadata,
     visitorContext: KotlinVisitorContext,
-    arrayDimensions: Int = 0
+    private val arrayDimensions: Int = 0
 ) : AbstractKotlinElement<KSTypeParameter>(classType, annotationMetadata, visitorContext), ArrayableClassElement, GenericPlaceholderElement {
 
-    override fun getName(): String = variableName
+
+    override fun getName(): String = "java.lang.Object"
 
     override fun isAssignable(type: String?): Boolean = false
+
+    override fun getArrayDimensions(): Int = arrayDimensions
 
     override fun withArrayDimensions(arrayDimensions: Int): ClassElement {
         return KotlinGenericPlaceholderElement(declaration, annotationMetadata, visitorContext, arrayDimensions)
