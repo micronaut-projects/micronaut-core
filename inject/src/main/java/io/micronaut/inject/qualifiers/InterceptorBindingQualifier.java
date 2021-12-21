@@ -17,6 +17,7 @@ package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.*;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanType;
 
@@ -64,9 +65,32 @@ public final class InterceptorBindingQualifier<T> implements Qualifier<T> {
      * Interceptor binding qualifiers.
      * @param bindingAnnotations The binding annotations
      */
-    InterceptorBindingQualifier(Collection<String> bindingAnnotations) {
+    InterceptorBindingQualifier(Collection<AnnotationValue<?>> bindingAnnotations) {
         if (CollectionUtils.isNotEmpty(bindingAnnotations)) {
             this.supportedAnnotationNames = new HashMap<>(bindingAnnotations.size());
+            for (AnnotationValue<?> bindingAnnotation : bindingAnnotations) {
+                final String name = bindingAnnotation.stringValue().orElse(null);
+                if (name != null) {
+                    final AnnotationValue<Annotation> members =
+                            bindingAnnotation.getAnnotation(META_MEMBER_MEMBERS).orElse(null);
+                    supportedAnnotationNames.putIfAbsent(name, members);
+                }
+            }
+        } else {
+            this.supportedAnnotationNames = Collections.emptyMap();
+        }
+        this.supportedInterceptorTypes = Collections.emptySet();
+    }
+
+    /**
+     * Interceptor binding qualifiers.
+     * @param bindingAnnotations The binding annotations
+     * @deprecated Use {@link #InterceptorBindingQualifier(java.util.Collection)} instead
+     */
+    @Deprecated
+    InterceptorBindingQualifier(String[] bindingAnnotations) {
+        if (ArrayUtils.isNotEmpty(bindingAnnotations)) {
+            this.supportedAnnotationNames = new HashMap<>(bindingAnnotations.length);
             for (String bindingAnnotation : bindingAnnotations) {
                 supportedAnnotationNames.put(bindingAnnotation, null);
             }

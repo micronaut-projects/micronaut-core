@@ -16,22 +16,29 @@
 package io.micronaut.aop.chain;
 
 import io.micronaut.aop.Interceptor;
+import io.micronaut.aop.InterceptorBinding;
+import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.InvocationContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
+import io.micronaut.core.util.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * Abstract interceptor chain implementation.
@@ -162,5 +169,32 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
             }
         }
         throw new IllegalArgumentException("Argument [" + from + "] is not within the interceptor chain");
+    }
+
+    /**
+     * Resolve interceptor binding for the given annotation metadata and kind.
+     * @param annotationMetadata The annotation metadata
+     * @param kind The kind
+     * @return The binding
+     * @since 3.3.0
+     */
+    protected static @NonNull Collection<AnnotationValue<?>> resolveInterceptorValues(@NonNull AnnotationMetadata annotationMetadata,
+                                                                             @NonNull InterceptorKind kind) {
+        List<AnnotationValue<InterceptorBinding>> bindings = annotationMetadata
+                .getAnnotationValuesByType(InterceptorBinding.class);
+        if (CollectionUtils.isNotEmpty(bindings)) {
+            return bindings
+                    .stream()
+                    .filter(av -> {
+                        if (!av.stringValue().isPresent()) {
+                            return false;
+                        }
+                        final InterceptorKind specifiedkind = av.enumValue("kind", InterceptorKind.class).orElse(null);
+                        return specifiedkind == null || specifiedkind.equals(kind);
+                    })
+                    .collect(Collectors.toList());
+        } else {
+            return Collections.emptyList();
+        }
     }
 }

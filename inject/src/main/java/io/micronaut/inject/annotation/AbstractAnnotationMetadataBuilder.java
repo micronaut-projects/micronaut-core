@@ -796,7 +796,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 if (!hasAnnotation(annotationType, AnnotationUtil.QUALIFIER) &&
                         !hasAnnotation(annotationType, Qualifier.class) && !hasAnnotation(annotationType, AnnotationUtil.ANN_INTERCEPTOR_BINDING)) {
                     addError(originatingElement, "@NonBinding annotation is only applicable to annotations that are annotated with @Qualifier or @InterceptorBinding");
-                } else if (!hasAnnotation(annotationType, AnnotationUtil.ANN_INTERCEPTOR_BINDING)){
+                } else if (!hasAnnotation(annotationType, AnnotationUtil.ANN_INTERCEPTOR_BINDING)) {
                     metadata.addDeclaredStereotype(
                             Collections.singletonList(getAnnotationTypeName(annotationMirror)),
                             AnnotationUtil.QUALIFIER,
