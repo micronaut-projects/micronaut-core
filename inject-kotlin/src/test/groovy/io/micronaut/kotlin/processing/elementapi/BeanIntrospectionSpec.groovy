@@ -3,13 +3,16 @@ package io.micronaut.kotlin.processing.elementapi
 import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
+import io.micronaut.core.beans.BeanIntrospectionReference
 import io.micronaut.core.beans.BeanMethod
 import io.micronaut.core.beans.BeanProperty
+import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.inject.ExecutableMethod
 import spock.lang.Specification
 
 import javax.validation.Constraint
 import javax.validation.constraints.Min
+import javax.validation.constraints.NotBlank
 
 class BeanIntrospectionSpec extends Specification {
 
@@ -99,7 +102,7 @@ class Test {
         BeanIntrospection introspection = Compiler.buildBeanIntrospection('fieldaccess.Test','''\
 package fieldaccess;
 
-import io.micronaut.core.annotation.*;
+import io.micronaut.core.annotation.*
 
 
 @Introspected(accessKind = [Introspected.AccessKind.FIELD, Introspected.AccessKind.METHOD])
@@ -408,5 +411,234 @@ data class Foo(val value: List<@Min(10) Long>)
         genericTypeArg.annotationMetadata.hasStereotype(Constraint)
         genericTypeArg.annotationMetadata.hasAnnotation(Min)
         genericTypeArg.annotationMetadata.intValue(Min).getAsInt() == 10
+    }
+
+    void 'test annotations on generic type arguments'() {
+        given:
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Foo', '''
+package test
+
+import javax.validation.constraints.Min
+import kotlin.annotation.AnnotationTarget.*
+
+@io.micronaut.core.annotation.Introspected
+class Foo {
+    private var value : List<@Min(10) @SomeAnn Long>? = null
+}
+
+@MustBeDocumented
+@Retention(AnnotationRetention.RUNTIME)
+@Target(FUNCTION, PROPERTY, ANNOTATION_CLASS, CONSTRUCTOR, VALUE_PARAMETER, TYPE)
+annotation class SomeAnn()
+''')
+        when:
+        BeanProperty<?, ?> property = introspection.getRequiredProperty("value", List)
+        def genericTypeArg = property.asArgument().getTypeParameters()[0]
+
+        then:
+        property != null
+        genericTypeArg.annotationMetadata.hasAnnotation(Min)
+        genericTypeArg.annotationMetadata.intValue(Min).getAsInt() == 10
+    }
+
+    void "test bean introspection on a data class"() {
+        given:
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Foo', '''
+package test
+
+@io.micronaut.core.annotation.Introspected
+data class Foo(@javax.validation.constraints.NotBlank val name: String, val age: Int)
+''')
+        when:
+        def test = introspection.instantiate("test", 20)
+        def property = introspection.getRequiredProperty("name", String)
+        def argument = introspection.getConstructorArguments()[0]
+
+        then:
+        argument.name == 'name'
+        argument.getAnnotationMetadata().hasStereotype(Constraint)
+        argument.getAnnotationMetadata().hasAnnotation(NotBlank)
+        test.name == 'test'
+        test.getName() == 'test'
+        introspection.propertyNames.length == 2
+        introspection.propertyNames == ['name', 'age'] as String[]
+        property.hasAnnotation(NotBlank)
+        property.isReadOnly()
+        property.hasSetterOrConstructorArgument()
+        property.name == 'name'
+        property.get(test) == 'test'
+
+        when:"a mutation is applied"
+        def newTest = property.withValue(test, "Changed")
+
+        then:"a new instance is returned"
+        !newTest.is(test)
+        newTest.getName() == 'Changed'
+        newTest.getAge() == 20
+    }
+
+    void "test create bean introspection for external inner class"() {
+        given:
+        ClassLoader classLoader = Compiler.buildClassLoader('test.Foo', '''
+package test
+
+import io.micronaut.core.annotation.*
+import io.micronaut.kotlin.processing.elementapi.OuterBean
+
+@Introspected(classes=[OuterBean.InnerBean::class])
+class Test
+''')
+
+        when:"the reference is loaded"
+        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef0')
+        BeanIntrospectionReference reference = clazz.newInstance()
+        String className = "io.micronaut.kotlin.processing.elementapi.OuterBean\$InnerBean"
+
+        then:"The reference is valid"
+        reference != null
+        reference.getBeanType().name == className
+
+        when:
+        BeanIntrospection i = reference.load()
+
+        then:
+        i.propertyNames.length == 1
+        i.propertyNames[0] == 'name'
+
+        when:
+        def o = i.instantiate()
+
+        then:
+        noExceptionThrown()
+        o.class.name == className
+    }
+
+    void "test create bean introspection for external inner interface"() {
+        given:
+        ClassLoader classLoader = Compiler.buildClassLoader('test.Foo', '''
+package test
+
+import io.micronaut.core.annotation.*
+import io.micronaut.kotlin.processing.elementapi.OuterBean
+
+@Introspected(classes=[OuterBean.InnerInterface::class])
+class Test
+''')
+
+        when:"the reference is loaded"
+        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef0')
+        BeanIntrospectionReference reference = clazz.newInstance()
+        String className = "io.micronaut.kotlin.processing.elementapi.OuterBean\$InnerInterface"
+
+        then:"The reference is valid"
+        reference != null
+        reference.getBeanType().name == className
+
+        when:
+        BeanIntrospection i = reference.load()
+
+        then:
+        i.propertyNames.length == 1
+        i.propertyNames[0] == 'name'
+
+        when:
+        def o = i.instantiate()
+
+        then:
+        def e = thrown(InstantiationException)
+        e.message == 'No default constructor exists'
+    }
+
+    void "test bean introspection with property of generic interface"() {
+        given:
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Foo', '''
+package test
+
+@io.micronaut.core.annotation.Introspected
+class Foo : GenBase<String> {
+    override fun getName() = "test"
+}
+
+interface GenBase<T> {
+    fun getName(): T
+}
+''')
+        when:
+        def test = introspection.instantiate()
+        def property = introspection.getRequiredProperty("name", String)
+
+        then:
+        introspection.beanProperties.first().type == String
+        property.get(test) == 'test'
+        !property.hasSetterOrConstructorArgument()
+
+        when:
+        property.withValue(test, 'try change')
+
+        then:
+        def e = thrown(UnsupportedOperationException)
+        e.message =='Cannot mutate property [name] that is not mutable via a setter method or constructor argument for type: test.Foo'
+    }
+
+    void "test bean introspection with property of generic superclass"() {
+        given:
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Foo', '''
+package test
+
+@io.micronaut.core.annotation.Introspected
+class Foo: GenBase<String>() {
+    override fun getName() = "test"
+}
+
+abstract class GenBase<T> {
+    abstract fun getName(): T
+    
+    fun getOther(): T {
+        return "other" as T
+    }
+}
+''')
+        when:
+        def test = introspection.instantiate()
+
+        def beanProperties = introspection.beanProperties.toList()
+        then:
+        beanProperties[0].type == String
+        beanProperties[1].type == String
+        introspection.getRequiredProperty("name", String)
+                .get(test) == 'test'
+        introspection.getRequiredProperty("other", String)
+                .get(test) == 'other'
+    }
+
+    void "test bean introspection with argument of generic interface"() {
+        given:
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Foo', '''
+package test
+
+@io.micronaut.core.annotation.Introspected
+class Foo: GenBase<Long?> {
+    override var value: Long? = null
+}
+
+interface GenBase<T> {
+    var value: T
+}
+
+''')
+        when:
+        def test = introspection.instantiate()
+        BeanProperty bp = introspection.getRequiredProperty("value", Long)
+        bp.set(test, 5L)
+
+        then:
+        bp.get(test) == 5L
+
+        when:
+        def returnedBean = bp.withValue(test, 10L)
+
+        then:
+        returnedBean.is(test)
+        bp.get(test) == 10L
     }
 }

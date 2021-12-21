@@ -221,7 +221,7 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
             val value = repeatable.arguments.find { it.name?.asString() == "value" }?.value
             if (value != null) {
                 val declaration = (value as KSType).declaration as KSClassDeclaration
-                return toClassName(declaration)
+                return declaration.toClassName()
             }
         }
         return null
@@ -285,20 +285,11 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
                 if (declaration.classKind == ClassKind.ENUM_ENTRY) {
                     return declaration.qualifiedName?.getShortName()
                 }
+                if (declaration.classKind == ClassKind.CLASS || declaration.classKind == ClassKind.INTERFACE) {
+                    return AnnotationClassValue<Any>(declaration.toClassName())
+                }
             }
         }
         return value
-    }
-
-    private fun toClassName(declaration: KSClassDeclaration): String {
-        val className = StringBuilder(declaration.packageName.asString())
-        val hierarchy = mutableListOf(declaration)
-        var parentDeclaration = declaration.parentDeclaration
-        while (parentDeclaration is KSClassDeclaration) {
-            hierarchy.add(0, parentDeclaration)
-            parentDeclaration = parentDeclaration.parentDeclaration
-        }
-        hierarchy.joinTo(className, "$", ".")
-        return className.toString()
     }
 }

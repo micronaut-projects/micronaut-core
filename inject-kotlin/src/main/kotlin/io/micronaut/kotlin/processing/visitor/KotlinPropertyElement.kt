@@ -53,6 +53,20 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
         this.getter = Optional.of(visitorContext.elementFactory.newMethodElement(classElement, getter, annotationMetadata))
     }
 
+    constructor(classElement: ClassElement,
+                type: ClassElement,
+                name: String,
+                getter: KotlinMethodElement,
+                setter: MethodElement?,
+                annotationMetadata: AnnotationMetadata,
+                visitorContext: KotlinVisitorContext) : super(getter.nativeType, annotationMetadata, visitorContext) {
+        this.name = name
+        this.type = type
+        this.classElement = classElement
+        this.setter = Optional.ofNullable(setter)
+        this.getter = Optional.of(getter)
+    }
+
     override fun getName(): String = name
 
     override fun getType(): ClassElement = type

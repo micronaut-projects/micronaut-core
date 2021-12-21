@@ -15,7 +15,7 @@ import java.util.Collections;
 
 public class Compiler {
 
-    static BeanIntrospection<?> buildBeanIntrospection(String name, @Language("kotlin") String clazz) {
+    static URLClassLoader buildClassLoader(String name, @Language("kotlin") String clazz) {
         KotlinCompilation compilation = new KotlinCompilation();
         compilation.setSources(Collections.singletonList(SourceFile.Companion.kotlin(name + ".kt", clazz, true)));
         compilation.setInheritClassPath(true);
@@ -40,7 +40,11 @@ public class Compiler {
             throw new RuntimeException(result.getMessages());
         }
 
-        final URLClassLoader classLoader = result.getClassLoader();
+        return result.getClassLoader();
+    }
+
+    static BeanIntrospection<?> buildBeanIntrospection(String name, @Language("kotlin") String clazz) {
+        final URLClassLoader classLoader = buildClassLoader(name, clazz);
         try {
             return BeanIntrospector.forClassLoader(classLoader).findIntrospection(classLoader.loadClass(name)).orElse(null);
         } catch (ClassNotFoundException e) {

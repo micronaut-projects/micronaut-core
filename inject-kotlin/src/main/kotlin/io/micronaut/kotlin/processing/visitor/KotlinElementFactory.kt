@@ -57,7 +57,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
             return if (resolvedGenerics.containsKey(name)) {
                 resolvedGenerics[name]!!
             } else {
-                KotlinGenericPlaceholderElement(type as KSTypeParameter, annotationMetadata, visitorContext)
+                KotlinGenericPlaceholderElement(declaration, annotationMetadata, visitorContext)
             }
         }
         if (!typeVariable) {
@@ -85,7 +85,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         declaringClass: ClassElement,
         method: KSFunctionDeclaration,
         annotationMetadata: AnnotationMetadata
-    ): MethodElement {
+    ): KotlinMethodElement {
         val annotationUtils = visitorContext.getAnnotationUtils()
         val returnType = method.returnType!!.resolve()
         return KotlinMethodElement(

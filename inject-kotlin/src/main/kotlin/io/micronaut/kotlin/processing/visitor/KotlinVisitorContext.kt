@@ -1,20 +1,24 @@
 package io.micronaut.kotlin.processing.visitor
 
+import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
+import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSNode
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.value.MutableConvertibleValues
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
 import io.micronaut.core.util.StringUtils
+import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.ClassGenerationException
 import io.micronaut.inject.writer.GeneratedFile
 import io.micronaut.kotlin.processing.AnnotationUtils
 import java.io.*
+import java.lang.StringBuilder
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.NoSuchFileException
@@ -61,6 +65,15 @@ class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment,
     override fun clear(): MutableConvertibleValues<Any> {
         visitorAttributes.clear()
         return this
+    }
+
+    override fun getClassElement(name: String): Optional<ClassElement> {
+        var declaration = resolver.getClassDeclarationByName(name)
+        if (declaration == null) {
+            declaration = resolver.getClassDeclarationByName(name.replace('$', '.'))
+        }
+        return Optional.ofNullable(declaration?.asStarProjectedType())
+            .map(elementFactory::newClassElement)
     }
 
     fun getAnnotationUtils() = annotationUtil
