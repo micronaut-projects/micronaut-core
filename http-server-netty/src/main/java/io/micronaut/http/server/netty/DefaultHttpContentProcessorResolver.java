@@ -106,7 +106,11 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
         if (bodyType.getType() == HttpRequest.class) {
             bodyType = bodyType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
         }
-        boolean isRaw = RAW_BODY_TYPES.contains(bodyType.getType());
+        Argument<?> type = bodyType;
+        if (type.isOptional()) {
+            type = type.getWrappedType();
+        }
+        boolean isRaw = RAW_BODY_TYPES.contains(type.getType());
         return resolve(request, isRaw);
     }
 
@@ -146,4 +150,5 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
         }
         return nettyHttpServerConfiguration;
     }
+
 }
