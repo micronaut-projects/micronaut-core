@@ -10,8 +10,8 @@ import io.micronaut.inject.ast.*
 import io.micronaut.kotlin.processing.toClassName
 import java.util.*
 import java.util.function.BiConsumer
-import java.util.function.Consumer
 import java.util.function.Predicate
+import java.util.stream.Collectors
 
 open class KotlinClassElement(val classType: KSType,
                               annotationMetadata: AnnotationMetadata,
@@ -19,9 +19,17 @@ open class KotlinClassElement(val classType: KSType,
                               private val arrayDimensions: Int = 0,
                               private val typeVariable: Boolean = false): AbstractKotlinElement<KSClassDeclaration>(classType.declaration as KSClassDeclaration, annotationMetadata, visitorContext), ArrayableClassElement {
 
+    companion object {
+        val CREATOR = "io.micronaut.core.annotation.Creator"
+    }
+
     @OptIn(KspExperimental::class)
     override fun getName(): String {
         return visitorContext.resolver.mapKotlinNameToJava(declaration.qualifiedName!!)?.asString() ?: declaration.toClassName()
+    }
+
+    override fun isInterface(): Boolean {
+        return declaration.classKind == ClassKind.INTERFACE
     }
 
     override fun isTypeVariable(): Boolean = typeVariable
@@ -90,34 +98,62 @@ open class KotlinClassElement(val classType: KSType,
     }
 
     override fun getDefaultConstructor(): Optional<MethodElement> {
+        var method = findDefaultStaticCreator()
+        if (method == null) {
+            method = findDefaultConstructor()
+        }
+
+        return createConstructor(method)
+    }
+
+    override fun getPrimaryConstructor(): Optional<MethodElement> {
+        var method = findStaticCreator()
+        if (method == null) {
+            method = findConcreteConstructor()
+        }
+
+        return createConstructor(method)
+    }
+
+    private fun createConstructor(ctor: KSFunctionDeclaration?): Optional<MethodElement> {
+        return Optional.ofNullable(ctor)
+            .map { constructor ->
+                if (constructor.isConstructor()) {
+                    visitorContext.elementFactory.newConstructorElement(
+                        this,
+                        constructor,
+                        visitorContext.getAnnotationUtils().getAnnotationMetadata(constructor)
+                    )
+                } else {
+                    visitorContext.elementFactory.newMethodElement(
+                        visitorContext.elementFactory.newClassElement(constructor.closestClassDeclaration()!!.asStarProjectedType()),
+                        constructor,
+                        visitorContext.getAnnotationUtils().getAnnotationMetadata(constructor)
+                    )
+                }
+            }
+    }
+
+    private fun findDefaultConstructor(): KSFunctionDeclaration? {
         val constructors = declaration.getConstructors()
             .filter {
                 it.parameters.isEmpty()
             }.toList()
 
         if (constructors.isEmpty()) {
-            return Optional.empty()
+            return null
         }
 
-        val constructor = if (constructors.size == 1) {
-           constructors.get(0)
+        return if (constructors.size == 1) {
+            constructors.get(0)
         } else {
             constructors.filter {
                 it.modifiers.contains(Modifier.PUBLIC)
             }.firstOrNull()
         }
-
-        return Optional.ofNullable(constructor)
-            .map { ctor ->
-                visitorContext.elementFactory.newConstructorElement(
-                    this,
-                    ctor,
-                    visitorContext.getAnnotationUtils().getAnnotationMetadata(ctor)
-                )
-            }
     }
 
-    override fun getPrimaryConstructor(): Optional<MethodElement> {
+    private fun findConcreteConstructor(): KSFunctionDeclaration? {
         val nonPrivateConstructors = declaration.getConstructors()
             .filter { ctor -> !ctor.isPrivate() }
             .toList()
@@ -130,14 +166,74 @@ open class KotlinClassElement(val classType: KSType,
                         annotationMetadata.hasAnnotation(Creator::class.java)
             }.firstOrNull() ?: declaration.primaryConstructor
         }
-        return Optional.ofNullable(constructor)
-            .map { ctor ->
-                visitorContext.elementFactory.newConstructorElement(
-                    this,
-                    ctor,
-                    visitorContext.getAnnotationUtils().getAnnotationMetadata(ctor)
-                )
+        return constructor
+    }
+
+    private fun findStaticCreator(): KSFunctionDeclaration? {
+        var creators = findNonPrivateStaticCreators()
+
+        if (creators.isEmpty()) {
+            return null
+        }
+        if (creators.size == 1) {
+            return creators[0]
+        }
+
+        //Can be multiple static @Creator methods. Prefer one with args here. The no arg method (if present) will
+        //be picked up by staticDefaultCreatorFor
+        val withArgs = creators.filter { method ->
+            method.parameters.isNotEmpty()
+        }.toList()
+
+        if (withArgs.size == 1) {
+            return withArgs[0]
+        } else {
+            creators = withArgs
+        }
+
+        return creators.firstOrNull(KSFunctionDeclaration::isPublic)
+    }
+
+    private fun findDefaultStaticCreator(): KSFunctionDeclaration? {
+        val creators = findNonPrivateStaticCreators().filter { func ->
+            func.parameters.isEmpty()
+        }.toList()
+
+        if (creators.isEmpty()) {
+            return null
+        }
+
+        if (creators.size == 1) {
+            return creators[0]
+        }
+
+        return creators.firstOrNull(KSFunctionDeclaration::isPublic)
+    }
+
+    private fun findNonPrivateStaticCreators(): List<KSFunctionDeclaration> {
+        val companion = declaration.declarations.find { it is KSClassDeclaration && it.isCompanionObject }
+        val creators = mutableListOf<KSFunctionDeclaration>()
+        if (companion != null) {
+            val isEnum = declaration.classKind == ClassKind.ENUM_CLASS
+            var enumCreator: KSFunctionDeclaration? = null
+            (companion as KSClassDeclaration).getDeclaredFunctions().forEach {
+                if (!it.isPrivate() && it.returnType?.resolve()?.declaration == declaration) {
+                    if (isEnum && it.simpleName.asString() == "valueOf") {
+                        enumCreator = it
+                    }
+                    if (it.annotations.any { ann ->
+                            ann.annotationType.resolve().declaration.qualifiedName!!.asString() == CREATOR
+                        }) {
+                        creators.add(it)
+                    }
+                }
             }
+            if (creators.isEmpty() && enumCreator != null) {
+                creators.add(enumCreator!!)
+            }
+            return creators
+        }
+        return emptyList()
     }
 
     override fun getEnclosingType(): Optional<ClassElement> {
