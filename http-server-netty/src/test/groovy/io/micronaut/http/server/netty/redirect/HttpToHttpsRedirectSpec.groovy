@@ -36,17 +36,20 @@ class HttpToHttpsRedirectSpec extends Specification {
     @Shared
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-        'micronaut.server.port'                  : port,
-        'micronaut.server.dual-protocol'         : true,
-        'micronaut.server.http-to-https-redirect': true,
-        'micronaut.ssl.enabled'                  : true,
-        'micronaut.ssl.build-self-signed'        : true,
-        'micronaut.http.client.follow-redirects' : false
+            'micronaut.server.port'                  : -1,
+            'micronaut.server.dual-protocol'         : true,
+            'micronaut.server.http-to-https-redirect': true,
+            'micronaut.ssl.enabled'                  : true,
+            'micronaut.ssl.port'                     : -1,
+            'micronaut.ssl.build-self-signed'        : true,
+            'micronaut.http.client.follow-redirects' : false
     ])
 
     @Shared
     @AutoCleanup
-    HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, new URL("http://localhost:$port"))
+    HttpClient httpClient = embeddedServer
+            .applicationContext
+            .createBean(HttpClient, new URL("http://localhost:${(embeddedServer.boundPorts - embeddedServer.port).first()}"))
 
     void 'test http to https redirect when enabled'() {
         when:
@@ -54,7 +57,7 @@ class HttpToHttpsRedirectSpec extends Specification {
 
         then:
         response.status == HttpStatus.PERMANENT_REDIRECT
-        response.header(HttpHeaders.LOCATION) == 'https://localhost:8443/hello'
+        response.header(HttpHeaders.LOCATION).startsWith("https://localhost")
         response.header(HttpHeaders.CONNECTION) == 'close'
     }
 }
