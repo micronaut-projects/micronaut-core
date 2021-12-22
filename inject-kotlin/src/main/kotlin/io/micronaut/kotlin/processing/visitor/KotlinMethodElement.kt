@@ -10,7 +10,7 @@ import io.micronaut.inject.ast.ParameterElement
 import io.micronaut.inject.ast.PrimitiveElement
 
 @OptIn(KspExperimental::class)
-open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElement {
+open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElement {
 
     private val name: String
     private val declaringType: ClassElement
@@ -22,7 +22,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
                 annotationMetadata: AnnotationMetadata,
                 visitorContext: KotlinVisitorContext,
                 parameter: ParameterElement
-    ) : super(method, annotationMetadata, visitorContext) {
+    ) : super(method.receiver, annotationMetadata, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.declaringType = declaringType
         this.parameters = listOf(parameter)
@@ -34,7 +34,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
                 returnType: ClassElement,
                 annotationMetadata: AnnotationMetadata,
                 visitorContext: KotlinVisitorContext,
-    ) : super(method, annotationMetadata, visitorContext) {
+    ) : super(method.receiver, annotationMetadata, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.declaringType = declaringType
         this.parameters = emptyList()
@@ -54,7 +54,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         this.returnType = returnType
     }
 
-    protected constructor(method: KSAnnotated,
+    protected constructor(method: KSDeclaration,
                           name: String,
                           declaringType: ClassElement,
                           annotationMetadata: AnnotationMetadata,

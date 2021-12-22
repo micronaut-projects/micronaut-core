@@ -641,4 +641,64 @@ interface GenBase<T> {
         returnedBean.is(test)
         bp.get(test) == 10L
     }
+
+    void "test bean introspection with property with static creator method on interface"() {
+        given:
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Foo', '''
+package test
+
+import io.micronaut.core.annotation.Creator
+
+@io.micronaut.core.annotation.Introspected
+fun interface Foo {
+
+    fun getName(): String
+
+    companion object {
+        @Creator
+        fun create(name: String): Foo {
+            return Foo { name }
+        }
+    }
+}
+
+''')
+        when:
+        def test = introspection.instantiate("test")
+
+        then:
+        introspection.constructorArguments.length == 1
+        introspection.getRequiredProperty("name", String)
+                .get(test) == 'test'
+    }
+
+    void "test bean introspection with property with static creator method on interface with generic type arguments"() {
+        given:
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+
+@io.micronaut.core.annotation.Introspected
+fun interface Foo<T> {
+
+    fun getName(): String
+
+    companion object {
+        @Creator
+        fun <T1> create(name: String): Foo<T1> {
+            return Foo { name }
+        }
+    }
+}
+
+''')
+        when:
+        def test = introspection.instantiate("test")
+
+        then:
+        introspection.constructorArguments.length == 1
+        introspection.getRequiredProperty("name", String)
+                .get(test) == 'test'
+    }
 }
