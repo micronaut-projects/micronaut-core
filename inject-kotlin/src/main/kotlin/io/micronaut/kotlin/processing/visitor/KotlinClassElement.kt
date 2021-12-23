@@ -460,28 +460,57 @@ open class KotlinClassElement(val classType: KSType,
             .filter { func -> !func.isPrivate() }
             .forEach { func ->
             val name = func.simpleName.asString()
-            if (NameUtils.isGetterName(name)) {
-                val propertyName = NameUtils.getPropertyNameForGetter(name)
-                updateGetterAndSetter(propertyName, functionBasedProperties, func) { gs, method -> gs.getter = method }
-            } else if (NameUtils.isSetterName(name)) {
-                val propertyName = NameUtils.getPropertyNameForSetter(name)
-                updateGetterAndSetter(propertyName, functionBasedProperties, func) { gs, method -> gs.setter = method }
+            val isGetter = NameUtils.isGetterName(name)
+            val isSetter = NameUtils.isSetterName(name) && func.parameters.size == 1
+            if (isGetter || isSetter) {
+                val elementFactory = visitorContext.elementFactory
+                val classDeclaration = func.closestClassDeclaration()!!
+
+                val declaringType = if (declaration == classDeclaration) {
+                    this
+                } else {
+                    val ksType = declaration.superTypes
+                        .map { it.resolve() }
+                        .find { it.declaration == classDeclaration }
+                    elementFactory.newClassElement(ksType!!)
+                }
+
+                val propertyName: String
+                val type: ClassElement
+                if (isGetter) {
+                    type = elementFactory.newClassElement(func.returnType!!.resolve(), declaringType.typeArguments)
+                    propertyName = NameUtils.getPropertyNameForGetter(name)
+                } else {
+                    type = elementFactory.newClassElement(func.parameters[0].type.resolve(), declaringType.typeArguments)
+                    propertyName = NameUtils.getPropertyNameForSetter(name)
+                }
+
+                var getterAndSetter = functionBasedProperties[propertyName]
+                if (getterAndSetter == null) {
+                    getterAndSetter = GetterAndSetter(type, this)
+                    functionBasedProperties[propertyName] = getterAndSetter
+                }
+                if (isGetter) {
+                    getterAndSetter.getter = func
+                } else if (isSetter) {
+                    getterAndSetter.setter = func
+                }
             }
         }
         functionBasedProperties.forEach { (name, getterSetter) ->
             if (getterSetter.getter != null) {
                 val parents: List<KSAnnotated> = if (getterSetter.setter != null) {
-                    listOf(getterSetter.setter!!.nativeType)
+                    listOf(getterSetter.setter!!)
                 } else {
                     emptyList()
                 }
                 val annotationMetadata = if (!parents.isEmpty()) {
                     annotationUtils.getAnnotationMetadata(
                         parents,
-                        getterSetter.getter!!.nativeType
+                        getterSetter.getter!!
                     )
                 } else {
-                    annotationUtils.getAnnotationMetadata(getterSetter.getter!!.nativeType)
+                    annotationUtils.getAnnotationMetadata(getterSetter.getter!!)
                 }
                 propertyList.add(KotlinPropertyElement(
                     getterSetter.declaringType,
@@ -496,34 +525,9 @@ open class KotlinClassElement(val classType: KSType,
         return propertyList
     }
 
-    private fun updateGetterAndSetter(propertyName: String,
-                                      functionBasedProperties: MutableMap<String, GetterAndSetter>,
-                                      func: KSFunctionDeclaration,
-                                      apply: BiConsumer<GetterAndSetter, KotlinMethodElement>) {
-        val elementFactory = visitorContext.elementFactory
-
-        val classDeclaration = func.closestClassDeclaration()!!
-        val declaringType = if (declaration == classDeclaration) {
-            this
-        } else {
-            val ksType = declaration.superTypes
-                .map { it.resolve() }
-                .find { it.declaration == classDeclaration }
-            elementFactory.newClassElement(ksType!!)
-        }
-        val type = elementFactory.newClassElement(func.returnType!!.resolve(), declaringType.typeArguments)
-
-        var getterAndSetter = functionBasedProperties[propertyName]
-        if (getterAndSetter == null) {
-            getterAndSetter = GetterAndSetter(type, this)
-            functionBasedProperties[propertyName] = getterAndSetter
-        }
-        apply.accept(getterAndSetter, elementFactory.newMethodElement(this, func, AnnotationMetadata.EMPTY_METADATA))
-    }
-
     private class GetterAndSetter(val type: ClassElement,
                                   val declaringType: ClassElement) {
-        var getter: KotlinMethodElement? = null
-        var setter: KotlinMethodElement? = null
+        var getter: KSFunctionDeclaration? = null
+        var setter: KSFunctionDeclaration? = null
     }
 }
