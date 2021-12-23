@@ -701,4 +701,59 @@ fun interface Foo<T> {
         introspection.getRequiredProperty("name", String)
                 .get(test) == 'test'
     }
+
+    void "test bean introspection with property from default interface method"() {
+        given:
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Test', '''
+package test
+
+@io.micronaut.core.annotation.Introspected
+class Test: Foo
+
+interface Foo {
+    fun getBar(): String = "good"
+}
+
+''')
+        when:
+        def test = introspection.instantiate()
+
+        then:
+        introspection.getRequiredProperty("bar", String)
+                .get(test) == 'good'
+    }
+
+    void "test generate bean introspection for interface"() {
+        when:
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Test','''\
+package test
+
+@io.micronaut.core.annotation.Introspected
+interface Test : io.micronaut.core.naming.Named {
+    fun setName(name: String)
+}
+''')
+        then:
+        introspection != null
+        introspection.propertyNames.length == 1
+        introspection.propertyNames[0] == 'name'
+
+        when:
+        introspection.instantiate()
+
+        then:
+        def e = thrown(InstantiationException)
+        e.message == 'No default constructor exists'
+
+        when:
+        def property = introspection.getRequiredProperty("name", String)
+        String setNameValue
+        def named = [getName:{-> "test"}, setName:{String n -> setNameValue= n }].asType(introspection.beanType)
+
+        property.set(named, "test")
+
+        then:
+        property.get(named) == 'test'
+        setNameValue == 'test'
+    }
 }

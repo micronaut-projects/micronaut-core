@@ -46,8 +46,8 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
         TODO("Not yet implemented")
     }
 
-    override fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSDeclaration {
-        return annotationMirror.annotationType.resolve().declaration
+    override fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSClassDeclaration {
+        return annotationMirror.annotationType.resolve().declaration as KSClassDeclaration
     }
 
     override fun hasAnnotation(element: KSAnnotated, annotation: Class<out Annotation>): Boolean {
@@ -67,7 +67,13 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
     }
 
     override fun getAnnotationTypeName(annotationMirror: KSAnnotation): String {
-        return getTypeForAnnotation(annotationMirror).qualifiedName!!.asString()
+        val type = getTypeForAnnotation(annotationMirror)
+        return if (type.qualifiedName != null) {
+            type.qualifiedName!!.asString()
+        } else {
+            println("Failed to get the qualified name of ${annotationMirror.shortName.asString()} annotation")
+            annotationMirror.shortName.asString()
+        }
     }
 
     override fun getElementName(element: KSAnnotated): String {

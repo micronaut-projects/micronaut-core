@@ -9,7 +9,8 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
     companion object {
         val primitives = mapOf(
             "kotlin.Boolean" to PrimitiveElement.BOOLEAN,
-            "kotlin.Int" to PrimitiveElement.INT
+            "kotlin.Int" to PrimitiveElement.INT,
+            "kotlin.Unit" to PrimitiveElement.VOID
         )
     }
 
