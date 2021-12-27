@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.SupplierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,7 +63,7 @@ import java.util.stream.Stream;
 public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>> {
     public static final String META_INF_SERVICES = "META-INF/services";
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(SoftServiceLoader.class);
+    private static final Supplier<Logger> LOGGER = SupplierUtil.memoized(() -> LoggerFactory.getLogger(SoftServiceLoader.class));
 
     private static final Map<String, SoftServiceLoader.StaticServiceLoader<?>> STATIC_SERVICES =
             StaticOptimizations.get(Optimizations.class)
@@ -160,7 +161,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             op.run();
         } finally {
             long dur = System.nanoTime() - sd;
-            LOGGER.debug(label + " took " + TimeUnit.MILLISECONDS.convert(dur, TimeUnit.NANOSECONDS) + "ms");
+            LOGGER.get().debug(label + " took " + TimeUnit.MILLISECONDS.convert(dur, TimeUnit.NANOSECONDS) + "ms");
         }
     }
 
@@ -180,7 +181,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             } else {
                 collectDynamicServices(values, predicate, name);
             }
-            LOGGER.debug("Loaded {} services of type {}", values.size(), name);
+            LOGGER.get().debug("Loaded {} services of type {}", values.size(), name);
         });
     }
 
