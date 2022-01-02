@@ -107,18 +107,19 @@ public final class InterceptorBindingQualifier<T> implements Qualifier<T> {
     }
 
     public static List<String> resolveInterceptorValues(AnnotationMetadata annotationMetadata, @Nullable String kind) {
-        AnnotationValue<?> bindings = annotationMetadata
-                .getAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
-        if (bindings != null) {
-            return bindings.getAnnotations(AnnotationMetadata.VALUE_MEMBER)
+        List<AnnotationValue<Annotation>> bindings = annotationMetadata
+                .getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING);
+        if (CollectionUtils.isNotEmpty(bindings)) {
+            return bindings
                     .stream()
                     .filter(av -> {
                         final String specifiedkind = av.stringValue("kind").orElse(null);
                         return kind == null || specifiedkind == null || specifiedkind.equals(kind);
                     })
-                    .map(AnnotationValue::stringValue)
-                    .filter(Optional::isPresent)
-                    .map(Optional::get)
+                    .flatMap(av -> {
+                        final String v = av.stringValue().orElse(null);
+                        return v != null ? Stream.of(v) : Stream.empty();
+                    })
                     .collect(Collectors.toList());
         } else {
             return Collections.emptyList();
