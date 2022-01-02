@@ -3,6 +3,7 @@ package io.micronaut.validation.validator.customwithdefaultconstraints
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.validation.validator.Validator
 import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
@@ -68,6 +69,31 @@ class EmployeeValidationsSpec extends Specification {
 
     }
 
+    void "test whether exceptions thrown when both custom message cascade constraint default validations fail"() {
+        given:
+        EmployeeService employeeService = applicationContext.getBean(EmployeeService.class)
+        Employee junior = new Employee()
+        junior.setName("")
+        junior.setExperience(10)
+
+        Employee emp = new Employee()
+        emp.setName("")
+        emp.setExperience(10)
+        emp.setJunior(junior);
+
+        when:
+        final ConstraintViolationException exception =
+                assertThrows(ConstraintViolationException.class, () ->
+                        employeeService.startHoliday(emp)
+                )
+        then:
+        String notBlankValidated = exception.getConstraintViolations().stream().filter(constraintViolation -> Objects.equals(constraintViolation.getPropertyPath().toString(), "startHoliday.emp.name")).map(ConstraintViolation::getMessage).findFirst().get();
+        String experienceValidated = exception.getConstraintViolations().stream().filter(constraintViolation -> Objects.equals(constraintViolation.getPropertyPath().toString(), "startHoliday.emp")).map(ConstraintViolation::getMessage).findFirst().get();
+        assertEquals("must not be blank", notBlankValidated);
+        assertEquals("Experience Ineligible", experienceValidated);
+
+    }
+
 }
 
 
@@ -86,6 +112,19 @@ class Employee {
     private String name;
 
     private int experience;
+
+
+    private Employee junior;
+
+    @EmployeeExperienceConstraint
+    @Nullable
+    Employee getJunior() {
+        return junior
+    }
+
+    void setJunior(Employee junior) {
+        this.junior = junior
+    }
 
     int getExperience() {
         return experience;
