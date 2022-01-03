@@ -444,7 +444,9 @@ open class KotlinClassElement(val classType: KSType,
         val annotationUtils = visitorContext.getAnnotationUtils()
         val elementFactory = visitorContext.elementFactory
         val typeArguments = typeArguments
-        val propertyList : MutableList<PropertyElement> = declaration.getAllProperties().map {
+        val propertyList : MutableList<PropertyElement> = declaration.getAllProperties()
+            .filter { !it.isPrivate() }
+            .map {
             val type = it.type.resolve()
             KotlinPropertyElement(
                 this,
