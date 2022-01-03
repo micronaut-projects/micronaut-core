@@ -330,6 +330,147 @@ class AnotherInterceptor implements Interceptor {
         context.close()
     }
 
+    void 'test multiple interceptor binding'() {
+        given:
+        ApplicationContext context = buildContext('''
+package multiplebinding;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.NonBinding;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import jakarta.inject.Singleton;
+
+@Retention(RUNTIME)
+@InterceptorBinding(kind = InterceptorKind.AROUND)
+@interface Deadly {
+
+}
+
+@Retention(RUNTIME)
+@InterceptorBinding(kind = InterceptorKind.AROUND)
+@interface Fast {
+}
+
+@Retention(RUNTIME)
+@InterceptorBinding(kind = InterceptorKind.AROUND)
+@interface Slow {
+}
+
+interface Missile {
+    void fire();
+}
+
+@Fast
+@Deadly
+@Singleton
+class FastAndDeadlyMissile implements Missile {
+    public void fire() {
+    }
+}
+
+@Deadly
+@Singleton
+class AnyDeadlyMissile implements Missile {
+    public void fire() {
+    }
+}
+
+@Singleton
+class GuidedMissile implements Missile {
+    @Slow
+    @Deadly
+    public void lockAndFire() {
+    }
+
+    @Fast
+    @Deadly
+    public void fire() {
+    }
+
+}
+
+@Slow
+@Deadly
+@Singleton
+class SlowMissile implements Missile {
+    public void fire() {
+    }
+}
+
+@Fast
+@Deadly
+@Singleton
+class MissileInterceptor implements MethodInterceptor<Object, Object> {
+    public boolean intercepted = false;
+
+    @Override public Object intercept(MethodInvocationContext<Object, Object> context) {
+        intercepted = true;
+        return context.proceed();
+    }
+}
+
+@Slow
+@Deadly
+@Singleton
+class LockInterceptor implements MethodInterceptor<Object, Object> {
+    public boolean intercepted = false;
+
+    @Override public Object intercept(MethodInvocationContext<Object, Object> context) {
+        intercepted = true;
+        return context.proceed();
+    }
+}
+
+''')
+        def missileInterceptor = getBean(context, 'multiplebinding.MissileInterceptor')
+        def lockInterceptor = getBean(context, 'multiplebinding.LockInterceptor')
+
+        when:
+        missileInterceptor.intercepted = false
+        lockInterceptor.intercepted = false
+        def guidedMissile = getBean(context, 'multiplebinding.GuidedMissile');
+        guidedMissile.fire()
+
+        then:
+        missileInterceptor.intercepted
+        !lockInterceptor.intercepted
+
+        when:
+        missileInterceptor.intercepted = false
+        lockInterceptor.intercepted = false
+        def fastAndDeadlyMissile = getBean(context, 'multiplebinding.FastAndDeadlyMissile');
+        fastAndDeadlyMissile.fire()
+
+        then:
+        missileInterceptor.intercepted
+        !lockInterceptor.intercepted
+
+        when:
+        missileInterceptor.intercepted = false
+        lockInterceptor.intercepted = false
+        def slowMissile = getBean(context, 'multiplebinding.SlowMissile');
+        slowMissile.fire()
+
+        then:
+        !missileInterceptor.intercepted
+        lockInterceptor.intercepted
+
+        when:
+        missileInterceptor.intercepted = false
+        lockInterceptor.intercepted = false
+        def anyMissile = getBean(context, 'multiplebinding.AnyDeadlyMissile');
+        anyMissile.fire()
+
+        then:
+        missileInterceptor.intercepted
+        lockInterceptor.intercepted
+
+
+        cleanup:
+        context.close()
+    }
+
     void 'test annotation with just interceptor binding - member binding'() {
         given:
         ApplicationContext context = buildContext('''
@@ -346,6 +487,11 @@ import jakarta.inject.Singleton;
 class MyBean {
     void test() {
     }
+    
+    @TestAnn(num=2) // overrides binding on type
+    void test2() {
+        
+    }
 }
 
 @Retention(RUNTIME)
@@ -361,7 +507,7 @@ class MyBean {
 @InterceptorBean(TestAnn.class)
 @TestAnn(num = 1, debug = true)
 class TestInterceptor implements Interceptor {
-    boolean invoked = false;
+    public boolean invoked = false;
     @Override
     public Object intercept(InvocationContext context) {
         invoked = true;
@@ -372,7 +518,7 @@ class TestInterceptor implements Interceptor {
 @InterceptorBean(TestAnn.class)
 @TestAnn(num = 2)
 class AnotherInterceptor implements Interceptor {
-    boolean invoked = false;
+    public boolean invoked = false;
     @Override
     public Object intercept(InvocationContext context) {
         invoked = true;
@@ -383,12 +529,22 @@ class AnotherInterceptor implements Interceptor {
         def instance = getBean(context, 'memberbinding.MyBean')
         def interceptor = getBean(context, 'memberbinding.TestInterceptor')
         def anotherInterceptor = getBean(context, 'memberbinding.AnotherInterceptor')
+
+        when:
         instance.test()
 
-        expect:"the interceptor was invoked"
+        then:"the interceptor was invoked"
         instance instanceof Intercepted
         interceptor.invoked
         !anotherInterceptor.invoked
+
+        when:
+        interceptor.invoked = false
+        instance.test2()
+
+        then:
+        !interceptor.invoked
+        anotherInterceptor.invoked
 
         cleanup:
         context.close()

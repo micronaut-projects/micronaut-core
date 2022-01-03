@@ -57,6 +57,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final Map<String, List<AnnotationTransformer<Annotation>>> ANNOTATION_TRANSFORMERS = new HashMap<>(5);
     private static final Map<String, List<AnnotationRemapper>> ANNOTATION_REMAPPERS = new HashMap<>(5);
     private static final Map<MetadataKey, AnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>(100);
+    private static final Map<String, Set<String>> NON_BINDING_CACHE = new HashMap<>(50);
     private static final List<String> DEFAULT_ANNOTATE_EXCLUDES = Arrays.asList(Internal.class.getName(), Experimental.class.getName());
 
     static {
@@ -274,7 +275,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param element The element
      * @return The declaring type
      */
-    protected abstract @NonNull String getDeclaringType(@NonNull T element);
+    protected abstract @Nullable String getDeclaringType(@NonNull T element);
 
     /**
      * Build the meta data for the given method element excluding any class metadata.
@@ -1466,33 +1467,27 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             if (o instanceof Boolean && ((Boolean) o)) {
                 Map<CharSequence, Object> values = metadata.getValues(lastParent);
                 if (!values.isEmpty()) {
-                    Set<String> nonBinding = new HashSet<>(5);
-                    final T parentAnn = getAnnotationMirror(lastParent).orElse(null);
-                    if (parentAnn != null) {
-                        values = new HashMap<>(values);
-                        final Iterator<Map.Entry<CharSequence, Object>> i = values.entrySet().iterator();
-                        while (i.hasNext()) {
-                            final Map.Entry<CharSequence, Object> entry = i.next();
-                            final T member = getAnnotationMember(parentAnn, entry.getKey());
-                            if (member != null) {
-                                final AnnotationMetadata memberMetadata = buildDeclared(member);
-                                if (memberMetadata.hasAnnotation(NonBinding.class)) {
-                                    nonBinding.add(entry.getKey().toString());
-                                    i.remove();
+                    Set<String> nonBinding = NON_BINDING_CACHE.computeIfAbsent(lastParent, (annotationName) -> {
+                        final HashSet<String> nonBindingResult = new HashSet<>(5);
+                        Map<String, ? extends T> members = getAnnotationMembers(lastParent);
+                        if (CollectionUtils.isNotEmpty(members)) {
+                            members.forEach((name, ann) -> {
+                                if (hasSimpleAnnotation(ann, NonBinding.class.getSimpleName())) {
+                                    nonBindingResult.add(name);
                                 }
-                            }
+                            });
                         }
+                        return nonBindingResult.isEmpty() ? Collections.emptySet() : nonBindingResult;
+                    });
+
+                    if (!nonBinding.isEmpty()) {
+                        values = new HashMap<>(values);
+                        values.keySet().removeAll(nonBinding);
                     }
                     final AnnotationValueBuilder<Annotation> builder =
                             AnnotationValue
                                 .builder(lastParent)
                                 .members(values);
-                    if (!nonBinding.isEmpty()) {
-                        builder.member(
-                                InterceptorBindingQualifier.META_MEMBER_NON_BINDING,
-                                nonBinding.toArray(StringUtils.EMPTY_STRING_ARRAY)
-                        );
-                    }
                     data.put(
                             InterceptorBindingQualifier.META_MEMBER_MEMBERS,
                             builder.build()
@@ -1502,6 +1497,22 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
         }
     }
+
+    /**
+     * Gets the annotation members for the given type.
+     * @param annotationType The annotation type
+     * @return The members
+     * @since 3.3.0
+     */
+    protected abstract @NonNull Map<String, ? extends T> getAnnotationMembers(@NonNull String annotationType);
+
+    /**
+     * Returns true if a simple meta annotation is present for the given element and annotation type
+     * @param element The element
+     * @param simpleName The simple name, ie {@link Class#getSimpleName()}
+     * @return True an annotation with the given simple name exists on the element
+     */
+    protected abstract boolean hasSimpleAnnotation(T element, String simpleName);
 
     private void addToInterceptorBindingsIfNecessary(LinkedList<AnnotationValueBuilder<?>> interceptorBindings, String lastParent, String annotationName) {
         if (lastParent != null) {
