@@ -145,7 +145,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                 try {
                     return Optional.of(resolveFormatter(context)
                             .map(formatter -> LocalDateTime.parse(object, formatter))
-                            .orElse(LocalDateTime.parse(object)));
+                            .orElseGet(() -> LocalDateTime.parse(object)));
                 } catch (DateTimeParseException e) {
                     context.reject(object, e);
                     return Optional.empty();
@@ -158,7 +158,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
             try {
                 return Optional.of(resolveFormatter(context)
                         .map(formatter -> formatter.format(object))
-                        .orElse(object.toString()));
+                        .orElseGet(() -> object.toString()));
             } catch (DateTimeParseException e) {
                 context.reject(object, e);
                 return Optional.empty();
@@ -178,7 +178,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                 try {
                     return Optional.of(resolveFormatter(context)
                             .map(formatter -> LocalDate.parse(object, formatter))
-                            .orElse(LocalDate.parse(object)));
+                            .orElseGet(() -> LocalDate.parse(object)));
                 } catch (DateTimeParseException e) {
                     context.reject(object, e);
                     return Optional.empty();
@@ -195,7 +195,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                 try {
                     return Optional.of(resolveFormatter(context)
                             .map(formatter -> ZonedDateTime.parse(object, formatter))
-                            .orElse(ZonedDateTime.parse(object)));
+                            .orElseGet(() -> ZonedDateTime.parse(object)));
                 } catch (DateTimeParseException e) {
                     context.reject(object, e);
                     return Optional.empty();
@@ -211,7 +211,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                     try {
                         return Optional.of(resolveFormatter(context)
                                 .map(formatter -> OffsetDateTime.parse(object, formatter))
-                                .orElse(OffsetDateTime.parse(object)));
+                                .orElseGet(() -> OffsetDateTime.parse(object)));
                     } catch (DateTimeParseException e) {
                         context.reject(object, e);
                         return Optional.empty();
