@@ -12,12 +12,10 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Flux
 import spock.lang.Issue
-import spock.lang.PendingFeature
 import spock.lang.Specification
 
 class FormDataDiskSpec extends Specification {
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6705')
-    @PendingFeature
     void "test parsing form to map with disk attributes"() {
         given:
         def server = (EmbeddedServer) ApplicationContext.run(EmbeddedServer, [
