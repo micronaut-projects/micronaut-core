@@ -1,18 +1,24 @@
 package io.micronaut.kotlin.processing.elementapi
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
+import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.core.beans.BeanMethod
 import io.micronaut.core.beans.BeanProperty
+import io.micronaut.core.convert.ConversionContext
+import io.micronaut.core.reflect.InstantiationUtils
 import io.micronaut.core.reflect.exception.InstantiationException
+import io.micronaut.core.type.Argument
 import io.micronaut.inject.ExecutableMethod
 import spock.lang.Specification
 
 import javax.validation.Constraint
 import javax.validation.constraints.Min
 import javax.validation.constraints.NotBlank
+import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends Specification {
 
@@ -423,7 +429,7 @@ import kotlin.annotation.AnnotationTarget.*
 
 @io.micronaut.core.annotation.Introspected
 class Foo {
-    private var value : List<@Min(10) @SomeAnn Long>? = null
+    var value : List<@Min(10) @SomeAnn Long>? = null
 }
 
 @MustBeDocumented
@@ -755,5 +761,349 @@ interface Test : io.micronaut.core.naming.Named {
         then:
         property.get(named) == 'test'
         setNameValue == 'test'
+    }
+
+    void "test build introspection"() {
+        given:
+        def classLoader = Compiler.buildClassLoader('test.Address', '''
+package test
+
+import javax.validation.constraints.*
+
+@io.micronaut.core.annotation.Introspected
+class Address {
+
+    @NotBlank(groups = [GroupOne::class])
+    @NotBlank(groups = [GroupThree::class], message = "different message")
+    @Size(min = 5, max = 20, groups = [GroupTwo::class])
+    private var street: String? = null
+}
+
+interface GroupOne
+interface GroupTwo
+interface GroupThree
+''')
+        def clazz = classLoader.loadClass('test.$Address$IntrospectionRef')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        expect:
+        reference != null
+        reference.load()
+    }
+
+    void "test primary constructor is preferred"() {
+        given:
+        def classLoader = Compiler.buildClassLoader('test.Book', '''
+package test
+
+@io.micronaut.core.annotation.Introspected
+class Book(val title: String) {
+
+    private var author: String? = null
+
+    constructor(title: String, author: String) : this(title) {
+        this.author = author
+    }
+}
+''')
+        Class clazz = classLoader.loadClass('test.$Book$IntrospectionRef')
+        BeanIntrospectionReference reference = (BeanIntrospectionReference) clazz.newInstance()
+
+        expect:
+        reference != null
+
+        when:
+        BeanIntrospection introspection = reference.load()
+
+        then:
+        introspection != null
+        introspection.hasAnnotation(Introspected)
+        introspection.propertyNames.length == 1
+
+        when:
+        introspection.instantiate()
+
+        then:
+        thrown(InstantiationException)
+
+        when: "update introspectionMap"
+        BeanIntrospector introspector = BeanIntrospector.SHARED
+        Field introspectionMapField = introspector.getClass().getDeclaredField("introspectionMap")
+        introspectionMapField.setAccessible(true)
+        introspectionMapField.set(introspector, new HashMap<String, BeanIntrospectionReference<Object>>());
+        Map map = (Map) introspectionMapField.get(introspector)
+        map.put(reference.getName(), reference)
+
+        and:
+        def book = InstantiationUtils.tryInstantiate(introspection.getBeanType(), ["title": "The Stand"], ConversionContext.of(Argument.of(introspection.beanType)))
+        def prop = introspection.getRequiredProperty("title", String)
+
+        then:
+        prop.get(book.get()) == "The Stand"
+
+        cleanup:
+        introspectionMapField.set(introspector, null)
+    }
+
+    void "test multiple constructors with primary constructor marked as @Creator"() {
+        given:
+        def classLoader = Compiler.buildClassLoader('test.Book', '''
+package test
+
+import io.micronaut.core.annotation.Creator
+
+@io.micronaut.core.annotation.Introspected
+class Book {
+
+    private var author: String? = null
+    val title: String
+
+    constructor(title: String, author: String) : this(title) {
+        this.author = author
+    }
+    
+    @Creator
+    constructor(title: String) {
+        this.title = title
+    }
+}
+''')
+        Class clazz = classLoader.loadClass('test.$Book$IntrospectionRef')
+        BeanIntrospectionReference reference = (BeanIntrospectionReference) clazz.newInstance()
+
+        expect:
+        reference != null
+
+        when:
+        BeanIntrospection introspection = reference.load()
+
+        then:
+        introspection != null
+        introspection.hasAnnotation(Introspected)
+        introspection.propertyNames.length == 1
+
+        when:
+        introspection.instantiate()
+
+        then:
+        thrown(InstantiationException)
+
+        when: "update introspectionMap"
+        BeanIntrospector introspector = BeanIntrospector.SHARED
+        Field introspectionMapField = introspector.getClass().getDeclaredField("introspectionMap")
+        introspectionMapField.setAccessible(true)
+        introspectionMapField.set(introspector, new HashMap<String, BeanIntrospectionReference<Object>>());
+        Map map = (Map) introspectionMapField.get(introspector)
+        map.put(reference.getName(), reference)
+
+        and:
+        def book = InstantiationUtils.tryInstantiate(introspection.getBeanType(), ["title": "The Stand"], ConversionContext.of(Argument.of(introspection.beanType)))
+        def prop = introspection.getRequiredProperty("title", String)
+
+        then:
+        prop.get(book.get()) == "The Stand"
+
+        cleanup:
+        introspectionMapField.set(introspector, null)
+    }
+
+    void "test default constructor "() {
+        given:
+        def classLoader = Compiler.buildClassLoader('test.Book', '''
+package test
+
+@io.micronaut.core.annotation.Introspected
+class Book {
+    var title: String? = null
+}
+''')
+        Class clazz = classLoader.loadClass('test.$Book$IntrospectionRef')
+        BeanIntrospectionReference reference = (BeanIntrospectionReference) clazz.newInstance()
+
+        expect:
+        reference != null
+
+        when:
+        BeanIntrospection introspection = reference.load()
+
+        then:
+        introspection != null
+        introspection.hasAnnotation(Introspected)
+        introspection.propertyNames.length == 1
+
+        when: "update introspectionMap"
+        BeanIntrospector introspector = BeanIntrospector.SHARED
+        Field introspectionMapField = introspector.getClass().getDeclaredField("introspectionMap")
+        introspectionMapField.setAccessible(true)
+        introspectionMapField.set(introspector, new HashMap<String, BeanIntrospectionReference<Object>>());
+        Map map = (Map) introspectionMapField.get(introspector)
+        map.put(reference.getName(), reference)
+
+        and:
+        def book = InstantiationUtils.tryInstantiate(introspection.getBeanType(), ["title": "The Stand"], ConversionContext.of(Argument.of(introspection.beanType)))
+        def prop = introspection.getRequiredProperty("title", String)
+
+        then:
+        prop.get(book.get()) == null
+
+        cleanup:
+        introspectionMapField.set(introspector, null)
+    }
+
+    void "test multiple constructors with @JsonCreator"() {
+        given:
+        def classLoader = Compiler.buildClassLoader('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.*
+import javax.validation.constraints.*
+import java.util.*
+import com.fasterxml.jackson.annotation.*
+
+@Introspected
+class Test {
+    private var name: String? = null
+    var age: Int = 0
+    
+    @JsonCreator
+    constructor(@JsonProperty("name") name: String) {
+        this.name = name
+    }
+    
+    constructor(age: Int) {
+        this.age = age
+    }
+    
+    fun getName(): String? = name
+    
+    fun setName(n: String): Test {
+        this.name = n
+        return this
+    }
+}
+
+''')
+
+        when:"the reference is loaded"
+        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+        reference.getAnnotationMetadata().hasAnnotation(Introspected)
+        reference.isPresent()
+        reference.beanType.name == 'test.Test'
+
+        when:"the introspection is loaded"
+        BeanIntrospection introspection = reference.load()
+
+        then:"The introspection is valid"
+        introspection != null
+        introspection.hasAnnotation(Introspected)
+        introspection.propertyNames.length == 2
+
+        when:
+        def test = introspection.instantiate("Fred")
+        def prop = introspection.getRequiredProperty("name", String)
+
+        then:
+        prop.get(test) == 'Fred'
+    }
+
+    void "test write bean introspection with builder style properties"() {
+        given:
+        def classLoader = Compiler.buildClassLoader('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.*
+import javax.validation.constraints.*
+import java.util.*
+
+@Introspected
+class Test {
+    private var name: String? = null
+    
+    fun getName(): String? = name
+    fun setName(n: String): Test {
+        this.name = n
+        return this
+    }
+}
+
+''')
+
+        when:"the reference is loaded"
+        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+        reference.getAnnotationMetadata().hasAnnotation(Introspected)
+        reference.isPresent()
+        reference.beanType.name == 'test.Test'
+
+        when:"the introspection is loaded"
+        BeanIntrospection introspection = reference.load()
+
+        then:"The introspection is valid"
+        introspection != null
+        introspection.hasAnnotation(Introspected)
+        introspection.propertyNames.length == 1
+
+        when:
+        def test = introspection.instantiate()
+        def prop = introspection.getRequiredProperty("name", String)
+        prop.set(test, "Foo")
+
+        then:
+        prop.get(test) == 'Foo'
+    }
+
+    void "test write bean introspection with inner classes"() {
+        given:
+        def classLoader = Compiler.buildClassLoader('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.*
+import javax.validation.constraints.*
+import java.util.*
+
+@Introspected
+class Test {
+
+    private var status: Status? = null
+    
+    fun setStatus(status: Status) {
+        this.status = status
+    }
+    
+    fun getStatus(): Status? {
+        return this.status
+    }
+
+    enum class Status {
+        UP, DOWN
+    }
+}
+
+''')
+
+        when:"the reference is loaded"
+        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+        reference.getAnnotationMetadata().hasAnnotation(Introspected)
+        reference.isPresent()
+        reference.beanType.name == 'test.Test'
+
+        when:"the introspection is loaded"
+        BeanIntrospection introspection = reference.load()
+
+        then:"The introspection is valid"
+        introspection != null
+        introspection.hasAnnotation(Introspected)
+        introspection.propertyNames.length == 1
     }
 }
