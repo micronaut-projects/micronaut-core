@@ -154,7 +154,7 @@ public final class InterceptorBindingQualifier<T> implements Qualifier<T> {
                     }
                 } else {
                     // multiple binding case
-                    boolean matched = true;
+                    boolean matched = false;
                     for (AnnotationValue<?> annotation : interceptorValues) {
                         final String annotationName = annotation.stringValue().orElse(null);
                         if (annotationName == null) {
@@ -165,11 +165,16 @@ public final class InterceptorBindingQualifier<T> implements Qualifier<T> {
                             final AnnotationValue<Annotation> otherBinding =
                                     annotation.getAnnotation(META_MEMBER_MEMBERS).orElse(null);
                             for (AnnotationValue<?> binding : bindingList) {
-                                matched = matched && (!binding.isPresent(META_MEMBER_MEMBERS) || binding.equals(otherBinding));
+                                matched = (!binding.isPresent(META_MEMBER_MEMBERS) || binding.equals(otherBinding));
+                                if (matched) {
+                                    break;
+                                }
                             }
+                        } else {
+                            matched = supportedAnnotationNames.containsKey(annotationName);
                         }
 
-                        if (!matched) {
+                        if (matched) {
                             break;
                         }
                     }
