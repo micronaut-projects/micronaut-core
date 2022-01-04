@@ -17,6 +17,7 @@ package io.micronaut.inject.beans.visitor;
 
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
@@ -106,7 +107,13 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     public void visitMethod(MethodElement element, VisitorContext context) {
         final ClassElement declaringType = element.getDeclaringType();
         final String methodName = element.getName();
-        if (declaringType.hasStereotype(ConfigurationReader.class) && methodName.startsWith("get") && !writers.containsKey(declaringType.getName())) {
+
+        final String[] readPrefixes = declaringType.getValue(AccessorsStyle.class, "readPrefixes", String[].class)
+                .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
+        final String[] writePrefixes = declaringType.getValue(AccessorsStyle.class, "writePrefixes", String[].class)
+                .orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX});
+
+        if (declaringType.hasStereotype(ConfigurationReader.class) && NameUtils.isReaderName(methodName, readPrefixes) && !writers.containsKey(declaringType.getName())) {
             final boolean hasConstraints = element.hasStereotype(JAVAX_VALIDATION_CONSTRAINT) || element.hasStereotype(JAVAX_VALIDATION_VALID);
             if (hasConstraints) {
                 processIntrospected(declaringType, context, AnnotationValue.builder(Introspected.class).build());
@@ -114,16 +121,16 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         }
 
         if (currentAbstractIntrospection != null) {
-            if (NameUtils.isGetterName(methodName) && element.getParameters().length == 0) {
-                final String propertyName = NameUtils.getPropertyNameForGetter(methodName);
+            if (NameUtils.isReaderName(methodName, readPrefixes) && element.getParameters().length == 0) {
+                final String propertyName = NameUtils.getPropertyNameForGetter(methodName, readPrefixes);
                 final AbstractPropertyElement propertyElement = currentAbstractIntrospection.properties.computeIfAbsent(propertyName, s -> new AbstractPropertyElement(
                         element.getDeclaringType(),
                         element.getReturnType(),
                         propertyName
                 ));
                 propertyElement.readMethod = element;
-            } else if (NameUtils.isSetterName(methodName) && element.getParameters().length == 1) {
-                final String propertyName = NameUtils.getPropertyNameForSetter(methodName);
+            } else if (NameUtils.isWriterName(methodName, writePrefixes) && element.getParameters().length == 1) {
+                final String propertyName = NameUtils.getPropertyNameForSetter(methodName, writePrefixes);
                 final AbstractPropertyElement propertyElement = currentAbstractIntrospection.properties.computeIfAbsent(propertyName, s -> new AbstractPropertyElement(
                         element.getDeclaringType(),
                         element.getParameters()[0].getType(),
