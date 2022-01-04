@@ -8,6 +8,161 @@ import spock.lang.Unroll
 
 class AroundConstructCompileSpec extends AbstractTypeElementSpec {
 
+    void 'test around construct on type and constructor with proxy target'() {
+        given:
+        ApplicationContext context = buildContext("""
+package ctorbinding; 
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import jakarta.inject.Singleton;
+import static java.lang.annotation.ElementType.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@FooClassBinding
+@Singleton
+class Foo {
+
+    @FooCtorBinding
+    public Foo() {
+    }
+}
+
+
+@Target({ TYPE, CONSTRUCTOR })
+@Retention(RUNTIME)
+@Documented
+@InterceptorBinding(kind = InterceptorKind.AROUND)
+@InterceptorBinding(kind = InterceptorKind.AROUND_CONSTRUCT)
+@interface FooCtorBinding {
+
+}
+
+@Target({ TYPE })
+@Retention(RUNTIME)
+@Documented
+@InterceptorBinding(kind = InterceptorKind.AROUND)
+@InterceptorBinding(kind = InterceptorKind.AROUND_CONSTRUCT)
+@Around(proxyTarget = true)
+@interface FooClassBinding {
+}
+
+@Singleton
+@FooClassBinding
+class Interceptor1 implements ConstructorInterceptor<Object> {
+    public boolean intercepted = false;
+    @Override public Object intercept(ConstructorInvocationContext<Object> context) {
+        intercepted = true;
+        return context.proceed();
+    }
+}
+
+@Singleton
+@FooCtorBinding
+class Interceptor2 implements ConstructorInterceptor<Object> {
+    public boolean intercepted = false;
+    @Override public Object intercept(ConstructorInvocationContext<Object> context) {
+        intercepted = true;
+        return context.proceed();
+    }
+}
+""")
+        when:
+        def i1 = getBean(context, 'ctorbinding.Interceptor1')
+        def i2 = getBean(context, 'ctorbinding.Interceptor2')
+
+        then:
+        !i1.intercepted
+        !i2.intercepted
+
+        when:
+        def bean = getBean(context, 'ctorbinding.Foo')
+
+        then:
+        i1.intercepted
+        i2.intercepted
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test around construct on type and constructor'() {
+        given:
+        ApplicationContext context = buildContext("""
+package ctorbinding; 
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import jakarta.inject.Singleton;
+import static java.lang.annotation.ElementType.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@FooClassBinding
+@Singleton
+class Foo {
+
+    @FooCtorBinding
+    public Foo() {
+    }
+}
+
+
+@Target({ TYPE, CONSTRUCTOR })
+@Retention(RUNTIME)
+@Documented
+@InterceptorBinding(kind = InterceptorKind.AROUND)
+@InterceptorBinding(kind = InterceptorKind.AROUND_CONSTRUCT)
+@interface FooCtorBinding {
+
+}
+
+@Target({ TYPE })
+@Retention(RUNTIME)
+@Documented
+@InterceptorBinding(kind = InterceptorKind.AROUND)
+@InterceptorBinding(kind = InterceptorKind.AROUND_CONSTRUCT)
+@interface FooClassBinding {
+}
+
+@Singleton
+@FooClassBinding
+class Interceptor1 implements ConstructorInterceptor<Object> {
+    public boolean intercepted = false;
+    @Override public Object intercept(ConstructorInvocationContext<Object> context) {
+        intercepted = true;
+        return context.proceed();
+    }
+}
+
+@Singleton
+@FooCtorBinding
+class Interceptor2 implements ConstructorInterceptor<Object> {
+    public boolean intercepted = false;
+    @Override public Object intercept(ConstructorInvocationContext<Object> context) {
+        intercepted = true;
+        return context.proceed();
+    }
+}
+""")
+        when:
+        def i1 = getBean(context, 'ctorbinding.Interceptor1')
+        def i2 = getBean(context, 'ctorbinding.Interceptor2')
+
+        then:
+        !i1.intercepted
+        !i2.intercepted
+
+        when:
+        def bean = getBean(context, 'ctorbinding.Foo')
+
+        then:
+        i1.intercepted
+        i2.intercepted
+
+        cleanup:
+        context.close()
+    }
+
     @Unroll
     void 'test around construct with around interception - proxyTarget = #proxyTarget'() {
         given:
