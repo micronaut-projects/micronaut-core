@@ -17,14 +17,11 @@ package io.micronaut.management.endpoint.health
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
-import io.micronaut.core.convert.ArgumentConversionContext
-import io.micronaut.core.type.Argument
 import io.micronaut.health.HealthStatus
-import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.bind.binders.TypedRequestArgumentBinder
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.management.endpoint.BasePrincipalBinder
 import io.micronaut.management.health.aggregator.DefaultHealthAggregator
 import io.micronaut.management.health.indicator.HealthIndicator
 import io.micronaut.management.health.indicator.HealthResult
@@ -39,7 +36,6 @@ import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 import javax.sql.DataSource
-import java.security.Principal
 
 class HealthEndpointSpec extends Specification {
 
@@ -436,27 +432,10 @@ class HealthEndpointSpec extends Specification {
 
     @Singleton
     @Requires(property = 'spec.name', value = 'HealthEndpointSpec')
-    static class TestPrincipalBinder implements TypedRequestArgumentBinder<Principal> {
-
+    static class TestPrincipalBinder extends BasePrincipalBinder {
         @Override
-        Argument<Principal> argumentType() {
-            return Argument.of(Principal)
-        }
-
-        @Override
-        BindingResult<Principal> bind(ArgumentConversionContext<Principal> context, HttpRequest<?> source) {
-            return new BindingResult<Principal>() {
-                @Override
-                Optional<Principal> getValue() {
-                    Optional.of(new Principal() {
-
-                        @Override
-                        String getName() {
-                            return "Test class"
-                        }
-                    })
-                }
-            }
+        String overriddenName() {
+            "Test class"
         }
     }
 

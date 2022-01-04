@@ -1,19 +1,65 @@
 The environment endpoint returns information about the link:{api}/io/micronaut/context/env/Environment.html[Environment] and its link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource]s.
 
-NOTE: Properties that may contain sensitive data are masked.
-
 == Configuration
 
-To configure the environment endpoint, supply configuration through `endpoints.env`.
+To enable and configure the environment endpoint, supply configuration through `endpoints.env`.
 
 .Environment Endpoint Configuration Example
 [source,yaml]
 ----
 endpoints:
   env:
-    enabled: Boolean    # default: true
+    enabled: Boolean    # default: false
     sensitive: Boolean  # default: true
 ----
+
+By default the endpoint will mask all values.
+To customize this masking you need to supply a Bean that implements link:{api}/io/micronaut/management/endpoint/env/EnvironmentEndpointFilter.html[EnvironmentEndpointFilter].
+
+This first example will mask all values except for those that contain the name `value_a` or `value_b`;
+
+.First example of environment masking
+[source,java]
+----
+@Singleton
+public class MaskEnvironmentEndpointFilter implements EnvironmentEndpointFilter {
+    @Override
+    public void specifyFiltering(EnvironmentFilterSpecification specification) {
+        specification
+            .maskAll() // All values will be masked, apart from the supplied patterns
+            .maskPatterns(
+                Pattern.compile(".*value_a.*", Pattern.CASE_INSENSITIVE),
+                Pattern.compile(".*value_b.*", Pattern.CASE_INSENSITIVE)
+            );
+    }
+}
+----
+
+It is also possible to allow all values in plain text using `maskNone()`, and then specify name patterns that will be masked, ie:
+
+.Deny instead of allow
+[source,java]
+----
+@Singleton
+public class AllPlainExceptSecretOrKeyEnvironmentEndpointFilter implements EnvironmentEndpointFilter {
+    @Override
+    public void specifyFiltering(EnvironmentFilterSpecification specification) {
+        specification
+            .maskNone() // All values will be in plain-text apart from the supplied patterns
+            .maskPatterns(
+                Pattern.compile(".*secret.*", Pattern.CASE_INSENSITIVE),
+                Pattern.compile(".*key.*", Pattern.CASE_INSENSITIVE)
+            );
+    }
+}
+----
+
+The link:{api}/io/micronaut/management/endpoint/env/EnvironmentFilterSpecification.html[EnvironmentFilterSpecification] class
+also contains the current `Principal` if one exists, so this can be used to further limit access based on the
+currently logged-in user.
+
+Sensible defaults can be applied by calling the link:{api}/io/micronaut/management/endpoint/env/EnvironmentFilterSpecification.html#legacyMasking--[`legacyMasking()`] method.
+This will show all values apart from those that contain the words `password`, `credential`, `certificate`, `key`, `secret` or `token` anywhere in their name.
 
 == Getting information about the environment
 
