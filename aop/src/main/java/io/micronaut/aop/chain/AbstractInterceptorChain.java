@@ -32,7 +32,6 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -191,7 +190,7 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
                     ((AnnotationMetadataHierarchy) annotationMetadata).getRootMetadata()
                     .getAnnotationValuesByType(InterceptorBinding.class);
             if (CollectionUtils.isNotEmpty(declaredValues) || CollectionUtils.isNotEmpty(parentValues)) {
-                List<AnnotationValue<?>> resolved = new ArrayList<>(declaredValues.size() + parentValues.size());
+                Set<AnnotationValue<?>> resolved = new HashSet<>(declaredValues.size() + parentValues.size());
                 Set<String> declared = new HashSet<>(declaredValues.size());
                 for (AnnotationValue<InterceptorBinding> declaredValue : declaredValues) {
                     final String annotationName = declaredValue.stringValue().orElse(null);
@@ -232,7 +231,7 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
                             final InterceptorKind specifiedkind = av.enumValue("kind", InterceptorKind.class).orElse(null);
                             return specifiedkind == null || specifiedkind.equals(kind);
                         })
-                        .collect(Collectors.toList());
+                        .collect(Collectors.toSet());
             } else {
                 return Collections.emptyList();
             }

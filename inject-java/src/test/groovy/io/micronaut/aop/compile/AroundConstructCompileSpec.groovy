@@ -2,11 +2,175 @@ package io.micronaut.aop.compile
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.Intercepted
+import io.micronaut.aop.InterceptorBinding
+import io.micronaut.aop.InterceptorKind
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
+import io.micronaut.core.annotation.AnnotationValue
+import io.micronaut.inject.annotation.NamedAnnotationTransformer
+import io.micronaut.inject.visitor.VisitorContext
 import spock.lang.Unroll
 
+import java.lang.annotation.Annotation
+
 class AroundConstructCompileSpec extends AbstractTypeElementSpec {
+
+    void 'test around construct with annotation mapper - plus members'() {
+        given:
+        ApplicationContext context = buildContext('''
+package aroundconstructmapperbindingmembers;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import jakarta.inject.*;
+import jakarta.inject.Singleton;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Singleton
+@TestAnn2
+class MyBean {
+    @TestAnn(num=1)
+    MyBean() {
+    }
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.ANNOTATION_TYPE})
+@interface MyInterceptorBinding {
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.CONSTRUCTOR, ElementType.TYPE})
+@MyInterceptorBinding
+@interface TestAnn {
+    int num();
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.CONSTRUCTOR, ElementType.TYPE})
+@MyInterceptorBinding
+@interface TestAnn2 {
+}
+
+@Singleton
+@TestAnn(num=1)
+class TestInterceptor implements ConstructorInterceptor<Object> {
+    public boolean invoked = false;
+    @Override 
+    public Object intercept(ConstructorInvocationContext<Object> context) {
+        invoked = true;
+        return context.proceed();
+    }
+} 
+
+@Singleton
+@TestAnn(num=2)
+class TestInterceptor2 implements ConstructorInterceptor<Object> {
+    public boolean invoked = false;
+    @Override 
+    public Object intercept(ConstructorInvocationContext<Object> context) {
+        invoked = true;
+        return context.proceed();
+    }
+} 
+
+''')
+
+
+        when:
+        def interceptor = getBean(context, 'aroundconstructmapperbindingmembers.TestInterceptor')
+        def interceptor2 = getBean(context, 'aroundconstructmapperbindingmembers.TestInterceptor2')
+
+        then:
+        !interceptor.invoked
+        !interceptor2.invoked
+
+        when:
+        def instance = getBean(context, 'aroundconstructmapperbindingmembers.MyBean')
+
+        then:"the interceptor was invoked"
+        interceptor.invoked
+        !interceptor2.invoked
+
+    }
+
+    void 'test around construct on type and constructor with proxy target + bind members'() {
+        given:
+        ApplicationContext context = buildContext("""
+package ctorbinding; 
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import jakarta.inject.Singleton;
+import static java.lang.annotation.ElementType.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@FooClassBinding
+@Singleton
+class Foo {
+
+    @FooCtorBinding
+    public Foo() {
+    }
+}
+
+
+@Target({ TYPE, CONSTRUCTOR })
+@Retention(RUNTIME)
+@Documented
+@InterceptorBinding(kind = InterceptorKind.AROUND, bindMembers = true)
+@InterceptorBinding(kind = InterceptorKind.AROUND_CONSTRUCT, bindMembers = true)
+@interface FooCtorBinding {
+
+}
+
+@Target({ TYPE })
+@Retention(RUNTIME)
+@Documented
+@InterceptorBinding(kind = InterceptorKind.AROUND, bindMembers = true)
+@InterceptorBinding(kind = InterceptorKind.AROUND_CONSTRUCT, bindMembers = true)
+@Around(proxyTarget = true)
+@interface FooClassBinding {
+}
+
+@Singleton
+@FooClassBinding
+class Interceptor1 implements ConstructorInterceptor<Object> {
+    public boolean intercepted = false;
+    @Override public Object intercept(ConstructorInvocationContext<Object> context) {
+        intercepted = true;
+        return context.proceed();
+    }
+}
+
+@Singleton
+@FooCtorBinding
+class Interceptor2 implements ConstructorInterceptor<Object> {
+    public boolean intercepted = false;
+    @Override public Object intercept(ConstructorInvocationContext<Object> context) {
+        intercepted = true;
+        return context.proceed();
+    }
+}
+""")
+        when:
+        def i1 = getBean(context, 'ctorbinding.Interceptor1')
+        def i2 = getBean(context, 'ctorbinding.Interceptor2')
+
+        then:
+        !i1.intercepted
+        !i2.intercepted
+
+        when:
+        def bean = getBean(context, 'ctorbinding.Foo')
+
+        then:
+        i1.intercepted
+        i2.intercepted
+
+        cleanup:
+        context.close()
+    }
 
     void 'test around construct on type and constructor with proxy target'() {
         given:
@@ -665,4 +829,20 @@ class AnotherInterceptor implements Interceptor {
 
     }
 
+    static class TestStereotypeAnnTransformer implements NamedAnnotationTransformer {
+
+        @Override
+        String getName() {
+            return 'aroundconstructmapperbindingmembers.MyInterceptorBinding'
+        }
+
+        @Override
+        List<AnnotationValue<?>> transform(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
+            return Collections.singletonList(AnnotationValue.builder(InterceptorBinding)
+                    .member("kind", InterceptorKind.AROUND_CONSTRUCT)
+                    .member("bindMembers", true)
+                    .build())
+        }
+    }
 }
+
