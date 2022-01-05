@@ -22,7 +22,7 @@ import javax.validation.constraints.NotNull;
  * displayed in the {@link EnvironmentEndpoint}.
  *
  * @author Tim Yates
- * @since 3.2.5
+ * @since 3.3.0
  */
 public interface EnvironmentEndpointFilter {
 
