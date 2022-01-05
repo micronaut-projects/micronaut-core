@@ -18,6 +18,21 @@ import java.util.*
 class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUtils,
                                       private val resolver: Resolver): AbstractAnnotationMetadataBuilder<KSAnnotated, KSAnnotation>() {
 
+    companion object {
+        private fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSClassDeclaration {
+            return annotationMirror.annotationType.resolve().declaration as KSClassDeclaration
+        }
+        fun getAnnotationTypeName(annotationMirror: KSAnnotation): String {
+            val type = getTypeForAnnotation(annotationMirror)
+            return if (type.qualifiedName != null) {
+                type.qualifiedName!!.asString()
+            } else {
+                println("Failed to get the qualified name of ${annotationMirror.shortName.asString()} annotation")
+                annotationMirror.shortName.asString()
+            }
+        }
+    }
+
     override fun isMethodOrClassElement(element: KSAnnotated): Boolean {
         return element is KSClassDeclaration || element is KSFunctionDeclaration
     }
@@ -47,7 +62,7 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
     }
 
     override fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSClassDeclaration {
-        return annotationMirror.annotationType.resolve().declaration as KSClassDeclaration
+        return KotlinAnnotationMetadataBuilder.getTypeForAnnotation(annotationMirror)
     }
 
     override fun hasAnnotation(element: KSAnnotated, annotation: Class<out Annotation>): Boolean {
@@ -67,13 +82,7 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
     }
 
     override fun getAnnotationTypeName(annotationMirror: KSAnnotation): String {
-        val type = getTypeForAnnotation(annotationMirror)
-        return if (type.qualifiedName != null) {
-            type.qualifiedName!!.asString()
-        } else {
-            println("Failed to get the qualified name of ${annotationMirror.shortName.asString()} annotation")
-            annotationMirror.shortName.asString()
-        }
+        return KotlinAnnotationMetadataBuilder.getAnnotationTypeName(annotationMirror)
     }
 
     override fun getElementName(element: KSAnnotated): String {
@@ -291,7 +300,9 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
                 if (declaration.classKind == ClassKind.ENUM_ENTRY) {
                     return declaration.qualifiedName?.getShortName()
                 }
-                if (declaration.classKind == ClassKind.CLASS || declaration.classKind == ClassKind.INTERFACE) {
+                if (declaration.classKind == ClassKind.CLASS ||
+                    declaration.classKind == ClassKind.INTERFACE ||
+                    declaration.classKind == ClassKind.ANNOTATION_CLASS) {
                     return AnnotationClassValue<Any>(declaration.toClassName())
                 }
             }

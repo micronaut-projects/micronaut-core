@@ -32,7 +32,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
     }
 
     private fun newClassElement(type: KSType, annotationMetadata: AnnotationMetadata, typeVariable: Boolean): ClassElement {
-        return newClassElement(type, annotationMetadata, emptyMap(), typeVariable)
+        return newClassElement(type, annotationMetadata, emptyMap(), !typeVariable)
     }
 
     override fun newClassElement(
@@ -40,18 +40,18 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         annotationMetadata: AnnotationMetadata,
         resolvedGenerics: Map<String, ClassElement>
     ): ClassElement {
-        return newClassElement(type, annotationMetadata, resolvedGenerics, false)
+        return newClassElement(type, annotationMetadata, resolvedGenerics, true)
     }
 
     fun newClassElement(type: KSType,
-                                annotationMetadata: AnnotationMetadata,
-                                resolvedGenerics: Map<String, ClassElement>,
-                                typeVariable: Boolean): ClassElement {
+                        annotationMetadata: AnnotationMetadata,
+                        resolvedGenerics: Map<String, ClassElement>,
+                        allowPrimitive: Boolean): ClassElement {
         val declaration = type.declaration
         val qualifiedName = declaration.qualifiedName!!.asString()
         if (qualifiedName == "kotlin.Array") {
             val component = type.arguments[0].type!!.resolve()
-            val componentElement = newClassElement(component, annotationMetadata, resolvedGenerics)
+            val componentElement = newClassElement(component, annotationMetadata, resolvedGenerics, false)
             return componentElement.toArray()
         } else if (declaration is KSTypeParameter) {
             val name = declaration.name.asString()
@@ -61,7 +61,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
                 KotlinGenericPlaceholderElement(declaration, annotationMetadata, visitorContext)
             }
         }
-        if (!typeVariable) {
+        if (allowPrimitive) {
             val element = primitives[qualifiedName]
             if (element != null) {
                 return element

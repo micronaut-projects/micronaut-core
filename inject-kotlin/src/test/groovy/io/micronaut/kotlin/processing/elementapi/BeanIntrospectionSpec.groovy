@@ -13,11 +13,17 @@ import io.micronaut.core.reflect.InstantiationUtils
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.ExecutableMethod
+import spock.lang.Ignore
 import spock.lang.Specification
 
+import javax.persistence.Column
+import javax.persistence.Entity
+import javax.persistence.Id
+import javax.persistence.Version
 import javax.validation.Constraint
 import javax.validation.constraints.Min
 import javax.validation.constraints.NotBlank
+import javax.validation.constraints.Size
 import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends Specification {
@@ -1106,4 +1112,194 @@ class Test {
         introspection.hasAnnotation(Introspected)
         introspection.propertyNames.length == 1
     }
+
+    void "test bean introspection with constructor"() {
+        given:
+        def classLoader = Compiler.buildClassLoader('test.Test', '''
+package test
+
+import javax.validation.constraints.*
+import javax.persistence.*
+
+@Entity
+class Test(
+    @Column(name="test_name") var name: String,
+    @Size(max=100) var age: Int,
+    primitiveArray: Array<Int>) {
+
+    @Id
+    @GeneratedValue
+    var id: Long? = null
+    
+    @Version
+    var version: Long? = null
+    
+    private var primitiveArray: Array<Int>? = null
+    
+    private var v: Long? = null
+    
+    @Version
+    fun getAnotherVersion(): Long? {
+        return v;
+    }
+    
+    fun setAnotherVersion(v: Long) {
+        this.v = v
+    }
+}
+''')
+
+        when:"the reference is loaded"
+        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+
+        when:"The introspection is loaded"
+        BeanIntrospection bi = reference.load()
+
+        then:"it is correct"
+        bi.getConstructorArguments().length == 3
+        bi.getConstructorArguments()[0].name == 'name'
+        bi.getConstructorArguments()[0].type == String
+        bi.getConstructorArguments()[1].name == 'age'
+        bi.getConstructorArguments()[1].getAnnotationMetadata().hasAnnotation(Size)
+        bi.getIndexedProperties(Id).size() == 1
+        bi.getIndexedProperty(Id).isPresent()
+        !bi.getIndexedProperty(Column, null).isPresent()
+        bi.getIndexedProperty(Column, "test_name").isPresent()
+        bi.getIndexedProperty(Column, "test_name").get().name == 'name'
+        bi.getProperty("version").get().hasAnnotation(Version)
+        bi.getProperty("anotherVersion").get().hasAnnotation(Version)
+        // should not inherit metadata from class
+        !bi.getProperty("anotherVersion").get().hasAnnotation(Entity)
+
+        when:
+        BeanProperty idProp = bi.getIndexedProperties(Id).first()
+
+        then:
+        idProp.name == 'id'
+        !idProp.hasAnnotation(Entity)
+        !idProp.hasStereotype(Entity)
+
+
+        when:
+        def object = bi.instantiate("test", 10, [20] as Integer[])
+
+        then:
+        object.name == 'test'
+        object.age == 10
+    }
+
+    void "test write bean introspection data for entity"() {
+        given:
+        def classLoader = Compiler.buildClassLoader('test.Test', '''
+package test
+
+import javax.validation.constraints.*
+import javax.persistence.*
+
+@Entity
+class Test {
+
+    @Id
+    @GeneratedValue
+    var id: Long? = null
+    
+    @Version
+    var version: Long? = null
+    
+    var name: String? = null
+    
+    @Size(max=100)
+    var age: Int? = null
+}
+''')
+
+        when:"the reference is loaded"
+        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+
+        when:"The introspection is loaded"
+        BeanIntrospection bi = reference.load()
+
+        then:"it is correct"
+        bi.instantiate()
+        bi.getIndexedProperties(Id).size() == 1
+        bi.getIndexedProperties(Id).first().name == 'id'
+    }
+
+    void "test write bean introspection data for class in another package"() {
+        given:
+        def classLoader = Compiler.buildClassLoader('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.kotlin.processing.elementapi.OtherTestBean
+
+@Introspected(classes=[OtherTestBean::class])
+class Test
+''')
+
+        when:"the reference is loaded"
+        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef0')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+        reference.getBeanType().name == "io.micronaut.kotlin.processing.elementapi.OtherTestBean"
+
+        when:
+        def introspection = reference.load()
+
+        then: "the introspection is under the reference package"
+        noExceptionThrown()
+        introspection.class.name == "test.\$io_micronaut_kotlin_processing_elementapi_OtherTestBean\$Introspection"
+        introspection.instantiate()
+    }
+
+    @Ignore
+    void "test write bean introspection data for class already introspected"() {
+        given:
+        def classLoader = Compiler.buildClassLoader('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.kotlin.processing.elementapi.TestBean
+
+@Introspected(classes=[TestBean::class])
+class Test
+''')
+
+        when:"the reference is loaded"
+        classLoader.loadClass('test.$Test$IntrospectionRef0')
+
+        then:"The reference is not written"
+        thrown(ClassNotFoundException)
+    }
+
+    void "test write bean introspection data for package with sources"() {
+        given:
+        def classLoader = Compiler.buildClassLoader('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.*
+import io.micronaut.kotlin.processing.elementapi.MarkerAnnotation
+
+@Introspected(packages = ["io.micronaut.kotlin.processing.elementapi"], includedAnnotations = [MarkerAnnotation::class])
+class Test
+''')
+
+        when:"the reference is loaded"
+        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef0')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is generated"
+        reference != null
+    }
+
 }
