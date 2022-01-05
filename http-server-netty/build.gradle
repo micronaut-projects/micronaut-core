@@ -1,3 +1,4 @@
+import org.apache.tools.ant.taskdefs.condition.Os
 
 internalSanityChecks {
     expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 24)
@@ -56,7 +57,7 @@ dependencies {
     }
     testImplementation(libs.managed.netty.transport.native.kqueue) {
         artifact {
-            classifier = "osx-x86_64"
+            classifier = Os.isArch("aarch64") ? "osx-aarch_64" : "osx-x86_64"
         }
     }
     testImplementation libs.managed.logback

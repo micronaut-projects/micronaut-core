@@ -71,7 +71,7 @@ dependencies {
     testImplementation libs.netty.tcnative.boringssl
     testImplementation(libs.netty.tcnative.boringssl) {
         artifact {
-            classifier = Os.isFamily(Os.FAMILY_MAC) ? 'osx-x86_64' : 'linux-x86_64'
+            classifier = Os.isFamily(Os.FAMILY_MAC) ? (Os.isArch("aarch64") ? "osx-aarch_64" : "osx-x86_64") : 'linux-x86_64'
         }
     }
     testImplementation libs.logbook.netty
