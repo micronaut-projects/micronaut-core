@@ -82,7 +82,7 @@ open class KotlinClassElement(val classType: KSType,
                     type.resolve(),
                     annotationUtils.getAnnotationMetadata(name, type),
                     emptyMap(),
-                    true)
+                    false)
                 typeArguments[typeParameters[i].name.asString()] = typeElement
             }
         }

@@ -1,5 +1,6 @@
 package io.micronaut.kotlin.processing.visitor
 
+import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.Resolver
@@ -7,6 +8,7 @@ import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSNode
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.value.MutableConvertibleValues
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
@@ -17,11 +19,10 @@ import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.ClassGenerationException
 import io.micronaut.inject.writer.GeneratedFile
 import io.micronaut.kotlin.processing.AnnotationUtils
+import io.micronaut.kotlin.processing.KotlinAnnotationMetadataBuilder
 import java.io.*
-import java.lang.StringBuilder
 import java.net.URI
 import java.nio.file.Files
-import java.nio.file.NoSuchFileException
 import java.util.*
 import java.util.function.BiConsumer
 
@@ -74,6 +75,22 @@ class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment,
         }
         return Optional.ofNullable(declaration?.asStarProjectedType())
             .map(elementFactory::newClassElement)
+    }
+
+    @OptIn(KspExperimental::class)
+    override fun getClassElements(aPackage: String, vararg stereotypes: String): Array<ClassElement> {
+        return resolver.getDeclarationsFromPackage(aPackage)
+            .filterIsInstance<KSClassDeclaration>()
+            .filter { declaration ->
+                declaration.annotations.any { ann ->
+                    stereotypes.contains(KotlinAnnotationMetadataBuilder.getAnnotationTypeName(ann))
+                }
+            }
+            .map { declaration ->
+                elementFactory.newClassElement(declaration.asStarProjectedType())
+            }
+            .toList()
+            .toTypedArray()
     }
 
     fun getAnnotationUtils() = annotationUtil

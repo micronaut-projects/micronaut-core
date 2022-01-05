@@ -1,6 +1,8 @@
 plugins {
     id 'java'
     id "org.jetbrains.kotlin.jvm"
+    id("com.google.devtools.ksp") version "1.6.0-1.0.1"
+
 }
 
 dependencies {
@@ -15,6 +17,7 @@ dependencies {
     testImplementation libs.kotlin.stdlib
     testImplementation libs.managed.jackson.annotations
     testImplementation libs.managed.validation
+    testImplementation libs.javax.persistence
 }
 
 afterEvaluate {
