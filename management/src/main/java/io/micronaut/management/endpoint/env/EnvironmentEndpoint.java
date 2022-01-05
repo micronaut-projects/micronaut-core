@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
 import io.micronaut.management.endpoint.annotation.Selector;
+import jakarta.inject.Inject;
 
 import java.security.Principal;
 import java.util.ArrayList;
@@ -56,8 +57,16 @@ public class EnvironmentEndpoint {
 
     /**
      * @param environment The {@link Environment}
+     */
+    public EnvironmentEndpoint(Environment environment) {
+        this(environment, null);
+    }
+
+    /**
+     * @param environment The {@link Environment}
      * @param environmentFilter The registered {@link EnvironmentEndpointFilter} bean if one is registered
      */
+    @Inject
     public EnvironmentEndpoint(Environment environment, @Nullable EnvironmentEndpointFilter environmentFilter) {
         this.environment = environment;
         this.environmentFilter = environmentFilter;
