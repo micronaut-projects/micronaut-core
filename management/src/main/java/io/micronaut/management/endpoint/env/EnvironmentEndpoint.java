@@ -56,6 +56,13 @@ public class EnvironmentEndpoint {
 
     /**
      * @param environment The {@link Environment}
+     */
+    public EnvironmentEndpoint(Environment environment) {
+        this(environment, null);
+    }
+
+    /**
+     * @param environment The {@link Environment}
      * @param environmentFilter The registered {@link EnvironmentEndpointFilter} bean if one is registered
      */
     public EnvironmentEndpoint(Environment environment, @Nullable EnvironmentEndpointFilter environmentFilter) {

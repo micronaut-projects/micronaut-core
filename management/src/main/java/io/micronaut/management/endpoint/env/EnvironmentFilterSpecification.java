@@ -17,12 +17,14 @@ package io.micronaut.management.endpoint.env;
 
 import io.micronaut.core.annotation.Nullable;
 
+import javax.validation.constraints.NotNull;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * This class is passed to an instance of {@link EnvironmentEndpointFilter} (if one is defined) each time the {@link EnvironmentEndpoint}
@@ -31,17 +33,16 @@ import java.util.stream.Collectors;
  * @author Tim Yates
  * @since 3.3.0
  */
-public class EnvironmentFilterSpecification {
+public final class EnvironmentFilterSpecification {
 
-    private static final String[] PROPERTY_NAMES_TO_MASK = new String[]{
-            "password", "credential", "certificate", "key", "secret", "token"
-    };
+    private static final List<Pattern> LEGACY_MASK_PATTERNS = Stream.of("password", "credential", "certificate", "key", "secret", "token")
+            .map(s -> Pattern.compile(".*" + s + ".*", Pattern.CASE_INSENSITIVE))
+            .collect(Collectors.toList());
 
     @Nullable
     private final Principal principal;
     private boolean allMasked;
     private final List<Pattern> maskedPatterns = new ArrayList<>();
-    private final List<Pattern> allowedPatterns = new ArrayList<>();
 
     EnvironmentFilterSpecification(@Nullable Principal principal) {
         this.principal = principal;
@@ -51,8 +52,7 @@ public class EnvironmentFilterSpecification {
     /**
      * @return The current {@link Principal} that is making the request (if any)
      */
-    @Nullable
-    public Principal getPrincipal() {
+    public @Nullable Principal getPrincipal() {
         return principal;
     }
 
@@ -61,7 +61,7 @@ public class EnvironmentFilterSpecification {
      *
      * @return itself for chaining calls.
      */
-    public EnvironmentFilterSpecification maskAll() {
+    public @NotNull EnvironmentFilterSpecification maskAll() {
         allMasked = true;
         return this;
     }
@@ -71,7 +71,7 @@ public class EnvironmentFilterSpecification {
      *
      * @return itself for chaining calls.
      */
-    public EnvironmentFilterSpecification maskNone() {
+    public @NotNull EnvironmentFilterSpecification maskNone() {
         allMasked = false;
         return this;
     }
@@ -84,7 +84,7 @@ public class EnvironmentFilterSpecification {
      * @param propertySourceNameMask one or more Patterns to match against property names for masking.
      * @return itself for chaining calls.
      */
-    public EnvironmentFilterSpecification maskPatterns(Pattern... propertySourceNameMask) {
+    public @NotNull EnvironmentFilterSpecification maskPatterns(Pattern... propertySourceNameMask) {
         maskedPatterns.addAll(Arrays.asList(propertySourceNameMask));
         return this;
     }
@@ -96,13 +96,9 @@ public class EnvironmentFilterSpecification {
      *
      * @return itself for chaining calls.
      */
-    public EnvironmentFilterSpecification legacyMasking() {
+    public @NotNull EnvironmentFilterSpecification legacyMasking() {
         allMasked = false;
-        maskedPatterns.addAll(
-                Arrays.stream(PROPERTY_NAMES_TO_MASK)
-                        .map(s -> Pattern.compile(".*" + s + ".*", Pattern.CASE_INSENSITIVE))
-                        .collect(Collectors.toList())
-        );
+        maskedPatterns.addAll(LEGACY_MASK_PATTERNS);
         return this;
     }
 

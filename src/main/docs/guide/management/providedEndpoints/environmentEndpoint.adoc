@@ -1,4 +1,4 @@
-The environment endpoint returns information about the link:{api}/io/micronaut/context/env/Environment.html[Environment] and its link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource]s.
+The environment endpoint returns information about the api:context.env.Environment[] and its api:context.env.PropertySource[]s.
 
 == Configuration
 
@@ -14,7 +14,7 @@ endpoints:
 ----
 
 By default the endpoint will mask all values.
-To customize this masking you need to supply a Bean that implements link:{api}/io/micronaut/management/endpoint/env/EnvironmentEndpointFilter.html[EnvironmentEndpointFilter].
+To customize this masking you need to supply a Bean that implements api:management.endpoint.env.EnvironmentEndpointFilter[].
 
 This first example will mask all values except for those that contain the name `value_a` or `value_b`;
 
@@ -35,7 +35,7 @@ public class MaskEnvironmentEndpointFilter implements EnvironmentEndpointFilter 
 }
 ----
 
-It is also possible to allow all values in plain text using `maskNone()`, and then specify name patterns that will be masked, ie:
+It is also possible to allow all values in plain text using api:management.endpoint.env.EnvironmentFilterSpecification#maskNone--[`maskNone()`], and then specify name patterns that will be masked, ie:
 
 .Deny instead of allow
 [source,java]
@@ -54,11 +54,11 @@ public class AllPlainExceptSecretOrKeyEnvironmentEndpointFilter implements Envir
 }
 ----
 
-The link:{api}/io/micronaut/management/endpoint/env/EnvironmentFilterSpecification.html[EnvironmentFilterSpecification] class
+The api:management.endpoint.env.EnvironmentFilterSpecification[] class
 also contains the current `Principal` if one exists, so this can be used to further limit access based on the
 currently logged-in user.
 
-Sensible defaults can be applied by calling the link:{api}/io/micronaut/management/endpoint/env/EnvironmentFilterSpecification.html#legacyMasking--[`legacyMasking()`] method.
+Sensible defaults can be applied by calling the api:management.endpoint.env.EnvironmentFilterSpecification#legacyMasking--[`legacyMasking()`] method.
 This will show all values apart from those that contain the words `password`, `credential`, `certificate`, `key`, `secret` or `token` anywhere in their name.
 
 == Getting information about the environment
