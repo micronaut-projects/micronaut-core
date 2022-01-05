@@ -17,12 +17,15 @@ package io.micronaut.core.optim;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.util.SupplierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.helpers.NOPLogger;
 
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 /**
  * This class is a generic container for pre-computed data
@@ -35,7 +38,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @SuppressWarnings("unchecked")
 @Internal
 public abstract class StaticOptimizations {
-    private static final Logger LOGGER = LoggerFactory.getLogger(StaticOptimizations.class);
+
+    private static final Supplier<Logger> LOGGER = SupplierUtil.memoized(StaticOptimizations::createLogger);
 
     private static final Map<Class<?>, Object> OPTIMIZATIONS = new ConcurrentHashMap<>();
     private static boolean cacheEnvironment = false;
@@ -61,9 +65,9 @@ public abstract class StaticOptimizations {
     public static <T> Optional<T> get(@NonNull Class<T> optimizationClass) {
         T value = (T) OPTIMIZATIONS.get(optimizationClass);
         if (value != null) {
-            LOGGER.debug("Found optimizations {}", optimizationClass);
+            LOGGER.get().debug("Found optimizations {}", optimizationClass);
         } else {
-            LOGGER.debug("No optimizations {} found", optimizationClass);
+            LOGGER.get().debug("No optimizations {} found", optimizationClass);
         }
         return Optional.ofNullable(value);
     }
@@ -77,7 +81,7 @@ public abstract class StaticOptimizations {
      */
     public static <T> void set(@NonNull T value) {
         Class<?> optimizationClass = value.getClass();
-        LOGGER.debug("Setting optimizations for {}", optimizationClass);
+        LOGGER.get().debug("Setting optimizations for {}", optimizationClass);
         OPTIMIZATIONS.put(optimizationClass, value);
     }
 
@@ -89,5 +93,17 @@ public abstract class StaticOptimizations {
      */
     public static boolean isEnvironmentCached() {
         return cacheEnvironment;
+    }
+
+    /**
+     * Tries to initialize {@link Logger} using {@link LoggerFactory}, otherwise returns {@link NOPLogger}.
+     * @return An instance of {@link Logger}.
+     */
+    private static Logger createLogger() {
+        try {
+            return LoggerFactory.getLogger(StaticOptimizations.class);
+        } catch (Throwable ignored) {
+            return NOPLogger.NOP_LOGGER;
+        }
     }
 }
