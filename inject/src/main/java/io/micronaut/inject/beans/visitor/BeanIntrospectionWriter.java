@@ -880,7 +880,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
     private void invokeBeanConstructor(GeneratorAdapter writer, MethodElement constructor, BiConsumer<GeneratorAdapter, MethodElement> argumentsPusher) {
         boolean isConstructor = constructor instanceof ConstructorElement;
-        boolean isCompanion = constructor != defaultConstructor && constructor.getDeclaringType().getSimpleName().endsWith("$Companion");
+        boolean isCompanion = !isConstructor && constructor.getDeclaringType().getSimpleName().endsWith("$Companion");
 
         List<ParameterElement> constructorArguments = Arrays.asList(constructor.getParameters());
         Collection<Type> argumentTypes = constructorArguments.stream().map(pe ->
