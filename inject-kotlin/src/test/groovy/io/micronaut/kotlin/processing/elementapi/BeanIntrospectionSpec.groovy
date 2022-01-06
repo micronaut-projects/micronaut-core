@@ -9,10 +9,12 @@ import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.core.beans.BeanMethod
 import io.micronaut.core.beans.BeanProperty
 import io.micronaut.core.convert.ConversionContext
+import io.micronaut.core.convert.TypeConverter
 import io.micronaut.core.reflect.InstantiationUtils
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.ExecutableMethod
+import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import spock.lang.Ignore
 import spock.lang.Specification
 
@@ -1302,4 +1304,307 @@ class Test
         reference != null
     }
 
+    void "test write bean introspection data for package with compiled classes"() {
+        given:
+        def classLoader = Compiler.buildClassLoader('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.*
+
+@Introspected(packages=["io.micronaut.inject.beans.visitor"], includedAnnotations=[Internal::class])
+class Test
+''')
+
+        when:"the reference is loaded"
+        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef0')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+        reference.getBeanType() == IntrospectedTypeElementVisitor
+    }
+
+    void "test write bean introspection data"() {
+        given:
+        def classLoader = Compiler.buildClassLoader('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.convert.TypeConverter
+import javax.validation.constraints.Size
+
+@Introspected
+class Test: ParentBean() {
+    val readOnly: String = "test"
+    var name: String? = null
+    
+    @Size(max=100)
+    var age: Int = 0
+    
+    var list: List<Number>? = null
+    var stringArray: Array<String>? = null
+    var primitiveArray: Array<Int>? = null
+    var flag: Boolean = false
+    val genericsTest: TypeConverter<String, Collection<*>>? = null
+    val genericsArrayTest: TypeConverter<String, Array<Any>>? = null
+}
+
+open class ParentBean {
+    var listOfBytes: List<ByteArray>? = null
+}
+''')
+
+        when:"the reference is loaded"
+        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+        reference.getAnnotationMetadata().hasAnnotation(Introspected)
+        reference.isPresent()
+        reference.beanType.name == 'test.Test'
+
+        when:"the introspection is loaded"
+        BeanIntrospection introspection = reference.load()
+
+        then:"The introspection is valid"
+        introspection != null
+        introspection.hasAnnotation(Introspected)
+        introspection.instantiate().getClass().name == 'test.Test'
+        introspection.getBeanProperties().size() == 10
+        introspection.getProperty("name").isPresent()
+        introspection.getProperty("name", String).isPresent()
+        !introspection.getProperty("name", Integer).isPresent()
+
+        when:
+        BeanProperty nameProp = introspection.getProperty("name", String).get()
+        BeanProperty boolProp = introspection.getProperty("flag", boolean.class).get()
+        BeanProperty ageProp = introspection.getProperty("age", int.class).get()
+        BeanProperty listProp = introspection.getProperty("list").get()
+        BeanProperty primitiveArrayProp = introspection.getProperty("primitiveArray").get()
+        BeanProperty stringArrayProp = introspection.getProperty("stringArray").get()
+        BeanProperty listOfBytes = introspection.getProperty("listOfBytes").get()
+        BeanProperty genericsTest = introspection.getProperty("genericsTest").get()
+        BeanProperty genericsArrayTest = introspection.getProperty("genericsArrayTest").get()
+        def readOnlyProp = introspection.getProperty("readOnly", String).get()
+        def instance = introspection.instantiate()
+
+        then:
+        readOnlyProp.isReadOnly()
+        nameProp != null
+        !nameProp.isReadOnly()
+        !nameProp.isWriteOnly()
+        nameProp.isReadWrite()
+        boolProp.get(instance) == false
+        nameProp.get(instance) == null
+        ageProp.get(instance) == 0
+        genericsTest != null
+        genericsTest.type == TypeConverter
+        genericsTest.asArgument().typeParameters.size() == 2
+        genericsTest.asArgument().typeParameters[0].type == String
+        genericsTest.asArgument().typeParameters[1].type == Collection
+        genericsTest.asArgument().typeParameters[1].typeParameters.length == 1
+        genericsArrayTest.type == TypeConverter
+        genericsArrayTest.asArgument().typeParameters.size() == 2
+        genericsArrayTest.asArgument().typeParameters[0].type == String
+        genericsArrayTest.asArgument().typeParameters[1].type == Object[].class
+        stringArrayProp.get(instance) == null
+        stringArrayProp.type == String[]
+        primitiveArrayProp.get(instance) == null
+        ageProp.hasAnnotation(Size)
+        listOfBytes.asArgument().getFirstTypeVariable().get().type == byte[].class
+        listProp.asArgument().getFirstTypeVariable().isPresent()
+        listProp.asArgument().getFirstTypeVariable().get().type == Number
+
+        when:
+        boolProp.set(instance, true)
+        nameProp.set(instance, "foo")
+        ageProp.set(instance, 10)
+        primitiveArrayProp.set(instance, [10] as Integer[])
+        stringArrayProp.set(instance, ['foo'] as String[])
+
+
+        then:
+        boolProp.get(instance) == true
+        nameProp.get(instance) == 'foo'
+        ageProp.get(instance) == 10
+        stringArrayProp.get(instance) == ['foo'] as String[]
+        primitiveArrayProp.get(instance) == [10] as Integer[]
+
+        when:
+        ageProp.convertAndSet(instance, "20")
+        nameProp.set(instance, "100" )
+
+        then:
+        ageProp.get(instance) == 20
+        nameProp.get(instance, Integer, null) == 100
+
+        when:
+        introspection.instantiate("blah") // illegal argument
+
+        then:
+        def e = thrown(InstantiationException)
+        e.message == 'Argument count [1] doesn\'t match required argument count: 0'
+    }
+
+    void "test constructor argument generics"() {
+        given:
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.*
+
+@Introspected
+class Test(var properties: Map<String, String>)
+''')
+        expect:
+        introspection.constructorArguments[0].getTypeVariable("K").get().getType() == String
+        introspection.constructorArguments[0].getTypeVariable("V").get().getType() == String
+    }
+
+    void "test static creator"() {
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.*
+
+@Introspected
+class Test private constructor(val name: String) {
+
+    companion object {
+        @Creator
+        fun forName(name: String): Test {
+            return Test(name)
+        }
+    }
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate("Sally")
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "Sally"
+
+        when:
+        introspection.instantiate(new Object[0])
+
+        then:
+        thrown(InstantiationException)
+
+        when:
+        introspection.instantiate()
+
+        then:
+        thrown(InstantiationException)
+    }
+
+    void "test static creator with no args"() {
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.*
+
+@Introspected
+class Test private constructor(val name: String) {
+
+    companion object {
+        @Creator
+        fun forName(): Test {
+            return Test("default")
+        }
+    }
+}
+''')
+        expect:
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate("Sally")
+
+        then:
+        thrown(InstantiationException)
+
+        when:
+        instance = introspection.instantiate(new Object[0])
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "default"
+
+        when:
+        instance = introspection.instantiate()
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "default"
+    }
+
+    void "test static creator multiple"() {
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.*
+
+@Introspected
+class Test private constructor(val name: String) {
+
+    companion object {
+        @Creator
+        fun forName(): Test {
+            return Test("default")
+        }
+        
+        @Creator
+        fun forName(name: String): Test {
+            return Test(name)
+        }
+    }
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate("Sally")
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "Sally"
+
+        when:
+        instance = introspection.instantiate(new Object[0])
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "default"
+
+        when:
+        instance = introspection.instantiate()
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "default"
+    }
+
+    void "test introspections are not created for super classes"() {
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.*
+
+@Introspected
+class Test: Foo()
+
+open class Foo
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        introspection.getClass().getClassLoader().loadClass("test.\$Foo\$Introspection")
+
+        then:
+        thrown(ClassNotFoundException)
+    }
 }

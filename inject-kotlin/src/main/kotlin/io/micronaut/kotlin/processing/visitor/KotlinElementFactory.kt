@@ -10,6 +10,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         val primitives = mapOf(
             "kotlin.Boolean" to PrimitiveElement.BOOLEAN,
             "kotlin.Int" to PrimitiveElement.INT,
+            "kotlin.Byte" to PrimitiveElement.BYTE,
             "kotlin.Unit" to PrimitiveElement.VOID
         )
     }
@@ -53,6 +54,8 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
             val component = type.arguments[0].type!!.resolve()
             val componentElement = newClassElement(component, annotationMetadata, resolvedGenerics, false)
             return componentElement.toArray()
+        } else if (qualifiedName == "kotlin.ByteArray") {
+            return PrimitiveElement.BYTE.toArray()
         } else if (declaration is KSTypeParameter) {
             val name = declaration.name.asString()
             return if (resolvedGenerics.containsKey(name)) {

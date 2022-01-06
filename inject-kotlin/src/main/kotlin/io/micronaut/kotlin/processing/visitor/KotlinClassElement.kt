@@ -465,14 +465,12 @@ open class KotlinClassElement(val classType: KSType,
             val isGetter = NameUtils.isGetterName(name)
             val isSetter = NameUtils.isSetterName(name) && func.parameters.size == 1
             if (isGetter || isSetter) {
-                val elementFactory = visitorContext.elementFactory
                 val classDeclaration = func.closestClassDeclaration()!!
 
                 val declaringType = if (declaration == classDeclaration) {
                     this
                 } else {
-                    val ksType = declaration.superTypes
-                        .map { it.resolve() }
+                    val ksType = declaration.getAllSuperTypes()
                         .find { it.declaration == classDeclaration }
                     elementFactory.newClassElement(ksType!!)
                 }
