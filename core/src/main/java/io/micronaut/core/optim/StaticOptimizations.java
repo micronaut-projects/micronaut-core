@@ -39,8 +39,6 @@ import java.util.function.Supplier;
 @Internal
 public abstract class StaticOptimizations {
 
-    private static final Supplier<Logger> LOGGER = SupplierUtil.memoized(StaticOptimizations::createLogger);
-
     private static final Map<Class<?>, Object> OPTIMIZATIONS = new ConcurrentHashMap<>();
     private static boolean cacheEnvironment = false;
 
@@ -64,11 +62,6 @@ public abstract class StaticOptimizations {
     @NonNull
     public static <T> Optional<T> get(@NonNull Class<T> optimizationClass) {
         T value = (T) OPTIMIZATIONS.get(optimizationClass);
-        if (value != null) {
-            LOGGER.get().debug("Found optimizations {}", optimizationClass);
-        } else {
-            LOGGER.get().debug("No optimizations {} found", optimizationClass);
-        }
         return Optional.ofNullable(value);
     }
 
@@ -81,7 +74,6 @@ public abstract class StaticOptimizations {
      */
     public static <T> void set(@NonNull T value) {
         Class<?> optimizationClass = value.getClass();
-        LOGGER.get().debug("Setting optimizations for {}", optimizationClass);
         OPTIMIZATIONS.put(optimizationClass, value);
     }
 
@@ -93,17 +85,5 @@ public abstract class StaticOptimizations {
      */
     public static boolean isEnvironmentCached() {
         return cacheEnvironment;
-    }
-
-    /**
-     * Tries to initialize {@link Logger} using {@link LoggerFactory}, otherwise returns {@link NOPLogger}.
-     * @return An instance of {@link Logger}.
-     */
-    private static Logger createLogger() {
-        try {
-            return LoggerFactory.getLogger(StaticOptimizations.class);
-        } catch (Throwable ignored) {
-            return NOPLogger.NOP_LOGGER;
-        }
     }
 }
