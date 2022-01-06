@@ -302,7 +302,6 @@ package fieldaccess;
 
 import io.micronaut.core.annotation.*;
 
-
 @Introspected(accessKind={Introspected.AccessKind.FIELD, Introspected.AccessKind.METHOD})
 class Test {
     public String one;

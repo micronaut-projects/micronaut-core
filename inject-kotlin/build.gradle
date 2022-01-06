@@ -1,8 +1,7 @@
 plugins {
     id 'java'
     id "org.jetbrains.kotlin.jvm"
-    id("com.google.devtools.ksp") version "1.6.0-1.0.1"
-
+    id "com.google.devtools.ksp" version "1.6.0-1.0.1"
 }
 
 dependencies {
