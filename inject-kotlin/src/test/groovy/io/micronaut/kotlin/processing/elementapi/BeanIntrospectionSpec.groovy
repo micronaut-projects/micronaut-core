@@ -1,6 +1,5 @@
 package io.micronaut.kotlin.processing.elementapi
 
-import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection

@@ -120,18 +120,14 @@ package fieldaccess;
 
 import io.micronaut.core.annotation.*;
 
-
 @Introspected(accessKind={Introspected.AccessKind.FIELD, Introspected.AccessKind.METHOD})
 class Test {
-    private String one;
+    public String one;
     public boolean invoked = false;
     public String getOne() {
         this.invoked = true;
         return one;
     } 
-    private void setOne(String one) {
-        this.one = one;
-    }
 }
 ''');
         when:
@@ -246,7 +242,7 @@ package beanctor;
 
 import java.net.URL;
 
-@io.micronaut.core.annotation.Introspected
+@io.micronaut.core.annotation.Introspected(withPrefix="alter")
 public class Test {
 
     private final String another;
