@@ -862,6 +862,12 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                         readOnly,
                         propertyNode
                 ) {
+
+                    final String[] readPrefixes = GroovyClassElement.this.getValue(AccessorsStyle.class, "readPrefixes", String[].class)
+                            .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
+                    final String[] writePrefixes = GroovyClassElement.this.getValue(AccessorsStyle.class, "writePrefixes", String[].class)
+                            .orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX});
+
                     @NonNull
                     @Override
                     public ClassElement getType() {
@@ -878,7 +884,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                                     annotationMetadata,
                                     PrimitiveElement.VOID,
                                     PrimitiveElement.VOID,
-                                    NameUtils.setterNameFor(propertyName),
+                                    NameUtils.setterNameFor(propertyName, writePrefixes),
                                     ParameterElement.of(getType(), propertyName)
 
                             ));
@@ -919,6 +925,11 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             classNode.visitContents(
                     new PublicMethodVisitor(null) {
 
+                        final String[] readPrefixes = getValue(AccessorsStyle.class, "readPrefixes", String[].class)
+                                .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
+                        final String[] writePrefixes = getValue(AccessorsStyle.class, "writePrefixes", String[].class)
+                                .orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX});
+
                         @Override
                         protected boolean isAcceptable(MethodNode node) {
                             boolean validModifiers = node.isPublic() && !node.isStatic() && !node.isSynthetic() && !node.isAbstract();
@@ -928,10 +939,10 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                                     return false;
                                 }
 
-                                if (NameUtils.isGetterName(methodName) && node.getParameters().length == 0) {
+                                if (NameUtils.isReaderName(methodName, readPrefixes) && node.getParameters().length == 0) {
                                     return true;
                                 } else {
-                                    return NameUtils.isSetterName(methodName) && node.getParameters().length == 1;
+                                    return NameUtils.isWriterName(methodName, writePrefixes) && node.getParameters().length == 1;
                                 }
                             }
                             return validModifiers;
@@ -941,8 +952,8 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                         public void accept(ClassNode classNode, MethodNode node) {
                             String methodName = node.getName();
                             final ClassNode declaringTypeElement = node.getDeclaringClass();
-                            if (NameUtils.isGetterName(methodName) && node.getParameters().length == 0) {
-                                String propertyName = NameUtils.getPropertyNameForGetter(methodName);
+                            if (NameUtils.isReaderName(methodName, readPrefixes) && node.getParameters().length == 0) {
+                                String propertyName = NameUtils.getPropertyNameForGetter(methodName, readPrefixes);
                                 if (groovyProps.contains(propertyName)) {
                                     return;
                                 }
@@ -970,8 +981,8 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                                         getterAndSetter.setter = null; // not a compatible setter
                                     }
                                 }
-                            } else if (NameUtils.isSetterName(methodName) && node.getParameters().length == 1) {
-                                String propertyName = NameUtils.getPropertyNameForSetter(methodName);
+                            } else if (NameUtils.isWriterName(methodName, writePrefixes) && node.getParameters().length == 1) {
+                                String propertyName = NameUtils.getPropertyNameForSetter(methodName, writePrefixes);
                                 if (groovyProps.contains(propertyName)) {
                                     return;
                                 }

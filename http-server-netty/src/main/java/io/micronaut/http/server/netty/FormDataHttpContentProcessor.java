@@ -124,11 +124,13 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
                         case Attribute:
                             Attribute attribute = (Attribute) data;
                             messages.add(attribute);
+                            postRequestDecoder.removeHttpDataFromClean(attribute);
                             break;
                         case FileUpload:
                             FileUpload fileUpload = (FileUpload) data;
                             if (fileUpload.isCompleted()) {
                                 messages.add(fileUpload);
+                                postRequestDecoder.removeHttpDataFromClean(fileUpload);
                             }
                             break;
                         default:
