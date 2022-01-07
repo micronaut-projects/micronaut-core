@@ -27,7 +27,7 @@ import io.micronaut.core.async.annotation.SingleResult
 @RequestAttribute(name = "version", value = "1")
 interface StoryClient {
 
-    @Get("/{storyId}")
+    @Get("/abc")
     @SingleResult
     Publisher<Story> getById(@RequestAttribute String storyId)
 }
