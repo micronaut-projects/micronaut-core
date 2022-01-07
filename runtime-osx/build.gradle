@@ -8,5 +8,4 @@ dependencies {
 
     api project(":runtime")
     implementation libs.managed.methvin.directoryWatcher
-    implementation libs.managed.jna
 }
