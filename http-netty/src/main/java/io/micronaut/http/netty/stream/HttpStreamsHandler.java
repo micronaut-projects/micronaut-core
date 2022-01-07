@@ -301,9 +301,8 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Calling ctx.read() for cancelled subscription");
             }
+            ctx.read();
             if (isClient()) {
-                ctx.read();
-            } else {
                 ctx.fireChannelWritabilityChanged();
             }
         }
@@ -330,8 +329,8 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                     removeHandlerIfActive(ctx, HANDLER_BODY_PUBLISHER);
                 }
                 currentlyStreamedMessage = null;
-                ctx.read();
             }
+            ctx.read();
         }
     }
 
@@ -339,7 +338,6 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
         if (ignoreBodyRead) {
             ctx.read();
-            ignoreBodyRead = false;
         } else {
             ctx.fireChannelReadComplete();
         }
