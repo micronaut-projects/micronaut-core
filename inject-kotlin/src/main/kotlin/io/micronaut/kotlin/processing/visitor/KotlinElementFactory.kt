@@ -9,9 +9,24 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
     companion object {
         val primitives = mapOf(
             "kotlin.Boolean" to PrimitiveElement.BOOLEAN,
+            "kotlin.Char" to PrimitiveElement.CHAR,
+            "kotlin.Short" to PrimitiveElement.SHORT,
             "kotlin.Int" to PrimitiveElement.INT,
+            "kotlin.Long" to PrimitiveElement.LONG,
+            "kotlin.Float" to PrimitiveElement.FLOAT,
+            "kotlin.Double" to PrimitiveElement.DOUBLE,
             "kotlin.Byte" to PrimitiveElement.BYTE,
             "kotlin.Unit" to PrimitiveElement.VOID
+        )
+        val primitiveArrays = mapOf(
+            "kotlin.BooleanArray" to PrimitiveElement.BOOLEAN.toArray(),
+            "kotlin.CharArray" to PrimitiveElement.CHAR.toArray(),
+            "kotlin.ShortArray" to PrimitiveElement.SHORT.toArray(),
+            "kotlin.IntArray" to PrimitiveElement.INT.toArray(),
+            "kotlin.LongArray" to PrimitiveElement.LONG.toArray(),
+            "kotlin.FloatArray" to PrimitiveElement.FLOAT.toArray(),
+            "kotlin.DoubleArray" to PrimitiveElement.DOUBLE.toArray(),
+            "kotlin.ByteArray" to PrimitiveElement.BYTE.toArray(),
         )
     }
 
@@ -50,12 +65,14 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
                         allowPrimitive: Boolean): ClassElement {
         val declaration = type.declaration
         val qualifiedName = declaration.qualifiedName!!.asString()
+        var element = primitiveArrays[qualifiedName]
+        if (element != null) {
+            return element
+        }
         if (qualifiedName == "kotlin.Array") {
             val component = type.arguments[0].type!!.resolve()
             val componentElement = newClassElement(component, annotationMetadata, resolvedGenerics, false)
             return componentElement.toArray()
-        } else if (qualifiedName == "kotlin.ByteArray") {
-            return PrimitiveElement.BYTE.toArray()
         } else if (declaration is KSTypeParameter) {
             val name = declaration.name.asString()
             return if (resolvedGenerics.containsKey(name)) {
@@ -65,12 +82,16 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
             }
         }
         if (allowPrimitive) {
-            val element = primitives[qualifiedName]
+            element = primitives[qualifiedName]
             if (element != null) {
                 return element
             }
         }
-        return KotlinClassElement(type, annotationMetadata, visitorContext)
+        return if (declaration is KSClassDeclaration && declaration.classKind == ClassKind.ENUM_CLASS) {
+            KotlinEnumElement(type, annotationMetadata, visitorContext)
+        } else {
+            KotlinClassElement(type, annotationMetadata, visitorContext)
+        }
     }
 
     override fun newSourceClassElement(type: KSType, annotationMetadata: AnnotationMetadata): ClassElement {
@@ -106,20 +127,20 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
     fun newMethodElement(
         declaringClass: ClassElement,
         method: KSPropertyGetter,
+        type: ClassElement,
         annotationMetadata: AnnotationMetadata
     ): MethodElement {
-        val annotationUtils = visitorContext.getAnnotationUtils()
-        val returnType = method.returnType!!.resolve()
-        return KotlinMethodElement(method, declaringClass, newClassElement(returnType, annotationUtils.getAnnotationMetadata(returnType.declaration), declaringClass.typeArguments), annotationMetadata, visitorContext)
+        return KotlinMethodElement(method, declaringClass, type, annotationMetadata, visitorContext)
     }
 
     fun newMethodElement(
         declaringClass: ClassElement,
         method: KSPropertySetter,
+        type: ClassElement,
         annotationMetadata: AnnotationMetadata
     ): MethodElement {
         val annotationUtils = visitorContext.getAnnotationUtils()
-        return KotlinMethodElement(method, declaringClass, annotationMetadata, visitorContext, KotlinParameterElement(newClassElement(method.parameter.type.resolve(), declaringClass.typeArguments), method.parameter, annotationUtils.getAnnotationMetadata(method.parameter), visitorContext))
+        return KotlinMethodElement(method, declaringClass, annotationMetadata, visitorContext, KotlinParameterElement(type, method.parameter, annotationUtils.getAnnotationMetadata(method.parameter), visitorContext))
     }
 
     override fun newConstructorElement(

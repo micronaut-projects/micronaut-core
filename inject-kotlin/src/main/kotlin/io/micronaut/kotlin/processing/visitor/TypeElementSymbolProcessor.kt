@@ -1,5 +1,6 @@
 package io.micronaut.kotlin.processing.visitor
 
+import com.google.devtools.ksp.closestClassDeclaration
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
@@ -15,6 +16,7 @@ import io.micronaut.core.version.VersionUtils
 import io.micronaut.inject.processing.JavaModelUtils
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
+import io.micronaut.kotlin.processing.isTypeReference
 import java.util.*
 import java.util.function.Predicate
 import java.util.stream.Collectors
@@ -59,12 +61,7 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
 
             val elements = resolver.getAllFiles()
                 .flatMap { file: KSFile -> file.declarations }
-                .filter { declaration: KSDeclaration ->
-                    declaration is KSClassDeclaration
-                }
-                .map { declaration: KSDeclaration ->
-                    declaration as KSClassDeclaration
-                }
+                .filterIsInstance<KSClassDeclaration>()
                 .filter { declaration: KSClassDeclaration ->
                     declaration.annotations.none { ksAnnotation ->
                         ksAnnotation.shortName.getQualifier() == Generated::class.simpleName
@@ -197,22 +194,32 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
 
         override fun visitPropertyDeclaration(property: KSPropertyDeclaration, data: Any): Any {
             val visitorContext = loadedVisitor.visitorContext
-            var parentDeclaration = property.parentDeclaration
-            while (parentDeclaration !is KSClassDeclaration) {
-                parentDeclaration = parentDeclaration?.parentDeclaration
-            }
-            val classAnnotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(parentDeclaration)
-            val classElement = visitorContext.elementFactory.newClassElement(parentDeclaration.asStarProjectedType(), classAnnotationMetadata)
-            val annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(property)
+            val annotationUtils = visitorContext.getAnnotationUtils()
+            val elementFactory = visitorContext.elementFactory
 
+            val parentDeclaration = property.closestClassDeclaration()!!
+            val classElement = elementFactory.newClassElement(parentDeclaration.asStarProjectedType())
+            val propertyMetadata = annotationUtils.getAnnotationMetadata(property)
+            if (property.hasBackingField) {
+                val fieldElement =
+                    elementFactory.newFieldElement(classElement, property, propertyMetadata)
+                loadedVisitor.visitor.visitField(fieldElement, visitorContext)
+            }
+            val propertyElement = elementFactory.newClassElement(
+                property.type.resolve(),
+                propertyMetadata,
+                classElement.typeArguments,
+                !property.isTypeReference())
             if (property.getter != null) {
+                val getterMetadata = annotationUtils.getAnnotationMetadata(property.getter!!)
                 val methodElement =
-                    visitorContext.elementFactory.newMethodElement(classElement, property.getter!!, annotationMetadata)
+                    elementFactory.newMethodElement(classElement, property.getter!!, propertyElement, getterMetadata)
                 loadedVisitor.visitor.visitMethod(methodElement, visitorContext)
             }
             if (property.setter != null) {
+                val setterMetadata = annotationUtils.getAnnotationMetadata(property.setter!!)
                 val methodElement =
-                    visitorContext.elementFactory.newMethodElement(classElement, property.setter!!, annotationMetadata)
+                    elementFactory.newMethodElement(classElement, property.setter!!, propertyElement, setterMetadata)
                 loadedVisitor.visitor.visitMethod(methodElement, visitorContext)
             }
             return data

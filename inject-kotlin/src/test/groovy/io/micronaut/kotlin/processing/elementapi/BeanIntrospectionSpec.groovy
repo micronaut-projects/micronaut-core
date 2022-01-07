@@ -1,5 +1,6 @@
 package io.micronaut.kotlin.processing.elementapi
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
@@ -642,17 +643,17 @@ interface GenBase<T> {
         when:
         def test = introspection.instantiate()
         BeanProperty bp = introspection.getRequiredProperty("value", Long)
-        bp.set(test, 5L)
+        bp.set(test, Long.valueOf(5))
 
         then:
-        bp.get(test) == 5L
+        bp.get(test) == Long.valueOf(5)
 
         when:
-        def returnedBean = bp.withValue(test, 10L)
+        def returnedBean = bp.withValue(test, Long.valueOf(10))
 
         then:
         returnedBean.is(test)
-        bp.get(test) == 10L
+        bp.get(test) == Long.valueOf(10)
     }
 
     void "test bean introspection with property with static creator method on interface"() {
@@ -1605,5 +1606,435 @@ open class Foo
 
         then:
         thrown(ClassNotFoundException)
+    }
+
+    void "test enum bean properties"() {
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.*
+
+@Introspected
+enum class Test(val number: Int) {
+    A(0), B(1), C(2);
+}
+''')
+
+        expect:
+        introspection != null
+        introspection.beanProperties.size() == 3
+        introspection.getProperty("number").isPresent()
+
+        when:
+        def instance = introspection.instantiate("A")
+
+        then:
+        instance.name() == "A"
+        introspection.getRequiredProperty("number", int).get(instance) == 0
+
+        when:
+        introspection.instantiate()
+
+        then:
+        thrown(InstantiationException)
+
+        when:
+        introspection.getClass().getClassLoader().loadClass("java.lang.\$Enum\$Introspection")
+
+        then:
+        thrown(ClassNotFoundException)
+    }
+
+    void "test instantiating an enum"() {
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+enum class Test {
+    A, B, C;
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate("A")
+
+        then:
+        instance.name() == "A"
+
+        when:
+        introspection.instantiate()
+
+        then:
+        thrown(InstantiationException)
+    }
+
+    void "test constructor argument nested generics"() {
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import java.util.List
+import java.util.Map
+
+@Introspected
+class Test(map: Map<String, List<Action>>)
+
+class Action
+''')
+
+        expect:
+        introspection != null
+        introspection.constructorArguments[0].typeParameters.size() == 2
+        introspection.constructorArguments[0].typeParameters[0].typeName == 'java.lang.String'
+        introspection.constructorArguments[0].typeParameters[1].typeName == 'java.util.List<test.Action>'
+        introspection.constructorArguments[0].typeParameters[1].typeParameters.size() == 1
+        introspection.constructorArguments[0].typeParameters[1].typeParameters[0].typeName == 'test.Action'
+    }
+
+    void "test primitive multi-dimensional arrays"() {
+        when:
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Test {
+    var oneDimension: IntArray? = null
+    var twoDimensions: Array<IntArray>? = null
+    var threeDimensions: Array<Array<IntArray>>? = null
+}
+''')
+
+        then:
+        noExceptionThrown()
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate()
+        def property = introspection.getRequiredProperty("oneDimension", int[].class)
+        int[] level1 = [1, 2, 3] as int[]
+        property.set(instance, level1)
+
+        then:
+        property.get(instance) == level1
+
+        when:
+        property = introspection.getRequiredProperty("twoDimensions", int[][].class)
+        int[] level2 = [4, 5, 6] as int[]
+        int[][] twoDimensions = [level1, level2] as int[][]
+        property.set(instance, twoDimensions)
+
+        then:
+        property.get(instance) == twoDimensions
+
+        when:
+        property = introspection.getRequiredProperty("threeDimensions", int[][][].class)
+        int[][][] threeDimensions = [[level1], [level2]] as int[][][]
+        property.set(instance, threeDimensions)
+
+        then:
+        property.get(instance) == threeDimensions
+    }
+
+    void "test class multi-dimensional arrays"() {
+        when:
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Test {
+    var oneDimension: Array<String>? = null
+    var twoDimensions: Array<Array<String>>? = null
+    var threeDimensions: Array<Array<Array<String>>>? = null
+}
+''')
+
+        then:
+        noExceptionThrown()
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate()
+        def property = introspection.getRequiredProperty("oneDimension", String[].class)
+        String[] level1 = ["1", "2", "3"] as String[]
+        property.set(instance, level1)
+
+        then:
+        property.get(instance) == level1
+
+        when:
+        property = introspection.getRequiredProperty("twoDimensions", String[][].class)
+        String[] level2 = ["4", "5", "6"] as String[]
+        String[][] twoDimensions = [level1, level2] as String[][]
+        property.set(instance, twoDimensions)
+
+        then:
+        property.get(instance) == twoDimensions
+
+        when:
+        property = introspection.getRequiredProperty("threeDimensions", String[][][].class)
+        String[][][] threeDimensions = [[level1], [level2]] as String[][][]
+        property.set(instance, threeDimensions)
+
+        then:
+        property.get(instance) == threeDimensions
+    }
+
+    void "test enum multi-dimensional arrays"() {
+        when:
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.kotlin.processing.elementapi.SomeEnum
+
+@Introspected
+class Test {
+    var oneDimension: Array<SomeEnum>? = null
+    var twoDimensions: Array<Array<SomeEnum>>? = null
+    var threeDimensions: Array<Array<Array<SomeEnum>>>? = null
+}
+''')
+
+        then:
+        noExceptionThrown()
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate()
+        def property = introspection.getRequiredProperty("oneDimension", SomeEnum[].class)
+        SomeEnum[] level1 = [SomeEnum.A, SomeEnum.B, SomeEnum.A] as SomeEnum[]
+        property.set(instance, level1)
+
+        then:
+        property.get(instance) == level1
+
+        when:
+        property = introspection.getRequiredProperty("twoDimensions", SomeEnum[][].class)
+        SomeEnum[] level2 = [SomeEnum.B, SomeEnum.A, SomeEnum.B] as SomeEnum[]
+        SomeEnum[][] twoDimensions = [level1, level2] as SomeEnum[][]
+        property.set(instance, twoDimensions)
+
+        then:
+        property.get(instance) == twoDimensions
+
+        when:
+        property = introspection.getRequiredProperty("threeDimensions", SomeEnum[][][].class)
+        SomeEnum[][][] threeDimensions = [[level1], [level2]] as SomeEnum[][][]
+        property.set(instance, threeDimensions)
+
+        then:
+        property.get(instance) == threeDimensions
+    }
+
+    void "test superclass methods are read before interface methods"() {
+        BeanIntrospection introspection = Compiler.buildBeanIntrospection('test.Test', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import javax.validation.constraints.NotNull
+
+interface IEmail {
+    fun getEmail(): String?
+}
+
+@Introspected
+open class SuperClass: IEmail {
+    @NotNull
+    override fun getEmail(): String? = null
+}
+
+@Introspected
+class SubClass: SuperClass()
+
+@Introspected
+class Test: SuperClass(), IEmail
+
+''')
+        expect:
+        introspection != null
+        introspection.getProperty("email").isPresent()
+        introspection.getIndexedProperties(Constraint).size() == 1
+    }
+
+    void "test introspection on abstract class"() {
+        BeanIntrospection beanIntrospection = Compiler.buildBeanIntrospection("test.Test", """
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+abstract class Test {
+    var name: String? = null
+    var author: String? = null
+}
+""")
+
+        expect:
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 2
+    }
+
+    void "test targeting abstract class with @Introspected(classes = "() {
+        ClassLoader classLoader = Compiler.buildClassLoader("test.Test", """
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected(classes = [io.micronaut.kotlin.processing.elementapi.TestClass::class])
+class MyConfig
+""")
+
+        when:
+        BeanIntrospector beanIntrospector = BeanIntrospector.forClassLoader(classLoader)
+
+        then:
+        BeanIntrospection beanIntrospection = beanIntrospector.getIntrospection(TestClass)
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 2
+    }
+
+    void "test introspection on abstract class with extra getter"() {
+        BeanIntrospection beanIntrospection = Compiler.buildBeanIntrospection("test.Test", """
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+abstract class Test {
+    var name: String? = null
+    var author: String? = null
+    
+    fun getAge(): Int = 0
+}
+""")
+
+        expect:
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 3
+    }
+
+    void "test class loading is not shared between the introspection and the ref"() {
+        when:
+        BeanIntrospection beanIntrospection = Compiler.buildBeanIntrospection("test.Test", """
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import java.util.Set;
+
+@Introspected(excludedAnnotations = [Deprecated::class])
+public class Test {
+    var authors: Set<Author>? = null
+}
+
+@Introspected(excludedAnnotations = [Deprecated::class])
+class Author {
+    var name: String? = null
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 1
+    }
+
+    void "test annotation on setter"() {
+        when:
+        BeanIntrospection beanIntrospection = Compiler.buildBeanIntrospection("test.Test", """
+package test
+
+import com.fasterxml.jackson.annotation.JsonProperty
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Test {
+    @set:JsonProperty
+    var foo: String = "bar"
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 1
+        beanIntrospection.getBeanProperties()[0].annotationMetadata.hasAnnotation(JsonProperty)
+    }
+
+    void "test annotation on field"() {
+        when:
+        BeanIntrospection beanIntrospection = Compiler.buildBeanIntrospection("test.Test", """
+package test
+
+import com.fasterxml.jackson.annotation.JsonProperty
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Test {
+    @field:JsonProperty
+    var foo: String = "bar"
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 1
+        beanIntrospection.getBeanProperties()[0].annotationMetadata.hasAnnotation(JsonProperty)
+    }
+
+    void "test getter annotation overrides setter and field"() {
+        when:
+        BeanIntrospection beanIntrospection = Compiler.buildBeanIntrospection("test.Test", """
+package test
+
+import com.fasterxml.jackson.annotation.JsonProperty
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Test {
+    @field:JsonProperty("field")
+    @get:JsonProperty("getter")
+    @set:JsonProperty("setter")
+    var foo: String? = null
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 1
+        beanIntrospection.getBeanProperties()[0].annotationMetadata.getAnnotation(JsonProperty).stringValue().get() == 'getter'
+    }
+
+    void "test field annotation overrides setter"() {
+        when:
+        BeanIntrospection beanIntrospection = Compiler.buildBeanIntrospection("test.Test", """
+package test
+
+import com.fasterxml.jackson.annotation.JsonProperty
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Test {
+    @field:JsonProperty("field")
+    @set:JsonProperty("setter")
+    var foo: String? = null
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 1
+        beanIntrospection.getBeanProperties()[0].annotationMetadata.getAnnotation(JsonProperty).stringValue().get() == 'field'
     }
 }

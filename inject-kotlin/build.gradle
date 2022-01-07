@@ -25,6 +25,10 @@ afterEvaluate {
     }
 }
 
+tasks.named("compileTestGroovy") {
+    classpath += files(tasks.compileTestKotlin)
+}
+
 tasks.named("test") {
     classpath += files(tasks.compileTestKotlin)
 }

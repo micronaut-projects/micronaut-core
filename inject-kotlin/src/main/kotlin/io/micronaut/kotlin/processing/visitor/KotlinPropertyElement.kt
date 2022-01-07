@@ -29,11 +29,11 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
         this.classElement = classElement
         this.setter = Optional.ofNullable(property.setter)
             .map { method ->
-                return@map visitorContext.elementFactory.newMethodElement(classElement, method, annotationMetadata)
+                return@map visitorContext.elementFactory.newMethodElement(classElement, method, type, annotationMetadata)
             }
         this.getter = Optional.ofNullable(property.getter)
             .map { method ->
-                return@map visitorContext.elementFactory.newMethodElement(classElement, method, annotationMetadata)
+                return@map visitorContext.elementFactory.newMethodElement(classElement, method, type, annotationMetadata)
             }
     }
     constructor(classElement: ClassElement,
