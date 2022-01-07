@@ -845,7 +845,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @Override
     public String getName() {
         if (name == null) {
-            name = JavaModelUtils.getClassName(classElement);
+            name = visitorContext.getElements().getBinaryName(classElement).toString();
         }
         return name;
     }
@@ -1113,10 +1113,12 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         });
 
         if (!typeArguments.isEmpty()) {
-            result.put(JavaModelUtils.getClassName(this.classElement), getTypeArguments());
+            result.put(getName(), getTypeArguments());
         }
         return result;
     }
+
+    
 
     /**
      * @return The generic type info for this class.

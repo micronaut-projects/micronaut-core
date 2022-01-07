@@ -125,7 +125,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                         Object value = av.getValue();
                         if (value instanceof DeclaredType) {
                             Element element = ((DeclaredType) value).asElement();
-                            return JavaModelUtils.getClassName((TypeElement) element);
+                            return elementUtils.getBinaryName((TypeElement) element).toString();
                         }
                     }
                 }
@@ -444,7 +444,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Override
     protected String getAnnotationTypeName(AnnotationMirror annotationMirror) {
-        return JavaModelUtils.getClassName((TypeElement) annotationMirror.getAnnotationType().asElement());
+        return elementUtils.getBinaryName((TypeElement) annotationMirror.getAnnotationType().asElement()).toString();
     }
 
     @Override
@@ -677,7 +677,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             if (t instanceof DeclaredType) {
                 Element typeElement = ((DeclaredType) t).asElement();
                 if (typeElement instanceof TypeElement) {
-                    String className = JavaModelUtils.getClassName((TypeElement) typeElement);
+                    String className = elementUtils.getBinaryName((TypeElement) typeElement).toString();
                     resolvedValue = new AnnotationClassValue<>(className);
                 }
             }
@@ -799,7 +799,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                 if (t instanceof DeclaredType) {
                     Element typeElement = ((DeclaredType) t).asElement();
                     if (typeElement instanceof TypeElement) {
-                        final String className = JavaModelUtils.getClassName((TypeElement) typeElement);
+                        final String className = elementUtils.getBinaryName((TypeElement) typeElement).toString();
                         values.add(new AnnotationClassValue<>(className));
                     }
                 } else if (t instanceof ArrayType) {
@@ -807,7 +807,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                     if (componentType instanceof DeclaredType) {
                         Element typeElement = ((DeclaredType) componentType).asElement();
                         if (typeElement instanceof TypeElement) {
-                            final String className = JavaModelUtils.getClassArrayName((TypeElement) typeElement);
+                            final String className = elementUtils.getBinaryName((TypeElement) typeElement).toString();
                             values.add(new AnnotationClassValue<>(className));
                         }
                     }

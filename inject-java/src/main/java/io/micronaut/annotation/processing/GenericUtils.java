@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
@@ -115,7 +114,7 @@ public class GenericUtils {
         if (element instanceof TypeElement) {
             TypeElement typeElement = (TypeElement) element;
             if (CollectionUtils.isNotEmpty(boundTypes)) {
-                beanTypeArguments.put(JavaModelUtils.getClassName(typeElement), boundTypes);
+                beanTypeArguments.put(elementUtils.getBinaryName(typeElement).toString(), boundTypes);
             }
             populateTypeArguments(typeElement, beanTypeArguments);
         }
@@ -509,11 +508,11 @@ public class GenericUtils {
                         TypeElement child = current;
                         current = (TypeElement) te;
                         if (CollectionUtils.isNotEmpty(superArguments)) {
-                            Map<String, TypeMirror> boundTypes = typeArguments.get(JavaModelUtils.getClassName(child));
+                            Map<String, TypeMirror> boundTypes = typeArguments.get(elementUtils.getBinaryName(child).toString());
                             if (boundTypes != null) {
                                 Map<String, TypeMirror> types = resolveGenericTypes(dt, current, boundTypes);
 
-                                String name = JavaModelUtils.getClassName(current);
+                                String name = elementUtils.getBinaryName(current).toString();
                                 typeArguments.put(name, types);
                             } else {
                                 List<? extends TypeParameterElement> typeParameters = current.getTypeParameters();
@@ -525,7 +524,7 @@ public class GenericUtils {
                                         types.put(n, i.next());
                                     }
                                 }
-                                typeArguments.put(JavaModelUtils.getClassName(current), types);
+                                typeArguments.put(elementUtils.getBinaryName(current).toString(), types);
                             }
                         }
 
@@ -546,9 +545,9 @@ public class GenericUtils {
                 Element element = declaredType.asElement();
                 if (element instanceof TypeElement) {
                     TypeElement te = (TypeElement) element;
-                    String name = JavaModelUtils.getClassName(te);
+                    String name = elementUtils.getBinaryName(te).toString();
                     if (!typeArguments.containsKey(name)) {
-                        Map<String, TypeMirror> boundTypes = typeArguments.get(JavaModelUtils.getClassName(child));
+                        Map<String, TypeMirror> boundTypes = typeArguments.get(elementUtils.getBinaryName(child).toString());
                         if (boundTypes == null) {
                             boundTypes = Collections.emptyMap();
                         }

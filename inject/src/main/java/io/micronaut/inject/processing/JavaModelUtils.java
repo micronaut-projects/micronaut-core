@@ -153,7 +153,9 @@ public class JavaModelUtils {
      *
      * @param typeElement The type element
      * @return The class name
+     * @deprecated use {@link javax.lang.model.util.Elements#getBinaryName(javax.lang.model.element.TypeElement)} instead
      */
+    @Deprecated
     public static String getClassName(TypeElement typeElement) {
         Name qualifiedName = typeElement.getQualifiedName();
         NestingKind nestingKind;
@@ -236,7 +238,9 @@ public class JavaModelUtils {
      *
      * @param typeElement The type element
      * @return The class name
+     * @deprecated use {@link javax.lang.model.util.Elements#getBinaryName(javax.lang.model.element.TypeElement)} instead
      */
+    @Deprecated
     public static String getClassArrayName(TypeElement typeElement) {
         return "[L" + getClassName(typeElement) + ";";
     }

@@ -151,16 +151,23 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
     private String resolveDeclaringTypeName() {
         String declaringTypeName;
         if (this instanceof MemberElement) {
-            declaringTypeName = ((MemberElement) this).getOwningType().getName();
-        } else if (this instanceof ParameterElement) {
-            TypeElement typeElement = visitorContext.getModelUtils().classElementFor((Element) this.getNativeType());
-            if (typeElement == null) {
-                declaringTypeName = getName();
-            } else {
-                declaringTypeName = typeElement.getQualifiedName().toString();
-            }
+            final ClassElement owningType = ((MemberElement) this).getOwningType();
+            final Element nativeType = (Element) owningType.getNativeType();
+            declaringTypeName = resolveCanonicalName(nativeType);
         } else {
+            final Element nativeType = (Element) this.getNativeType();
+            declaringTypeName = resolveCanonicalName(nativeType);
+        }
+        return declaringTypeName;
+    }
+
+    private String resolveCanonicalName(Element nativeType) {
+        String declaringTypeName;
+        TypeElement typeElement = visitorContext.getModelUtils().classElementFor(nativeType);
+        if (typeElement == null) {
             declaringTypeName = getName();
+        } else {
+            declaringTypeName = typeElement.getQualifiedName().toString();
         }
         return declaringTypeName;
     }
