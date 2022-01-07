@@ -246,6 +246,17 @@ public class JavaModelUtils {
     }
 
     /**
+     * Get the array class name for the given type element. Handles {@link NestingKind}.
+     *
+     * @param binaryName The binary name
+     * @return The class name
+     * @since 3.2.5
+     */
+    public static String getClassArrayName(String binaryName) {
+        return "[L" + binaryName + ";";
+    }
+
+    /**
      * Return whether this is a record or a component of a record.
      * @param e The element
      * @return True if it is

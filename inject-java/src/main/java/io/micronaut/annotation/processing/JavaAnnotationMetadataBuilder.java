@@ -808,7 +808,8 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                         Element typeElement = ((DeclaredType) componentType).asElement();
                         if (typeElement instanceof TypeElement) {
                             final String className = elementUtils.getBinaryName((TypeElement) typeElement).toString();
-                            values.add(new AnnotationClassValue<>(className));
+                            final String arrayName = JavaModelUtils.getClassArrayName(className);
+                            values.add(new AnnotationClassValue<>(arrayName));
                         }
                     }
                 }
