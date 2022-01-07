@@ -71,6 +71,17 @@ class ExceptionHandlerSpec extends Specification {
         stock == 1234
     }
 
+    void "test wrapped HttpStatusException in Mono is unwrapped and handled by ExceptionHandler"() {
+        when:
+        HttpRequest request = HttpRequest.GET('/books/stock/mono/1234')
+        Integer stock = client.toBlocking().retrieve(request, Integer)
+
+        then:
+        noExceptionThrown()
+        stock != null
+        stock == 1234
+    }
+
     void "test error route with @Status"() {
         when:
         HttpRequest request = HttpRequest.GET('/books/null-pointer')

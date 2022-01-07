@@ -18,8 +18,10 @@ package io.micronaut.docs.http.server.exception;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Error;
 import io.micronaut.http.annotation.Get;
@@ -27,6 +29,7 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.exceptions.HttpStatusException;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -55,6 +58,12 @@ public class BookController {
         CompletableFuture<Integer> future = new CompletableFuture<>();
         future.completeExceptionally(new HttpStatusException(HttpStatus.OK, 1234));
         return future.get();
+    }
+
+    @Produces(MediaType.TEXT_PLAIN)
+    @Get("/stock/mono/{isbn}")
+    MutableHttpResponse<Mono<?>> stockMonoBlocking(String isbn) throws InterruptedException, ExecutionException {
+        return HttpResponse.ok(Mono.error(new HttpStatusException(HttpStatus.OK, 1234)));
     }
 
     @Produces(MediaType.TEXT_PLAIN)
