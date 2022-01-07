@@ -27,7 +27,7 @@ import org.reactivestreams.Publisher
 @RequestAttributes(RequestAttribute(name = "client-name", value = "storyClient"), RequestAttribute(name = "version", value = "1"))
 interface StoryClient {
 
-    @Get("/{storyId}")
+    @Get("/abc")
     @SingleResult
     fun getById(@RequestAttribute storyId: String): Publisher<Story>
 }
