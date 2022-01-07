@@ -7,6 +7,7 @@ import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Creator
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.ast.*
+import io.micronaut.kotlin.processing.isTypeReference
 import io.micronaut.kotlin.processing.toClassName
 import java.util.*
 import java.util.function.BiConsumer
@@ -214,22 +215,14 @@ open class KotlinClassElement(val classType: KSType,
         val companion = declaration.declarations.find { it is KSClassDeclaration && it.isCompanionObject }
         val creators = mutableListOf<KSFunctionDeclaration>()
         if (companion != null) {
-            val isEnum = declaration.classKind == ClassKind.ENUM_CLASS
-            var enumCreator: KSFunctionDeclaration? = null
             (companion as KSClassDeclaration).getDeclaredFunctions().forEach {
                 if (!it.isPrivate() && it.returnType?.resolve()?.declaration == declaration) {
-                    if (isEnum && it.simpleName.asString() == "valueOf") {
-                        enumCreator = it
-                    }
                     if (it.annotations.any { ann ->
                             ann.annotationType.resolve().declaration.qualifiedName!!.asString() == CREATOR
                         }) {
                         creators.add(it)
                     }
                 }
-            }
-            if (creators.isEmpty() && enumCreator != null) {
-                creators.add(enumCreator!!)
             }
             return creators
         }
@@ -395,8 +388,13 @@ open class KotlinClassElement(val classType: KSType,
     }
 
     private fun getAllDeclarations(): Set<KSDeclaration>  {
-        val declarations = declaration.declarations.toMutableSet()
-        val excluded = mutableListOf<KSDeclaration>()
+        return getAllDeclarations(declaration, mutableListOf())
+    }
+
+    private fun getAllDeclarations(declaration: KSClassDeclaration, excluded: MutableList<KSDeclaration>): Set<KSDeclaration>  {
+        val declarations = declaration.declarations
+            .filter { !excluded.contains(it) }
+            .toMutableSet()
         declarations.forEach {
             if (it is KSFunctionDeclaration) {
                 var overridee = it.findOverridee()
@@ -413,11 +411,7 @@ open class KotlinClassElement(val classType: KSType,
             }
         }
         declaration.getAllSuperTypes().forEach { superType ->
-            (superType.declaration as KSClassDeclaration).declarations.forEach { declaration ->
-                if (!excluded.contains(declaration)) {
-                    declarations.add(declaration)
-                }
-            }
+            declarations.addAll(getAllDeclarations(superType.declaration as KSClassDeclaration, excluded))
         }
         return declarations
     }
@@ -447,14 +441,31 @@ open class KotlinClassElement(val classType: KSType,
         val propertyList : MutableList<PropertyElement> = declaration.getAllProperties()
             .filter { !it.isPrivate() }
             .map {
-            val type = it.type.resolve()
-            KotlinPropertyElement(
-                this,
-                elementFactory.newClassElement(type, typeArguments),
-                it,
-                annotationUtils.getAnnotationMetadata(it),
-                visitorContext
-            )
+                val type = it.type.resolve()
+                val parents = mutableListOf<KSAnnotated>(it)
+                if (it.setter != null) {
+                    parents.add(it.setter!!)
+                }
+                if (it.getter != null) {
+                    parents.add(it.getter!!)
+                }
+                val element = parents.removeLast()
+                val annotationMetadata = if (parents.isNotEmpty()) {
+                    annotationUtils.getAnnotationMetadata(parents, element)
+                } else {
+                    annotationUtils.getAnnotationMetadata(element)
+                }
+                KotlinPropertyElement(
+                    this,
+                    elementFactory.newClassElement(
+                        type,
+                        annotationUtils.getAnnotationMetadata(type.declaration),
+                        typeArguments,
+                        !it.isTypeReference()),
+                    it,
+                    annotationMetadata,
+                    visitorContext
+                )
         }.toMutableList()
         val functionBasedProperties: MutableMap<String, GetterAndSetter> = mutableMapOf()
         getAllDeclarations()

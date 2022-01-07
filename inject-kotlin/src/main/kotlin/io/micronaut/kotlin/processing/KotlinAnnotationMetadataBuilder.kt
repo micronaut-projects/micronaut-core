@@ -58,6 +58,12 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
                 return closestClassDeclaration.qualifiedName!!.asString()
             }
         }
+        if (element is KSPropertyAccessor) {
+            val closestClassDeclaration = element.receiver.closestClassDeclaration()
+            if (closestClassDeclaration != null) {
+                return closestClassDeclaration.qualifiedName!!.asString()
+            }
+        }
         TODO("Not yet implemented")
     }
 
