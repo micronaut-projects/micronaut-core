@@ -2052,12 +2052,13 @@ import io.micronaut.context.annotation.Executable
 class Test
 
 @JsonClassDescription
-interface MyInterface {
+public interface MyInterface {
     fun getName(): String
     
     @Executable
     fun name(): String = getName()
 }
+
 class MyImpl: MyInterface {
     override fun getName(): String = "ok"
 }
