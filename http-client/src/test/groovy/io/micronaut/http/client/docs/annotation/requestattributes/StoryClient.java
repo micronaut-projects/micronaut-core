@@ -31,7 +31,7 @@ import reactor.core.publisher.Mono;
 })
 public interface StoryClient {
 
-    @Get("/abc")
+    @Get("/{storyId}")
     @SingleResult
     Publisher<Story> getById(@RequestAttribute String storyId);
 }

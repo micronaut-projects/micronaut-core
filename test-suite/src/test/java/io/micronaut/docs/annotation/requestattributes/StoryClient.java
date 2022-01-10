@@ -30,7 +30,7 @@ import org.reactivestreams.Publisher;
 })
 public interface StoryClient {
 
-    @Get("/abc")
+    @Get("/{storyId}")
     @SingleResult
     Publisher<Story> getById(@RequestAttribute String storyId);
 }

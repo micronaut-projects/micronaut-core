@@ -124,11 +124,20 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
         });
         byAnnotation.put(RequestAttribute.class, (context, uriContext, value, request) -> {
             AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
+            String name = context.getArgument().getName();
             String attributeName = annotationMetadata
                     .stringValue(RequestAttribute.class)
                     .filter(StringUtils::isNotEmpty)
-                    .orElse(NameUtils.hyphenate(context.getArgument().getName()));
+                    .orElse(NameUtils.hyphenate(name));
             request.getAttributes().put(attributeName, value);
+
+            conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
+                    .filter(StringUtils::isNotEmpty)
+                    .ifPresent(param -> {
+                        if (uriContext.getUriTemplate().getVariableNames().contains(name)) {
+                            uriContext.getPathParameters().put(name, param);
+                        }
+                    });
         });
         byAnnotation.put(Body.class, (context, uriContext, value, request) -> {
             request.body(value);
