@@ -25,6 +25,7 @@ import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.annotation.AnnotatedElementValidator;
+import io.micronaut.inject.annotation.AnnotationMetadataSupport;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -585,6 +586,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      */
     public static void clearCaches() {
         OVERRIDDEN_METHOD_CACHE.clear();
+        AnnotationMetadataSupport.clearDefaultValues();
     }
 
     /**

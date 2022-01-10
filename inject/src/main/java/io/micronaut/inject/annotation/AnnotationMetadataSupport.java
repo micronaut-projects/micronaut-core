@@ -130,6 +130,14 @@ public final class AnnotationMetadataSupport {
         return REPEATABLE_ANNOTATIONS.get(annotation);
     }
 
+
+    /**
+     * Clear any annotation default values.
+     */
+    public static void clearDefaultValues() {
+        ANNOTATION_DEFAULTS.clear();
+    }
+
     /**
      * Gets a registered annotation type.
      *

@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Internal
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
+import io.micronaut.inject.annotation.AnnotationMetadataSupport
 import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.AnnotationNode
 import org.codehaus.groovy.ast.ClassNode
@@ -105,6 +106,7 @@ class AstAnnotationUtils {
     @Internal
     static void invalidateCache() {
         annotationMetadataCache.clear()
+        AnnotationMetadataSupport.clearDefaultValues()
     }
 
     /**
