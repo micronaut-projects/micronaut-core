@@ -36,8 +36,6 @@ import java.util.stream.Stream;
  */
 public final class EnvironmentFilterSpecification {
 
-    public interface EnvironmentFilterNamePredicate extends Predicate<String> {}
-
     private static final List<EnvironmentFilterNamePredicate> LEGACY_MASK_PATTERNS =
             Stream.of(".*password.*", ".*credential.*", ".*certificate.*", ".*key.*", ".*secret.*", ".*token.*")
             .map(s -> regularExpressionPredicate(s, Pattern.CASE_INSENSITIVE))
@@ -120,6 +118,9 @@ public final class EnvironmentFilterSpecification {
 
     public static EnvironmentFilterNamePredicate regularExpressionPredicate(String pattern, int flags) {
         return s -> Pattern.compile(pattern, flags).matcher(s).matches();
+    }
+
+    public interface EnvironmentFilterNamePredicate extends Predicate<String> {
     }
 
     enum FilterResult {
