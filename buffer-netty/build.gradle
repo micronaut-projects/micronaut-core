@@ -6,8 +6,8 @@ internalSanityChecks {
 dependencies {
     api project(":core")
     api project(":inject")
-    api project(":netty-graal")
     api libs.managed.netty.buffer
+    compileOnly libs.managed.graal
 
     annotationProcessor project(":inject-java")
 }

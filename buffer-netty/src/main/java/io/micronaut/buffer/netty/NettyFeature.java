@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.netty;
+package io.micronaut.buffer.netty;
 
 import com.oracle.svm.core.annotate.AutomaticFeature;
 import com.oracle.svm.core.jdk.SystemPropertiesSupport;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.graal.AutomaticFeatureUtils;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 import io.netty.util.internal.logging.Slf4JLoggerFactory;
@@ -34,6 +35,7 @@ import java.util.Arrays;
  * @author Jonas Konrad
  * @since 3.3.0
  */
+@Internal
 @AutomaticFeature
 final class NettyFeature implements Feature {
     @Override

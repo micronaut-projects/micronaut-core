@@ -52,7 +52,6 @@ include "jackson-databind"
 include "json-core"
 include "management"
 include "messaging"
-include 'netty-graal'
 include "router"
 include "runtime"
 include "runtime-osx"
