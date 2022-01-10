@@ -30,7 +30,7 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
 
     override fun isPublic(): Boolean {
         return if (declaration is KSModifierListOwner) {
-            declaration.modifiers.contains(Modifier.PUBLIC)
+            declaration.modifiers.isEmpty() || declaration.modifiers.contains(Modifier.PUBLIC)
         } else {
             false
         }
