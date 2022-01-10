@@ -23,8 +23,7 @@ This first example will mask all values except for those that are prefixed by `s
 ----
 @Singleton
 public class OnlySafePrefixedEnvFilter implements EnvironmentEndpointFilter {
-    private static final EnvironmentFilterNamePredicate SAFE_PREFIX_PATTERN =
-            EnvironmentFilterSpecification.regularExpressionPredicate("safe.*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SAFE_PREFIX_PATTERN = Pattern.compile("safe.*", Pattern.CASE_INSENSITIVE);
 
     @Override
     public void specifyFiltering(@NotNull EnvironmentFilterSpecification specification) {
@@ -43,24 +42,24 @@ It is also possible to allow all values in plain text using api:management.endpo
 @Singleton
 public class AllPlainExceptSecretOrMatchEnvFilter implements EnvironmentEndpointFilter {
     // Mask anything starting with `sekrt`
-    private static final EnvironmentFilterNamePredicate SECRET_PREFIX_PATTERN =
-            EnvironmentFilterSpecification.regularExpressionPredicate("sekrt.*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SECRET_PREFIX_PATTERN = Pattern.compile("sekrt.*", Pattern.CASE_INSENSITIVE);
 
     // Mask anything exactly matching `exact-match`
-    private static final EnvironmentFilterNamePredicate EXACT_MATCH = "exact-match"::equals;
+    private static final String EXACT_MATCH = "exact-match";
+
+    // Mask anything that starts with `private.`
+    private static final Predicate<String> PREDICATE_MATCH = name -> name.startsWith("private.");
 
     @Override
     public void specifyFiltering(@NotNull EnvironmentFilterSpecification specification) {
         specification
                 .maskNone() // All values will be in plain-text apart from the supplied patterns
-                .exclude(SECRET_PREFIX_PATTERN, EXACT_MATCH);
+                .exclude(SECRET_PREFIX_PATTERN)
+                .exclude(EXACT_MATCH)
+                .exclude(PREDICATE_MATCH);
     }
 }
 ----
-
-The api:management.endpoint.env.EnvironmentFilterSpecification[] class
-also contains the current `Principal` if one exists, so this can be used to further limit access based on the
-currently logged-in user.
 
 Sensible defaults can be applied by calling the api:management.endpoint.env.EnvironmentFilterSpecification#legacyMasking--[`legacyMasking()`] method.
 This will show all values apart from those that contain the words `password`, `credential`, `certificate`, `key`, `secret` or `token` anywhere in their name.

@@ -19,7 +19,7 @@ This will then be available, but mask all values.  To restore the legacy functio
 @Singleton
 public class LegacyEnvEndpointFilter implements EnvironmentEndpointFilter {
     @Override
-    public void specifyFiltering(EnvironmentFilterSpecification specification) {
+    public void specifyFiltering(@NotNull EnvironmentFilterSpecification specification) {
         specification.legacyFiltering();
     }
 }

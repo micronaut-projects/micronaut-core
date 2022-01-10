@@ -2,14 +2,16 @@ package io.micronaut.management.endpoint.env
 
 import spock.lang.Specification
 
+import java.util.regex.Pattern
+
 class EnvironmentFilterSpecificationSpec extends Specification {
 
-    private EnvironmentFilterSpecification.EnvironmentFilterNamePredicate TEST_REGEX_PREDICATE = EnvironmentFilterSpecification.regularExpressionPredicate("test")
-    private EnvironmentFilterSpecification.EnvironmentFilterNamePredicate TEST_STATIC_PREDICATE = { it -> it == 'test' }
+    private Pattern PATTERN_MASK = ~"(?i)test.*"
+    private String LITERAL_MASK = 'test'
 
     def "masks all by default"() {
         when:
-        def spec = new EnvironmentFilterSpecification(null)
+        def spec = new EnvironmentFilterSpecification()
 
         then:
         spec.test("test") == EnvironmentFilterSpecification.FilterResult.MASK
@@ -17,18 +19,19 @@ class EnvironmentFilterSpecificationSpec extends Specification {
 
     def "can unmask given patterns"() {
         when:
-        def spec = new EnvironmentFilterSpecification(null) // defaults to maskAll()
-                .exclude(TEST_REGEX_PREDICATE)
+        def spec = new EnvironmentFilterSpecification() // defaults to maskAll()
+                .exclude(PATTERN_MASK)
 
         then:
         spec.test("test") == EnvironmentFilterSpecification.FilterResult.PLAIN
-        spec.test("test2") == EnvironmentFilterSpecification.FilterResult.MASK
+        spec.test("test2") == EnvironmentFilterSpecification.FilterResult.PLAIN
+        spec.test("another") == EnvironmentFilterSpecification.FilterResult.MASK
     }
 
     def "can unmask static names"() {
         when:
-        def spec = new EnvironmentFilterSpecification(null) // defaults to maskAll()
-                .exclude(TEST_STATIC_PREDICATE)
+        def spec = new EnvironmentFilterSpecification() // defaults to maskAll()
+                .exclude(LITERAL_MASK)
 
         then:
         spec.test("test") == EnvironmentFilterSpecification.FilterResult.PLAIN
@@ -37,7 +40,7 @@ class EnvironmentFilterSpecificationSpec extends Specification {
 
     def "can be set to unmask all"() {
         when:
-        def spec = new EnvironmentFilterSpecification(null).maskNone()
+        def spec = new EnvironmentFilterSpecification().maskNone()
 
         then:
         spec.test("test") == EnvironmentFilterSpecification.FilterResult.PLAIN
@@ -45,17 +48,18 @@ class EnvironmentFilterSpecificationSpec extends Specification {
 
     def "can mask given patterns"() {
         when:
-        def spec = new EnvironmentFilterSpecification(null).maskNone()
-                .exclude(TEST_REGEX_PREDICATE)
+        def spec = new EnvironmentFilterSpecification().maskNone()
+                .exclude(PATTERN_MASK)
 
         then:
         spec.test("test") == EnvironmentFilterSpecification.FilterResult.MASK
-        spec.test("test2") == EnvironmentFilterSpecification.FilterResult.PLAIN
+        spec.test("TEST_2") == EnvironmentFilterSpecification.FilterResult.MASK
+        spec.test("another") == EnvironmentFilterSpecification.FilterResult.PLAIN
     }
 
     def "can set legacy mode"() {
         when:
-        def spec = new EnvironmentFilterSpecification(null).legacyMasking()
+        def spec = new EnvironmentFilterSpecification().legacyMasking()
 
         then:
         spec.test("test") == EnvironmentFilterSpecification.FilterResult.PLAIN
@@ -65,10 +69,11 @@ class EnvironmentFilterSpecificationSpec extends Specification {
         spec.test("SOME_PASSWORD") == EnvironmentFilterSpecification.FilterResult.MASK
 
         when:
-        spec = spec.exclude(TEST_REGEX_PREDICATE)
+        spec = spec.exclude(PATTERN_MASK)
 
         then:
         spec.test("test") == EnvironmentFilterSpecification.FilterResult.MASK
-        spec.test("test2") == EnvironmentFilterSpecification.FilterResult.PLAIN
+        spec.test("test2") == EnvironmentFilterSpecification.FilterResult.MASK
+        spec.test("another") == EnvironmentFilterSpecification.FilterResult.PLAIN
     }
 }

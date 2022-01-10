@@ -5,13 +5,10 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.Environment
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.management.endpoint.BasePrincipalBinder
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
 import spock.lang.Specification
-
-import java.util.function.Predicate
 
 class EnvironmentEndpointSpec extends Specification {
 
@@ -53,7 +50,7 @@ class EnvironmentEndpointSpec extends Specification {
 
         when:
         Map result = call("/${EnvironmentEndpoint.NAME}")
-
+result.each { println "$it.key => $it.value"}
         then:
         result.activeEnvironments == ["test"]
         result.packages.contains("io.micronaut.management.endpoint.env")
@@ -172,7 +169,7 @@ class EnvironmentEndpointSpec extends Specification {
 
         @Override
         void specifyFiltering(EnvironmentFilterSpecification specification) {
-            specification.maskNone().exclude(regexPredicate("iShouldBeMasked"))
+            specification.maskNone().exclude("iShouldBeMasked")
         }
     }
 
@@ -200,7 +197,7 @@ class EnvironmentEndpointSpec extends Specification {
 
         @Override
         void specifyFiltering(EnvironmentFilterSpecification specification) {
-            specification.legacyMasking().exclude(regexPredicate('iShouldBeMasked'))
+            specification.legacyMasking().exclude('iShouldBeMasked')
         }
     }
 
@@ -233,69 +230,8 @@ class EnvironmentEndpointSpec extends Specification {
 
         @Override
         void specifyFiltering(EnvironmentFilterSpecification specification) {
-            specification.maskAll().exclude(regexPredicate('dontMaskMe'))
+            specification.maskAll().exclude('dontMaskMe')
         }
-    }
-
-    void "masking and hiding can be performed by principal"() {
-        given:
-        this.client = buildClient(
-                'test.filter': 'principal',
-                'unmasked.for.tim': 'baz',
-                'clair.only': 'secret',
-                'bind.principal': principal
-        )
-
-        when:
-        Map result = call()
-
-        then:
-        result.properties == expected
-
-        where:
-        principal | expected
-        'unbound' | ['endpoints.env.enabled': '*****', 'endpoints.env.sensitive': '*****', 'foo.bar': '*****', 'test.filter': '*****', 'unmasked.for.tim': '*****', 'clair.only': '*****', 'bind.principal': '*****']
-        'tim'     | ['endpoints.env.enabled': true, 'endpoints.env.sensitive': false, 'foo.bar': 'baz', 'test.filter': 'principal', 'unmasked.for.tim': 'baz', 'clair.only': '*****', 'bind.principal': 'tim']
-        'clair'   | ['endpoints.env.enabled': true, 'endpoints.env.sensitive': false, 'foo.bar': 'baz', 'test.filter': 'principal', 'unmasked.for.tim': '*****', 'clair.only': 'secret', 'bind.principal': 'clair']
-    }
-
-    @Singleton
-    @Requires(property = "test.filter", value = "principal")
-    static class PrincipalEnvironmentEndpointFilter implements EnvironmentEndpointFilter {
-
-        @Override
-        void specifyFiltering(EnvironmentFilterSpecification specification) {
-            specification.legacyMasking()
-            if (specification.principal?.name == 'Tim') {
-                specification.exclude(regexPredicate('clair.only'))
-            } else if (specification.principal?.name == 'Clair') {
-                specification.exclude(regexPredicate('unmasked.for.tim'))
-            } else {
-                specification.maskAll()
-            }
-        }
-    }
-
-    @Singleton
-    @Requires(property = 'bind.principal', value = 'tim')
-    static class TimProvider extends BasePrincipalBinder {
-        @Override
-        String overriddenName() {
-            'Tim'
-        }
-    }
-
-    @Singleton
-    @Requires(property = 'bind.principal', value = 'clair')
-    static class ClairProvider extends BasePrincipalBinder {
-        @Override
-        String overriddenName() {
-            'Clair'
-        }
-    }
-
-    private static EnvironmentFilterSpecification.EnvironmentFilterNamePredicate regexPredicate(String pattern) {
-        EnvironmentFilterSpecification.regularExpressionPredicate(pattern)
     }
 
     private Map call(String uri = "/${EnvironmentEndpoint.NAME}/context") {

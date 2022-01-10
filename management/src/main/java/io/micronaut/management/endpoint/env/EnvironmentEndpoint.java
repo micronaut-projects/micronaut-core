@@ -75,20 +75,10 @@ public class EnvironmentEndpoint {
     /**
      * @return The environment information as a map with the following keys: activeEnvironments, packages and
      * propertySources.
-     * @deprecated Use {@link #getEnvironmentInfo(Principal)} instead.
-     */
-    public Map<String, Object> getEnvironmentInfo() {
-        return getEnvironmentInfo(null);
-    }
-
-    /**
-     * @param principal The current {@link Principal} if one exists
-     * @return The environment information as a map with the following keys: activeEnvironments, packages and
-     * propertySources.
      */
     @Read
-    public Map<String, Object> getEnvironmentInfo(@Nullable Principal principal) {
-        EnvironmentFilterSpecification filter = createFilterSpecification(principal);
+    public Map<String, Object> getEnvironmentInfo() {
+        EnvironmentFilterSpecification filter = createFilterSpecification();
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("activeEnvironments", environment.getActiveNames());
@@ -106,20 +96,10 @@ public class EnvironmentEndpoint {
     /**
      * @param propertySourceName The {@link PropertySource} name
      * @return a map with all the properties defined in the property source if it exists; null otherwise.
-     * @deprecated Use {@link #getProperties(String,Principal)} instead.
-     */
-    public Map<String, Object> getProperties(@Selector String propertySourceName) {
-        return this.getProperties(propertySourceName, null);
-    }
-
-    /**
-     * @param propertySourceName The {@link PropertySource} name
-     * @param principal The current {@link Principal} if one exists
-     * @return a map with all the properties defined in the property source if it exists; null otherwise.
      */
     @Read
-    public Map<String, Object> getProperties(@Selector String propertySourceName, @Nullable Principal principal) {
-        EnvironmentFilterSpecification filter = createFilterSpecification(principal);
+    public Map<String, Object> getProperties(@Selector String propertySourceName) {
+        EnvironmentFilterSpecification filter = createFilterSpecification();
 
         return environment.getPropertySources()
                 .stream()
@@ -129,8 +109,8 @@ public class EnvironmentEndpoint {
                 .orElse(null);
     }
 
-    private EnvironmentFilterSpecification createFilterSpecification(@Nullable Principal principal) {
-        EnvironmentFilterSpecification filter = new EnvironmentFilterSpecification(principal);
+    private EnvironmentFilterSpecification createFilterSpecification() {
+        EnvironmentFilterSpecification filter = new EnvironmentFilterSpecification();
         if (environmentFilter != null) {
             environmentFilter.specifyFiltering(filter);
         }
