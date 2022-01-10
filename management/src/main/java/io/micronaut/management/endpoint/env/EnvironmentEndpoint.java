@@ -73,6 +73,15 @@ public class EnvironmentEndpoint {
     }
 
     /**
+     * @return The environment information as a map with the following keys: activeEnvironments, packages and
+     * propertySources.
+     * @deprecated Use {@link #getEnvironmentInfo(Principal)} instead.
+     */
+    public Map<String, Object> getEnvironmentInfo() {
+        return getEnvironmentInfo(null);
+    }
+
+    /**
      * @param principal The current {@link Principal} if one exists
      * @return The environment information as a map with the following keys: activeEnvironments, packages and
      * propertySources.
@@ -92,6 +101,15 @@ public class EnvironmentEndpoint {
                 .forEach(propertySources::add);
         result.put("propertySources", propertySources);
         return result;
+    }
+
+    /**
+     * @param propertySourceName The {@link PropertySource} name
+     * @return a map with all the properties defined in the property source if it exists; null otherwise.
+     * @deprecated Use {@link #getProperties(String,Principal)} instead.
+     */
+    public Map<String, Object> getProperties(@Selector String propertySourceName) {
+        return this.getProperties(propertySourceName, null);
     }
 
     /**

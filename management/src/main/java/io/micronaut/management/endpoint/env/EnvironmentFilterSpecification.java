@@ -112,14 +112,37 @@ public final class EnvironmentFilterSpecification {
         return allMasked ? FilterResult.MASK : FilterResult.PLAIN;
     }
 
+    /**
+     * Given a regular expression pattern string, generate a Predicate which matches to it.
+     *
+     * @param pattern A string representation of the Pattern for the matcher.
+     * @return A {@code EnvironmentFilterNamePredicate} which when tested with a given property source name will
+     * check it matches the passed pattern.
+     */
     public static EnvironmentFilterNamePredicate regularExpressionPredicate(String pattern) {
         return regularExpressionPredicate(pattern, 0);
     }
 
+    /**
+     * Given a regular expression pattern string and Pattern flags, generate a Predicate which matches to it.
+     *
+     * @param pattern A string representation of the Pattern for the matcher.
+     * @param flags Match flags, a bit mask that may include {@link Pattern#CASE_INSENSITIVE}, {@link Pattern#MULTILINE},
+     * {@link Pattern#DOTALL}, {@link Pattern#UNICODE_CASE}, {@link Pattern#CANON_EQ}, {@link Pattern#UNIX_LINES}, {@link Pattern#LITERAL}, {@link Pattern#UNICODE_CHARACTER_CLASS} and {@link Pattern#COMMENTS}
+     * @return A {@code EnvironmentFilterNamePredicate} which when tested with a given property source name will
+     * check it matches the passed pattern.
+
+     * @see Pattern#compile(String, int)
+     */
     public static EnvironmentFilterNamePredicate regularExpressionPredicate(String pattern, int flags) {
         return s -> Pattern.compile(pattern, flags).matcher(s).matches();
     }
 
+    /**
+     * This is a type-alias for {@code Predicate<String>} so that varargs calls do not give an unchecked generic warning.
+     *
+     * @see Predicate
+     */
     public interface EnvironmentFilterNamePredicate extends Predicate<String> {
     }
 
