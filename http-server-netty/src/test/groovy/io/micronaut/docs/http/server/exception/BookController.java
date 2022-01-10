@@ -78,6 +78,12 @@ public class BookController {
         return Publishers.just(new ReactiveException());
     }
 
+    @Get("/reactiveMulti")
+    @SingleResult
+    Publisher<String> reactiveMulti() {
+        return Publishers.just(new ReactiveMultiException());
+    }
+
     @Error(exception = NullPointerException.class)
     @Produces(MediaType.TEXT_PLAIN)
     @Status(HttpStatus.MULTI_STATUS)

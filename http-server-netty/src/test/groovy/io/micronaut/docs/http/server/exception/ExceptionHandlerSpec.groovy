@@ -103,4 +103,15 @@ class ExceptionHandlerSpec extends Specification {
         stock.getBody(String).get() == "reactive handler"
         stock.status() == HttpStatus.OK
     }
+
+    void "test exception handler returning a publisher with multiple items"() {
+        when:
+        HttpRequest request = HttpRequest.GET('/books/reactiveMulti')
+        HttpResponse<String> stock = client.toBlocking().exchange(request, String)
+
+        then:
+        noExceptionThrown()
+        stock.getBody(String).get() == '[foo,bar]'
+        stock.status() == HttpStatus.OK
+    }
 }
