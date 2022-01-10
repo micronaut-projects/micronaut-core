@@ -18,12 +18,14 @@ package io.micronaut.inject.beans.visitor;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.*;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -203,12 +205,16 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
                 classElement.ifPresent(ce -> {
                     if (ce.isPublic() && !isIntrospected(context, ce)) {
+                        final AnnotationMetadata typeMetadata = ce.getAnnotationMetadata();
+                        final AnnotationMetadata resolvedMetadata = typeMetadata == AnnotationMetadata.EMPTY_METADATA
+                                ? element.getAnnotationMetadata()
+                                : new AnnotationMetadataHierarchy(element.getAnnotationMetadata(), typeMetadata);
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                                 element.getName(),
                                 index.getAndIncrement(),
                                 element,
                                 ce,
-                                metadata ? element.getAnnotationMetadata() : null
+                                metadata ? resolvedMetadata : null
                         );
 
                         processElement(
@@ -410,7 +416,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             }
 
             ElementQuery<MethodElement> query = ElementQuery.of(MethodElement.class)
-                    .onlyConcrete()
                     .onlyAccessible()
                     .modifiers((modifiers) -> !modifiers.contains(ElementModifier.STATIC))
                     .annotated((am) -> am.hasStereotype(Executable.class));
