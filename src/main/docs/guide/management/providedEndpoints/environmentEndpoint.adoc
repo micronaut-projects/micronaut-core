@@ -16,21 +16,21 @@ endpoints:
 By default the endpoint will mask all values.
 To customize this masking you need to supply a Bean that implements api:management.endpoint.env.EnvironmentEndpointFilter[].
 
-This first example will mask all values except for those that contain the name `value_a` or `value_b`;
+This first example will mask all values except for those that are prefixed by `safe`
 
 .First example of environment masking
 [source,java]
 ----
 @Singleton
-public class MaskEnvironmentEndpointFilter implements EnvironmentEndpointFilter {
+public class OnlySafePrefixedEnvFilter implements EnvironmentEndpointFilter {
+    private static final EnvironmentFilterNamePredicate SAFE_PREFIX_PATTERN =
+            EnvironmentFilterSpecification.regularExpressionPredicate("safe.*", Pattern.CASE_INSENSITIVE);
+
     @Override
-    public void specifyFiltering(EnvironmentFilterSpecification specification) {
+    public void specifyFiltering(@NotNull EnvironmentFilterSpecification specification) {
         specification
-            .maskAll() // All values will be masked, apart from the supplied patterns
-            .maskPatterns(
-                Pattern.compile(".*value_a.*", Pattern.CASE_INSENSITIVE),
-                Pattern.compile(".*value_b.*", Pattern.CASE_INSENSITIVE)
-            );
+                .maskAll() // All values will be masked apart from the supplied patterns
+                .exclude(SAFE_PREFIX_PATTERN);
     }
 }
 ----
@@ -41,15 +41,19 @@ It is also possible to allow all values in plain text using api:management.endpo
 [source,java]
 ----
 @Singleton
-public class AllPlainExceptSecretOrKeyEnvironmentEndpointFilter implements EnvironmentEndpointFilter {
+public class AllPlainExceptSecretOrMatchEnvFilter implements EnvironmentEndpointFilter {
+    // Mask anything starting with `sekrt`
+    private static final EnvironmentFilterNamePredicate SECRET_PREFIX_PATTERN =
+            EnvironmentFilterSpecification.regularExpressionPredicate("sekrt.*", Pattern.CASE_INSENSITIVE);
+
+    // Mask anything exactly matching `exact-match`
+    private static final EnvironmentFilterNamePredicate EXACT_MATCH = "exact-match"::equals;
+
     @Override
-    public void specifyFiltering(EnvironmentFilterSpecification specification) {
+    public void specifyFiltering(@NotNull EnvironmentFilterSpecification specification) {
         specification
-            .maskNone() // All values will be in plain-text apart from the supplied patterns
-            .maskPatterns(
-                Pattern.compile(".*secret.*", Pattern.CASE_INSENSITIVE),
-                Pattern.compile(".*key.*", Pattern.CASE_INSENSITIVE)
-            );
+                .maskNone() // All values will be in plain-text apart from the supplied patterns
+                .exclude(SECRET_PREFIX_PATTERN, EXACT_MATCH);
     }
 }
 ----

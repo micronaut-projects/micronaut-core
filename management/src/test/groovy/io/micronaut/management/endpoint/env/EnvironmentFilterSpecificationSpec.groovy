@@ -4,6 +4,9 @@ import spock.lang.Specification
 
 class EnvironmentFilterSpecificationSpec extends Specification {
 
+    private EnvironmentFilterSpecification.EnvironmentFilterNamePredicate TEST_REGEX_PREDICATE = EnvironmentFilterSpecification.regularExpressionPredicate("test")
+    private EnvironmentFilterSpecification.EnvironmentFilterNamePredicate TEST_STATIC_PREDICATE = { it -> it == 'test' }
+
     def "masks all by default"() {
         when:
         def spec = new EnvironmentFilterSpecification(null)
@@ -14,7 +17,18 @@ class EnvironmentFilterSpecificationSpec extends Specification {
 
     def "can unmask given patterns"() {
         when:
-        def spec = new EnvironmentFilterSpecification(null).maskPatterns(~'test')
+        def spec = new EnvironmentFilterSpecification(null) // defaults to maskAll()
+                .exclude(TEST_REGEX_PREDICATE)
+
+        then:
+        spec.test("test") == EnvironmentFilterSpecification.FilterResult.PLAIN
+        spec.test("test2") == EnvironmentFilterSpecification.FilterResult.MASK
+    }
+
+    def "can unmask static names"() {
+        when:
+        def spec = new EnvironmentFilterSpecification(null) // defaults to maskAll()
+                .exclude(TEST_STATIC_PREDICATE)
 
         then:
         spec.test("test") == EnvironmentFilterSpecification.FilterResult.PLAIN
@@ -31,7 +45,8 @@ class EnvironmentFilterSpecificationSpec extends Specification {
 
     def "can mask given patterns"() {
         when:
-        def spec = new EnvironmentFilterSpecification(null).maskNone().maskPatterns(~'test')
+        def spec = new EnvironmentFilterSpecification(null).maskNone()
+                .exclude(TEST_REGEX_PREDICATE)
 
         then:
         spec.test("test") == EnvironmentFilterSpecification.FilterResult.MASK
@@ -50,7 +65,7 @@ class EnvironmentFilterSpecificationSpec extends Specification {
         spec.test("SOME_PASSWORD") == EnvironmentFilterSpecification.FilterResult.MASK
 
         when:
-        spec = spec.maskPatterns(~"test")
+        spec = spec.exclude(TEST_REGEX_PREDICATE)
 
         then:
         spec.test("test") == EnvironmentFilterSpecification.FilterResult.MASK

@@ -22,6 +22,7 @@ import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -35,14 +36,17 @@ import java.util.stream.Stream;
  */
 public final class EnvironmentFilterSpecification {
 
-    private static final List<Pattern> LEGACY_MASK_PATTERNS = Stream.of("password", "credential", "certificate", "key", "secret", "token")
-            .map(s -> Pattern.compile(".*" + s + ".*", Pattern.CASE_INSENSITIVE))
+    public interface EnvironmentFilterNamePredicate extends Predicate<String> {}
+
+    private static final List<EnvironmentFilterNamePredicate> LEGACY_MASK_PATTERNS =
+            Stream.of(".*password.*", ".*credential.*", ".*certificate.*", ".*key.*", ".*secret.*", ".*token.*")
+            .map(s -> regularExpressionPredicate(s, Pattern.CASE_INSENSITIVE))
             .collect(Collectors.toList());
 
     @Nullable
     private final Principal principal;
     private boolean allMasked;
-    private final List<Pattern> maskedPatterns = new ArrayList<>();
+    private final List<EnvironmentFilterNamePredicate> exclusions = new ArrayList<>();
 
     EnvironmentFilterSpecification(@Nullable Principal principal) {
         this.principal = principal;
@@ -52,12 +56,13 @@ public final class EnvironmentFilterSpecification {
     /**
      * @return The current {@link Principal} that is making the request (if any)
      */
-    public @Nullable Principal getPrincipal() {
+    public @Nullable
+    Principal getPrincipal() {
         return principal;
     }
 
     /**
-     * Turn on global masking. Items can be unmasked by adding their {@link Pattern} to {@link EnvironmentFilterSpecification#maskPatterns(Pattern...)}.
+     * Turn on global masking. Items can be unmasked by adding their {@link Pattern} to {@link EnvironmentFilterSpecification#exclude(EnvironmentFilterNamePredicate...)}.
      *
      * @return itself for chaining calls.
      */
@@ -67,7 +72,7 @@ public final class EnvironmentFilterSpecification {
     }
 
     /**
-     * Turn off global masking. Items can be masked by adding their {@link Pattern} to {@link EnvironmentFilterSpecification#maskPatterns(Pattern...)} (Pattern...)}.
+     * Turn off global masking. Items can be masked by adding a matching {@link Predicate} to {@link EnvironmentFilterSpecification#exclude(EnvironmentFilterNamePredicate...)}.
      *
      * @return itself for chaining calls.
      */
@@ -77,36 +82,44 @@ public final class EnvironmentFilterSpecification {
     }
 
     /**
-     * Adds patterns to the list of known mask patterns.  If the {@link EnvironmentFilterSpecification#maskAll()} flag is set
+     * Adds predicates to the list of known masks.  If the {@link EnvironmentFilterSpecification#maskAll()} flag is set
      * then this list will be used for exceptions (values in clear-text).  If the {@link EnvironmentFilterSpecification#maskNone()}
      * flag is set then this list will be those values that are masked.
      *
-     * @param propertySourceNameMask one or more Patterns to match against property names for masking.
+     * @param propertySourceNamePredicates one or more predicates to match against property names for masking.
      * @return itself for chaining calls.
      */
-    public @NotNull EnvironmentFilterSpecification maskPatterns(Pattern... propertySourceNameMask) {
-        maskedPatterns.addAll(Arrays.asList(propertySourceNameMask));
+    public @NotNull EnvironmentFilterSpecification exclude(EnvironmentFilterNamePredicate... propertySourceNamePredicates) {
+        exclusions.addAll(Arrays.asList(propertySourceNamePredicates));
         return this;
     }
 
     /**
      * Adds the masking rules from legacy pre 3.3.0.  Effectively the same as calling {@link EnvironmentFilterSpecification#maskNone()}
-     * and adding patterns via {@link EnvironmentFilterSpecification#maskPatterns(Pattern...)} to mask anything containing the words
+     * and adding predicates via {@link EnvironmentFilterSpecification#exclude(EnvironmentFilterNamePredicate...)} to mask anything containing the words
      * {@code password, credential, certificate, key, secret} or {@code token}.
      *
      * @return itself for chaining calls.
      */
     public @NotNull EnvironmentFilterSpecification legacyMasking() {
         allMasked = false;
-        maskedPatterns.addAll(LEGACY_MASK_PATTERNS);
+        exclusions.addAll(LEGACY_MASK_PATTERNS);
         return this;
     }
 
     FilterResult test(String propertySourceName) {
-        if (maskedPatterns.stream().anyMatch(p -> p.matcher(propertySourceName).matches())) {
+        if (exclusions.stream().anyMatch(p -> p.test(propertySourceName))) {
             return allMasked ? FilterResult.PLAIN : FilterResult.MASK;
         }
         return allMasked ? FilterResult.MASK : FilterResult.PLAIN;
+    }
+
+    public static EnvironmentFilterNamePredicate regularExpressionPredicate(String pattern) {
+        return regularExpressionPredicate(pattern, 0);
+    }
+
+    public static EnvironmentFilterNamePredicate regularExpressionPredicate(String pattern, int flags) {
+        return s -> Pattern.compile(pattern, flags).matcher(s).matches();
     }
 
     enum FilterResult {

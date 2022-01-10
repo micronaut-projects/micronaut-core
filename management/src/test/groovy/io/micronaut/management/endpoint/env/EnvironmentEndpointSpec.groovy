@@ -11,6 +11,8 @@ import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
 import spock.lang.Specification
 
+import java.util.function.Predicate
+
 class EnvironmentEndpointSpec extends Specification {
 
     @AutoCleanup
@@ -170,7 +172,7 @@ class EnvironmentEndpointSpec extends Specification {
 
         @Override
         void specifyFiltering(EnvironmentFilterSpecification specification) {
-            specification.maskNone().maskPatterns(~"iShouldBeMasked")
+            specification.maskNone().exclude(regexPredicate("iShouldBeMasked"))
         }
     }
 
@@ -198,7 +200,7 @@ class EnvironmentEndpointSpec extends Specification {
 
         @Override
         void specifyFiltering(EnvironmentFilterSpecification specification) {
-            specification.legacyMasking().maskPatterns(~"iShouldBeMasked")
+            specification.legacyMasking().exclude(regexPredicate('iShouldBeMasked'))
         }
     }
 
@@ -231,7 +233,7 @@ class EnvironmentEndpointSpec extends Specification {
 
         @Override
         void specifyFiltering(EnvironmentFilterSpecification specification) {
-            specification.maskAll().maskPatterns(~"dontMaskMe")
+            specification.maskAll().exclude(regexPredicate('dontMaskMe'))
         }
     }
 
@@ -265,9 +267,9 @@ class EnvironmentEndpointSpec extends Specification {
         void specifyFiltering(EnvironmentFilterSpecification specification) {
             specification.legacyMasking()
             if (specification.principal?.name == 'Tim') {
-                specification.maskPatterns(~'clair.only')
+                specification.exclude(regexPredicate('clair.only'))
             } else if (specification.principal?.name == 'Clair') {
-                specification.maskPatterns(~'unmasked.for.tim')
+                specification.exclude(regexPredicate('unmasked.for.tim'))
             } else {
                 specification.maskAll()
             }
@@ -290,6 +292,10 @@ class EnvironmentEndpointSpec extends Specification {
         String overriddenName() {
             'Clair'
         }
+    }
+
+    private static EnvironmentFilterSpecification.EnvironmentFilterNamePredicate regexPredicate(String pattern) {
+        EnvironmentFilterSpecification.regularExpressionPredicate(pattern)
     }
 
     private Map call(String uri = "/${EnvironmentEndpoint.NAME}/context") {
