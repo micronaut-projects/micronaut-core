@@ -100,7 +100,7 @@ class ExceptionHandlerSpec extends Specification {
 
         then:
         noExceptionThrown()
-        stock.getBody(String).get() == "[reactive handler]"
+        stock.getBody(String).get() == "reactive handler"
         stock.status() == HttpStatus.OK
     }
 }
