@@ -1,5 +1,6 @@
 package io.micronaut.kotlin.processing.elementapi
 
+import com.fasterxml.jackson.annotation.JsonClassDescription
 import com.fasterxml.jackson.annotation.JsonProperty
 import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected
@@ -2036,5 +2037,71 @@ class Test {
         beanIntrospection != null
         beanIntrospection.getBeanProperties().size() == 1
         beanIntrospection.getBeanProperties()[0].annotationMetadata.getAnnotation(JsonProperty).stringValue().get() == 'field'
+    }
+
+    void "test create bean introspection for interface"() {
+        given:
+        def classLoader = Compiler.buildClassLoader('itfcetest.MyInterface','''
+package itfcetest
+
+import com.fasterxml.jackson.annotation.JsonClassDescription
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.context.annotation.Executable
+
+@Introspected(classes = [MyInterface::class])
+class Test
+
+@JsonClassDescription
+interface MyInterface {
+    fun getName(): String
+    
+    @Executable
+    fun name(): String = getName()
+}
+class MyImpl: MyInterface {
+    override fun getName(): String = "ok"
+}
+''')
+        when:"the reference is loaded"
+        def clazz = classLoader.loadClass('itfcetest.$Test$IntrospectionRef0')
+        BeanIntrospectionReference reference = clazz.newInstance()
+        BeanIntrospection introspection = reference.load()
+
+        then:
+        introspection.getBeanType().isInterface()
+        introspection.beanProperties.size() == 1
+        introspection.beanMethods.size() == 1
+        introspection.hasAnnotation(JsonClassDescription)
+    }
+
+    void "test create bean introspection for interface - only methods"() {
+        given:
+        def classLoader = Compiler.buildClassLoader('itfcetest.MyInterface','''
+package itfcetest
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.context.annotation.Executable
+
+@Introspected(classes = [MyInterface::class])
+class Test
+
+interface MyInterface {
+    @Executable
+    fun name(): String    
+}
+
+class MyImpl: MyInterface {
+    override fun name(): String = "ok"
+}
+''')
+        when:"the reference is loaded"
+        def clazz = classLoader.loadClass('itfcetest.$Test$IntrospectionRef0')
+        BeanIntrospectionReference reference = clazz.newInstance()
+        BeanIntrospection introspection = reference.load()
+
+        then:
+        introspection.getBeanType().isInterface()
+        introspection.beanProperties.size() == 0
+        introspection.beanMethods.size() == 1
     }
 }
