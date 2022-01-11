@@ -58,7 +58,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final Map<String, List<AnnotationRemapper>> ANNOTATION_REMAPPERS = new HashMap<>(5);
     private static final Map<MetadataKey, AnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>(100);
     private static final List<String> DEFAULT_ANNOTATE_EXCLUDES = Arrays.asList(Internal.class.getName(), Experimental.class.getName());
-    private static final Map<String, Map<String, Object>> ANNOTATION_DEFAULTS = new ConcurrentHashMap<>(20);
+    private static final Map<String, Map<String, Object>> ANNOTATION_DEFAULTS = new HashMap<>(20);
 
     static {
         SoftServiceLoader<AnnotationMapper> serviceLoader = SoftServiceLoader.load(AnnotationMapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader());
