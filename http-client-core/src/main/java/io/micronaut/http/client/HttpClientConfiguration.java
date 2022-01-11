@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -141,6 +141,8 @@ public abstract class HttpClientConfiguration {
 
     private SslConfiguration sslConfiguration = new ClientSslConfiguration();
 
+    private ProxyHttpClientConfiguration proxyHttpClientConfiguration = new ProxyHttpClientConfiguration();
+
     private String loggerName;
 
     private String eventLoopGroup = "default";
@@ -193,6 +195,7 @@ public abstract class HttpClientConfiguration {
             this.shutdownTimeout = copy.shutdownTimeout;
             this.shutdownQuietPeriod = copy.shutdownQuietPeriod;
             this.sslConfiguration = copy.sslConfiguration;
+            this.proxyHttpClientConfiguration = copy.proxyHttpClientConfiguration;
             this.threadFactory = copy.threadFactory;
             this.httpVersion = copy.httpVersion;
         }
@@ -268,6 +271,22 @@ public abstract class HttpClientConfiguration {
      */
     public void setSslConfiguration(SslConfiguration sslConfiguration) {
         this.sslConfiguration = sslConfiguration;
+    }
+
+    /**
+     * @return The {@link ProxyHttpClientConfiguration} for the client
+     */
+    public ProxyHttpClientConfiguration getProxyClientConfiguration() {
+        return proxyHttpClientConfiguration;
+    }
+
+    /**
+     * Sets the Proxy header configuration for the client.
+     *
+     * @param proxyHttpClientConfiguration The proxy client header configuration
+     */
+    public void setProxyClientConfiguration(ProxyHttpClientConfiguration proxyHttpClientConfiguration) {
+        this.proxyHttpClientConfiguration = proxyHttpClientConfiguration;
     }
 
     /**

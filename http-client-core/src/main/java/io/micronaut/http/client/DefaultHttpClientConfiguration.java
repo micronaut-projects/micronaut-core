@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -71,6 +71,18 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
     public void setClientSslConfiguration(@Nullable ClientSslConfiguration sslConfiguration) {
         if (sslConfiguration != null) {
             super.setSslConfiguration(sslConfiguration);
+        }
+    }
+
+    /**
+     * Uses the default ProxyHttpClient configuration.
+     *
+     * @param proxyHttpClientConfiguration The ProxyHttpClient configuration
+     */
+    @Inject
+    public void setProxyClientConfiguration(@Nullable ProxyHttpClientConfiguration proxyHttpClientConfiguration) {
+        if (proxyHttpClientConfiguration != null) {
+            super.setProxyClientConfiguration(proxyHttpClientConfiguration);
         }
     }
 

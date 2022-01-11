@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -2929,11 +2929,42 @@ public class DefaultHttpClient implements
         };
     }
 
+    private void hostHeaderHandling(io.micronaut.http.MutableHttpRequest<?> request) {
+        String host = request.getHeaders().get(HttpHeaderNames.HOST);
+        switch (configuration.getProxyClientConfiguration().getHostMode()) {
+            case REPLACE:
+                request.getHeaders().remove(HttpHeaderNames.HOST);
+                break;
+            case FORWARDED:
+                if (host != null) {
+                    String forwarded = request.getHeaders().get("forwarded");
+                    request.headers(headers -> headers
+                            .set("Forwarded", (forwarded == null ? "" : forwarded + ",") + "host=" + host)
+                            .remove(HttpHeaderNames.HOST)
+                    );
+                }
+                break;
+            case X_FORWARDED_HOST:
+                if (host != null) {
+                    request.headers(headers -> headers
+                            .set("X-Forwarded-Host", host)
+                            .remove(HttpHeaderNames.HOST)
+                    );
+                }
+                break;
+            default:
+                // KEEP behaviour, do nothing
+        }
+    }
+
     @Override
     public Publisher<MutableHttpResponse<?>> proxy(@NonNull io.micronaut.http.HttpRequest<?> request) {
         return Flux.from(resolveRequestURI(request))
                 .flatMap(requestURI -> {
-                    AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request instanceof MutableHttpRequest ? request : request.mutate());
+                    io.micronaut.http.MutableHttpRequest<?> mutableRequest = request instanceof MutableHttpRequest ? (MutableHttpRequest<?>) request : request.mutate();
+                    hostHeaderHandling(mutableRequest);
+
+                    AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(mutableRequest);
                     Flux<MutableHttpResponse<Object>> proxyResponsePublisher = Flux.create(emitter -> {
                         SslContext sslContext = buildSslContext(requestURI);
                         ChannelFuture channelFuture;

@@ -1,6 +1,6 @@
 
 internalSanityChecks {
-    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 20)
+    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 21)
     expectedServiceCount.put('io.micronaut.core.beans.BeanIntrospectionReference', 1)
     expectedServiceCount.put('io.micronaut.inject.BeanConfiguration', 1)
 }           

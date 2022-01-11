@@ -1,5 +1,19 @@
 This section documents breaking changes between Micronaut versions
 
+== 3.3.0
+
+- The api:io.micronaut.http.client.ProxyHttpClient used to incorrectly forward the Host header downstream. The default behaviour has now been changed so that it gets overwritten with the target Host each hop.
+To set ths back to its previous behavior, you will need to add the following to your config:
+
+[source,yaml]
+----
+micronaut:
+  http:
+    client:
+      proxy:
+        hostMode: keep
+----
+
 == 3.2.0
 
 - The HTTP client now does SSL certificate verification by default. The old insecure behavior can be re-enabled by setting the `micronaut.http.client.ssl.insecureTrustAllCertificates` property to `true`, but consider using a trust store instead if you're using self-signed certificates.
