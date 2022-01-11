@@ -492,7 +492,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private final List<String> beanTypeInnerClasses;
     private GeneratorAdapter buildMethodVisitor;
     private GeneratorAdapter injectMethodVisitor;
-    private GeneratorAdapter shouldLoadMethodVisitor;
+    private GeneratorAdapter checkIfShouldLoadMethodVisitor;
     private Label injectEnd = null;
     private GeneratorAdapter preDestroyMethodVisitor;
     private GeneratorAdapter postConstructMethodVisitor;
@@ -1148,9 +1148,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             interceptedDisposeMethod.visitMaxs(1, 1);
             interceptedDisposeMethod.visitEnd();
         }
-        if (shouldLoadMethodVisitor != null) {
-            buildCheckIfShouldLoadMethod(shouldLoadMethodVisitor, annotationInjectionPoints);
-            shouldLoadMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, 10);
+        if (checkIfShouldLoadMethodVisitor != null) {
+            buildCheckIfShouldLoadMethod(checkIfShouldLoadMethodVisitor, annotationInjectionPoints);
+            checkIfShouldLoadMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, 10);
         }
 
         getInterceptedType().ifPresent(t -> implementInterceptedTypeMethod(t, this.classWriter));
@@ -2831,9 +2831,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 false);
     }
 
-    private void visitShouldLoadMethodDefinition() {
+    private void visitCheckIfShouldLoadMethodDefinition() {
         String desc = getMethodDescriptor("void", BeanResolutionContext.class.getName(), BeanContext.class.getName());
-        this.shouldLoadMethodVisitor = new GeneratorAdapter(classWriter.visitMethod(
+        this.checkIfShouldLoadMethodVisitor = new GeneratorAdapter(classWriter.visitMethod(
             ACC_PROTECTED,
             "checkIfShouldLoad",
             desc,
@@ -3284,7 +3284,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (requiresAnnotation != null
                 && requiresAnnotation.stringValue(RequiresCondition.MEMBER_BEAN).isPresent()
                 && requiresAnnotation.stringValue(RequiresCondition.MEMBER_BEAN_PROPERTY).isPresent()) {
-            visitShouldLoadMethodDefinition();
+            visitCheckIfShouldLoadMethodDefinition();
 
             buildMethodVisitor.loadThis();
             buildMethodVisitor.loadArg(0);

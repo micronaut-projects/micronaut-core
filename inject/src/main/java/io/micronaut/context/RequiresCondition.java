@@ -203,8 +203,7 @@ public class RequiresCondition implements Condition {
     }
 
     /**
-     * This method will run conditions that require all beans to be loaded. These conditions included "beans",
-     * "missingBeans", "configProperties" and custom conditions.
+     * This method will run conditions that require all beans to be loaded. These conditions included "beans", "bean", "missingBeans" and custom conditions.
      */
     private void processPostStartRequirements(ConditionContext context, AnnotationValue<Requires> requirements) {
         processPreStartRequirements(context, requirements);
