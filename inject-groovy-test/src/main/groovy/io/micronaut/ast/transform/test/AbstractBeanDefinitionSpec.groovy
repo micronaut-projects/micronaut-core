@@ -33,6 +33,7 @@ import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.provider.BeanProviderDefinition
@@ -187,6 +188,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         sourceUnit.getErrorCollector() >> new ErrorCollector(new CompilerConfiguration())
         GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(sourceUnit, null)
         AnnotationMetadata metadata = element != null ? builder.build(element) : null
+        AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
 
@@ -197,6 +199,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
             getErrorCollector() >> null
         }, null)
         AnnotationMetadata metadata = method != null ? builder.build(method) : null
+        AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
 
@@ -206,6 +209,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         Parameter parameter = Arrays.asList(method.getParameters()).find { it.name == fieldName }
         GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(null, null)
         AnnotationMetadata metadata = method != null ? builder.build(new ExtendedParameter(method, parameter)) : null
+        AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
 
