@@ -120,11 +120,11 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     @Nullable
     private final FieldReference[] fieldInjection;
     @Nullable
-    private final AnnotationReference[] annotationInjection;
-    @Nullable
     private final ExecutableMethodsDefinition<T> executableMethodsDefinition;
     @Nullable
     private final Map<String, Argument<?>[]> typeArgumentsMap;
+    @Nullable
+    private AnnotationReference[] annotationInjection;
     @Nullable
     private Environment environment;
     @Nullable
@@ -153,7 +153,6 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable MethodReference[] methodInjection,
             @Nullable FieldReference[] fieldInjection,
-            @Nullable AnnotationReference[] annotationInjection,
             @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition,
             @Nullable Map<String, Argument<?>[]> typeArgumentsMap,
             Optional<String> scope,
@@ -186,12 +185,50 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         this.constructor = constructor;
         this.methodInjection = methodInjection;
         this.fieldInjection = fieldInjection;
-        this.annotationInjection = annotationInjection;
         this.executableMethodsDefinition = executableMethodsDefinition;
         this.typeArgumentsMap = typeArgumentsMap;
         this.isConfigurationProperties = isConfigurationProperties;
         this.isContainerType = isContainerType;
         this.requiresMethodProcessing = requiresMethodProcessing;
+    }
+
+    @SuppressWarnings("ParameterNumber")
+    @Internal
+    @UsedByGeneratedCode
+    protected AbstractInitializableBeanDefinition(
+            Class<T> beanType,
+            @Nullable MethodOrFieldReference constructor,
+            @Nullable AnnotationMetadata annotationMetadata,
+            @Nullable MethodReference[] methodInjection,
+            @Nullable FieldReference[] fieldInjection,
+            @Nullable AnnotationReference[] annotationInjection,
+            @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition,
+            @Nullable Map<String, Argument<?>[]> typeArgumentsMap,
+            Optional<String> scope,
+            boolean isAbstract,
+            boolean isProvided,
+            boolean isIterable,
+            boolean isSingleton,
+            boolean isPrimary,
+            boolean isConfigurationProperties,
+            boolean isContainerType,
+            boolean requiresMethodProcessing) {
+        this(beanType,
+            constructor,
+            annotationMetadata,
+            methodInjection,
+            fieldInjection,
+            executableMethodsDefinition,
+            typeArgumentsMap,
+            scope, isAbstract,
+            isProvided,
+            isIterable,
+            isSingleton,
+            isPrimary,
+            isConfigurationProperties,
+            isContainerType,
+            requiresMethodProcessing);
+        this.annotationInjection = annotationInjection;
     }
 
     @Override
