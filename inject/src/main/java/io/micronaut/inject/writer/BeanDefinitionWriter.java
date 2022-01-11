@@ -1871,7 +1871,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                                             String annotationMemberProperty,
                                                             @Nullable String requiredValue,
                                                             @Nullable String notEqualsValue) {
-        MethodElement memberPropertyGetter = annotationMemberBeanType.getType().getBeanProperties()
+        ClassElement annotationMemberClassElement = annotationMemberBeanType.getType();
+        MethodElement memberPropertyGetter = annotationMemberClassElement.getBeanProperties()
             .stream()
             .filter(property -> property.getSimpleName().equals(annotationMemberProperty))
             .findFirst()
@@ -1882,9 +1883,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             final String[] readPrefixes = annotationMetadata.getValue(AccessorsStyle.class, "readPrefixes", String[].class)
                 .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
 
-            memberPropertyGetter = annotationMemberBeanType.getType().getEnclosedElements(ElementQuery.ALL_METHODS)
+            memberPropertyGetter = annotationMemberClassElement.getEnclosedElements(ElementQuery.ALL_METHODS)
                 .stream()
                 .filter(methodElement -> NameUtils.getPropertyNameForGetter(methodElement.getSimpleName(), readPrefixes).equals(annotationMemberProperty))
+                .filter(this::isMethodAccessible)
                 .findFirst()
                 .orElse(null);
         }
@@ -1893,9 +1895,19 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             visitorContext.fail("Bean property [" + annotationMemberProperty + "] is not available on bean ["
                                     + annotationMemberBeanType.getName() + "]", annotationMemberBeanType);
         } else {
-            Type injectedType = JavaModelUtils.getTypeReference(annotationMemberBeanType.getType());
+            Type injectedType = JavaModelUtils.getTypeReference(annotationMemberClassElement);
             annotationInjectionPoints.computeIfAbsent(injectedType, type -> new ArrayList<>(2))
                                          .add(new AnnotationVisitData(annotationMemberBeanType, memberPropertyGetter, requiredValue, notEqualsValue));
+        }
+    }
+
+    private boolean isMethodAccessible(MethodElement methodElement) {
+        if (methodElement.isPublic()) {
+            return true;
+        } else if (methodElement.isPrivate()) {
+            return false;
+        } else {
+            return beanTypeElement.getPackage().equals(methodElement.getDeclaringType().getPackage());
         }
     }
 
