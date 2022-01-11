@@ -585,6 +585,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      */
     public static void clearCaches() {
         OVERRIDDEN_METHOD_CACHE.clear();
+        AbstractAnnotationMetadataBuilder.clearCaches();
     }
 
     /**

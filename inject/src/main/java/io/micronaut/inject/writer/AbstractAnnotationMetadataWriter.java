@@ -137,8 +137,6 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
             // write the static initializers for the annotation metadata
             GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
             staticInit.visitCode();
-            staticInit.visitLabel(new Label());
-            initializeAnnotationMetadata(staticInit, classWriter, defaults);
             if (writeAnnotationDefault && annotationMetadata instanceof DefaultAnnotationMetadata) {
                 DefaultAnnotationMetadata dam = (DefaultAnnotationMetadata) annotationMetadata;
                 AnnotationMetadataWriter.writeAnnotationDefaults(
@@ -149,8 +147,9 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
                         defaults,
                         loadTypeMethods
                 );
-
             }
+            staticInit.visitLabel(new Label());
+            initializeAnnotationMetadata(staticInit, classWriter, defaults);
             staticInit.visitInsn(RETURN);
             staticInit.visitMaxs(1, 1);
             staticInit.visitEnd();

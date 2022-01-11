@@ -31,7 +31,6 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
-import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.ast.*;
@@ -269,7 +268,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
             } finally {
                 AnnotationUtils.invalidateCache();
-                AbstractAnnotationMetadataBuilder.clearMutated();
                 JavaAnnotationMetadataBuilder.clearCaches();
             }
         }
