@@ -106,7 +106,7 @@ class AstAnnotationUtils {
     @Internal
     static void invalidateCache() {
         annotationMetadataCache.clear()
-        AnnotationMetadataSupport.clearDefaultValues()
+        AbstractAnnotationMetadataBuilder.clearCaches()
     }
 
     /**

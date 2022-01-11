@@ -32,6 +32,7 @@ import jakarta.inject.Qualifier;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -57,6 +58,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final Map<String, List<AnnotationRemapper>> ANNOTATION_REMAPPERS = new HashMap<>(5);
     private static final Map<MetadataKey, AnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>(100);
     private static final List<String> DEFAULT_ANNOTATE_EXCLUDES = Arrays.asList(Internal.class.getName(), Experimental.class.getName());
+    private static final Map<String, Map<String, Object>> ANNOTATION_DEFAULTS = new ConcurrentHashMap<>(20);
 
     static {
         SoftServiceLoader<AnnotationMapper> serviceLoader = SoftServiceLoader.load(AnnotationMapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader());
@@ -968,21 +970,22 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract VisitorContext createVisitorContext();
 
     private void processAnnotationDefaults(T originatingElement, DefaultAnnotationMetadata metadata, String annotationName, Supplier<Map<? extends T, ?>> elementDefaultValues) {
-        if (AnnotationMetadataSupport.hasDefaultValues(annotationName)) {
-            Map<CharSequence, Object> defaultValues = new LinkedHashMap<>(AnnotationMetadataSupport.getDefaultValues(annotationName));
-            metadata.addDefaultAnnotationValues(annotationName, defaultValues);
+        Map<CharSequence, Object> defaultValues;
+        final Map<String, Object> defaults = ANNOTATION_DEFAULTS.get(annotationName);
+        if (defaults != null) {
+            defaultValues = new LinkedHashMap<>(defaults);
         } else {
-            final Map<CharSequence, Object> annotationDefaults = getAnnotationDefaults(originatingElement, annotationName, elementDefaultValues.get());
-            if (annotationDefaults != null) {
-                metadata.addDefaultAnnotationValues(annotationName, annotationDefaults);
-                DefaultAnnotationMetadata.registerAnnotationDefaults(annotationName, annotationDefaults.entrySet().stream()
+            defaultValues = getAnnotationDefaults(originatingElement, annotationName, elementDefaultValues.get());
+            if (defaultValues != null) {
+                ANNOTATION_DEFAULTS.put(annotationName, defaultValues.entrySet().stream()
                         .collect(Collectors.toMap(
                                 (entry) -> entry.getKey().toString(),
                                 Map.Entry::getValue)));
             } else {
-                metadata.addDefaultAnnotationValues(annotationName, Collections.emptyMap());
+                defaultValues = Collections.emptyMap();
             }
         }
+        metadata.addDefaultAnnotationValues(annotationName, defaultValues);
     }
 
     private Map<CharSequence, Object> getAnnotationDefaults(T originatingElement, String annotationName, Map<? extends T, ?> elementDefaultValues) {
@@ -2001,8 +2004,19 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * Used to clear mutated metadata at the end of a compilation cycle.
      */
     @Internal
-    public static void clearMutated() {
+    public static void clearCaches() {
         MUTATED_ANNOTATION_METADATA.clear();
+        ANNOTATION_DEFAULTS.clear();
+    }
+
+    /**
+     * This is used for testing scenarios only where annotation metadata
+     * is created without bean creation. It is needed because at compile time
+     * there are no defaults added via DefaultAnnotationMetadata.
+     */
+    @Internal
+    public static void copyToRuntime() {
+        ANNOTATION_DEFAULTS.forEach(DefaultAnnotationMetadata::registerAnnotationDefaults);
     }
 
     /**
