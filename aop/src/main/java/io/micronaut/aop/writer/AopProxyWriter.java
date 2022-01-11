@@ -1265,14 +1265,16 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
-    public void visitAnnotationPropertyInjectionPoint(TypedElement injectedBeanType,
-                                                      MethodElement getterMethod,
-                                                      String expectedValue) {
+    public void visitAnnotationMemberPropertyInjectionPoint(TypedElement annotationMemberBeanType,
+                                                            String annotationMemberProperty,
+                                                            String requiredValue,
+                                                            String notEqualsValue) {
         deferredInjectionPoints.add(() ->
-                proxyBeanDefinitionWriter.visitAnnotationPropertyInjectionPoint(
-                    injectedBeanType,
-                    getterMethod,
-                    expectedValue));
+                proxyBeanDefinitionWriter.visitAnnotationMemberPropertyInjectionPoint(
+                    annotationMemberBeanType,
+                    annotationMemberProperty,
+                    requiredValue,
+                    notEqualsValue));
     }
 
     @Override

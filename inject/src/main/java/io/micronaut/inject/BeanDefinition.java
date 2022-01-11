@@ -306,16 +306,6 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     }
 
     /**
-     * Decide whether the bean should be loaded.
-     * @param resolutionContext - the resolution context
-     * @param context - the bean context
-     * @return should be be loaded
-     */
-    default boolean shouldLoad(BeanResolutionContext resolutionContext, BeanContext context) {
-        return true;
-    }
-
-    /**
      * @return The {@link ExecutableMethod} instances for this definition
      */
     default Collection<ExecutableMethod<T, ?>> getExecutableMethods() {

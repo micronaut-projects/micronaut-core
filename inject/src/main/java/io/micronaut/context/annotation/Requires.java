@@ -205,23 +205,23 @@ public @interface Requires {
     Family[] notOs() default {};
 
     /**
-     * Expresses that configuration properties of the given class should be
-     * available for the bean or configuration to load. Can be used in combination
-     * with {@link #configProperty()} to specify the required configuration
-     * property
+     * Expresses that the bean the given class should be available for the bean or configuration to load.
+     * Can be used in combination with {@link #beanProperty()} to specify the required bean property
      *
      * @return The configuration properties class
+     * @since 3.3.0
      */
-    Class configProperties() default void.class;
+    Class bean() default void.class;
 
     /**
-     * Used in combination with {@link #configProperties()} to
-     * express that the given configuration property should be
+     * Used in combination with {@link #bean()} to
+     * express that the given bean property should be
      * set for the bean to load.
      *
      * @return The configuration property that should be set.
+     * @since 3.3.0
      */
-    String configProperty() default "";
+    String beanProperty() default "";
 
     /**
      * Used to express a required SDK version.

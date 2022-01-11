@@ -23,6 +23,7 @@ import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.Qualifier;
+import io.micronaut.context.RequiresCondition;
 import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationBuilder;
@@ -38,7 +39,10 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.PropertySource;
 import io.micronaut.context.annotation.Provided;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.context.exceptions.DisabledBeanException;
+import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -49,8 +53,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.bind.annotation.Bindable;
-import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
@@ -517,11 +519,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private int innerClassIndex;
 
     private final List<FieldVisitData> fieldInjectionPoints = new ArrayList<>(2);
-    private final List<AnnotationPropertyVisitData> annotationPropertyInjectionPoints = new ArrayList<>(2);
     private final List<MethodVisitData> methodInjectionPoints = new ArrayList<>(2);
     private final List<MethodVisitData> postConstructMethodVisits = new ArrayList<>(2);
     private final List<MethodVisitData> preDestroyMethodVisits = new ArrayList<>(2);
     private final List<MethodVisitData> allMethodVisits = new ArrayList<>(2);
+    private final Map<Type, List<AnnotationVisitData>> annotationInjectionPoints = new LinkedHashMap<>(2);
     private final Map<String, Boolean> isLifeCycleCache = new HashMap<>(2);
     private ExecutableMethodsDefinitionWriter executableMethodsDefinitionWriter;
 
@@ -1064,23 +1066,20 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             staticInit.putStatic(beanDefinitionType, FIELD_INJECTION_FIELDS, fieldsFieldType);
         }
 
-        if (!annotationPropertyInjectionPoints.isEmpty()) {
-            Type fieldsFieldType = Type.getType(AbstractInitializableBeanDefinition.AnnotationReference[].class);
+        if (!annotationInjectionPoints.isEmpty()) {
+            Type annotationInjectionsFieldType = Type.getType(AbstractInitializableBeanDefinition.AnnotationReference[].class);
             classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_ANNOTATION_INJECTIONS,
-                fieldsFieldType.getDescriptor(), null, null);
-            int length = annotationPropertyInjectionPoints.size();
+                annotationInjectionsFieldType.getDescriptor(), null, null);
+
+            List<Type> injectedTypes = new ArrayList<>(annotationInjectionPoints.keySet());
+            int length = injectedTypes.size();
             pushNewArray(staticInit, AbstractInitializableBeanDefinition.AnnotationReference.class, length);
+
             for (int i = 0; i < length; i++) {
-                AnnotationPropertyVisitData annotationMemberVisitData = annotationPropertyInjectionPoints.get(i);
-                pushStoreInArray(staticInit, i, length, () ->
-                        pushNewAnnotationReference(
-                            staticInit,
-                            JavaModelUtils.getTypeReference(annotationMemberVisitData.annotationBeanType),
-                            annotationMemberVisitData.annotationBeanType
-                        )
-                );
+                Type annotationVisitData = injectedTypes.get(i);
+                pushStoreInArray(staticInit, i, length, () -> pushNewAnnotationReference(staticInit, annotationVisitData));
             }
-            staticInit.putStatic(beanDefinitionType, FIELD_ANNOTATION_INJECTIONS, fieldsFieldType);
+            staticInit.putStatic(beanDefinitionType, FIELD_ANNOTATION_INJECTIONS, annotationInjectionsFieldType);
         }
 
         if (!superBeanDefinition && hasTypeArguments()) {
@@ -1117,8 +1116,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         staticInit.visitMaxs(DEFAULT_MAX_STACK, defaultsStorage.size() + 3);
         staticInit.visitEnd();
 
-        visitShouldLoadMethodDefinition();
-
         if (buildMethodVisitor != null) {
             if (isPrimitiveBean) {
                 pushBoxPrimitiveIfNecessary(beanType, buildMethodVisitor);
@@ -1152,9 +1149,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             interceptedDisposeMethod.visitEnd();
         }
         if (shouldLoadMethodVisitor != null) {
-            checkIfShouldLoad(shouldLoadMethodVisitor, annotationPropertyInjectionPoints);
-            shouldLoadMethodVisitor.push(true);
-            shouldLoadMethodVisitor.returnValue();
+            buildCheckIfShouldLoadMethod(shouldLoadMethodVisitor, annotationInjectionPoints);
             shouldLoadMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, 10);
         }
 
@@ -1168,79 +1163,147 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.beanFinalized = true;
     }
 
-    private void checkIfShouldLoad(GeneratorAdapter adapter, List<AnnotationPropertyVisitData> beanPropertyVisitData) {
-        for (int i = 0; i < beanPropertyVisitData.size(); i++) {
-            int currentIndex = i;
-            AnnotationPropertyVisitData visitData = beanPropertyVisitData.get(i);
-            MethodVisitData getterVisitData = visitData.getterVisitData;
-            // load 'this'
-            adapter.loadThis();
-            // 1st argument load BeanResolutionContext
-            adapter.loadArg(0);
-            // 2nd argument load BeanContext
-            adapter.loadArg(1);
-            // 2rd argument the field index
-            adapter.push(currentIndex);
-            // push qualifier
-            pushQualifier(adapter, visitData.annotationBeanType, () -> resolveAnnotationArgument(adapter, currentIndex));
-            // invoke getBeanForField
-            pushInvokeMethodOnSuperClass(adapter, GET_BEAN_FOR_ANNOTATION);
-            // cast the return value to the correct type
-            pushCastToType(adapter, getterVisitData.getBeanType().getType());
-            // invoke property getter
-            adapter.invokeVirtual(JavaModelUtils.getTypeReference(getterVisitData.getBeanType()),
-                org.objectweb.asm.commons.Method.getMethod(getterVisitData.getMethodElement().getDescription(false)));
+    private void buildCheckIfShouldLoadMethod(GeneratorAdapter adapter, Map<Type, List<AnnotationVisitData>> beanPropertyVisitData) {
+        final Type conversionServiceType = Type.getType(ConversionService.class);
+        final Type stringBuilderType = Type.getType(StringBuilder.class);
+        final Type stringType = Type.getType(String.class);
+        final Type disabledBeanExceptionType = Type.getType(DisabledBeanException.class);
+        final Type optionalType = Type.getType(Optional.class);
 
-            // storing getter return value to local variable
-            int propertyValueIndex = adapter.newLocal(JavaModelUtils.getTypeReference(getterVisitData.getMethodElement().getReturnType()));
-            adapter.storeLocal(propertyValueIndex);
-            // loading conversion service instance
-            adapter.getStatic(Type.getType(ConversionService.class), "SHARED", Type.getType(ConversionService.class));
+        org.objectweb.asm.commons.Method conversionMethod = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredMethod(ConversionService.class, "convert", Object.class, Class.class));
+        org.objectweb.asm.commons.Method orElseOptionalMethod = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredMethod(Optional.class, "orElse", Object.class));
+        org.objectweb.asm.commons.Method stringEqualsMethod = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredMethod(String.class, "equals", Object.class));
+        org.objectweb.asm.commons.Method disabledBeanExceptionConstructor = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.findConstructor(DisabledBeanException.class, String.class).get());
 
-            adapter.loadLocal(propertyValueIndex);
+        // StringBuilder methods
+        org.objectweb.asm.commons.Method stringBuilderConstructor = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.findConstructor(StringBuilder.class).get());
+        org.objectweb.asm.commons.Method stringBuilderAppendMethod = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredMethod(StringBuilder.class, "append", String.class));
+        org.objectweb.asm.commons.Method toStringMethod = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredMethod(StringBuilder.class, "toString"));
 
-            // creating String conversion context
-            adapter.push(Type.getType(String.class));
-            adapter.invokeStatic(Type.getType(ConversionContext.class), org.objectweb.asm.commons.Method.getMethod(
-                ReflectionUtils.getRequiredMethod(ConversionContext.class, "of", Class.class)));
+        List<Type> injectedTypes = new ArrayList<>(beanPropertyVisitData.keySet());
 
-            // converting property value to String through SHARED ConversionService
-            adapter.invokeInterface(Type.getType(ConversionService.class), org.objectweb.asm.commons.Method.getMethod(
-                ReflectionUtils.getRequiredMethod(ConversionService.class, "convert", Object.class,
-                    ArgumentConversionContext.class)));
+        for (int currentTypeIndex = 0; currentTypeIndex < injectedTypes.size(); currentTypeIndex++) {
+            Type injectedType = injectedTypes.get(currentTypeIndex);
+            List<AnnotationVisitData> annotationVisitData = beanPropertyVisitData.get(injectedType);
+            boolean multiplePropertiesFromType = annotationVisitData.size() > 1;
 
-            // extracting from optional
-            adapter.push((String) null);
-            adapter.invokeVirtual(Type.getType(Optional.class), org.objectweb.asm.commons.Method.getMethod(
-                ReflectionUtils.getRequiredMethod(Optional.class, "orElse", Object.class)));
-            pushCastToType(adapter, String.class);
+            Integer injectedBeanIndex = null;
+            for (int i = 0; i < annotationVisitData.size(); i++) {
+                int currentPropertyIndex = i;
+                boolean isLastProperty = currentTypeIndex == (injectedTypes.size() - 1) && currentPropertyIndex == (annotationVisitData.size() - 1);
 
-            // storing to new local variable
-            propertyValueIndex = adapter.newLocal(Type.getType(String.class));
-            adapter.storeLocal(propertyValueIndex);
+                AnnotationVisitData visitData = annotationVisitData.get(currentPropertyIndex);
+                MethodElement propertyGetter = visitData.memberPropertyGetter;
 
-            adapter.loadLocal(propertyValueIndex);
-            Label ifNullLabel = new Label();
-            adapter.ifNull(ifNullLabel);
-            Label equalityLabel = new Label();
+                if (injectedBeanIndex != null) {
+                    adapter.getStatic(conversionServiceType, "SHARED", conversionServiceType);
+                    adapter.loadLocal(injectedBeanIndex);
+                } else {
+                    if (!multiplePropertiesFromType) {
+                        adapter.getStatic(conversionServiceType, "SHARED", conversionServiceType);
+                    }
 
-            if (visitData.expectedValue != null) {
+                    // load 'this'
+                    adapter.loadThis();
+                    // 1st argument load BeanResolutionContext
+                    adapter.loadArg(0);
+                    // 2nd argument load BeanContext
+                    adapter.loadArg(1);
+                    // 3rd argument the injected bean index
+                    adapter.push(currentTypeIndex);
+                    // push qualifier
+                    pushQualifier(adapter, visitData.memberBeanType, () -> resolveAnnotationArgument(adapter, currentPropertyIndex));
+                    // invoke getBeanForAnnotation
+                    pushInvokeMethodOnSuperClass(adapter, GET_BEAN_FOR_ANNOTATION);
+                    // cast the return value to the correct type
+                    pushCastToType(adapter, visitData.memberBeanType);
+
+                    // if multiple properties from same bean should be checked, saving bean to local variable
+                    if (multiplePropertiesFromType) {
+                        injectedBeanIndex = adapter.newLocal(injectedType);
+                        adapter.storeLocal(injectedBeanIndex);
+                        adapter.getStatic(conversionServiceType, "SHARED", conversionServiceType);
+                        adapter.loadLocal(injectedBeanIndex);
+                    }
+                }
+
+                org.objectweb.asm.commons.Method propertyGetterMethod = org.objectweb.asm.commons.Method.getMethod(propertyGetter.getDescription(false));
+                // getter might be an interface method
+                if (propertyGetter.isAbstract()) {
+                    adapter.invokeInterface(injectedType, propertyGetterMethod);
+                    // interface getter might return optional
+                    if (propertyGetter.getReturnType().isOptional()) {
+                        adapter.push((String) null);
+                        adapter.invokeVirtual(optionalType, orElseOptionalMethod);
+                    }
+                } else {
+                    adapter.invokeVirtual(injectedType, propertyGetterMethod);
+                }
+                pushBoxPrimitiveIfNecessary(propertyGetterMethod.getReturnType(), adapter);
+                // creating String conversion context
+                adapter.push(stringType);
+                // converting property value to String through SHARED ConversionService
+                adapter.invokeInterface(conversionServiceType, conversionMethod);
+                // extracting from optional
+                adapter.push((String) null);
+                adapter.invokeVirtual(optionalType, orElseOptionalMethod);
+                pushCastToType(adapter, String.class);
+
+                // storing to new local variable
+                int propertyValueIndex = adapter.newLocal(stringType);
+                adapter.storeLocal(propertyValueIndex);
+
                 adapter.loadLocal(propertyValueIndex);
-                adapter.push(visitData.expectedValue);
-                // comparing through String.equals
-                adapter.invokeVirtual(Type.getType(String.class), org.objectweb.asm.commons.Method.getMethod(
-                    ReflectionUtils.getRequiredMethod(String.class, "equals", Object.class)));
-                adapter.push(false);
-                adapter.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.NE, equalityLabel);
-            } else {
-                adapter.push(true);
-                adapter.returnValue();
-            }
+                Label exceptionLabel = new Label();
+                Label furtherCheckLabel = new Label();
 
-            adapter.visitLabel(ifNullLabel);
-            adapter.push(false);
-            adapter.returnValue();
-            adapter.visitLabel(equalityLabel);
+                if (visitData.requiredValue != null || visitData.notEqualsValue != null) {
+                    adapter.ifNull(visitData.requiredValue != null ? exceptionLabel : furtherCheckLabel);
+                    adapter.loadLocal(propertyValueIndex);
+                    adapter.push(visitData.requiredValue != null ? visitData.requiredValue : visitData.notEqualsValue);
+                    // comparing through String.equals
+                    adapter.invokeVirtual(stringType, stringEqualsMethod);
+                    adapter.push(false);
+                    adapter.ifCmp(Type.BOOLEAN_TYPE, visitData.requiredValue != null ?
+                                                         GeneratorAdapter.NE : GeneratorAdapter.EQ, furtherCheckLabel);
+                } else {
+                    adapter.ifNull(exceptionLabel);
+                    adapter.goTo(furtherCheckLabel);
+                }
+
+                adapter.visitLabel(exceptionLabel);
+                // Building DisabledBeanException
+                adapter.newInstance(disabledBeanExceptionType);
+                adapter.dup();
+                // Building string concatenation with exception message
+                adapter.newInstance(stringBuilderType);
+                adapter.dup();
+                adapter.invokeConstructor(stringBuilderType, stringBuilderConstructor);
+                adapter.push("Bean [" + beanType.getClassName() + "] is disabled since property getter [" + propertyGetter.getSimpleName() + "] on bean [" + injectedType.getClassName() + "] returned value ");
+                adapter.invokeVirtual(stringBuilderType, stringBuilderAppendMethod);
+                // loading property value which caused exception
+                adapter.loadLocal(propertyValueIndex);
+                // appending property value to exception message
+                adapter.invokeVirtual(stringBuilderType, stringBuilderAppendMethod);
+                adapter.invokeVirtual(stringBuilderType, toStringMethod);
+                // invoking exception constructor
+                adapter.invokeConstructor(disabledBeanExceptionType, disabledBeanExceptionConstructor);
+                adapter.throwException();
+
+                // label visited when no exception is thrown
+                adapter.visitLabel(furtherCheckLabel);
+                // if check is over returning from method
+                if (isLastProperty) {
+                    adapter.returnValue();
+                }
+            }
         }
     }
 
@@ -1804,11 +1867,36 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
-    public void visitAnnotationPropertyInjectionPoint(TypedElement injectedBeanType,
-                                                      @Nullable MethodElement getterMethod,
-                                                      @Nullable String expectedValue) {
-        annotationPropertyInjectionPoints.add(new AnnotationPropertyVisitData(injectedBeanType, getterMethod,
-            expectedValue));
+    public void visitAnnotationMemberPropertyInjectionPoint(TypedElement annotationMemberBeanType,
+                                                            String annotationMemberProperty,
+                                                            @Nullable String requiredValue,
+                                                            @Nullable String notEqualsValue) {
+        MethodElement memberPropertyGetter = annotationMemberBeanType.getType().getBeanProperties()
+            .stream()
+            .filter(property -> property.getSimpleName().equals(annotationMemberProperty))
+            .findFirst()
+            .flatMap(PropertyElement::getReadMethod)
+            .orElse(null);
+
+        if (memberPropertyGetter == null) {
+            final String[] readPrefixes = annotationMetadata.getValue(AccessorsStyle.class, "readPrefixes", String[].class)
+                .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
+
+            memberPropertyGetter = annotationMemberBeanType.getType().getEnclosedElements(ElementQuery.ALL_METHODS)
+                .stream()
+                .filter(methodElement -> NameUtils.getPropertyNameForGetter(methodElement.getSimpleName(), readPrefixes).equals(annotationMemberProperty))
+                .findFirst()
+                .orElse(null);
+        }
+
+        if (memberPropertyGetter == null) {
+            visitorContext.fail("Bean property [" + annotationMemberProperty + "] is not available on bean ["
+                                    + annotationMemberBeanType.getName() + "]", annotationMemberBeanType);
+        } else {
+            Type injectedType = JavaModelUtils.getTypeReference(annotationMemberBeanType.getType());
+            annotationInjectionPoints.computeIfAbsent(injectedType, type -> new ArrayList<>(2))
+                                         .add(new AnnotationVisitData(annotationMemberBeanType, memberPropertyGetter, requiredValue, notEqualsValue));
+        }
     }
 
     @Override
@@ -2744,13 +2832,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void visitShouldLoadMethodDefinition() {
-        String desc = getMethodDescriptor("boolean", BeanResolutionContext.class.getName(), BeanContext.class.getName());
+        String desc = getMethodDescriptor("void", BeanResolutionContext.class.getName(), BeanContext.class.getName());
         this.shouldLoadMethodVisitor = new GeneratorAdapter(classWriter.visitMethod(
-            ACC_PUBLIC,
-            "shouldLoad",
+            ACC_PROTECTED,
+            "checkIfShouldLoad",
             desc,
             null,
-            null), ACC_PUBLIC, "shouldLoad", desc);
+            null), ACC_PROTECTED, "checkIfShouldLoad", desc);
     }
 
     @SuppressWarnings("MagicNumber")
@@ -3055,6 +3143,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // load this
 
             GeneratorAdapter buildMethodVisitor = this.buildMethodVisitor;
+            invokeCheckIfShouldLoadIfNecessary(buildMethodVisitor);
             // for Factory beans first we need to lookup the the factory bean
             // before invoking the method to instantiate
             // the below code looks up the factory bean.
@@ -3132,6 +3221,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // load this
 
             GeneratorAdapter buildMethodVisitor = this.buildMethodVisitor;
+            invokeCheckIfShouldLoadIfNecessary(buildMethodVisitor);
 
             // if there is constructor interception present then we have to
             // build the parameters into an Object[] and build a constructor invocation
@@ -3186,6 +3276,23 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             buildMethodVisitor.loadLocal(buildInstanceLocalVarIndex);
             initLifeCycleMethodsIfNecessary();
             pushBoxPrimitiveIfNecessary(beanType, buildMethodVisitor);
+        }
+    }
+
+    private void invokeCheckIfShouldLoadIfNecessary(GeneratorAdapter buildMethodVisitor) {
+        AnnotationValue<Requires> requiresAnnotation = annotationMetadata.getAnnotation(Requires.class);
+        if (requiresAnnotation != null
+                && requiresAnnotation.stringValue(RequiresCondition.MEMBER_BEAN).isPresent()
+                && requiresAnnotation.stringValue(RequiresCondition.MEMBER_BEAN_PROPERTY).isPresent()) {
+            visitShouldLoadMethodDefinition();
+
+            buildMethodVisitor.loadThis();
+            buildMethodVisitor.loadArg(0);
+            buildMethodVisitor.loadArg(1);
+            buildMethodVisitor.invokeVirtual(beanDefinitionType, org.objectweb.asm.commons.Method.getMethod(
+                ReflectionUtils.getRequiredMethod(AbstractInitializableBeanDefinition.class, "checkIfShouldLoad",
+                    BeanResolutionContext.class,
+                    BeanContext.class)));
         }
     }
 
@@ -3899,8 +4006,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             } else {
                 protectedConstructor.getStatic(beanDefinitionType, FIELD_INJECTION_FIELDS, Type.getType(AbstractInitializableBeanDefinition.FieldReference[].class));
             }
-            // 6: `AbstractBeanDefinition2.FieldReference[].class` annotationInjection
-            if (annotationPropertyInjectionPoints.isEmpty()) {
+            // 6: `AbstractBeanDefinition2.AnnotationReference[].class` annotationInjection
+            if (annotationInjectionPoints.isEmpty()) {
                 protectedConstructor.push((String) null);
             } else {
                 protectedConstructor.getStatic(beanDefinitionType, FIELD_ANNOTATION_INJECTIONS, Type.getType(AbstractInitializableBeanDefinition.AnnotationReference[].class));
@@ -4043,12 +4150,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         staticInit.invokeConstructor(Type.getType(AbstractInitializableBeanDefinition.FieldReference.class), FIELD_REFERENCE_CONSTRUCTOR);
     }
 
-    private void pushNewAnnotationReference(GeneratorAdapter staticInit, Type declaringType, TypedElement classElement) {
+    private void pushNewAnnotationReference(GeneratorAdapter staticInit, Type referencedType) {
         staticInit.newInstance(Type.getType(AbstractInitializableBeanDefinition.AnnotationReference.class));
         staticInit.dup();
 
-        // create argument
-        staticInit.push(JavaModelUtils.getTypeReference(classElement));
+        // 1: argument
+        staticInit.push(referencedType);
         invokeInterfaceStaticMethod(
             staticInit,
             Argument.class,
@@ -4358,17 +4465,20 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Internal
-    private static final class AnnotationPropertyVisitData {
-        final TypedElement annotationBeanType;
-        final MethodVisitData getterVisitData;
-        final String expectedValue;
+    private static final class AnnotationVisitData {
+        final TypedElement memberBeanType;
+        final MethodElement memberPropertyGetter;
+        final String requiredValue;
+        final String notEqualsValue;
 
-        public AnnotationPropertyVisitData(TypedElement annotationBeanType,
-                                           MethodElement getterMethod,
-                                           @Nullable String expectedValue) {
-            this.annotationBeanType = annotationBeanType;
-            this.getterVisitData = new MethodVisitData(annotationBeanType, getterMethod, false);
-            this.expectedValue = expectedValue;
+        public AnnotationVisitData(TypedElement memberBeanType,
+                                   MethodElement memberPropertyGetter,
+                                   @Nullable String requiredValue,
+                                   @Nullable String notEqualsValue) {
+            this.memberBeanType = memberBeanType;
+            this.memberPropertyGetter = memberPropertyGetter;
+            this.requiredValue = requiredValue;
+            this.notEqualsValue = notEqualsValue;
         }
     }
 

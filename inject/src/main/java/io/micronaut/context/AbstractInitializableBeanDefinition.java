@@ -431,6 +431,13 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
                 }
             }
         }
+        if (annotationInjection != null) {
+            for (AnnotationReference annotationReference: annotationInjection) {
+                if (annotationReference.argument != null) {
+                    argumentConsumer.accept(annotationReference.argument);
+                }
+            }
+        }
         this.requiredComponents = Collections.unmodifiableSet(requiredComponents);
         return this.requiredComponents;
     }
@@ -821,6 +828,17 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     @UsedByGeneratedCode
     protected boolean isInnerConfiguration(Class<?> clazz) {
         return false;
+    }
+
+
+    /**
+     * Checks whether the bean should be loaded.
+     * @param resolutionContext - the resolution context
+     * @param context - the bean context
+     */
+    @Internal
+    @UsedByGeneratedCode
+    protected void checkIfShouldLoad(BeanResolutionContext resolutionContext, BeanContext context) {
     }
 
     /**
@@ -2217,17 +2235,6 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         }
     }
 
-    @Internal
-    @SuppressWarnings("VisibilityModifier")
-    public static final class AnnotationReference {
-        public final Argument argument;
-
-        public AnnotationReference(Argument argument) {
-            this.argument = argument;
-        }
-
-    }
-
     /**
      * The data class containing all filed reference information.
      */
@@ -2254,6 +2261,20 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         public MethodOrFieldReference(Class declaringType, boolean requiresReflection) {
             this.declaringType = declaringType;
             this.requiresReflection = requiresReflection;
+        }
+
+    }
+
+    /**
+     * The data class containing annotation injection information.
+     */
+    @Internal
+    @SuppressWarnings("VisibilityModifier")
+    public static final class AnnotationReference {
+        public final Argument argument;
+
+        public AnnotationReference(Argument argument) {
+            this.argument = argument;
         }
 
     }

@@ -254,13 +254,16 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     /**
      * Visits an annotation injection point.
      *
-     * @param injectedBeanType   The type of the injected bean
-     * @param getterMethod       The getter method which has to be invoked on injected bean to obtain property value
-     * @param expectedValue      The value which is compared to the value returned by getterMethod
+     * @param annotationMemberBeanType     The type of the injected bean
+     * @param annotationMemberProperty       Required property of the injected bean
+     * @param requiredValue      Required value of the bean property for the bean to be loaded
+     * @param notEqualsValue      The bean property value which should not be equal to present value for the bean to
+     *                           be loaded
      */
-    void visitAnnotationPropertyInjectionPoint(TypedElement injectedBeanType,
-                                               @Nullable MethodElement getterMethod,
-                                               @Nullable String expectedValue);
+    void visitAnnotationMemberPropertyInjectionPoint(TypedElement annotationMemberBeanType,
+                                                     String annotationMemberProperty,
+                                                     @Nullable String requiredValue,
+                                                     @Nullable String notEqualsValue);
 
     /**
      * Visits a field injection point.

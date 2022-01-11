@@ -2273,10 +2273,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
                        @Nullable Argument<T> qualifierBeanType,
                        boolean isSingleton,
                        @Nullable Map<String, Object> argumentValues) {
-        if (!beanDefinition.shouldLoad(resolutionContext, this)) {
-            throw new DisabledBeanException("Bean is disabled");
-        }
-
         if (argumentValues == null) {
             argumentValues = Collections.emptyMap();
         }

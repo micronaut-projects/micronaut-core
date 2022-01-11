@@ -326,10 +326,10 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         @Override
-        public Path pushAnnotationResolve(BeanDefinition beanDefinition, Argument annotationBeanAsArgument) {
-            AnnotationSegment annotationSegment = new AnnotationSegment(beanDefinition, annotationBeanAsArgument);
+        public Path pushAnnotationResolve(BeanDefinition beanDefinition, Argument annotationMemberBeanAsArgument) {
+            AnnotationSegment annotationSegment = new AnnotationSegment(beanDefinition, annotationMemberBeanAsArgument);
             if (contains(annotationSegment)) {
-                throw new CircularDependencyException(AbstractBeanResolutionContext.this, beanDefinition, annotationBeanAsArgument.getName(), "Circular dependency detected");
+                throw new CircularDependencyException(AbstractBeanResolutionContext.this, beanDefinition, annotationMemberBeanAsArgument.getName(), "Circular dependency detected");
             } else {
                 push(annotationSegment);
             }
@@ -599,14 +599,20 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     /**
      * A segment that represents annotation.
+     * @since 3.3.0
      */
-    public static class AnnotationSegment extends AbstractSegment implements InjectionPoint {
+    public static final class AnnotationSegment extends AbstractSegment implements InjectionPoint {
         /**
          * @param beanDefinition      The bean definition
          * @param argument            The argument
          */
         AnnotationSegment(BeanDefinition beanDefinition, Argument argument) {
             super(beanDefinition, argument.getName(), argument);
+        }
+
+        @Override
+        public String toString() {
+            return getName();
         }
 
         @Override
