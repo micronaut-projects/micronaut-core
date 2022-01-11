@@ -17,6 +17,7 @@ package io.micronaut.context.env;
 
 import io.micronaut.context.ApplicationContextConfiguration;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.context.logging.LoggingConfigurer;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionContext;
@@ -269,9 +270,18 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
                 readPropertySources(getPropertySourceRootName());
                 reading.set(false);
+                applyLogging();
             }
         }
         return this;
+    }
+
+    private void applyLogging() {
+        List<LoggingConfigurer> list = new ArrayList<>(3);
+        SoftServiceLoader.load(LoggingConfigurer.class, getClassLoader()).collectAll(list);
+        for (LoggingConfigurer loggingConfigurer : list) {
+            loggingConfigurer.apply(this);
+        }
     }
 
     @Override

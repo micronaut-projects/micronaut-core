@@ -2,6 +2,7 @@ package io.micronaut.logging
 
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.LoggerContext
 import com.github.stefanbirkner.systemlambda.SystemLambda
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
@@ -141,5 +142,76 @@ logger:
             loggerName    | expectedLevel
             'foo.bar3'    | Level.INFO
     }
+
+    void 'test that logger console pattern appender'() {
+        given:
+            def map = new YamlPropertySourceLoader().read("myconfig.yml", '''
+logger:
+  appenders:
+    console:
+      pattern: '%cyan(%d{HH:mm:ss.SSS}) %gray([%thread]) %highlight(%-5level) %magenta(%logger{36}) - %msg%n'
+  levels:
+    xyz: INFO
+'''.bytes)
+        when:
+            def rootLogger = (Logger) LoggerFactory.getLogger("root")
+        then:
+            rootLogger.getAppender("console") == null
+
+        when:
+            ApplicationContext context = ApplicationContext.builder()
+                    .propertySources(PropertySource.of(map))
+                    .start()
+            def logger = (Logger) LoggerFactory.getLogger("xyz")
+        then:
+            logger.getLevel() == Level.INFO
+            rootLogger.getAppender("console") != null
+
+        cleanup:
+            context.close()
+            ((LoggerContext) LoggerFactory.getILoggerFactory()).reset()
+    }
+
+    void 'test that logger file pattern appender'() {
+        given:
+            def map = new YamlPropertySourceLoader().read("myconfig.yml", '''
+logger:
+  appenders:
+    console:
+      pattern: '%cyan(%d{HH:mm:ss.SSS}) %gray([%thread]) %highlight(%-5level) %magenta(%logger{36}) - %msg%n'
+    custom-console:
+      pattern: '%cyan(%d{HH:mm:ss.SSS}) %gray([%thread]) %highlight(%-5level) %magenta(%logger{36}) - %msg%n'
+      type: console
+    file:
+      file: out.log
+      pattern: '%cyan(%d{HH:mm:ss.SSS}) %gray([%thread]) %highlight(%-5level) %magenta(%logger{36}) - %msg%n'
+    custom-file:
+      file: out2.log
+      type: file
+      pattern: '%cyan(%d{HH:mm:ss.SSS}) %gray([%thread]) %highlight(%-5level) %magenta(%logger{36}) - %msg%n'
+  levels:
+    xyz: INFO
+'''.bytes)
+        when:
+            def rootLogger = (Logger) LoggerFactory.getLogger("root")
+        then:
+            rootLogger.getAppender("console") == null
+            rootLogger.getAppender("file") == null
+
+        when:
+            ApplicationContext context = ApplicationContext.builder()
+                    .propertySources(PropertySource.of(map))
+                    .start()
+        then:
+            rootLogger.getAppender("console") != null
+            rootLogger.getAppender("custom-console") != null
+            rootLogger.getAppender("file") != null
+            rootLogger.getAppender("custom-file") != null
+
+        cleanup:
+            context.close()
+            ((LoggerContext) LoggerFactory.getILoggerFactory()).reset()
+    }
+
 
 }
