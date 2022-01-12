@@ -11,6 +11,7 @@ hibernate = "5.5.3.Final"
 hibernate-validator = "6.1.6.Final"
 htmlSanityCheck = "1.1.6"
 htmlunit = "2.47.1"
+httpcomponents-client = "4.5.13"
 jakarta-inject-api = "2.0.1"
 jakarta-inject-tck = "2.0.1"
 javax-inject = "1"
@@ -524,6 +525,7 @@ testcontainers-spock = { module = "org.testcontainers:spock", version.ref = "man
 
 vertx = { module = "io.vertx:vertx-core", version.ref = "vertx" }
 vertx-webclient = { module = "io.vertx:vertx-web-client", version.ref = "vertx" }
+httpcomponents-client = { module = "org.apache.httpcomponents:httpclient", version.ref = "httpcomponents-client" }
 
 wiremock = { module = "com.github.tomakehurst:wiremock-jre8", version.ref = "wiremock" }
 

@@ -42,9 +42,10 @@ dependencies {
     }
     testImplementation libs.managed.jackson.databind
 
-    // following 3 dependencies needed for Http2PostTest
+    // http impls for tests
     testImplementation libs.vertx
     testImplementation libs.vertx.webclient
+    testImplementation libs.httpcomponents.client
     testImplementation libs.jetty.alpn.openjdk8.client
 
     testImplementation libs.managed.groovy.json
