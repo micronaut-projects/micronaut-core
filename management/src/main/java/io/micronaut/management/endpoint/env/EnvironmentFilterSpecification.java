@@ -15,11 +15,14 @@
  */
 package io.micronaut.management.endpoint.env;
 
+import io.micronaut.core.util.SupplierUtil;
+
 import javax.validation.constraints.NotNull;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -33,10 +36,11 @@ import java.util.stream.Stream;
  */
 public final class EnvironmentFilterSpecification {
 
-    private static final List<Pattern> LEGACY_MASK_PATTERNS =
-            Stream.of(".*password.*", ".*credential.*", ".*certificate.*", ".*key.*", ".*secret.*", ".*token.*")
-            .map(s -> Pattern.compile(s, Pattern.CASE_INSENSITIVE))
-            .collect(Collectors.toList());
+    private static final Supplier<List<Pattern>> LEGACY_MASK_PATTERNS = SupplierUtil.memoized(() -> {
+        return Stream.of(".*password.*", ".*credential.*", ".*certificate.*", ".*key.*", ".*secret.*", ".*token.*")
+                .map(s -> Pattern.compile(s, Pattern.CASE_INSENSITIVE))
+                .collect(Collectors.toList());
+    });
 
     private boolean allMasked;
     private final List<Predicate<String>> exclusions = new ArrayList<>();
@@ -46,9 +50,9 @@ public final class EnvironmentFilterSpecification {
     }
 
     /**
-     * Turn on global masking. Items can be unmasked by adding {@link Pattern}s to {@link #exclude(Pattern...)}, literals to {@link #exclude(String...)}, or {@link Predicate}s to {@link #exclude(Predicate)}.
+     * Turn on global masking. Items can be unmasked by executing any of the exclude methods.
      *
-     * @return itself for chaining calls.
+     * @return this
      */
     public @NotNull EnvironmentFilterSpecification maskAll() {
         allMasked = true;
@@ -56,9 +60,9 @@ public final class EnvironmentFilterSpecification {
     }
 
     /**
-     * Turn off global masking. Items can be masked by adding {@link Pattern}s to {@link #exclude(Pattern...)}, literals to {@link #exclude(String...)}, or {@link Predicate}s to {@link #exclude(Predicate)}.
+     * Turn off global masking. Items can be masked by executing any of the exclude methods.
      *
-     * @return itself for chaining calls.
+     * @return this
      */
     public @NotNull EnvironmentFilterSpecification maskNone() {
         allMasked = false;
@@ -66,62 +70,76 @@ public final class EnvironmentFilterSpecification {
     }
 
     /**
-     * Adds a predicate to the list of known masks.  If the {@link EnvironmentFilterSpecification#maskAll()} flag is set
-     * then this will be used for exceptions (values in clear-text).  If the {@link EnvironmentFilterSpecification#maskNone()}
+     * Adds a predicate to test property keys. If the {@link #maskAll()} flag is set
+     * then this will be used for exceptions (values in clear-text). If the {@link #maskNone()}
      * flag is set then this will be those values that are masked.
      *
-     * @param propertySourceNamePredicates one or more predicates to match against property names for masking.
-     * @return itself for chaining calls.
+     * @param keyPredicate A predicate to match against property keys for masking
+     * @return this
      */
-    public @NotNull EnvironmentFilterSpecification exclude(@NotNull Predicate<String> propertySourceNamePredicates) {
-        exclusions.add(propertySourceNamePredicates);
+    public @NotNull EnvironmentFilterSpecification exclude(@NotNull Predicate<String> keyPredicate) {
+        exclusions.add(keyPredicate);
         return this;
     }
 
     /**
-     * Adds literal strings to the list of known masks.  If the {@link EnvironmentFilterSpecification#maskAll()} flag is set
+     * Adds literal strings to the list of excluded keys.  If the {@link EnvironmentFilterSpecification#maskAll()} flag is set
      * then this list will be used for exceptions (values in clear-text).  If the {@link EnvironmentFilterSpecification#maskNone()}
      * flag is set then this list will be those values that are masked.
      *
-     * @param propertySourceNamePredicates one or more predicates to match against property names for masking.
-     * @return itself for chaining calls.
+     * @param keys Literal keys that should be excluded
+     * @return this
      */
-    public @NotNull EnvironmentFilterSpecification exclude(@NotNull String... propertySourceNamePredicates) {
-        exclusions.add(name -> Arrays.asList(propertySourceNamePredicates).contains(name));
+    public @NotNull EnvironmentFilterSpecification exclude(@NotNull String... keys) {
+        if (keys.length > 0) {
+            if (keys.length == 1) {
+                exclusions.add(name -> keys[0].equals(name));
+            } else {
+                List<String> keysList = Arrays.asList(keys);
+                exclusions.add(keysList::contains);
+            }
+        }
         return this;
     }
 
     /**
-     * Adds regular expression patterns to the list of known masks.  If the {@link EnvironmentFilterSpecification#maskAll()} flag is set
-     * then this list will be used for exceptions (values in clear-text).  If the {@link EnvironmentFilterSpecification#maskNone()}
-     * flag is set then this list will be those values that are masked.
+     * Adds regular expression patterns to the list of known masks.  If the {@link #maskAll()} flag is set
+     * then this list will be used for exceptions (values in clear-text).  If the {@link #maskNone()}
+     * flag is set then this list will be those values that are masked. Patterns must match
+     * the entire property key.
      *
-     * @param propertySourceNamePredicates one or more predicates to match against property names for masking.
-     * @return itself for chaining calls.
+     * @param keyPatterns The patterns used to compare keys to exclude them
+     * @return this
      */
-    public @NotNull EnvironmentFilterSpecification exclude(@NotNull Pattern... propertySourceNamePredicates) {
-        exclusions.add(name -> Arrays.stream(propertySourceNamePredicates).anyMatch(pattern -> pattern.matcher(name).matches()));
+    public @NotNull EnvironmentFilterSpecification exclude(@NotNull Pattern... keyPatterns) {
+        if (keyPatterns.length > 0) {
+            if (keyPatterns.length == 1) {
+                exclusions.add(name -> keyPatterns[0].matcher(name).matches());
+            } else {
+                exclusions.add(name -> Arrays.stream(keyPatterns).anyMatch(pattern -> pattern.matcher(name).matches()));
+            }
+        }
         return this;
     }
 
     /**
-     * Adds the masking rules from legacy pre 3.3.0.  Effectively the same as calling {@link EnvironmentFilterSpecification#maskNone()}
-     * and adding pattern predicates via {@link #exclude(Pattern...)} to mask anything containing the words {@code password},
-     * {@code credential}, {@code certificate}, {@code key}, {@code secret} or {@code token}.
+     * Configures the key masking to behave as it did prior to 3.3.0.
      *
-     * @return itself for chaining calls.
+     * @return this
      */
     public @NotNull EnvironmentFilterSpecification legacyMasking() {
         allMasked = false;
-        for (Pattern pattern : LEGACY_MASK_PATTERNS) {
+        for (Pattern pattern : LEGACY_MASK_PATTERNS.get()) {
             exclude(pattern);
         }
         return this;
     }
 
-    FilterResult test(String propertySourceName) {
-        if (exclusions.stream().anyMatch(p -> p.test(propertySourceName))) {
-            return allMasked ? FilterResult.PLAIN : FilterResult.MASK;
+    FilterResult test(String key) {
+        for (Predicate<String> exclusion: exclusions) {
+            if (exclusion.test(key)) {
+                return allMasked ? FilterResult.PLAIN : FilterResult.MASK;
+            }
         }
         return allMasked ? FilterResult.MASK : FilterResult.PLAIN;
     }

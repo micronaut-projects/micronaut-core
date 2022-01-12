@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2022 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ import java.util.Map;
  */
 @Endpoint(
         id = EnvironmentEndpoint.NAME,
-        defaultEnabled = EnvironmentEndpoint.DEFAULT_ENABLED
+        defaultEnabled = false
 )
 public class EnvironmentEndpoint {
 
@@ -47,10 +47,7 @@ public class EnvironmentEndpoint {
      */
     public static final String NAME = "env";
 
-    /**
-     * Endpoint default enabled.
-     */
-    public static final boolean DEFAULT_ENABLED = false;
+    private static final String MASK_VALUE = "*****";
 
     private final Environment environment;
     private final EnvironmentEndpointFilter environmentFilter;
@@ -122,7 +119,7 @@ public class EnvironmentEndpoint {
         propertySource.forEach(k -> {
             EnvironmentFilterSpecification.FilterResult test = filter.test(k);
             if (test != EnvironmentFilterSpecification.FilterResult.HIDE) {
-                properties.put(k, test == EnvironmentFilterSpecification.FilterResult.MASK ? "*****" : propertySource.get(k));
+                properties.put(k, test == EnvironmentFilterSpecification.FilterResult.MASK ? MASK_VALUE : propertySource.get(k));
             }
         });
         return properties;
