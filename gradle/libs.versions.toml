@@ -163,6 +163,7 @@ boms-micronaut-data = { module = "io.micronaut.data:micronaut-data-bom", version
 boms-micronaut-groovy = { module = "io.micronaut.groovy:micronaut-groovy-bom", version.ref = "managed-micronaut-groovy" }
 boms-micronaut-micrometer = { module = "io.micronaut.micrometer:micronaut-micrometer-bom", version.ref = "managed-micronaut-micrometer" }
 boms-micronaut-oraclecloud = { module = "io.micronaut.oraclecloud:micronaut-oraclecloud-bom", version.ref = "managed-micronaut-oraclecloud" }
+boms-micronaut-serialization = { module = "io.micronaut.serde:micronaut-serde-bom", version.ref = "managed-micronaut-serialization" }
 boms-micronaut-sql = { module = "io.micronaut.sql:micronaut-sql-bom", version.ref = "managed-micronaut-sql" }
 boms-micronaut-test = { module = "io.micronaut.test:micronaut-test-bom", version.ref = "managed-micronaut-test" }
 boms-micronaut-views = { module = "io.micronaut.views:micronaut-views-bom", version.ref = "managed-micronaut-views" }
