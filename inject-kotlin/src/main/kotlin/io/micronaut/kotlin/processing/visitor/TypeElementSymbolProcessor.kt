@@ -31,7 +31,6 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
         private val SERVICE_LOADER = io.micronaut.core.io.service.SoftServiceLoader.load(TypeElementVisitor::class.java)
     }
 
-
     override fun process(resolver: Resolver): List<KSAnnotated> {
         // set supported options as system properties to keep compatibility
         // in particular for micronaut-openapi
@@ -51,8 +50,6 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
         typeElementVisitors = findTypeElementVisitors()
         loadedVisitors = ArrayList(typeElementVisitors.size)
         visitorContext = KotlinVisitorContext(environment, resolver)
-
-        //resolver.createKSTypeReferenceFromKSType(KSType)
 
         start()
 
