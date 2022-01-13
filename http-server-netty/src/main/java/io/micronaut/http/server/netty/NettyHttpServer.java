@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -136,7 +136,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Implements the bootstrap and configuration logic for the Netty implementation of {@link io.micronaut.runtime.server.EmbeddedServer}.
@@ -841,11 +844,28 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             initHttpCoders();
         }
 
+        private Predicate<String> inclusionPredicate(NettyHttpServerConfiguration.AccessLogger config) {
+            List<String> exclusions = config.getExclusions();
+            if (CollectionUtils.isEmpty(exclusions)) {
+                return HttpAccessLogHandler.INCLUDE_ALL;
+            } else {
+                // Don't do this inside the predicate to avoid compiling every request
+                List<Pattern> patterns = exclusions.stream().map(Pattern::compile).collect(Collectors.toList());
+                return uri -> patterns.stream().noneMatch(pattern -> pattern.matcher(uri).matches());
+            }
+        }
+
+        private HttpAccessLogHandler accessLogHandler() {
+            NettyHttpServerConfiguration.AccessLogger accessLogger = serverConfiguration.getAccessLogger();
+            if (accessLogger != null && accessLogger.isEnabled()) {
+                return new HttpAccessLogHandler(accessLogger.getLoggerName(), accessLogger.getLogFormat(), inclusionPredicate(accessLogger));
+            } else {
+                return null;
+            }
+        }
+
         void initHttpCoders() {
-            this.accessLogHandler = serverConfiguration.getAccessLogger() != null && serverConfiguration.getAccessLogger()
-                    .isEnabled() ?
-                    new HttpAccessLogHandler(serverConfiguration.getAccessLogger().getLoggerName(),
-                            serverConfiguration.getAccessLogger().getLogFormat()) : null;
+            this.accessLogHandler = accessLogHandler();
             this.requestDecoder = new HttpRequestDecoder(NettyHttpServer.this,
                     environment,
                     serverConfiguration,

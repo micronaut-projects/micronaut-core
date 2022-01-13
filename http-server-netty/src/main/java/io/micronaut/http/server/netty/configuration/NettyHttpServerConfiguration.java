@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -671,6 +671,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private boolean enabled;
         private String loggerName;
         private String logFormat;
+        private List<String> exclusions;
 
         /**
          * Returns whether the access logger is enabled.
@@ -720,6 +721,23 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
             this.logFormat = logFormat;
         }
 
+        /**
+         * @return The URI patterns to exclude from the access log.
+         */
+        public List<String> getExclusions() {
+            return exclusions;
+        }
+
+        /**
+         * Sets the URI patterns to be excluded from the access log.
+         *
+         * @param exclusions A list of regular expression patterns to be excluded from the access logger if the request URI matches.
+         *
+         * @see java.util.regex.Pattern#compile(String) 
+         */
+        public void setExclusions(List<String> exclusions) {
+            this.exclusions = exclusions;
+        }
     }
 
     /**
