@@ -10,9 +10,7 @@ import io.micronaut.inject.ast.*
 import io.micronaut.kotlin.processing.isTypeReference
 import io.micronaut.kotlin.processing.toClassName
 import java.util.*
-import java.util.function.BiConsumer
 import java.util.function.Predicate
-import java.util.stream.Collectors
 
 open class KotlinClassElement(val classType: KSType,
                               annotationMetadata: AnnotationMetadata,
