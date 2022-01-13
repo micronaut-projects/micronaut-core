@@ -16,7 +16,7 @@ TIP: Be aware that some annotations, such as api:http.annotation.Produces[] and 
 
 Additionally, to use the `javax.validation` features, add the `validation` module to your build:
 
-dependency:micronaut-validator[]
+dependency:micronaut-validation[]
 
 On the server-side of Micronaut you can implement the `PetOperations` interface:
 
