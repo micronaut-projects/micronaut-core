@@ -733,7 +733,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          *
          * @param exclusions A list of regular expression patterns to be excluded from the access logger if the request URI matches.
          *
-         * @see java.util.regex.Pattern#compile(String) 
+         * @see java.util.regex.Pattern#compile(String)
          */
         public void setExclusions(List<String> exclusions) {
             this.exclusions = exclusions;

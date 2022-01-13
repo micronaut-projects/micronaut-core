@@ -2,6 +2,7 @@ package io.micronaut.http
 
 import ch.qos.logback.classic.Logger
 import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
@@ -17,6 +18,7 @@ import spock.util.concurrent.PollingConditions
 @Property(name = 'micronaut.server.netty.access-logger.enabled', value = 'true')
 @Property(name = 'micronaut.server.netty.access-logger.exclusions[0]', value = '/some/path')
 @Property(name = 'micronaut.server.netty.access-logger.exclusions[1]', value = '/prefix.+')
+@Property(name = 'spec.name', value = 'ExcludedHttpAccessLoggerSpec')
 class ExcludedHttpAccessLoggerSpec extends Specification {
 
     @Inject
@@ -65,6 +67,7 @@ class ExcludedHttpAccessLoggerSpec extends Specification {
     }
 
     @Controller("/")
+    @Requires(property = "spec.name", value = "ExcludedHttpAccessLoggerSpec")
     static class GetController {
 
         @Get('/{+path}')
