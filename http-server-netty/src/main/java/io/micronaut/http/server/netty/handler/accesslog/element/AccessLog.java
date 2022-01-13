@@ -143,7 +143,7 @@ public class AccessLog {
     }
 
     /**
-     * Mark the current AccessLog as excluded (if for example, it is filtered by the access log filters).
+     * Mark the current AccessLog as excluded (if for example, it is excluded by the access log exclusions).
      */
     public void exclude() {
         this.excluded = true;
