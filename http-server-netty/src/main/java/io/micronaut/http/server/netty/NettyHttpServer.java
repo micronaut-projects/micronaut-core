@@ -847,7 +847,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         private Predicate<String> inclusionPredicate(NettyHttpServerConfiguration.AccessLogger config) {
             List<String> exclusions = config.getExclusions();
             if (CollectionUtils.isEmpty(exclusions)) {
-                return HttpAccessLogHandler.INCLUDE_ALL;
+                return null;
             } else {
                 // Don't do this inside the predicate to avoid compiling every request
                 List<Pattern> patterns = exclusions.stream().map(Pattern::compile).collect(Collectors.toList());

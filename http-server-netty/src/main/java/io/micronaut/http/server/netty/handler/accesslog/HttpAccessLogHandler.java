@@ -52,11 +52,6 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
      */
     public static final String HTTP_ACCESS_LOGGER = "HTTP_ACCESS_LOGGER";
 
-    /**
-     * A lenient filter that allows all uri's to pass.
-     */
-    public static final Predicate<String> INCLUDE_ALL = uri -> true;
-
     private static final AttributeKey<AccessLog> ACCESS_LOGGER = AttributeKey.valueOf("ACCESS_LOGGER");
     private static final String H2_PROTOCOL_NAME = "HTTP/2.0";
 
@@ -71,7 +66,7 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
      * @param spec The log format specification.
      */
     public HttpAccessLogHandler(String loggerName, String spec) {
-        this(loggerName == null || loggerName.isEmpty() ? null : LoggerFactory.getLogger(loggerName), spec, INCLUDE_ALL);
+        this(loggerName == null || loggerName.isEmpty() ? null : LoggerFactory.getLogger(loggerName), spec, null);
     }
 
     /**
@@ -92,7 +87,7 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
      * @param spec The log format specification.
      */
     public HttpAccessLogHandler(Logger logger, String spec) {
-        this(logger, spec, INCLUDE_ALL);
+        this(logger, spec, null);
     }
 
     /**
@@ -115,7 +110,7 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
             final SocketChannel channel = (SocketChannel) ctx.channel();
             final HttpRequest request = (HttpRequest) msg;
             AccessLog accessLog = accessLog(channel);
-            if (uriInclusion.test(request.uri())) {
+            if (uriInclusion == null || uriInclusion.test(request.uri())) {
                 final HttpHeaders headers = request.headers();
                 // Trying to detect http/2
                 String protocol;
