@@ -5,7 +5,7 @@ import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 class AnnotationMetadataSpec extends AbstractBeanDefinitionSpec {
 
     void "test mutated metadata from a visitor is available on beans"() {
-        given:
+        when:
         def definition = buildBeanDefinition('test.TestListener', '''
 package test
 
@@ -24,7 +24,7 @@ class TestListener {
 
 ''')
 
-        expect:
+        then:
         noExceptionThrown() //asserts default values are available
         definition.findMethod("receive", String).get().hasAnnotation('my.custom.Annotation')
     }
