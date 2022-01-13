@@ -25,7 +25,7 @@ class ExcludedHttpAccessLoggerSpec extends Specification {
     @Client("/")
     HttpClient client
 
-    PollingConditions conditions = new PollingConditions(timeout: 3, delay: 0.5)
+    PollingConditions conditions = new PollingConditions(timeout: 5, delay: 0.5)
 
     static MemoryAppender appender = new MemoryAppender()
 
@@ -39,7 +39,7 @@ class ExcludedHttpAccessLoggerSpec extends Specification {
         appender.events.clear()
     }
 
-    def "quick"() {
+    def "test paths are excluded for specified patterns"() {
         when:
         def paths = [
                 [uri: '/prefix/a', logged: false],    // Matches /prefix.+
