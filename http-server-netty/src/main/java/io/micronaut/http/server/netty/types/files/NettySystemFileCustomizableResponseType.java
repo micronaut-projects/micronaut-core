@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.SmartHttpContentCompressor;
@@ -119,14 +118,8 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
 
             // Write the request data
             final DefaultHttpResponse finalResponse = new DefaultHttpResponse(nettyResponse.getNettyHttpVersion(), nettyResponse.getNettyHttpStatus(), nettyResponse.getNettyHeaders());
-            final io.micronaut.http.HttpVersion httpVersion = request.getHttpVersion();
-            final boolean isHttp2 = httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0;
-            if (isHttp2 && request instanceof NettyHttpRequest) {
-                final io.netty.handler.codec.http.HttpHeaders nativeHeaders = ((NettyHttpRequest<?>) request).getNativeRequest().headers();
-                final String streamId = nativeHeaders.get(AbstractNettyHttpRequest.STREAM_ID);
-                if (streamId != null) {
-                    finalResponse.headers().set(AbstractNettyHttpRequest.STREAM_ID, streamId);
-                }
+            if (request instanceof NettyHttpRequest) {
+                ((NettyHttpRequest<?>) request).prepareHttp2ResponseIfNecessary(finalResponse);
             }
             context.write(finalResponse, context.voidPromise());
 
@@ -159,4 +152,5 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
             throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + response);
         }
     }
+
 }
