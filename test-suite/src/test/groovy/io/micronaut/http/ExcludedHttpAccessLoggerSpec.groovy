@@ -62,7 +62,7 @@ class ExcludedHttpAccessLoggerSpec extends Specification {
                 matcher.matches() ? matcher.group('uri') : it
             }
 
-            loggedUris == paths.findAll { it.logged }.uri
+            loggedUris.toSet() == paths.findAll { it.logged }.uri.toSet()
         }
     }
 
