@@ -179,11 +179,12 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     }
 
     /**
-     * Prepares a response based on this HTTP/2 request if HTTP/2 is enabled
+     * Prepares a response based on this HTTP/2 request if HTTP/2 is enabled.
+     * 
      * @param finalResponse The response to prepare, never {@code null}
      */
     @Internal
-    public void prepareHttp2ResponseIfNecessary(@NonNull HttpResponse finalResponse) {
+    public final void prepareHttp2ResponseIfNecessary(@NonNull HttpResponse finalResponse) {
         final io.micronaut.http.HttpVersion httpVersion = getHttpVersion();
         final boolean isHttp2 = httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0;
         if (isHttp2) {
