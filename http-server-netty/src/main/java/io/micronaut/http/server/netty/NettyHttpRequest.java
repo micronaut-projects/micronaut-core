@@ -54,9 +54,11 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpRequest;
+import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import io.netty.handler.codec.http.multipart.AbstractHttpData;
@@ -174,6 +176,23 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
         this.body = SupplierUtil.memoizedNonEmpty(() -> Optional.ofNullable((T) buildBody()));
+    }
+
+    /**
+     * Prepares a response based on this HTTP/2 request if HTTP/2 is enabled
+     * @param finalResponse The response to prepare, never {@code null}
+     */
+    @Internal
+    public void prepareHttp2ResponseIfNecessary(@NonNull HttpResponse finalResponse) {
+        final io.micronaut.http.HttpVersion httpVersion = getHttpVersion();
+        final boolean isHttp2 = httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0;
+        if (isHttp2) {
+            final io.netty.handler.codec.http.HttpHeaders nativeHeaders = nettyRequest.headers();
+            final String streamId = nativeHeaders.get(STREAM_ID);
+            if (streamId != null) {
+                finalResponse.headers().set(STREAM_ID, streamId);
+            }
+        }
     }
 
     @Override
