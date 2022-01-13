@@ -67,6 +67,7 @@ include "test-suite-javax-inject"
 include "test-suite-jakarta-inject-bean-import"
 include "test-suite-kotlin"
 include "test-suite-groovy"
+include "test-suite-log4j"
 include "test-utils"
 
 // benchmarks

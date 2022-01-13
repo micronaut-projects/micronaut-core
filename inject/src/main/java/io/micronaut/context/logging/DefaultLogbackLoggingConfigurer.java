@@ -23,10 +23,11 @@ import ch.qos.logback.core.Appender;
 import ch.qos.logback.core.ConsoleAppender;
 import ch.qos.logback.core.FileAppender;
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.util.StringUtils;
 import org.slf4j.ILoggerFactory;
 import org.slf4j.LoggerFactory;
 
-import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 
@@ -36,7 +37,7 @@ import java.util.Map;
  * @author Denis Stepanov
  * @since 3.3
  */
-public class DefaultLogbackLoggingConfigurer implements LoggingConfigurer {
+public final class DefaultLogbackLoggingConfigurer extends AbstractLoggingConfigurer<LoggerContext> {
 
     @Override
     public void apply(Environment environment) {
@@ -44,39 +45,18 @@ public class DefaultLogbackLoggingConfigurer implements LoggingConfigurer {
         if (loggerFactory instanceof LoggerContext) {
             LoggerContext loggerContext = (LoggerContext) loggerFactory;
             Util.configureLogLevels(environment, (loggerPrefix, levelValue) -> {
-                Level level = Level.toLevel(levelValue.toString().toUpperCase(Locale.ROOT));
+                String levelString = levelValue.toString().toUpperCase(Locale.ROOT);
+                Level level = Level.toLevel(levelValue.toString());
+                if (level == null && StringUtils.isNotEmpty(levelString)) {
+                    throw new ConfigurationException("Invalid log level: '" + levelValue + "' for logger: '" + levelString + "'");
+                }
                 loggerContext.getLogger(loggerPrefix).setLevel(level);
             });
-
-            Map<String, Object> appenders = environment.get("logger.appenders", Map.class).orElse(null);
-            if (appenders != null) {
-                for (Map.Entry<String, Object> e : appenders.entrySet()) {
-                    String name = e.getKey();
-                    Map<String, Object> conf = (Map<String, Object>) e.getValue();
-                    if (conf == null) {
-                        conf = Collections.emptyMap();
-                    }
-                    String type = (String) conf.get("type");
-                    if (type == null) {
-                        type = name;
-                    }
-                    if ("console".equals(type)) {
-                        addConsoleAppender(loggerContext, name, conf);
-                    } else if ("file".equals(type)) {
-                        addFileAppender(loggerContext, name, conf);
-                    } else {
-                        throw new IllegalStateException("Unrecognized type for appender: '" + name + "'. Use 'type' property or have the name one of: 'console', 'file'");
-                    }
-                }
-            }
+            configureAppenders(environment, loggerContext);
         }
     }
 
-    private void addConsoleAppender(LoggerContext loggerContext, String name, Map<String, Object> conf) {
-        String pattern = (String) conf.get("pattern");
-        if (pattern == null) {
-            throw new IllegalStateException("Console appender is required to have the 'pattern' property specified!");
-        }
+    protected void addConsoleAppender(LoggerContext loggerContext, String name, String pattern, Map<String, Object> conf) {
         PatternLayoutEncoder ple = new PatternLayoutEncoder();
         ple.setPattern(pattern);
         ple.setContext(loggerContext);
@@ -90,15 +70,7 @@ public class DefaultLogbackLoggingConfigurer implements LoggingConfigurer {
         appendToRoot(loggerContext, conf, consoleAppender);
     }
 
-    private void addFileAppender(LoggerContext loggerContext, String name, Map<String, Object> conf) {
-        String pattern = (String) conf.get("pattern");
-        if (pattern == null) {
-            throw new IllegalStateException("Console appender is required to have the 'pattern' property specified!");
-        }
-        String file = (String) conf.get("file");
-        if (file == null) {
-            throw new IllegalStateException("File appender is required to have the 'file' property specified!");
-        }
+    protected void addFileAppender(LoggerContext loggerContext, String name, String pattern, String file, Map<String, Object> conf) {
         PatternLayoutEncoder ple = new PatternLayoutEncoder();
         ple.setPattern(pattern);
         ple.setContext(loggerContext);
@@ -112,10 +84,9 @@ public class DefaultLogbackLoggingConfigurer implements LoggingConfigurer {
         appendToRoot(loggerContext, conf, consoleAppender);
     }
 
-    private void appendToRoot(LoggerContext loggerContext, Map<String, Object> conf, Appender<ILoggingEvent> consoleAppender) {
-        String appendToRoot = (String) conf.get("appendToRoot");
-        if (appendToRoot == null || !appendToRoot.toLowerCase(Locale.ROOT).equals("true")) {
-            loggerContext.getLogger("root").addAppender(consoleAppender);
+    private void appendToRoot(LoggerContext loggerContext, Map<String, Object> conf, Appender<ILoggingEvent> appender) {
+        if (shouldAppendToRoot(conf)) {
+            loggerContext.getLogger("root").addAppender(appender);
         }
     }
 

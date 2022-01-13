@@ -267,7 +267,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 LOG.debug("Starting environment {} for active names {}", this, getActiveNames());
             }
             if (reading.compareAndSet(false, true)) {
-
                 readPropertySources(getPropertySourceRootName());
                 reading.set(false);
                 applyLogging();
@@ -277,10 +276,12 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     private void applyLogging() {
-        List<LoggingConfigurer> list = new ArrayList<>(3);
-        SoftServiceLoader.load(LoggingConfigurer.class, getClassLoader()).collectAll(list);
-        for (LoggingConfigurer loggingConfigurer : list) {
-            loggingConfigurer.apply(this);
+        if (containsProperties("logger")) {
+            List<LoggingConfigurer> list = new ArrayList<>(3);
+            SoftServiceLoader.load(LoggingConfigurer.class, getClassLoader()).collectAll(list);
+            for (LoggingConfigurer loggingConfigurer : list) {
+                loggingConfigurer.apply(this);
+            }
         }
     }
 

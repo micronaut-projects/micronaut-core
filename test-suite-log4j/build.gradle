@@ -1,0 +1,21 @@
+dependencies {
+    annotationProcessor project(":inject-java")
+    api project(":inject")
+
+    testImplementation project(":context")
+    testImplementation project(":inject-java")
+    // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
+    testImplementation libs.junit.jupiter.api
+
+    testImplementation(libs.managed.micronaut.test.spock) {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+    }
+    testImplementation libs.log4j
+    testImplementation libs.log4j.slf4j
+}
+
+configurations.all {
+    exclude group: "ch.qos.logback"
+    exclude module: "slf4j-simple"
+}
