@@ -7,13 +7,18 @@ import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFile
 import io.micronaut.context.annotation.ConfigurationReader
+import io.micronaut.context.annotation.Context
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Generated
+import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
+import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.inject.writer.BeanDefinitionWriter
+import io.micronaut.kotlin.processing.KotlinOutputVisitor
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
-import javax.lang.model.element.ElementVisitor
 
 class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironment): SymbolProcessor {
+
+    private val beanDefinitionWriters = mutableListOf<BeanDefinitionWriter>()
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val visitorContext = KotlinVisitorContext(environment, resolver)
@@ -28,7 +33,6 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
             }
             .toList()
 
-        val beanDefinitionWriters = mutableListOf<BeanDefinitionWriter>()
         for (classDeclaration in elements) {
             val classElement = visitorContext.elementFactory.newClassElement(classDeclaration.asStarProjectedType())
 
@@ -47,9 +51,26 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
         return emptyList()
     }
 
-    private fun visit(classDeclaration: KSClassDeclaration, beanDefinitionWriters: MutableList<BeanDefinitionWriter>, visitorContext: KotlinVisitorContext) {
-        val visitor = BeanDefinitionVisitor(classDeclaration, visitorContext)
-        classDeclaration.accept(visitor, Object())
-        beanDefinitionWriters.addAll(visitor.beanDefinitionWriters)
+    override fun finish() {
+        val outputVisitor = KotlinOutputVisitor(environment)
+        for (beanDefWriter in beanDefinitionWriters) {
+            val beanReferenceWriter = BeanDefinitionReferenceWriter(beanDefWriter)
+            beanReferenceWriter.setRequiresMethodProcessing(beanDefWriter.requiresMethodProcessing())
+            beanReferenceWriter.setContextScope(beanDefWriter.annotationMetadata.hasDeclaredAnnotation(Context::class.java))
+            beanDefWriter.visitBeanDefinitionEnd()
+            beanReferenceWriter.accept(outputVisitor)
+            beanDefWriter.accept(outputVisitor)
+        }
+        if (beanDefinitionWriters.isNotEmpty()) {
+            outputVisitor.finish()
+        }
     }
+
+    private fun visit(classDeclaration: KSClassDeclaration, beanDefinitionWriters: MutableList<BeanDefinitionWriter>, visitorContext: KotlinVisitorContext) {
+        val visitor = BeanDefinitionProcessorVisitor(classDeclaration, visitorContext)
+        visitor.visitClassDeclaration(classDeclaration, Object())
+        beanDefinitionWriters.addAll(visitor.beanDefinitionWriters.values)
+    }
+
+
 }

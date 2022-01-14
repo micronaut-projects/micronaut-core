@@ -1,18 +1,18 @@
 plugins {
     id 'java'
     id "org.jetbrains.kotlin.jvm"
-    id "com.google.devtools.ksp" version "1.6.0-1.0.1"
+    id "com.google.devtools.ksp" version "1.6.10-1.0.2"
 }
 
 dependencies {
     api project(":inject")
     api project(':aop')
 
-    implementation("com.google.devtools.ksp:symbol-processing-api:1.6.0-1.0.1")
+    implementation("com.google.devtools.ksp:symbol-processing-api:1.6.10-1.0.2")
     if (!JavaVersion.current().isJava9Compatible()) {
         api files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
-    testImplementation("com.github.tschuchortdev:kotlin-compile-testing-ksp:1.4.6")
+    testImplementation("com.github.tschuchortdev:kotlin-compile-testing-ksp:1.4.7")
     testImplementation libs.kotlin.stdlib
     testImplementation libs.managed.jackson.annotations
     testImplementation libs.managed.validation

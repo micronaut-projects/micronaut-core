@@ -20,6 +20,7 @@ import io.micronaut.inject.writer.ClassGenerationException
 import io.micronaut.inject.writer.GeneratedFile
 import io.micronaut.kotlin.processing.AnnotationUtils
 import io.micronaut.kotlin.processing.KotlinAnnotationMetadataBuilder
+import io.micronaut.kotlin.processing.KotlinOutputVisitor
 import java.io.*
 import java.net.URI
 import java.nio.file.Files
@@ -32,7 +33,7 @@ class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment,
     private val visitorAttributes: MutableConvertibleValues<Any>
     private val annotationUtil: AnnotationUtils
     private val elementFactory: KotlinElementFactory
-    private val serviceDescriptors: LinkedHashMap<String, MutableSet<String>> = LinkedHashMap()
+    private val outputVisitor = KotlinOutputVisitor(environment)
 
 
     init {
@@ -96,77 +97,27 @@ class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment,
     fun getAnnotationUtils() = annotationUtil
 
     override fun getServiceEntries(): MutableMap<String, MutableSet<String>> {
-        return serviceDescriptors
+        return outputVisitor.serviceEntries
     }
 
     override fun visitClass(classname: String, vararg originatingElements: Element): OutputStream {
-        return environment.codeGenerator.createNewFile(
-            getNativeElements(originatingElements),
-            classname.substringBeforeLast('.'),
-            classname.substringAfterLast('.'),
-            "class")
+        return outputVisitor.visitClass(classname, *originatingElements)
     }
 
     override fun visitServiceDescriptor(type: String, classname: String) {
-        if (StringUtils.isNotEmpty(type) && StringUtils.isNotEmpty(classname)) {
-            serviceDescriptors.computeIfAbsent(type) { s -> LinkedHashSet() }.add(classname)
-        }
+        outputVisitor.visitServiceDescriptor(type, classname)
     }
 
     override fun visitMetaInfFile(path: String, vararg originatingElements: Element): Optional<GeneratedFile> {
-        val elements = path.split(File.separator).toMutableList()
-        elements.add(0, "META-INF")
-        val file = elements.removeAt(elements.size - 1)
-
-        val stream = environment.codeGenerator.createNewFile(
-            getNativeElements(originatingElements),
-            elements.joinToString("."),
-            file.substringBeforeLast('.'),
-            file.substringAfterLast('.'))
-
-        return Optional.of(KspGeneratedFile(stream, elements.joinToString(File.separator)))
+        return outputVisitor.visitMetaInfFile(path, *originatingElements)
     }
 
     override fun visitGeneratedFile(path: String?): Optional<GeneratedFile> {
-        TODO("Not yet implemented")
+        return outputVisitor.visitGeneratedFile(path)
     }
 
     override fun finish() {
-        for ((serviceName, value) in serviceEntries) {
-            val serviceTypes: MutableSet<String> = TreeSet(value)
-            val serviceFile = visitMetaInfFile("services/$serviceName",  *Element.EMPTY_ELEMENT_ARRAY)
-            if (serviceFile.isPresent) {
-                val generatedFile = serviceFile.get()
-
-                // add the existing definitions
-                try {
-                    BufferedReader(generatedFile.openReader()).use { bufferedReader ->
-                        var line = bufferedReader.readLine()
-                        while (line != null) {
-                            serviceTypes.add(line)
-                            line = bufferedReader.readLine()
-                        }
-                    }
-                } catch (x: FileNotFoundException) {
-                    // doesn't exist
-                } catch (e: Throwable) {
-                    throw ClassGenerationException("Failed to load existing service definition files: $e", e)
-                }
-
-                // write out new definitions
-                try {
-                    BufferedWriter(generatedFile.openWriter()).use { writer ->
-                        for (serviceType in serviceTypes) {
-                            writer.write(serviceType)
-                            writer.newLine()
-                        }
-                    }
-                } catch (x: IOException) {
-                    throw ClassGenerationException("Failed to open writer for service definition files: $x")
-                }
-            }
-        }
-
+        outputVisitor.finish()
     }
 
     override fun getElementFactory(): KotlinElementFactory = elementFactory
@@ -175,11 +126,19 @@ class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment,
         printMessage(message, environment.logger::info, element)
     }
 
+    fun info(message: String, element: KSNode?) {
+        printMessage(message, environment.logger::info, element)
+    }
+
     override fun info(message: String) {
-        printMessage(message, environment.logger::info, null)
+        printMessage(message, environment.logger::info, null as KSNode?)
     }
 
     override fun fail(message: String, element: Element?) {
+        printMessage(message, environment.logger::error, element)
+    }
+
+    fun fail(message: String, element: KSNode?) {
         printMessage(message, environment.logger::error, element)
     }
 
@@ -187,26 +146,23 @@ class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment,
         printMessage(message, environment.logger::warn, element)
     }
 
+    fun warn(message: String, element: KSNode?) {
+        printMessage(message, environment.logger::warn, element)
+    }
+
     private fun printMessage(message: String, logger: BiConsumer<String, KSNode?>, element: Element?) {
-        if (StringUtils.isNotEmpty(message)) {
-            if (element is AbstractKotlinElement<*>) {
-                val el = element.nativeType
-                logger.accept(message, el)
-            } else {
-                logger.accept(message, null)
-            }
+        if (element is AbstractKotlinElement<*>) {
+            val el = element.nativeType
+            printMessage(message, logger, el)
+        } else {
+            printMessage(message, logger, null as KSNode?)
         }
     }
 
-    private fun getNativeElements(originatingElements: Array<out Element>): Dependencies {
-        val originatingFiles: MutableList<KSFile> = ArrayList(originatingElements.size)
-        for (originatingElement in originatingElements) {
-            val nativeType = originatingElement.nativeType
-            if (nativeType is KSFile) {
-                originatingFiles.add(nativeType)
-            }
+    private fun printMessage(message: String, logger: BiConsumer<String, KSNode?>, element: KSNode?) {
+        if (StringUtils.isNotEmpty(message)) {
+            logger.accept(message, element)
         }
-        return Dependencies(false, *originatingFiles.toTypedArray())
     }
 
     class KspGeneratedFile(private val outputStream: OutputStream,
