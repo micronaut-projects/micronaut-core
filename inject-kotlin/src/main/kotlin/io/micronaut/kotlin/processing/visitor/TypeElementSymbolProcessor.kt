@@ -6,6 +6,7 @@ import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
 import com.google.devtools.ksp.visitor.KSDefaultVisitor
+import com.google.devtools.ksp.visitor.KSTopDownVisitor
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.annotation.Requires.Sdk
 import io.micronaut.core.annotation.Generated
@@ -164,7 +165,7 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
         return typeElementVisitors.values
     }
 
-    private class ElementVisitor(private val loadedVisitor: LoadedVisitor) : KSDefaultVisitor<Any, Any>() {
+    private class ElementVisitor(private val loadedVisitor: LoadedVisitor) : KSTopDownVisitor<Any, Any>() {
 
         override fun visitClassDeclaration(classDeclaration: KSClassDeclaration, data: Any): Any {
             val visitorContext = loadedVisitor.visitorContext

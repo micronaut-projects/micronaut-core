@@ -27,6 +27,17 @@ open class KotlinClassElement(val classType: KSType,
         return visitorContext.resolver.mapKotlinNameToJava(declaration.qualifiedName!!)?.asString() ?: declaration.toClassName()
     }
 
+    override fun getSuperType(): Optional<ClassElement> {
+        val superType = declaration.superTypes.firstOrNull {
+            val declaration = it.resolve().declaration
+            declaration is KSClassDeclaration && declaration.classKind != ClassKind.INTERFACE
+        }
+        return Optional.ofNullable(superType)
+            .map {
+                visitorContext.elementFactory.newClassElement(it.resolve())
+            }
+    }
+
     override fun isInterface(): Boolean {
         return declaration.classKind == ClassKind.INTERFACE
     }
