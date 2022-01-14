@@ -313,6 +313,7 @@ managed-micronaut-ignite-core = { module = "io.micronaut.ignite:micronaut-ignite
 managed-micronaut-ignite-cache = { module = "io.micronaut.ignite:micronaut-ignite-cache", version.ref = "managed-micronaut-ignite" }
 managed-micronaut-jaxrs-server = { module = "io.micronaut.jaxrs:micronaut-jaxrs-server", version.ref = "managed-micronaut-jaxrs" }
 managed-micronaut-jaxrs-processor = { module = "io.micronaut.jaxrs:micronaut-jaxrs-processor", version.ref = "managed-micronaut-jaxrs" }
+managed-micronaut-jaxrs-server-security = { module = "io.micronaut.jaxrs:micronaut-jaxrs-server-security", version.ref = "managed-micronaut-jaxrs" }
 managed-micronaut-jms = { module = "io.micronaut.jms:micronaut-jms-core", version.ref = "managed-micronaut-jms" }
 managed-micronaut-jms-activemq-classic = { module = "io.micronaut.jms:micronaut-jms-activemq-classic", version.ref = "managed-micronaut-jms" }
 managed-micronaut-jms-activemq-artemis = { module = "io.micronaut.jms:micronaut-jms-activemq-artemis", version.ref = "managed-micronaut-jms" }
