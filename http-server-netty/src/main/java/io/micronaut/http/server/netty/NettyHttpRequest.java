@@ -61,6 +61,8 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import io.netty.handler.codec.http.multipart.AbstractHttpData;
+import io.netty.handler.codec.http.multipart.HttpData;
+import io.netty.handler.codec.http.multipart.MixedAttribute;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.ssl.SslHandler;
@@ -144,7 +146,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private MutableConvertibleValues<Object> attributes;
     private NettyCookies nettyCookies;
     private List<ByteBufHolder> receivedContent = new ArrayList<>();
-    private Map<IdentityWrapper, AbstractHttpData> receivedData = new LinkedHashMap<>();
+    private Map<IdentityWrapper, HttpData> receivedData = new LinkedHashMap<>();
 
     private Supplier<Optional<T>> body;
     private RouteMatch<?> matchedRoute;
@@ -297,7 +299,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         if (!receivedData.isEmpty()) {
             Map body = new LinkedHashMap(receivedData.size());
 
-            for (AbstractHttpData data: receivedData.values()) {
+            for (HttpData data: receivedData.values()) {
                 String newValue = getContent(data);
                 //noinspection unchecked
                 body.compute(data.getName(), (key, oldValue) -> {
@@ -332,7 +334,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         }
     }
 
-    private String getContent(AbstractHttpData data) {
+    private String getContent(HttpData data) {
         String newValue;
         try {
             newValue = data.getString(serverConfiguration.getDefaultCharset());
@@ -412,10 +414,10 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     public void addContent(ByteBufHolder httpContent) {
-        if (httpContent instanceof AbstractHttpData) {
+        if (httpContent instanceof AbstractHttpData || httpContent instanceof MixedAttribute) {
             receivedData.computeIfAbsent(new IdentityWrapper(httpContent), key -> {
                 httpContent.retain();
-                return (AbstractHttpData) httpContent;
+                return (HttpData) httpContent;
             });
         } else {
             receivedContent.add(httpContent.retain());
