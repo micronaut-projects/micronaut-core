@@ -24,7 +24,6 @@ import ch.qos.logback.core.ConsoleAppender;
 import ch.qos.logback.core.FileAppender;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.context.logging.LoggingConfigurer;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
 import org.slf4j.ILoggerFactory;
@@ -34,7 +33,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Logback default implementation of {@link LoggingConfigurer}.
+ * Logback default implementation of {@link io.micronaut.context.logging.LoggingConfigurer}.
  *
  * @author Denis Stepanov
  * @since 3.3

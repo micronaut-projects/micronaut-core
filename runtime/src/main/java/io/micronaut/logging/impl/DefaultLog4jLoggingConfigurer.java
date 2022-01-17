@@ -17,7 +17,6 @@ package io.micronaut.logging.impl;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.context.logging.LoggingConfigurer;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
 import org.apache.logging.log4j.Level;
@@ -34,7 +33,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Log4j default implementation of {@link LoggingConfigurer}.
+ * Log4j default implementation of {@link io.micronaut.context.logging.LoggingConfigurer}.
  *
  * @author Denis Stepanov
  * @since 3.3
