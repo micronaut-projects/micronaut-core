@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package io.micronaut.tracing.instrument.http;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
@@ -31,7 +32,10 @@ import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.noop.NoopTracer;
 import io.opentracing.propagation.Format;
+import jakarta.inject.Inject;
 import org.reactivestreams.Publisher;
+
+import java.util.function.Predicate;
 
 /**
  * An HTTP server instrumentation filter that uses Open Tracing.
@@ -47,6 +51,7 @@ public class OpenTracingServerFilter extends AbstractOpenTracingFilter implement
 
     private static final CharSequence APPLIED = OpenTracingServerFilter.class.getName() + "-applied";
     private static final CharSequence CONTINUE = OpenTracingServerFilter.class.getName() + "-continue";
+    private final Predicate<String> uriExclusion;
 
     /**
      * Creates an HTTP server instrumentation filter.
@@ -54,7 +59,19 @@ public class OpenTracingServerFilter extends AbstractOpenTracingFilter implement
      * @param tracer For span creation and propagation across transport
      */
     public OpenTracingServerFilter(Tracer tracer) {
+        this(tracer, null);
+    }
+
+    /**
+     * Creates an HTTP server instrumentation filter.
+     *
+     * @param tracer For span creation and propagation across transport
+     * @param exclusionsConfiguration The {@link TracingExclusionsConfiguration}
+     */
+    @Inject
+    public OpenTracingServerFilter(Tracer tracer, @Nullable TracingExclusionsConfiguration exclusionsConfiguration) {
         super(tracer);
+        this.uriExclusion = exclusionsConfiguration == null ? null : exclusionsConfiguration.exclusionTest();
     }
 
     @SuppressWarnings("unchecked")
@@ -62,7 +79,7 @@ public class OpenTracingServerFilter extends AbstractOpenTracingFilter implement
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
         boolean applied = request.getAttribute(APPLIED, Boolean.class).orElse(false);
         boolean continued = request.getAttribute(CONTINUE, Boolean.class).orElse(false);
-        if (applied && !continued) {
+        if ((applied && !continued) || shouldSkip(request.getPath())) {
             return chain.proceed(request);
         }
         Tracer.SpanBuilder spanBuilder = continued ? null : newSpan(request, initSpanContext(request));
@@ -103,6 +120,10 @@ public class OpenTracingServerFilter extends AbstractOpenTracingFilter implement
                 return false;
             }
         };
+    }
+
+    private boolean shouldSkip(String path) {
+        return uriExclusion != null && uriExclusion.test(path);
     }
 
     @Override

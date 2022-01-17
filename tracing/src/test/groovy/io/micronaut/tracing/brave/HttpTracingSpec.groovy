@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,6 +58,24 @@ class HttpTracingSpec extends Specification {
         reporter.spans[0].tags().get("foo") == 'bar'
         reporter.spans[0].tags().get('http.path') == '/traced/hello/John'
         reporter.spans[0].name() == 'get /traced/hello/{name}'
+
+        cleanup:
+        context.close()
+    }
+
+    void "test basic http tracing with exclusions"() {
+        given:
+        ApplicationContext context = buildContext('tracing.exclusions[0]': '/traced.*')
+        TestReporter reporter = context.getBean(TestReporter)
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange('/traced/hello/John', String)
+
+        then:
+        response
+        reporter.spans.empty
 
         cleanup:
         context.close()
@@ -203,6 +221,42 @@ class HttpTracingSpec extends Specification {
         appWithoutTracing.close()
     }
 
+    void "tested nested http tracing with server without tracing and exclusions"() {
+        given:
+        ApplicationContext appWithoutTracing = ApplicationContext.builder().start()
+        EmbeddedServer embeddedServerWithoutTracing = appWithoutTracing.getBean(EmbeddedServer).start()
+
+        ApplicationContext context = ApplicationContext.builder(
+                'tracing.zipkin.enabled':true,
+                'tracing.zipkin.sampler.probability':1,
+                'micronaut.http.services.not-traced-client.urls[0]':"http://localhost:${embeddedServerWithoutTracing.port}",
+                'tracing.exclusions[0]': '/traced.*',
+
+        )
+                .singletons(new StrictCurrentTraceContext(), new TestReporter())
+                .start()
+
+        TestReporter reporter = context.getBean(TestReporter)
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange('/traced/nested-not-traced/John', String)
+
+        then:
+        response
+        reporter.spans.size() == 1
+        reporter.spans[0].tags().get('http.path') == '/not-traced/hello/John'
+        reporter.spans[0].name() == 'get /not-traced/hello/{name}'
+        reporter.spans[0].kind() == zipkin2.Span.Kind.CLIENT
+        reporter.spans[0].remoteEndpoint().serviceName() == "not-traced-client"
+
+        cleanup:
+        client.close()
+        context.close()
+        appWithoutTracing.close()
+    }
+
     void "tested nested http error tracing"() {
         given:
         ApplicationContext context = buildContext()
@@ -249,12 +303,12 @@ class HttpTracingSpec extends Specification {
                 span.kind() == kind
     }
 
-    ApplicationContext buildContext() {
+    ApplicationContext buildContext(Map<String, Object> extras = [:]) {
         def reporter = new TestReporter()
-        ApplicationContext.builder(
-                'tracing.zipkin.enabled':true,
-                'tracing.zipkin.sampler.probability':1
-        )
+        ApplicationContext.builder([
+                    'tracing.zipkin.enabled':true,
+                    'tracing.zipkin.sampler.probability':1
+        ] + extras)
         .singletons(new StrictCurrentTraceContext(), reporter)
         .start()
     }

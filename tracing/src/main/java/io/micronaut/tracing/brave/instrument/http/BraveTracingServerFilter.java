@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import brave.http.HttpServerRequest;
 import brave.http.HttpServerResponse;
 import brave.http.HttpTracing;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
@@ -28,7 +29,11 @@ import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.tracing.instrument.http.AbstractOpenTracingFilter;
+import io.micronaut.tracing.instrument.http.TracingExclusionsConfiguration;
+import jakarta.inject.Inject;
 import org.reactivestreams.Publisher;
+
+import java.util.function.Predicate;
 
 /**
  * Instruments incoming HTTP requests.
@@ -42,6 +47,7 @@ public class BraveTracingServerFilter extends AbstractBraveTracingFilter impleme
 
     private final HttpServerHandler<HttpServerRequest, HttpServerResponse> serverHandler;
     private final io.opentracing.Tracer openTracer;
+    private final Predicate<String> uriInclusion;
 
     /**
      * @param httpTracing The {@link HttpTracing} instance
@@ -52,23 +58,43 @@ public class BraveTracingServerFilter extends AbstractBraveTracingFilter impleme
             HttpTracing httpTracing,
             io.opentracing.Tracer openTracer,
             HttpServerHandler<HttpServerRequest, HttpServerResponse> serverHandler) {
+        this(httpTracing, openTracer, serverHandler, null);
+    }
+
+    /**
+     * @param httpTracing The {@link HttpTracing} instance
+     * @param openTracer The open tracing instance
+     * @param serverHandler The {@link HttpServerHandler} instance
+     * @param exclusionsConfiguration The {@link TracingExclusionsConfiguration}
+     */
+    @Inject
+    public BraveTracingServerFilter(
+            HttpTracing httpTracing,
+            io.opentracing.Tracer openTracer,
+            HttpServerHandler<HttpServerRequest, HttpServerResponse> serverHandler,
+            @Nullable TracingExclusionsConfiguration exclusionsConfiguration) {
         super(httpTracing);
         this.openTracer = openTracer;
         this.serverHandler = serverHandler;
+        this.uriInclusion = exclusionsConfiguration == null ? null : exclusionsConfiguration.inclusionTest();
     }
 
     @Override
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-        HttpServerRequest httpServerRequest = mapRequest(request);
-        Span span = serverHandler.handleReceive(httpServerRequest);
-        return new HttpServerTracingPublisher(
-                chain.proceed(request),
-                request,
-                serverHandler,
-                httpTracing,
-                openTracer,
-                span
-        );
+        if (uriInclusion == null || uriInclusion.test(request.getPath())) {
+            HttpServerRequest httpServerRequest = mapRequest(request);
+            Span span = serverHandler.handleReceive(httpServerRequest);
+            return new HttpServerTracingPublisher(
+                    chain.proceed(request),
+                    request,
+                    serverHandler,
+                    httpTracing,
+                    openTracer,
+                    span
+            );
+        } else {
+            return chain.proceed(request);
+        }
     }
 
     @Override

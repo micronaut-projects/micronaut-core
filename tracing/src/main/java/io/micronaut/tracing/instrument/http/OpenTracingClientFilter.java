@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package io.micronaut.tracing.instrument.http;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.Filter;
@@ -30,7 +31,10 @@ import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.noop.NoopTracer;
 import io.opentracing.propagation.Format;
+import jakarta.inject.Inject;
 import org.reactivestreams.Publisher;
+
+import java.util.function.Predicate;
 
 /**
  * An HTTP client instrumentation filter that uses Open Tracing.
@@ -44,19 +48,36 @@ import org.reactivestreams.Publisher;
 @Requires(missingBeans = BraveTracingClientFilter.class)
 public class OpenTracingClientFilter extends AbstractOpenTracingFilter implements HttpClientFilter {
 
+    private final Predicate<String> uriExclusion;
+
     /**
      * Initialize the open tracing client filter with tracer.
      *
      * @param tracer The tracer for span creation and configuring across arbitrary transports
      */
     public OpenTracingClientFilter(Tracer tracer) {
+        this(tracer, null);
+    }
+
+    /**
+     * Initialize the open tracing client filter with tracer and exclusion configuration.
+     *
+     * @param tracer The tracer for span creation and configuring across arbitrary transports
+     * @param exclusionsConfiguration The {@link TracingExclusionsConfiguration}
+     */
+    @Inject
+    public OpenTracingClientFilter(Tracer tracer, @Nullable TracingExclusionsConfiguration exclusionsConfiguration) {
         super(tracer);
+        this.uriExclusion = exclusionsConfiguration == null ? null : exclusionsConfiguration.exclusionTest();
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
         Publisher<? extends HttpResponse<?>> requestPublisher = chain.proceed(request);
+        if (uriExclusion != null && uriExclusion.test(request.getPath())) {
+            return requestPublisher;
+        }
         Span activeSpan = tracer.scopeManager().activeSpan();
         SpanContext activeContext = activeSpan != null ? activeSpan.context() : null;
         Tracer.SpanBuilder spanBuilder = newSpan(request, activeContext);

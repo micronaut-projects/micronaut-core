@@ -194,6 +194,17 @@ public class JaegerConfiguration implements Toggleable  {
     }
 
     /**
+     * Set codecs from string.
+     *
+     * @param codecs the codecs
+     */
+    public void setCodecs(String codecs) { // codecs = "JAEGER, B3, W3C"
+        if (codecs != null) {
+            setCodecConfiguration(Configuration.CodecConfiguration.fromString(codecs));
+        }
+    }
+
+    /**
      * The sampler configuration bean.
      */
     @ConfigurationProperties("sampler")
@@ -275,17 +286,6 @@ public class JaegerConfiguration implements Toggleable  {
          */
         public Configuration.SenderConfiguration getSenderConfiguration() {
             return configuration;
-        }
-    }
-
-    /**
-     * Set codecs from string.
-     *
-     * @param codecs the codecs
-     */
-    public void setCodecs(String codecs) { // codecs = "JAEGER, B3, W3C"
-        if (codecs != null) {
-            setCodecConfiguration(Configuration.CodecConfiguration.fromString(codecs));
         }
     }
 

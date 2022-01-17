@@ -90,6 +90,9 @@ tracing:
     traceId128Bit: true
     sampler:
       probability: 1
+  exclusions: # Optionally exclude http path patterns from tracing
+    - /health
+    - /admin/.*
 ----
 
 You can also optionally dependency-inject common configuration classes into api:tracing.brave.BraveTracerConfiguration[] such as `brave.sampler.Sampler` just by defining them as beans. See the API for api:tracing.brave.BraveTracerConfiguration[] for available injection points.
