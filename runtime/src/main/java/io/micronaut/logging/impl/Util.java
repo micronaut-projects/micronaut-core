@@ -13,12 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.context.logging;
+package io.micronaut.logging.impl;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.naming.conventions.StringConvention;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -32,7 +30,6 @@ import java.util.Map;
 final class Util {
 
     static final String LOGGER_LEVELS_PROPERTY_PREFIX = "logger.levels";
-    private static final Logger LOGGER = LoggerFactory.getLogger(Util.class);
 
     static void configureLogLevels(Environment environment, LoggerValueApplier loggerValueApplier) {
         // Using raw keys here allows configuring log levels for camelCase package names in application.yml
@@ -50,10 +47,6 @@ final class Util {
         if (levelValue instanceof Boolean && !((boolean) levelValue)) {
             levelValue = "OFF"; // SnakeYAML converts OFF (without quotations) to a boolean false value, hence we need to handle that here...
         }
-        if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug("Setting log level '{}' for logger: '{}'", levelValue, loggerPrefix);
-        }
-        LOGGER.info("Setting log level '{}' for logger: '{}'", levelValue, loggerPrefix);
         loggerValueApplier.apply(loggerPrefix, levelValue);
     }
 

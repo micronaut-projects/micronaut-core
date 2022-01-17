@@ -82,7 +82,7 @@ public class DiscoveryClientHealthIndicator implements HealthIndicator {
                     );
 
                     builder.details(Collections.singletonMap(
-                            "services", value
+                            "META-INF/services", value
                     ));
                     return builder.build();
                 }).flux();

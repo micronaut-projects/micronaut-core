@@ -13,10 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.context.logging;
+package io.micronaut.logging.impl;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.context.logging.LoggingConfigurer;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
@@ -31,6 +33,13 @@ import org.apache.logging.log4j.core.layout.PatternLayout;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * Log4j default implementation of {@link LoggingConfigurer}.
+ *
+ * @author Denis Stepanov
+ * @since 3.3
+ */
+@Internal
 public class DefaultLog4jLoggingConfigurer extends AbstractLoggingConfigurer<Configuration> {
 
     @Override
@@ -46,18 +55,11 @@ public class DefaultLog4jLoggingConfigurer extends AbstractLoggingConfigurer<Con
             }
             LoggerConfig loggerConfig = config.getLoggerConfig(loggerName);
             if (!loggerName.equals(loggerConfig.getName())) {
-                if (level == null) {
-                    return;
-                }
                 loggerConfig = new LoggerConfig(loggerName, level, true);
                 config.addLogger(loggerName, loggerConfig);
                 loggerConfig.setLevel(level);
             } else {
-                if (level == null) {
-                    config.removeLogger(loggerName);
-                } else {
-                    loggerConfig.setLevel(level);
-                }
+                loggerConfig.setLevel(level);
             }
         });
 

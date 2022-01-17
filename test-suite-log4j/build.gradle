@@ -1,6 +1,6 @@
 dependencies {
     annotationProcessor project(":inject-java")
-    api project(":inject")
+    api project(":runtime")
 
     testImplementation project(":context")
     testImplementation project(":inject-java")

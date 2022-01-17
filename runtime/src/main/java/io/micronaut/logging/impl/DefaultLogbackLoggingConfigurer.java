@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.context.logging;
+package io.micronaut.logging.impl;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.LoggerContext;
@@ -24,6 +24,8 @@ import ch.qos.logback.core.ConsoleAppender;
 import ch.qos.logback.core.FileAppender;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.context.logging.LoggingConfigurer;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
 import org.slf4j.ILoggerFactory;
 import org.slf4j.LoggerFactory;
@@ -37,6 +39,7 @@ import java.util.Map;
  * @author Denis Stepanov
  * @since 3.3
  */
+@Internal
 public final class DefaultLogbackLoggingConfigurer extends AbstractLoggingConfigurer<LoggerContext> {
 
     @Override
@@ -46,7 +49,7 @@ public final class DefaultLogbackLoggingConfigurer extends AbstractLoggingConfig
             LoggerContext loggerContext = (LoggerContext) loggerFactory;
             Util.configureLogLevels(environment, (loggerPrefix, levelValue) -> {
                 String levelString = levelValue.toString().toUpperCase(Locale.ROOT);
-                Level level = Level.toLevel(levelValue.toString());
+                Level level = Level.toLevel(levelValue.toString(), null);
                 if (level == null && StringUtils.isNotEmpty(levelString)) {
                     throw new ConfigurationException("Invalid log level: '" + levelValue + "' for logger: '" + levelString + "'");
                 }

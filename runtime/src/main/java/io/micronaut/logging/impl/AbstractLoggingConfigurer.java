@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.context.logging;
+package io.micronaut.logging.impl;
 
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.logging.LoggingConfigurer;
 import io.micronaut.core.annotation.Internal;
 
 import java.util.Collections;

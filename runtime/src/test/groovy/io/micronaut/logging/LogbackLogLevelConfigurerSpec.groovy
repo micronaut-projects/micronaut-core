@@ -7,7 +7,6 @@ import com.github.stefanbirkner.systemlambda.SystemLambda
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.env.yaml.YamlPropertySourceLoader
-import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.context.exceptions.ConfigurationException
 import org.slf4j.LoggerFactory
 import spock.lang.Specification
@@ -85,8 +84,7 @@ logger:
                 .start()
 
         then:
-        BeanInstantiationException beanInstantiationException = thrown(BeanInstantiationException)
-        beanInstantiationException.cause.cause instanceof ConfigurationException
+        thrown(ConfigurationException)
     }
 
     void 'test that log levels can be configured via environment variables'() {

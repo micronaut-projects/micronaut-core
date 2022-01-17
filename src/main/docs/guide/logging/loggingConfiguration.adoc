@@ -21,5 +21,32 @@ logger:
 ----
 1. This will disable ALL logging for the class `io.verbose.logger.who.CriedWolf`
 
+==== Configuring Logger Appenders
+
+It's possible to configure logger appenders with property values:
+
+[source,yaml]
+----
+logger:
+  appenders:
+    console: <1>
+      pattern: '%cyan(%d{HH:mm:ss.SSS}) %gray([%thread]) %highlight(%-5level) %magenta(%logger{36}) - %msg%n'
+    custom-console:
+      pattern: '%cyan(%d{HH:mm:ss.SSS}) %gray([%thread]) %highlight(%-5level) %magenta(%logger{36}) - %msg%n'
+      type: console <2>
+    file:
+      file: out.log
+      pattern: '%cyan(%d{HH:mm:ss.SSS}) %gray([%thread]) %highlight(%-5level) %magenta(%logger{36}) - %msg%n'
+    custom-file:
+      file: out2.log
+      type: file
+      pattern: '%cyan(%d{HH:mm:ss.SSS}) %gray([%thread]) %highlight(%-5level) %magenta(%logger{36}) - %msg%n'
+      append-to-root: false <2>
+  levels:
+    xyz: INFO
+----
+1. Each appender has a name, by convention `console` or `file` name automatically specifies `console` / `file` type
+2. The `type` property is required when custom name is used
+3. Set `append-to-root: false` to exclude the appender from the root
 
 Note that the ability to control log levels via config is controlled via the api:logging.LoggingSystem[] interface. Currently, Micronaut includes a single implementation that allows setting log levels for the Logback library. If you use another library, you should provide a bean that implements this interface.

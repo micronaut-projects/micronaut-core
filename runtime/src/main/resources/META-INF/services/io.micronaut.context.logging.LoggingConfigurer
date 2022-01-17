@@ -1,0 +1,2 @@
+io.micronaut.logging.impl.DefaultLogbackLoggingConfigurer
+io.micronaut.logging.impl.DefaultLog4jLoggingConfigurer

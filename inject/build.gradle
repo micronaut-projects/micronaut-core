@@ -13,8 +13,6 @@ dependencies {
     compileOnly libs.managed.groovy
     compileOnly libs.kotlin.stdlib.jdk8
     compileOnly libs.managed.validation
-    compileOnly libs.log4j
-    compileOnly libs.managed.logback
 
 //    testImplementation libs.managed.validation
     testImplementation project(":context")
