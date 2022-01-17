@@ -126,4 +126,5 @@ class InputStreamBodySpec2 extends Specification {
             return "Some body content"
         }
     }
+
 }
