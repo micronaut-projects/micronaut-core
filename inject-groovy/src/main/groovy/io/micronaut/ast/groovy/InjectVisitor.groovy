@@ -308,7 +308,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             annotation.stringValue(RequiresCondition.MEMBER_BEAN_PROPERTY)
                     .ifPresent((String beanProperty) -> {
                         annotation.stringValue(RequiresCondition.MEMBER_BEAN)
-                                .map{it.replace('$', '.')}
                                 .map{ String s -> compilationUnit.getAST().classes.find {ClassNode cn -> cn.name == s }}
                                 .map{elementFactory.newClassElement(it, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, it))}
                                 .ifPresent((ClassElement classElement) -> {

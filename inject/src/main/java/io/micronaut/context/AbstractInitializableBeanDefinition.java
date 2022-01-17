@@ -879,6 +879,39 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     }
 
     /**
+     * Check the value of the injected bean property to decide whether the
+     * bean should be loaded.
+     *
+     * @param injectedBeanPropertyName the name of the injected bean property
+     * @param beanPropertyValue the value of injected bean property
+     * @param requiredValue the value which is required for the bean to be loaded
+     * @param notEqualsValue the value which bean property should not be equal to for the bean to be loaded
+     */
+    @Internal
+    @UsedByGeneratedCode
+    protected final void checkInjectedBeanPropertyValue(String injectedBeanPropertyName,
+                                                        @Nullable Object beanPropertyValue,
+                                                        @Nullable String requiredValue,
+                                                        @Nullable String notEqualsValue) {
+        if (beanPropertyValue instanceof Optional) {
+            beanPropertyValue = ((Optional<?>) beanPropertyValue).orElse(null);
+        }
+
+        String convertedValue = ConversionService.SHARED.convert(beanPropertyValue, String.class).orElse(null);
+        if (convertedValue == null && notEqualsValue == null) {
+            throw new DisabledBeanException("Bean [" + getBeanType() + "] is disabled since required bean property [" + injectedBeanPropertyName + "] id not set");
+        } else if (convertedValue != null) {
+            if (requiredValue != null && !convertedValue.equals(requiredValue)) {
+                throw new DisabledBeanException("Bean [" + getBeanType() + "] is disabled since bean property [" + injectedBeanPropertyName + "] " +
+                                                        "value is not equal to [" + requiredValue + "]");
+            } else if (requiredValue == null && convertedValue.equals(notEqualsValue)) {
+                throw new DisabledBeanException("Bean [" + getBeanType() + "] is disabled since bean property [" + injectedBeanPropertyName + "] " +
+                                                    "value is equal to [" + notEqualsValue + "]");
+            }
+        }
+    }
+
+    /**
      * Invoke a bean method that requires reflection.
      *
      * @param resolutionContext The resolution context

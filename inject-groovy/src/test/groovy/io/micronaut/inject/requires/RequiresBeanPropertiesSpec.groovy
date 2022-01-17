@@ -17,16 +17,7 @@ import jakarta.inject.Singleton
 
 @ConfigurationProperties("config")
 class Config {
-
-    private String property
-
-    String getProperty() {
-        return property
-    }
-
-    void setProperty(String property) {
-        this.property = property
-    }
+    String property
 }
 
 @Singleton
@@ -46,7 +37,7 @@ class PresentPropertyDependantBean {}
         context.close()
     }
 
-    void "test bean property absence"() {
+    void "test requires bean property with absent property"() {
         given:
         ApplicationContext context = buildContext('''
 package test
@@ -56,16 +47,7 @@ import jakarta.inject.Singleton
 
 @ConfigurationProperties("config")
 class Config {
-
-    private String property
-
-    String getProperty() {
-        return property
-    }
-
-    void setProperty(String property) {
-        this.property = property
-    }
+    String property
 }
 
 @Singleton
@@ -84,6 +66,111 @@ class AbsentPropertyDependantBean {}
         context.close()
     }
 
+
+    void "test requires not equals property value with value not set"() {
+        given:
+        ApplicationContext context = buildContext('''
+package test
+import io.micronaut.context.annotation.*
+import io.micronaut.core.annotation.*
+import jakarta.inject.Singleton
+
+@ConfigurationProperties("test")
+class Config
+{
+    Boolean boolProperty
+}
+
+@Singleton
+@Requires(bean = Config.class, beanProperty = "boolProperty", notEquals = "true")
+class DependantBean
+{
+}
+''')
+        def type = context.classLoader.loadClass('test.DependantBean')
+
+        when:
+        context.getBean(type)
+
+        then:
+        noExceptionThrown()
+
+        cleanup:
+        context.close()
+    }
+
+    void "test requires not equals property value with value set"() {
+        given:
+        ApplicationContext context = buildContext('''
+package test
+import io.micronaut.context.annotation.*
+import io.micronaut.core.annotation.*
+import jakarta.inject.Singleton
+
+@ConfigurationProperties("test")
+class Config
+{
+    Boolean boolProperty
+}
+
+@Singleton
+@Requires(bean = Config.class, beanProperty = "boolProperty", notEquals = "true")
+class DependantBean
+{
+}
+''')
+        def type = context.classLoader.loadClass('test.DependantBean')
+
+        when:
+        context.environment.addPropertySource(PropertySource.of("test", ['test.bool-property': "true"]))
+        context.getBean(type)
+
+        then:
+        thrown(NoSuchBeanException.class)
+
+        cleanup:
+        context.close()
+    }
+
+    void "test requires bean property value with getters and setters"() {
+        given:
+        ApplicationContext context = buildContext('''
+package test
+import io.micronaut.context.annotation.*
+import io.micronaut.core.annotation.*
+import jakarta.inject.Singleton
+
+@ConfigurationProperties("config.properties")
+class Config {
+    private String property
+    
+    public String getProperty() {
+        return property;
+    }
+    
+    public void setProperty(String property) {
+        this.property = property;
+    }
+}
+
+@Singleton
+@Requires(bean = Config.class, beanProperty = "property", value = "required value")
+class AbsentPropertyDependantBean {}
+''')
+        def type = context.classLoader.loadClass('test.AbsentPropertyDependantBean')
+
+        when:
+        context.environment.addPropertySource(PropertySource.of("test",
+                ['config.properties.property': 'required value']))
+        context.getBean(type)
+
+        then:
+        noExceptionThrown()
+
+        cleanup:
+        context.close()
+    }
+
     void "test requires inner configuration property presence"() {
         given:
         ApplicationContext context = buildContext('''
@@ -95,29 +182,11 @@ import jakarta.inject.Singleton
 @ConfigurationProperties("outer")
 class OuterConfig {
 
-    private String outerProperty
+    String outerProperty
 
-    String getOuterProperty() {
-        return outerProperty
-    }
-
-    void setOuterProperty(String outerProperty) {
-        this.outerProperty = outerProperty
-    }
-
-    @Introspected
     @ConfigurationProperties("inner")
     static class InnerConfig {
-
-        private String innerProperty
-
-        String getInnerProperty() {
-            return innerProperty
-        }
-
-        void setInnerProperty(String innerProperty) {
-            this.innerProperty = innerProperty
-        }
+        String innerProperty
     }
 }
 
@@ -141,6 +210,78 @@ class InnerPropertyDependentConfig {}
         context.close()
     }
 
+    void "test requires inner configuration property with absent property"() {
+        given:
+        ApplicationContext context = buildContext('''
+package test
+import io.micronaut.context.annotation.*
+import io.micronaut.core.annotation.*
+import jakarta.inject.Singleton
+
+@ConfigurationProperties("outer")
+class OuterConfig {
+
+    String outerProperty
+
+    @ConfigurationProperties("inner")
+    static class InnerConfig {
+        String innerProperty
+    }
+}
+
+@Singleton
+@Requires(bean = OuterConfig.class, beanProperty = "outerProperty", value = "outer-enabled")
+@Requires(bean = OuterConfig.InnerConfig.class, beanProperty = "innerProperty", value = "inner-enabled")
+class InnerPropertyDependentConfig {}
+''')
+        def type = context.classLoader.loadClass('test.InnerPropertyDependentConfig')
+
+        when:
+        context.environment.addPropertySource(PropertySource.of("test",
+                ['outer.outer-property': 'outer-enabled']))
+        context.getBean(type)
+
+        then:
+        thrown(NoSuchBeanException.class)
+
+        cleanup:
+        context.close()
+    }
+
+    void "test requires inherited config property with absent property"() {
+        given:
+        ApplicationContext context = buildContext('''
+package test
+import io.micronaut.context.annotation.*
+import io.micronaut.core.annotation.*
+import jakarta.inject.Singleton
+
+@ConfigurationProperties("outer")
+class ParentConfig {
+    String simpleConfigProperty
+}
+
+@ConfigurationProperties("inherited")
+class InheritedConfig extends ParentConfig {
+    String inheritedProperty
+}
+
+@Singleton
+@Requires(bean = InheritedConfig.class, beanProperty = "inheritedProperty")
+class DifferentTypesProperties {}
+''')
+        def type = context.classLoader.loadClass('test.DifferentTypesProperties')
+
+        when:
+        context.getBean(type)
+
+        then:
+        thrown(NoSuchBeanException.class)
+
+        cleanup:
+        context.close()
+    }
+
     void "test requires multiple beans properties"() {
         given:
         ApplicationContext context = buildContext('''
@@ -151,63 +292,19 @@ import jakarta.inject.Singleton
 
 @ConfigurationProperties("type")
 class TypesConfig {
-
-    private String stringProperty
-    private Boolean boolProperty
-    private Integer intProperty
-
-    Boolean isBoolProperty() {
-        return boolProperty
-    }
-
-    void setBoolProperty(boolean boolProperty) {
-        this.boolProperty = boolProperty
-    }
-
-    Integer getIntProperty() {
-        return intProperty
-    }
-
-    void setIntProperty(int intProperty) {
-        this.intProperty = intProperty
-    }
-
-    String getStringProperty() {
-        return stringProperty
-    }
-
-    void setStringProperty(String stringProperty) {
-        this.stringProperty = stringProperty
-    }
+    String stringProperty
+    Boolean boolProperty
+    Integer intProperty
 }
 
 @ConfigurationProperties("inherited")
 class InheritedConfig extends SimpleConfig {
-    private String inheritedProperty
-
-    String getInheritedProperty()
-    {
-        return inheritedProperty
-    }
-
-    void setInheritedProperty(String inheritedProperty)
-    {
-        this.inheritedProperty = inheritedProperty
-    }
+    String inheritedProperty
 }
 
 @ConfigurationProperties("outer")
 class SimpleConfig {
-
-    private String simpleConfigProperty
-
-    String getSimpleConfigProperty() {
-        return simpleConfigProperty
-    }
-
-    void setSimpleConfigProperty(String simpleConfigProperty) {
-        this.simpleConfigProperty = simpleConfigProperty
-    }
+    String simpleConfigProperty
 }
 
 @Singleton
@@ -234,7 +331,105 @@ class DifferentTypesProperties {}
         context.close()
     }
 
-    void "test accessor style property"() {
+    void "test requires multiple beans properties with absent property"() {
+        given:
+        ApplicationContext context = buildContext('''
+package test
+import io.micronaut.context.annotation.*
+import io.micronaut.core.annotation.*
+import jakarta.inject.Singleton
+
+@ConfigurationProperties("type")
+class TypesConfig {
+    String stringProperty
+    Boolean boolProperty
+    Integer intProperty
+}
+
+@ConfigurationProperties("inherited")
+class InheritedConfig extends SimpleConfig {
+    String inheritedProperty
+}
+
+@ConfigurationProperties("outer")
+class SimpleConfig {
+    String simpleConfigProperty
+}
+
+@Singleton
+@Requires(bean = InheritedConfig.class, beanProperty = "inheritedProperty", value = "inheritedPropertyValue")
+@Requires(bean = TypesConfig.class, beanProperty = "intProperty", value = "1")
+@Requires(bean = SimpleConfig.class, beanProperty = "simpleConfigProperty", notEquals = "disabled")
+@Requires(bean = TypesConfig.class, beanProperty = "stringProperty", value = "test")
+class DifferentTypesProperties {}
+''')
+        def type = context.classLoader.loadClass('test.DifferentTypesProperties')
+
+        when:
+        context.environment.addPropertySource(PropertySource.of("test",
+                ['type.string-property'              : 'test',
+                 'outer.outer-property'              : 'enabled',
+                 'outer.inherited.inherited-property': 'inheritedPropertyValue']))
+        context.getBean(type)
+
+        then:
+        thrown(NoSuchBeanException.class)
+
+        cleanup:
+        context.close()
+    }
+
+    void "test requires multiple beans properties with notEquals value set"() {
+        given:
+        ApplicationContext context = buildContext('''
+package test
+import io.micronaut.context.annotation.*
+import io.micronaut.core.annotation.*
+import jakarta.inject.Singleton
+
+@ConfigurationProperties("type")
+class TypesConfig {
+    String stringProperty
+    Boolean boolProperty
+    Integer intProperty
+}
+
+@ConfigurationProperties("inherited")
+class InheritedConfig extends SimpleConfig {
+    String inheritedProperty
+}
+
+@ConfigurationProperties("outer")
+class SimpleConfig {
+    String simpleConfigProperty
+}
+
+@Singleton
+@Requires(bean = InheritedConfig.class, beanProperty = "inheritedProperty", value = "inheritedPropertyValue")
+@Requires(bean = TypesConfig.class, beanProperty = "intProperty", value = "1")
+@Requires(bean = SimpleConfig.class, beanProperty = "simpleConfigProperty", notEquals = "disabled")
+@Requires(bean = TypesConfig.class, beanProperty = "stringProperty", value = "test")
+class DifferentTypesProperties {}
+''')
+        def type = context.classLoader.loadClass('test.DifferentTypesProperties')
+
+        when:
+        context.environment.addPropertySource(PropertySource.of("test",
+                ['type.string-property'              : 'test',
+                 'type.int-property'                 : '1',
+                 'outer.outer-property'              : 'enabled',
+                 'outer.simple-config-property'      : 'disabled',
+                 'outer.inherited.inherited-property': 'inheritedPropertyValue']))
+        context.getBean(type)
+
+        then:
+        thrown(NoSuchBeanException.class)
+
+        cleanup:
+        context.close()
+    }
+
+    void "test requires accessor style property"() {
         given:
         ApplicationContext context = buildContext('''
 package test
@@ -276,7 +471,7 @@ class AccessorStyleBean {
         context.close()
     }
 
-    void "test primitive properties"() {
+    void "test requires primitive properties with default values"() {
         given:
         ApplicationContext context = buildContext('''
 package test
@@ -290,30 +485,6 @@ class PrimitiveConfig
     int intProperty
     int anotherIntProperty
     boolean boolProperty
-
-    int getIntProperty() {
-        return intProperty
-    }
-    
-    void setIntProperty(int intProperty) {
-        this.intProperty = intProperty
-    }
-
-    int getAnotherIntProperty() {
-        return anotherIntProperty
-    }
-    
-    void setAnotherIntProperty(int anotherIntProperty) {
-        this.anotherIntProperty = anotherIntProperty
-    }
-    
-    boolean isBoolProperty() {
-        return boolProperty
-    }
-
-    void setBoolProperty(boolean boolProperty) {
-        this.boolProperty = boolProperty
-    }
 }
 
 @Singleton
@@ -337,7 +508,7 @@ class PrimitivesDependantBean
         context.close()
     }
 
-    void "test not configuration properties"() {
+    void "test requires not configuration properties"() {
         given:
         ApplicationContext context = buildContext('''
 package test
@@ -352,30 +523,6 @@ class NotConfigurationProperties
     boolean boolProperty
     @Property(name = "test.string-property", defaultValue = "disabled")
     String stringProperty
-
-    int getIntProperty() {
-        return intProperty
-    }
-    
-    void setIntProperty(int intProperty) {
-        this.intProperty = intProperty
-    }
-    
-    boolean isBoolProperty() {
-        return boolProperty
-    }
-
-    void setBoolProperty(boolean boolProperty) {
-        this.boolProperty = boolProperty
-    }
-    
-    String getStringProperty() {
-        return stringProperty
-    }
-    
-    void setStringProperty(String stringProperty) {
-        this.stringProperty = stringProperty
-    }
 }
 
 @Singleton
@@ -400,7 +547,7 @@ class NotConfigPropertiesDependantBean {
         context.close()
     }
 
-    void "test bean factory"() {
+    void "test requires in bean factory"() {
         given:
         ApplicationContext context = buildContext('''
 package test
@@ -410,25 +557,14 @@ import io.micronaut.context.annotation.Property;import io.micronaut.context.anno
 import jakarta.inject.Singleton
 
 @ConfigurationProperties("test")
-class RequiredBean
+class Config
 {
-    private Integer intProperty
-    private String stringProperty
-
-    Integer getIntProperty() {
-        return intProperty
-    }
-
-    void setIntProperty(Integer intProperty) {
-        this.intProperty = intProperty
-    }
-
-    String getStringProperty() {
-        return stringProperty
-    }
-
-    void setStringProperty(String stringProperty) {
-        this.stringProperty = stringProperty
+    Integer intProperty
+    String stringProperty
+    
+    @ConfigurationProperties("inner")
+    static class InnerConfig {
+        String innerProperty = "default value"
     }
 }
 
@@ -439,8 +575,9 @@ class TestBean{
 class TestBeanFactory
 {
     @Bean
-    @Requires(bean = RequiredBean.class, beanProperty = "intProperty", value = "1")
-    @Requires(bean = RequiredBean.class, beanProperty = "stringProperty", value = "enabled")
+    @Requires(bean = Config.class, beanProperty = "intProperty", value = "1")
+    @Requires(bean = Config.class, beanProperty = "stringProperty", value = "enabled")
+    @Requires(bean = Config.InnerConfig.class, beanProperty = "innerProperty", value = "default value")
     TestBean testBean() {
         return new TestBean()
     }
