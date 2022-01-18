@@ -105,6 +105,7 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
         TypeElementVisitorTransform.loadedVisitors.remove()
         TypeElementVisitorTransform.beanDefinitionBuilders.remove()
         AstAnnotationUtils.invalidateCache()
+        AbstractAnnotationMetadataBuilder.clearMutated()
     }
 
     @Override

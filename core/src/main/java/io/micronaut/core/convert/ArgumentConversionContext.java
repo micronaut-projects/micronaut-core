@@ -19,6 +19,8 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.type.Argument;
 
+import java.util.Map;
+
 /**
  * Extended version of the {@link ConversionContext} specifically for conversion {@link Argument} instances.
  *
@@ -32,6 +34,16 @@ public interface ArgumentConversionContext<T> extends ConversionContext, Annotat
      * @return The {@link Argument} being converted
      */
     Argument<T> getArgument();
+
+    @Override
+    default Argument[] getTypeParameters() {
+        return getArgument().getTypeParameters();
+    }
+
+    @Override
+    default Map<String, Argument<?>> getTypeVariables() {
+        return getArgument().getTypeVariables();
+    }
 
     @Override
     default AnnotationMetadata getAnnotationMetadata() {

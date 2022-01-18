@@ -93,7 +93,7 @@ public final class RouteExecutor {
 
     private static final Logger LOG = LoggerFactory.getLogger(RouteExecutor.class);
     /**
-     * Also present in netty RoutingInBoundHandler
+     * Also present in netty RoutingInBoundHandler.
      */
     private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
             "^.*(?:connection.*(?:reset|closed|abort|broken)|broken.*pipe).*$", Pattern.CASE_INSENSITIVE);

@@ -430,6 +430,28 @@ class MixedUploadSpec extends AbstractMicronautSpec {
         result == 'data.json: 16'
     }
 
+    void "test normal form items"() {
+        given:
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("title", "foo")
+                .build()
+
+
+        when:
+        Mono<HttpResponse<String>> flowable = Mono.from(client.exchange(
+                HttpRequest.POST("/upload/receive-multipart", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.block()
+        def result = response.getBody().get()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        result == "Data{title='foo'}"
+    }
+
     @Override
     Map<String, Object> getConfiguration() {
         super.getConfiguration() << ['micronaut.http.client.read-timeout': 300,

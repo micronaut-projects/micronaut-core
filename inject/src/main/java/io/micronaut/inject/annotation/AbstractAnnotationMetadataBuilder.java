@@ -32,7 +32,6 @@ import jakarta.inject.Qualifier;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -2004,8 +2003,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * Used to clear mutated metadata at the end of a compilation cycle.
      */
     @Internal
-    public static void clearCaches() {
+    public static void clearMutated() {
         MUTATED_ANNOTATION_METADATA.clear();
+    }
+
+    /**
+     * Used to clear caches at the end of a compilation cycle.
+     */
+    @Internal
+    public static void clearCaches() {
         ANNOTATION_DEFAULTS.clear();
     }
 
