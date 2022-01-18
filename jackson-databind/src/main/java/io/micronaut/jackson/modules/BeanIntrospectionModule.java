@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import com.fasterxml.jackson.annotation.OptBoolean;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.ObjectCodec;
 import com.fasterxml.jackson.core.SerializableString;
 import com.fasterxml.jackson.core.io.SerializedString;
 import com.fasterxml.jackson.databind.*;
@@ -38,8 +39,13 @@ import com.fasterxml.jackson.databind.deser.SettableBeanProperty;
 import com.fasterxml.jackson.databind.deser.ValueInstantiator;
 import com.fasterxml.jackson.databind.deser.impl.MethodProperty;
 import com.fasterxml.jackson.databind.deser.std.StdValueInstantiator;
+import com.fasterxml.jackson.databind.introspect.AccessorNamingStrategy;
+import com.fasterxml.jackson.databind.introspect.AnnotatedClass;
+import com.fasterxml.jackson.databind.introspect.AnnotatedField;
 import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
+import com.fasterxml.jackson.databind.introspect.AnnotatedMethod;
 import com.fasterxml.jackson.databind.introspect.AnnotationCollector;
+import com.fasterxml.jackson.databind.introspect.DefaultAccessorNamingStrategy;
 import com.fasterxml.jackson.databind.introspect.TypeResolutionContext;
 import com.fasterxml.jackson.databind.introspect.VirtualAnnotatedMember;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
@@ -80,6 +86,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * A Jackson module that adds reflection-free bean serialization and deserialization for Micronaut.
@@ -106,6 +114,18 @@ public class BeanIntrospectionModule extends SimpleModule {
     public BeanIntrospectionModule() {
         setDeserializerModifier(new BeanIntrospectionDeserializerModifier());
         setSerializerModifier(new BeanIntrospectionSerializerModifier());
+    }
+
+    @Override
+    public void setupModule(SetupContext context) {
+        super.setupModule(context);
+
+        ObjectCodec owner = context.getOwner();
+        if (owner instanceof ObjectMapper) {
+            ObjectMapper mapper = (ObjectMapper) owner;
+            mapper.setConfig(mapper.getSerializationConfig().with(new BeanIntrospectionAccessorNamingStrategyProvider(mapper.getSerializationConfig().getAccessorNaming())));
+            mapper.setConfig(mapper.getDeserializationConfig().with(new BeanIntrospectionAccessorNamingStrategyProvider(mapper.getDeserializationConfig().getAccessorNaming())));
+        }
     }
 
     /**
@@ -371,7 +391,7 @@ public class BeanIntrospectionModule extends SimpleModule {
             }
 
             final Class<?> beanClass = beanDesc.getBeanClass();
-            final BeanIntrospection<Object> introspection = (BeanIntrospection<Object>) BeanIntrospector.SHARED.findIntrospection(beanClass).orElse(null);
+            final BeanIntrospection<Object> introspection = findIntrospection(beanClass);
             if (introspection == null) {
                 return builder;
             } else {
@@ -440,7 +460,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                     @Override
                     public SettableBeanProperty[] getFromObjectArguments(DeserializationConfig config) {
 
-                        SettableBeanProperty[] existing = defaultInstantiator.getFromObjectArguments(config);
+                        SettableBeanProperty[] existing = ignoreReflectiveProperties ? null : defaultInstantiator.getFromObjectArguments(config);
                         if (props == null) {
                             props = new SettableBeanProperty[constructorArguments.length];
                             for (int i = 0; i < constructorArguments.length; i++) {
@@ -1008,6 +1028,52 @@ public class BeanIntrospectionModule extends SimpleModule {
         public Object setAndReturn(Object instance, Object value) {
             beanProperty.set(instance, value);
             return null;
+        }
+    }
+
+    private class BeanIntrospectionAccessorNamingStrategyProvider extends AccessorNamingStrategy.Provider {
+        private final AccessorNamingStrategy.Provider delegate;
+
+        BeanIntrospectionAccessorNamingStrategyProvider(AccessorNamingStrategy.Provider delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public AccessorNamingStrategy forPOJO(MapperConfig<?> config, AnnotatedClass valueClass) {
+            return delegate.forPOJO(config, valueClass);
+        }
+
+        @Override
+        public AccessorNamingStrategy forBuilder(MapperConfig<?> config, AnnotatedClass builderClass, BeanDescription valueTypeDesc) {
+            return delegate.forBuilder(config, builderClass, valueTypeDesc);
+        }
+
+        @Override
+        public AccessorNamingStrategy forRecord(MapperConfig<?> config, AnnotatedClass recordClass) {
+            BeanIntrospection<Object> introspection = findIntrospection(recordClass.getRawType());
+            if (introspection != null) {
+                return new DefaultAccessorNamingStrategy(config, recordClass, null, "get", "is", null) {
+                    final Set<String> names = introspection.getBeanProperties().stream().map(BeanProperty::getName).collect(Collectors.toSet());
+
+                    @Override
+                    public String findNameForRegularGetter(AnnotatedMethod am, String name) {
+                        if (names.contains(name)) {
+                            return name;
+                        }
+                        return super.findNameForRegularGetter(am, name);
+                    }
+                };
+            } else {
+                try {
+                    return delegate.forRecord(config, recordClass);
+                } catch (IllegalArgumentException e) {
+                    if (e.getMessage().startsWith("Failed to access RecordComponents of type")) {
+                        throw new RuntimeException("Failed to construct AccessorNamingStrategy for record. This can happen when running in native-image. Either make this type @Introspected, or mark it for @ReflectiveAccess.", e);
+                    } else {
+                        throw e;
+                    }
+                }
+            }
         }
     }
 }
