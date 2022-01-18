@@ -27,6 +27,7 @@ import io.micronaut.core.util.ArgumentUtils;
  * @author graemerocher
  */
 public interface ImmutableArgumentConversionContext<T> extends ArgumentConversionContext<T> {
+
     /**
      * Create a new simple {@link ConversionContext} for the given generic type variables.
      *
