@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
+import org.jetbrains.annotations.NotNull;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * A mutable various of {@link DefaultAnnotationMetadata} that is used only at build time.
@@ -38,6 +40,7 @@ import java.util.function.Predicate;
  * @since 2.4.0
  */
 public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
+
     private boolean hasPropertyExpressions = false;
 
     /**
@@ -80,6 +83,20 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
             cloned.annotationDefaultValues = new LinkedHashMap<>(annotationDefaultValues);
         }
         return cloned;
+    }
+
+    @NotNull
+    @Override
+    public Map<String, Object> getDefaultValues(@NonNull String annotation) {
+        Map<String, Object> values = super.getDefaultValues(annotation);
+        if (values.isEmpty() && annotationDefaultValues != null) {
+            final Map<CharSequence, Object> compileTimeDefaults = annotationDefaultValues.get(annotation);
+            if (compileTimeDefaults != null && !compileTimeDefaults.isEmpty()) {
+                return compileTimeDefaults.entrySet().stream()
+                        .collect(Collectors.toMap(e -> e.getKey().toString(), Map.Entry::getValue));
+            }
+        }
+        return values;
     }
 
     @Override

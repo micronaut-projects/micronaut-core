@@ -11,6 +11,7 @@ hibernate = "5.5.9.Final"
 hibernate-validator = "6.1.6.Final"
 htmlSanityCheck = "1.1.6"
 htmlunit = "2.47.1"
+httpcomponents-client = "4.5.13"
 jakarta-inject-api = "2.0.1"
 jakarta-inject-tck = "2.0.1"
 javax-inject = "1"
@@ -23,7 +24,7 @@ javax-el = "3.0.1-b12"
 javax-el-impl = "2.2.1-b05"
 kotest-junit5 = "4.6.0"
 logbook-netty = "2.4.1"
-log4j = "2.17.0"
+log4j = "2.17.1"
 mongo-javadriver = "3.12.10"
 mysql-driver = "8.0.22"
 powermock = "2.0.9"
@@ -117,12 +118,12 @@ managed-micronaut-rss = "3.0.0"
 managed-micronaut-rxjava1 = "1.0.0"
 managed-micronaut-rxjava2 = "1.1.0"
 managed-micronaut-rxjava3 = "2.1.1"
-managed-micronaut-security = "3.2.1"
+managed-micronaut-security = "3.2.2"
 managed-micronaut-serialization = "1.0.0-M4"
 managed-micronaut-servlet = "3.1.0"
 managed-micronaut-spring = "4.0.1"
 managed-micronaut-sql = "4.1.0"
-managed-micronaut-test = "3.0.2"
+managed-micronaut-test = "3.0.5"
 managed-micronaut-views = "3.1.2"
 managed-micronaut-xml = "3.0.0"
 managed-mongo = "4.3.0"
@@ -314,6 +315,7 @@ managed-micronaut-ignite-core = { module = "io.micronaut.ignite:micronaut-ignite
 managed-micronaut-ignite-cache = { module = "io.micronaut.ignite:micronaut-ignite-cache", version.ref = "managed-micronaut-ignite" }
 managed-micronaut-jaxrs-server = { module = "io.micronaut.jaxrs:micronaut-jaxrs-server", version.ref = "managed-micronaut-jaxrs" }
 managed-micronaut-jaxrs-processor = { module = "io.micronaut.jaxrs:micronaut-jaxrs-processor", version.ref = "managed-micronaut-jaxrs" }
+managed-micronaut-jaxrs-server-security = { module = "io.micronaut.jaxrs:micronaut-jaxrs-server-security", version.ref = "managed-micronaut-jaxrs" }
 managed-micronaut-jms = { module = "io.micronaut.jms:micronaut-jms-core", version.ref = "managed-micronaut-jms" }
 managed-micronaut-jms-activemq-classic = { module = "io.micronaut.jms:micronaut-jms-activemq-classic", version.ref = "managed-micronaut-jms" }
 managed-micronaut-jms-activemq-artemis = { module = "io.micronaut.jms:micronaut-jms-activemq-artemis", version.ref = "managed-micronaut-jms" }
@@ -526,6 +528,7 @@ testcontainers-spock = { module = "org.testcontainers:spock", version.ref = "man
 
 vertx = { module = "io.vertx:vertx-core", version.ref = "vertx" }
 vertx-webclient = { module = "io.vertx:vertx-web-client", version.ref = "vertx" }
+httpcomponents-client = { module = "org.apache.httpcomponents:httpclient", version.ref = "httpcomponents-client" }
 
 wiremock = { module = "com.github.tomakehurst:wiremock-jre8", version.ref = "wiremock" }
 

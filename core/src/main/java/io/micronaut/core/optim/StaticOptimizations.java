@@ -17,8 +17,6 @@ package io.micronaut.core.optim;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.Optional;
@@ -36,7 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @SuppressWarnings("unchecked")
 @Internal
 public abstract class StaticOptimizations {
-    private static final Logger LOGGER = LoggerFactory.getLogger(StaticOptimizations.class);
+
     private static final boolean CAPTURE_STACKTRACE_ON_READ = Boolean.getBoolean("micronaut.optimizations.capture.read.trace");
 
     private static final Map<Class<?>, Object> OPTIMIZATIONS = new ConcurrentHashMap<>();
@@ -79,11 +77,6 @@ public abstract class StaticOptimizations {
     public static <T> Optional<T> get(@NonNull Class<T> optimizationClass) {
         CHECKED.put(optimizationClass, maybeCaptureStackTrace());
         T value = (T) OPTIMIZATIONS.get(optimizationClass);
-        if (value != null) {
-            LOGGER.debug("Found optimizations {}", optimizationClass);
-        } else {
-            LOGGER.debug("No optimizations {} found", optimizationClass);
-        }
         return Optional.ofNullable(value);
     }
 
@@ -114,7 +107,6 @@ public abstract class StaticOptimizations {
             }
             throw new IllegalStateException(sb.toString());
         }
-        LOGGER.debug("Setting optimizations for {}", optimizationClass);
         OPTIMIZATIONS.put(optimizationClass, value);
     }
 
