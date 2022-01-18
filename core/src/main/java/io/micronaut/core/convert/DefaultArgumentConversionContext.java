@@ -20,6 +20,7 @@ import io.micronaut.core.type.Argument;
 
 import java.nio.charset.Charset;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Default implementation of the {@link ConversionContext} interface.
