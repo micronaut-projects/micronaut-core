@@ -12,6 +12,7 @@ import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.NamedAnnotationMapper
+import io.micronaut.inject.annotation.NamedAnnotationTransformer
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Issue
@@ -19,6 +20,64 @@ import spock.lang.Issue
 import java.lang.annotation.Annotation
 
 class AroundCompileSpec extends AbstractTypeElementSpec {
+
+    void 'test stereotype method level interceptor matching'() {
+        given:
+        ApplicationContext context = buildContext('''
+package annbinding2;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import jakarta.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import io.micronaut.aop.simple.*;
+
+@Singleton
+class MyBean {
+    @TestAnn2
+    void test() {
+        
+    }
+    
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Around
+@interface TestAnn {
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@TestAnn
+@interface TestAnn2 {
+}
+
+@InterceptorBean(TestAnn.class)
+class TestInterceptor implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+} 
+
+''')
+        def instance = getBean(context, 'annbinding2.MyBean')
+        def interceptor = getBean(context, 'annbinding2.TestInterceptor')
+
+        when:
+        instance.test()
+
+        then:"the interceptor was invoked"
+        instance instanceof Intercepted
+        interceptor.invoked
+
+
+        cleanup:
+        context.close()
+    }
 
     void 'test apply interceptor binder with annotation mapper'() {
         given:
@@ -64,6 +123,73 @@ class TestInterceptor implements Interceptor {
         then:"the interceptor was invoked"
         instance instanceof Intercepted
         interceptor.invoked
+
+    }
+
+    void 'test apply interceptor binder with annotation mapper - plus members'() {
+        given:
+        ApplicationContext context = buildContext('''
+package mapperbindingmembers;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import jakarta.inject.*;
+import jakarta.inject.Singleton;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Singleton
+class MyBean {
+    @TestAnn(num=1)
+    void test() {
+    }
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.ANNOTATION_TYPE})
+@interface MyInterceptorBinding {
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@MyInterceptorBinding
+@interface TestAnn {
+    int num();
+}
+
+@Singleton
+@TestAnn(num=1)
+class TestInterceptor implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+} 
+
+@Singleton
+@TestAnn(num=2)
+class TestInterceptor2 implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+} 
+
+''')
+        def instance = getBean(context, 'mapperbindingmembers.MyBean')
+        def interceptor = getBean(context, 'mapperbindingmembers.TestInterceptor')
+        def interceptor2 = getBean(context, 'mapperbindingmembers.TestInterceptor2')
+
+        when:
+        instance.test()
+
+        then:"the interceptor was invoked"
+        instance instanceof Intercepted
+        interceptor.invoked
+        !interceptor2.invoked
 
     }
 
@@ -199,6 +325,226 @@ class AnotherInterceptor implements Interceptor {
         instance instanceof Intercepted
         interceptor.invoked
         !anotherInterceptor.invoked
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test multiple interceptor binding'() {
+        given:
+        ApplicationContext context = buildContext('''
+package multiplebinding;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.NonBinding;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import jakarta.inject.Singleton;
+
+@Retention(RUNTIME)
+@InterceptorBinding(kind = InterceptorKind.AROUND)
+@interface Deadly {
+
+}
+
+@Retention(RUNTIME)
+@InterceptorBinding(kind = InterceptorKind.AROUND)
+@interface Fast {
+}
+
+@Retention(RUNTIME)
+@InterceptorBinding(kind = InterceptorKind.AROUND)
+@interface Slow {
+}
+
+interface Missile {
+    void fire();
+}
+
+@Fast
+@Deadly
+@Singleton
+class FastAndDeadlyMissile implements Missile {
+    public void fire() {
+    }
+}
+
+@Deadly
+@Singleton
+class AnyDeadlyMissile implements Missile {
+    public void fire() {
+    }
+}
+
+@Singleton
+class GuidedMissile implements Missile {
+    @Slow
+    @Deadly
+    public void lockAndFire() {
+    }
+
+    @Fast
+    @Deadly
+    public void fire() {
+    }
+
+}
+
+@Slow
+@Deadly
+@Singleton
+class SlowMissile implements Missile {
+    public void fire() {
+    }
+}
+
+@Fast
+@Deadly
+@Singleton
+class MissileInterceptor implements MethodInterceptor<Object, Object> {
+    public boolean intercepted = false;
+
+    @Override public Object intercept(MethodInvocationContext<Object, Object> context) {
+        intercepted = true;
+        return context.proceed();
+    }
+}
+
+@Slow
+@Deadly
+@Singleton
+class LockInterceptor implements MethodInterceptor<Object, Object> {
+    public boolean intercepted = false;
+
+    @Override public Object intercept(MethodInvocationContext<Object, Object> context) {
+        intercepted = true;
+        return context.proceed();
+    }
+}
+
+''')
+        def missileInterceptor = getBean(context, 'multiplebinding.MissileInterceptor')
+        def lockInterceptor = getBean(context, 'multiplebinding.LockInterceptor')
+
+        when:
+        missileInterceptor.intercepted = false
+        lockInterceptor.intercepted = false
+        def guidedMissile = getBean(context, 'multiplebinding.GuidedMissile');
+        guidedMissile.fire()
+
+        then:
+        missileInterceptor.intercepted
+        !lockInterceptor.intercepted
+
+        when:
+        missileInterceptor.intercepted = false
+        lockInterceptor.intercepted = false
+        def fastAndDeadlyMissile = getBean(context, 'multiplebinding.FastAndDeadlyMissile');
+        fastAndDeadlyMissile.fire()
+
+        then:
+        missileInterceptor.intercepted
+        !lockInterceptor.intercepted
+
+        when:
+        missileInterceptor.intercepted = false
+        lockInterceptor.intercepted = false
+        def slowMissile = getBean(context, 'multiplebinding.SlowMissile');
+        slowMissile.fire()
+
+        then:
+        !missileInterceptor.intercepted
+        lockInterceptor.intercepted
+
+        when:
+        missileInterceptor.intercepted = false
+        lockInterceptor.intercepted = false
+        def anyMissile = getBean(context, 'multiplebinding.AnyDeadlyMissile');
+        anyMissile.fire()
+
+        then:
+        missileInterceptor.intercepted
+        lockInterceptor.intercepted
+
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test annotation with just interceptor binding - member binding'() {
+        given:
+        ApplicationContext context = buildContext('''
+package memberbinding;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.NonBinding;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import jakarta.inject.Singleton;
+
+@Singleton
+@TestAnn(num=1, debug = false)
+class MyBean {
+    void test() {
+    }
+    
+    @TestAnn(num=2) // overrides binding on type
+    void test2() {
+        
+    }
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@InterceptorBinding(bindMembers = true)
+@interface TestAnn {
+    int num();
+    
+    @NonBinding
+    boolean debug() default false;
+}
+
+@InterceptorBean(TestAnn.class)
+@TestAnn(num = 1, debug = true)
+class TestInterceptor implements Interceptor {
+    public boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+} 
+
+@InterceptorBean(TestAnn.class)
+@TestAnn(num = 2)
+class AnotherInterceptor implements Interceptor {
+    public boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+} 
+''')
+        def instance = getBean(context, 'memberbinding.MyBean')
+        def interceptor = getBean(context, 'memberbinding.TestInterceptor')
+        def anotherInterceptor = getBean(context, 'memberbinding.AnotherInterceptor')
+
+        when:
+        instance.test()
+
+        then:"the interceptor was invoked"
+        instance instanceof Intercepted
+        interceptor.invoked
+        !anotherInterceptor.invoked
+
+        when:
+        interceptor.invoked = false
+        instance.test2()
+
+        then:
+        !interceptor.invoked
+        anotherInterceptor.invoked
 
         cleanup:
         context.close()
@@ -592,6 +938,22 @@ interface IBeanValidator<T> {
         List<AnnotationValue<?>> map(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
             return Collections.singletonList(AnnotationValue.builder(InterceptorBinding)
                     .value(getName())
+                    .build())
+        }
+    }
+
+    static class TestStereotypeAnnTransformer implements NamedAnnotationTransformer {
+
+        @Override
+        String getName() {
+            return 'mapperbindingmembers.MyInterceptorBinding'
+        }
+
+        @Override
+        List<AnnotationValue<?>> transform(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
+            return Collections.singletonList(AnnotationValue.builder(InterceptorBinding)
+                    .member("kind", InterceptorKind.AROUND)
+                    .member("bindMembers", true)
                     .build())
         }
     }

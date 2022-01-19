@@ -115,8 +115,9 @@ public interface JsonMapper {
     /**
      * Transform an object value to a json tree.
      *
-     * @param type The object type
+     * @param type  The object type
      * @param value The object value to transform.
+     * @param <T>   The type variable of the type.
      * @return The json representation.
      * @throws IOException If there are any mapping exceptions (e.g. illegal values).
      */

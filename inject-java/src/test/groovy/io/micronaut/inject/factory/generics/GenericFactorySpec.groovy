@@ -3,8 +3,44 @@ package io.micronaut.inject.factory.generics
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.exceptions.DependencyInjectionException
 import io.micronaut.context.exceptions.NoSuchBeanException
+import io.micronaut.inject.BeanDefinition
 
 class GenericFactorySpec extends AbstractTypeElementSpec {
+
+    void "test factory with generic arrays"() {
+        given:
+        def context = buildContext('''
+package genericarray;
+
+import io.micronaut.context.annotation.Factory;
+import jakarta.inject.Singleton;
+import io.micronaut.core.type.Argument;
+
+@Factory
+class SerdeFactory {
+    @Singleton
+    protected <T> Serde<T[]> arraySerde() {
+        return new Serde<T[]>() {
+        };
+    }    
+}
+
+interface Serializer<T> {
+}
+interface Deserializer<T> {
+}
+interface Serde<T> extends Serializer<T>, Deserializer<T> {}
+''')
+        when:
+        def t = context.classLoader.loadClass('genericarray.Serde')
+        BeanDefinition<?> bd = context.getBeanDefinition(t)
+
+        then:
+        bd != null
+
+        cleanup:
+        context.close()
+    }
 
     void "test generic factory with type variables"() {
         given:

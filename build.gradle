@@ -112,12 +112,6 @@ subprojects { Project subproject ->
         options.compilerArgs.add("-Amicronaut.processing.module=micronaut-$project.name")
         groovyOptions.forkOptions.memoryMaximumSize = "2g"
     }
-    tasks.withType(Checkstyle).configureEach {
-        reports {
-            xml.enabled = !System.getenv("GITHUB_ACTIONS")
-            html.enabled = !System.getenv("GITHUB_ACTIONS")
-        }
-    }
 
     configurations {
         shadowCompile
@@ -133,7 +127,7 @@ subprojects { Project subproject ->
 
     apply plugin: 'com.github.johnrengelman.shadow'
 
-    shadowJar {
+    tasks.named("shadowJar") {
         configurations = [project.configurations.shadowCompile]
         relocate "com.github.benmanes.caffeine", "io.micronaut.caffeine"
         relocate "org.objectweb.asm", "io.micronaut.asm"
@@ -210,7 +204,10 @@ htmlSanityCheck {
         include "index.html"
     }
 }
-docs.finalizedBy(htmlSanityCheck)
+
+tasks.named("docs") {
+    finalizedBy(htmlSanityCheck)
+}
 
 tasks.named("updateVersionCatalogs") {
     // we set the list to empty because we accept upgrades which improve the status

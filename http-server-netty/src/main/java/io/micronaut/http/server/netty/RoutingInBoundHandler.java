@@ -105,7 +105,7 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.MonoSink;
-import reactor.core.publisher.UnicastProcessor;
+import reactor.core.publisher.Sinks;
 
 import javax.net.ssl.SSLException;
 import java.io.File;
@@ -114,6 +114,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.channels.ClosedChannelException;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -143,6 +144,9 @@ import java.util.stream.Collectors;
 class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.http.HttpRequest<?>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(RoutingInBoundHandler.class);
+    /*
+     * Also present in {@link RouteExecutor}.
+     */
     private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
             "^.*(?:connection.*(?:reset|closed|abort|broken)|broken.*pipe).*$", Pattern.CASE_INSENSITIVE);
     private static final Argument ARGUMENT_PART_DATA = Argument.of(PartData.class);
@@ -244,9 +248,18 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        // short-circuit ignorable exceptions: This is also handled by RouteExecutor, but handling this early avoids
+        // running any filters
+        if (isIgnorable(cause)) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Swallowed an IOException caused by client connectivity: " + cause.getMessage(), cause);
+            }
+            return;
+        }
+
         NettyHttpRequest<?> nettyHttpRequest = NettyHttpRequest.remove(ctx);
         if (nettyHttpRequest == null) {
-            if (cause instanceof SSLException || cause.getCause() instanceof SSLException || isIgnorable(cause)) {
+            if (cause instanceof SSLException || cause.getCause() instanceof SSLException) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Micronaut Server Error - No request state present. Cause: " + cause.getMessage(), cause);
                 }
@@ -330,6 +343,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         RouteMatch<?> route;
 
         if (routeMatch == null) {
+
+            //Check if there is a file for the route before returning route not found
+            Optional<? extends FileCustomizableResponseType> optionalFile = matchFile(requestPath);
+
+            if (optionalFile.isPresent()) {
+                filterAndEncodeResponse(ctx, nettyHttpRequest, Flux.just(HttpResponse.ok(optionalFile.get())));
+                return;
+            }
+
             if (LOG.isDebugEnabled()) {
                 LOG.debug("No matching route: {} {}", httpMethod, request.getUri());
             }
@@ -397,12 +419,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         HttpResponse.notAllowedGeneric(allowedMethods),
                         "Method [" + requestMethodName + "] not allowed for URI [" + request.getUri() + "]. Allowed methods: " + allowedMethods);
                 return;
-            }
-
-            Optional<? extends FileCustomizableResponseType> optionalFile = matchFile(requestPath);
-
-            if (optionalFile.isPresent()) {
-                filterAndEncodeResponse(ctx, nettyHttpRequest, Flux.just(HttpResponse.ok(optionalFile.get())));
             } else {
                 handleStatusError(ctx, nettyHttpRequest, HttpResponse.status(HttpStatus.NOT_FOUND), "Page Not Found");
             }
@@ -611,8 +627,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 RouteMatch<?> routeMatch = finalRoute;
                 final AtomicBoolean executed = new AtomicBoolean(false);
                 final AtomicLong pressureRequested = new AtomicLong(0);
-                final ConcurrentHashMap<String, UnicastProcessor> subjects = new ConcurrentHashMap<>();
-                final ConcurrentHashMap<Integer, HttpDataReference> dataReferences = new ConcurrentHashMap<>();
+                final ConcurrentHashMap<String, Sinks.Many<Object>> subjectsByDataName = new ConcurrentHashMap<>();
+                final Collection<Sinks.Many<Object>> downstreamSubscribers = Collections.synchronizedList(new ArrayList<>());
+                final ConcurrentHashMap<IdentityWrapper, HttpDataReference> dataReferences = new ConcurrentHashMap<>();
                 final ConversionService conversionService = ConversionService.SHARED;
                 Subscription s;
                 final LongConsumer onRequest = num -> pressureRequested.updateAndGet(p -> {
@@ -625,14 +642,14 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     }
                 });
 
-                Flux processFlowable(Flux flowable, Integer dataKey, boolean controlsFlow) {
+                Flux processFlowable(Sinks.Many<Object> many, HttpDataReference dataReference, boolean controlsFlow) {
+                    Flux flux = many.asFlux();
                     if (controlsFlow) {
-                        flowable = flowable.doOnRequest(onRequest);
+                        flux = flux.doOnRequest(onRequest);
                     }
-                    return flowable
+                    return flux
                             .doAfterTerminate(() -> {
                                 if (controlsFlow) {
-                                    HttpDataReference dataReference = dataReferences.get(dataKey);
                                     dataReference.destroy();
                                 }
                             });
@@ -665,8 +682,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 boolean chunkedProcessing = false;
 
                                 if (isPublisher) {
-                                    Integer dataKey = System.identityHashCode(data);
-                                    HttpDataReference dataReference = dataReferences.computeIfAbsent(dataKey, key -> new HttpDataReference(data));
+                                    HttpDataReference dataReference = dataReferences.computeIfAbsent(new IdentityWrapper(data), key -> new HttpDataReference(data));
                                     Argument typeVariable;
 
                                     if (StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
@@ -676,7 +692,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     }
                                     Class typeVariableType = typeVariable.getType();
 
-                                    UnicastProcessor namedSubject = subjects.computeIfAbsent(name, key -> UnicastProcessor.create());
+                                    Sinks.Many<Object> namedSubject = subjectsByDataName.computeIfAbsent(name, key -> makeDownstreamUnicastProcessor());
 
                                     chunkedProcessing = PartData.class.equals(typeVariableType) ||
                                             Publishers.isConvertibleToPublisher(typeVariableType) ||
@@ -691,16 +707,16 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         }
                                         dataReference.subject.getAndUpdate(subject -> {
                                             if (subject == null) {
-                                                UnicastProcessor childSubject = UnicastProcessor.create();
-                                                Flux flowable = processFlowable(childSubject, dataKey, true);
+                                                Sinks.Many<Object> childSubject = makeDownstreamUnicastProcessor();
+                                                Flux flowable = processFlowable(childSubject, dataReference, true);
                                                 if (streamingFileUpload && data instanceof FileUpload) {
-                                                    namedSubject.onNext(new NettyStreamingFileUpload(
+                                                    namedSubject.tryEmitNext(new NettyStreamingFileUpload(
                                                             (FileUpload) data,
                                                             serverConfiguration.getMultipart(),
                                                             getIoExecutor(),
                                                             (Flux<PartData>) flowable));
                                                 } else {
-                                                    namedSubject.onNext(flowable);
+                                                    namedSubject.tryEmitNext(flowable);
                                                 }
 
                                                 return childSubject;
@@ -709,9 +725,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         });
                                     }
 
-                                    UnicastProcessor subject;
+                                    Sinks.Many<Object> subject;
 
-                                    final UnicastProcessor ds = dataReference.subject.get();
+                                    final Sinks.Many<Object> ds = dataReference.subject.get();
                                     if (ds != null) {
                                         subject = ds;
                                     } else {
@@ -729,7 +745,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                 return;
                                             }
                                         } catch (IOException e) {
-                                            subject.onError(e);
+                                            subject.tryEmitError(e);
                                             s.cancel();
                                             return;
                                         }
@@ -744,7 +760,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                         (FileUpload) data,
                                                         serverConfiguration.getMultipart(),
                                                         getIoExecutor(),
-                                                        (Flux<PartData>) processFlowable(subject, dataKey, true));
+                                                        (Flux<PartData>) processFlowable(subject, dataReference, true));
                                             }
                                             return upload;
                                         });
@@ -752,10 +768,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                                     Optional<?> converted = conversionService.convert(part, typeVariable);
 
-                                    converted.ifPresent(subject::onNext);
+                                    converted.ifPresent(subject::tryEmitNext);
 
                                     if (data.isCompleted() && chunkedProcessing) {
-                                        subject.onComplete();
+                                        subject.tryEmitComplete();
                                     }
 
                                     value = () -> {
@@ -763,7 +779,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         if (upload != null) {
                                             return upload;
                                         } else {
-                                            return processFlowable(namedSubject, dataKey, dataReference.subject.get() == null);
+                                            return processFlowable(namedSubject, dataReference, dataReference.subject.get() == null);
                                         }
                                     };
 
@@ -786,7 +802,14 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 if (!executed) {
                                     String argumentName = argument.getName();
                                     if (!routeMatch.isSatisfied(argumentName)) {
-                                        routeMatch = routeMatch.fulfill(Collections.singletonMap(argumentName, value.get()));
+                                        Object fulfillParamter = value.get();
+                                        routeMatch = routeMatch.fulfill(Collections.singletonMap(argumentName, fulfillParamter));
+                                        // we need to release the data here. However, if the route argument is a
+                                        // ByteBuffer, we need to retain the data until the route is executed. Adding
+                                        // the data to the request ensures it is cleaned up after the route completes.
+                                        if (!alwaysAddContent && fulfillParamter instanceof ByteBufHolder) {
+                                            request.addContent((ByteBufHolder) fulfillParamter);
+                                        }
                                     }
                                     if (isPublisher && chunkedProcessing) {
                                         //accounting for the previous request
@@ -823,20 +846,25 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 @Override
                 protected void doOnError(Throwable t) {
                     s.cancel();
-                    for (UnicastProcessor subject : subjects.values()) {
-                        subject.onError(t);
+                    for (Sinks.Many<Object> subject : downstreamSubscribers) {
+                        subject.tryEmitError(t);
                     }
                     emitter.error(t);
                 }
 
                 @Override
                 protected void doOnComplete() {
-                    for (UnicastProcessor subject : subjects.values()) {
-                        if (!subject.hasCompleted()) {
-                            subject.onComplete();
-                        }
+                    for (Sinks.Many<Object> subject : downstreamSubscribers) {
+                        // subjects will ignore the onComplete if they're already done
+                        subject.tryEmitComplete();
                     }
                     executeRoute();
+                }
+
+                private Sinks.Many<Object> makeDownstreamUnicastProcessor() {
+                    Sinks.Many<Object> processor = Sinks.many().unicast().onBackpressureBuffer();
+                    downstreamSubscribers.add(processor);
+                    return processor;
                 }
 
                 private void executeRoute() {
@@ -1074,7 +1102,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         } else {
             MediaType mediaType = message.getContentType().orElse(null);
             if (mediaType == null) {
-                mediaType = message.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).map(routeInfo -> routeExecutor.resolveDefaultResponseContentType(request, routeInfo)).orElse(null);
+                mediaType = message.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class)
+                        .map(routeInfo -> routeExecutor.resolveDefaultResponseContentType(request, routeInfo))
+                        // RouteExecutor will pick json by default, so we do too
+                        .orElse(MediaType.APPLICATION_JSON_TYPE);
                 message.contentType(mediaType);
             }
             if (body instanceof CharSequence) {

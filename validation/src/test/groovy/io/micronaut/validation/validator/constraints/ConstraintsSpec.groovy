@@ -8,10 +8,13 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Unroll
 
+import javax.validation.ClockProvider
 import javax.validation.constraints.*
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDateTime
-import java.time.temporal.ChronoUnit
+import java.time.ZoneId
+import java.time.ZoneOffset
 
 import static java.math.BigInteger.ONE
 
@@ -233,24 +236,75 @@ class ConstraintsSpec extends AbstractTypeElementSpec {
         Digits         | 10                                            | true    | constraintMetadata(constraint, /@Digits(integer=2, fraction=2)/)
         Digits         | 110                                           | false   | constraintMetadata(constraint, /@Digits(integer=2, fraction=2)/)
 
-        // Past
-        Past           | null                                          | true    | constraintMetadata(constraint, /@Past/)
-        Past           | Instant.now().minus(1, ChronoUnit.DAYS)       | true    | constraintMetadata(constraint, /@Past/)
-        Past           | Instant.now().plus(1, ChronoUnit.DAYS)        | false   | constraintMetadata(constraint, /@Past/)
-        Past           | LocalDateTime.now().minus(1, ChronoUnit.DAYS) | true    | constraintMetadata(constraint, /@Past/)
-        Past           | LocalDateTime.now().plus(1, ChronoUnit.DAYS)  | false   | constraintMetadata(constraint, /@Past/)
-
-        // Future
-        Future         | null                                          | true    | constraintMetadata(constraint, /@Past/)
-        Future         | Instant.now().minus(1, ChronoUnit.DAYS)       | false   | constraintMetadata(constraint, /@Past/)
-        Future         | Instant.now().plus(1, ChronoUnit.DAYS)        | true    | constraintMetadata(constraint, /@Past/)
-        Future         | LocalDateTime.now().minus(1, ChronoUnit.DAYS) | false   | constraintMetadata(constraint, /@Past/)
-        Future         | LocalDateTime.now().plus(1, ChronoUnit.DAYS)  | true    | constraintMetadata(constraint, /@Past/)
-
         // Email
         Email          | null                                          | true    | constraintMetadata(constraint, /@Email/)
         Email          | "junk"                                        | false   | constraintMetadata(constraint, /@Email/)
         Email          | "junk@junk.com"                               | true    | constraintMetadata(constraint, /@Email/)
+    }
+
+    @Unroll
+    void "test #constraint constraint for value dates [#value]"() {
+        given:
+        def context = Mock(ConstraintValidatorContext)
+        def fixedInstant = LocalDateTime.parse("2020-01-01T00:00:00").toInstant(ZoneOffset.UTC)
+        context.getClockProvider() >> new TestClockProvider(fixedInstant)
+
+        def validator = reg.getConstraintValidator(constraint, value?.getClass() ?: Object)
+
+        expect:
+        validator.isValid(value, metadata, context) == isValid
+
+        where:
+        constraint     | value                                         | isValid | metadata
+
+        // Past
+        Past           | Date.from(LocalDateTime.parse("2019-12-30T00:00:00").toInstant(ZoneOffset.UTC)) | true  | constraintMetadata(constraint, /@Past/)
+        Past           | Date.from(LocalDateTime.parse("2020-02-01T00:00:00").toInstant(ZoneOffset.UTC)) | false | constraintMetadata(constraint, /@Past/)
+        Past           | LocalDateTime.parse("2019-12-30T00:00:00").toInstant(ZoneOffset.UTC)            | true  | constraintMetadata(constraint, /@Past/)
+        Past           | LocalDateTime.parse("2020-02-01T00:00:00").toInstant(ZoneOffset.UTC)            | false | constraintMetadata(constraint, /@Past/)
+        Past           | LocalDateTime.parse("2019-12-30T00:00:00")                                      | true  | constraintMetadata(constraint, /@Past/)
+        Past           | LocalDateTime.parse("2020-02-01T00:00:00")                                      | false | constraintMetadata(constraint, /@Past/)
+        Past           | null                                                                            | true  | constraintMetadata(constraint, /@Past/)
+
+        // Future
+        Future           | Date.from(LocalDateTime.parse("2019-12-30T00:00:00").toInstant(ZoneOffset.UTC)) | false | constraintMetadata(constraint, /@Future/)
+        Future           | Date.from(LocalDateTime.parse("2020-02-01T00:00:00").toInstant(ZoneOffset.UTC)) | true  | constraintMetadata(constraint, /@Future/)
+        Future           | LocalDateTime.parse("2019-12-30T00:00:00").toInstant(ZoneOffset.UTC)            | false | constraintMetadata(constraint, /@Future/)
+        Future           | LocalDateTime.parse("2020-02-01T00:00:00").toInstant(ZoneOffset.UTC)            | true  | constraintMetadata(constraint, /@Future/)
+        Future           | LocalDateTime.parse("2019-12-30T00:00:00")                                      | false | constraintMetadata(constraint, /@Future/)
+        Future           | LocalDateTime.parse("2020-02-01T00:00:00")                                      | true  | constraintMetadata(constraint, /@Future/)
+        Future           | null                                                                            | true  | constraintMetadata(constraint, /@Future/)
+
+        // FutureOrPresent
+        FutureOrPresent  | Date.from(LocalDateTime.parse("2019-12-30T00:00:00").toInstant(ZoneOffset.UTC)) | false| constraintMetadata(constraint, /@FutureOrPresent/)
+        FutureOrPresent  | Date.from(LocalDateTime.parse("2020-01-01T00:00:00").toInstant(ZoneOffset.UTC)) | true | constraintMetadata(constraint, /@FutureOrPresent/)
+        FutureOrPresent  | Date.from(LocalDateTime.parse("2020-01-02T00:00:00").toInstant(ZoneOffset.UTC)) | true | constraintMetadata(constraint, /@FutureOrPresent/)
+        FutureOrPresent  | LocalDateTime.parse("2019-12-30T00:00:00").toInstant(ZoneOffset.UTC)            | false| constraintMetadata(constraint, /@FutureOrPresent/)
+        FutureOrPresent  | LocalDateTime.parse("2020-01-01T00:00:00").toInstant(ZoneOffset.UTC)            | true | constraintMetadata(constraint, /@FutureOrPresent/)
+        FutureOrPresent  | LocalDateTime.parse("2020-01-02T00:00:00").toInstant(ZoneOffset.UTC)            | true | constraintMetadata(constraint, /@FutureOrPresent/)
+        FutureOrPresent  | null                                                                            | true | constraintMetadata(constraint, /@FutureOrPresent/)
+
+        // PastOrPresent
+        PastOrPresent  | Date.from(LocalDateTime.parse("2019-12-30T00:00:00").toInstant(ZoneOffset.UTC)) | true | constraintMetadata(constraint, /@PastOrPresent/)
+        PastOrPresent  | Date.from(LocalDateTime.parse("2020-01-01T00:00:00").toInstant(ZoneOffset.UTC)) | true | constraintMetadata(constraint, /@PastOrPresent/)
+        PastOrPresent  | Date.from(LocalDateTime.parse("2020-01-02T00:00:00").toInstant(ZoneOffset.UTC)) | false| constraintMetadata(constraint, /@PastOrPresent/)
+        PastOrPresent  | LocalDateTime.parse("2019-12-30T00:00:00").toInstant(ZoneOffset.UTC)            | true | constraintMetadata(constraint, /@PastOrPresent/)
+        PastOrPresent  | LocalDateTime.parse("2020-01-01T00:00:00").toInstant(ZoneOffset.UTC)            | true | constraintMetadata(constraint, /@PastOrPresent/)
+        PastOrPresent  | LocalDateTime.parse("2020-01-02T00:00:00").toInstant(ZoneOffset.UTC)            | false| constraintMetadata(constraint, /@PastOrPresent/)
+        PastOrPresent  | null                                                                            | true | constraintMetadata(constraint, /@PastOrPresent/)
+    }
+
+    private class TestClockProvider implements ClockProvider {
+        final Instant instant
+
+        TestClockProvider(Instant instant) {
+            this.instant = instant
+        }
+
+        @Override
+        Clock getClock() {
+            return Clock.fixed(instant, ZoneId.of("UTC"))
+        }
     }
 
     private AnnotationValue constraintMetadata(Class annotation, String ann) {

@@ -2,6 +2,7 @@ dependencies {
     api project(":inject")
     api project(':aop')
 
+    implementation(libs.managed.slf4j.simple)
     if (!JavaVersion.current().isJava9Compatible()) {
         compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
@@ -47,7 +48,7 @@ dependencies {
 //compileTestJava.options.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
 
 
-tasks.withType(Test) {
+tasks.withType(Test).configureEach {
     forkEvery = 100
     maxParallelForks = 2
     useJUnitPlatform()

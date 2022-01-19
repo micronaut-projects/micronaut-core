@@ -32,6 +32,7 @@ import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
@@ -44,10 +45,13 @@ import io.micronaut.http.netty.channel.converters.DefaultChannelOptionFactory;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.server.netty.ssl.CertificateProvidedSslBuilder;
+import io.micronaut.http.server.netty.ssl.SelfSignedSslBuilder;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.netty.types.DefaultCustomizableResponseTypeHandlerRegistry;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
 import io.micronaut.http.server.netty.types.files.FileTypeHandler;
+import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
@@ -123,7 +127,13 @@ public class DefaultNettyEmbeddedServerFactory
     @Override
     @NonNull
     public NettyEmbeddedServer build(@NonNull NettyHttpServerConfiguration configuration) {
-        return buildInternal(configuration, false);
+        return buildInternal(configuration, false, null);
+    }
+
+    @Override
+    @NonNull
+    public NettyEmbeddedServer build(@NonNull NettyHttpServerConfiguration configuration, @Nullable ServerSslConfiguration sslConfiguration) {
+        return buildInternal(configuration, false, sslConfiguration);
     }
 
     /**
@@ -135,23 +145,68 @@ public class DefaultNettyEmbeddedServerFactory
     @Primary
     @NonNull
     protected NettyEmbeddedServer buildDefaultServer(@NonNull NettyHttpServerConfiguration configuration) {
-        return buildInternal(configuration, true);
+        return buildInternal(configuration, true, null);
     }
 
     @NotNull
     private NettyEmbeddedServer buildInternal(@NonNull NettyHttpServerConfiguration configuration,
-                                              boolean isDefaultServer) {
+                                              boolean isDefaultServer,
+                                              @Nullable ServerSslConfiguration sslConfiguration) {
         Objects.requireNonNull(configuration, "Netty HTTP server configuration cannot be null");
         List<NettyCustomizableResponseTypeHandler<?>> handlers = Arrays.asList(
                 new FileTypeHandler(configuration.getFileTypeHandlerConfiguration()),
                 new StreamTypeHandler()
         );
-        return new NettyHttpServer(
-                configuration,
-                this,
-                new DefaultCustomizableResponseTypeHandlerRegistry(handlers.toArray(new NettyCustomizableResponseTypeHandler[0])),
-                isDefaultServer
-        );
+
+        if (isDefaultServer) {
+            return new NettyHttpServer(
+                    configuration,
+                    this,
+                    new DefaultCustomizableResponseTypeHandlerRegistry(handlers.toArray(new NettyCustomizableResponseTypeHandler[0])),
+                    true
+            );
+        } else {
+            NettyEmbeddedServices embeddedServices = resolveNettyEmbeddedServices(configuration, sslConfiguration);
+            return new NettyHttpServer(
+                    configuration,
+                    embeddedServices,
+                    new DefaultCustomizableResponseTypeHandlerRegistry(handlers.toArray(new NettyCustomizableResponseTypeHandler[0])),
+                    false
+            );
+        }
+    }
+
+    private NettyEmbeddedServices resolveNettyEmbeddedServices(@NonNull NettyHttpServerConfiguration configuration,
+                                                               @Nullable ServerSslConfiguration sslConfiguration) {
+        if (sslConfiguration != null && sslConfiguration.isEnabled()) {
+            ServerSslBuilder serverSslBuilder;
+            final ResourceResolver resourceResolver = applicationContext.getBean(ResourceResolver.class);
+            if (sslConfiguration.buildSelfSigned()) {
+                serverSslBuilder = new SelfSignedSslBuilder(
+                      configuration,
+                      sslConfiguration,
+                      resourceResolver
+                );
+            } else {
+                serverSslBuilder = new CertificateProvidedSslBuilder(
+                    configuration,
+                    sslConfiguration,
+                    resourceResolver
+                );
+            }
+            return new DelegateNettyEmbeddedServices() {
+                @Override
+                public NettyEmbeddedServices getDelegate() {
+                    return DefaultNettyEmbeddedServerFactory.this;
+                }
+
+                @Override
+                public ServerSslBuilder getServerSslBuilder() {
+                    return serverSslBuilder;
+                }
+            };
+        }
+        return this;
     }
 
     @Override

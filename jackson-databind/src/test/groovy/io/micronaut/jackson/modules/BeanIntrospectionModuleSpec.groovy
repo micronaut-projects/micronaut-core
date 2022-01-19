@@ -868,4 +868,99 @@ class BeanIntrospectionModuleSpec extends Specification {
             this.ldt = ldt
         }
     }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6625')
+    void "JsonIgnore on main accessor, with secondary override"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        expect:
+        objectMapper.writeValueAsString(new IgnoreBean()) == '{"foo":"bar"}'
+        objectMapper.readValue('{"foo":"bar"}', IgnoreBean).foo == 'foo'
+        objectMapper.readValue('{"foo":"bar"}', IgnoreBean).secondary == 'bar'
+
+        cleanup:
+        ctx.close()
+
+        where:
+        // need reflective access here, because with only introspections, the secondary methods arent available.
+        ignoreReflectiveProperties << [false]//[true, false]
+    }
+
+    @Introspected
+    static class IgnoreBean {
+
+        private String foo = 'foo'
+        private String secondary = 'bar'
+
+        @JsonProperty('foo')
+        public String secondary() {
+            return secondary
+        }
+
+        @JsonProperty('foo')
+        public void secondary(String s) {
+            this.secondary = s
+        }
+
+        @JsonIgnore
+        public String getFoo() {
+            return foo
+        }
+
+        @JsonIgnore
+        public void setFoo(String s) {
+            this.foo = s
+        }
+    }
+
+    void "JsonIgnore on one accessor"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        expect:
+        objectMapper.writeValueAsString(new IgnoreBean2(foo: 'x', bar: 'y')) == '{"bar":"y"}'
+        objectMapper.readValue('{"foo":"x","bar":"y"}', IgnoreBean2).foo == 'x'
+        objectMapper.readValue('{"foo":"x","bar":"y"}', IgnoreBean2).bar == null
+
+        cleanup:
+        ctx.close()
+
+        where:
+        // without reflection we only see JsonIgnore on the whole property
+        ignoreReflectiveProperties << [false]
+    }
+
+    @Introspected
+    static class IgnoreBean2 {
+
+        @JsonIgnore
+        private String foo
+        @JsonIgnore
+        private String bar
+
+        @JsonIgnore
+        public String getFoo() {
+            return foo
+        }
+
+        @JsonProperty('foo')
+        public void setFoo(String s) {
+            this.foo = s
+        }
+
+        @JsonProperty('bar')
+        public String getBar() {
+            return bar
+        }
+
+        @JsonIgnore
+        public void setBar(String s) {
+            this.bar = s
+        }
+    }
 }

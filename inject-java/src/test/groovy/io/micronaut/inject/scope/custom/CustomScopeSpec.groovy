@@ -54,4 +54,14 @@ class CustomScopeSpec extends Specification {
         then:
         context.findBeanRegistration(bean).isPresent()
     }
+
+    void "test retrieving multiple beans with a custom scope"() {
+        when:
+        def beans = context.getBeansOfType(AbstractBean)
+
+        then:
+        beans.size() == 2
+        beans.any( { it instanceof BeanA })
+        beans.any( { it instanceof BeanB })
+    }
 }

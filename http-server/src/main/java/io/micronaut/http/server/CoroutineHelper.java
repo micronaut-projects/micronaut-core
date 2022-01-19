@@ -34,7 +34,7 @@ import java.util.List;
 @Internal
 @Singleton
 @Requires(classes = kotlin.coroutines.CoroutineContext.class)
-final class CoroutineHelper {
+public final class CoroutineHelper {
 
     private final List<HttpCoroutineContextFactory<?>> coroutineContextFactories;
 
@@ -42,7 +42,7 @@ final class CoroutineHelper {
         this.coroutineContextFactories = coroutineContextFactories;
     }
 
-    void setupCoroutineContext(HttpRequest<?> httpRequest, ContextView contextView) {
+    public void setupCoroutineContext(HttpRequest<?> httpRequest, ContextView contextView) {
         ContinuationArgumentBinder.setupCoroutineContext(httpRequest, contextView, coroutineContextFactories);
     }
 }

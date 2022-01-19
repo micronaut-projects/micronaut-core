@@ -146,6 +146,18 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     }
 
     @Override
+    protected <T extends Annotation> void annotate(AnnotationMetadata annotationMetadata, AnnotationValue<T> annotationValue) {
+        ArgumentUtils.requireNonNull("annotationMetadata", annotationMetadata);
+        ArgumentUtils.requireNonNull("annotationValue", annotationValue);
+
+        AnnotationUtils annotationUtils = javaVisitorContext
+                .getAnnotationUtils();
+        annotationUtils
+                .newAnnotationBuilder()
+                .annotate(annotationMetadata, annotationValue);
+    }
+
+    @Override
     protected <T extends Annotation> void annotate(AnnotationMetadata annotationMetadata, String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
         ArgumentUtils.requireNonNull("consumer", consumer);

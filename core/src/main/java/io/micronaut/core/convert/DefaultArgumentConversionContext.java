@@ -30,6 +30,7 @@ import java.util.*;
  */
 @Internal
 class DefaultArgumentConversionContext<T> implements ArgumentConversionContext<T> {
+
     private final Argument<T> argument;
     private final Locale finalLocale;
     private final Charset finalCharset;
@@ -44,16 +45,6 @@ class DefaultArgumentConversionContext<T> implements ArgumentConversionContext<T
         this.argument = argument;
         this.finalLocale = finalLocale;
         this.finalCharset = finalCharset;
-    }
-
-    @Override
-    public Argument[] getTypeParameters() {
-        return argument.getTypeParameters();
-    }
-
-    @Override
-    public Map<String, Argument<?>> getTypeVariables() {
-        return argument.getTypeVariables();
     }
 
     @Override

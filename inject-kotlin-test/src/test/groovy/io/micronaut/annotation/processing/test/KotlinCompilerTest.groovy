@@ -1,6 +1,15 @@
 package io.micronaut.annotation.processing.test
 
-class Test extends AbstractKotlinCompilerSpec {
+import io.micronaut.core.version.SemanticVersion
+import spock.lang.Requires
+import spock.util.environment.Jvm
+
+// fails due to https://issues.apache.org/jira/browse/GROOVY-10145
+@Requires({
+    SemanticVersion.isAtLeastMajorMinor(GroovySystem.version, 4, 0) ||
+            !Jvm.current.isJava16Compatible()
+})
+class KotlinCompilerTest extends AbstractKotlinCompilerSpec {
     void "simple class"() {
         given:
         def cl = buildClassLoader('example.Test', '''

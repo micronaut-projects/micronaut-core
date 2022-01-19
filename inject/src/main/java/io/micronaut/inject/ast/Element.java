@@ -46,7 +46,7 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement, D
     Element[] EMPTY_ELEMENT_ARRAY = new Element[0];
 
     /**
-     * @return The name of the element.
+     * @return The name of the element. For a type this represents the binary name.
      */
     @Override
     @NonNull String getName();
