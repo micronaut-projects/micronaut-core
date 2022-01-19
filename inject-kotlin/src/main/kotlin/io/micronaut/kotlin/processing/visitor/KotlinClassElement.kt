@@ -428,16 +428,19 @@ open class KotlinClassElement(val classType: KSType,
     private fun <T : Element?> getElementKind(elementType: Class<T>): Predicate<KSDeclaration> {
         return when (elementType) {
             MethodElement::class.java -> {
-                Predicate { declaration ->  declaration is KSFunctionDeclaration }
+                Predicate { declaration -> declaration is KSFunctionDeclaration }
             }
             FieldElement::class.java -> {
-                Predicate { declaration ->  declaration is KSPropertyDeclaration && declaration.hasBackingField }
+                Predicate { declaration -> declaration is KSPropertyDeclaration && declaration.hasBackingField }
             }
             ConstructorElement::class.java -> {
-                Predicate { declaration ->  declaration is KSFunctionDeclaration && declaration.functionKind == FunctionKind.TOP_LEVEL }
+                Predicate { declaration -> declaration is KSFunctionDeclaration && declaration.isConstructor() }
             }
             ClassElement::class.java -> {
                 Predicate { declaration -> declaration is KSClassDeclaration }
+            }
+            PropertyElement::class.java -> {
+                Predicate { declaration -> declaration is KSPropertyDeclaration }
             }
             else -> throw IllegalArgumentException("Unsupported element type for query: $elementType")
         }

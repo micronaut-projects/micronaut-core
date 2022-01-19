@@ -1,9 +1,6 @@
 package io.micronaut.kotlin.processing.beans
 
-import com.google.devtools.ksp.getConstructors
 import com.google.devtools.ksp.symbol.*
-import com.google.devtools.ksp.visitor.KSDefaultVisitor
-import com.google.devtools.ksp.visitor.KSTopDownVisitor
 import io.micronaut.aop.Interceptor
 import io.micronaut.aop.InterceptorBinding
 import io.micronaut.aop.InterceptorKind
@@ -11,44 +8,49 @@ import io.micronaut.context.annotation.*
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.ast.ClassElement
-import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.ast.ElementQuery
+import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.configuration.ConfigurationMetadata
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.inject.writer.BeanDefinitionWriter
+import io.micronaut.kotlin.processing.visitor.KotlinClassElement
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 
-class BeanDefinitionProcessorVisitor(private val classDeclaration: KSClassDeclaration,
+class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElement,
                                      private val visitorContext: KotlinVisitorContext) {
 
-    val beanDefinitionWriters: MutableMap<KSAnnotated, BeanDefinitionWriter> = mutableMapOf()
+    val beanDefinitionWriters: MutableList<BeanDefinitionWriter> = mutableListOf()
     private var beanWriter: BeanDefinitionVisitor? = null
     private val isAopProxyType: Boolean
     private val isExecutableType: Boolean
     private val isDeclaredBean: Boolean
     private val isConfigurationProperties: Boolean
     private val isFactoryClass: Boolean
-    private val concreteClassElement: ClassElement = visitorContext.elementFactory.newClassElement(classDeclaration.asStarProjectedType())
     private val configurationMetadataBuilder = KotlinConfigurationMetadataBuilder()
     private var configurationMetadata: ConfigurationMetadata? = null
 
     init {
-        this.isAopProxyType = hasAroundStereotype(concreteClassElement.annotationMetadata) &&
-                !concreteClassElement.isAbstract &&
-                !concreteClassElement.isAssignable(Interceptor::class.java)
-        this.isExecutableType = isAopProxyType || concreteClassElement.hasStereotype(Executable::class.java)
-        this.isConfigurationProperties = concreteClassElement.hasDeclaredStereotype(ConfigurationReader::class.java)
-        this.isFactoryClass = concreteClassElement.hasStereotype(Factory::class.java)
+        this.isAopProxyType = hasAroundStereotype(classElement.annotationMetadata) &&
+                !classElement.isAbstract &&
+                !classElement.isAssignable(Interceptor::class.java)
+        this.isExecutableType = isAopProxyType || classElement.hasStereotype(Executable::class.java)
+        this.isConfigurationProperties = classElement.hasDeclaredStereotype(ConfigurationReader::class.java)
+        if (isConfigurationProperties) {
+            this.configurationMetadata = configurationMetadataBuilder.visitProperties(
+                classElement,
+                null
+            )
+        }
+        this.isFactoryClass = classElement.hasStereotype(Factory::class.java)
         this.isDeclaredBean = isExecutableType ||
                 isConfigurationProperties ||
                 isFactoryClass ||
-                concreteClassElement.hasStereotype(AnnotationUtil.SCOPE) ||
-                concreteClassElement.hasStereotype(DefaultScope::class.java) ||
-                concreteClassElement.hasDeclaredStereotype(Bean::class.java) ||
-                concreteClassElement.primaryConstructor.filter { it.hasStereotype(AnnotationUtil.INJECT) }.isPresent
+                classElement.hasStereotype(AnnotationUtil.SCOPE) ||
+                classElement.hasStereotype(DefaultScope::class.java) ||
+                classElement.hasDeclaredStereotype(Bean::class.java) ||
+                classElement.primaryConstructor.filter { it.hasStereotype(AnnotationUtil.INJECT) }.isPresent
 
-        if (isDeclaredBean) {
-            defineBeanDefinition()
-        }
+
     }
 
     companion object {
@@ -67,69 +69,56 @@ class BeanDefinitionProcessorVisitor(private val classDeclaration: KSClassDeclar
         }
     }
 
-    fun visitClassDeclaration(classDeclaration: KSClassDeclaration, data: Any): Any {
-        val owningClass = this.classDeclaration == classDeclaration
-        val classElement = if (owningClass) {
-            concreteClassElement
-        } else {
-            visitorContext.elementFactory.newClassElement(classDeclaration.asStarProjectedType())
-        }
-        if (owningClass && concreteClassElement.isAbstract && !isDeclaredBean) {
-            return data
-        }
+    fun visit() {
+        if (isDeclaredBean) {
+            if (classElement.isAbstract && !isDeclaredBean) {
+                return
+            }
+            if (isAopProxyType && classElement.isFinal) {
+                visitorContext.fail("Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + classElement.name, classElement)
+                return
+            }
+            if (classElement.packageName.isEmpty()) {
+                visitorContext.fail("Micronaut beans cannot be in the default package", classElement)
+                return
+            }
+            defineBeanDefinition()
 
-        var superType = classElement.superType.orElse(null)
-        val superClasses = mutableListOf<ClassElement>()
-        while (superType != null) {
-            superClasses.add(superType)
-            superType = superType.superType.orElse(null)
+            classElement.getEnclosedElements(ElementQuery.of(PropertyElement::class.java))
         }
-        superClasses.reverse()
-/*        for (clazz in superClasses) {
-            (clazz.nativeType as KSClassDeclaration).accept(this, data)
-        }*/
-        return data
     }
 
 
 
     private fun defineBeanDefinition() {
-        if (!beanDefinitionWriters.contains(classDeclaration)) {
-            if (classDeclaration.packageName.asString().isEmpty()) {
-                visitorContext.fail("Micronaut beans cannot be in the default package", classDeclaration)
-                return
-            }
+        val beanWriter = BeanDefinitionWriter(classElement, configurationMetadataBuilder, visitorContext)
+        beanWriter.visitTypeArguments(classElement.allTypeArguments)
+        beanDefinitionWriters.add(beanWriter)
 
-            val beanWriter = BeanDefinitionWriter(concreteClassElement, configurationMetadataBuilder, visitorContext)
-            beanWriter.visitTypeArguments(concreteClassElement.allTypeArguments)
-            beanDefinitionWriters[classDeclaration] = beanWriter
+        val constructor = classElement.primaryConstructor.orElse(null)
 
-            val constructor = concreteClassElement.primaryConstructor.orElse(null)
-
-            if (constructor != null) {
-                if (constructor.parameters.isEmpty()) {
-                    beanWriter.visitDefaultConstructor(AnnotationMetadata.EMPTY_METADATA, visitorContext)
-                } else {
-                    val constructorMetadata = constructor.annotationMetadata
-                    val isConstructBinding = constructorMetadata.hasDeclaredStereotype(ConfigurationInject::class.java)
-                    if (isConstructBinding) {
-                        this.configurationMetadata = configurationMetadataBuilder.visitProperties(
-                            classDeclaration,
-                            null)
-                    }
-                    beanWriter.visitBeanDefinitionConstructor(constructor, constructor.isPrivate, visitorContext)
-                }
-
+        if (constructor != null) {
+            if (constructor.parameters.isEmpty()) {
+                beanWriter.visitDefaultConstructor(AnnotationMetadata.EMPTY_METADATA, visitorContext)
             } else {
-                val defaultConstructor = concreteClassElement.defaultConstructor.orElse(null)
-                if (defaultConstructor == null) {
-                    visitorContext.fail("Class must have at least one non private constructor in order to be a candidate for dependency injection", classDeclaration)
-                } else {
-                    beanWriter.visitDefaultConstructor(defaultConstructor.annotationMetadata, visitorContext)
+                val constructorMetadata = constructor.annotationMetadata
+                val isConstructBinding = constructorMetadata.hasDeclaredStereotype(ConfigurationInject::class.java)
+                if (isConstructBinding) {
+                    this.configurationMetadata = configurationMetadataBuilder.visitProperties(
+                        classElement,
+                        null)
                 }
+                beanWriter.visitBeanDefinitionConstructor(constructor, constructor.isPrivate, visitorContext)
             }
+
         } else {
-            beanWriter = beanDefinitionWriters[classDeclaration]
+            val defaultConstructor = classElement.defaultConstructor.orElse(null)
+            if (defaultConstructor == null) {
+                visitorContext.fail("Class must have at least one non private constructor in order to be a candidate for dependency injection", classElement)
+            } else {
+                beanWriter.visitDefaultConstructor(defaultConstructor.annotationMetadata, visitorContext)
+            }
         }
+        this.beanWriter = beanWriter
     }
 }
