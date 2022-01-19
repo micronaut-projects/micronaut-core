@@ -1509,7 +1509,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract @NonNull Map<String, ? extends T> getAnnotationMembers(@NonNull String annotationType);
 
     /**
-     * Returns true if a simple meta annotation is present for the given element and annotation type
+     * Returns true if a simple meta annotation is present for the given element and annotation type.
+     *
      * @param element The element
      * @param simpleName The simple name, ie {@link Class#getSimpleName()}
      * @return True an annotation with the given simple name exists on the element
