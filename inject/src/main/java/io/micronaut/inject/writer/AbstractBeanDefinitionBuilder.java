@@ -416,6 +416,12 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     }
 
     @Override
+    public <T extends Annotation> Element annotate(AnnotationValue<T> annotationValue) {
+        annotate(this.annotationMetadata, annotationValue);
+        return this;
+    }
+
+    @Override
     public BeanElementBuilder removeAnnotation(@NonNull String annotationType) {
         removeAnnotation(this.annotationMetadata, annotationType);
         return this;
@@ -646,6 +652,15 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
      * @param <T> The annotation generic type
      */
     protected abstract <T extends Annotation> void annotate(AnnotationMetadata annotationMetadata, String annotationType, Consumer<AnnotationValueBuilder<T>> consumer);
+
+    /**
+     * Add an annotation to the given metadata.
+     * @param annotationMetadata The annotation metadata
+     * @param annotationValue The value
+     * @param <T> The annotation generic type
+     * @since 3.3.0
+     */
+    protected abstract <T extends Annotation> void annotate(@NonNull AnnotationMetadata annotationMetadata, @NonNull AnnotationValue<T> annotationValue);
 
     /**
      * Remove a stereotype from the given metadata.
