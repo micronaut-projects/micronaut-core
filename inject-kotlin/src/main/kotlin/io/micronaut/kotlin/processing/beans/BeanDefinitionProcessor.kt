@@ -14,6 +14,7 @@ import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.kotlin.processing.KotlinOutputVisitor
+import io.micronaut.kotlin.processing.visitor.KotlinClassElement
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 
 class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironment): SymbolProcessor {
@@ -34,7 +35,7 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
             .toList()
 
         for (classDeclaration in elements) {
-            val classElement = visitorContext.elementFactory.newClassElement(classDeclaration.asStarProjectedType())
+            val classElement = visitorContext.elementFactory.newClassElement(classDeclaration.asStarProjectedType()) as KotlinClassElement
 
             if (classElement.isInner && !classElement.isStatic) {
                 continue
@@ -42,10 +43,10 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
             if (classElement.isInterface) {
                 if (classElement.hasStereotype(AnnotationUtil.ANN_INTRODUCTION) ||
                     classElement.hasStereotype(ConfigurationReader::class.java)) {
-                    visit(classDeclaration, beanDefinitionWriters, visitorContext)
+                    visit(classElement, beanDefinitionWriters, visitorContext)
                 }
             } else {
-                visit(classDeclaration, beanDefinitionWriters, visitorContext)
+                visit(classElement, beanDefinitionWriters, visitorContext)
             }
         }
         return emptyList()
@@ -66,9 +67,9 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
         }
     }
 
-    private fun visit(classDeclaration: KSClassDeclaration, beanDefinitionWriters: MutableList<BeanDefinitionWriter>, visitorContext: KotlinVisitorContext) {
-        val visitor = BeanDefinitionProcessorVisitor(classDeclaration, visitorContext)
-        visitor.visitClassDeclaration(classDeclaration, Object())
+    private fun visit(classElement: KotlinClassElement, beanDefinitionWriters: MutableList<BeanDefinitionWriter>, visitorContext: KotlinVisitorContext) {
+        val visitor = BeanDefinitionProcessorVisitor(classElement, visitorContext)
+        visitor.visit()
         beanDefinitionWriters.addAll(visitor.beanDefinitionWriters.values)
     }
 
