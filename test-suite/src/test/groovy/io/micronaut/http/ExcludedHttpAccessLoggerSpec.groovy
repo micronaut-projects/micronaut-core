@@ -51,11 +51,14 @@ class ExcludedHttpAccessLoggerSpec extends Specification {
         ]
 
         and:
-        paths.each {
-            Flux.from(client.exchange(HttpRequest.GET(it.uri))).blockFirst()
+        def responses = paths.collect {
+            Flux.from(client.retrieve(HttpRequest.GET(it.uri), String)).blockFirst()
         }
 
         then:
+        responses.size() == paths.size()
+        responses.every { it == "ok" }
+
         conditions.eventually {
             def loggedUris = appender.events.collect {
                 def matcher = (it =~ /^.+GET (?<uri>\S+).+$/)
