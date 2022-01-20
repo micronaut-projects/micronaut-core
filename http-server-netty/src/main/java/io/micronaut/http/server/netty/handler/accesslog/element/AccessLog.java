@@ -73,7 +73,7 @@ public class AccessLog {
     * @param protocol The protocol.
     */
     public void onRequestHeaders(SocketChannel channel, String method, HttpHeaders headers, String uri, String protocol) {
-        for (IndexedLogElement element : onRequestHeadersElements) {
+        for (IndexedLogElement element: onRequestHeadersElements) {
             elements[element.index] = element.onRequestHeaders(channel, method, headers, uri, protocol);
         }
     }
@@ -86,7 +86,7 @@ public class AccessLog {
      * @param status The response status.
      */
     public void onResponseHeaders(ChannelHandlerContext ctx, HttpHeaders headers, String status) {
-        for (IndexedLogElement element : onResponseHeadersElements) {
+        for (IndexedLogElement element: onResponseHeadersElements) {
             elements[element.index] = element.onResponseHeaders(ctx, headers, status);
         }
     }
@@ -96,7 +96,7 @@ public class AccessLog {
      * @param bytesSent The number of bytes sent.
      */
     public void onResponseWrite(int bytesSent) {
-        for (IndexedLogElement element : onResponseWriteElements) {
+        for (IndexedLogElement element: onResponseWriteElements) {
             element.onResponseWrite(bytesSent);
         }
     }
@@ -106,7 +106,7 @@ public class AccessLog {
      * @param bytesSent The number of bytes sent.
      */
     public void onLastResponseWrite(int bytesSent) {
-        for (IndexedLogElement element : onLastResponseWriteElements) {
+        for (IndexedLogElement element: onLastResponseWriteElements) {
             elements[element.index] = element.onLastResponseWrite(bytesSent);
         }
     }
