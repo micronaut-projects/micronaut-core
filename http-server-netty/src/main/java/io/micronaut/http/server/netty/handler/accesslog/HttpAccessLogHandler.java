@@ -107,10 +107,10 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Http2Exception {
         if (logger.isInfoEnabled() && msg instanceof HttpRequest) {
+            final SocketChannel channel = (SocketChannel) ctx.channel();
             final HttpRequest request = (HttpRequest) msg;
+            AccessLog accessLog = accessLog(channel);
             if (uriInclusion == null || uriInclusion.test(request.uri())) {
-
-                final SocketChannel channel = (SocketChannel) ctx.channel();
                 final HttpHeaders headers = request.headers();
                 // Trying to detect http/2
                 String protocol;
@@ -119,9 +119,9 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
                 } else {
                     protocol = request.protocolVersion().text();
                 }
-                accessLog(channel).onRequestHeaders(channel, request.method().name(), request.headers(), request.uri(), protocol);
+                accessLog.onRequestHeaders(channel, request.method().name(), request.headers(), request.uri(), protocol);
             } else {
-                ctx.pipeline().remove(this);
+                accessLog.exclude();
             }
         }
         ctx.fireChannelRead(msg);

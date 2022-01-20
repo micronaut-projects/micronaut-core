@@ -35,6 +35,7 @@ public class AccessLog {
     private final List<IndexedLogElement> onResponseWriteElements;
     private final List<IndexedLogElement> onLastResponseWriteElements;
     private final String[] elements;
+    private boolean excluded;
 
     /**
      * Creates an AccessLog.
@@ -51,6 +52,7 @@ public class AccessLog {
         this.onResponseWriteElements = onResponseWriteElements;
         this.onLastResponseWriteElements = onLastResponseWriteElements;
         this.elements = elements;
+        this.excluded = false;
     }
 
     /**
@@ -61,6 +63,7 @@ public class AccessLog {
         onResponseHeadersElements.forEach(this::resetIndexedLogElement);
         onResponseWriteElements.forEach(this::resetIndexedLogElement);
         onLastResponseWriteElements.forEach(this::resetIndexedLogElement);
+        excluded = false;
     }
 
    /**
@@ -73,8 +76,10 @@ public class AccessLog {
     * @param protocol The protocol.
     */
     public void onRequestHeaders(SocketChannel channel, String method, HttpHeaders headers, String uri, String protocol) {
-        for (IndexedLogElement element: onRequestHeadersElements) {
-            elements[element.index] = element.onRequestHeaders(channel, method, headers, uri, protocol);
+        if (!excluded) {
+            for (IndexedLogElement element: onRequestHeadersElements) {
+                elements[element.index] = element.onRequestHeaders(channel, method, headers, uri, protocol);
+            }
         }
     }
 
@@ -86,8 +91,10 @@ public class AccessLog {
      * @param status The response status.
      */
     public void onResponseHeaders(ChannelHandlerContext ctx, HttpHeaders headers, String status) {
-        for (IndexedLogElement element: onResponseHeadersElements) {
-            elements[element.index] = element.onResponseHeaders(ctx, headers, status);
+        if (!excluded) {
+            for (IndexedLogElement element: onResponseHeadersElements) {
+                elements[element.index] = element.onResponseHeaders(ctx, headers, status);
+            }
         }
     }
 
@@ -96,8 +103,10 @@ public class AccessLog {
      * @param bytesSent The number of bytes sent.
      */
     public void onResponseWrite(int bytesSent) {
-        for (IndexedLogElement element: onResponseWriteElements) {
-            element.onResponseWrite(bytesSent);
+        if (!excluded) {
+            for (IndexedLogElement element: onResponseWriteElements) {
+                element.onResponseWrite(bytesSent);
+            }
         }
     }
 
@@ -106,8 +115,10 @@ public class AccessLog {
      * @param bytesSent The number of bytes sent.
      */
     public void onLastResponseWrite(int bytesSent) {
-        for (IndexedLogElement element: onLastResponseWriteElements) {
-            elements[element.index] = element.onLastResponseWrite(bytesSent);
+        if (!excluded) {
+            for (IndexedLogElement element: onLastResponseWriteElements) {
+                elements[element.index] = element.onLastResponseWrite(bytesSent);
+            }
         }
     }
 
@@ -117,7 +128,7 @@ public class AccessLog {
      * @param accessLogger A logger.
      */
     public void log(Logger accessLogger) {
-        if (accessLogger.isInfoEnabled()) {
+        if (accessLogger.isInfoEnabled() && !excluded) {
             final StringBuilder b = new StringBuilder(elements.length * 5);
             for (int i = 0; i < elements.length; ++i) {
                 b.append(elements[i] == null ? ConstantElement.UNKNOWN_VALUE : elements[i]);
@@ -129,5 +140,12 @@ public class AccessLog {
     private void resetIndexedLogElement(IndexedLogElement elt) {
         elements[elt.index] = null;
         elt.reset();
+    }
+
+    /**
+     * Mark the current AccessLog as excluded (if for example, it is excluded by the access log exclusions).
+     */
+    public void exclude() {
+        this.excluded = true;
     }
 }
