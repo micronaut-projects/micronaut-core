@@ -13,6 +13,7 @@ import io.micronaut.core.beans.BeanProperty
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.introspections.Person
+import spock.lang.Issue
 import spock.util.environment.RestoreSystemProperties
 
 import javax.validation.constraints.Size
@@ -1407,4 +1408,43 @@ abstract class Test {
         beanIntrospection != null
         beanIntrospection.getBeanProperties().size() == 3
     }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/6756")
+    def "covariant property is not read only"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Test implements B {
+
+    private AImpl a
+
+    @Override
+    AImpl getA() {
+        a
+    }
+
+    void setA(AImpl a) {
+        this.a = a
+    }
+}
+
+interface A {}
+
+interface B {
+    A getA()
+}
+
+class AImpl implements A {
+}
+''')
+        def property = introspection.getProperty("a").get()
+
+        then:
+        property.isReadWrite()
+    }
+
 }
