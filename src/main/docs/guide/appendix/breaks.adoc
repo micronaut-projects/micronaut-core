@@ -25,6 +25,10 @@ public class LegacyEnvEndpointFilter implements EnvironmentEndpointFilter {
 }
 ----
 
+== 3.2.4
+
+- The link:{api}/io/micronaut/http/client/ProxyHttpClient.html[ProxyHttpClient] now sends the Host header of the proxied service https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.23[as per the RFC], instead of the originating service.
+
 == 3.2.0
 
 - The HTTP client now does SSL certificate verification by default. The old insecure behavior can be re-enabled by setting the `micronaut.http.client.ssl.insecureTrustAllCertificates` property to `true`, but consider using a trust store instead if you're using self-signed certificates.

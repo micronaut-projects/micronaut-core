@@ -29,9 +29,13 @@ The native Netty transports add features specific to a particular platform, gene
 
 To enable native transports, first add a dependency:
 
-For macOS:
+For macOS on x86:
 
 dependency:netty-transport-native-kqueue[groupId="io.netty",scope="runtime",classifier="osx-x86_64"]
+
+For macOS on M1:
+
+dependency:netty-transport-native-kqueue[groupId="io.netty",scope="runtime",classifier="osx-aarch_64"]
 
 For Linux on x86:
 

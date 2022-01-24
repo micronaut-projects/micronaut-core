@@ -182,6 +182,11 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         }
     }
 
+    /**
+     * Calls the open method of the websocket bean.
+     *
+     * @param ctx THe handler context
+     */
     protected void callOpenMethod(ChannelHandlerContext ctx) {
         if (session == null) {
             return;

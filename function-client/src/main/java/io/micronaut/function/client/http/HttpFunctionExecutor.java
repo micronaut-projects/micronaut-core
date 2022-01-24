@@ -88,6 +88,9 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
                 return ConversionService.SHARED.convert(publisher, outputType).orElseThrow(() ->
                     new FunctionExecutionException("Unsupported Reactive type: " + outputJavaType)
                 );
+            } else if (outputType.isVoid()) {
+                httpClient.toBlocking().exchange(request);
+                return null;
             } else {
                 return (O) httpClient.toBlocking().retrieve(request, outputType);
             }

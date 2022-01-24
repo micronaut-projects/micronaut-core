@@ -1,6 +1,7 @@
 package io.micronaut.inject.visitor.beans
 
 import com.blazebit.persistence.impl.function.entity.ValuesEntity
+import com.fasterxml.jackson.annotation.JsonClassDescription
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -832,6 +833,78 @@ class Test {}
 
         cleanup:
         applicationContext.close()
+    }
+
+    void "test create bean introspection for interface"() {
+        given:
+        def context = buildContext('itfcetest.MyInterface','''
+package itfcetest;
+
+import com.fasterxml.jackson.annotation.JsonClassDescription;
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected(classes = MyInterface.class)
+class Test {}
+
+@JsonClassDescription
+public interface MyInterface {
+    String getName();
+    @Executable
+    default String name() {
+        return getName();
+    }    
+}
+
+class MyImpl implements MyInterface {
+    @Override public String getName() {
+        return "ok";
+    }
+}
+''')
+        when:"the reference is loaded"
+        def clazz = context.classLoader.loadClass('itfcetest.$Test$IntrospectionRef0')
+        BeanIntrospectionReference reference = clazz.newInstance()
+        BeanIntrospection introspection = reference.load()
+
+        then:
+        introspection.getBeanType().isInterface()
+        introspection.beanProperties.size() == 1
+        introspection.beanMethods.size() == 1
+        introspection.hasAnnotation(JsonClassDescription)
+    }
+
+    void "test create bean introspection for interface - only methods"() {
+        given:
+        def context = buildContext('itfcetest.MyInterface','''
+package itfcetest;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected(classes = MyInterface.class)
+class Test {}
+
+public interface MyInterface {
+    @Executable
+    String name();    
+}
+
+class MyImpl implements MyInterface {
+    @Override public String name() {
+        return "ok";
+    }
+}
+''')
+        when:"the reference is loaded"
+        def clazz = context.classLoader.loadClass('itfcetest.$Test$IntrospectionRef0')
+        BeanIntrospectionReference reference = clazz.newInstance()
+        BeanIntrospection introspection = reference.load()
+
+        then:
+        introspection.getBeanType().isInterface()
+        introspection.beanProperties.size() == 0
+        introspection.beanMethods.size() == 1
     }
 
     void "test create bean introspection for external inner interface"() {

@@ -188,6 +188,40 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
+    protected Map<String, Element> getAnnotationMembers(String annotationType) {
+        final Element element = getAnnotationMirror(annotationType).orElse(null);
+        if (element != null && element.getKind() == ElementKind.ANNOTATION_TYPE) {
+            final List<? extends Element> elements = element.getEnclosedElements();
+            if (elements.isEmpty()) {
+                return Collections.emptyMap();
+            } else {
+                Map<String, Element> members = new LinkedHashMap<>(elements.size());
+                for (Element method : elements) {
+                    members.put(method.getSimpleName().toString(), method);
+                }
+                return Collections.unmodifiableMap(members);
+            }
+        }
+        return Collections.emptyMap();
+    }
+
+    @Override
+    protected boolean hasSimpleAnnotation(Element element, String simpleName) {
+        if (element != null) {
+            final List<? extends AnnotationMirror> mirrors = element.getAnnotationMirrors();
+            for (AnnotationMirror mirror : mirrors) {
+                final String s = mirror.getAnnotationType()
+                        .asElement()
+                        .getSimpleName().toString();
+                if (s.equalsIgnoreCase(simpleName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
     protected boolean isMethodOrClassElement(Element element) {
         return element instanceof TypeElement || element instanceof ExecutableElement;
     }
@@ -585,6 +619,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      */
     public static void clearCaches() {
         OVERRIDDEN_METHOD_CACHE.clear();
+        AbstractAnnotationMetadataBuilder.clearCaches();
     }
 
     /**
