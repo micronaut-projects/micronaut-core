@@ -3,10 +3,18 @@ package io.micronaut.kotlin.processing;
 import com.tschuchort.compiletesting.KotlinCompilation;
 import com.tschuchort.compiletesting.KspKt;
 import com.tschuchort.compiletesting.SourceFile;
+import io.micronaut.aop.internal.InterceptorRegistryBean;
+import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.DefaultApplicationContext;
+import io.micronaut.context.event.ApplicationEventPublisherFactory;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
+import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.BeanDefinitionReference;
+import io.micronaut.inject.provider.BeanProviderDefinition;
+import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
 import io.micronaut.kotlin.processing.beans.BeanDefinitionProcessorProvider;
 import io.micronaut.kotlin.processing.visitor.TypeElementSymbolProcessorProvider;
@@ -16,12 +24,19 @@ import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URLClassLoader;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class KotlinCompiler {
 
     public static URLClassLoader buildClassLoader(String name, @Language("kotlin") String clazz) {
+        return compile(name, clazz).getClassLoader();
+    }
+
+    public static KotlinCompilation.Result compile(String name, @Language("kotlin") String clazz) {
         KotlinCompilation compilation = new KotlinCompilation();
         compilation.setSources(Collections.singletonList(SourceFile.Companion.kotlin(name + ".kt", clazz, true)));
         compilation.setInheritClassPath(true);
@@ -39,14 +54,14 @@ public class KotlinCompiler {
                 new File(kspCompilation.getWorkingDir(), "ksp/classes"),
                 new File(kspCompilation.getWorkingDir(), "ksp/sources/resources"),
                 compilation.getClassesDir()));
-        KspKt.setSymbolProcessorProviders(kspCompilation, Arrays.asList(new TypeElementSymbolProcessorProvider(), new BeanDefinitionProcessorProvider()));
+        KspKt.setSymbolProcessorProviders(kspCompilation, Arrays.asList(new TypeElementSymbolProcessorProvider(), new BeanDefinitionProcessorProvider(), new ServiceDescriptionProcessorProvider()));
 
         result = kspCompilation.compile();
         if (result.getExitCode() != KotlinCompilation.ExitCode.OK) {
             throw new RuntimeException(result.getMessages());
         }
 
-        return result.getClassLoader();
+        return result;
     }
 
     public static BeanIntrospection<?> buildBeanIntrospection(String name, @Language("kotlin") String clazz) {
@@ -64,11 +79,50 @@ public class KotlinCompiler {
         String beanDefName = (simpleName.startsWith("$") ? "" : '$') + simpleName + BeanDefinitionWriter.CLASS_SUFFIX;
         String packageName = NameUtils.getPackageName(name);
         String beanFullName = packageName + "." + beanDefName;
+        return (BeanDefinition<?>) loadDefinition(classLoader, beanFullName);
+    }
+
+    public static ApplicationContext buildContext(@Language("kotlin") String clazz) {
+        return buildContext(clazz, false);
+    }
+
+    public static ApplicationContext buildContext(@Language("kotlin") String clazz, boolean includeAllBeans) {
+        KotlinCompilation.Result result = compile("temp", clazz);
+        ClassLoader classLoader = result.getClassLoader();
+        return new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(classLoader),"test") {
+     /*       @Override
+            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
+                List<String> beanDefinitionNames = result.getCompiledClassAndResourceFiles()
+                        .stream()
+                        .map(File::getName)
+                        .filter(name -> name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX))
+                        .collect(Collectors.toList());
+
+                List<BeanDefinitionReference> beanDefinitions = new ArrayList<>(beanDefinitionNames.size());
+                for (String name : beanDefinitionNames) {
+                    try {
+                        beanDefinitions.add((BeanDefinitionReference) loadDefinition(classLoader, name));
+                    } catch (NoSuchMethodException | InvocationTargetException | InstantiationException | IllegalAccessException e) {
+                    }
+                }
+                if (includeAllBeans) {
+                    beanDefinitions.addAll(super.resolveBeanDefinitionReferences());
+                } else {
+                    beanDefinitions.add(new InterceptorRegistryBean());
+                    beanDefinitions.add(new BeanProviderDefinition());
+                    beanDefinitions.add(new ApplicationEventPublisherFactory<>());
+                }
+                return beanDefinitions;
+            }*/
+        }.start();
+    }
+
+    private static Object loadDefinition(ClassLoader classLoader, String name) throws NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
         try {
-            Class<?> c = classLoader.loadClass(beanFullName);
+            Class<?> c = classLoader.loadClass(name);
             Constructor<?> constructor = c.getDeclaredConstructor();
             constructor.setAccessible(true);
-            return (BeanDefinition<?>) constructor.newInstance();
+            return constructor.newInstance();
         } catch (ClassNotFoundException e) {
             return null;
         }

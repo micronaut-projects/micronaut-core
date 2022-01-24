@@ -25,6 +25,8 @@ class KotlinOutputVisitor(private val environment: SymbolProcessorEnvironment): 
             "class")
     }
 
+    override fun getServiceEntries(): MutableMap<String, MutableSet<String>> = serviceDescriptors
+
     override fun visitServiceDescriptor(type: String, classname: String) {
         if (StringUtils.isNotEmpty(type) && StringUtils.isNotEmpty(classname)) {
             serviceDescriptors.computeIfAbsent(type) { s -> LinkedHashSet() }.add(classname)

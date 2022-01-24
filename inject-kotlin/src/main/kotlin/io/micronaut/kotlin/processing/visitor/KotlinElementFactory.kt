@@ -2,7 +2,9 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.*
+import io.micronaut.kotlin.processing.isTypeReference
 
 class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): ElementFactory<Any, KSType, KSFunctionDeclaration, KSPropertyDeclaration> {
 
@@ -94,6 +96,33 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         }
     }
 
+    fun newPropertyElement(declaringClass: ClassElement, propertyDeclaration: KSPropertyDeclaration): PropertyElement {
+        val type = propertyDeclaration.type.resolve()
+        val parents = mutableListOf<KSAnnotated>()
+        if (propertyDeclaration.getter != null) {
+            parents.add(propertyDeclaration.getter!!)
+        }
+        if (propertyDeclaration.setter != null) {
+            parents.add(propertyDeclaration.setter!!)
+        }
+        val annotationMetadata = if (parents.isNotEmpty()) {
+            visitorContext.getAnnotationUtils().getAnnotationMetadata(parents, propertyDeclaration)
+        } else {
+            visitorContext.getAnnotationUtils().getAnnotationMetadata(propertyDeclaration)
+        }
+        return KotlinPropertyElement(
+            declaringClass,
+            newClassElement(
+                type,
+                visitorContext.getAnnotationUtils().getAnnotationMetadata(type.declaration),
+                declaringClass.typeArguments,
+                !propertyDeclaration.isTypeReference()),
+            propertyDeclaration,
+            annotationMetadata,
+            visitorContext
+        )
+    }
+
     override fun newSourceClassElement(type: KSType, annotationMetadata: AnnotationMetadata): ClassElement {
         TODO("Not yet implemented")
     }
@@ -120,7 +149,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
             method.parameters.map { param ->
                 KotlinParameterElement(newClassElement(param.type.resolve()), param, annotationUtils.getAnnotationMetadata(param), visitorContext)
             },
-            annotationMetadata,
+            AnnotationMetadataHierarchy(declaringClass.annotationMetadata, annotationMetadata),
             visitorContext)
     }
 
@@ -130,7 +159,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         type: ClassElement,
         annotationMetadata: AnnotationMetadata
     ): MethodElement {
-        return KotlinMethodElement(method, declaringClass, type, annotationMetadata, visitorContext)
+        return KotlinMethodElement(method, declaringClass, type, AnnotationMetadataHierarchy(declaringClass.annotationMetadata, annotationMetadata), visitorContext)
     }
 
     fun newMethodElement(
@@ -140,7 +169,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         annotationMetadata: AnnotationMetadata
     ): MethodElement {
         val annotationUtils = visitorContext.getAnnotationUtils()
-        return KotlinMethodElement(method, declaringClass, annotationMetadata, visitorContext, KotlinParameterElement(type, method.parameter, annotationUtils.getAnnotationMetadata(method.parameter), visitorContext))
+        return KotlinMethodElement(method, declaringClass, AnnotationMetadataHierarchy(declaringClass.annotationMetadata, annotationMetadata), visitorContext, KotlinParameterElement(type, method.parameter, annotationUtils.getAnnotationMetadata(method.parameter), visitorContext))
     }
 
     override fun newConstructorElement(
@@ -149,7 +178,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         annotationMetadata: AnnotationMetadata
     ): ConstructorElement {
         val annotationUtils = visitorContext.getAnnotationUtils()
-        return KotlinConstructorElement(constructor, declaringClass, annotationMetadata, visitorContext, declaringClass, constructor.parameters.map { param ->
+        return KotlinConstructorElement(constructor, declaringClass, AnnotationMetadataHierarchy(declaringClass.annotationMetadata, annotationMetadata), visitorContext, declaringClass, constructor.parameters.map { param ->
             KotlinParameterElement(newClassElement(param.type.resolve(), declaringClass.typeArguments), param, annotationUtils.getAnnotationMetadata(param), visitorContext)
         })
     }

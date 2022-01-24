@@ -70,7 +70,7 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
     private fun visit(classElement: KotlinClassElement, beanDefinitionWriters: MutableList<BeanDefinitionWriter>, visitorContext: KotlinVisitorContext) {
         val visitor = BeanDefinitionProcessorVisitor(classElement, visitorContext)
         visitor.visit()
-        beanDefinitionWriters.addAll(visitor.beanDefinitionWriters.values)
+        beanDefinitionWriters.addAll(visitor.beanDefinitionWriters)
     }
 
 

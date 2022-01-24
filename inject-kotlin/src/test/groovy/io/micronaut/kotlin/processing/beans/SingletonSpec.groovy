@@ -7,7 +7,7 @@ class SingletonSpec extends Specification {
 
     void "test simple singleton bean"() {
         when:
-        def definition = KotlinCompiler.buildBeanDefinition("test.Test", """
+        def context = KotlinCompiler.buildContext("""
 package test
 
  import jakarta.inject.Singleton
@@ -18,6 +18,63 @@ class Test
 
         then:
         noExceptionThrown()
-        definition != null
+
+        when:
+        Class<?> test = context.classLoader.loadClass("test.Test")
+        context.getBean(test)
+
+        then:
+        noExceptionThrown()
+    }
+
+    void "test singleton bean from a factory property"() {
+        when:
+        def context = KotlinCompiler.buildContext("""
+package test
+
+import io.micronaut.context.annotation.Bean
+import io.micronaut.context.annotation.Factory
+import jakarta.inject.Singleton
+
+@Factory
+class Test {
+    
+    @Singleton
+    @Bean
+    val one = Foo("one")
+    
+}
+
+class Foo(val name: String)
+""")
+
+        then:
+        noExceptionThrown()
+        Class<?> foo = context.classLoader.loadClass("test.Foo")
+        context.getBean(foo).getName() == "one"
+    }
+
+    void "test singleton bean from a factory method"() {
+        when:
+        def context = KotlinCompiler.buildContext("""
+package test
+
+import io.micronaut.context.annotation.Bean
+import io.micronaut.context.annotation.Factory
+import jakarta.inject.Singleton
+
+@Factory
+class Test {      
+    @Singleton
+    fun one() = Foo("one")
+}
+
+class Foo(val name: String)
+""")
+
+        then:
+        noExceptionThrown()
+        Class<?> foo = context.classLoader.loadClass("test.Foo")
+        context.getBean(foo).getName() == "one"
     }
 }
