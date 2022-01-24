@@ -29,24 +29,20 @@ import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 
-@Retry(mode = Retry.Mode.SETUP_FEATURE_CLEANUP)
 class SslSelfSignedSpec extends Specification {
-
     @Shared
     String host = Optional.ofNullable(System.getenv(Environment.HOSTNAME)).orElse(SocketUtils.LOCALHOST)
 
-    int port
     ApplicationContext context
     EmbeddedServer embeddedServer
     HttpClient client
 
     void setup() {
-        port = SocketUtils.findAvailableTcpPort()
         context = ApplicationContext.run([
                 'spec.name': 'SslSelfSignedSpec',
                 'micronaut.ssl.enabled': true,
                 'micronaut.server.ssl.buildSelfSigned': true,
-                'micronaut.server.ssl.port': port,
+                'micronaut.server.ssl.port': -1,
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
         ])
         embeddedServer = context.getBean(EmbeddedServer).start()
@@ -60,7 +56,7 @@ class SslSelfSignedSpec extends Specification {
 
     void "expect the url to be https"() {
         expect:
-        embeddedServer.getURL().toString() == "https://${host}:${port}"
+        embeddedServer.getURL().toString().startsWith("https://${host}:")
     }
 
     void "test send https request"() {

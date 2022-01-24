@@ -436,6 +436,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 .forEach(propertySources::add);
     }
 
+    /**
+     * @return Property sources created at build time
+     */
     protected List<PropertySource> getConstantPropertySources() {
         return CONSTANT_PROPERTY_SOURCES;
     }

@@ -218,3 +218,10 @@ tasks.named("updateVersionCatalogs") {
     // workaround Gradle variant selection problem
     ignoredModules.add("com.github.ben-manes.caffeine:caffeine")
 }
+
+allprojects {
+    tasks.withType(JavaCompile).configureEach {
+        options.fork = true
+        options.forkOptions.memoryMaximumSize = "1048m"
+    }
+}
