@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: ['java11', 'java17']
+        java: ['11', '17']
     steps:
        # https://github.com/actions/virtual-environments/issues/709
       - name: Free disk space
@@ -36,12 +36,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
       - name: Setup GraalVM CE
-        uses: DeLaGuardo/setup-graalvm@5.0
+        uses: graalvm/setup-graalvm@v1
         with:
-          graalvm: 21.3.0
-          java: ${{ matrix.java }}
-      - name: Install Native Image
-        run: gu install native-image
+          version: '21.3.0'
+          java-version: ${{ matrix.java }}
+          components: 'native-image'
       - name: Build with Gradle
         run: |
           if ./gradlew tasks --no-daemon --all | grep -w "testNativeImage"
@@ -59,5 +58,5 @@ jobs:
         if: always()
         uses: mikepenz/action-junit-report@v2
         with:
-          check_name: GraalVM CE CI / Test Report (${{ matrix.java }})
+          check_name: GraalVM CE CI / Test Report (Java ${{ matrix.java }})
           report_paths: '**/build/test-results/test/TEST-*.xml'
