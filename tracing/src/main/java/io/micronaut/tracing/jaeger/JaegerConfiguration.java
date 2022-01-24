@@ -277,4 +277,16 @@ public class JaegerConfiguration implements Toggleable  {
             return configuration;
         }
     }
+
+    /**
+     * Set codecs from string.
+     *
+     * @param codecs the codecs
+     */
+    public void setCodecs(String codecs) { // codecs = "JAEGER, B3, W3C"
+        if (codecs != null) {
+            setCodecConfiguration(Configuration.CodecConfiguration.fromString(codecs));
+        }
+    }
+
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,11 @@ package io.micronaut.runtime.server.watch.event;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.runtime.EmbeddedApplication;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.scheduling.io.watch.FileWatchConfiguration;
 import io.micronaut.scheduling.io.watch.event.FileChangedEvent;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,25 +36,35 @@ import org.slf4j.LoggerFactory;
  * @since 1.1.0
  */
 @Singleton
-@Requires(beans = EmbeddedServer.class)
+@Requires(beans = EmbeddedApplication.class)
 @Requires(property = FileWatchConfiguration.RESTART, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 public class FileWatchRestartListener implements ApplicationEventListener<FileChangedEvent> {
 
     private static final Logger LOG = LoggerFactory.getLogger(FileWatchRestartListener.class);
 
-    private final EmbeddedServer embeddedServer;
+    private final EmbeddedApplication<?> embeddedApplication;
 
     /**
      * Default constructor.
-     * @param embeddedServer The embedded server
+     * @param embeddedApplication The embedded application
      */
+    @Inject
+    public FileWatchRestartListener(EmbeddedApplication<?> embeddedApplication) {
+        this.embeddedApplication = embeddedApplication;
+    }
+
+    /**
+     * @param embeddedServer The embedded server
+     * @deprecated Use {@link #FileWatchRestartListener(EmbeddedApplication)} instead.
+     */
+    @Deprecated
     public FileWatchRestartListener(EmbeddedServer embeddedServer) {
-        this.embeddedServer = embeddedServer;
+        this.embeddedApplication = embeddedServer;
     }
 
     @Override
     public void onApplicationEvent(FileChangedEvent event) {
-        embeddedServer.stop();
+        embeddedApplication.stop();
         if (LOG.isInfoEnabled()) {
             LOG.info("Shutting down server following file change.");
         }

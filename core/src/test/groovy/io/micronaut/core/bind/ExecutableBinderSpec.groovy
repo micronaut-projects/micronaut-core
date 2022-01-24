@@ -74,7 +74,7 @@ class ExecutableBinderSpec extends Specification {
         given:
 
         AnnotationMetadata annotationMetadata = Mock(AnnotationMetadata)
-        annotationMetadata.hasAnnotation(AnnotationUtil.NULLABLE) >> true
+        annotationMetadata.hasStereotype(AnnotationUtil.NULLABLE) >> true
         annotationMetadata.getAnnotationTypeByStereotype(_) >> Optional.empty()
 
         Executable executable = new Executable() {
