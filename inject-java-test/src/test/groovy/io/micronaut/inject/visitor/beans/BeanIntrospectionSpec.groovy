@@ -12,7 +12,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Replaces
 import io.micronaut.core.annotation.Introspected
-import io.micronaut.core.beans.BeanConstructor
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
 import io.micronaut.core.beans.BeanIntrospector
@@ -29,9 +28,6 @@ import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.jackson.modules.BeanIntrospectionModule
 import spock.lang.IgnoreIf
 
-//import org.objectweb.asm.ClassReader
-//import org.objectweb.asm.util.ASMifier
-//import org.objectweb.asm.util.TraceClassVisitor
 import spock.lang.Issue
 import spock.lang.Requires
 
@@ -3091,6 +3087,42 @@ public class Test {
         beanIntrospection != null
         beanIntrospection.getBeanProperties().size() == 1
         beanIntrospection.getBeanProperties()[0].annotationMetadata.getAnnotation(JsonProperty).stringValue().get() == 'field'
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/6756")
+    def "covariant property is not read only"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+@io.micronaut.core.annotation.Introspected
+class Test implements B {
+
+    private AImpl a;
+
+    @Override
+    public AImpl getA() {
+        return a;
+    }
+
+    public void setA(AImpl a) {
+        this.a = a;
+    }
+}
+
+interface A {}
+
+interface B {
+    A getA();
+}
+
+class AImpl implements A {
+}
+''')
+        def property = introspection.getProperty("a").get()
+
+        then:
+        property.isReadWrite()
     }
 
     @Override
