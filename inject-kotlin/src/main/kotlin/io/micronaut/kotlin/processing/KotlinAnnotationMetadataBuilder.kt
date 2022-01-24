@@ -199,7 +199,7 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
         member: KSAnnotated,
         annotationType: Class<*>
     ): OptionalValues<*> {
-        val annotationMirrors: List<KSAnnotation> = member.annotations.toList()
+        val annotationMirrors: List<KSAnnotation> = (member as KSPropertyDeclaration).getter!!.annotations.toList()
         val annotationName = annotationType.name
         for (annotationMirror in annotationMirrors) {
             if (annotationMirror.annotationType.resolve().declaration.qualifiedName?.asString() == annotationName) {
@@ -211,7 +211,7 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
                         originatingElement,
                         annotationName,
                         member,
-                        key.simpleName.toString(),
+                        key.simpleName.asString(),
                         value,
                         converted
                     )
@@ -264,13 +264,34 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
     }
 
     override fun getRetentionPolicy(annotation: KSAnnotated): RetentionPolicy {
-        val retention = annotation.annotations.find {
+        var retention = annotation.annotations.find {
             getAnnotationTypeName(it) == java.lang.annotation.Retention::class.java.name
         }
         if (retention != null) {
             val value = retention.arguments.find { it.name?.asString() == "value" }?.value
             if (value != null) {
                 return value as RetentionPolicy
+            }
+        } else {
+            retention = annotation.annotations.find {
+                getAnnotationTypeName(it) == Retention::class.java.name
+            }
+            if (retention != null) {
+                val value = retention.arguments.find { it.name?.asString() == "value" }?.value
+                if (value != null) {
+                    val entry = AnnotationRetention.valueOf(readAnnotationValue(value) as String)
+                    return when (entry) {
+                        AnnotationRetention.RUNTIME -> {
+                            RetentionPolicy.RUNTIME
+                        }
+                        AnnotationRetention.SOURCE -> {
+                            RetentionPolicy.SOURCE
+                        }
+                        AnnotationRetention.BINARY -> {
+                            RetentionPolicy.CLASS
+                        }
+                    }
+                }
             }
         }
         return RetentionPolicy.RUNTIME

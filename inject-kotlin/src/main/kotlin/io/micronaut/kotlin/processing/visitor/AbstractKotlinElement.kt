@@ -1,5 +1,7 @@
 package io.micronaut.kotlin.processing.visitor;
 
+import com.google.devtools.ksp.isOpen
+import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSModifierListOwner
 import com.google.devtools.ksp.symbol.KSNode
 import com.google.devtools.ksp.symbol.Modifier
@@ -39,6 +41,14 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
     override fun isPrivate(): Boolean {
         return if (declaration is KSModifierListOwner) {
             declaration.modifiers.contains(Modifier.PRIVATE)
+        } else {
+            false
+        }
+    }
+
+    override fun isFinal(): Boolean {
+        return if (declaration is KSDeclaration) {
+            !declaration.isOpen()
         } else {
             false
         }

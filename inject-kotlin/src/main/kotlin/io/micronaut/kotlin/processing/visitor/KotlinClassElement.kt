@@ -280,10 +280,12 @@ open class KotlinClassElement(val classType: KSType,
         val namePredicates = result.namePredicates
         val annotationPredicates = result.annotationPredicates
         val typePredicates = result.typePredicates
+        val elementPredicates = result.elementPredicates
         val hasNamePredicates = namePredicates.isNotEmpty()
         val hasModifierPredicates = modifierPredicates.isNotEmpty()
         val hasAnnotationPredicates = annotationPredicates.isNotEmpty()
         val hasTypePredicates = typePredicates.isNotEmpty()
+        val hasElementPredicates = elementPredicates.isNotEmpty()
 
         val elements = ArrayList<T>()
 
@@ -374,11 +376,15 @@ open class KotlinClassElement(val classType: KSType,
                     declaringClass = elementFactory.newClassElement(declaringDeclaration.asStarProjectedType())
                     classDeclarationElements[declaringDeclaration] = declaringClass
                 }
-                element =  elementFactory.newFieldElement(
-                    declaringClass,
-                    enclosingElement,
-                    metadata
-                ) as T
+                if (result.elementType == PropertyElement::class.java) {
+                    element = elementFactory.newPropertyElement(declaringClass, enclosingElement) as T
+                } else {
+                    element = elementFactory.newFieldElement(
+                        declaringClass,
+                        enclosingElement,
+                        metadata
+                    ) as T
+                }
             } else if (enclosingElement is KSClassDeclaration) {
                 element = elementFactory.newClassElement(
                     enclosingElement.asType(declaration.asStarProjectedType().arguments),
@@ -389,9 +395,17 @@ open class KotlinClassElement(val classType: KSType,
             }
 
             if (element != null) {
-                elements.add(element)
+                if (hasElementPredicates) {
+                    if (elementPredicates.all { it.test(element) }) {
+                        elements.add(element)
+                    }
+                } else {
+                    elements.add(element)
+                }
             }
         }
+
+
 
         return elements
     }
@@ -453,32 +467,9 @@ open class KotlinClassElement(val classType: KSType,
         val propertyList : MutableList<PropertyElement> = declaration.getAllProperties()
             .filter { !it.isPrivate() }
             .map {
-                val type = it.type.resolve()
-                val parents = mutableListOf<KSAnnotated>(it)
-                if (it.setter != null) {
-                    parents.add(it.setter!!)
-                }
-                if (it.getter != null) {
-                    parents.add(it.getter!!)
-                }
-                val element = parents.removeLast()
-                val annotationMetadata = if (parents.isNotEmpty()) {
-                    annotationUtils.getAnnotationMetadata(parents, element)
-                } else {
-                    annotationUtils.getAnnotationMetadata(element)
-                }
-                KotlinPropertyElement(
-                    this,
-                    elementFactory.newClassElement(
-                        type,
-                        annotationUtils.getAnnotationMetadata(type.declaration),
-                        typeArguments,
-                        !it.isTypeReference()),
-                    it,
-                    annotationMetadata,
-                    visitorContext
-                )
-        }.toMutableList()
+                elementFactory.newPropertyElement(this, it)
+            }
+            .toMutableList()
         val functionBasedProperties: MutableMap<String, GetterAndSetter> = mutableMapOf()
         getAllDeclarations()
             .filterIsInstance<KSFunctionDeclaration>()

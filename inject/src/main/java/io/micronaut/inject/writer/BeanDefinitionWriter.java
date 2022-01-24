@@ -592,6 +592,22 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             }
             final ClassElement declaringType = factoryMethodElement.getOwningType();
             this.beanDefinitionName = declaringType.getPackageName() + "." + prefixClassName(declaringType.getSimpleName()) + "$" + upperCaseMethodName + uniqueIdentifier + CLASS_SUFFIX;
+        } else if (beanProducingElement instanceof PropertyElement) {
+            autoApplyNamedToBeanProducingElement(beanProducingElement);
+            PropertyElement factoryPropertyElement = (PropertyElement) beanProducingElement;
+            final ClassElement producedElement = factoryPropertyElement.getGenericType();
+            this.beanTypeElement = producedElement;
+            this.packageName = producedElement.getPackageName();
+            this.isInterface = producedElement.isInterface();
+            this.isAbstract = false;
+            this.beanFullClassName = producedElement.getName();
+            this.beanSimpleClassName = producedElement.getSimpleName();
+            String upperCaseMethodName = NameUtils.capitalize(factoryPropertyElement.getName());
+            if (uniqueIdentifier == null) {
+                throw new IllegalArgumentException("Factory methods require passing a unique identifier");
+            }
+            final ClassElement declaringType = factoryPropertyElement.getOwningType();
+            this.beanDefinitionName = declaringType.getPackageName() + "." + prefixClassName(declaringType.getSimpleName()) + "$" + upperCaseMethodName + uniqueIdentifier + CLASS_SUFFIX;
         } else if (beanProducingElement instanceof FieldElement) {
             autoApplyNamedToBeanProducingElement(beanProducingElement);
             FieldElement factoryMethodElement = (FieldElement) beanProducingElement;
