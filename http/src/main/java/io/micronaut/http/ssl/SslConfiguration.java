@@ -172,7 +172,7 @@ public class SslConfiguration implements Toggleable {
      */
     @Deprecated
     public void setPort(int port) {
-        LOGGER.warn("micronaut.ssl.port is deprecated.");
+        LOGGER.warn("The configuration micronaut.ssl.port is deprecated. Use micronaut.server.ssl.port instead.");
         this.port = port;
     }
 
@@ -185,7 +185,7 @@ public class SslConfiguration implements Toggleable {
      */
     @Deprecated
     public void setBuildSelfSigned(boolean buildSelfSigned) {
-        LOGGER.warn("micronaut.ssl.build-self-signed is deprecated.");
+        LOGGER.warn("The configuration micronaut.ssl.build-self-signed is deprecated. Use micronaut.server.ssl.build-self-signed instead.");
         this.buildSelfSigned = buildSelfSigned;
     }
 

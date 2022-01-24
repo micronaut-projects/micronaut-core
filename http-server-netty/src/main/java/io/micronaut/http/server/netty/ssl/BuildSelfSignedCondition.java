@@ -51,7 +51,6 @@ abstract class BuildSelfSignedCondition implements Condition {
     protected abstract boolean validate(ConditionContext context, boolean deprecatedPropertyFound, boolean newPropertyFound);
 
     private boolean enabledForPrefix(PropertyResolver resolver, String prefix) {
-        return resolver.containsProperties(prefix + ".build-self-signed")
-                && resolver.getProperty(prefix + ".build-self-signed", ConversionContext.BOOLEAN).orElse(false);
+        return resolver.getProperty(prefix + ".build-self-signed", ConversionContext.BOOLEAN).orElse(false);
     }
 }
