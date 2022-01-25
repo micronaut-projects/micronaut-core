@@ -40,7 +40,7 @@ class DeprecatedSslConfigurationSpec extends Specification {
         response.body() == 'true'
 
         and:
-        !shouldLog || appender.events == ["[WARN] micronaut.ssl.build-self-signed is deprecated."]
+        !shouldLog || appender.events == ["[WARN] The configuration micronaut.ssl.build-self-signed is deprecated. Use micronaut.server.ssl.build-self-signed instead."]
 
         cleanup:
         client.close()
@@ -76,7 +76,7 @@ class DeprecatedSslConfigurationSpec extends Specification {
         response.body() == 'true'
 
         and:
-        !shouldLog || appender.events == ["[WARN] micronaut.ssl.port is deprecated."]
+        !shouldLog || appender.events == ["[WARN] The configuration micronaut.ssl.port is deprecated. Use micronaut.server.ssl.port instead."]
 
         cleanup:
         client.close()
