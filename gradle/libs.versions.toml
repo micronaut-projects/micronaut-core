@@ -83,7 +83,7 @@ managed-micronaut-cache = "3.0.0"
 managed-micronaut-cassandra = "4.0.0"
 managed-micronaut-coherence = "3.0.1"
 managed-micronaut-data = "3.2.2"
-managed-micronaut-discovery-client = "3.1.0"
+managed-micronaut-discovery = "3.1.0"
 managed-micronaut-elasticsearch = "4.1.0"
 managed-micronaut-flyway = "5.1.0"
 managed-micronaut-gcp = "4.0.0"
@@ -292,7 +292,7 @@ managed-micronaut-azure-function = { module = "io.micronaut.azure:micronaut-azur
 managed-micronaut-azure-function-http = { module = "io.micronaut.azure:micronaut-azure-function-http", version.ref = "managed-micronaut-azure" }
 managed-micronaut-azure-function-http-test = { module = "io.micronaut.azure:micronaut-azure-function-http-test", version.ref = "managed-micronaut-azure" }
 managed-micronaut-cassandra = { module = "io.micronaut.cassandra:micronaut-cassandra", version.ref = "managed-micronaut-cassandra" }
-managed-micronaut-discovery-client = { module = "io.micronaut.discovery:micronaut-discovery-client", version.ref = "managed-micronaut-discovery-client" }
+managed-micronaut-discovery = { module = "io.micronaut.discovery:micronaut-discovery-client", version.ref = "managed-micronaut-discovery" }
 managed-micronaut-elasticsearch = { module = "io.micronaut.elasticsearch:micronaut-elasticsearch", version.ref = "managed-micronaut-elasticsearch" }
 managed-micronaut-flyway = { module = "io.micronaut.flyway:micronaut-flyway", version.ref = "managed-micronaut-flyway" }
 managed-micronaut-gcp = { module = "io.micronaut.gcp:micronaut-gcp-common", version.ref = "managed-micronaut-gcp" }
