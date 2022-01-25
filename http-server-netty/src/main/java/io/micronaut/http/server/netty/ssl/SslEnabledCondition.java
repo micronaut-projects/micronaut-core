@@ -54,7 +54,6 @@ class SslEnabledCondition  implements Condition {
     }
 
     private boolean enabledForPrefix(PropertyResolver resolver, String prefix) {
-        return resolver.containsProperties(prefix + ".enabled")
-                && resolver.getProperty(prefix + ".enabled", ConversionContext.BOOLEAN).orElse(false);
+        return resolver.getProperty(prefix + ".enabled", ConversionContext.BOOLEAN).orElse(false);
     }
 }
