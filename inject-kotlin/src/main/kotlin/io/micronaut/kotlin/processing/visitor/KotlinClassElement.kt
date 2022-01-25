@@ -60,6 +60,10 @@ open class KotlinClassElement(val classType: KSType,
         return super.isAssignable(type)
     }
 
+    override fun isAbstract(): Boolean {
+        return declaration.isAbstract()
+    }
+
     override fun isArray(): Boolean {
         return arrayDimensions > 0
     }

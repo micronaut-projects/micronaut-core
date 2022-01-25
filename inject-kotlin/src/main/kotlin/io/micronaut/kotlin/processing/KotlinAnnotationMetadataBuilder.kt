@@ -2,18 +2,17 @@ package io.micronaut.kotlin.processing
 
 import com.google.devtools.ksp.closestClassDeclaration
 import com.google.devtools.ksp.getClassDeclarationByName
-import com.google.devtools.ksp.isAnnotationPresent
+import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.visitor.VisitorContext
-import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
-import java.lang.StringBuilder
 import java.lang.annotation.Inherited
 import java.lang.annotation.RetentionPolicy
 import java.util.*
+import javax.lang.model.element.AnnotationMirror
 
 class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUtils,
                                       private val resolver: Resolver): AbstractAnnotationMetadataBuilder<KSAnnotated, KSAnnotation>() {
@@ -335,5 +334,23 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
             }
         }
         return value
+    }
+
+    override fun getAnnotationMembers(annotationType: String): MutableMap<String, out KSAnnotated> {
+        val annotationMirror = getAnnotationMirror(annotationType)
+        val members = mutableMapOf<String, KSAnnotated>()
+        if (annotationMirror.isPresent) {
+            (annotationMirror.get() as KSClassDeclaration).getDeclaredProperties()
+                .forEach {
+                    members[it.simpleName.asString()] = it
+                }
+        }
+        return members
+    }
+
+    override fun hasSimpleAnnotation(element: KSAnnotated, simpleName: String): Boolean {
+        return element.annotations.any {
+            it.annotationType.resolve().declaration.simpleName.asString() == simpleName
+        }
     }
 }

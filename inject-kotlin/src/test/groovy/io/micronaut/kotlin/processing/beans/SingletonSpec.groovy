@@ -1,5 +1,6 @@
 package io.micronaut.kotlin.processing.beans
 
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.kotlin.processing.KotlinCompiler
 import spock.lang.Specification
 
@@ -76,5 +77,21 @@ class Foo(val name: String)
         noExceptionThrown()
         Class<?> foo = context.classLoader.loadClass("test.Foo")
         context.getBean(foo).getName() == "one"
+    }
+
+    void "test singleton abstract class"() {
+        when:
+        BeanDefinition beanDefinition = KotlinCompiler.buildBeanDefinition('test.AbstractBean', '''
+package test
+
+import jakarta.inject.Singleton
+
+@Singleton
+abstract class AbstractBean {
+
+}
+''')
+        then:
+        beanDefinition.isAbstract()
     }
 }

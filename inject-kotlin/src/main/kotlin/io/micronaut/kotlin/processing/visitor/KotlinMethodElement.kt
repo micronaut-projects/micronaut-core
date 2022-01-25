@@ -1,6 +1,7 @@
 package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.KspExperimental
+import com.google.devtools.ksp.isAbstract
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.naming.NameUtils
@@ -16,6 +17,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
     private val declaringType: ClassElement
     private val parameters: List<ParameterElement>
     private val returnType: ClassElement
+    private val abstract: Boolean
 
     constructor(method: KSPropertySetter,
                 declaringType: ClassElement,
@@ -27,6 +29,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
         this.declaringType = declaringType
         this.parameters = listOf(parameter)
         this.returnType = PrimitiveElement.VOID
+        this.abstract = method.modifiers.contains(Modifier.ABSTRACT)
     }
 
     constructor(method: KSPropertyGetter,
@@ -39,6 +42,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
         this.declaringType = declaringType
         this.parameters = emptyList()
         this.returnType = returnType
+        this.abstract = method.modifiers.contains(Modifier.ABSTRACT)
     }
 
     constructor(method: KSFunctionDeclaration,
@@ -52,6 +56,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
         this.declaringType = declaringType
         this.parameters = parameters
         this.returnType = returnType
+        this.abstract = method.isAbstract
     }
 
     protected constructor(method: KSDeclaration,
@@ -60,12 +65,14 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
                           annotationMetadata: AnnotationMetadata,
                           visitorContext: KotlinVisitorContext,
                           returnType: ClassElement,
-                          parameters: List<ParameterElement>
+                          parameters: List<ParameterElement>,
+                          abstract: Boolean
     ) : super(method, annotationMetadata, visitorContext) {
         this.name = name
         this.declaringType = declaringType
         this.parameters = parameters
         this.returnType = returnType
+        this.abstract = abstract
     }
 
     override fun getName(): String {
@@ -85,7 +92,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
     }
 
     override fun withNewParameters(vararg newParameters: ParameterElement): MethodElement {
-        return KotlinMethodElement(declaration, name, declaringType, annotationMetadata, visitorContext, returnType, newParameters.toList())
+        return KotlinMethodElement(declaration, name, declaringType, annotationMetadata, visitorContext, returnType, newParameters.toList(), abstract)
     }
 
 }

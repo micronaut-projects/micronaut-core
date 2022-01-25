@@ -13,7 +13,7 @@ class KotlinConstructorElement(private val method: KSDeclaration,
                                visitorContext: KotlinVisitorContext,
                                returnType: ClassElement,
                                parameters: List<ParameterElement>
-): ConstructorElement, KotlinMethodElement(method, "<init>", declaringType, annotationMetadata, visitorContext, returnType, parameters) {
+): ConstructorElement, KotlinMethodElement(method, "<init>", declaringType, annotationMetadata, visitorContext, returnType, parameters, false) {
 
     override fun getName() = "<init>"
 
