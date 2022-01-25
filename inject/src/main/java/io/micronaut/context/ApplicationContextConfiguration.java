@@ -111,6 +111,15 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
         return true;
     }
 
+    /**
+     * Should the app fail to start up if there are configuration conversion errors.
+     *
+     * @return Disabled by default.
+     */
+    default boolean isFailOnConfigConversionError() {
+        return false;
+    }
+
     @Nullable
     default Boolean isBootstrapEnvironmentEnabled() {
         return null;

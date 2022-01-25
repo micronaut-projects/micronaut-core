@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,14 +19,17 @@ import com.github.stefanbirkner.systemlambda.SystemLambda
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.convert.ConversionService
+import io.micronaut.core.convert.exceptions.ConversionErrorException
 import io.micronaut.core.convert.format.MapFormat
 import io.micronaut.core.naming.conventions.StringConvention
+import io.micronaut.core.type.Argument
 import io.micronaut.core.value.MapPropertyResolver
 import io.micronaut.core.value.PropertyResolver
 import io.micronaut.core.value.ValueException
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Unroll
+import spock.util.environment.RestoreSystemProperties
 
 /**
  * @author Graeme Rocher
@@ -640,5 +643,45 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
         then:
         resolver.containsProperty("extra.listval")
+    }
+
+    void "default missing enum behaviour for a #type"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(PropertySource.of("test", [deep: [value: config]]))
+
+        when:
+        def value = resolver.get('deep.value', argument)
+
+        then:
+        expected(value)
+
+        where:
+        type                          | config                               | argument                                                                              | expected
+        'single missing value'        | 'NO'                                 | Argument.of(Status)                                                                   | { Optional<?> opt -> assert !opt.isPresent(); true }
+        'single valid value'          | 'ONE'                                | Argument.of(Status)                                                                   | { Optional<?> opt -> assert opt.get() == Status.ONE; true }
+        'list with missing value'     | ['NO', 'ONE']                        | Argument.listOf(Status)                                                               | { Optional<?> opt -> assert opt.get() == [Status.ONE]; true }
+        'map with missing value'      | [a: 'ONE', b: 'NO']                  | Argument.mapOf(Argument.of(String, "K"), Argument.of(Status, "V"))                    | { Optional<?> opt -> assert opt.get() == [a: Status.ONE]; true }
+        'map with missing list value' | [a: ['ONE', 'NO'], b: ['NO', 'TWO']] | Argument.mapOf(Argument.of(String, "K"), Argument.of(List, "V", Argument.of(Status))) | { Optional<?> opt -> assert opt.get() == [a: [Status.ONE], b: [Status.TWO]]; true }
+    }
+
+    void "test exception thrown if property set for a #type"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(true, PropertySource.of("test", [deep: [value: config]]))
+
+        when:
+        resolver.get('deep.value', argument)
+
+        then:
+        def ex = thrown(ConversionErrorException)
+        with(ex) {
+            it.argument == argument
+        }
+
+        where:
+        type                          | config                               | argument
+        'single missing value'        | 'NO'                                 | Argument.of(Status)
+        'list with missing value'     | ['NO', 'ONE']                        | Argument.listOf(Status)
+        'map with missing value'      | [a: 'ONE', b: 'NO']                  | Argument.mapOf(Argument.of(String, "K"), Argument.of(Status, "V"))
+        'map with missing list value' | [a: ['ONE', 'NO'], b: ['NO', 'TWO']] | Argument.mapOf(Argument.of(String, "K"), Argument.of(List, "V", Argument.of(Status)))
     }
 }

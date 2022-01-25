@@ -206,6 +206,14 @@ public interface ApplicationContextBuilder {
     @NonNull ApplicationContextBuilder banner(boolean isEnabled);
 
     /**
+     * Stop if there is an issue reading and converting the config at startup.
+     *
+     * @param fail Whether the app should stop if it fails to read or convert any of the configuration.
+     * @return This application
+     */
+    @NonNull ApplicationContextBuilder failOnConfigConversionError(boolean fail);
+
+    /**
      * Whether to error on an empty bean provider. Defaults to {@code false}.
      *
      * @param shouldAllow True if empty {@link jakarta.inject.Provider} instances are allowed
