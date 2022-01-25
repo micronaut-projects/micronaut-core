@@ -54,6 +54,14 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
         }
     }
 
+    override fun isAbstract(): Boolean {
+        return if (declaration is KSModifierListOwner) {
+            declaration.modifiers.contains(Modifier.ABSTRACT)
+        } else {
+            false
+        }
+    }
+
     override fun getAnnotationMetadata(): AnnotationMetadata {
         return annotationMetadata
     }
