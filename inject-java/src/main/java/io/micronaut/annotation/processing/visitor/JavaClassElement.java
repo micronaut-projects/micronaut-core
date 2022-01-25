@@ -100,24 +100,6 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     }
 
     /**
-     * Used by OpenAPI.
-     *
-     * @param classElement       The {@link TypeElement}
-     * @param annotationMetadata The annotation metadata
-     * @param visitorContext     The visitor context
-     * @param genericsInfo       The generic type info
-     * @param arrayDimensions    The number of array dimensions
-     */
-    JavaClassElement(
-            TypeElement classElement,
-            AnnotationMetadata annotationMetadata,
-            JavaVisitorContext visitorContext,
-            Map<String, Map<String, TypeMirror>> genericsInfo,
-            int arrayDimensions) {
-        this(classElement, annotationMetadata, visitorContext, Collections.emptyList(), genericsInfo, arrayDimensions, false);
-    }
-
-    /**
      * @param classElement       The {@link TypeElement}
      * @param annotationMetadata The annotation metadata
      * @param visitorContext     The visitor context
