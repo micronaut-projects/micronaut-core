@@ -197,7 +197,7 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
         // HTTP1 does not have stream IDs. To emulate them, we have two counters. One counts up on every request, and
         // the other counts up on every *completed* response.
         private long http1NextRequestStreamId = 0;
-        private long http1CurrentPendingResponseStreamId = 0;
+        private long currentPendingResponseStreamId = 0;
 
         private AccessLog logForReuse;
 
@@ -232,12 +232,12 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
             String streamIdHeader = msg == null ? null : msg.headers().get(ExtensionHeaderNames.STREAM_ID.text());
             long streamId;
             if (streamIdHeader == null) {
-                streamId = http1CurrentPendingResponseStreamId;
+                streamId = currentPendingResponseStreamId;
                 if (finishResponse) {
-                    http1CurrentPendingResponseStreamId++;
+                    currentPendingResponseStreamId++;
                 }
             } else {
-                streamId = Long.parseLong(streamIdHeader);
+                currentPendingResponseStreamId = streamId = Long.parseLong(streamIdHeader);
             }
             if (finishResponse) {
                 AccessLog accessLog = liveAccessLogsByStreamId.remove(streamId);
