@@ -20,9 +20,11 @@ import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.util.StringUtils;
 import jakarta.inject.Named;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
@@ -312,9 +314,24 @@ public class Qualifiers {
      * @param <T>                    The bean type
      * @return The qualifier
      * @since 3.0.0
+     * @deprecated Use {@link #byInterceptorBindingValues(java.util.Collection)}
      */
+    @Deprecated
     public static @NonNull
     <T> Qualifier<T> byInterceptorBinding(@NonNull Collection<String> bindingAnnotationNames) {
-        return new InterceptorBindingQualifier<>(bindingAnnotationNames);
+        return new InterceptorBindingQualifier<>(bindingAnnotationNames.toArray(StringUtils.EMPTY_STRING_ARRAY));
+    }
+
+    /**
+     * Reduces bean definitions by the given interceptor binding.
+     *
+     * @param binding The binding values to use
+     * @param <T>     The bean type
+     * @return The qualifier
+     * @since 3.3.0
+     */
+    public static @NonNull
+    <T> Qualifier<T> byInterceptorBindingValues(@NonNull Collection<AnnotationValue<?>> binding) {
+        return new InterceptorBindingQualifier<>(binding);
     }
 }

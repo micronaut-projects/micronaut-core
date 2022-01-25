@@ -30,3 +30,7 @@ spotless {
                 '**/io/micronaut/http/netty/reactive/package-info.java'
     }
 }
+
+tasks.named("test", Test) {
+    forkEvery = 1
+}

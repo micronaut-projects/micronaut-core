@@ -373,6 +373,12 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
                     Arrays.hashCode(methodReference.arguments)
             );
         }
+
+        @Override
+        public String toString() {
+            String text = Argument.toString(getArguments());
+            return getReturnType().getType().getSimpleName() + " " + getMethodName() + "(" + text + ")";
+        }
     }
 
     private static final class MethodAnnotationMetadata extends AbstractEnvironmentAnnotationMetadata {

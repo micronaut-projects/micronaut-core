@@ -21,6 +21,7 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
+import io.micronaut.inject.BeanType;
 
 import java.util.Objects;
 
@@ -32,7 +33,7 @@ import java.util.Objects;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class BeanRegistration<T> implements Ordered, CreatedBean<T> {
+public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T> {
     final BeanIdentifier identifier;
     final BeanDefinition<T> beanDefinition;
     final T bean;
@@ -116,5 +117,15 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T> {
     @Override
     public void close() {
         // no-op
+    }
+
+    @Override
+    public boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
+        return definition().isEnabled(context, resolutionContext);
+    }
+
+    @Override
+    public Class<T> getBeanType() {
+        return definition().getBeanType();
     }
 }
