@@ -183,7 +183,8 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
             if (!createIfMissing) {
                 return null;
             }
-            attr.set(holder = new AccessLogHolder());
+            holder = new AccessLogHolder();
+            attr.set(holder);
         }
         return holder;
     }
@@ -237,7 +238,8 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
                     currentPendingResponseStreamId++;
                 }
             } else {
-                currentPendingResponseStreamId = streamId = Long.parseLong(streamIdHeader);
+                streamId = Long.parseLong(streamIdHeader);
+                currentPendingResponseStreamId = streamId; // in case future HttpContent objects arrive without a stream_id header
             }
             if (finishResponse) {
                 AccessLog accessLog = liveAccessLogsByStreamId.remove(streamId);
