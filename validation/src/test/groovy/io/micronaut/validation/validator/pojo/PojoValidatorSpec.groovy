@@ -17,15 +17,10 @@
 package io.micronaut.validation.validator.pojo
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Factory
-import io.micronaut.context.annotation.Parameter
-import io.micronaut.context.annotation.Prototype
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.Environment
 import io.micronaut.core.annotation.Introspected
-import io.micronaut.core.beans.BeanIntrospection
-import io.micronaut.core.beans.BeanMethod
 import io.micronaut.validation.validator.Validator
 import io.micronaut.validation.validator.constraints.ConstraintValidator
 import jakarta.inject.Singleton
