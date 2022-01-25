@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,8 @@ import io.netty.util.AttributeKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.function.Predicate;
+
 /**
  * Logging handler for HTTP access logs.
  * Access logs will be logged at info level.
@@ -55,6 +57,7 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
 
     private final Logger logger;
     private final AccessLogFormatParser accessLogFormatParser;
+    private final Predicate<String> uriInclusion;
 
     /**
      * Creates a HttpAccessLogHandler.
@@ -63,7 +66,18 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
      * @param spec The log format specification.
      */
     public HttpAccessLogHandler(String loggerName, String spec) {
-        this(loggerName == null || loggerName.isEmpty() ? null : LoggerFactory.getLogger(loggerName), spec);
+        this(loggerName == null || loggerName.isEmpty() ? null : LoggerFactory.getLogger(loggerName), spec, null);
+    }
+
+    /**
+     * Creates a HttpAccessLogHandler.
+     *
+     * @param loggerName A logger name.
+     * @param spec The log format specification.
+     * @param uriInclusion A filtering Predicate that will be checked per URI.
+     */
+    public HttpAccessLogHandler(String loggerName, String spec, Predicate<String> uriInclusion) {
+        this(loggerName == null || loggerName.isEmpty() ? null : LoggerFactory.getLogger(loggerName), spec, uriInclusion);
     }
 
     /**
@@ -73,9 +87,21 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
      * @param spec The log format specification.
      */
     public HttpAccessLogHandler(Logger logger, String spec) {
+        this(logger, spec, null);
+    }
+
+    /**
+     * Creates a HttpAccessLogHandler.
+     *
+     * @param logger A logger. Will log at info level.
+     * @param spec The log format specification.
+     * @param uriInclusion A filtering Predicate that will be checked per URI.
+     */
+    public HttpAccessLogHandler(Logger logger, String spec, Predicate<String> uriInclusion) {
         super();
         this.logger = logger == null ? LoggerFactory.getLogger(HTTP_ACCESS_LOGGER) : logger;
         this.accessLogFormatParser = new AccessLogFormatParser(spec);
+        this.uriInclusion = uriInclusion;
     }
 
     @Override
@@ -83,15 +109,20 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
         if (logger.isInfoEnabled() && msg instanceof HttpRequest) {
             final SocketChannel channel = (SocketChannel) ctx.channel();
             final HttpRequest request = (HttpRequest) msg;
-            final HttpHeaders headers = request.headers();
-            // Trying to detect http/2
-            String protocol;
-            if (headers.contains(ExtensionHeaderNames.STREAM_ID.text()) || headers.contains(ExtensionHeaderNames.SCHEME.text())) {
-                protocol = H2_PROTOCOL_NAME;
+            AccessLog accessLog = accessLog(channel);
+            if (uriInclusion == null || uriInclusion.test(request.uri())) {
+                final HttpHeaders headers = request.headers();
+                // Trying to detect http/2
+                String protocol;
+                if (headers.contains(ExtensionHeaderNames.STREAM_ID.text()) || headers.contains(ExtensionHeaderNames.SCHEME.text())) {
+                    protocol = H2_PROTOCOL_NAME;
+                } else {
+                    protocol = request.protocolVersion().text();
+                }
+                accessLog.onRequestHeaders(channel, request.method().name(), request.headers(), request.uri(), protocol);
             } else {
-                protocol = request.protocolVersion().text();
+                accessLog.exclude();
             }
-            accessLog(channel).onRequestHeaders(channel, request.method().name(), request.headers(), request.uri(), protocol);
         }
         ctx.fireChannelRead(msg);
     }

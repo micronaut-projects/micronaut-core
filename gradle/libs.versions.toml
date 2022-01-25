@@ -124,6 +124,7 @@ managed-micronaut-servlet = "3.1.0"
 managed-micronaut-spring = "4.0.1"
 managed-micronaut-sql = "4.1.0"
 managed-micronaut-test = "3.0.5"
+managed-micronaut-toml = "1.0.0-M2"
 managed-micronaut-views = "3.1.2"
 managed-micronaut-xml = "3.0.0"
 managed-mongo = "4.3.0"
@@ -389,6 +390,7 @@ managed-micronaut-test-core = { module = "io.micronaut.test:micronaut-test-core"
 managed-micronaut-test-junit5 = { module = "io.micronaut.test:micronaut-test-junit5", version.ref = "managed-micronaut-test" }
 managed-micronaut-test-kotest = { module = "io.micronaut.test:micronaut-test-kotest", version.ref = "managed-micronaut-test" }
 managed-micronaut-test-spock = { module = "io.micronaut.test:micronaut-test-spock", version.ref = "managed-micronaut-test" }
+managed-micronaut-toml = { module = "io.micronaut.toml:micronaut-toml", version.ref = "managed-micronaut-toml" }
 managed-micronaut-xml = { module = "io.micronaut.xml:micronaut-jackson-xml", version.ref = "managed-micronaut-xml" }
 
 managed-opentracing = { module = "io.opentracing:opentracing-api", version.ref = "managed-opentracing" }
