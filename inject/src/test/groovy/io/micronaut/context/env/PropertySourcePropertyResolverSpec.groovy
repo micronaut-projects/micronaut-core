@@ -477,17 +477,35 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.getProperty("start", String).get() == "`startswithtick"
     }
 
-    void 'test escaping a literal ${value}'() {
+    void 'test escaping #desc "#test"'() {
         given:
         def values = [
-                'foo.bar': '${:$}{some-value}'
+                'some-value': 'testing',
+                test        : test,
         ]
+
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
                 PropertySource.of("test", values)
         )
 
         expect:
-        resolver.getProperty("foo.bar", String).get() == '${some-value}'
+        resolver.getProperty("test", String).get() == expected
+
+        where:
+        desc             | test                                     | expected
+        'raw'            | '$${some-value}'                         | '${some-value}'
+        'prefix'         | 'value $${some-value}'                   | 'value ${some-value}'
+        'suffix'         | '$${some-value} value'                   | '${some-value} value'
+        'wrapped'        | 'one $${some-value} value'               | 'one ${some-value} value'
+        'embedded'       | '$${some-value-${some-value}}'           | '${some-value-testing}'
+        'escaped path'   | '\\path\\to\\$${some-value}\\readme.txt' | '\\path\\to\\${some-value}\\readme.txt'
+        'path'           | '\\path\\to\\${some-value}\\readme.txt'  | '\\path\\to\\testing\\readme.txt'
+        'double escaped' | '$$${some-value}'                        | '$testing'
+        'double prefix'  | 'value $$${some-value}'                  | 'value $testing'
+        'double suffix'  | '$$${some-value} value'                  | '$testing value'
+        'double wrapped' | 'one $$${some-value} value'              | 'one $testing value'
+        'overrun'        | '$${'                                    | '${'
+        'incomplete'     | 'test $${ inline'                        | 'test ${ inline'
     }
 
     void "test properties starting with z"() {

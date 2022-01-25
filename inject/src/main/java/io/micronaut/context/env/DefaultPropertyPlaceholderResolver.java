@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -109,8 +109,22 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
         String value = str;
         int i = value.indexOf(PREFIX);
         while (i > -1) {
-            //the text before the prefix
-            if (i > 0) {
+            if (isDoubleEscaped(value, i)) {
+                RawSegment rawSegment = new RawSegment(value.substring(0, i - 1));
+                segments.add(rawSegment);
+                value = value.substring(i);
+                i = value.indexOf(PREFIX);
+                continue;
+            }
+            else if (isEscaped(value, i)) {
+                RawSegment rawSegment = new RawSegment(value.substring(0, i - 1));
+                segments.add(rawSegment);
+                segments.add(new RawSegment(PREFIX));
+                value = value.substring(i + PREFIX.length());
+                i = value.indexOf(PREFIX);
+                continue;
+            } else if (i > 0) {
+                //the text before the prefix
                 String rawSegment = value.substring(0, i);
                 segments.add(new RawSegment(rawSegment));
             }
@@ -132,6 +146,14 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
             segments.add(new RawSegment(value));
         }
         return segments;
+    }
+
+    private boolean isDoubleEscaped(String value, int i) {
+        return i > 1 && value.charAt(i - 2) == '$';
+    }
+
+    private boolean isEscaped(String value, int i) {
+        return i > 0 && value.charAt(i - 1) == '$';
     }
 
     /**
