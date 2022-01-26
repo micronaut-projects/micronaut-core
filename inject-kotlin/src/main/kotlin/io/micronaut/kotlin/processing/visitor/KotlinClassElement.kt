@@ -46,16 +46,12 @@ open class KotlinClassElement(val classType: KSType,
 
     override fun isAssignable(type: String): Boolean {
         val ksType = visitorContext.resolver.getClassDeclarationByName(type)?.asStarProjectedType()
-        return if (ksType != null) {
-            classType.isAssignableFrom(ksType)
-        } else {
-            false
-        }
+        return ksType?.isAssignableFrom(classType) ?: false
     }
 
     override fun isAssignable(type: ClassElement): Boolean {
         if (type is KotlinClassElement) {
-            return classType.isAssignableFrom(type.classType)
+            return type.classType.isAssignableFrom(classType)
         }
         return super.isAssignable(type)
     }

@@ -6,6 +6,7 @@ import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationClassValue
+import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.visitor.VisitorContext
@@ -164,10 +165,10 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
     ): Any? {
         if (annotationValue is Collection<*>) {
             return annotationValue.map {
-                readAnnotationValue(it)
+                readAnnotationValue(originatingElement, it)
             }
         }
-        return readAnnotationValue(annotationValue)
+        return readAnnotationValue(originatingElement, annotationValue)
     }
 
     override fun readAnnotationDefaultValues(annotationMirror: KSAnnotation): MutableMap<out KSDeclaration, *> {
@@ -278,7 +279,7 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
             if (retention != null) {
                 val value = retention.arguments.find { it.name?.asString() == "value" }?.value
                 if (value != null) {
-                    val entry = AnnotationRetention.valueOf(readAnnotationValue(value) as String)
+                    val entry = AnnotationRetention.valueOf((value as KSType).declaration.qualifiedName!!.getShortName())
                     return when (entry) {
                         AnnotationRetention.RUNTIME -> {
                             RetentionPolicy.RUNTIME
@@ -316,7 +317,7 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
         }
     }
 
-    private fun readAnnotationValue(value: Any?): Any? {
+    private fun readAnnotationValue(originatingElement: KSAnnotated, value: Any?): Any? {
         if (value == null) {
             return null
         }
@@ -332,6 +333,9 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
                     return AnnotationClassValue<Any>(declaration.toClassName())
                 }
             }
+        }
+        if (value is KSAnnotation) {
+            return readNestedAnnotationValue(originatingElement, value)
         }
         return value
     }

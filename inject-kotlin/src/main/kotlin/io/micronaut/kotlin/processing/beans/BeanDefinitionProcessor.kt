@@ -3,6 +3,7 @@ package io.micronaut.kotlin.processing.beans
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
+import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFile
@@ -38,6 +39,9 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
             val classElement = visitorContext.elementFactory.newClassElement(classDeclaration.asStarProjectedType()) as KotlinClassElement
 
             if (classElement.isInner && !classElement.isStatic) {
+                continue
+            }
+            if (classDeclaration.classKind == ClassKind.ANNOTATION_CLASS) {
                 continue
             }
             if (classElement.isInterface) {

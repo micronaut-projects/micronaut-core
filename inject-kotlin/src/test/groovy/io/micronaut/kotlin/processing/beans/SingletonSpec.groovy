@@ -4,11 +4,14 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.kotlin.processing.KotlinCompiler
 import spock.lang.Specification
 
+import static io.micronaut.kotlin.processing.KotlinCompiler.*
+
+
 class SingletonSpec extends Specification {
 
     void "test simple singleton bean"() {
         when:
-        def context = KotlinCompiler.buildContext("""
+        def context = buildContext("""
 package test
 
  import jakarta.inject.Singleton
@@ -30,7 +33,7 @@ class Test
 
     void "test singleton bean from a factory property"() {
         when:
-        def context = KotlinCompiler.buildContext("""
+        def context = buildContext("""
 package test
 
 import io.micronaut.context.annotation.Bean
@@ -57,7 +60,7 @@ class Foo(val name: String)
 
     void "test singleton bean from a factory method"() {
         when:
-        def context = KotlinCompiler.buildContext("""
+        def context = buildContext("""
 package test
 
 import io.micronaut.context.annotation.Bean
@@ -81,7 +84,7 @@ class Foo(val name: String)
 
     void "test singleton abstract class"() {
         when:
-        BeanDefinition beanDefinition = KotlinCompiler.buildBeanDefinition('test.AbstractBean', '''
+        BeanDefinition beanDefinition = buildBeanDefinition('test.AbstractBean', '''
 package test
 
 import jakarta.inject.Singleton

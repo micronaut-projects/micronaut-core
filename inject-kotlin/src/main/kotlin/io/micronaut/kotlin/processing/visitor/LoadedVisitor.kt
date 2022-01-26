@@ -2,6 +2,7 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSType
 import io.micronaut.core.order.Ordered
 import io.micronaut.inject.visitor.TypeElementVisitor
 import org.omg.CORBA.Object
@@ -28,22 +29,27 @@ class LoadedVisitor(val visitor: TypeElementVisitor<*, *>,
                 .find {
                     it.declaration.qualifiedName?.asString() == tevClassName
                 }!!
-
-            classAnnotation = reference.arguments[0].type!!.resolve().declaration.qualifiedName!!.asString()
-            if (classAnnotation == ANY) {
-                classAnnotation = visitor.classType
-            }
-
-            elementAnnotation = reference.arguments[1].type!!.resolve().declaration.qualifiedName!!.asString()
-            if (elementAnnotation == ANY) {
-                elementAnnotation = visitor.elementType
-            }
+            classAnnotation = getType(reference.arguments[0].type!!.resolve(), visitor.classType)
+            elementAnnotation = getType(reference.arguments[1].type!!.resolve(), visitor.elementType)
         }
         if (classAnnotation == ANY) {
             classAnnotation = Object::class.java.name
         }
         if (elementAnnotation == ANY) {
             elementAnnotation = Object::class.java.name
+        }
+    }
+
+    private fun getType(type: KSType, default: String): String {
+        return if (!type.isError) {
+            val elementAnnotation = type.declaration.qualifiedName!!.asString()
+            if (elementAnnotation == ANY) {
+                default
+            } else {
+                elementAnnotation
+            }
+        } else {
+            default
         }
     }
 
