@@ -2,6 +2,10 @@
 
 == 3.3.0
 
+=== GraalVM 22.0.0
+
+Micronaut now supports lastest GraalVM 22.0.0 release.
+
 === Micronaut Kubernetes 3.3.0
 
 Micronaut Kubernetes 3.3 adds support to easily create the Kubernetes Operator. The Kubernetes Operator is a known pattern used to extend the capabilities of Kubernetes by creating application specific controllers for both native and custom resources. See more on https://micronaut-projects.github.io/micronaut-kubernetes/latest/guide/#kubernetes-operator[Kubernetes Operator].

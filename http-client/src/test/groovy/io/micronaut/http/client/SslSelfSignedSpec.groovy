@@ -41,8 +41,8 @@ class SslSelfSignedSpec extends Specification {
         context = ApplicationContext.run([
                 'spec.name': 'SslSelfSignedSpec',
                 'micronaut.ssl.enabled': true,
-                'micronaut.ssl.buildSelfSigned': true,
-                'micronaut.ssl.port': -1,
+                'micronaut.server.ssl.buildSelfSigned': true,
+                'micronaut.server.ssl.port': -1,
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
         ])
         embeddedServer = context.getBean(EmbeddedServer).start()

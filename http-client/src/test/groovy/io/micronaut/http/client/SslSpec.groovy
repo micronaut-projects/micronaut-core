@@ -81,10 +81,10 @@ class SslSpec extends Specification {
         given:
         def group = new NioEventLoopGroup()
         ApplicationContext context = ApplicationContext.run([
-                'micronaut.ssl.port'            : -1,
-                'micronaut.ssl.enabled'         : true,
-                'micronaut.ssl.buildSelfSigned' : true,
-                'micronaut.ssl.handshakeTimeout': '1s',
+                'micronaut.server.ssl.port'            : -1,
+                'micronaut.server.ssl.enabled'         : true,
+                'micronaut.server.ssl.buildSelfSigned' : true,
+                'micronaut.ssl.handshakeTimeout'       : '1s',
         ])
         def embeddedServer = context.getBean(EmbeddedServer)
         embeddedServer.start()

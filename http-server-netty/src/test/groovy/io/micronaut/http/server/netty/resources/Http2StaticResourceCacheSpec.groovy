@@ -46,8 +46,8 @@ class Http2StaticResourceCacheSpec extends Specification {
         def app = ApplicationContext.run([
                 'micronaut.server.http-version': '2.0',
                 'micronaut.ssl.enabled': true,
-                'micronaut.ssl.port': -1,
-                'micronaut.ssl.buildSelfSigned': true,
+                'micronaut.server.ssl.port': -1,
+                'micronaut.server.ssl.buildSelfSigned': true,
                 'micronaut.router.static-resources.default.paths': ['classpath:public', 'file:' + tempFile.parent, 'file:' + tempSubDir.absolutePath]
         ])
         def embeddedServer = app.getBean(EmbeddedServer)
