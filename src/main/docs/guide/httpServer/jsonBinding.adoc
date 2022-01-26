@@ -76,6 +76,7 @@ All features can be configured with their name as the key and a boolean to indic
 |mapper | Map | link:{jackson-databind}com/fasterxml/jackson/databind/MapperFeature.html[MapperFeature]
 |parser | Map | link:{jackson-core}com/fasterxml/jackson/core/JsonParser.Feature.html[JsonParser.Feature]
 |generator | Map | link:{jackson-core}com/fasterxml/jackson/core/JsonGenerator.Feature.html[JsonGenerator.Feature]
+|factory | Map | link:{jackson-core}com/fasterxml/jackson/core/JsonFactory.Feature.html[JsonFactory.Feature]
 |======
 
 Example:
@@ -90,6 +91,11 @@ jackson:
     useBigIntegerForInts: true
     failOnUnknownProperties: false
 ----
+
+=== Further customising `JsonFactory`
+
+There may be situations where you wish to customise the `JsonFactory` used by the `ObjectMapper` beyond the configuration of features (for example to allow custom character escaping).
+This can be achieved by providing your own `JsonFactory` bean, or by providing a `BeanCreatedEventListener<JsonFactory>` which configures the default bean on startup.
 
 === Support for `@JsonView`
 
