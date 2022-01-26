@@ -18,7 +18,7 @@ class PcapLoggingSpec extends Specification {
         given:
         def tmp = Files.createTempDirectory("micronaut-http-server-netty-test-pcap-logging-spec")
         def ctx = ApplicationContext.run([
-                'micronaut.server.netty.pcap-logging-path-pattern': tmp.toString() + '/{localAddress}-{remoteAddress}-{random}-{qualifier}-{timestamp}.pcap',
+                'micronaut.server.netty.pcap-logging-path-pattern': tmp.toString() + '/{localAddress}-{remoteAddress}-{qualifier}-{random}-{timestamp}.pcap',
                 'micronaut.ssl.enabled': true,
                 'micronaut.ssl.buildSelfSigned': true,
                 'micronaut.ssl.port': -1,
@@ -40,8 +40,8 @@ class PcapLoggingSpec extends Specification {
         def names = Files.list(tmp).map(p -> p.fileName.toString()).sorted().collect(Collectors.toList())
         then:
         names.size() == 2
-        names[0].matches('127\\.0\\.0\\.1_\\d+-127\\.0\\.0\\.1_\\d+-\\w+-encapsulated-\\d+-\\d+-\\d+T\\d+_\\d+_\\d+\\.\\d+Z\\.pcap')
-        names[1].matches('127\\.0\\.0\\.1_\\d+-127\\.0\\.0\\.1_\\d+-\\w+-ssl-decapsulated-\\d+-\\d+-\\d+T\\d+_\\d+_\\d+\\.\\d+Z\\.pcap')
+        names[0].matches('127\\.0\\.0\\.1_\\d+-127\\.0\\.0\\.1_\\d+-encapsulated-\\w+-\\d+-\\d+-\\d+T\\d+_\\d+_\\d+\\.\\d+Z\\.pcap')
+        names[1].matches('127\\.0\\.0\\.1_\\d+-127\\.0\\.0\\.1_\\d+-ssl-decapsulated-\\w+-\\d+-\\d+-\\d+T\\d+_\\d+_\\d+\\.\\d+Z\\.pcap')
 
         cleanup:
         server.close()
