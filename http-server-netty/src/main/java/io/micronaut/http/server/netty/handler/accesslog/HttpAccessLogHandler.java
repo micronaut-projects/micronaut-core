@@ -35,7 +35,6 @@ import io.netty.handler.codec.http2.Http2Exception;
 import io.netty.handler.codec.http2.HttpConversionUtil.ExtensionHeaderNames;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
-import org.jetbrains.annotations.Contract;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,6 +114,7 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
             final SocketChannel channel = (SocketChannel) ctx.channel();
             final HttpRequest request = (HttpRequest) msg;
             AccessLogHolder accessLogHolder = getAccessLogHolder(ctx, true);
+            assert accessLogHolder != null; // can only return null when createIfMissing is false
             if (uriInclusion == null || uriInclusion.test(request.uri())) {
                 final HttpHeaders headers = request.headers();
                 // Trying to detect http/2
@@ -175,7 +175,6 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
     }
 
     @Nullable
-    @Contract("_, true -> !null") // can only return null when createIfMissing is false
     private AccessLogHolder getAccessLogHolder(ChannelHandlerContext ctx, boolean createIfMissing) {
         final Attribute<AccessLogHolder> attr = ctx.channel().attr(ACCESS_LOGGER);
         AccessLogHolder holder = attr.get();
