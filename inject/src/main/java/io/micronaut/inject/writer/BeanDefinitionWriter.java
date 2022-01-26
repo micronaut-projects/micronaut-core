@@ -599,7 +599,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             this.beanTypeElement = producedElement;
             this.packageName = producedElement.getPackageName();
             this.isInterface = producedElement.isInterface();
-            this.isAbstract = false;
+            this.isAbstract = beanProducingElement.isAbstract();
             this.beanFullClassName = producedElement.getName();
             this.beanSimpleClassName = producedElement.getSimpleName();
             String upperCaseMethodName = NameUtils.capitalize(factoryPropertyElement.getName());

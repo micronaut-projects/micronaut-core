@@ -32,11 +32,13 @@ import javax.validation.constraints.NotBlank
 import javax.validation.constraints.Size
 import java.lang.reflect.Field
 
+import static io.micronaut.kotlin.processing.KotlinCompiler.*
+
 class BeanIntrospectionSpec extends Specification {
 
     void "test basic introspection"() {
         when:
-        def introspection = KotlinCompiler.buildBeanIntrospection("test.Test", """
+        def introspection = buildBeanIntrospection("test.Test", """
 package test
 
 import io.micronaut.core.annotation.Introspected
@@ -55,7 +57,7 @@ class Test {
 
     void "test generics in arrays don't stack overflow"() {
         given:
-        def introspection = KotlinCompiler.buildBeanIntrospection('arraygenerics.Test', '''
+        def introspection = buildBeanIntrospection('arraygenerics.Test', '''
 package arraygenerics
 
 import io.micronaut.core.annotation.Introspected
@@ -81,7 +83,7 @@ class Test<T : CharSequence> {
 
     void 'test favor method access'() {
         given:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('fieldaccess.Test','''\
+        BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
 package fieldaccess
 
 import io.micronaut.core.annotation.*
@@ -117,7 +119,7 @@ class Test {
 
     void 'test favor field access'() {
         given:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('fieldaccess.Test','''\
+        BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
 package fieldaccess;
 
 import io.micronaut.core.annotation.*
@@ -152,7 +154,7 @@ class Test {
 
     void 'test field access only'() {
         given:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('fieldaccess.Test','''\
+        BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
 package fieldaccess
 
 import io.micronaut.core.annotation.*
@@ -174,7 +176,7 @@ open class Test(val two: Integer?) {  // read-only
 
     void 'test bean constructor'() {
         given:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('beanctor.Test','''\
+        BeanIntrospection introspection = buildBeanIntrospection('beanctor.Test','''\
 package beanctor
 
 import java.net.URL
@@ -202,7 +204,7 @@ class Test @com.fasterxml.jackson.annotation.JsonCreator constructor(private val
 
     void "test generate bean method for introspected class"() {
         given:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.MethodTest', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.MethodTest', '''
 package test
 
 import io.micronaut.core.annotation.Introspected
@@ -271,7 +273,7 @@ interface SomeInt {
 
     void "test custom with prefix"() {
         given:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('customwith.CopyMe', '''\
+        BeanIntrospection introspection = buildBeanIntrospection('customwith.CopyMe', '''\
 package customwith
 
 import java.net.URL
@@ -306,7 +308,7 @@ class CopyMe(val another: String) {
 
     void "test copy constructor via mutate method"() {
         given:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.CopyMe','''\
+        BeanIntrospection introspection = buildBeanIntrospection('test.CopyMe','''\
 package test
 
 import java.net.URL
@@ -365,7 +367,7 @@ class CopyMe(val name: String,
 
     void "test secondary constructor for data classes"() {
         given:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Foo', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
 package test
 
 @io.micronaut.core.annotation.Introspected
@@ -386,7 +388,7 @@ data class Foo(val x: Int, val y: Int) {
 
     void "test secondary constructor with @Creator for data classes"() {
         given:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Foo', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
 package test
 
 import io.micronaut.core.annotation.Creator
@@ -410,7 +412,7 @@ data class Foo(val x: Int, val y: Int) {
 
     void "test annotations on generic type arguments for data classes"() {
         given:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Foo', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
 package test
 
 import io.micronaut.core.annotation.Creator
@@ -433,7 +435,7 @@ data class Foo(val value: List<@Min(10) Long>)
 
     void 'test annotations on generic type arguments'() {
         given:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Foo', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
 package test
 
 import javax.validation.constraints.Min
@@ -461,7 +463,7 @@ annotation class SomeAnn()
 
     void "test bean introspection on a data class"() {
         given:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Foo', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
 package test
 
 @io.micronaut.core.annotation.Introspected
@@ -497,7 +499,7 @@ data class Foo(@javax.validation.constraints.NotBlank val name: String, val age:
 
     void "test create bean introspection for external inner class"() {
         given:
-        ClassLoader classLoader = KotlinCompiler.buildClassLoader('test.Foo', '''
+        ClassLoader classLoader = buildClassLoader('test.Foo', '''
 package test
 
 import io.micronaut.core.annotation.*
@@ -533,7 +535,7 @@ class Test
 
     void "test create bean introspection for external inner interface"() {
         given:
-        ClassLoader classLoader = KotlinCompiler.buildClassLoader('test.Foo', '''
+        ClassLoader classLoader = buildClassLoader('test.Foo', '''
 package test
 
 import io.micronaut.core.annotation.*
@@ -569,7 +571,7 @@ class Test
 
     void "test bean introspection with property of generic interface"() {
         given:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Foo', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
 package test
 
 @io.micronaut.core.annotation.Introspected
@@ -600,7 +602,7 @@ interface GenBase<T> {
 
     void "test bean introspection with property of generic superclass"() {
         given:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Foo', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
 package test
 
 @io.micronaut.core.annotation.Introspected
@@ -631,7 +633,7 @@ abstract class GenBase<T> {
 
     void "test bean introspection with argument of generic interface"() {
         given:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Foo', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
 package test
 
 @io.micronaut.core.annotation.Introspected
@@ -662,7 +664,7 @@ interface GenBase<T> {
 
     void "test bean introspection with property with static creator method on interface"() {
         given:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Foo', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
 package test
 
 import io.micronaut.core.annotation.Creator
@@ -692,7 +694,7 @@ fun interface Foo {
 
     void "test bean introspection with property with static creator method on interface with generic type arguments"() {
         given:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Foo', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
 package test;
 
 import io.micronaut.core.annotation.Creator;
@@ -722,7 +724,7 @@ fun interface Foo<T> {
 
     void "test bean introspection with property from default interface method"() {
         given:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Test', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test
 
 @io.micronaut.core.annotation.Introspected
@@ -743,7 +745,7 @@ interface Foo {
 
     void "test generate bean introspection for interface"() {
         when:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Test','''\
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
 package test
 
 @io.micronaut.core.annotation.Introspected
@@ -777,7 +779,7 @@ interface Test : io.micronaut.core.naming.Named {
 
     void "test build introspection"() {
         given:
-        def classLoader = KotlinCompiler.buildClassLoader('test.Address', '''
+        def classLoader = buildClassLoader('test.Address', '''
 package test
 
 import javax.validation.constraints.*
@@ -805,7 +807,7 @@ interface GroupThree
 
     void "test primary constructor is preferred"() {
         given:
-        def classLoader = KotlinCompiler.buildClassLoader('test.Book', '''
+        def classLoader = buildClassLoader('test.Book', '''
 package test
 
 @io.micronaut.core.annotation.Introspected
@@ -859,7 +861,7 @@ class Book(val title: String) {
 
     void "test multiple constructors with primary constructor marked as @Creator"() {
         given:
-        def classLoader = KotlinCompiler.buildClassLoader('test.Book', '''
+        def classLoader = buildClassLoader('test.Book', '''
 package test
 
 import io.micronaut.core.annotation.Creator
@@ -921,7 +923,7 @@ class Book {
 
     void "test default constructor "() {
         given:
-        def classLoader = KotlinCompiler.buildClassLoader('test.Book', '''
+        def classLoader = buildClassLoader('test.Book', '''
 package test
 
 @io.micronaut.core.annotation.Introspected
@@ -964,7 +966,7 @@ class Book {
 
     void "test multiple constructors with @JsonCreator"() {
         given:
-        def classLoader = KotlinCompiler.buildClassLoader('test.Test', '''
+        def classLoader = buildClassLoader('test.Test', '''
 package test
 
 import io.micronaut.core.annotation.*
@@ -1024,7 +1026,7 @@ class Test {
 
     void "test write bean introspection with builder style properties"() {
         given:
-        def classLoader = KotlinCompiler.buildClassLoader('test.Test', '''
+        def classLoader = buildClassLoader('test.Test', '''
 package test
 
 import io.micronaut.core.annotation.*
@@ -1073,7 +1075,7 @@ class Test {
 
     void "test write bean introspection with inner classes"() {
         given:
-        def classLoader = KotlinCompiler.buildClassLoader('test.Test', '''
+        def classLoader = buildClassLoader('test.Test', '''
 package test
 
 import io.micronaut.core.annotation.*
@@ -1121,7 +1123,7 @@ class Test {
 
     void "test bean introspection with constructor"() {
         given:
-        def classLoader = KotlinCompiler.buildClassLoader('test.Test', '''
+        def classLoader = buildClassLoader('test.Test', '''
 package test
 
 import javax.validation.constraints.*
@@ -1200,7 +1202,7 @@ class Test(
 
     void "test write bean introspection data for entity"() {
         given:
-        def classLoader = KotlinCompiler.buildClassLoader('test.Test', '''
+        def classLoader = buildClassLoader('test.Test', '''
 package test
 
 import javax.validation.constraints.*
@@ -1241,7 +1243,7 @@ class Test {
 
     void "test write bean introspection data for class in another package"() {
         given:
-        def classLoader = KotlinCompiler.buildClassLoader('test.Test', '''
+        def classLoader = buildClassLoader('test.Test', '''
 package test
 
 import io.micronaut.core.annotation.Introspected
@@ -1271,7 +1273,7 @@ class Test
     @Ignore
     void "test write bean introspection data for class already introspected"() {
         given:
-        def classLoader = KotlinCompiler.buildClassLoader('test.Test', '''
+        def classLoader = buildClassLoader('test.Test', '''
 package test
 
 import io.micronaut.core.annotation.Introspected
@@ -1290,7 +1292,7 @@ class Test
 
     void "test write bean introspection data for package with sources"() {
         given:
-        def classLoader = KotlinCompiler.buildClassLoader('test.Test', '''
+        def classLoader = buildClassLoader('test.Test', '''
 package test
 
 import io.micronaut.core.annotation.*
@@ -1310,7 +1312,7 @@ class Test
 
     void "test write bean introspection data for package with compiled classes"() {
         given:
-        def classLoader = KotlinCompiler.buildClassLoader('test.Test', '''
+        def classLoader = buildClassLoader('test.Test', '''
 package test
 
 import io.micronaut.core.annotation.*
@@ -1330,7 +1332,7 @@ class Test
 
     void "test write bean introspection data"() {
         given:
-        def classLoader = KotlinCompiler.buildClassLoader('test.Test', '''
+        def classLoader = buildClassLoader('test.Test', '''
 package test
 
 import io.micronaut.core.annotation.Introspected
@@ -1453,7 +1455,7 @@ open class ParentBean {
 
     void "test constructor argument generics"() {
         given:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Test', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test
 
 import io.micronaut.core.annotation.*
@@ -1467,7 +1469,7 @@ class Test(var properties: Map<String, String>)
     }
 
     void "test static creator"() {
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Test', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test
 
 import io.micronaut.core.annotation.*
@@ -1507,7 +1509,7 @@ class Test private constructor(val name: String) {
     }
 
     void "test static creator with no args"() {
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Test', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test
 
 import io.micronaut.core.annotation.*
@@ -1546,7 +1548,7 @@ class Test private constructor(val name: String) {
     }
 
     void "test static creator multiple"() {
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Test', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test
 
 import io.micronaut.core.annotation.*
@@ -1591,7 +1593,7 @@ class Test private constructor(val name: String) {
     }
 
     void "test introspections are not created for super classes"() {
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Test', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test
 
 import io.micronaut.core.annotation.*
@@ -1613,7 +1615,7 @@ open class Foo
     }
 
     void "test enum bean properties"() {
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Test', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test
 
 import io.micronaut.core.annotation.*
@@ -1650,7 +1652,7 @@ enum class Test(val number: Int) {
     }
 
     void "test instantiating an enum"() {
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Test', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test
 
 import io.micronaut.core.annotation.Introspected
@@ -1678,7 +1680,7 @@ enum class Test {
     }
 
     void "test constructor argument nested generics"() {
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Test', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test
 
 import io.micronaut.core.annotation.Introspected
@@ -1702,7 +1704,7 @@ class Action
 
     void "test primitive multi-dimensional arrays"() {
         when:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Test', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test
 
 import io.micronaut.core.annotation.Introspected
@@ -1748,7 +1750,7 @@ class Test {
 
     void "test class multi-dimensional arrays"() {
         when:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Test', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test
 
 import io.micronaut.core.annotation.Introspected
@@ -1794,7 +1796,7 @@ class Test {
 
     void "test enum multi-dimensional arrays"() {
         when:
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Test', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test
 
 import io.micronaut.core.annotation.Introspected
@@ -1840,7 +1842,7 @@ class Test {
     }
 
     void "test superclass methods are read before interface methods"() {
-        BeanIntrospection introspection = KotlinCompiler.buildBeanIntrospection('test.Test', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test
 
 import io.micronaut.core.annotation.Introspected
@@ -1870,7 +1872,7 @@ class Test: SuperClass(), IEmail
     }
 
     void "test introspection on abstract class"() {
-        BeanIntrospection beanIntrospection = KotlinCompiler.buildBeanIntrospection("test.Test", """
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
 package test
 
 import io.micronaut.core.annotation.Introspected
@@ -1888,7 +1890,7 @@ abstract class Test {
     }
 
     void "test targeting abstract class with @Introspected(classes = "() {
-        ClassLoader classLoader = KotlinCompiler.buildClassLoader("test.Test", """
+        ClassLoader classLoader = buildClassLoader("test.Test", """
 package test
 
 import io.micronaut.core.annotation.Introspected
@@ -1907,7 +1909,7 @@ class MyConfig
     }
 
     void "test introspection on abstract class with extra getter"() {
-        BeanIntrospection beanIntrospection = KotlinCompiler.buildBeanIntrospection("test.Test", """
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
 package test
 
 import io.micronaut.core.annotation.Introspected
@@ -1928,7 +1930,7 @@ abstract class Test {
 
     void "test class loading is not shared between the introspection and the ref"() {
         when:
-        BeanIntrospection beanIntrospection = KotlinCompiler.buildBeanIntrospection("test.Test", """
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
 package test;
 
 import io.micronaut.core.annotation.Introspected;
@@ -1953,7 +1955,7 @@ class Author {
 
     void "test annotation on setter"() {
         when:
-        BeanIntrospection beanIntrospection = KotlinCompiler.buildBeanIntrospection("test.Test", """
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
 package test
 
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -1975,7 +1977,7 @@ class Test {
 
     void "test annotation on field"() {
         when:
-        BeanIntrospection beanIntrospection = KotlinCompiler.buildBeanIntrospection("test.Test", """
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
 package test
 
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -1997,7 +1999,7 @@ class Test {
 
     void "test getter annotation overrides setter and field"() {
         when:
-        BeanIntrospection beanIntrospection = KotlinCompiler.buildBeanIntrospection("test.Test", """
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
 package test
 
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -2021,7 +2023,7 @@ class Test {
 
     void "test field annotation overrides setter"() {
         when:
-        BeanIntrospection beanIntrospection = KotlinCompiler.buildBeanIntrospection("test.Test", """
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
 package test
 
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -2044,7 +2046,7 @@ class Test {
 
     void "test create bean introspection for interface"() {
         given:
-        def classLoader = KotlinCompiler.buildClassLoader('itfcetest.MyInterface','''
+        def classLoader = buildClassLoader('itfcetest.MyInterface','''
 package itfcetest
 
 import com.fasterxml.jackson.annotation.JsonClassDescription
@@ -2080,7 +2082,7 @@ class MyImpl: MyInterface {
 
     void "test create bean introspection for interface - only methods"() {
         given:
-        def classLoader = KotlinCompiler.buildClassLoader('itfcetest.MyInterface','''
+        def classLoader = buildClassLoader('itfcetest.MyInterface','''
 package itfcetest
 
 import io.micronaut.core.annotation.Introspected

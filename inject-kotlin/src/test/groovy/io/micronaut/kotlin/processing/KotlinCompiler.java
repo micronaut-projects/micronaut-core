@@ -74,12 +74,25 @@ public class KotlinCompiler {
     }
 
     public static BeanDefinition<?> buildBeanDefinition(String name, @Language("kotlin") String clazz) throws InstantiationException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
-        final URLClassLoader classLoader = buildClassLoader(name, clazz);
-        String simpleName = NameUtils.getSimpleName(name);
+        return buildBeanDefinition(NameUtils.getPackageName(name),
+                NameUtils.getSimpleName(name),
+                clazz);
+    }
+
+    public static BeanDefinition<?> buildBeanDefinition(String packageName, String simpleName, @Language("kotlin") String clazz) throws InstantiationException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        final URLClassLoader classLoader = buildClassLoader(packageName + "." + simpleName, clazz);
         String beanDefName = (simpleName.startsWith("$") ? "" : '$') + simpleName + BeanDefinitionWriter.CLASS_SUFFIX;
-        String packageName = NameUtils.getPackageName(name);
         String beanFullName = packageName + "." + beanDefName;
         return (BeanDefinition<?>) loadDefinition(classLoader, beanFullName);
+    }
+
+    public static BeanDefinitionReference<?> buildBeanDefinitionReference(String name, @Language("kotlin") String clazz) throws InstantiationException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        final URLClassLoader classLoader = buildClassLoader(name, clazz);
+        String simpleName = NameUtils.getSimpleName(name);
+        String beanDefName = (simpleName.startsWith("$") ? "" : '$') + simpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX;
+        String packageName = NameUtils.getPackageName(name);
+        String beanFullName = packageName + "." + beanDefName;
+        return (BeanDefinitionReference<?>) loadDefinition(classLoader, beanFullName);
     }
 
     public static ApplicationContext buildContext(@Language("kotlin") String clazz) {

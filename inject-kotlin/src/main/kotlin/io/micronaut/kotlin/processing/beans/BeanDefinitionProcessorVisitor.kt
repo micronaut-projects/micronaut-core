@@ -6,7 +6,6 @@ import io.micronaut.aop.InterceptorKind
 import io.micronaut.context.annotation.*
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.configuration.ConfigurationMetadata
 import io.micronaut.inject.writer.BeanDefinitionVisitor
@@ -43,15 +42,15 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
             )
         }
         this.isFactoryClass = classElement.hasStereotype(Factory::class.java)
+        val hasQualifier = classElement.hasStereotype(AnnotationUtil.QUALIFIER) && !classElement.isAbstract
         this.isDeclaredBean = isExecutableType ||
                 isConfigurationProperties ||
                 isFactoryClass ||
+                hasQualifier ||
                 classElement.hasStereotype(AnnotationUtil.SCOPE) ||
                 classElement.hasStereotype(DefaultScope::class.java) ||
                 classElement.hasDeclaredStereotype(Bean::class.java) ||
                 classElement.primaryConstructor.filter { it.hasStereotype(AnnotationUtil.INJECT) }.isPresent
-
-
     }
 
     companion object {
