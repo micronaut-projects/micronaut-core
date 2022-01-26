@@ -6,6 +6,10 @@
 
 Micronaut now supports the latest GraalVM 22.0.0 release.
 
+=== Environment Endpoint
+
+A new API api:management.endpoint.env.EnvironmentEndpointFilter[] has been created to allow applications to customize which keys should have their values masked and which keys should not have their values masked. See the <<environmentEndpoint, documentation>> for full details.
+
 === AOP Interceptor Binding
 
 When binding an AOP annotation to an interceptor, only the presence of the annotation is used to determine if the interceptor should be applied. Now it's possible to also bind based on the values of the annotation. To enable this feature, set the `bindMembers` member of the ann:aop.InterceptorBinding[] annotation to `true`.
