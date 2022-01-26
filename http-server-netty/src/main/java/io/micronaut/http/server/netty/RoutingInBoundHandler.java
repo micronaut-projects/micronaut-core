@@ -968,6 +968,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         toNettyResponse(response),
                         mapToHttpContent(nettyRequest, response, body, context)
                 );
+                nettyRequest.prepareHttp2ResponseIfNecessary(streamedResponse);
                 context.writeAndFlush(streamedResponse);
                 context.read();
             } else {
