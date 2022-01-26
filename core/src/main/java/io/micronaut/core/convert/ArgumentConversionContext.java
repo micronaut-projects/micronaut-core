@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,9 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.type.Argument;
 
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Extended version of the {@link ConversionContext} specifically for conversion {@link Argument} instances.
@@ -64,6 +66,31 @@ public interface ArgumentConversionContext<T> extends ConversionContext, Annotat
             @Override
             public AnnotationMetadata getAnnotationMetadata() {
                 return annotationMetadata;
+            }
+
+            @Override
+            public void reject(Exception exception) {
+                thisContext.reject(exception);
+            }
+
+            @Override
+            public void reject(Object value, Exception exception) {
+                thisContext.reject(value, exception);
+            }
+
+            @Override
+            public Iterator<ConversionError> iterator() {
+                return thisContext.iterator();
+            }
+
+            @Override
+            public boolean hasErrors() {
+                return thisContext.hasErrors();
+            }
+
+            @Override
+            public Optional<ConversionError> getLastError() {
+                return thisContext.getLastError();
             }
         };
     }

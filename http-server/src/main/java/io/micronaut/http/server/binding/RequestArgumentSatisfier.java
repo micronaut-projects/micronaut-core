@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,8 @@ import io.micronaut.web.router.NullArgument;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UnresolvedArgument;
 import jakarta.inject.Singleton;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -47,6 +49,8 @@ import java.util.Optional;
 @Singleton
 @Internal
 public class RequestArgumentSatisfier {
+
+    private static final Logger LOG = LoggerFactory.getLogger(RequestArgumentSatisfier.class);
 
     private final RequestBinderRegistry binderRegistry;
 
@@ -129,6 +133,9 @@ public class RequestArgumentSatisfier {
             } else {
                 ArgumentBinder.BindingResult bindingResult = argumentBinder.bind(conversionContext, request);
 
+                if (LOG.isDebugEnabled() && conversionContext.hasErrors()) {
+                    LOG.debug("Failed to convert argument '" + argument.getName() + "' to " + conversionContext.getArgument().getTypeString(true) + " at uri " + request.getUri());
+                }
                 if (argument.getType() == Optional.class) {
                     if (bindingResult.isSatisfied() || satisfyOptionals) {
                         Optional optionalValue = bindingResult.getValue();
