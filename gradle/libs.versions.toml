@@ -55,6 +55,7 @@ managed-google-function-framework = "1.0.2"
 managed-google-function-invoker = "1.0.0"
 managed-gorm = "7.1.0.M6"
 managed-gorm-hibernate = "7.1.0.M3"
+# be sure to update graal version in gradle.properties as well
 managed-graal = "22.0.0"
 managed-graal-sdk = "22.0.0"
 managed-groovy = "3.0.9"
