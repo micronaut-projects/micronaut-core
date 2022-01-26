@@ -330,10 +330,10 @@ class MaxRequestSizeSpec extends Specification {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'micronaut.server.maxRequestSize': '10KB',
                 'micronaut.server.http-version': '2.0',
-                'micronaut.ssl.enabled': true,
+                'micronaut.server.ssl.enabled': true,
                 'micronaut.server.netty.log-level': 'TRACE',
-                'micronaut.ssl.port': -1,
-                'micronaut.ssl.buildSelfSigned': true
+                'micronaut.server.ssl.port': -1,
+                'micronaut.server.ssl.buildSelfSigned': true
         ])
 
         def request1 = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, '/test-max-size/multipart-body')

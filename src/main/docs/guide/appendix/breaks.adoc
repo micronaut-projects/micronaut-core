@@ -1,5 +1,30 @@
 This section documents breaking changes between Micronaut versions
 
+== 3.3.0
+
+- The link:#environmentEndpoint[environmental endpoint] is now disabled by default. To enable it, you must update your endpoint config:
+
+[source,yaml]
+----
+endpoints:
+  env:
+    enabled: true
+----
+
+This will then be available, but mask all values.  To restore the legacy functionality, you can add a Bean like so:
+
+.Legacy Environment Filtering Bean
+[source,java]
+----
+@Singleton
+public class LegacyEnvEndpointFilter implements EnvironmentEndpointFilter {
+    @Override
+    public void specifyFiltering(@NotNull EnvironmentFilterSpecification specification) {
+        specification.legacyFiltering();
+    }
+}
+----
+
 == 3.2.4
 
 - The link:{api}/io/micronaut/http/client/ProxyHttpClient.html[ProxyHttpClient] now sends the Host header of the proxied service https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.23[as per the RFC], instead of the originating service.

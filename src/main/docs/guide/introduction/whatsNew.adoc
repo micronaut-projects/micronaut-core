@@ -1,5 +1,11 @@
 //Micronaut {version} includes the following changes:
 
+== 3.3.0
+
+=== GraalVM 22.0.0
+
+Micronaut now supports lastest GraalVM 22.0.0 release.
+
 == 3.2.0
 
 === GraalVM 21.3.0

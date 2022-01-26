@@ -20,11 +20,11 @@ Since browsers don't support `h2c` and in general https://http2.github.io/http2-
 [source,yaml]
 ----
 micronaut:
-  ssl:
-    enabled: true
-    buildSelfSigned: true
   server:
     http-version: 2.0
+    ssl:
+      enabled: true
+      buildSelfSigned: true
 ----
 
 For production, see the <<https, configuring HTTPS>> section of the documentation.
