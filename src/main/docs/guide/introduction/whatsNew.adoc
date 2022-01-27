@@ -2,9 +2,9 @@
 
 == 3.3.0
 
-=== GraalVM 22.0.0
+=== GraalVM 22.0.0.2
 
-Micronaut now supports the latest GraalVM 22.0.0 release.
+Micronaut now supports the latest GraalVM 22.0.0.2 release.
 
 === Environment Endpoint
 
