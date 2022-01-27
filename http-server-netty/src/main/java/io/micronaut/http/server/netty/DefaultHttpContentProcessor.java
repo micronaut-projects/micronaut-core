@@ -66,9 +66,10 @@ public class DefaultHttpContentProcessor extends SingleThreadedBufferingProcesso
 
     @Override
     public final void subscribe(Subscriber<? super ByteBufHolder> downstreamSubscriber) {
+        super.subscribe(downstreamSubscriber);
+        //ensures the subscriber is present before subscribing to the message
         StreamedHttpMessage message = (StreamedHttpMessage) nettyHttpRequest.getNativeRequest();
         message.subscribe(this);
-        super.subscribe(downstreamSubscriber);
     }
 
     @Override

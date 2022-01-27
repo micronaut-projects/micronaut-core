@@ -19,9 +19,11 @@ import io.micronaut.aop.HotSwappableInterceptedProxy;
 import io.micronaut.aop.Intercepted;
 import io.micronaut.aop.InterceptedProxy;
 import io.micronaut.aop.Interceptor;
+import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.Introduced;
 import io.micronaut.aop.chain.InterceptorChain;
 import io.micronaut.aop.chain.MethodInterceptorChain;
+import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanRegistration;
@@ -451,6 +453,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.constructorRequiresReflection = requiresReflection;
         this.declaredConstructor = constructor;
         this.visitorContext = visitorContext;
+        io.micronaut.core.annotation.AnnotationValue<?>[] interceptorTypes =
+                InterceptedMethodUtil.resolveInterceptorBinding(constructor.getAnnotationMetadata(), InterceptorKind.AROUND_CONSTRUCT);
+        visitInterceptorBinding(interceptorTypes);
     }
 
     @Override
@@ -742,7 +747,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             processAlreadyVisitedMethods(parentWriter);
         }
 
-        interceptorParameter.annotate(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER, builder -> {
+        interceptorParameter.annotate(AnnotationUtil. ANN_INTERCEPTOR_BINDING_QUALIFIER, builder -> {
             final AnnotationValue<?>[] interceptorBinding = this.interceptorBinding.toArray(new AnnotationValue[0]);
             builder.values(interceptorBinding);
         });

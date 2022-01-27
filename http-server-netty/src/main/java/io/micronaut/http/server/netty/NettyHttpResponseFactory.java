@@ -25,7 +25,6 @@ import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.Attribute;
-import io.netty.util.AttributeKey;
 
 import java.util.Optional;
 
@@ -37,8 +36,6 @@ import java.util.Optional;
  */
 @Internal
 public class NettyHttpResponseFactory implements HttpResponseFactory {
-
-    private static final AttributeKey<NettyMutableHttpResponse> KEY = AttributeKey.valueOf(NettyMutableHttpResponse.class.getSimpleName());
 
     @Override
     public <T> MutableHttpResponse<T> ok(T body) {
@@ -86,7 +83,7 @@ public class NettyHttpResponseFactory implements HttpResponseFactory {
      */
     @Internal
     public static NettyMutableHttpResponse getOr(NettyHttpRequest<?> request, io.micronaut.http.HttpResponse<?> alternative) {
-        Attribute<NettyMutableHttpResponse> attr = request.attr(KEY);
+        Attribute<NettyMutableHttpResponse> attr = request.attr(ServerAttributeKeys.RESPONSE_KEY);
         NettyMutableHttpResponse nettyHttpResponse = attr.get();
         if (nettyHttpResponse == null) {
             nettyHttpResponse = (NettyMutableHttpResponse) alternative;
@@ -103,7 +100,7 @@ public class NettyHttpResponseFactory implements HttpResponseFactory {
      */
     @Internal
     public static Optional<NettyMutableHttpResponse> get(NettyHttpRequest<?> request) {
-        NettyMutableHttpResponse nettyHttpResponse = request.attr(KEY).get();
+        NettyMutableHttpResponse nettyHttpResponse = request.attr(ServerAttributeKeys.RESPONSE_KEY).get();
         return Optional.ofNullable(nettyHttpResponse);
     }
 
@@ -116,7 +113,7 @@ public class NettyHttpResponseFactory implements HttpResponseFactory {
      */
     @Internal
     public static Optional<NettyMutableHttpResponse> set(NettyHttpRequest<?> request, HttpResponse<?> response) {
-        request.attr(KEY).set((NettyMutableHttpResponse) response);
+        request.attr(ServerAttributeKeys.RESPONSE_KEY).set((NettyMutableHttpResponse) response);
         return Optional.ofNullable((NettyMutableHttpResponse) response);
     }
 }

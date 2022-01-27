@@ -77,6 +77,11 @@ public interface RetryState {
     }
 
     /**
+     * @return The captured exception type (default to {@link RuntimeException}
+     */
+    Class<? extends Throwable> getCapturedException();
+
+    /**
      * Opens the retry state.
      */
     default void open() {

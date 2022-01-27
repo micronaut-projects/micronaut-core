@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -97,6 +97,7 @@ import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
 import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
 import io.netty.handler.flow.FlowControlHandler;
 import io.netty.handler.logging.LoggingHandler;
+import io.netty.handler.pcap.PcapWriteHandler;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslContext;
@@ -113,14 +114,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
+import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -133,10 +138,14 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Implements the bootstrap and configuration logic for the Netty implementation of {@link io.micronaut.runtime.server.EmbeddedServer}.
@@ -677,6 +686,53 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
     }
 
+    private void insertPcapLoggingHandler(ChannelPipeline pipeline, String qualifier) {
+        String pattern = serverConfiguration.getPcapLoggingPathPattern();
+        if (pattern == null) {
+            return;
+        }
+
+        String path = pattern;
+        path = path.replace("{qualifier}", qualifier);
+        path = path.replace("{localAddress}", resolveIfNecessary(pipeline.channel().localAddress()));
+        path = path.replace("{remoteAddress}", resolveIfNecessary(pipeline.channel().remoteAddress()));
+        path = path.replace("{random}", Long.toHexString(ThreadLocalRandom.current().nextLong()));
+        path = path.replace("{timestamp}", Instant.now().toString());
+
+        path = path.replace(':', '_'); // for windows
+
+        LOG.warn("Logging *full* request data, as configured. This will contain sensitive information! Path: '{}'", path);
+
+        try {
+            pipeline.addLast(new PcapWriteHandler(new FileOutputStream(path)));
+        } catch (FileNotFoundException e) {
+            LOG.warn("Failed to create target pcap at '{}', not logging.", path, e);
+        }
+    }
+
+    /**
+     * Force resolution of the given address, and then transform it to string. This prevents any potential user data
+     * appearing in the file path
+     */
+    private static String resolveIfNecessary(SocketAddress address) {
+        if (address instanceof InetSocketAddress) {
+            if (((InetSocketAddress) address).isUnresolved()) {
+                // try resolution
+                address = new InetSocketAddress(((InetSocketAddress) address).getHostString(), ((InetSocketAddress) address).getPort());
+                if (((InetSocketAddress) address).isUnresolved()) {
+                    // resolution failed, bail
+                    return "unresolved";
+                }
+            }
+            return ((InetSocketAddress) address).getAddress().getHostAddress() + ':' + ((InetSocketAddress) address).getPort();
+        }
+        String s = address.toString();
+        if (s.contains("/")) {
+            return "weird";
+        }
+        return s;
+    }
+
     /**
      * Negotiates with the browser if HTTP2 or HTTP is going to be used. Once decided, the Netty
      * pipeline is setup with the correct handlers for the selected protocol.
@@ -808,8 +864,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             handlers.put(HttpResponseEncoder.ID, responseEncoder);
             handlers.put(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
                     nettyEmbeddedServices,
-                    getWebSocketSessionRepository()
-            ));
+                    getWebSocketSessionRepository()));
             handlers.put(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, routingHandler);
             return handlers;
         }
@@ -842,11 +897,28 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             initHttpCoders();
         }
 
+        private Predicate<String> inclusionPredicate(NettyHttpServerConfiguration.AccessLogger config) {
+            List<String> exclusions = config.getExclusions();
+            if (CollectionUtils.isEmpty(exclusions)) {
+                return null;
+            } else {
+                // Don't do this inside the predicate to avoid compiling every request
+                List<Pattern> patterns = exclusions.stream().map(Pattern::compile).collect(Collectors.toList());
+                return uri -> patterns.stream().noneMatch(pattern -> pattern.matcher(uri).matches());
+            }
+        }
+
+        private HttpAccessLogHandler accessLogHandler() {
+            NettyHttpServerConfiguration.AccessLogger accessLogger = serverConfiguration.getAccessLogger();
+            if (accessLogger != null && accessLogger.isEnabled()) {
+                return new HttpAccessLogHandler(accessLogger.getLoggerName(), accessLogger.getLogFormat(), inclusionPredicate(accessLogger));
+            } else {
+                return null;
+            }
+        }
+
         void initHttpCoders() {
-            this.accessLogHandler = serverConfiguration.getAccessLogger() != null && serverConfiguration.getAccessLogger()
-                    .isEnabled() ?
-                    new HttpAccessLogHandler(serverConfiguration.getAccessLogger().getLoggerName(),
-                            serverConfiguration.getAccessLogger().getLogFormat()) : null;
+            this.accessLogHandler = accessLogHandler();
             this.requestDecoder = new HttpRequestDecoder(NettyHttpServer.this,
                     environment,
                     serverConfiguration,
@@ -861,12 +933,16 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         protected void initChannel(SocketChannel ch) {
             ChannelPipeline pipeline = ch.pipeline();
 
+            insertPcapLoggingHandler(pipeline, "encapsulated");
+
             int port = ch.localAddress().getPort();
             boolean ssl = sslContext != null && sslConfiguration != null && port == serverPort;
             if (ssl) {
                 SslHandler sslHandler = sslContext.newHandler(ch.alloc());
                 sslHandler.setHandshakeTimeoutMillis(sslConfiguration.getHandshakeTimeout().toMillis());
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler);
+
+                insertPcapLoggingHandler(pipeline, "ssl-decapsulated");
             }
 
             if (loggingHandler != null) {

@@ -12,7 +12,7 @@ dependencies {
     compileOnly libs.kotlinx.coroutines.core
 }
 
-compileKotlin {
+tasks.named("compileKotlin") {
     kotlinOptions.jvmTarget = "1.8"
     kotlinOptions.languageVersion = "1.6"
 }

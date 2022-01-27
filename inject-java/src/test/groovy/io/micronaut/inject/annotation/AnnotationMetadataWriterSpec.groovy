@@ -595,6 +595,79 @@ class Test {
         properties[4].getValue(String).get() == "value3"
     }
 
+    void "test repeatable annotations are combined, lookup by name"() {
+        BeanDefinition definition = buildBeanDefinition('test.Test', '''\
+package test;
+
+import io.micronaut.inject.annotation.repeatable.*;
+import io.micronaut.context.annotation.*;
+
+@Property(name="prop1", value="value1")
+@Property(name="prop2", value="value2")
+@Property(name="prop3", value="value3")
+@jakarta.inject.Singleton
+class Test {
+
+    @Property(name="prop2", value="value2")    
+    @Property(name="prop3", value="value33")    
+    @Property(name="prop4", value="value4")    
+    @io.micronaut.context.annotation.Executable
+    void someMethod() {}
+}
+''')
+
+        when:
+        AnnotationMetadata metadata = definition.getRequiredMethod("someMethod").getAnnotationMetadata()
+
+        then:
+        List<AnnotationValue<?>> properties = metadata.getAnnotationValuesByName(Property.name)
+
+        then:
+        properties.size() == 5
+        properties[0].get("name", String).get() == "prop2"
+        properties[1].get("name", String).get() == "prop3"
+        properties[1].getValue(String).get() == "value33"
+        properties[2].get("name", String).get() == "prop4"
+        properties[3].get("name", String).get() == "prop1"
+        properties[4].get("name", String).get() == "prop3"
+        properties[4].getValue(String).get() == "value3"
+    }
+
+    void "test declared repeatable annotations are combined, lookup by name"() {
+        BeanDefinition definition = buildBeanDefinition('test.Test', '''\
+package test;
+
+import io.micronaut.inject.annotation.repeatable.*;
+import io.micronaut.context.annotation.*;
+
+@Property(name="prop1", value="value1")
+@Property(name="prop2", value="value2")
+@Property(name="prop3", value="value3")
+@jakarta.inject.Singleton
+class Test {
+
+    @Property(name="prop2", value="value2")    
+    @Property(name="prop3", value="value33")    
+    @Property(name="prop4", value="value4")    
+    @io.micronaut.context.annotation.Executable
+    void someMethod() {}
+}
+''')
+
+        when:
+        AnnotationMetadata metadata = definition.getRequiredMethod("someMethod").getAnnotationMetadata()
+
+        then:
+        List<AnnotationValue<?>> properties = metadata.getDeclaredAnnotationValuesByName(Property.name)
+
+        then:
+        properties.size() == 3
+        properties[0].get("name", String).get() == "prop2"
+        properties[1].get("name", String).get() == "prop3"
+        properties[1].getValue(String).get() == "value33"
+        properties[2].get("name", String).get() == "prop4"
+    }
+
     void "test annotation metadata string value array types"() {
         given:
         AnnotationMetadata metadata = buildTypeAnnotationMetadata('''

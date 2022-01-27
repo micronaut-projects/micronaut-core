@@ -46,7 +46,7 @@ class DefaultConversionServiceSpec extends Specification {
         "10"                    | Byte        | 10
         "10"                    | Integer     | 10
         "${5 + 5}"              | Integer     | 10
-        "10"                    | BigInteger  | new BigInteger(10)
+        "10"                    | BigInteger  | BigInteger.valueOf(10)
         "yes"                   | Boolean     | true
         "true"                  | Boolean     | true
         "Y"                     | Boolean     | true

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
@@ -135,6 +136,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private Http2Settings http2Settings = new Http2Settings();
     private boolean keepAliveOnServerError = DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR;
     private boolean bindToRouterExposedPorts = true;
+    private String pcapLoggingPathPattern = null;
 
     /**
      * Default empty constructor.
@@ -522,6 +524,28 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
+     * The path pattern to use for logging incoming connections to pcap. This is an unsupported option: Behavior may
+     * change, or it may disappear entirely, without notice!
+     *
+     * @return The path pattern, or {@code null} if logging is disabled.
+     */
+    @Internal
+    public String getPcapLoggingPathPattern() {
+        return pcapLoggingPathPattern;
+    }
+
+    /**
+     * The path pattern to use for logging incoming connections to pcap. This is an unsupported option: Behavior may
+     * change, or it may disappear entirely, without notice!
+     *
+     * @param pcapLoggingPathPattern The path pattern, or {@code null} to disable logging.
+     */
+    @Internal
+    public void setPcapLoggingPathPattern(String pcapLoggingPathPattern) {
+        this.pcapLoggingPathPattern = pcapLoggingPathPattern;
+    }
+
+    /**
      * Http2 settings.
      */
     @ConfigurationProperties("http2")
@@ -671,6 +695,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private boolean enabled;
         private String loggerName;
         private String logFormat;
+        private List<String> exclusions;
 
         /**
          * Returns whether the access logger is enabled.
@@ -720,6 +745,23 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
             this.logFormat = logFormat;
         }
 
+        /**
+         * @return The URI patterns to exclude from the access log.
+         */
+        public List<String> getExclusions() {
+            return exclusions;
+        }
+
+        /**
+         * Sets the URI patterns to be excluded from the access log.
+         *
+         * @param exclusions A list of regular expression patterns to be excluded from the access logger if the request URI matches.
+         *
+         * @see java.util.regex.Pattern#compile(String)
+         */
+        public void setExclusions(List<String> exclusions) {
+            this.exclusions = exclusions;
+        }
     }
 
     /**

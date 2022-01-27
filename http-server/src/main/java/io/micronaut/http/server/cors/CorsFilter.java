@@ -18,6 +18,7 @@ package io.micronaut.http.server.cors;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.ImmutableArgumentConversionContext;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
@@ -51,7 +52,7 @@ import static io.micronaut.http.HttpHeaders.*;
 @Filter("/**")
 public class CorsFilter implements HttpServerFilter {
 
-    private static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ConversionContext.of(HttpMethod.class);
+    private static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ImmutableArgumentConversionContext.of(HttpMethod.class);
 
     protected final HttpServerConfiguration.CorsConfiguration corsConfiguration;
 
