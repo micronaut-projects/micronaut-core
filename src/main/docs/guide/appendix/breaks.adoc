@@ -20,7 +20,7 @@ This will then be available, but mask all values.  To restore the previous funct
 public class LegacyEnvEndpointFilter implements EnvironmentEndpointFilter {
     @Override
     public void specifyFiltering(@NotNull EnvironmentFilterSpecification specification) {
-        specification.legacyFiltering();
+        specification.legacyMasking();
     }
 }
 ----
