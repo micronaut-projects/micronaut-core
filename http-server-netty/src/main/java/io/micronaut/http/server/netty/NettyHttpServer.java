@@ -25,7 +25,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.io.socket.SocketUtils;
-import io.micronaut.core.naming.Named;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.discovery.EmbeddedServerInstance;
@@ -33,25 +32,18 @@ import io.micronaut.discovery.event.ServiceReadyEvent;
 import io.micronaut.discovery.event.ServiceStoppedEvent;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
-import io.micronaut.http.netty.AbstractNettyHttpRequest;
-import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
-import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
 import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
-import io.micronaut.http.server.netty.decoders.HttpRequestDecoder;
-import io.micronaut.http.server.netty.encoders.HttpResponseEncoder;
-import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.micronaut.http.server.netty.ssl.HttpRequestCertificateHandler;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
-import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
 import io.micronaut.http.server.util.DefaultHttpHostResolver;
 import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.ssl.ServerSslConfiguration;
@@ -65,80 +57,42 @@ import io.micronaut.web.router.Router;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandler;
-import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
-import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.socket.SocketChannel;
-import io.netty.handler.codec.http.FullHttpRequest;
-import io.netty.handler.codec.http.HttpContentDecompressor;
-import io.netty.handler.codec.http.HttpMessage;
-import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpServerCodec;
-import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
-import io.netty.handler.codec.http.HttpServerUpgradeHandler;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
-import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
-import io.netty.handler.codec.http2.CleartextHttp2ServerUpgradeHandler;
 import io.netty.handler.codec.http2.DefaultHttp2Connection;
-import io.netty.handler.codec.http2.Http2CodecUtil;
 import io.netty.handler.codec.http2.Http2Connection;
 import io.netty.handler.codec.http2.Http2FrameListener;
 import io.netty.handler.codec.http2.Http2FrameLogger;
-import io.netty.handler.codec.http2.Http2ServerUpgradeCodec;
-import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
 import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
-import io.netty.handler.flow.FlowControlHandler;
-import io.netty.handler.logging.LoggingHandler;
-import io.netty.handler.pcap.PcapWriteHandler;
-import io.netty.handler.ssl.ApplicationProtocolNames;
-import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslHandler;
-import io.netty.handler.ssl.SslHandshakeCompletionEvent;
-import io.netty.handler.stream.ChunkedWriteHandler;
-import io.netty.handler.timeout.IdleStateHandler;
-import io.netty.util.AsciiString;
-import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GlobalEventExecutor;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
-import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.channels.ClosedChannelException;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
@@ -285,6 +239,30 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     @SuppressWarnings("WeakerAccess")
     public NettyHttpServerConfiguration getServerConfiguration() {
         return serverConfiguration;
+    }
+
+    ServerSslConfiguration getSslConfiguration() {
+        return sslConfiguration;
+    }
+
+    NettyEmbeddedServices getNettyEmbeddedServices() {
+        return nettyEmbeddedServices;
+    }
+
+    ApplicationEventPublisher<HttpRequestReceivedEvent> getHttpRequestReceivedEventPublisher() {
+        return httpRequestReceivedEventPublisher;
+    }
+
+    RoutingInBoundHandler getRoutingHandler() {
+        return routingHandler;
+    }
+
+    HttpRequestCertificateHandler getRequestCertificateHandler() {
+        return requestCertificateHandler;
+    }
+
+    HttpHostResolver getHostResolver() {
+        return hostResolver;
     }
 
     @Override
@@ -678,206 +656,24 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         // this will ensure re-configuration to HTTPS settings, read-timeouts, logging etc. apply
         // configuration properties are auto-refreshed so will be visible automatically
         if (childHandler != null) {
-            final ServerSslBuilder serverSslBuilder = nettyEmbeddedServices.getServerSslBuilder();
-            childHandler.sslContext = serverSslBuilder != null ? serverSslBuilder.build().orElse(null) : null;
-            childHandler.loggingHandler = serverConfiguration.getLogLevel().isPresent() ?
-                    new LoggingHandler(NettyHttpServer.class, serverConfiguration.getLogLevel().get()) : null;
             childHandler.initHttpCoders();
         }
     }
 
-    private void insertPcapLoggingHandler(ChannelPipeline pipeline, String qualifier) {
-        String pattern = serverConfiguration.getPcapLoggingPathPattern();
-        if (pattern == null) {
-            return;
-        }
-
-        String path = pattern;
-        path = path.replace("{qualifier}", qualifier);
-        path = path.replace("{localAddress}", resolveIfNecessary(pipeline.channel().localAddress()));
-        path = path.replace("{remoteAddress}", resolveIfNecessary(pipeline.channel().remoteAddress()));
-        path = path.replace("{random}", Long.toHexString(ThreadLocalRandom.current().nextLong()));
-        path = path.replace("{timestamp}", Instant.now().toString());
-
-        path = path.replace(':', '_'); // for windows
-
-        LOG.warn("Logging *full* request data, as configured. This will contain sensitive information! Path: '{}'", path);
-
-        try {
-            pipeline.addLast(new PcapWriteHandler(new FileOutputStream(path)));
-        } catch (FileNotFoundException e) {
-            LOG.warn("Failed to create target pcap at '{}', not logging.", path, e);
+    void triggerPipelineListeners(ChannelPipeline pipeline) {
+        for (ChannelPipelineListener pipelineListener : pipelineListeners) {
+            pipelineListener.onConnect(pipeline);
         }
     }
 
-    /**
-     * Force resolution of the given address, and then transform it to string. This prevents any potential user data
-     * appearing in the file path
-     */
-    private static String resolveIfNecessary(SocketAddress address) {
-        if (address instanceof InetSocketAddress) {
-            if (((InetSocketAddress) address).isUnresolved()) {
-                // try resolution
-                address = new InetSocketAddress(((InetSocketAddress) address).getHostString(), ((InetSocketAddress) address).getPort());
-                if (((InetSocketAddress) address).isUnresolved()) {
-                    // resolution failed, bail
-                    return "unresolved";
-                }
-            }
-            return ((InetSocketAddress) address).getAddress().getHostAddress() + ':' + ((InetSocketAddress) address).getPort();
-        }
-        String s = address.toString();
-        if (s.contains("/")) {
-            return "weird";
-        }
-        return s;
-    }
-
-    /**
-     * Negotiates with the browser if HTTP2 or HTTP is going to be used. Once decided, the Netty
-     * pipeline is setup with the correct handlers for the selected protocol.
-     *
-     * This handler cannot be {@link io.netty.channel.ChannelHandler.Sharable shared} because
-     * {@link ApplicationProtocolNegotiationHandler} does not support it.
-     */
-    private final class Http2OrHttpHandler extends ApplicationProtocolNegotiationHandler {
-        private final boolean useSsl;
-        private final HttpAccessLogHandler accessLogHandler;
-        private final HttpRequestDecoder requestDecoder;
-        private final HttpResponseEncoder responseEncoder;
-
-        /**
-         * Default constructor.
-         *
-         * @param useSsl           true when using ssl
-         * @param fallbackProtocol The fallback protocol
-         * @param accessLogHandler Handler for writing access logs
-         * @param requestDecoder   Request decoder
-         * @param responseEncoder  Response encoder
-         */
-        Http2OrHttpHandler(boolean useSsl, String fallbackProtocol,
-                           @Nullable HttpAccessLogHandler accessLogHandler,
-                           HttpRequestDecoder requestDecoder,
-                           HttpResponseEncoder responseEncoder) {
-            super(fallbackProtocol);
-            this.useSsl = useSsl;
-            this.accessLogHandler = accessLogHandler;
-            this.requestDecoder = requestDecoder;
-            this.responseEncoder = responseEncoder;
-        }
-
-        @Override
-        public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-            if (evt instanceof SslHandshakeCompletionEvent) {
-                SslHandshakeCompletionEvent event = (SslHandshakeCompletionEvent) evt;
-                if (!event.isSuccess()) {
-                    final Throwable cause = event.cause();
-                    if (!(cause instanceof ClosedChannelException)) {
-                        super.userEventTriggered(ctx, evt);
-                    } else {
-                        return;
-                    }
-                }
-            }
-            super.userEventTriggered(ctx, evt);
-        }
-
-        @Override
-        protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
-            final ChannelPipeline pipeline = ctx.pipeline();
-            configurePipeline(protocol, pipeline);
-            ctx.read();
-        }
-
-        private void configurePipeline(String protocol, ChannelPipeline pipeline) {
-            Map<String, ChannelHandler> handlers = getHandlerForProtocol(protocol);
-            handlers.forEach(pipeline::addLast);
-            for (ChannelPipelineListener pipelineListener : pipelineListeners) {
-                pipelineListener.onConnect(pipeline);
-            }
-        }
-
-        private void registerMicronautChannelHandlers(Map<String, ChannelHandler> channelHandlerMap) {
-            int i = 0;
-            for (ChannelOutboundHandler outboundHandlerAdapter : nettyEmbeddedServices.getOutboundHandlers()) {
-                String name;
-                if (outboundHandlerAdapter instanceof Named) {
-                    name = ((Named) outboundHandlerAdapter).getName();
-                } else {
-                    name = ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND + NettyHttpServer.OUTBOUND_KEY + ++i;
-                }
-                channelHandlerMap.put(name, outboundHandlerAdapter);
-            }
-        }
-
-        @NonNull
-        private Map<String, ChannelHandler> getHandlerForProtocol(@Nullable String protocol) {
-            return getHandlerForProtocol(protocol, null);
-        }
-
-        @NonNull
-        private Map<String, ChannelHandler> getHandlerForProtocol(@Nullable String protocol, @Nullable HttpServerCodec serverCodec) {
-            final Duration idleTime = serverConfiguration.getIdleTimeout();
-            Map<String, ChannelHandler> handlers = new LinkedHashMap<>(15);
-            if (!idleTime.isNegative()) {
-                handlers.put(HANDLER_IDLE_STATE, new IdleStateHandler(
-                        (int) serverConfiguration.getReadIdleTimeout().getSeconds(),
-                        (int) serverConfiguration.getWriteIdleTimeout().getSeconds(),
-                        (int) idleTime.getSeconds()));
-            }
-            if (protocol == null) {
-                handlers.put(ChannelPipelineCustomizer.HANDLER_FLOW_CONTROL, new FlowControlHandler());
-                if (accessLogHandler != null) {
-                    handlers.put(HANDLER_ACCESS_LOGGER, accessLogHandler);
-                }
-            } else if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
-                final HttpToHttp2ConnectionHandler httpToHttp2ConnectionHandler = newHttpToHttp2ConnectionHandler();
-                handlers.put(HANDLER_HTTP2_CONNECTION, httpToHttp2ConnectionHandler);
-                registerMicronautChannelHandlers(handlers);
-                handlers.put(ChannelPipelineCustomizer.HANDLER_FLOW_CONTROL, new FlowControlHandler());
-                if (accessLogHandler != null) {
-                    handlers.put(HANDLER_ACCESS_LOGGER, accessLogHandler);
-                }
-            } else {
-                handlers.put(HANDLER_HTTP_SERVER_CODEC, serverCodec == null ? createServerCodec() : serverCodec);
-                if (accessLogHandler != null) {
-                    handlers.put(HANDLER_ACCESS_LOGGER, accessLogHandler);
-                }
-                registerMicronautChannelHandlers(handlers);
-                handlers.put(HANDLER_FLOW_CONTROL, new FlowControlHandler());
-                handlers.put(HANDLER_HTTP_KEEP_ALIVE, new HttpServerKeepAliveHandler());
-                handlers.put(HANDLER_HTTP_COMPRESSOR, new SmartHttpContentCompressor(
-                        nettyEmbeddedServices.getHttpCompressionStrategy()
-                ));
-                handlers.put(HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
-            }
-            handlers.put(NettyServerWebSocketUpgradeHandler.COMPRESSION_HANDLER, new WebSocketServerCompressionHandler());
-            handlers.put(HANDLER_HTTP_STREAM, new HttpStreamsServerHandler());
-            handlers.put(HANDLER_HTTP_CHUNK, new ChunkedWriteHandler());
-            handlers.put(HttpRequestDecoder.ID, requestDecoder);
-            if (serverConfiguration.isDualProtocol() && serverConfiguration.isHttpToHttpsRedirect() && useSsl) {
-                handlers.put(HANDLER_HTTP_TO_HTTPS_REDIRECT, new HttpToHttpsRedirectHandler(sslConfiguration, hostResolver));
-            }
-            if (useSsl) {
-                handlers.put("request-certificate-handler", requestCertificateHandler);
-            }
-            handlers.put(HttpResponseEncoder.ID, responseEncoder);
-            handlers.put(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
-                    nettyEmbeddedServices,
-                    getWebSocketSessionRepository()));
-            handlers.put(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, routingHandler);
-            return handlers;
-        }
-
-        @NotNull
-        private HttpServerCodec createServerCodec() {
-            return new HttpServerCodec(
-                    serverConfiguration.getMaxInitialLineLength(),
-                    serverConfiguration.getMaxHeaderSize(),
-                    serverConfiguration.getMaxChunkSize(),
-                    serverConfiguration.isValidateHeaders(),
-                    serverConfiguration.getInitialBufferSize()
-            );
+    static Predicate<String> inclusionPredicate(NettyHttpServerConfiguration.AccessLogger config) {
+        List<String> exclusions = config.getExclusions();
+        if (CollectionUtils.isEmpty(exclusions)) {
+            return null;
+        } else {
+            // Don't do this inside the predicate to avoid compiling every request
+            List<Pattern> patterns = exclusions.stream().map(Pattern::compile).collect(Collectors.toList());
+            return uri -> patterns.stream().noneMatch(pattern -> pattern.matcher(uri).matches());
         }
     }
 
@@ -885,162 +681,31 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      * An HTTP server initializer for Netty.
      */
     private class NettyHttpServerInitializer extends ChannelInitializer<SocketChannel> {
-        SslContext sslContext = nettyEmbeddedServices.getServerSslBuilder() != null ? nettyEmbeddedServices.getServerSslBuilder().build().orElse(null) : null;
-        LoggingHandler loggingHandler =
-                serverConfiguration.getLogLevel().isPresent() ? new LoggingHandler(NettyHttpServer.class, serverConfiguration.getLogLevel().get()) : null;
-
-        private HttpAccessLogHandler accessLogHandler;
-        private HttpRequestDecoder requestDecoder;
-        private HttpResponseEncoder responseEncoder;
+        private volatile HttpPipelineBuilder httpPipelineBuilder;
 
         {
             initHttpCoders();
         }
 
-        private Predicate<String> inclusionPredicate(NettyHttpServerConfiguration.AccessLogger config) {
-            List<String> exclusions = config.getExclusions();
-            if (CollectionUtils.isEmpty(exclusions)) {
-                return null;
-            } else {
-                // Don't do this inside the predicate to avoid compiling every request
-                List<Pattern> patterns = exclusions.stream().map(Pattern::compile).collect(Collectors.toList());
-                return uri -> patterns.stream().noneMatch(pattern -> pattern.matcher(uri).matches());
-            }
-        }
-
-        private HttpAccessLogHandler accessLogHandler() {
-            NettyHttpServerConfiguration.AccessLogger accessLogger = serverConfiguration.getAccessLogger();
-            if (accessLogger != null && accessLogger.isEnabled()) {
-                return new HttpAccessLogHandler(accessLogger.getLoggerName(), accessLogger.getLogFormat(), inclusionPredicate(accessLogger));
-            } else {
-                return null;
-            }
-        }
-
         void initHttpCoders() {
-            this.accessLogHandler = accessLogHandler();
-            this.requestDecoder = new HttpRequestDecoder(NettyHttpServer.this,
-                    environment,
-                    serverConfiguration,
-                    httpRequestReceivedEventPublisher);
-            this.responseEncoder = new HttpResponseEncoder(
-                    nettyEmbeddedServices.getMediaTypeCodecRegistry(),
-                    serverConfiguration
-            );
+            httpPipelineBuilder = new HttpPipelineBuilder(NettyHttpServer.this);
         }
 
         @Override
         protected void initChannel(SocketChannel ch) {
-            ChannelPipeline pipeline = ch.pipeline();
-
-            insertPcapLoggingHandler(pipeline, "encapsulated");
-
             int port = ch.localAddress().getPort();
-            boolean ssl = sslContext != null && sslConfiguration != null && port == serverPort;
-            if (ssl) {
-                SslHandler sslHandler = sslContext.newHandler(ch.alloc());
-                sslHandler.setHandshakeTimeoutMillis(sslConfiguration.getHandshakeTimeout().toMillis());
-                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler);
+            boolean ssl = httpPipelineBuilder.supportsSsl() && sslConfiguration != null && port == serverPort;
+            HttpPipelineBuilder.ConnectionPipeline pipelineBuilder = httpPipelineBuilder.new ConnectionPipeline(ch, ssl);
 
-                insertPcapLoggingHandler(pipeline, "ssl-decapsulated");
-            }
-
-            if (loggingHandler != null) {
-                pipeline.addLast(loggingHandler);
-            }
-
-            Http2OrHttpHandler http2OrHttpHandler = new Http2OrHttpHandler(sslContext != null, serverConfiguration.getFallbackProtocol(), accessLogHandler, requestDecoder, responseEncoder);
+            pipelineBuilder.insertOuterTcpHandlers();
 
             if (serverConfiguration.getHttpVersion() != io.micronaut.http.HttpVersion.HTTP_2_0) {
-                http2OrHttpHandler.configurePipeline(ApplicationProtocolNames.HTTP_1_1, pipeline);
+                pipelineBuilder.configureForHttp1();
             } else {
                 if (ssl) {
-                    pipeline.addLast(http2OrHttpHandler);
+                    pipelineBuilder.configureForAlpn();
                 } else {
-                    final HttpToHttp2ConnectionHandler connectionHandler = newHttpToHttp2ConnectionHandler();
-                    final String fallbackHandlerName = "http1-fallback-handler";
-                    HttpServerUpgradeHandler.UpgradeCodecFactory upgradeCodecFactory = protocol -> {
-                        if (AsciiString.contentEquals(Http2CodecUtil.HTTP_UPGRADE_PROTOCOL_NAME, protocol)) {
-
-                            return new Http2ServerUpgradeCodec(HANDLER_HTTP2_CONNECTION, connectionHandler) {
-                                @Override
-                                public void upgradeTo(ChannelHandlerContext ctx, FullHttpRequest upgradeRequest) {
-                                    final ChannelPipeline p = ctx.pipeline();
-                                    p.remove(fallbackHandlerName);
-                                    http2OrHttpHandler.getHandlerForProtocol(null)
-                                            .forEach(p::addLast);
-                                    for (ChannelPipelineListener pipelineListener : pipelineListeners) {
-                                        pipelineListener.onConnect(p);
-                                    }
-                                    super.upgradeTo(ctx, upgradeRequest);
-                                    // HTTP1 request is on the implicit stream 1
-                                    upgradeRequest.headers().set(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), 1);
-                                    ctx.fireChannelRead(ReferenceCountUtil.retain(upgradeRequest));
-                                }
-                            };
-                        } else {
-                            return null;
-                        }
-                    };
-                    final HttpServerCodec sourceCodec = http2OrHttpHandler.createServerCodec();
-                    final HttpServerUpgradeHandler upgradeHandler = new HttpServerUpgradeHandler(
-                            sourceCodec,
-                            upgradeCodecFactory,
-                            serverConfiguration.getMaxH2cUpgradeRequestSize()
-                    );
-                    final CleartextHttp2ServerUpgradeHandler cleartextHttp2ServerUpgradeHandler =
-                            new CleartextHttp2ServerUpgradeHandler(sourceCodec, upgradeHandler, connectionHandler);
-
-                    pipeline.addLast(cleartextHttp2ServerUpgradeHandler);
-                    pipeline.addLast(fallbackHandlerName, new SimpleChannelInboundHandler<HttpMessage>() {
-                        @Override
-                        protected void channelRead0(ChannelHandlerContext ctx, HttpMessage msg) {
-                            // If this handler is hit then no upgrade has been attempted and the client is just talking HTTP.
-                            if (msg instanceof HttpRequest) {
-                                HttpRequest req = (HttpRequest) msg;
-                                if (req.headers().contains(AbstractNettyHttpRequest.STREAM_ID)) {
-                                    ChannelPipeline pipeline = ctx.pipeline();
-                                    pipeline.remove(this);
-                                    pipeline.fireChannelRead(ReferenceCountUtil.retain(msg));
-                                    return;
-                                }
-                            }
-                            ChannelPipeline pipeline = ctx.pipeline();
-
-                            // remove the handlers we don't need anymore
-                            pipeline.remove(upgradeHandler);
-                            pipeline.remove(this);
-
-                            // reconfigure for http1
-                            // note: we have to reuse the serverCodec in case it still has some data buffered
-                            ChannelHandlerContext serverCodecContext = pipeline.context(HttpServerCodec.class);
-                            Iterator<Map.Entry<String, ChannelHandler>> newHandlers = http2OrHttpHandler
-                                    .getHandlerForProtocol(ApplicationProtocolNames.HTTP_1_1, (HttpServerCodec) serverCodecContext.handler())
-                                    .entrySet().iterator();
-                            // first, add the handlers before the serverCodec
-                            while (true) {
-                                if (!newHandlers.hasNext()) {
-                                    throw new AssertionError("getHandlerForProtocol(HTTP_1_1) should return the HttpServerCodec passed to it");
-                                }
-                                Map.Entry<String, ChannelHandler> entry = newHandlers.next();
-                                if (entry.getValue() == serverCodecContext.handler()) {
-                                    break;
-                                }
-                                pipeline.addBefore(serverCodecContext.name(), entry.getKey(), entry.getValue());
-                            }
-                            // now, the final handlers
-                            while (newHandlers.hasNext()) {
-                                Map.Entry<String, ChannelHandler> entry = newHandlers.next();
-                                pipeline.addLast(entry.getKey(), entry.getValue());
-                            }
-
-                            for (ChannelPipelineListener pipelineListener : pipelineListeners) {
-                                pipelineListener.onConnect(pipeline);
-                            }
-                            pipeline.fireChannelRead(ReferenceCountUtil.retain(msg));
-                        }
-                    });
-
+                    pipelineBuilder.configureForH2cSupport();
                 }
             }
         }
