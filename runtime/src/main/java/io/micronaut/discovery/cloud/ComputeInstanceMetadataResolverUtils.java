@@ -90,7 +90,7 @@ public class ComputeInstanceMetadataResolverUtils {
      * @param requestProperties   any request properties to pass
      * @return a {@link JsonNode} instance
      * @throws IOException if any I/O error occurs
-     * @since 3.2.1
+     * @since 3.3.0
      */
     @Experimental
     public static JsonNode readMetadataUrl(URL url, int connectionTimeoutMs, int readTimeoutMs, JsonMapper jsonMapper, Map<String, String> requestProperties) throws IOException {
