@@ -5,7 +5,7 @@ The following example implements a simple echo server that echoes the body sent 
 snippet::io.micronaut.docs.server.body.MessageController[tags="imports,class,echo,endclass", indent=0, title="Using the @Body annotation"]
 
 <1> The api:io.micronaut.http.annotation.Post[] annotation is used with a api:http.MediaType[] of `text/plain` (the default is `application/json`).
-<2> The api:http.annotation.Body[] annotation is used with a `javax.validation.constraints.Size` that limits the size of the body to at most 1MB. This constraint does *not* limit the amount of data read/buffered by the server.
+<2> The api:http.annotation.Body[] annotation is used with a `javax.validation.constraints.Size` that limits the size of the body to at most 1KB. This constraint does *not* limit the amount of data read/buffered by the server.
 <3> The body is returned as the result of the method
 
 Note that reading the request body is done in a non-blocking manner in that the request contents are read as the data becomes available and accumulated into the String passed to the method.

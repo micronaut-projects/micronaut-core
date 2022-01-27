@@ -8,6 +8,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.Issue
 import spock.lang.Retry
 import spock.lang.Specification
 
@@ -48,6 +49,32 @@ class EndpointsPortSpec extends Specification {
         cleanup:
         serverClient.close()
         rxClient.close()
+        server.close()
+    }
+
+    // retry as a port binding conflict on CI can occur
+    @Retry
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/3839")
+    def "test admin port can be configured to be the same as the server port"() {
+        given:
+        def port = SocketUtils.findAvailableTcpPort()
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName,
+                'micronaut.application.name': 'foo',
+                'micronaut.server.port': port,
+                'endpoints.all.port': port,
+                'endpoints.all.enabled': true
+        ])
+        HttpClient serverClient = server.applicationContext.createBean(HttpClient.class, server.getURL())
+
+        when:
+        serverClient.toBlocking().retrieve('/health')
+
+        then:
+        noExceptionThrown()
+
+        cleanup:
+        serverClient.close()
         server.close()
     }
 

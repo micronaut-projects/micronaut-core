@@ -32,10 +32,6 @@ When the `management` dependency is added to your project, the following built-i
 | `/routes`
 |Returns information about URIs available to be called for your application (see <<routesEndpoint, RoutesEndpoint>>)
 
-|api:management.endpoint.env.EnvironmentEndpoint[]
-| `/env`
-|Returns information about the environment and its property sources (see <<environmentEndpoint, EnvironmentEndpoint>>)
-
 |api:management.endpoint.threads.ThreadDumpEndpoint[]
 | `/threaddump`
 |Returns information about the current threads in the application.
@@ -47,6 +43,10 @@ In addition, the following built-in endpoint(s) are provided by the `management`
 .Disabled Endpoints
 |===
 |Endpoint|URI|Description
+
+|api:management.endpoint.env.EnvironmentEndpoint[]
+| `/env`
+|Returns information about the environment and its property sources (see <<environmentEndpoint, EnvironmentEndpoint>>)
 
 |<<cachesEndpoint, CachesEndpoint>>
 | `/caches`

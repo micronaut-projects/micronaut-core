@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -97,24 +97,6 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @Internal
     public JavaClassElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
         this(classElement, annotationMetadata, visitorContext, Collections.emptyList(), null, 0, false);
-    }
-
-    /**
-     * Used by OpenAPI.
-     *
-     * @param classElement       The {@link TypeElement}
-     * @param annotationMetadata The annotation metadata
-     * @param visitorContext     The visitor context
-     * @param genericsInfo       The generic type info
-     * @param arrayDimensions    The number of array dimensions
-     */
-    JavaClassElement(
-            TypeElement classElement,
-            AnnotationMetadata annotationMetadata,
-            JavaVisitorContext visitorContext,
-            Map<String, Map<String, TypeMirror>> genericsInfo,
-            int arrayDimensions) {
-        this(classElement, annotationMetadata, visitorContext, Collections.emptyList(), genericsInfo, arrayDimensions, false);
     }
 
     /**
@@ -415,7 +397,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                             if (beanPropertyData.setter != null) {
                                 TypeMirror typeMirror = beanPropertyData.setter.getParameters().get(0).asType();
                                 ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext, JavaClassElement.this.genericTypeInfo, true);
-                                if (!setterParameterType.getName().equals(getterReturnType.getName())) {
+                                if (!setterParameterType.isAssignable(getterReturnType)) {
                                     beanPropertyData.setter = null; // not a compatible setter
                                 }
                             }
