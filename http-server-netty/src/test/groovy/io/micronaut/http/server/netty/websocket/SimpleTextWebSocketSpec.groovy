@@ -115,6 +115,7 @@ class SimpleTextWebSocketSpec extends Specification {
         EmbeddedServer embeddedServer = ApplicationContext.builder([
                 'micronaut.server.netty.log-level':'TRACE',
                 'micronaut.server.ssl.enabled':true,
+                'micronaut.server.ssl.port': -1,
                 'micronaut.server.ssl.build-self-signed':true,
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
                 ]).run(EmbeddedServer)
