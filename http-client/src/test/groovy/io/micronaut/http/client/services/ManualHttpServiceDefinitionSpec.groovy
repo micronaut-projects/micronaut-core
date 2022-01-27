@@ -189,9 +189,9 @@ class ManualHttpServiceDefinitionSpec extends Specification {
 
     void "test working SSL configuration"() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'micronaut.ssl.enabled': true,
+                'micronaut.server.ssl.enabled': true,
                 // let the HTTPS port be random
-                'micronaut.ssl.port': -1,
+                'micronaut.server.ssl.port': -1,
                 'micronaut.server.ssl.client-authentication': 'NEED',
                 'micronaut.server.ssl.key-store.path': 'classpath:certs/server.p12',
                 'micronaut.server.ssl.key-store.password': 'secret',

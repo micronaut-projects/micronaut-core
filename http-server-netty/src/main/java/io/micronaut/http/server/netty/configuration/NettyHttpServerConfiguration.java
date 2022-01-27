@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
@@ -135,6 +136,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private Http2Settings http2Settings = new Http2Settings();
     private boolean keepAliveOnServerError = DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR;
     private boolean bindToRouterExposedPorts = true;
+    private String pcapLoggingPathPattern = null;
 
     /**
      * Default empty constructor.
@@ -519,6 +521,28 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setKeepAliveOnServerError(boolean keepAliveOnServerError) {
         this.keepAliveOnServerError = keepAliveOnServerError;
+    }
+
+    /**
+     * The path pattern to use for logging incoming connections to pcap. This is an unsupported option: Behavior may
+     * change, or it may disappear entirely, without notice!
+     *
+     * @return The path pattern, or {@code null} if logging is disabled.
+     */
+    @Internal
+    public String getPcapLoggingPathPattern() {
+        return pcapLoggingPathPattern;
+    }
+
+    /**
+     * The path pattern to use for logging incoming connections to pcap. This is an unsupported option: Behavior may
+     * change, or it may disappear entirely, without notice!
+     *
+     * @param pcapLoggingPathPattern The path pattern, or {@code null} to disable logging.
+     */
+    @Internal
+    public void setPcapLoggingPathPattern(String pcapLoggingPathPattern) {
+        this.pcapLoggingPathPattern = pcapLoggingPathPattern;
     }
 
     /**
