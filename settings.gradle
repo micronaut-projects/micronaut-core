@@ -56,7 +56,6 @@ include "router"
 include "runtime"
 include "runtime-osx"
 include "session"
-include "tracing"
 include "validation"
 include "websocket"
 
