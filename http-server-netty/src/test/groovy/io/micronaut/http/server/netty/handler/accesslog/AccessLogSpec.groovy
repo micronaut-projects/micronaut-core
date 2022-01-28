@@ -113,7 +113,9 @@ class AccessLogSpec extends Specification {
         responses[0].content().toString(StandardCharsets.UTF_8) == 'open'
         responses[1].content().toString(StandardCharsets.UTF_8) == 'finish'
 
-        listAppender.list.size() == 2
+        new PollingConditions(timeout: 5).eventually {
+            listAppender.list.size() == 2
+        }
         listAppender.list[0].message.contains('/interleave/open')
         listAppender.list[1].message.contains('/interleave/finish')
 
@@ -177,7 +179,9 @@ class AccessLogSpec extends Specification {
         responses[0].content().toString(StandardCharsets.UTF_8) == 'open'
         responses[1].content().toString(StandardCharsets.UTF_8) == 'finish'
 
-        listAppender.list.size() == 1
+        new PollingConditions(timeout: 5).eventually {
+            listAppender.list.size() == 1
+        }
         listAppender.list[0].message.contains('/interleave/finish')
 
         cleanup:
@@ -243,7 +247,9 @@ class AccessLogSpec extends Specification {
         responses[1].content().toString(StandardCharsets.UTF_8) == 'post: foo'
         responses[2].content().toString(StandardCharsets.UTF_8) == 'simple'
 
-        listAppender.list.size() == 2
+        new PollingConditions(timeout: 5).eventually {
+            listAppender.list.size() == 2
+        }
         listAppender.list[0].message.contains('/interleave/post')
         listAppender.list[1].message.contains('/interleave/simple')
 
@@ -351,7 +357,9 @@ class AccessLogSpec extends Specification {
         responses[1].content().toString(StandardCharsets.UTF_8) == 'open'
         responses[2].content().toString(StandardCharsets.UTF_8) == 'finish'
 
-        listAppender.list.size() == 3
+        new PollingConditions(timeout: 5).eventually {
+            listAppender.list.size() == 3
+        }
         listAppender.list[0].message.contains('/interleave/simple')
         listAppender.list[1].message.contains('/interleave/open')
         listAppender.list[2].message.contains('/interleave/finish')
@@ -445,7 +453,9 @@ class AccessLogSpec extends Specification {
         responses[2].content().toString(StandardCharsets.UTF_8) == 'open'
         responses[3].content().toString(StandardCharsets.UTF_8) == 'finish'
 
-        listAppender.list.size() == 4
+        new PollingConditions(timeout: 5).eventually {
+            listAppender.list.size() == 4
+        }
         listAppender.list[0].message.contains('/interleave/simple')
         listAppender.list[1].message.contains('/interleave/simple')
         listAppender.list[2].message.contains('/interleave/open')
@@ -541,7 +551,9 @@ class AccessLogSpec extends Specification {
         responses[2].content().toString(StandardCharsets.UTF_8) == 'open'
         responses[3].content().toString(StandardCharsets.UTF_8) == 'finish'
 
-        listAppender.list.size() == 1
+        new PollingConditions(timeout: 5).eventually {
+            listAppender.list.size() == 1
+        }
         listAppender.list[0].message.contains('/interleave/open')
 
         cleanup:

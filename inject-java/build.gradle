@@ -33,7 +33,12 @@ dependencies {
     testImplementation libs.managed.micrometer.core
     testImplementation project(":validation")
     testImplementation libs.junit.jupiter.api
-    testImplementation libs.managed.zipkin.reporter
+    testImplementation(libs.managed.micronaut.tracing.zipkin) {
+        exclude module: 'micronaut-bom'
+        exclude module: 'micronaut-http-client'
+        exclude module: 'micronaut-inject'
+        exclude module: 'micronaut-runtime'
+    }
     testImplementation(libs.managed.micronaut.test.core) {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-bom'
