@@ -43,7 +43,6 @@ managed-azure-function = "1.4.2"
 managed-commons-dbcp = "2.9.0"
 managed-dekorate = "1.0.3"
 managed-elasticsearch = "7.16.3"
-managed-flyway = "8.4.2"
 managed-grpc = "1.39.0"
 managed-ignite = "2.8.1"
 managed-junit5 = "5.7.2"
@@ -84,7 +83,7 @@ managed-micronaut-data = "3.2.2"
 managed-micronaut-discovery = "3.1.0"
 managed-micronaut-elasticsearch = "4.2.0"
 managed-micronaut-email = "1.0.0"
-managed-micronaut-flyway = "5.1.1"
+managed-micronaut-flyway = "5.1.2"
 managed-micronaut-gcp = "4.0.0"
 managed-micronaut-graphql = "3.0.0"
 managed-micronaut-groovy = "3.0.0"
@@ -172,6 +171,7 @@ boms-micronaut-test = { module = "io.micronaut.test:micronaut-test-bom", version
 boms-micronaut-tracing = { module = "io.micronaut.tracing:micronaut-tracing-bom", version.ref = "managed-micronaut-tracing" }
 boms-micronaut-views = { module = "io.micronaut.views:micronaut-views-bom", version.ref = "managed-micronaut-views" }
 boms-micronaut-r2dbc = { module = "io.micronaut.r2dbc:micronaut-r2dbc-bom", version.ref = "managed-micronaut-r2dbc" }
+boms-micronaut-flyway = { module = "io.micronaut.flyway:micronaut-flyway-bom", version.ref = "managed-micronaut-flyway" }
 
 boms-groovy = { module = "org.codehaus.groovy:groovy-bom", version.ref = "managed-groovy" }
 boms-grpc = { module = "io.grpc:grpc-bom", version.ref = "managed-grpc" }
@@ -204,8 +204,6 @@ managed-dekorate-servicecatalog-annotations = { module = "io.dekorate:servicecat
 managed-dekorate-halkyon-annotations = { module = "io.dekorate:halkyon-annotations", version.ref = "managed-dekorate" }
 
 managed-elasticsearch = { module = "org.elasticsearch.client:elasticsearch-rest-high-level-client", version.ref = "managed-elasticsearch" }
-
-managed-flyway = { module = "org.flywaydb:flyway-core", version.ref = "managed-flyway" }
 
 managed-google-function-framework = { module = "com.google.cloud.functions:functions-framework-api", version.ref = "managed-google-function-framework" }
 managed-google-function-invoker = { module = "com.google.cloud.functions.invoker:java-function-invoker", version.ref = "managed-google-function-invoker" }
@@ -293,7 +291,6 @@ managed-micronaut-azure-function-http-test = { module = "io.micronaut.azure:micr
 managed-micronaut-cassandra = { module = "io.micronaut.cassandra:micronaut-cassandra", version.ref = "managed-micronaut-cassandra" }
 managed-micronaut-discovery = { module = "io.micronaut.discovery:micronaut-discovery-client", version.ref = "managed-micronaut-discovery" }
 managed-micronaut-elasticsearch = { module = "io.micronaut.elasticsearch:micronaut-elasticsearch", version.ref = "managed-micronaut-elasticsearch" }
-managed-micronaut-flyway = { module = "io.micronaut.flyway:micronaut-flyway", version.ref = "managed-micronaut-flyway" }
 managed-micronaut-gcp = { module = "io.micronaut.gcp:micronaut-gcp-common", version.ref = "managed-micronaut-gcp" }
 managed-micronaut-gcp-tracing = { module = "io.micronaut.gcp:micronaut-gcp-tracing", version.ref = "managed-micronaut-gcp" }
 managed-micronaut-gcp-function = { module = "io.micronaut.gcp:micronaut-gcp-function", version.ref = "managed-micronaut-gcp" }
