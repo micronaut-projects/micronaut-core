@@ -64,8 +64,24 @@ open class KotlinClassElement(val classType: KSType,
 
     override fun isTypeVariable(): Boolean = typeVariable
 
+    @OptIn(KspExperimental::class)
     override fun isAssignable(type: String): Boolean {
-        val ksType = visitorContext.resolver.getClassDeclarationByName(type)?.asStarProjectedType()
+        var ksType = visitorContext.resolver.getClassDeclarationByName(type)?.asStarProjectedType()
+        if (ksType != null) {
+            if (ksType.isAssignableFrom(classType)) {
+                return true
+            }
+            val kotlinName = visitorContext.resolver.mapJavaNameToKotlin(
+                visitorContext.resolver.getKSNameFromString(type))
+            if (kotlinName != null) {
+                ksType = visitorContext.resolver.getKotlinClassByName(kotlinName)?.asStarProjectedType()
+                if (ksType != null) {
+                    if (ksType.isAssignableFrom(classType)) {
+                        return true
+                    }
+                }
+            }
+        }
         return ksType?.isAssignableFrom(classType) ?: false
     }
 

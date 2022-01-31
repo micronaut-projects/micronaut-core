@@ -169,7 +169,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         annotationMetadata: AnnotationMetadata
     ): MethodElement {
         val annotationUtils = visitorContext.getAnnotationUtils()
-        return KotlinMethodElement(method, declaringClass, AnnotationMetadataHierarchy(declaringClass.annotationMetadata, annotationMetadata), visitorContext, KotlinParameterElement(type, method.parameter, annotationUtils.getAnnotationMetadata(method.parameter), visitorContext))
+        return KotlinMethodElement(method, declaringClass, AnnotationMetadataHierarchy(declaringClass.annotationMetadata, annotationMetadata), visitorContext, KotlinParameterElement(type, method.parameter, AnnotationMetadataHierarchy(annotationMetadata, annotationUtils.getAnnotationMetadata(method.parameter)), visitorContext))
     }
 
     override fun newConstructorElement(
