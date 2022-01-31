@@ -30,7 +30,6 @@ import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.discovery.EmbeddedServerInstance;
 import io.micronaut.discovery.event.ServiceReadyEvent;
 import io.micronaut.discovery.event.ServiceStoppedEvent;
-import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
@@ -124,7 +123,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private final ServerSslConfiguration sslConfiguration;
     private final Environment environment;
     private final int specifiedPort;
-    private final HttpRequestCertificateHandler requestCertificateHandler;
     private final RoutingInBoundHandler routingHandler;
     private final HttpContentProcessorResolver httpContentProcessorResolver;
     private final boolean isDefault;
@@ -139,7 +137,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private EventLoopGroup parentGroup;
     private EmbeddedServerInstance serviceInstance;
     private final Collection<ChannelPipelineListener> pipelineListeners = new ArrayList<>(2);
-    private final ApplicationEventPublisher<HttpRequestReceivedEvent> httpRequestReceivedEventPublisher;
     private NettyHttpServerInitializer childHandler;
     private final Set<Integer> boundPorts = new HashSet<>(2);
 
@@ -181,9 +178,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
 
         this.serverPort = port;
-        this.requestCertificateHandler = new HttpRequestCertificateHandler();
-        this.httpRequestReceivedEventPublisher = nettyEmbeddedServices
-                .getEventPublisher(HttpRequestReceivedEvent.class);
         ApplicationEventPublisher<HttpRequestTerminatedEvent> httpRequestTerminatedEventPublisher = nettyEmbeddedServices
                 .getEventPublisher(HttpRequestTerminatedEvent.class);
         final Supplier<ExecutorService> ioExecutor = SupplierUtil.memoized(() ->
@@ -239,30 +233,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     @SuppressWarnings("WeakerAccess")
     public NettyHttpServerConfiguration getServerConfiguration() {
         return serverConfiguration;
-    }
-
-    ServerSslConfiguration getSslConfiguration() {
-        return sslConfiguration;
-    }
-
-    NettyEmbeddedServices getNettyEmbeddedServices() {
-        return nettyEmbeddedServices;
-    }
-
-    ApplicationEventPublisher<HttpRequestReceivedEvent> getHttpRequestReceivedEventPublisher() {
-        return httpRequestReceivedEventPublisher;
-    }
-
-    RoutingInBoundHandler getRoutingHandler() {
-        return routingHandler;
-    }
-
-    HttpRequestCertificateHandler getRequestCertificateHandler() {
-        return requestCertificateHandler;
-    }
-
-    HttpHostResolver getHostResolver() {
-        return hostResolver;
     }
 
     @Override
@@ -688,7 +658,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
 
         void initHttpCoders() {
-            httpPipelineBuilder = new HttpPipelineBuilder(NettyHttpServer.this);
+            httpPipelineBuilder = new HttpPipelineBuilder(NettyHttpServer.this, nettyEmbeddedServices, sslConfiguration, routingHandler, hostResolver);
         }
 
         @Override
