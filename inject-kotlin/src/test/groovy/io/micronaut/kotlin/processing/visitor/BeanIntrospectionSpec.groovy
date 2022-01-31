@@ -1268,7 +1268,6 @@ class Test
         introspection.instantiate()
     }
 
-    @Ignore
     void "test write bean introspection data for class already introspected"() {
         given:
         def classLoader = buildClassLoader('test.Test', '''

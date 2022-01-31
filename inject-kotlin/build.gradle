@@ -12,8 +12,8 @@ dependencies {
     if (!JavaVersion.current().isJava9Compatible()) {
         api files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
-    //kspTest(project)
-    //kspTest libs.bundles.asm
+    kspTest(project)
+    kspTest libs.bundles.asm
     testImplementation("com.github.tschuchortdev:kotlin-compile-testing-ksp:1.4.7")
     testImplementation libs.kotlin.stdlib
     testImplementation libs.managed.jackson.annotations

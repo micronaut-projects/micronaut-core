@@ -10,8 +10,6 @@ import io.micronaut.inject.ast.*
 import io.micronaut.kotlin.processing.toClassName
 import java.util.*
 import java.util.function.Predicate
-import javax.lang.model.element.NestingKind
-import javax.lang.model.element.TypeElement
 
 open class KotlinClassElement(val classType: KSType,
                               annotationMetadata: AnnotationMetadata,
@@ -56,6 +54,15 @@ open class KotlinClassElement(val classType: KSType,
             .map {
                 visitorContext.elementFactory.newClassElement(it.resolve())
             }
+    }
+
+    override fun getInterfaces(): Collection<ClassElement> {
+        return declaration.superTypes.map { it.resolve() }.filter {
+            val declaration = it.declaration
+            declaration is KSClassDeclaration && declaration.classKind == ClassKind.INTERFACE
+        }.map {
+            visitorContext.elementFactory.newClassElement(it)
+        }.toList()
     }
 
     override fun isInterface(): Boolean {
@@ -136,11 +143,42 @@ open class KotlinClassElement(val classType: KSType,
     }
 
     override fun getTypeArguments(type: String): Map<String, ClassElement> {
-        return emptyMap()
+        return allTypeArguments.getOrElse(type, { -> emptyMap() })
     }
 
     override fun getAllTypeArguments(): Map<String, Map<String, ClassElement>> {
-        return emptyMap()
+        val allTypeArguments = mutableMapOf<String, Map<String, ClassElement>>()
+        val resolvedArguments = mutableMapOf<String, ClassElement>()
+        var superType = this.superType.orElse(null)
+        while (superType != null) {
+            populateTypeArguments(allTypeArguments, resolvedArguments, superType)
+            superType.interfaces.forEach {
+                populateTypeArguments(allTypeArguments, resolvedArguments, it)
+            }
+            superType = superType.superType.orElse(null)
+        }
+        populateTypeArguments(allTypeArguments, resolvedArguments, this)
+        interfaces.forEach {
+            populateTypeArguments(allTypeArguments, resolvedArguments, it)
+        }
+        return allTypeArguments
+    }
+
+    private fun populateTypeArguments(allTypeArguments: MutableMap<String, Map<String, ClassElement>>,
+                                      resolvedArguments: MutableMap<String, ClassElement>,
+                                      classElement: ClassElement) {
+        var typeArguments = classElement.typeArguments
+        if (typeArguments.isNotEmpty()) {
+            typeArguments = typeArguments.mapValues { entry ->
+                if (entry.value is GenericPlaceholderElement) {
+                    resolvedArguments.getOrDefault(entry.key, entry.value)
+                } else {
+                    resolvedArguments.putIfAbsent(entry.key, entry.value)
+                    entry.value
+                }
+            }
+            allTypeArguments[classElement.name] = typeArguments
+        }
     }
 
     override fun getDefaultConstructor(): Optional<MethodElement> {
