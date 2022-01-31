@@ -51,9 +51,9 @@ class NettyHttpPortContentionSpec extends Specification{
         when: "we spin up 2 servers"
         PropertySource propertySource = PropertySource.of(
                 'micronaut.server.port': -1,
-                'micronaut.ssl.port': -1,
-                'micronaut.ssl.enabled': true,
-                'micronaut.ssl.buildSelfSigned': true,
+                'micronaut.server.ssl.port': -1,
+                'micronaut.server.ssl.enabled': true,
+                'micronaut.server.ssl.buildSelfSigned': true,
                 'micronaut.server.dualProtocol':true
         )
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, propertySource)

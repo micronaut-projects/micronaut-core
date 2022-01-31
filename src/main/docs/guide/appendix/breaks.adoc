@@ -2,7 +2,7 @@ This section documents breaking changes between Micronaut versions
 
 == 3.3.0
 
-- The link:#environmentEndpoint[environmental endpoint] is now disabled by default. To enable it, you must update your endpoint config:
+- The <<environmentEndpoint, environmental endpoint>> is now disabled by default. To enable it, you must update your endpoint config:
 
 [source,yaml]
 ----
@@ -11,7 +11,7 @@ endpoints:
     enabled: true
 ----
 
-This will then be available, but mask all values.  To restore the legacy functionality, you can add a Bean like so:
+This will then be available, but mask all values.  To restore the previous functionality, you can add a bean that implements api:management.endpoint.env.EnvironmentEndpointFilter[]:
 
 .Legacy Environment Filtering Bean
 [source,java]
@@ -20,10 +20,12 @@ This will then be available, but mask all values.  To restore the legacy functio
 public class LegacyEnvEndpointFilter implements EnvironmentEndpointFilter {
     @Override
     public void specifyFiltering(@NotNull EnvironmentFilterSpecification specification) {
-        specification.legacyFiltering();
+        specification.legacyMasking();
     }
 }
 ----
+
+See the <<environmentEndpoint, documentation>> for more filtering options.
 
 == 3.2.4
 
