@@ -1169,7 +1169,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         Object v = values.get(member);
         if (v instanceof AnnotationValue) {
             final AnnotationValue<T> av = (AnnotationValue<T>) v;
-            if (av.getAnnotationName().equals(type)) {
+            if (av.getAnnotationName().equals(typeName)) {
                 return Optional.of(av);
             }
             return Optional.empty();
