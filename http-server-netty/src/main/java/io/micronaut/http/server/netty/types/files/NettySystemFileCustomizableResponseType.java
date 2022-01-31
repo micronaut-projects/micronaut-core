@@ -22,7 +22,6 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.SmartHttpContentCompressor;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
@@ -112,9 +111,6 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
 
             // Write the request data
             final DefaultHttpResponse finalResponse = new DefaultHttpResponse(nettyResponse.getNettyHttpVersion(), nettyResponse.getNettyHttpStatus(), nettyResponse.getNettyHeaders());
-            if (request instanceof NettyHttpRequest) {
-                ((NettyHttpRequest<?>) request).prepareHttp2ResponseIfNecessary(finalResponse);
-            }
             context.write(finalResponse, context.voidPromise());
 
             FileHolder file = new FileHolder(getFile());
