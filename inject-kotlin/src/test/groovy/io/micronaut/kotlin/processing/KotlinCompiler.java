@@ -3,17 +3,14 @@ package io.micronaut.kotlin.processing;
 import com.tschuchort.compiletesting.KotlinCompilation;
 import com.tschuchort.compiletesting.KspKt;
 import com.tschuchort.compiletesting.SourceFile;
-import io.micronaut.aop.internal.InterceptorRegistryBean;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.DefaultApplicationContext;
-import io.micronaut.context.event.ApplicationEventPublisherFactory;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
-import io.micronaut.inject.provider.BeanProviderDefinition;
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
 import io.micronaut.kotlin.processing.beans.BeanDefinitionProcessorProvider;
@@ -24,11 +21,8 @@ import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URLClassLoader;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
 
 public class KotlinCompiler {
 

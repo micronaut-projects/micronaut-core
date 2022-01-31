@@ -214,7 +214,7 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
                 val methodElement = visitorContext.elementFactory.newMethodElement(classElement, function, annotationMetadata)
                 loadedVisitor.visitor.visitMethod(methodElement, visitorContext)
             }
-            return super.visitFunctionDeclaration(function, data)
+            return data
         }
 
         override fun visitPropertyDeclaration(property: KSPropertyDeclaration, data: Any): Any {
@@ -268,7 +268,7 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
                     loadedVisitor.visitor.visitMethod(methodElement, visitorContext)
                 }
             }
-            return super.visitPropertyDeclaration(property, data)
+            return data
         }
 
         override fun defaultHandler(node: KSNode, data: Any): Any {
