@@ -13,9 +13,10 @@ class BeanRegistrationSpec extends Specification {
         def context = buildContext( '''
 package beanreg
 
-import jakarta.inject.*
+import jakarta.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Named
 import io.micronaut.context.BeanRegistration
-import java.util.*
 
 @Singleton
 class Test(val registrations: Collection<BeanRegistration<Foo>>, val primaryBean: BeanRegistration<Foo>) {

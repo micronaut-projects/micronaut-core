@@ -168,6 +168,8 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
     private class ElementVisitor(private val loadedVisitor: LoadedVisitor,
     private val classDeclaration: KSClassDeclaration) : KSTopDownVisitor<Any, Any>() {
 
+        val excludes: MutableSet<KSDeclaration> = mutableSetOf()
+
         override fun visitClassDeclaration(classDeclaration: KSClassDeclaration, data: Any): Any {
             if (classDeclaration.qualifiedName!!.asString() == "kotlin.Any") {
                 return data
@@ -193,6 +195,13 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
         }
 
         override fun visitFunctionDeclaration(function: KSFunctionDeclaration, data: Any): Any {
+            val overridee = function.findOverridee()
+            if (overridee != null) {
+                excludes.add(overridee)
+            }
+            if (excludes.contains(function)) {
+                return data
+            }
             val visitorContext = loadedVisitor.visitorContext
             var parentDeclaration = function.parentDeclaration
             while (parentDeclaration !is KSClassDeclaration) {
@@ -209,6 +218,13 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
         }
 
         override fun visitPropertyDeclaration(property: KSPropertyDeclaration, data: Any): Any {
+            val overridee = property.findOverridee()
+            if (overridee != null) {
+                excludes.add(overridee)
+            }
+            if (excludes.contains(property)) {
+                return data
+            }
             val visitorContext = loadedVisitor.visitorContext
             val annotationUtils = visitorContext.getAnnotationUtils()
             val elementFactory = visitorContext.elementFactory
