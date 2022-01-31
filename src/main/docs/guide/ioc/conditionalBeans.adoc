@@ -108,6 +108,25 @@ Adding a requirement on a property has some additional functionality. You can re
 <3> Requires the property to be "John" or not set
 <4> Requires the property to not be "Sally" or not set
 
+=== Referencing bean properties in @Requires.
+
+You can also reference other beans properties in `@Requires` to conditionally load beans. Similar to `property` requirements, you can specify required `value` or set the value bean property should no be equal to using `notEquals` annotation member. For the bean property to be checked, the bean of type specified in `bean` annotation member should be present within context, otherwise conditional bean will not be loaded.
+
+[source,java]
+----
+@Requires(bean=Config.class, beanProperty="foo") //<1>
+@Requires(bean=Config.class, beanProperty="foo", value="John") //<2>
+@Requires(bean=Config.class, beanProperty="foo", notEquals="Sally") //<3>
+----
+
+<1> Requires the "foo" property on `Config` bean to be set
+<2> Requires the "foo" property on `Config` bean to be "John"
+<3> Requires the "foo" property on `Config` bean to not be "Sally" or not set
+
+Specified bean property is accessed through respective getter method whose presence and availability will be checked at compilation time.
+
+Note that bean property is considered to be present in case it's value is not null. Keep in mind that primitive properties are initialized with default values such as `false` for boolean and `0` for int, so they are considered to be set even if no value is explicitly specified for them.
+
 == Debugging Conditional Beans
 
 If you have multiple conditions and complex requirements it may become difficult to understand why a particular bean has not been loaded.
