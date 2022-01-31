@@ -47,7 +47,9 @@ import static io.netty.util.internal.ObjectUtil.checkNotNull;
  *
  * @author graemerocher
  * @since 2.0
+ * @deprecated Should be treated as internal. May be removed in the future.
  */
+@Deprecated
 public class StreamingInboundHttp2ToHttpAdapter extends Http2EventAdapter {
     protected final Http2Connection connection;
     protected final boolean validateHttpHeaders;

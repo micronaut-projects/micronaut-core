@@ -17,11 +17,9 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.Named;
-import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
-import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.decoders.HttpRequestDecoder;
 import io.micronaut.http.server.netty.encoders.HttpResponseEncoder;
@@ -44,19 +42,14 @@ import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
 import io.netty.handler.codec.http2.CleartextHttp2ServerUpgradeHandler;
-import io.netty.handler.codec.http2.DefaultHttp2Connection;
 import io.netty.handler.codec.http2.Http2CodecUtil;
-import io.netty.handler.codec.http2.Http2Connection;
 import io.netty.handler.codec.http2.Http2FrameCodec;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
-import io.netty.handler.codec.http2.Http2FrameListener;
 import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2MultiplexHandler;
 import io.netty.handler.codec.http2.Http2ServerUpgradeCodec;
 import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamFrameToHttpObjectCodec;
-import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
-import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
 import io.netty.handler.flow.FlowControlHandler;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.pcap.PcapWriteHandler;
@@ -81,7 +74,6 @@ import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Helper class that manages the {@link ChannelPipeline} of incoming HTTP connections.
@@ -292,30 +284,6 @@ final class HttpPipelineBuilder {
         }
 
         /**
-         * Create the HTTP 2 <-> HTTP 1 converter, inserted as
-         * {@value ChannelPipelineCustomizer#HANDLER_HTTP2_CONNECTION}.
-         */
-        private HttpToHttp2ConnectionHandler newHttpToHttp2ConnectionHandler() {
-            Http2Connection connection = new DefaultHttp2Connection(true);
-            final Http2FrameListener http2ToHttpAdapter = new StreamingInboundHttp2ToHttpAdapter(
-                    connection,
-                    (int) server.getServerConfiguration().getMaxRequestSize(),
-                    server.getServerConfiguration().isValidateHeaders(),
-                    true
-            );
-            final HttpToHttp2ConnectionHandlerBuilder builder = new HttpToHttp2ConnectionHandlerBuilder()
-                    .frameListener(http2ToHttpAdapter)
-                    .validateHeaders(server.getServerConfiguration().isValidateHeaders())
-                    .initialSettings(server.getServerConfiguration().getHttp2().http2Settings());
-
-            server.getServerConfiguration().getLogLevel().ifPresent(logLevel ->
-                    builder.frameLogger(new Http2FrameLogger(logLevel,
-                            NettyHttpServer.class))
-            );
-            return builder.connection(connection).build();
-        }
-
-        /**
          * Configure this pipeline for ALPN.
          */
         void configureForAlpn() {
@@ -376,14 +344,10 @@ final class HttpPipelineBuilder {
             HttpServerUpgradeHandler.UpgradeCodecFactory upgradeCodecFactory = protocol -> {
                 if (AsciiString.contentEquals(Http2CodecUtil.HTTP_UPGRADE_PROTOCOL_NAME, protocol)) {
 
-                    AtomicReference<Http2StreamChannel> upgradeChannel = new AtomicReference<>();
                     return new Http2ServerUpgradeCodec(connectionHandler, new Http2MultiplexHandler(new ChannelInitializer<Http2StreamChannel>() {
                         @Override
                         protected void initChannel(@NonNull Http2StreamChannel ch) {
                             new StreamPipeline(ch, ssl).insertHttp2FrameHandlers();
-                            if (ch.stream().id() == 1) {
-                                upgradeChannel.set(ch);
-                            }
                         }
                     })) {
                         @Override
