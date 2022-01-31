@@ -40,7 +40,6 @@ import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
-import io.micronaut.http.server.netty.ssl.HttpRequestCertificateHandler;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
 import io.micronaut.http.server.util.DefaultHttpHostResolver;
@@ -630,7 +629,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
     }
 
-    void triggerPipelineListeners(ChannelPipeline pipeline) {
+    final void triggerPipelineListeners(ChannelPipeline pipeline) {
         for (ChannelPipelineListener pipelineListener : pipelineListeners) {
             pipelineListener.onConnect(pipeline);
         }
