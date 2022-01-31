@@ -80,7 +80,7 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
                             continue
                         }
                         val className = typeElement.qualifiedName.toString()
-                        typeElement.accept(ElementVisitor(loadedVisitor), className)
+                        typeElement.accept(ElementVisitor(loadedVisitor, typeElement), className)
                     }
                 }
             }
@@ -165,13 +165,30 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
         return typeElementVisitors.values
     }
 
-    private class ElementVisitor(private val loadedVisitor: LoadedVisitor) : KSTopDownVisitor<Any, Any>() {
+    private class ElementVisitor(private val loadedVisitor: LoadedVisitor,
+    private val classDeclaration: KSClassDeclaration) : KSTopDownVisitor<Any, Any>() {
 
         override fun visitClassDeclaration(classDeclaration: KSClassDeclaration, data: Any): Any {
-            val visitorContext = loadedVisitor.visitorContext
-            val annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(classDeclaration)
-            val classElement = visitorContext.elementFactory.newClassElement(classDeclaration.asStarProjectedType(), annotationMetadata)
-            loadedVisitor.visitor.visitClass(classElement, visitorContext)
+            if (classDeclaration.qualifiedName!!.asString() == "kotlin.Any") {
+                return data
+            }
+            if (classDeclaration.classKind == ClassKind.ENUM_ENTRY) {
+                return data
+            }
+            if (classDeclaration == this.classDeclaration) {
+                val visitorContext = loadedVisitor.visitorContext
+                val annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(classDeclaration)
+                val classElement = visitorContext.elementFactory.newClassElement(
+                    classDeclaration.asStarProjectedType(),
+                    annotationMetadata
+                )
+                loadedVisitor.visitor.visitClass(classElement, visitorContext)
+            }
+            visitDeclaration(classDeclaration, data)
+            visitDeclarationContainer(classDeclaration, data)
+            classDeclaration.superTypes.map {
+                it.resolve().declaration as KSClassDeclaration
+            }.forEach { it.accept(this, data) }
             return data
         }
 
@@ -184,10 +201,11 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
             val classAnnotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(parentDeclaration)
             val classElement = visitorContext.elementFactory.newClassElement(parentDeclaration.asStarProjectedType(), classAnnotationMetadata)
             val annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(function)
-
-            val methodElement = visitorContext.elementFactory.newMethodElement(classElement, function, annotationMetadata)
-            loadedVisitor.visitor.visitMethod(methodElement, visitorContext)
-            return data
+            if (loadedVisitor.matches(annotationMetadata)) {
+                val methodElement = visitorContext.elementFactory.newMethodElement(classElement, function, annotationMetadata)
+                loadedVisitor.visitor.visitMethod(methodElement, visitorContext)
+            }
+            return super.visitFunctionDeclaration(function, data)
         }
 
         override fun visitPropertyDeclaration(property: KSPropertyDeclaration, data: Any): Any {
@@ -198,7 +216,7 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
             val parentDeclaration = property.closestClassDeclaration()!!
             val classElement = elementFactory.newClassElement(parentDeclaration.asStarProjectedType())
             val propertyMetadata = annotationUtils.getAnnotationMetadata(property)
-            if (property.hasBackingField) {
+            if (property.hasBackingField && loadedVisitor.matches(propertyMetadata)) {
                 val fieldElement =
                     elementFactory.newFieldElement(classElement, property, propertyMetadata)
                 loadedVisitor.visitor.visitField(fieldElement, visitorContext)
@@ -210,17 +228,31 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
                 !property.isTypeReference())
             if (property.getter != null) {
                 val getterMetadata = annotationUtils.getAnnotationMetadata(property.getter!!)
-                val methodElement =
-                    elementFactory.newMethodElement(classElement, property.getter!!, propertyElement, getterMetadata)
-                loadedVisitor.visitor.visitMethod(methodElement, visitorContext)
+                if (loadedVisitor.matches(getterMetadata)) {
+                    val methodElement =
+                        elementFactory.newMethodElement(
+                            classElement,
+                            property.getter!!,
+                            propertyElement,
+                            getterMetadata
+                        )
+                    loadedVisitor.visitor.visitMethod(methodElement, visitorContext)
+                }
             }
             if (property.setter != null) {
                 val setterMetadata = annotationUtils.getAnnotationMetadata(property.setter!!)
-                val methodElement =
-                    elementFactory.newMethodElement(classElement, property.setter!!, propertyElement, setterMetadata)
-                loadedVisitor.visitor.visitMethod(methodElement, visitorContext)
+                if (loadedVisitor.matches(setterMetadata)) {
+                    val methodElement =
+                        elementFactory.newMethodElement(
+                            classElement,
+                            property.setter!!,
+                            propertyElement,
+                            setterMetadata
+                        )
+                    loadedVisitor.visitor.visitMethod(methodElement, visitorContext)
+                }
             }
-            return data
+            return super.visitPropertyDeclaration(property, data)
         }
 
         override fun defaultHandler(node: KSNode, data: Any): Any {

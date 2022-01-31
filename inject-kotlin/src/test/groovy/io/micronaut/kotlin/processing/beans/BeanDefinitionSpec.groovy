@@ -3,7 +3,7 @@ package io.micronaut.kotlin.processing.beans
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Order
 import io.micronaut.inject.qualifiers.Qualifiers
-import spock.lang.Issue
+import spock.lang.PendingFeature
 import spock.lang.Specification
 
 import static io.micronaut.kotlin.processing.KotlinCompiler.*
@@ -258,6 +258,7 @@ annotation class MockBean(
         definition.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).get() == AnnotationUtil.NAMED
     }
 
+    @PendingFeature(reason = "annotation defaults")
     void 'test qualifier annotation'() {
         given:
         def definition = buildBeanDefinition('test.Test', '''

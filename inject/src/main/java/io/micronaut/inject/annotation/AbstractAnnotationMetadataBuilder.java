@@ -897,8 +897,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         Optional<?> aliases = getAnnotationValues(originatingElement, member, Aliases.class).get("value");
         if (aliases.isPresent()) {
             Object value = aliases.get();
+            Collection<AnnotationValue> values = null;
             if (value instanceof AnnotationValue[]) {
-                AnnotationValue[] values = (AnnotationValue[]) value;
+                values = Arrays.asList((AnnotationValue[]) value);
+            } else if (value instanceof Collection) {
+                values = (Collection<AnnotationValue>) value;
+            }
+            if (values != null) {
                 for (AnnotationValue av : values) {
                     OptionalValues<Object> aliasForValues = OptionalValues.of(Object.class, av.getValues());
                     processAnnotationAlias(
