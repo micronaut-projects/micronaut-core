@@ -7,10 +7,11 @@ import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Creator
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.ast.*
-import io.micronaut.kotlin.processing.isTypeReference
 import io.micronaut.kotlin.processing.toClassName
 import java.util.*
 import java.util.function.Predicate
+import javax.lang.model.element.NestingKind
+import javax.lang.model.element.TypeElement
 
 open class KotlinClassElement(val classType: KSType,
                               annotationMetadata: AnnotationMetadata,
@@ -25,6 +26,25 @@ open class KotlinClassElement(val classType: KSType,
     @OptIn(KspExperimental::class)
     override fun getName(): String {
         return visitorContext.resolver.mapKotlinNameToJava(declaration.qualifiedName!!)?.asString() ?: declaration.toClassName()
+    }
+
+    override fun getPackageName(): String {
+        return declaration.packageName.asString()
+    }
+
+    override fun getSimpleName(): String {
+        var parentDeclaration = declaration.parentDeclaration
+        if (parentDeclaration == null) {
+            return declaration.simpleName.asString()
+        } else {
+            val builder = StringBuilder(declaration.simpleName.asString())
+            while (parentDeclaration != null) {
+                builder.insert(0, '$')
+                    .insert(0, parentDeclaration.simpleName.asString())
+                parentDeclaration = parentDeclaration.parentDeclaration
+            }
+            return builder.toString()
+        }
     }
 
     override fun getSuperType(): Optional<ClassElement> {
@@ -256,11 +276,12 @@ open class KotlinClassElement(val classType: KSType,
         val kind = getElementKind(result.elementType)
         val classDeclarationElements = mutableMapOf<KSClassDeclaration, ClassElement>(declaration to this)
 
-        var enclosedElements = getAllDeclarations().filter { kind.test(it) }
-
-        if (result.isOnlyDeclared) {
-            enclosedElements = enclosedElements.filter { declaration ->  declaration.parentDeclaration == this.declaration }
+        var enclosedElements = if (result.isOnlyDeclared) {
+            declaration.declarations.toSet().filter { kind.test(it) }
+        } else {
+            getAllDeclarations().filter { kind.test(it) }
         }
+
         if (result.isOnlyAbstract) {
             enclosedElements = enclosedElements.filter { declaration -> declaration.modifiers.contains(Modifier.ABSTRACT) }
         } else if (result.isOnlyConcrete) {
@@ -386,10 +407,19 @@ open class KotlinClassElement(val classType: KSType,
                     ) as T
                 }
             } else if (enclosingElement is KSClassDeclaration) {
-                element = elementFactory.newClassElement(
+                val classElement = elementFactory.newClassElement(
                     enclosingElement.asType(declaration.asStarProjectedType().arguments),
                     metadata
-                ) as T
+                )
+
+                if (hasTypePredicates) {
+                    for (typePredicate in typePredicates) {
+                        if (!typePredicate.test(classElement)) {
+                            continue@elementLoop
+                        }
+                    }
+                }
+                element = classElement as T
             } else {
                 element = null
             }
@@ -404,8 +434,6 @@ open class KotlinClassElement(val classType: KSType,
                 }
             }
         }
-
-
 
         return elements
     }
@@ -463,7 +491,6 @@ open class KotlinClassElement(val classType: KSType,
     override fun getBeanProperties(): MutableList<PropertyElement> {
         val annotationUtils = visitorContext.getAnnotationUtils()
         val elementFactory = visitorContext.elementFactory
-        val typeArguments = typeArguments
         val propertyList : MutableList<PropertyElement> = declaration.getAllProperties()
             .filter { !it.isPrivate() }
             .map {
@@ -506,7 +533,7 @@ open class KotlinClassElement(val classType: KSType,
                 }
                 if (isGetter) {
                     getterAndSetter.getter = func
-                } else if (isSetter) {
+                } else {
                     getterAndSetter.setter = func
                 }
             }

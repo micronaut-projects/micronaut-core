@@ -44,9 +44,7 @@ package test
 import io.micronaut.core.annotation.Introspected
 
 @Introspected
-class Test {
-
-}
+class Test
 """)
 
         then:
@@ -1997,7 +1995,7 @@ class Test {
         beanIntrospection.getBeanProperties()[0].annotationMetadata.hasAnnotation(JsonProperty)
     }
 
-    void "test getter annotation overrides setter and field"() {
+    void "test field annotation overrides getter and setter"() {
         when:
         BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
 package test
@@ -2018,10 +2016,10 @@ class Test {
         noExceptionThrown()
         beanIntrospection != null
         beanIntrospection.getBeanProperties().size() == 1
-        beanIntrospection.getBeanProperties()[0].annotationMetadata.getAnnotation(JsonProperty).stringValue().get() == 'getter'
+        beanIntrospection.getBeanProperties()[0].annotationMetadata.getAnnotation(JsonProperty).stringValue().get() == 'field'
     }
 
-    void "test field annotation overrides setter"() {
+    void "test getter annotation overrides setter"() {
         when:
         BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
 package test
@@ -2031,7 +2029,7 @@ import io.micronaut.core.annotation.Introspected
 
 @Introspected
 class Test {
-    @field:JsonProperty("field")
+    @get:JsonProperty("getter")
     @set:JsonProperty("setter")
     var foo: String? = null
 }
@@ -2041,7 +2039,7 @@ class Test {
         noExceptionThrown()
         beanIntrospection != null
         beanIntrospection.getBeanProperties().size() == 1
-        beanIntrospection.getBeanProperties()[0].annotationMetadata.getAnnotation(JsonProperty).stringValue().get() == 'field'
+        beanIntrospection.getBeanProperties()[0].annotationMetadata.getAnnotation(JsonProperty).stringValue().get() == 'getter'
     }
 
     void "test create bean introspection for interface"() {

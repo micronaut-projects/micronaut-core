@@ -178,7 +178,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         annotationMetadata: AnnotationMetadata
     ): ConstructorElement {
         val annotationUtils = visitorContext.getAnnotationUtils()
-        return KotlinConstructorElement(constructor, declaringClass, AnnotationMetadataHierarchy(declaringClass.annotationMetadata, annotationMetadata), visitorContext, declaringClass, constructor.parameters.map { param ->
+        return KotlinConstructorElement(constructor, declaringClass, annotationMetadata, visitorContext, declaringClass, constructor.parameters.map { param ->
             KotlinParameterElement(newClassElement(param.type.resolve(), declaringClass.typeArguments), param, annotationUtils.getAnnotationMetadata(param), visitorContext)
         })
     }

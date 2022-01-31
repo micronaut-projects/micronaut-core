@@ -71,9 +71,6 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
 
     fun visit() {
         if (isDeclaredBean) {
-            if (classElement.isAbstract && !isDeclaredBean) {
-                return
-            }
             if (isAopProxyType && classElement.isFinal) {
                 visitorContext.fail("Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + classElement.name, classElement)
                 return
@@ -97,6 +94,16 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
                 visitorContext.fail("Beans produced from properties cannot be private", propertyElement)
             } else {
                 visitFactoryProperty(propertyElement)
+            }
+        }
+        if (propertyElement.hasStereotype(AnnotationUtil.INJECT) || propertyElement.hasStereotype(AnnotationUtil.QUALIFIER)) {
+            propertyElement.writeMethod.ifPresent { wm ->
+                beanWriter!!.visitMethodInjectionPoint(
+                    propertyElement.declaringType,
+                    wm,
+                    false,
+                    visitorContext
+                )
             }
         }
     }

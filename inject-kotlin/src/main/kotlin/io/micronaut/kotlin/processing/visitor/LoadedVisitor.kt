@@ -3,9 +3,11 @@ package io.micronaut.kotlin.processing.visitor
 import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSType
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.order.Ordered
 import io.micronaut.inject.visitor.TypeElementVisitor
 import org.omg.CORBA.Object
+import java.util.*
 
 class LoadedVisitor(val visitor: TypeElementVisitor<*, *>,
                     val visitorContext: KotlinVisitorContext): Ordered {
@@ -49,7 +51,8 @@ class LoadedVisitor(val visitor: TypeElementVisitor<*, *>,
                 elementAnnotation
             }
         } else {
-            default
+            //sigh
+            UUID.randomUUID().toString()
         }
     }
 
@@ -60,5 +63,12 @@ class LoadedVisitor(val visitor: TypeElementVisitor<*, *>,
         val annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(classDeclaration)
 
         return annotationMetadata.hasStereotype(classAnnotation)
+    }
+
+    fun matches(annotationMetadata: AnnotationMetadata): Boolean {
+        if (elementAnnotation == "java.lang.Object") {
+            return true
+        }
+        return annotationMetadata.hasStereotype(elementAnnotation)
     }
 }
