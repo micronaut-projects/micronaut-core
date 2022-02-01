@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import jakarta.inject.Singleton;
 
@@ -43,9 +44,10 @@ public class NettyRequestArgumentSatisfier extends RequestArgumentSatisfier {
      * Constructor.
      *
      * @param requestBinderRegistry The request argument binder
+     * @param httpServerConfiguration The server configuration
      */
-    public NettyRequestArgumentSatisfier(RequestBinderRegistry requestBinderRegistry) {
-        super(requestBinderRegistry);
+    public NettyRequestArgumentSatisfier(RequestBinderRegistry requestBinderRegistry, HttpServerConfiguration httpServerConfiguration) {
+        super(requestBinderRegistry, httpServerConfiguration);
     }
 
     @Override

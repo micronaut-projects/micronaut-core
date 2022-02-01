@@ -27,6 +27,7 @@ import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.BodyArgumentBinder;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.bind.binders.RequestBeanAnnotationBinder;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.web.router.NullArgument;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UnresolvedArgument;
@@ -49,12 +50,15 @@ import java.util.Optional;
 public class RequestArgumentSatisfier {
 
     private final RequestBinderRegistry binderRegistry;
+    private final HttpServerConfiguration httpServerConfiguration;
 
     /**
      * @param requestBinderRegistry The Request binder registry
+     * @param httpServerConfiguration The server configuration
      */
-    public RequestArgumentSatisfier(RequestBinderRegistry requestBinderRegistry) {
+    public RequestArgumentSatisfier(RequestBinderRegistry requestBinderRegistry, HttpServerConfiguration httpServerConfiguration) {
         this.binderRegistry = requestBinderRegistry;
+        this.httpServerConfiguration = httpServerConfiguration;
     }
 
     /**
@@ -140,7 +144,7 @@ public class RequestArgumentSatisfier {
                     }
                 } else if (bindingResult.isPresentAndSatisfied()) {
                     value = bindingResult.get();
-                } else if (bindingResult.isSatisfied() && argument.isNullable()) {
+                } else if (bindingResult.isSatisfied() && argument.isNullable() && (!conversionContext.hasErrors() || !httpServerConfiguration.isStrictArgumentConversion())) {
                     value = NullArgument.INSTANCE;
                 } else if (HttpMethod.requiresRequestBody(request.getMethod()) || argument.isNullable() || conversionContext.hasErrors()) {
                     value = (UnresolvedArgument) () -> {

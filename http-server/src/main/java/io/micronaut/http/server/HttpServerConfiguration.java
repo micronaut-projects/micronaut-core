@@ -138,6 +138,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
     private ThreadSelection threadSelection = ThreadSelection.MANUAL;
+    private boolean strictArgumentConversion = false;
 
     /**
      * Default constructor.
@@ -500,6 +501,30 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      */
     public void setHttpToHttpsRedirect(boolean httpToHttpsRedirect) {
         this.httpToHttpsRedirect = httpToHttpsRedirect;
+    }
+
+    /**
+     * Enable strict argument conversion error checking. When the value of a request argument (e.g. a
+     * {@code @}{@link io.micronaut.http.annotation.QueryValue}) is invalid, but the parameter is marked
+     * {@code @}{@link Nullable}, strict conversion checking will produce an error. Without this option enabled, the
+     * parameter will simply be set to {@code null}.
+     *
+     * @return Whether to perform strict error checking during argument conversion
+     */
+    public boolean isStrictArgumentConversion() {
+        return strictArgumentConversion;
+    }
+
+    /**
+     * Enable strict argument conversion error checking. When the value of a request argument (e.g. a
+     * {@code @}{@link io.micronaut.http.annotation.QueryValue}) is invalid, but the parameter is marked
+     * {@code @}{@link Nullable}, strict conversion checking will produce an error. Without this option enabled, the
+     * parameter will simply be set to {@code null}.
+     *
+     * @param strictArgumentConversion Whether to perform strict error checking during argument conversion
+     */
+    public void setStrictArgumentConversion(boolean strictArgumentConversion) {
+        this.strictArgumentConversion = strictArgumentConversion;
     }
 
     /**

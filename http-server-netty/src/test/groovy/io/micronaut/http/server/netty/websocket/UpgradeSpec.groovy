@@ -27,7 +27,7 @@ class UpgradeSpec extends Specification {
         }
 
         def mock = Mock(NettyEmbeddedServices)
-        mock.getRequestArgumentSatisfier() >> new RequestArgumentSatisfier(null)
+        mock.getRequestArgumentSatisfier() >> new RequestArgumentSatisfier(null, null)
         NettyServerWebSocketUpgradeHandler handler = new NettyServerWebSocketUpgradeHandler(mock, Mock(WebSocketSessionRepository))
 
         when:
