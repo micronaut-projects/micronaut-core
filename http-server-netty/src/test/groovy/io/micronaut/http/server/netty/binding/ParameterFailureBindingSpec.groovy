@@ -69,6 +69,9 @@ class ParameterFailureBindingSpec extends AbstractMicronautSpec {
         HttpMethod.GET  | '/parameterNullable/simple?max=inv'                     | null                  | HttpStatus.BAD_REQUEST
 
         HttpMethod.GET  | '/parameterNullable/exploded?title=The%20Stand&age=inv' | null                  | HttpStatus.BAD_REQUEST
+
+        HttpMethod.GET  | '/parameter/list?values=10,inv'                         | null                  | HttpStatus.BAD_REQUEST
+        HttpMethod.GET  | '/parameter/list?values=10&values=inv'                  | null                  | HttpStatus.BAD_REQUEST
     }
 
     @Controller(value = "/parameterNullable", produces = MediaType.TEXT_PLAIN)
@@ -128,6 +131,11 @@ class ParameterFailureBindingSpec extends AbstractMicronautSpec {
             "Parameter Value: $name"
         }
 
+        @Get("/list")
+        String list(List<Integer> values) {
+            assert values.every() { it instanceof Integer }
+            "Parameter Value: ${values.inspect()}"
+        }
 
         @Introspected
         static class Book {

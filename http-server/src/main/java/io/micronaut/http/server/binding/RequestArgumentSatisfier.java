@@ -121,7 +121,7 @@ public class RequestArgumentSatisfier {
 
                     if (bindingResult.isPresentAndSatisfied()) {
                         value = bindingResult.get();
-                    } else if (bindingResult.isSatisfied() && argument.isNullable()) {
+                    } else if (bindingResult.isSatisfied() && argument.isNullable() && (!httpServerConfiguration.isStrictArgumentConversion() || !conversionContext.hasErrors())) {
                         value = NullArgument.INSTANCE;
                     }
                 } else {
@@ -132,6 +132,7 @@ public class RequestArgumentSatisfier {
                 value = (UnresolvedArgument<?>) () -> argumentBinder.bind(conversionContext, request);
             } else {
                 ArgumentBinder.BindingResult bindingResult = argumentBinder.bind(conversionContext, request);
+                boolean strictFailure = httpServerConfiguration.isStrictArgumentConversion() && conversionContext.hasErrors();
 
                 if (argument.getType() == Optional.class) {
                     if (bindingResult.isSatisfied() || satisfyOptionals) {
@@ -142,9 +143,9 @@ public class RequestArgumentSatisfier {
                             value = optionalValue;
                         }
                     }
-                } else if (bindingResult.isPresentAndSatisfied()) {
+                } else if (bindingResult.isPresentAndSatisfied() && !strictFailure) {
                     value = bindingResult.get();
-                } else if (bindingResult.isSatisfied() && argument.isNullable() && (!conversionContext.hasErrors() || !httpServerConfiguration.isStrictArgumentConversion())) {
+                } else if (bindingResult.isSatisfied() && argument.isNullable() && !strictFailure) {
                     value = NullArgument.INSTANCE;
                 } else if (HttpMethod.requiresRequestBody(request.getMethod()) || argument.isNullable() || conversionContext.hasErrors()) {
                     value = (UnresolvedArgument) () -> {
