@@ -15,8 +15,9 @@
  */
 package io.micronaut.http.hateoas;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.value.OptionalMultiValues;
 
@@ -27,7 +28,6 @@ import io.micronaut.core.value.OptionalMultiValues;
  * @since 1.1
  */
 @Introspected
-@JsonDeserialize(as = GenericResource.class)
 public interface Resource {
 
     /**
@@ -54,5 +54,17 @@ public interface Resource {
     @JsonProperty(EMBEDDED)
     default OptionalMultiValues<? extends Resource> getEmbedded() {
         return OptionalMultiValues.empty();
+    }
+
+    /**
+     * Factory method for deserialization.
+     *
+     * @param genericResource The deserialized resource.
+     * @return The deserialized resource.
+     */
+    @Internal
+    @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
+    static Resource deserialize(GenericResource genericResource) {
+        return genericResource;
     }
 }
