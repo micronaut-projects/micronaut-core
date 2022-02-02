@@ -1,10 +1,9 @@
 package io.micronaut.http.server.netty.binding
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.annotation.Nullable
-import io.micronaut.core.convert.format.Format
 import io.micronaut.http.HttpMethod
-import io.micronaut.http.HttpParameters
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -14,25 +13,23 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.PathVariable
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.QueryValue
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.http.server.netty.AbstractMicronautSpec
+import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Flux
 import spock.lang.Issue
+import spock.lang.Specification
 import spock.lang.Unroll
 
-@Issue('https://github.com/micronaut-projects/micronaut-core/issues/5135')
-class ParameterFailureBindingSpec extends AbstractMicronautSpec {
-
-    @Override
-    Map<String, Object> getConfiguration() {
-        return super.getConfiguration() << [
-                'micronaut.server.strict-argument-conversion': true
-        ]
-    }
+class ParameterFailureBindingSpec extends Specification {
 
     @Unroll
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/5135')
     void "test bind HTTP parameters for URI #httpMethod #uri"() {
         given:
+        EmbeddedServer embeddedServer = ApplicationContext.builder().strictConversionChecking(true).run(EmbeddedServer)
+        def rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.URI)
+
         HttpRequest req = httpMethod == HttpMethod.GET ? HttpRequest.GET(uri) : HttpRequest.POST(uri, '{}')
         Flux exchange = Flux.from(rxClient.exchange(req, String))
         HttpResponse response = exchange.onErrorResume(t -> {
@@ -50,6 +47,10 @@ class ParameterFailureBindingSpec extends AbstractMicronautSpec {
         expect:
         body == result
         status == httpStatus
+
+        cleanup:
+        embeddedServer.close()
+        rxClient.close()
 
         where:
         httpMethod      | uri                                                     | result                | httpStatus

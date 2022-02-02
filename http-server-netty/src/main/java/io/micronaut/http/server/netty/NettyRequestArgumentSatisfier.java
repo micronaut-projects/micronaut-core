@@ -15,12 +15,12 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import jakarta.inject.Singleton;
 
@@ -44,10 +44,10 @@ public class NettyRequestArgumentSatisfier extends RequestArgumentSatisfier {
      * Constructor.
      *
      * @param requestBinderRegistry The request argument binder
-     * @param httpServerConfiguration The server configuration
+     * @param beanContext The bean context
      */
-    public NettyRequestArgumentSatisfier(RequestBinderRegistry requestBinderRegistry, HttpServerConfiguration httpServerConfiguration) {
-        super(requestBinderRegistry, httpServerConfiguration);
+    public NettyRequestArgumentSatisfier(RequestBinderRegistry requestBinderRegistry, BeanContext beanContext) {
+        super(requestBinderRegistry, beanContext);
     }
 
     @Override

@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server.binding;
 
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanContextConfiguration;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -27,7 +29,6 @@ import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.BodyArgumentBinder;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.bind.binders.RequestBeanAnnotationBinder;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.web.router.NullArgument;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UnresolvedArgument;
@@ -50,15 +51,15 @@ import java.util.Optional;
 public class RequestArgumentSatisfier {
 
     private final RequestBinderRegistry binderRegistry;
-    private final HttpServerConfiguration httpServerConfiguration;
+    private final BeanContextConfiguration beanContextConfiguration;
 
     /**
      * @param requestBinderRegistry The Request binder registry
-     * @param httpServerConfiguration The server configuration
+     * @param beanContext The bean context
      */
-    public RequestArgumentSatisfier(RequestBinderRegistry requestBinderRegistry, HttpServerConfiguration httpServerConfiguration) {
+    public RequestArgumentSatisfier(RequestBinderRegistry requestBinderRegistry, BeanContext beanContext) {
         this.binderRegistry = requestBinderRegistry;
-        this.httpServerConfiguration = httpServerConfiguration;
+        this.beanContextConfiguration = beanContext.getContextConfiguration();
     }
 
     /**
@@ -121,7 +122,7 @@ public class RequestArgumentSatisfier {
 
                     if (bindingResult.isPresentAndSatisfied()) {
                         value = bindingResult.get();
-                    } else if (bindingResult.isSatisfied() && argument.isNullable() && (!httpServerConfiguration.isStrictArgumentConversion() || !conversionContext.hasErrors())) {
+                    } else if (bindingResult.isSatisfied() && argument.isNullable() && (!beanContextConfiguration.isStrictConversionChecking() || !conversionContext.hasErrors())) {
                         value = NullArgument.INSTANCE;
                     }
                 } else {
@@ -132,7 +133,7 @@ public class RequestArgumentSatisfier {
                 value = (UnresolvedArgument<?>) () -> argumentBinder.bind(conversionContext, request);
             } else {
                 ArgumentBinder.BindingResult bindingResult = argumentBinder.bind(conversionContext, request);
-                boolean strictFailure = httpServerConfiguration.isStrictArgumentConversion() && conversionContext.hasErrors();
+                boolean strictFailure = beanContextConfiguration.isStrictConversionChecking() && conversionContext.hasErrors();
 
                 if (argument.getType() == Optional.class) {
                     if (bindingResult.isSatisfied() || satisfyOptionals) {
