@@ -3,14 +3,14 @@ plugins {
 }
 
 internalSanityChecks {
-    expectedServiceCount.put('io.micronaut.core.beans.BeanIntrospectionReference', 4)
+    expectedServiceCount.put('io.micronaut.core.beans.BeanIntrospectionReference', 5)
     expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 21)
 }
 
 
 internalSanityChecks {
     expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 21)
-    expectedServiceCount.put('io.micronaut.core.beans.BeanIntrospectionReference', 4)
+    expectedServiceCount.put('io.micronaut.core.beans.BeanIntrospectionReference', 5)
 }           
 
 dependencies {
@@ -21,6 +21,7 @@ dependencies {
     implementation libs.managed.reactor
     compileOnly libs.kotlinx.coroutines.core
     compileOnly libs.kotlinx.coroutines.reactor
+    compileOnly libs.managed.jackson.databind // for databind annotations
 
     compileOnly libs.managed.jackson.annotations
 

@@ -1,0 +1,33 @@
+package io.micronaut.http.hateoas
+
+import io.micronaut.context.ApplicationContext
+import io.micronaut.core.type.Argument
+import io.micronaut.json.JsonMapper
+import spock.lang.Specification
+
+import java.nio.charset.StandardCharsets
+
+class GenericResourceSpec extends Specification {
+    def 'deserialization'() {
+        given:
+        def mapper = ApplicationContext.run().getBean(JsonMapper)
+        def original = new JsonError('foo')
+                .path('/p')
+                .embedded('bar', new JsonError('baz').path('/q'))
+        def json = new String(mapper.writeValueAsBytes(original), StandardCharsets.UTF_8)
+
+        when:
+        def parsed = mapper.readValue(json, Argument.of(Resource))
+        then:
+        parsed.additionalProperties == ['path': '/p', 'message': 'foo']
+        parsed.embedded.size() == 1
+        parsed.embedded.collect() == ['bar']
+        parsed.embedded.get('bar').get()[0].additionalProperties == ['path': '/q', 'message': 'baz']
+
+        when:
+        def reserialized = new String(mapper.writeValueAsBytes(parsed), StandardCharsets.UTF_8)
+        def reparsed = mapper.readValue(reserialized, Argument.of(Resource))
+        then:
+        reparsed == parsed
+    }
+}

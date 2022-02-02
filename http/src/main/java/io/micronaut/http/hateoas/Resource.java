@@ -16,6 +16,8 @@
 package io.micronaut.http.hateoas;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.value.OptionalMultiValues;
 
 /**
@@ -24,6 +26,8 @@ import io.micronaut.core.value.OptionalMultiValues;
  * @author Graeme Rocher
  * @since 1.1
  */
+@Introspected
+@JsonDeserialize(as = GenericResource.class)
 public interface Resource {
 
     /**
