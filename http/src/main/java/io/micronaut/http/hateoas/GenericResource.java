@@ -20,7 +20,7 @@ import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -33,7 +33,7 @@ import java.util.Objects;
  */
 @Introspected
 public final class GenericResource extends AbstractResource<GenericResource> {
-    private final Map<String, Object> additionalProperties = new HashMap<>();
+    private final Map<String, Object> additionalProperties = new LinkedHashMap<>();
 
     /**
      * Create a new resource. Note: Should only be called by deserialization – if you wish to create your own
