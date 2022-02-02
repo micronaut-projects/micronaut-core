@@ -1,0 +1,1 @@
+NOTE: For historic reasons the dependency injection processor does not use the api:inject.visitor.TypeElementVisitor[] API but will likely do so in the future

@@ -284,6 +284,16 @@ i18n:
   bundle: Resource Bundles
 appendix:
   title: Appendices
+  architecture: 
+    title: Micronaut Architecture
+    compilerArch: Compiler         
+    annotationArch: Annotation Metadata
+    introspectionArch: Bean Introspections
+    iocArch: Inversion of Control (IoC)
+    aopArch: Aspect Oriented Programming (AOP)
+    containerArch: Application Container 
+    httpServerArch: HTTP Server
+    httpClientArch: HTTP Client
   faq: Frequently Asked Questions (FAQ)
   usingsnapshots: Using Snapshots
   problems: Common Problems
