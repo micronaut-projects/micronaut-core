@@ -199,7 +199,8 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
         member: KSAnnotated,
         annotationType: Class<*>
     ): OptionalValues<*> {
-        val annotationMirrors: List<KSAnnotation> = (member as KSPropertyDeclaration).getter!!.annotations.toList()
+        val annotationMirrors: MutableList<KSAnnotation> = (member as KSPropertyDeclaration).getter!!.annotations.toMutableList()
+        annotationMirrors.addAll(member.annotations.toList())
         val annotationName = annotationType.name
         for (annotationMirror in annotationMirrors) {
             if (annotationMirror.annotationType.resolve().declaration.qualifiedName?.asString() == annotationName) {

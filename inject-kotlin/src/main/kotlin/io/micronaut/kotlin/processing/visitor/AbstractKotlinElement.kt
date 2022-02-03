@@ -10,7 +10,11 @@ import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.AnnotationValueBuilder
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.util.ArgumentUtils
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
+import io.micronaut.inject.annotation.DefaultAnnotationMetadata
+import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
+import io.micronaut.inject.ast.MemberElement
 import java.util.function.Consumer
 import java.util.function.Predicate
 
@@ -64,6 +68,10 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
 
     override fun getAnnotationMetadata(): AnnotationMetadata {
         return annotationMetadata
+    }
+
+    fun mutateMember(annotationType: String, member: String, value: Any) {
+        this.annotationMetadata = DefaultAnnotationMetadata.mutateMember(annotationMetadata, annotationType, member, value)
     }
 
     @NonNull
@@ -132,6 +140,14 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
     }
 
     private fun updateMetadataCaches() {
-        TODO("implement me")
+        val declaringTypeName: String = if (this is MemberElement) {
+            this.declaringType.name
+        } else {
+            this.name
+        }
+        AbstractAnnotationMetadataBuilder.addMutatedMetadata(declaringTypeName, nativeType, annotationMetadata)
+        if (declaration is KSDeclaration) {
+            visitorContext.getAnnotationUtils().invalidateMetadata(declaration)
+        }
     }
 }
