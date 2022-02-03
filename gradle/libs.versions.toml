@@ -28,7 +28,6 @@ log4j = "2.17.1"
 mongo-javadriver = "3.12.10"
 mysql-driver = "8.0.27"
 powermock = "2.0.9"
-rxjava3 = "3.0.13"
 selenium = "3.141.59"
 smallrye = "5.1.0"
 systemlambda = "1.2.1"
@@ -115,7 +114,7 @@ managed-micronaut-redis = "5.1.0"
 managed-micronaut-rss = "3.0.0"
 managed-micronaut-rxjava1 = "1.0.0"
 managed-micronaut-rxjava2 = "1.1.0"
-managed-micronaut-rxjava3 = "2.1.1"
+managed-micronaut-rxjava3 = "2.2.0"
 managed-micronaut-security = "3.3.0"
 managed-micronaut-serialization = "1.0.0-M6"
 managed-micronaut-servlet = "3.2.0"
@@ -164,6 +163,7 @@ boms-micronaut-kubernetes = { module = "io.micronaut.kubernetes:micronaut-kubern
 boms-micronaut-micrometer = { module = "io.micronaut.micrometer:micronaut-micrometer-bom", version.ref = "managed-micronaut-micrometer" }
 boms-micronaut-oraclecloud = { module = "io.micronaut.oraclecloud:micronaut-oraclecloud-bom", version.ref = "managed-micronaut-oraclecloud" }
 boms-micronaut-problem-json = { module = "io.micronaut.problem:micronaut-problem-json-bom", version.ref = "managed-micronaut-problem" }
+boms-micronaut-rxjava3 = { module = "io.micronaut.rxjava3:micronaut-rxjava3-bom", version.ref = "managed-micronaut-rxjava3" }
 boms-micronaut-security = { module = "io.micronaut.security:micronaut-security-bom", version.ref = "managed-micronaut-security" }
 boms-micronaut-serialization = { module = "io.micronaut.serde:micronaut-serde-bom", version.ref = "managed-micronaut-serialization" }
 boms-micronaut-servlet = { module = "io.micronaut.servlet:micronaut-servlet-bom", version.ref = "managed-micronaut-servlet" }
@@ -353,8 +353,6 @@ managed-micronaut-rxjava1 = { module = "io.micronaut.rxjava1:micronaut-rxjava1",
 managed-micronaut-rxjava2 = { module = "io.micronaut.rxjava2:micronaut-rxjava2", version.ref = "managed-micronaut-rxjava2" }
 managed-micronaut-rxjava2-http-client = { module = "io.micronaut.rxjava2:micronaut-rxjava2-http-client", version.ref = "managed-micronaut-rxjava2" }
 managed-micronaut-rxjava2-http-server-netty = { module = "io.micronaut.rxjava2:micronaut-rxjava2-http-server-netty", version.ref = "managed-micronaut-rxjava2" }
-managed-micronaut-rxjava3 = { module = "io.micronaut.rxjava3:micronaut-rxjava3", version.ref = "managed-micronaut-rxjava3" }
-managed-micronaut-rxjava3-http-client = { module = "io.micronaut.rxjava3:micronaut-rxjava3-http-client", version.ref = "managed-micronaut-rxjava3" }
 managed-micronaut-spring = { module = "io.micronaut.spring:micronaut-spring", version.ref = "managed-micronaut-spring" }
 managed-micronaut-spring-annotation = { module = "io.micronaut.spring:micronaut-spring-annotation", version.ref = "managed-micronaut-spring" }
 managed-micronaut-spring-boot = { module = "io.micronaut.spring:micronaut-spring-boot", version.ref = "managed-micronaut-spring" }
