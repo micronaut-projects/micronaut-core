@@ -21,6 +21,13 @@ open class KotlinClassElement(val classType: KSType,
         val CREATOR = "io.micronaut.core.annotation.Creator"
     }
 
+    val outerType: KSType?
+
+    init {
+        val outerDecl = declaration.parentDeclaration as? KSClassDeclaration
+        outerType = outerDecl?.asType(classType.arguments.subList(declaration.typeParameters.size, classType.arguments.size))
+    }
+
     @OptIn(KspExperimental::class)
     override fun getName(): String {
         return visitorContext.resolver.mapKotlinNameToJava(declaration.qualifiedName!!)?.asString() ?: declaration.toClassName()
@@ -116,7 +123,7 @@ open class KotlinClassElement(val classType: KSType,
     }
 
     override fun isInner(): Boolean {
-        return classType.outerType != null
+        return outerType != null
     }
 
     override fun getTypeArguments(): Map<String, ClassElement> {
@@ -314,11 +321,10 @@ open class KotlinClassElement(val classType: KSType,
 
     override fun getEnclosingType(): Optional<ClassElement> {
         if (isInner) {
-            val parentDeclaration = declaration.closestClassDeclaration()!!
             return Optional.of(
                 visitorContext.elementFactory.newClassElement(
-                    classType.outerType!!,
-                    visitorContext.getAnnotationUtils().getAnnotationMetadata(parentDeclaration)
+                    outerType!!,
+                    visitorContext.getAnnotationUtils().getAnnotationMetadata(outerType.declaration)
                 )
             )
         }
@@ -376,13 +382,13 @@ open class KotlinClassElement(val classType: KSType,
                 if (enclosingElement.modifiers.contains(Modifier.PRIVATE)) {
                     continue
                 }
-                val onlyAccessibleFrom = result.onlyAccessibleFromType.orElse(this)
-                val accessibleFrom = onlyAccessibleFrom.nativeType
-                // if the outer element of the enclosed element is not the current class
-                // we need to check if it package private and within a different package so it can be excluded
-                if (enclosingElement !== accessibleFrom && enclosingElement.modifiers.contains(Modifier.INTERNAL)) {
-                    TODO("how to determine if element is in module")
-                }
+//                val onlyAccessibleFrom = result.onlyAccessibleFromType.orElse(this)
+//                val accessibleFrom = onlyAccessibleFrom.nativeType
+//                // if the outer element of the enclosed element is not the current class
+//                // we need to check if it package private and within a different package so it can be excluded
+//                if (enclosingElement !== accessibleFrom && enclosingElement.modifiers.contains(Modifier.INTERNAL)) {
+//                    TODO("how to determine if element is in module")
+//                }
             }
 
             if (hasModifierPredicates) {

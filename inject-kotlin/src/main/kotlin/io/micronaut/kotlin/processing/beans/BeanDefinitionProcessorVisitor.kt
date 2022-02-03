@@ -4,8 +4,12 @@ import io.micronaut.aop.Interceptor
 import io.micronaut.aop.InterceptorBinding
 import io.micronaut.aop.InterceptorKind
 import io.micronaut.context.annotation.*
+import io.micronaut.core.annotation.AccessorsStyle
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.core.annotation.AnnotationValueBuilder
+import io.micronaut.core.naming.NameUtils
+import io.micronaut.core.util.StringUtils
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.configuration.ConfigurationMetadata
 import io.micronaut.inject.writer.BeanDefinitionVisitor
@@ -81,11 +85,19 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
             }
             defineBeanDefinition()
 
-            classElement.getEnclosedElements(ElementQuery.of(PropertyElement::class.java))
+            classElement.getEnclosedElements(ElementQuery.of(PropertyElement::class.java).onlyAccessible())
                 .forEach(this::visitProperty)
-            classElement.getEnclosedElements(ElementQuery.of(MethodElement::class.java))
+            classElement.getEnclosedElements(ElementQuery.of(MethodElement::class.java).onlyAccessible())
                 .forEach(this::visitMethod)
+            classElement.getEnclosedElements(ElementQuery.of(ClassElement::class.java).onlyAccessible())
+                .forEach(this::visitInnerClass)
         }
+    }
+
+    private fun visitInnerClass(classElement: ClassElement) {
+        val visitor = BeanDefinitionProcessorVisitor(classElement as KotlinClassElement, visitorContext)
+        visitor.visit()
+        beanDefinitionWriters.addAll(visitor.beanDefinitionWriters)
     }
 
     private fun visitProperty(propertyElement: PropertyElement) {
@@ -105,6 +117,28 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
                     visitorContext
                 )
             }
+        } else if (isConfigurationProperties && propertyElement.writeMethod.isPresent) {
+            val methodElement = propertyElement.writeMethod.get()
+            val parameterElement = methodElement.parameters[0]
+            val propertyMetadata = configurationMetadataBuilder.visitProperty(
+                classElement,
+                propertyElement.declaringType,
+                parameterElement.type.name,
+                propertyElement.name,
+                null,
+                null
+            )
+
+            propertyElement.annotate(Property::class.qualifiedName!!) { builder: AnnotationValueBuilder<Property> ->
+                builder.member("name", propertyMetadata.path)
+            }
+
+            beanWriter!!.visitSetterValue(
+                methodElement.declaringType,
+                methodElement,
+                false,
+                true
+            )
         }
     }
 
@@ -180,6 +214,22 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
     }
 
     private fun defineBeanDefinition() {
+        if (configurationMetadata != null) {
+            val existingPrefix = classElement.stringValue(ConfigurationReader::class.java, "prefix")
+                .orElse("")
+            val computedPrefix = if (StringUtils.isNotEmpty(existingPrefix)) {
+                existingPrefix + "." + configurationMetadata!!.name
+            } else {
+                configurationMetadata!!.name
+            }
+
+            classElement.mutateMember(
+                ConfigurationReader::class.qualifiedName!!,
+                "prefix",
+                computedPrefix
+            )
+        }
+
         val beanWriter = BeanDefinitionWriter(classElement, configurationMetadataBuilder, visitorContext)
         beanWriter.visitTypeArguments(classElement.allTypeArguments)
         beanDefinitionWriters.add(beanWriter)
@@ -208,6 +258,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
                 beanWriter.visitDefaultConstructor(defaultConstructor.annotationMetadata, visitorContext)
             }
         }
+
         this.beanWriter = beanWriter
     }
 }
