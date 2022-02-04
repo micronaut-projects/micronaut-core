@@ -18,6 +18,7 @@ import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.sse.Event
+import io.micronaut.http.ssl.AbstractClientSslConfiguration
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
@@ -36,13 +37,14 @@ import java.util.function.Consumer
 //@IgnoreIf({ !Jvm.current.isJava9Compatible() })
 class Http2RequestSpec extends Specification {
     @Shared @AutoCleanup EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
-            'micronaut.ssl.enabled': true,
+            'micronaut.server.ssl.enabled': true,
             "micronaut.server.http-version" : "2.0",
             "micronaut.http.client.http-version" : "2.0",
-            'micronaut.ssl.buildSelfSigned': true,
-            'micronaut.ssl.port': -1,
+            'micronaut.server.ssl.buildSelfSigned': true,
+            'micronaut.server.ssl.port': -1,
             "micronaut.http.client.log-level" : "TRACE",
-            "micronaut.server.netty.log-level" : "TRACE"
+            "micronaut.server.netty.log-level" : "TRACE",
+            'micronaut.http.client.ssl.insecure-trust-all-certificates': true
     ])
     HttpClient client = server.getApplicationContext().getBean(HttpClient)
 
@@ -146,12 +148,13 @@ class Http2RequestSpec extends Specification {
     void "test HTTP/2 server with HTTP/1 client request works"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
-                'micronaut.ssl.enabled': true,
+                'micronaut.server.ssl.enabled': true,
                 "micronaut.server.http-version" : "2.0",
-                'micronaut.ssl.buildSelfSigned': true,
-                'micronaut.ssl.port': -1,
+                'micronaut.server.ssl.buildSelfSigned': true,
+                'micronaut.server.ssl.port': -1,
                 "micronaut.http.client.log-level" : "TRACE",
-                "micronaut.server.netty.log-level" : "TRACE"
+                "micronaut.server.netty.log-level" : "TRACE",
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true
         ])
         HttpClient client = server.getApplicationContext().getBean(HttpClient)
         String result = client.toBlocking().retrieve("${server.URL}/http2")
@@ -167,15 +170,16 @@ class Http2RequestSpec extends Specification {
     void "test creating a client with a null URL and httpVersion set in HttpClientConfiguration"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
-                'micronaut.ssl.enabled': true,
+                'micronaut.server.ssl.enabled': true,
                 "micronaut.server.http-version" : "2.0",
-                'micronaut.ssl.buildSelfSigned': true,
-                'micronaut.ssl.port': -1,
+                'micronaut.server.ssl.buildSelfSigned': true,
+                'micronaut.server.ssl.port': -1,
                 "micronaut.http.client.log-level" : "TRACE",
                 "micronaut.server.netty.log-level" : "TRACE"
         ])
         HttpClientConfiguration configuration = server.getApplicationContext().getBean(HttpClientConfiguration);
         configuration.setHttpVersion(HttpVersion.HTTP_2_0);
+        ((AbstractClientSslConfiguration) configuration.sslConfiguration).insecureTrustAllCertificates = true
         HttpClient client = HttpClient.create(null, configuration);
         String result = client.toBlocking().retrieve("${server.URL}/http2")
 
@@ -190,14 +194,15 @@ class Http2RequestSpec extends Specification {
     void "test HTTP/2 server with HTTP/1 client  created outside with a null URL and default httpVersion set in HttpClientConfiguration"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
-                'micronaut.ssl.enabled': true,
+                'micronaut.server.ssl.enabled': true,
                 "micronaut.server.http-version" : "2.0",
-                'micronaut.ssl.buildSelfSigned': true,
-                'micronaut.ssl.port': -1,
+                'micronaut.server.ssl.buildSelfSigned': true,
+                'micronaut.server.ssl.port': -1,
                 "micronaut.http.client.log-level" : "TRACE",
                 "micronaut.server.netty.log-level" : "TRACE"
         ])
         HttpClientConfiguration configuration = server.getApplicationContext().getBean(HttpClientConfiguration);
+        ((AbstractClientSslConfiguration) configuration.sslConfiguration).insecureTrustAllCertificates = true
         HttpClient client = HttpClient.create(null, configuration);
         String result = client.toBlocking().retrieve("${server.URL}/http2")
 

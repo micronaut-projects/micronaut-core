@@ -15,6 +15,7 @@
  */
 package io.micronaut.jackson.core.env;
 
+import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceLoader;
@@ -62,7 +63,7 @@ public class EnvJsonPropertySourceLoader extends JsonPropertySourceLoader {
     protected Optional<InputStream> getEnvValueAsStream() {
         String v = getEnvValue();
         if (v != null) {
-            String encoding = System.getProperty("file.encoding");
+            String encoding = CachedEnvironment.getProperty("file.encoding");
             Charset charset = encoding != null ? Charset.forName(encoding) : StandardCharsets.UTF_8;
             return Optional.of(new ByteArrayInputStream(v.getBytes(charset)));
         }
@@ -74,9 +75,9 @@ public class EnvJsonPropertySourceLoader extends JsonPropertySourceLoader {
      * <tt>SPRING_APPLICATION_JSON</tt> or <tt>MICRONAUT_APPLICATION_JSON</tt>.
      */
     protected String getEnvValue() {
-        String v = System.getenv(SPRING_APPLICATION_JSON);
+        String v = CachedEnvironment.getenv(SPRING_APPLICATION_JSON);
         if (v == null) {
-            v = System.getenv(MICRONAUT_APPLICATION_JSON);
+            v = CachedEnvironment.getenv(MICRONAUT_APPLICATION_JSON);
         }
         return v;
     }

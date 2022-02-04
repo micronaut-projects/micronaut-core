@@ -18,9 +18,11 @@ package io.micronaut.http.server.netty.errors
 import groovy.json.JsonSlurper
 import io.micronaut.context.annotation.Property
 import io.micronaut.http.*
+import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.hateoas.JsonError
@@ -31,6 +33,7 @@ import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import io.micronaut.core.async.annotation.SingleResult
+import spock.lang.Issue
 
 /**
  * Tests for different kinds of errors and the expected responses
@@ -190,6 +193,15 @@ class ErrorSpec extends AbstractMicronautSpec {
         response.getBody(Map).get()._embedded.errors[0].message.contains("Failed to inject value for parameter [prop]")
     }
 
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6526')
+    def 'test bad request from incorrect use of array'() {
+        when:
+        rxClient.toBlocking().exchange(HttpRequest.POST('/errors/feedBirds', '[ { "name": "eagle" }, { "name": "hen" } ]').contentType(MediaType.APPLICATION_JSON))
+        then:
+        def e = thrown HttpClientResponseException
+        e.status == HttpStatus.BAD_REQUEST
+    }
+
     @Controller('/errors')
     static class ErrorController {
 
@@ -210,6 +222,26 @@ class ErrorSpec extends AbstractMicronautSpec {
         String handlerContentTypeError() {
             throw new ContentTypeExceptionHandlerException()
         }
+
+        @Post(value = "/feedBirds", processes = MediaType.APPLICATION_JSON)
+        void feedBirds(Flock flock) {
+        }
+    }
+
+    static class Flock {
+        private Bird[] birds;
+
+        public Bird[] getBirds() { return birds; }
+
+        public void setBirds(Bird[] birds) { this.birds = birds; }
+    }
+
+    static class Bird {
+        private String name;
+
+        public String getName() { return name; }
+
+        public void setName(String name) { this.name = name; }
     }
 
     @Controller('/errors/loop')

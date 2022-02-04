@@ -1,3 +1,9 @@
+import org.apache.tools.ant.taskdefs.condition.Os
+
+internalSanityChecks {
+    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 24)
+}           
+
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")
@@ -36,9 +42,10 @@ dependencies {
     }
     testImplementation libs.managed.jackson.databind
 
-    // following 3 dependencies needed for Http2PostTest
+    // http impls for tests
     testImplementation libs.vertx
     testImplementation libs.vertx.webclient
+    testImplementation libs.httpcomponents.client
     testImplementation libs.jetty.alpn.openjdk8.client
 
     testImplementation libs.managed.groovy.json
@@ -51,7 +58,7 @@ dependencies {
     }
     testImplementation(libs.managed.netty.transport.native.kqueue) {
         artifact {
-            classifier = "osx-x86_64"
+            classifier = Os.isArch("aarch64") ? "osx-aarch_64" : "osx-x86_64"
         }
     }
     testImplementation libs.managed.logback
@@ -63,7 +70,7 @@ dependencies {
     testImplementation libs.junit.jupiter.api
 }
 
-//tasks.withType(Test) {
+//tasks.withType(Test).configureEach {
 //    testLogging {
 //        showStandardStreams = true
 //        exceptionFormat = 'full'

@@ -1,3 +1,9 @@
+
+internalSanityChecks {
+    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 16)
+    expectedServiceCount.put('io.micronaut.core.beans.BeanIntrospectionReference', 2)
+}           
+
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")
@@ -23,4 +29,8 @@ spotless {
         targetExclude '**/io/micronaut/http/netty/stream/package-info.java',
                 '**/io/micronaut/http/netty/reactive/package-info.java'
     }
+}
+
+tasks.named("test", Test) {
+    forkEvery = 1
 }

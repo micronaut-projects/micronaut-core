@@ -15,18 +15,22 @@
  */
 package io.micronaut.jackson.modules;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
+import com.fasterxml.jackson.annotation.OptBoolean;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.ObjectCodec;
 import com.fasterxml.jackson.core.SerializableString;
 import com.fasterxml.jackson.core.io.SerializedString;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.cfg.MapperConfig;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerBuilder;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
 import com.fasterxml.jackson.databind.deser.CreatorProperty;
@@ -35,8 +39,12 @@ import com.fasterxml.jackson.databind.deser.SettableBeanProperty;
 import com.fasterxml.jackson.databind.deser.ValueInstantiator;
 import com.fasterxml.jackson.databind.deser.impl.MethodProperty;
 import com.fasterxml.jackson.databind.deser.std.StdValueInstantiator;
+import com.fasterxml.jackson.databind.introspect.AccessorNamingStrategy;
+import com.fasterxml.jackson.databind.introspect.AnnotatedClass;
 import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
+import com.fasterxml.jackson.databind.introspect.AnnotatedMethod;
 import com.fasterxml.jackson.databind.introspect.AnnotationCollector;
+import com.fasterxml.jackson.databind.introspect.DefaultAccessorNamingStrategy;
 import com.fasterxml.jackson.databind.introspect.TypeResolutionContext;
 import com.fasterxml.jackson.databind.introspect.VirtualAnnotatedMember;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
@@ -52,6 +60,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
@@ -76,6 +85,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * A Jackson module that adds reflection-free bean serialization and deserialization for Micronaut.
@@ -102,6 +113,18 @@ public class BeanIntrospectionModule extends SimpleModule {
     public BeanIntrospectionModule() {
         setDeserializerModifier(new BeanIntrospectionDeserializerModifier());
         setSerializerModifier(new BeanIntrospectionSerializerModifier());
+    }
+
+    @Override
+    public void setupModule(SetupContext context) {
+        super.setupModule(context);
+
+        ObjectCodec owner = context.getOwner();
+        if (owner instanceof ObjectMapper) {
+            ObjectMapper mapper = (ObjectMapper) owner;
+            mapper.setConfig(mapper.getSerializationConfig().with(new BeanIntrospectionAccessorNamingStrategyProvider(mapper.getSerializationConfig().getAccessorNaming())));
+            mapper.setConfig(mapper.getDeserializationConfig().with(new BeanIntrospectionAccessorNamingStrategyProvider(mapper.getDeserializationConfig().getAccessorNaming())));
+        }
     }
 
     /**
@@ -131,7 +154,7 @@ public class BeanIntrospectionModule extends SimpleModule {
         );
     }
 
-    private VirtualAnnotatedMember createVirtualMember(TypeResolutionContext typeResolutionContext, Class<?> beanClass, String name, JavaType javaType, AnnotationMetadata annotationMetadata) {
+    private AnnotatedMember createVirtualMember(TypeResolutionContext typeResolutionContext, Class<?> beanClass, String name, JavaType javaType, AnnotationMetadata annotationMetadata) {
         return new VirtualAnnotatedMember(
                 typeResolutionContext,
                 beanClass,
@@ -188,6 +211,21 @@ public class BeanIntrospectionModule extends SimpleModule {
             }
         }
         return null;
+    }
+
+    @NonNull
+    private JsonFormat.Value parseJsonFormat(@NonNull AnnotationValue<JsonFormat> formatAnnotation) {
+        return new JsonFormat.Value(
+                formatAnnotation.stringValue("pattern").orElse(""),
+                formatAnnotation.enumValue("shape", JsonFormat.Shape.class).orElse(JsonFormat.Shape.ANY),
+                formatAnnotation.stringValue("locale").orElse(JsonFormat.DEFAULT_LOCALE),
+                formatAnnotation.stringValue("timezone").orElse(JsonFormat.DEFAULT_TIMEZONE),
+                JsonFormat.Features.construct(
+                        formatAnnotation.enumValues("with", JsonFormat.Feature.class),
+                        formatAnnotation.enumValues("without", JsonFormat.Feature.class)
+                ),
+                formatAnnotation.enumValue("lenient", OptBoolean.class).orElse(OptBoolean.DEFAULT).asBoolean()
+        );
     }
 
     /**
@@ -287,7 +325,9 @@ public class BeanIntrospectionModule extends SimpleModule {
                         } else {
                             property = introspection.getProperty(existingName);
                         }
-                        if (property.isPresent()) {
+                        // ignore properties that are @JsonIgnore, so that we don't replace other properties of the
+                        // same name
+                        if (property.isPresent() && !property.get().isAnnotationPresent(JsonIgnore.class)) {
                             final BeanProperty<Object, Object> beanProperty = property.get();
                             if (isResource) {
                                 if ("embedded".equals(beanProperty.getName())) {
@@ -350,7 +390,7 @@ public class BeanIntrospectionModule extends SimpleModule {
             }
 
             final Class<?> beanClass = beanDesc.getBeanClass();
-            final BeanIntrospection<Object> introspection = (BeanIntrospection<Object>) BeanIntrospector.SHARED.findIntrospection(beanClass).orElse(null);
+            final BeanIntrospection<Object> introspection = findIntrospection(beanClass);
             if (introspection == null) {
                 return builder;
             } else {
@@ -370,6 +410,12 @@ public class BeanIntrospectionModule extends SimpleModule {
                 } else {
                     Map<String, BeanProperty<Object, Object>> remainingProperties = new LinkedHashMap<>();
                     for (BeanProperty<Object, Object> beanProperty : introspection.getBeanProperties()) {
+                        // ignore properties that are @JsonIgnore, so that we don't replace other properties of the
+                        // same name
+                        if (beanProperty.isAnnotationPresent(JsonIgnore.class)) {
+                            continue;
+                        }
+
                         remainingProperties.put(beanProperty.getName(), beanProperty);
                     }
                     while (properties.hasNext()) {
@@ -413,7 +459,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                     @Override
                     public SettableBeanProperty[] getFromObjectArguments(DeserializationConfig config) {
 
-                        SettableBeanProperty[] existing = defaultInstantiator.getFromObjectArguments(config);
+                        SettableBeanProperty[] existing = ignoreReflectiveProperties ? null : defaultInstantiator.getFromObjectArguments(config);
                         if (props == null) {
                             props = new SettableBeanProperty[constructorArguments.length];
                             for (int i = 0; i < constructorArguments.length; i++) {
@@ -706,6 +752,20 @@ public class BeanIntrospectionModule extends SimpleModule {
             beanProperty.set(instance, value);
             return null;
         }
+
+        @Override
+        public JsonFormat.Value findPropertyFormat(MapperConfig<?> config, Class<?> baseType) {
+            JsonFormat.Value v1 = config.getDefaultPropertyFormat(baseType);
+            JsonFormat.Value v2 = null;
+            AnnotationValue<JsonFormat> formatAnnotation = beanProperty.getAnnotation(JsonFormat.class);
+            if (formatAnnotation != null) {
+                v2 = parseJsonFormat(formatAnnotation);
+            }
+            if (v1 == null) {
+                return (v2 == null) ? EMPTY_FORMAT : v2;
+            }
+            return (v2 == null) ? v1 : v1.withOverrides(v2);
+        }
     }
 
 
@@ -746,7 +806,7 @@ public class BeanIntrospectionModule extends SimpleModule {
         }
 
         BeanIntrospectionPropertyWriter(
-                VirtualAnnotatedMember virtualMember,
+                AnnotatedMember virtualMember,
                 SerializationConfig config,
                 String name,
                 BeanProperty<Object, Object> introspection,
@@ -806,29 +866,6 @@ public class BeanIntrospectionModule extends SimpleModule {
                 }
             }
             return false;
-        }
-
-        /**
-         * @see <a href="https://github.com/micronaut-projects/micronaut-core/issues/2933">Issue 2933</a>
-         */
-        private boolean shouldSuppressNulls(boolean defaultSupressNull) {
-            JsonInclude.Include include = beanProperty.enumValue(JsonInclude.class, JsonInclude.Include.class).orElse(null);
-            if (include == null) {
-                include = beanProperty.getDeclaringBean().enumValue(JsonInclude.class, JsonInclude.Include.class).orElse(null);
-            }
-            if (include != null) {
-                switch (include) {
-                    case ALWAYS:
-                        return false;
-                    case NON_NULL:
-                    case NON_ABSENT:
-                    case NON_EMPTY:
-                        return true;
-                    default:
-                        return defaultSupressNull;
-                }
-            }
-            return defaultSupressNull;
         }
 
         @Override
@@ -938,6 +975,19 @@ public class BeanIntrospectionModule extends SimpleModule {
             }
         }
 
+        @Override
+        public JsonFormat.Value findPropertyFormat(MapperConfig<?> config, Class<?> baseType) {
+            JsonFormat.Value v1 = config.getDefaultPropertyFormat(baseType);
+            JsonFormat.Value v2 = null;
+            AnnotationValue<JsonFormat> formatAnnotation = beanProperty.getAnnotation(JsonFormat.class);
+            if (formatAnnotation != null) {
+                v2 = parseJsonFormat(formatAnnotation);
+            }
+            if (v1 == null) {
+                return (v2 == null) ? EMPTY_FORMAT : v2;
+            }
+            return (v2 == null) ? v1 : v1.withOverrides(v2);
+        }
     }
 
     /**
@@ -977,6 +1027,52 @@ public class BeanIntrospectionModule extends SimpleModule {
         public Object setAndReturn(Object instance, Object value) {
             beanProperty.set(instance, value);
             return null;
+        }
+    }
+
+    private class BeanIntrospectionAccessorNamingStrategyProvider extends AccessorNamingStrategy.Provider {
+        private final AccessorNamingStrategy.Provider delegate;
+
+        BeanIntrospectionAccessorNamingStrategyProvider(AccessorNamingStrategy.Provider delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public AccessorNamingStrategy forPOJO(MapperConfig<?> config, AnnotatedClass valueClass) {
+            return delegate.forPOJO(config, valueClass);
+        }
+
+        @Override
+        public AccessorNamingStrategy forBuilder(MapperConfig<?> config, AnnotatedClass builderClass, BeanDescription valueTypeDesc) {
+            return delegate.forBuilder(config, builderClass, valueTypeDesc);
+        }
+
+        @Override
+        public AccessorNamingStrategy forRecord(MapperConfig<?> config, AnnotatedClass recordClass) {
+            BeanIntrospection<Object> introspection = findIntrospection(recordClass.getRawType());
+            if (introspection != null) {
+                return new DefaultAccessorNamingStrategy(config, recordClass, null, "get", "is", null) {
+                    final Set<String> names = introspection.getBeanProperties().stream().map(BeanProperty::getName).collect(Collectors.toSet());
+
+                    @Override
+                    public String findNameForRegularGetter(AnnotatedMethod am, String name) {
+                        if (names.contains(name)) {
+                            return name;
+                        }
+                        return super.findNameForRegularGetter(am, name);
+                    }
+                };
+            } else {
+                try {
+                    return delegate.forRecord(config, recordClass);
+                } catch (IllegalArgumentException e) {
+                    if (e.getMessage().startsWith("Failed to access RecordComponents of type")) {
+                        throw new RuntimeException("Failed to construct AccessorNamingStrategy for record. This can happen when running in native-image. Either make this type @Introspected, or mark it for @ReflectiveAccess.", e);
+                    } else {
+                        throw e;
+                    }
+                }
+            }
         }
     }
 }

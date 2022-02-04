@@ -136,6 +136,7 @@ import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
+import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketClientCompressionHandler;
 import io.netty.handler.codec.http2.*;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.proxy.HttpProxyHandler;
@@ -148,6 +149,7 @@ import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.netty.resolver.NoopAddressResolverGroup;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import io.netty.util.CharsetUtil;
@@ -179,7 +181,6 @@ import java.net.Proxy.Type;
 import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -382,6 +383,7 @@ public class DefaultHttpClient implements
                     @Override
                     protected ChannelPool newPool(RequestKey key) {
                         Bootstrap newBootstrap = bootstrap.clone(group);
+                        initBootstrapForProxy(newBootstrap, key.isSecure(), key.getHost(), key.getPort());
                         newBootstrap.remoteAddress(key.getRemoteAddress());
 
                         AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
@@ -403,6 +405,7 @@ public class DefaultHttpClient implements
                     @Override
                     protected ChannelPool newPool(RequestKey key) {
                         Bootstrap newBootstrap = bootstrap.clone(group);
+                        initBootstrapForProxy(newBootstrap, key.isSecure(), key.getHost(), key.getPort());
                         newBootstrap.remoteAddress(key.getRemoteAddress());
 
                         AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
@@ -446,10 +449,10 @@ public class DefaultHttpClient implements
     }
 
     /**
-     * @param url The URL
+     * @param uri The URL
      */
-    public DefaultHttpClient(@Nullable URL url) {
-        this(url, new DefaultHttpClientConfiguration());
+    public DefaultHttpClient(@Nullable URI uri) {
+        this(uri, new DefaultHttpClientConfiguration());
     }
 
     /**
@@ -460,12 +463,12 @@ public class DefaultHttpClient implements
     }
 
     /**
-     * @param url           The URL
+     * @param uri           The URI
      * @param configuration The {@link HttpClientConfiguration} object
      */
-    public DefaultHttpClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
+    public DefaultHttpClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {
         this(
-                url == null ? null : LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
+                uri == null ? null : LoadBalancer.fixed(uri), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
                 new NettyClientSslBuilder(new ResourceResolver()),
                 createDefaultMediaTypeRegistry(),
                 AnnotationMetadataResolver.DEFAULT,
@@ -885,6 +888,7 @@ public class DefaultHttpClient implements
             }
 
             bootstrap.remoteAddress(requestKey.getHost(), requestKey.getPort());
+            initBootstrapForProxy(bootstrap, sslContext != null, requestKey.getHost(), requestKey.getPort());
             bootstrap.handler(new HttpClientInitializer(
                     sslContext,
                     requestKey.getHost(),
@@ -931,10 +935,11 @@ public class DefaultHttpClient implements
                                 request,
                                 finalWebSocketBean,
                                 WebSocketClientHandshakerFactory.newHandshaker(
-                                        webSocketURL, protocolVersion, subprotocol, false, customHeaders, maxFramePayloadLength),
+                                        webSocketURL, protocolVersion, subprotocol, true, customHeaders, maxFramePayloadLength),
                                 requestBinderRegistry,
                                 mediaTypeCodecRegistry,
                                 emitter);
+                        pipeline.addLast(WebSocketClientCompressionHandler.INSTANCE);
                         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_WEBSOCKET_CLIENT, webSocketHandler);
                     } catch (Throwable e) {
                         emitter.error(new WebSocketSessionException("Error opening WebSocket client session: " + e.getMessage(), e));
@@ -1403,6 +1408,13 @@ public class DefaultHttpClient implements
         return null;
     }
 
+    private void initBootstrapForProxy(Bootstrap bootstrap, boolean ssl, String host, int port) {
+        Proxy proxy = configuration.resolveProxy(ssl, host, port);
+        if (proxy.type() != Type.DIRECT) {
+            bootstrap.resolver(NoopAddressResolverGroup.INSTANCE);
+        }
+    }
+
     /**
      * Creates an initial connection to the given remote host.
      *
@@ -1444,6 +1456,7 @@ public class DefaultHttpClient implements
             boolean isStream,
             Consumer<ChannelHandlerContext> contextConsumer) {
         Bootstrap localBootstrap = this.bootstrap.clone();
+        initBootstrapForProxy(localBootstrap, sslCtx != null, host, port);
         String acceptHeader = request.getHeaders().get(io.micronaut.http.HttpHeaders.ACCEPT);
         localBootstrap.handler(new HttpClientInitializer(
                 sslCtx,
@@ -1507,8 +1520,7 @@ public class DefaultHttpClient implements
      */
     protected SslContext buildSslContext(URI uriObject) {
         final SslContext sslCtx;
-        if (io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(uriObject.getScheme()) ||
-            SCHEME_WSS.equalsIgnoreCase(uriObject.getScheme())) {
+        if (isSecureScheme(uriObject.getScheme())) {
             sslCtx = sslContext;
             //Allow https requests to be sent if SSL is disabled but a proxy is present
             if (sslCtx == null && !configuration.getProxyAddress().isPresent()) {
@@ -1630,6 +1642,7 @@ public class DefaultHttpClient implements
      * @param requestURI             The URI of the request
      * @param requestContentType     The request content type
      * @param permitsBody            Whether permits body
+     * @param bodyType               The body type
      * @param onError                Called when the body publisher encounters an error
      * @param closeChannelAfterWrite Whether to close the channel. For stream requests we don't close the channel until disposed of.
      * @return A {@link NettyRequestWriter}
@@ -1640,6 +1653,7 @@ public class DefaultHttpClient implements
             URI requestURI,
             MediaType requestContentType,
             boolean permitsBody,
+            @Nullable Argument<?> bodyType,
             Consumer<? super Throwable> onError,
             boolean closeChannelAfterWrite) throws HttpPostRequestEncoder.ErrorDataEncoderException {
 
@@ -1705,7 +1719,13 @@ public class DefaultHttpClient implements
                                 }
                             } else if (mediaTypeCodecRegistry != null) {
                                 Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
-                                ByteBuf encoded = registeredCodec.map(codec -> codec.encode(o, byteBufferFactory).asNativeBuffer())
+                                ByteBuf encoded = registeredCodec.map(codec -> {
+                                            if (bodyType != null && bodyType.isInstance(o)) {
+                                                return codec.encode((Argument<Object>) bodyType, o, byteBufferFactory).asNativeBuffer();
+                                            } else {
+                                                return codec.encode(o, byteBufferFactory).asNativeBuffer();
+                                            }
+                                        })
                                         .orElse(null);
                                 if (encoded != null) {
                                     if (log.isTraceEnabled()) {
@@ -1735,7 +1755,13 @@ public class DefaultHttpClient implements
                         bodyContent = charSequenceToByteBuf((CharSequence) bodyValue, requestContentType);
                     } else if (mediaTypeCodecRegistry != null) {
                         Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
-                        bodyContent = registeredCodec.map(codec -> codec.encode(bodyValue, byteBufferFactory).asNativeBuffer())
+                        bodyContent = registeredCodec.map(codec -> {
+                                    if (bodyType != null && bodyType.isInstance(bodyValue)) {
+                                        return codec.encode((Argument<Object>) bodyType, bodyValue, byteBufferFactory).asNativeBuffer();
+                                    } else {
+                                        return codec.encode(bodyValue, byteBufferFactory).asNativeBuffer();
+                                    }
+                                })
                                 .orElse(null);
                     }
                     if (bodyContent == null) {
@@ -1997,6 +2023,7 @@ public class DefaultHttpClient implements
                 requestURI,
                 requestContentType,
                 permitsBody,
+                bodyType,
                 throwable -> {
                     if (!emitter.isCancelled()) {
                         emitter.error(throwable);
@@ -2808,6 +2835,7 @@ public class DefaultHttpClient implements
                 requestURI,
                 requestContentType,
                 permitsBody,
+                null,
                 throwable -> {
                     if (!emitter.isCancelled()) {
                         emitter.error(throwable);
@@ -2917,7 +2945,12 @@ public class DefaultHttpClient implements
     public Publisher<MutableHttpResponse<?>> proxy(@NonNull io.micronaut.http.HttpRequest<?> request) {
         return Flux.from(resolveRequestURI(request))
                 .flatMap(requestURI -> {
-                    AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request instanceof MutableHttpRequest ? request : request.mutate());
+                    io.micronaut.http.MutableHttpRequest<?> httpRequest = request instanceof MutableHttpRequest
+                            ? (io.micronaut.http.MutableHttpRequest<?>) request
+                            : request.mutate();
+                    httpRequest.headers(headers -> headers.remove(HttpHeaderNames.HOST));
+
+                    AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(httpRequest);
                     Flux<MutableHttpResponse<Object>> proxyResponsePublisher = Flux.create(emitter -> {
                         SslContext sslContext = buildSslContext(requestURI);
                         ChannelFuture channelFuture;
@@ -3015,6 +3048,10 @@ public class DefaultHttpClient implements
                 .map(InvocationInstrumenterFactory::newInvocationInstrumenter)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList()));
+    }
+
+    private static boolean isSecureScheme(String scheme) {
+        return io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(scheme) || SCHEME_WSS.equalsIgnoreCase(scheme);
     }
 
 
@@ -3144,11 +3181,8 @@ public class DefaultHttpClient implements
                 });
 
                 if (sslContext != null) {
-                    SslHandler sslHandler = sslContext.newHandler(
-                            ch.alloc(),
-                            host,
-                            port
-                    );
+                    SslHandler sslHandler = sslContext.newHandler(ch.alloc(), host, port);
+                    sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
                     p.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler);
                 }
 
@@ -3370,7 +3404,7 @@ public class DefaultHttpClient implements
         private final boolean secure;
 
         public RequestKey(URI requestURI) {
-            this.secure = io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(requestURI.getScheme());
+            this.secure = isSecureScheme(requestURI.getScheme());
             String host = requestURI.getHost();
             int port;
             if (host == null) {
@@ -3466,8 +3500,7 @@ public class DefaultHttpClient implements
         protected void writeAndClose(Channel channel, ChannelPool channelPool, FluxSink<?> emitter) {
             final ChannelPipeline pipeline = channel.pipeline();
             if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
-                final boolean isSecure = sslContext != null &&
-                        io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(scheme);
+                final boolean isSecure = sslContext != null && isSecureScheme(scheme);
                 if (isSecure) {
                     nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTPS);
                 } else {

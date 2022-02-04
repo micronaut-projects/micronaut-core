@@ -31,6 +31,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpParameters;
 import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.PushCapableHttpRequest;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
@@ -51,23 +52,32 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import io.netty.handler.codec.http.multipart.AbstractHttpData;
+import io.netty.handler.codec.http.multipart.HttpData;
+import io.netty.handler.codec.http.multipart.MixedAttribute;
+import io.netty.handler.codec.http2.Http2ConnectionHandler;
+import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.ssl.SslHandler;
-import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCounted;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -84,9 +94,51 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Internal
-public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T> {
+public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T> {
 
-    private static final AttributeKey<NettyHttpRequest> KEY = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
+    /**
+     * Headers to exclude from the push promise sent to the client. We use
+     * {@link io.netty.handler.codec.http.HttpHeaders} to store this set, so that the semantics (e.g. case
+     * insensitivity) are the same as for the actual header storage, so that we don't accidentally copy headers we're
+     * not supposed to.
+     */
+    private static final io.netty.handler.codec.http.HttpHeaders SERVER_PUSH_EXCLUDE_HEADERS;
+
+    static {
+        SERVER_PUSH_EXCLUDE_HEADERS = new DefaultHttpHeaders();
+        // from JavaEE PushBuilder javadoc: "The existing request headers of the current HttpServletRequest are added to the builder, except for: "
+        // "Conditional headers (defined in RFC 7232)"
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.ETAG, "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.IF_MATCH, "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.IF_MODIFIED_SINCE, "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.IF_NONE_MATCH, "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.IF_UNMODIFIED_SINCE, "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.LAST_MODIFIED, "");
+        // "Range headers" (RFC 7233)
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.ACCEPT_RANGES, "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.CONTENT_RANGE, "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.IF_RANGE, "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.RANGE, "");
+        // "Expect headers"
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.EXPECT, "");
+        // "Referrer headers"
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.REFERER, "");
+        // "Authorization headers"
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.PROXY_AUTHENTICATE, "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpHeaderNames.PROXY_AUTHORIZATION, "");
+        // we do copy other authorization headers and cookies. This is a potential security risk, e.g. if there's an
+        // intermediate HTTP proxy that adds auth headers that the client isn't supposed to see – the client will
+        // receive a copy of those headers in the PUSH_PROMISE. However, I'm not sure if the client will utilize the
+        // pushed response properly if we don't send the authorization headers. It might also depend on the Vary
+        // header. This behavior is documented in PushCapableHttpRequest.
+
+        // some netty headers we won't copy
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpConversionUtil.ExtensionHeaderNames.PATH.text(), "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), "");
+        SERVER_PUSH_EXCLUDE_HEADERS.add(HttpConversionUtil.ExtensionHeaderNames.STREAM_PROMISE_ID.text(), "");
+        // we do copy the weight and dependency id
+    }
 
     private final NettyHttpHeaders headers;
     private final ChannelHandlerContext channelHandlerContext;
@@ -94,7 +146,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private MutableConvertibleValues<Object> attributes;
     private NettyCookies nettyCookies;
     private List<ByteBufHolder> receivedContent = new ArrayList<>();
-    private Map<IdentityWrapper, AbstractHttpData> receivedData = new LinkedHashMap<>();
+    private Map<IdentityWrapper, HttpData> receivedData = new LinkedHashMap<>();
 
     private Supplier<Optional<T>> body;
     private RouteMatch<?> matchedRoute;
@@ -119,12 +171,30 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         Objects.requireNonNull(environment, "Environment cannot be null");
         Channel channel = ctx.channel();
         if (channel != null) {
-            channel.attr(KEY).set(this);
+            channel.attr(ServerAttributeKeys.REQUEST_KEY).set(this);
         }
         this.serverConfiguration = serverConfiguration;
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
         this.body = SupplierUtil.memoizedNonEmpty(() -> Optional.ofNullable((T) buildBody()));
+    }
+
+    /**
+     * Prepares a response based on this HTTP/2 request if HTTP/2 is enabled.
+     *
+     * @param finalResponse The response to prepare, never {@code null}
+     */
+    @Internal
+    public final void prepareHttp2ResponseIfNecessary(@NonNull HttpResponse finalResponse) {
+        final io.micronaut.http.HttpVersion httpVersion = getHttpVersion();
+        final boolean isHttp2 = httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0;
+        if (isHttp2) {
+            final io.netty.handler.codec.http.HttpHeaders nativeHeaders = nettyRequest.headers();
+            final String streamId = nativeHeaders.get(STREAM_ID);
+            if (streamId != null) {
+                finalResponse.headers().set(STREAM_ID, streamId);
+            }
+        }
     }
 
     @Override
@@ -229,7 +299,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         if (!receivedData.isEmpty()) {
             Map body = new LinkedHashMap(receivedData.size());
 
-            for (AbstractHttpData data: receivedData.values()) {
+            for (HttpData data: receivedData.values()) {
                 String newValue = getContent(data);
                 //noinspection unchecked
                 body.compute(data.getName(), (key, oldValue) -> {
@@ -264,7 +334,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         }
     }
 
-    private String getContent(AbstractHttpData data) {
+    private String getContent(HttpData data) {
         String newValue;
         try {
             newValue = data.getString(serverConfiguration.getDefaultCharset());
@@ -344,10 +414,10 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     public void addContent(ByteBufHolder httpContent) {
-        if (httpContent instanceof AbstractHttpData) {
+        if (httpContent instanceof AbstractHttpData || httpContent instanceof MixedAttribute) {
             receivedData.computeIfAbsent(new IdentityWrapper(httpContent), key -> {
                 httpContent.retain();
-                return (AbstractHttpData) httpContent;
+                return (HttpData) httpContent;
             });
         } else {
             receivedContent.add(httpContent.retain());
@@ -376,6 +446,90 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     @Internal
     boolean isBodyRequired() {
         return bodyRequired || HttpMethod.requiresRequestBody(getMethod());
+    }
+
+    @Override
+    public boolean isServerPushSupported() {
+        Http2ConnectionHandler http2ConnectionHandler = channelHandlerContext.pipeline().get(Http2ConnectionHandler.class);
+        return http2ConnectionHandler != null && http2ConnectionHandler.connection().remote().allowPushTo();
+    }
+
+    @Override
+    public PushCapableHttpRequest<T> serverPush(@NotNull HttpRequest<?> request) {
+        ChannelHandlerContext connectionHandlerContext = channelHandlerContext.pipeline().context(Http2ConnectionHandler.class);
+        if (connectionHandlerContext != null) {
+            Http2ConnectionHandler connectionHandler = (Http2ConnectionHandler) connectionHandlerContext.handler();
+
+            if (!connectionHandler.connection().remote().allowPushTo()) {
+                throw new UnsupportedOperationException("Server push not supported by this client: Client is HTTP2 but does not report support for this feature");
+            }
+
+            URI configuredUri = request.getUri();
+            String scheme = configuredUri.getScheme();
+            if (scheme == null) {
+                scheme = channelHandlerContext.pipeline().get(SslHandler.class) == null ? SCHEME_HTTP : SCHEME_HTTPS;
+            }
+            String authority = configuredUri.getAuthority();
+            if (authority == null) {
+                // this is potentially user-controlled.
+                authority = this.getHeaders().get("Host");
+            }
+            String path = configuredUri.getPath();
+            if (path == null || !path.startsWith("/")) {
+                throw new IllegalArgumentException("Request must have an absolute path");
+            }
+            String query = configuredUri.getQuery();
+            String fragment = configuredUri.getFragment();
+
+            URI fixedUri;
+            try {
+                fixedUri = new URI(scheme, authority, path, query, fragment);
+            } catch (URISyntaxException e) {
+                throw new IllegalArgumentException("Illegal URI", e);
+            }
+
+            // request used to trigger our handlers
+            io.netty.handler.codec.http.HttpRequest inboundRequest = NettyHttpRequestBuilder.toHttpRequest(request);
+
+            // copy headers from our request
+            for (Iterator<Map.Entry<CharSequence, CharSequence>> itr = headers.getNettyHeaders().iteratorCharSequence(); itr.hasNext(); ) {
+                Map.Entry<CharSequence, CharSequence> entry = itr.next();
+                if (!inboundRequest.headers().contains(entry.getKey()) && !SERVER_PUSH_EXCLUDE_HEADERS.contains(entry.getKey())) {
+                    inboundRequest.headers().add(entry.getKey(), entry.getValue());
+                }
+            }
+            if (!inboundRequest.headers().contains(HttpHeaderNames.REFERER)) {
+                inboundRequest.headers().add(HttpHeaderNames.REFERER, getUri().toString());
+            }
+
+            // request used to compute the headers for the PUSH_PROMISE frame
+            io.netty.handler.codec.http.HttpRequest outboundRequest = new DefaultHttpRequest(
+                    inboundRequest.protocolVersion(),
+                    inboundRequest.method(),
+                    fixedUri.toString(),
+                    inboundRequest.headers()
+            );
+
+            int ourStream = this.nettyRequest.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text());
+            int newStream = connectionHandler.connection().local().incrementAndGetNextStreamId();
+
+            connectionHandler.encoder().frameWriter().writePushPromise(
+                    connectionHandlerContext,
+                    ourStream,
+                    newStream,
+                    HttpConversionUtil.toHttp2Headers(outboundRequest, false),
+                    0,
+                    connectionHandlerContext.voidPromise()
+            );
+
+            inboundRequest.headers().setInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), newStream);
+            inboundRequest.headers().setInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_PROMISE_ID.text(), ourStream);
+            // delay until our handling is complete
+            connectionHandlerContext.executor().execute(() -> connectionHandlerContext.fireChannelRead(inboundRequest));
+            return this;
+        } else {
+            throw new UnsupportedOperationException("Server push not supported by this client: Not a HTTP2 client");
+        }
     }
 
     @Override
@@ -409,7 +563,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     static NettyHttpRequest get(ChannelHandlerContext ctx) {
         Channel channel = ctx.channel();
-        io.netty.util.Attribute<NettyHttpRequest> attr = channel.attr(KEY);
+        io.netty.util.Attribute<NettyHttpRequest> attr = channel.attr(ServerAttributeKeys.REQUEST_KEY);
         return attr.get();
     }
 
@@ -422,7 +576,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     static NettyHttpRequest remove(ChannelHandlerContext ctx) {
         Channel channel = ctx.channel();
 
-        io.netty.util.Attribute<NettyHttpRequest> attr = channel.attr(KEY);
+        io.netty.util.Attribute<NettyHttpRequest> attr = channel.attr(ServerAttributeKeys.REQUEST_KEY);
         return attr.getAndSet(null);
     }
 

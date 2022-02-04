@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 
 @MicronautTest
 @Property(name = "secondary.enabled", value = StringUtils.TRUE)
+@Property(name = "micronaut.http.client.ssl.insecure-trust-all-certificates", value = StringUtils.TRUE)
 public class SecondaryServerTest {
     // tag::inject[]
     @Client(path = "/", id = SecondaryNettyServer.SERVER_ID)

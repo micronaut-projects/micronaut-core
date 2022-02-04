@@ -1,7 +1,11 @@
+
+internalSanityChecks {
+    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 3)
+}           
+
 dependencies {
     annotationProcessor project(":inject-java")
 
     api project(":runtime")
     implementation libs.managed.methvin.directoryWatcher
-    implementation libs.managed.jna
 }

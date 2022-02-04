@@ -86,4 +86,9 @@ public @interface Retryable {
      * (defaults to none)
      */
     Class<? extends RetryPredicate> predicate() default DefaultRetryPredicate.class;
+
+    /**
+     * @return The capture exception types (defaults to RuntimeException)
+     */
+    Class<? extends Throwable> capturedException() default RuntimeException.class;
 }

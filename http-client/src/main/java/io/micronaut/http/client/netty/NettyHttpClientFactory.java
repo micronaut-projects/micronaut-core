@@ -30,7 +30,9 @@ import io.micronaut.http.client.sse.SseClientFactory;
 import io.micronaut.websocket.WebSocketClient;
 import io.micronaut.websocket.WebSocketClientFactory;
 
+import java.net.URISyntaxException;
 import java.net.URL;
+import java.net.URI;
 
 /**
  * A factory to create Netty HTTP clients.
@@ -96,22 +98,37 @@ public class NettyHttpClientFactory implements
 
     @NonNull
     @Override
-    public WebSocketClient createWebSocketClient(URL url) {
-        return createNettyClient(url);
+    public WebSocketClient createWebSocketClient(URI uri) {
+        return createNettyClient(uri);
     }
 
     @NonNull
     @Override
-    public WebSocketClient createWebSocketClient(URL url, @NonNull HttpClientConfiguration configuration) {
-        return createNettyClient(url, configuration);
+    public WebSocketClient createWebSocketClient(URI uri, @NonNull HttpClientConfiguration configuration) {
+        return createNettyClient(uri, configuration);
     }
 
     private DefaultHttpClient createNettyClient(URL url) {
-        return new DefaultHttpClient(url);
+        try {
+            return createNettyClient(url != null ? url.toURI() : null);
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException(e);
+        }
     }
 
     private DefaultHttpClient createNettyClient(URL url, HttpClientConfiguration configuration) {
-        return new DefaultHttpClient(url, configuration);
+        try {
+            return createNettyClient(url != null ? url.toURI() : null, configuration);
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException(e);
+        }
     }
 
+    private DefaultHttpClient createNettyClient(URI uri) {
+        return new DefaultHttpClient(uri);
+    }
+
+    private DefaultHttpClient createNettyClient(URI uri, HttpClientConfiguration configuration) {
+        return new DefaultHttpClient(uri, configuration);
+    }
 }

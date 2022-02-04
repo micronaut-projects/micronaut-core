@@ -1,3 +1,8 @@
+
+internalSanityChecks {
+    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 5)
+}           
+
 dependencies {
     annotationProcessor project(":inject-java")
     api project(":function")

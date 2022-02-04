@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
@@ -122,6 +123,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private int maxInitialLineLength = DEFAULT_MAXINITIALLINELENGTH;
     private int maxHeaderSize = DEFAULT_MAXHEADERSIZE;
     private int maxChunkSize = DEFAULT_MAXCHUNKSIZE;
+    private int maxH2cUpgradeRequestSize = DEFAULT_MAXCHUNKSIZE; // same default as maxChunkSize, we don't want to buffer super long bodies
     private boolean chunkedSupported = DEFAULT_CHUNKSUPPORTED;
     private boolean validateHeaders = DEFAULT_VALIDATEHEADERS;
     private int initialBufferSize = DEFAULT_INITIALBUFFERSIZE;
@@ -134,6 +136,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private Http2Settings http2Settings = new Http2Settings();
     private boolean keepAliveOnServerError = DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR;
     private boolean bindToRouterExposedPorts = true;
+    private String pcapLoggingPathPattern = null;
 
     /**
      * Default empty constructor.
@@ -256,6 +259,21 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public int getMaxChunkSize() {
         return maxChunkSize;
+    }
+
+    /**
+     * The maximum size of the body of the HTTP1.1 request used to upgrade a connection to HTTP2 clear-text (h2c).
+     * This initial request cannot be streamed and is instead buffered in full, so the default value
+     * ({@value #DEFAULT_MAXCHUNKSIZE}) is relatively small. <i>If this value is too small for your use case,
+     * instead consider using an empty initial "upgrade request" (e.g. {@code OPTIONS /}), or switch to normal
+     * HTTP2.</i>
+     * <p>
+     * <i>Does not affect normal HTTP2 (TLS).</i>
+     *
+     * @return The maximum content length of the request.
+     */
+    public int getMaxH2cUpgradeRequestSize() {
+        return maxH2cUpgradeRequestSize;
     }
 
     /**
@@ -427,6 +445,20 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
+     * Sets the maximum size of the body of the HTTP1.1 request used to upgrade a connection to HTTP2 clear-text (h2c).
+     * This initial request cannot be streamed and is instead buffered in full, so the default value
+     * ({@value #DEFAULT_MAXCHUNKSIZE}) is relatively small. <i>If this value is too small for your use case,
+     * instead consider using an empty initial "upgrade request" (e.g. {@code OPTIONS /}), or switch to normal
+     * HTTP2.</i>
+     * <p>
+     * <i>Does not affect normal HTTP2 (TLS).</i>
+     * @param maxH2cUpgradeRequestSize The maximum content length of the request.
+     */
+    public void setMaxH2cUpgradeRequestSize(int maxH2cUpgradeRequestSize) {
+        this.maxH2cUpgradeRequestSize = maxH2cUpgradeRequestSize;
+    }
+
+    /**
      * Sets whether chunked transfer encoding is supported. Default value ({@value #DEFAULT_CHUNKSUPPORTED}).
      * @param chunkedSupported True if it is supported
      */
@@ -489,6 +521,28 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setKeepAliveOnServerError(boolean keepAliveOnServerError) {
         this.keepAliveOnServerError = keepAliveOnServerError;
+    }
+
+    /**
+     * The path pattern to use for logging incoming connections to pcap. This is an unsupported option: Behavior may
+     * change, or it may disappear entirely, without notice!
+     *
+     * @return The path pattern, or {@code null} if logging is disabled.
+     */
+    @Internal
+    public String getPcapLoggingPathPattern() {
+        return pcapLoggingPathPattern;
+    }
+
+    /**
+     * The path pattern to use for logging incoming connections to pcap. This is an unsupported option: Behavior may
+     * change, or it may disappear entirely, without notice!
+     *
+     * @param pcapLoggingPathPattern The path pattern, or {@code null} to disable logging.
+     */
+    @Internal
+    public void setPcapLoggingPathPattern(String pcapLoggingPathPattern) {
+        this.pcapLoggingPathPattern = pcapLoggingPathPattern;
     }
 
     /**
@@ -641,6 +695,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private boolean enabled;
         private String loggerName;
         private String logFormat;
+        private List<String> exclusions;
 
         /**
          * Returns whether the access logger is enabled.
@@ -690,6 +745,23 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
             this.logFormat = logFormat;
         }
 
+        /**
+         * @return The URI patterns to exclude from the access log.
+         */
+        public List<String> getExclusions() {
+            return exclusions;
+        }
+
+        /**
+         * Sets the URI patterns to be excluded from the access log.
+         *
+         * @param exclusions A list of regular expression patterns to be excluded from the access logger if the request URI matches.
+         *
+         * @see java.util.regex.Pattern#compile(String)
+         */
+        public void setExclusions(List<String> exclusions) {
+            this.exclusions = exclusions;
+        }
     }
 
     /**

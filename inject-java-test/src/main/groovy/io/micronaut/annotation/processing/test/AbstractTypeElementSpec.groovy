@@ -33,6 +33,7 @@ import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.annotation.AnnotationMapper
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import io.micronaut.inject.annotation.AnnotationTransformer
@@ -110,6 +111,7 @@ abstract class AbstractTypeElementSpec extends Specification {
         Element element = buildTypeElement(cls)
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = element != null ? builder.build(element) : null
+        AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
 
@@ -118,6 +120,7 @@ abstract class AbstractTypeElementSpec extends Specification {
         Element method = element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = method != null ? builder.buildDeclared(method) : null
+        AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
 
@@ -127,6 +130,7 @@ abstract class AbstractTypeElementSpec extends Specification {
         VariableElement argument = method.parameters.find() { it.simpleName.toString() == argumentName }
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = argument != null ? builder.build(argument) : null
+        AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
 

@@ -26,6 +26,7 @@ import org.neo4j.driver.v1.Config
  * @since 1.0
  */
 class ConfigurationPropertiesBuilderSpec extends AbstractTypeElementSpec {
+
     void "test configuration builder on method"() {
         given:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
@@ -127,7 +128,6 @@ class Test {
         bean.test.bar == null
     }
 
-
     void "test configuration builder with factory method"() {
         given:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
@@ -200,7 +200,6 @@ class Test {
         )
         factory.build(applicationContext, beanDefinition)
     }
-
 
     void "test with setters that return void"() {
         given:
@@ -384,6 +383,53 @@ class Neo4jProperties {
                 'neo4j.test.options.encryptionLevel':'none',
                 'neo4j.test.options.leakedSessionsLogging':true,
                 'neo4j.test.options.maxIdleSessions':2
+        )
+        def bean = factory.build(applicationContext, beanDefinition)
+
+        then:
+        bean != null
+        bean.options != null
+
+        when:
+        Config config = bean.options.toConfig()
+
+        then:
+        config.maxIdleConnectionPoolSize() == 2
+        config.encrypted() == true // deprecated properties are ignored
+        config.logLeakedSessions()
+    }
+
+    void "test specifying a configuration prefix with value using @AccessorsStyle"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.Neo4jProperties', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import io.micronaut.core.annotation.AccessorsStyle;
+import org.neo4j.driver.v1.*;
+
+@ConfigurationProperties("neo4j.test")
+class Neo4jProperties {
+    protected java.net.URI uri;
+
+    @ConfigurationBuilder(
+        allowZeroArgs = true,
+        value = "options"
+    )
+    @AccessorsStyle(writePrefixes = "with")
+    Config.ConfigBuilder options = Config.build();
+}
+''')
+        then:
+        beanDefinition.injectedFields.size() == 1
+        beanDefinition.injectedFields.first().name == 'uri'
+
+        when:
+        BeanFactory factory = beanDefinition
+        ApplicationContext applicationContext = ApplicationContext.run(
+            'neo4j.test.options.encryptionLevel':'none',
+            'neo4j.test.options.leakedSessionsLogging':true,
+            'neo4j.test.options.maxIdleSessions':2
         )
         def bean = factory.build(applicationContext, beanDefinition)
 

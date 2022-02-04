@@ -42,7 +42,7 @@ class SslFileTypeHandlerSpec extends AbstractMicronautSpec {
 
     @Override
     Map<String, Object> getConfiguration() {
-        super.getConfiguration() << ['micronaut.ssl.enabled': true, 'micronaut.ssl.buildSelfSigned': true]
+        super.getConfiguration() << ['micronaut.ssl.enabled': true, 'micronaut.server.ssl.buildSelfSigned': true, 'micronaut.http.client.ssl.insecureTrustAllCertificates': true]
     }
 
     @Controller('/test')

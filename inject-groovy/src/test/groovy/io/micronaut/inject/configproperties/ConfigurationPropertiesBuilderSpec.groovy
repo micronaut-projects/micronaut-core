@@ -23,6 +23,7 @@ import io.micronaut.inject.BeanFactory
 import org.neo4j.driver.v1.Config
 
 class ConfigurationPropertiesBuilderSpec extends AbstractBeanDefinitionSpec {
+
     void "test configuration builder on method"() {
         given:
         BeanDefinition beanDefinition = buildBeanDefinition('cpbtest1.MyPropertiesAA', '''

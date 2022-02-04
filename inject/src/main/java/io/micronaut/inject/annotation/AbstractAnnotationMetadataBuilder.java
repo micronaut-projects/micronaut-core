@@ -23,6 +23,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
+import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import io.micronaut.core.annotation.NonNull;
@@ -56,7 +57,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final Map<String, List<AnnotationTransformer<Annotation>>> ANNOTATION_TRANSFORMERS = new HashMap<>(5);
     private static final Map<String, List<AnnotationRemapper>> ANNOTATION_REMAPPERS = new HashMap<>(5);
     private static final Map<MetadataKey, AnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>(100);
+    private static final Map<String, Set<String>> NON_BINDING_CACHE = new HashMap<>(50);
     private static final List<String> DEFAULT_ANNOTATE_EXCLUDES = Arrays.asList(Internal.class.getName(), Experimental.class.getName());
+    private static final Map<String, Map<String, Object>> ANNOTATION_DEFAULTS = new HashMap<>(20);
 
     static {
         SoftServiceLoader<AnnotationMapper> serviceLoader = SoftServiceLoader.load(AnnotationMapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader());
@@ -170,7 +173,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
 
         try {
-            includeAnnotations(annotationMetadata, element, null, true, annotations, true);
+            includeAnnotations(annotationMetadata, element, false, true, annotations, true);
             if (annotationMetadata.isEmpty()) {
                 return AnnotationMetadata.EMPTY_METADATA;
             }
@@ -273,7 +276,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param element The element
      * @return The declaring type
      */
-    protected abstract @NonNull String getDeclaringType(@NonNull T element);
+    protected abstract @Nullable String getDeclaringType(@NonNull T element);
 
     /**
      * Build the meta data for the given method element excluding any class metadata.
@@ -303,8 +306,22 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata buildForParent(T parent, T element) {
+        return buildForParents(parent == null ? Collections.emptyList() : Collections.singletonList(parent), element);
+    }
+
+    /**
+     * Get the annotation metadata for the given element and the given parents.
+     * This method is used for cases when you need to combine annotation metadata for
+     * two elements, for example a JavaBean property where the field and the method metadata
+     * need to be combined.
+     *
+     * @param parents The parent elements
+     * @param element The element
+     * @return The {@link AnnotationMetadata}
+     */
+    public AnnotationMetadata buildForParents(List<T> parents, T element) {
         String declaringType = getDeclaringType(element);
-        return buildForParent(declaringType, parent, element);
+        return buildForParents(declaringType, parents, element);
     }
 
     /**
@@ -316,6 +333,18 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata buildForParent(String declaringType, T parent, T element) {
+        return buildForParents(declaringType, parent == null ? Collections.emptyList() : Collections.singletonList(parent), element);
+    }
+
+    /**
+     * Build the meta data for the given parents and method element excluding any class metadata.
+     *
+     * @param declaringType The declaring type
+     * @param parents       The parent elements
+     * @param element       The element
+     * @return The {@link AnnotationMetadata}
+     */
+    public AnnotationMetadata buildForParents(String declaringType, List<T> parents, T element) {
         final AnnotationMetadata existing = lookupExisting(declaringType, element);
         DefaultAnnotationMetadata annotationMetadata;
         if (existing instanceof DefaultAnnotationMetadata) {
@@ -331,7 +360,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         } else {
             annotationMetadata = new MutableAnnotationMetadata();
         }
-        return buildInternal(parent, element, annotationMetadata, false, false, true);
+        return buildInternalMulti(parents, element, annotationMetadata, false, false, true);
     }
 
     /**
@@ -657,7 +686,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * Populate the annotation data for the given annotation.
      *
      * @param originatingElement The element the annotation data originates from
-     * @param parent  The parent element
+     * @param parent             The parent element
      * @param annotationMirror   The annotation
      * @param metadata           the metadata
      * @param isDeclared         Is the annotation a declared annotation
@@ -668,6 +697,37 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected Map<CharSequence, Object> populateAnnotationData(
             T originatingElement,
             @Nullable T parent,
+            A annotationMirror,
+            DefaultAnnotationMetadata metadata,
+            boolean isDeclared,
+            RetentionPolicy retentionPolicy,
+            boolean allowAliases) {
+        return populateAnnotationData(
+                originatingElement,
+                parent == originatingElement,
+                annotationMirror,
+                metadata,
+                isDeclared,
+                retentionPolicy,
+                allowAliases
+        );
+    }
+
+    /**
+     * Populate the annotation data for the given annotation.
+     *
+     * @param originatingElement The element the annotation data originates from
+     * @param originatingElementIsSameParent Whether the originating element is considered a parent element
+     * @param annotationMirror   The annotation
+     * @param metadata           the metadata
+     * @param isDeclared         Is the annotation a declared annotation
+     * @param retentionPolicy    The retention policy
+     * @param allowAliases       Whether aliases are allowed
+     * @return The annotation values
+     */
+    protected Map<CharSequence, Object> populateAnnotationData(
+            T originatingElement,
+            boolean originatingElementIsSameParent,
             A annotationMirror,
             DefaultAnnotationMetadata metadata,
             boolean isDeclared,
@@ -701,7 +761,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     final List<? extends A> annotationsForMember = getAnnotationsForType(member)
                             .stream().filter((a) -> !getAnnotationTypeName(a).equals(annotationName))
                             .collect(Collectors.toList());
-                    includeAnnotations(memberMetadata, member, null, true, annotationsForMember, false);
+                    includeAnnotations(memberMetadata, member, false, true, annotationsForMember, false);
 
                     boolean isInstantiatedMember = memberMetadata.hasAnnotation(InstantiatedMember.class);
 
@@ -735,10 +795,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
             if (!nonBindingMembers.isEmpty()) {
                 T annotationType = getTypeForAnnotation(annotationMirror);
-                if (!hasAnnotation(annotationType, AnnotationUtil.QUALIFIER) &&
-                        !hasAnnotation(annotationType, Qualifier.class)) {
-                    addError(originatingElement, "@NonBinding annotation is only applicable to annotations that are annotated with @Qualifier");
-                } else {
+                if (hasAnnotation(annotationType, AnnotationUtil.QUALIFIER) ||
+                        hasAnnotation(annotationType, Qualifier.class)) {
                     metadata.addDeclaredStereotype(
                             Collections.singletonList(getAnnotationTypeName(annotationMirror)),
                             AnnotationUtil.QUALIFIER,
@@ -824,7 +882,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                         mappedAnnotationName,
                                         metadata,
                                         isDeclared,
-                                        isInheritedAnnotationType(annMirror) || originatingElement == parent);
+                                        isInheritedAnnotationType(annMirror) || originatingElementIsSameParent);
 
                             });
                         }
@@ -911,21 +969,22 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract VisitorContext createVisitorContext();
 
     private void processAnnotationDefaults(T originatingElement, DefaultAnnotationMetadata metadata, String annotationName, Supplier<Map<? extends T, ?>> elementDefaultValues) {
-        if (AnnotationMetadataSupport.hasDefaultValues(annotationName)) {
-            Map<CharSequence, Object> defaultValues = new LinkedHashMap<>(AnnotationMetadataSupport.getDefaultValues(annotationName));
-            metadata.addDefaultAnnotationValues(annotationName, defaultValues);
+        Map<CharSequence, Object> defaultValues;
+        final Map<String, Object> defaults = ANNOTATION_DEFAULTS.get(annotationName);
+        if (defaults != null) {
+            defaultValues = new LinkedHashMap<>(defaults);
         } else {
-            final Map<CharSequence, Object> annotationDefaults = getAnnotationDefaults(originatingElement, annotationName, elementDefaultValues.get());
-            if (annotationDefaults != null) {
-                metadata.addDefaultAnnotationValues(annotationName, annotationDefaults);
-                DefaultAnnotationMetadata.registerAnnotationDefaults(annotationName, annotationDefaults.entrySet().stream()
+            defaultValues = getAnnotationDefaults(originatingElement, annotationName, elementDefaultValues.get());
+            if (defaultValues != null) {
+                ANNOTATION_DEFAULTS.put(annotationName, defaultValues.entrySet().stream()
                         .collect(Collectors.toMap(
                                 (entry) -> entry.getKey().toString(),
                                 Map.Entry::getValue)));
             } else {
-                metadata.addDefaultAnnotationValues(annotationName, Collections.emptyMap());
+                defaultValues = Collections.emptyMap();
             }
         }
+        metadata.addDefaultAnnotationValues(annotationName, defaultValues);
     }
 
     private Map<CharSequence, Object> getAnnotationDefaults(T originatingElement, String annotationName, Map<? extends T, ?> elementDefaultValues) {
@@ -1071,8 +1130,22 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             boolean inheritTypeAnnotations,
             boolean declaredOnly,
             boolean allowAliases) {
+        return buildInternalMulti(
+                parent == null ? Collections.emptyList() : Collections.singletonList(parent),
+                element,
+                annotationMetadata, inheritTypeAnnotations, declaredOnly, allowAliases
+        );
+    }
+
+    private AnnotationMetadata buildInternalMulti(
+            List<T> parents,
+            T element,
+            DefaultAnnotationMetadata annotationMetadata,
+            boolean inheritTypeAnnotations,
+            boolean declaredOnly,
+            boolean allowAliases) {
         List<T> hierarchy = buildHierarchy(element, inheritTypeAnnotations, declaredOnly);
-        if (parent != null) {
+        for (T parent : parents) {
             final List<T> parentHierarchy = buildHierarchy(parent, inheritTypeAnnotations, declaredOnly);
             if (hierarchy.isEmpty() && !parentHierarchy.isEmpty()) {
                 hierarchy = parentHierarchy;
@@ -1090,13 +1163,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             if (annotationHierarchy.isEmpty()) {
                 continue;
             }
-            boolean isDeclared = currentElement == element;
 
             includeAnnotations(
                     annotationMetadata,
                     currentElement,
-                    parent,
-                    isDeclared,
+                    parents.contains(currentElement),
+                    currentElement == element,
                     annotationHierarchy,
                     allowAliases
             );
@@ -1111,7 +1183,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     private void includeAnnotations(DefaultAnnotationMetadata annotationMetadata,
                                     T element,
-                                    @Nullable T parent,
+                                    boolean originatingElementIsSameParent,
                                     boolean isDeclared,
                                     List<? extends A> annotationHierarchy,
                                     boolean allowAliases) {
@@ -1131,7 +1203,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             RetentionPolicy retentionPolicy = getRetentionPolicy(annotationType);
             Map<CharSequence, Object> annotationValues = populateAnnotationData(
                     element,
-                    parent,
+                    originatingElementIsSameParent,
                     annotationMirror,
                     annotationMetadata,
                     isDeclared,
@@ -1151,7 +1223,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         annotationMetadata::addDeclaredRepeatable,
                         annotationMetadata::addDeclaredAnnotation);
             } else {
-                if (isInheritedAnnotation(annotationMirror) || element == parent) {
+                if (isInheritedAnnotation(annotationMirror) || originatingElementIsSameParent) {
                     applyTransformations(
                             listIterator,
                             annotationMetadata,
@@ -1171,7 +1243,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             String annotationTypeName = getAnnotationTypeName(annotationMirror);
             String packageName = NameUtils.getPackageName(annotationTypeName);
             if (!AnnotationUtil.STEREOTYPE_EXCLUDES.contains(packageName)) {
-                processAnnotationStereotype(element, parent, annotationMirror, annotationMetadata, isDeclared);
+                processAnnotationStereotype(element, originatingElementIsSameParent, annotationMirror, annotationMetadata, isDeclared);
             }
         }
     }
@@ -1354,6 +1426,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
         final boolean hasInterceptorBinding = !interceptorBindings.isEmpty();
         if (hasInterceptorBinding && AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(annotationName)) {
+            handleMemberBinding(metadata, lastParent, data);
             interceptorBindings.getLast().members(data);
             return;
         }
@@ -1389,6 +1462,60 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
         }
     }
+
+    private void handleMemberBinding(DefaultAnnotationMetadata metadata, String lastParent, Map<CharSequence, Object> data) {
+        if (data.containsKey(InterceptorBindingQualifier.META_MEMBER_MEMBERS)) {
+            final Object o = data.remove(InterceptorBindingQualifier.META_MEMBER_MEMBERS);
+            if (o instanceof Boolean && ((Boolean) o)) {
+                Map<CharSequence, Object> values = metadata.getValues(lastParent);
+                if (!values.isEmpty()) {
+                    Set<String> nonBinding = NON_BINDING_CACHE.computeIfAbsent(lastParent, (annotationName) -> {
+                        final HashSet<String> nonBindingResult = new HashSet<>(5);
+                        Map<String, ? extends T> members = getAnnotationMembers(lastParent);
+                        if (CollectionUtils.isNotEmpty(members)) {
+                            members.forEach((name, ann) -> {
+                                if (hasSimpleAnnotation(ann, NonBinding.class.getSimpleName())) {
+                                    nonBindingResult.add(name);
+                                }
+                            });
+                        }
+                        return nonBindingResult.isEmpty() ? Collections.emptySet() : nonBindingResult;
+                    });
+
+                    if (!nonBinding.isEmpty()) {
+                        values = new HashMap<>(values);
+                        values.keySet().removeAll(nonBinding);
+                    }
+                    final AnnotationValueBuilder<Annotation> builder =
+                            AnnotationValue
+                                .builder(lastParent)
+                                .members(values);
+                    data.put(
+                            InterceptorBindingQualifier.META_MEMBER_MEMBERS,
+                            builder.build()
+                    );
+
+                }
+            }
+        }
+    }
+
+    /**
+     * Gets the annotation members for the given type.
+     * @param annotationType The annotation type
+     * @return The members
+     * @since 3.3.0
+     */
+    protected abstract @NonNull Map<String, ? extends T> getAnnotationMembers(@NonNull String annotationType);
+
+    /**
+     * Returns true if a simple meta annotation is present for the given element and annotation type.
+     *
+     * @param element The element
+     * @param simpleName The simple name, ie {@link Class#getSimpleName()}
+     * @return True an annotation with the given simple name exists on the element
+     */
+    protected abstract boolean hasSimpleAnnotation(T element, String simpleName);
 
     private void addToInterceptorBindingsIfNecessary(LinkedList<AnnotationValueBuilder<?>> interceptorBindings, String lastParent, String annotationName) {
         if (lastParent != null) {
@@ -1426,10 +1553,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
             // first add the top level annotations
             List<AnnotationValue<?>> topLevel = new ArrayList<>();
-            final ListIterator<AnnotationValue<?>> listIterator = annotationMirrors.listIterator();
-            while (listIterator.hasNext()) {
-                AnnotationValue<?> annotationMirror = listIterator.next();
-
+            for (AnnotationValue<?> annotationMirror : annotationMirrors) {
                 String annotationName = annotationMirror.getAnnotationName();
                 if (annotationName.equals(annotationValue.getAnnotationName())) {
                     continue;
@@ -1452,6 +1576,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
                     final boolean hasInterceptorBinding = !interceptorBindings.isEmpty();
                     if (hasInterceptorBinding && AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(annotationName)) {
+                        handleMemberBinding(metadata, lastParent, data);
                         interceptorBindings.getLast().members(data);
                         continue;
                     }
@@ -1506,7 +1631,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     private void processAnnotationStereotype(
             T element,
-            T parent,
+            boolean originatingElementIsSameParent,
             A annotationMirror,
             DefaultAnnotationMetadata annotationMetadata,
             boolean isDeclared) {
@@ -1516,7 +1641,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             processAnnotationStereotypes(
                     annotationMetadata,
                     isDeclared,
-                    isInheritedAnnotation(annotationMirror) || element == parent,
+                    isInheritedAnnotation(annotationMirror) || originatingElementIsSameParent,
                     annotationType,
                     parentAnnotationName,
                     Collections.emptyList()
@@ -1731,8 +1856,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                                                                                           interceptorBindings,
                                                                                                           addRepeatableAnnotation,
                                                                                                           addAnnotation,
-                                                                                                          annotationValue
-                                );
+                                                                                                          annotationValue,
+                                                                                                          annotationMetadata);
                                 if (CollectionUtils.isNotEmpty(annotationValue.getStereotypes())) {
                                     addTransformedStereotypes(annotationMetadata, isDeclared, annotationValue, parents);
                                 } else {
@@ -1759,7 +1884,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                                                                                   interceptorBindings,
                                                                                                   addRepeatableAnnotation,
                                                                                                   addAnnotation,
-                                                                                                  transformedValue
+                                                                                                  transformedValue,
+                                                                                                  annotationMetadata
 
                         );
                         if (CollectionUtils.isNotEmpty(transformedValue.getStereotypes())) {
@@ -1774,16 +1900,18 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     private String handleTransformedAnnotationValue(List<String> parents,
-                             LinkedList<AnnotationValueBuilder<?>> interceptorBindings,
-                             BiConsumer<String, AnnotationValue> addRepeatableAnnotation,
-                             TriConsumer<String, Map<CharSequence, Object>, RetentionPolicy> addAnnotation,
-                             AnnotationValue<?> transformedValue) {
+                                                    LinkedList<AnnotationValueBuilder<?>> interceptorBindings,
+                                                    BiConsumer<String, AnnotationValue> addRepeatableAnnotation,
+                                                    TriConsumer<String, Map<CharSequence, Object>, RetentionPolicy> addAnnotation,
+                                                    AnnotationValue<?> transformedValue,
+                                                    DefaultAnnotationMetadata annotationMetadata) {
         final String transformedAnnotationName = transformedValue.getAnnotationName();
         addTransformedInterceptorBindingsIfNecessary(
                 parents,
                 interceptorBindings,
                 transformedValue,
-                transformedAnnotationName
+                transformedAnnotationName,
+                annotationMetadata
         );
         final String transformedRepeatableName;
 
@@ -1815,7 +1943,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private void addTransformedInterceptorBindingsIfNecessary(List<String> parents,
                                                               LinkedList<AnnotationValueBuilder<?>> interceptorBindings,
                                                               AnnotationValue<?> transformedValue,
-                                                              String transformedAnnotationName) {
+                                                              String transformedAnnotationName,
+                                                              DefaultAnnotationMetadata annotationMetadata) {
         if (interceptorBindings != null && !parents.isEmpty() && AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(
                 transformedAnnotationName)) {
             final AnnotationValueBuilder<Annotation> newBuilder = AnnotationValue
@@ -1823,6 +1952,17 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     .members(transformedValue.getValues());
             if (!transformedValue.contains(AnnotationMetadata.VALUE_MEMBER)) {
                 newBuilder.value(parents.get(parents.size() - 1));
+            }
+            if (transformedValue.booleanValue("bindMembers").orElse(false)) {
+
+                final String parent = CollectionUtils.last(parents);
+                final HashMap<CharSequence, Object> data = new HashMap<>(transformedValue.getValues());
+                handleMemberBinding(
+                        annotationMetadata,
+                        parent,
+                        data
+                );
+                newBuilder.members(data);
             }
             interceptorBindings.add(newBuilder);
         }
@@ -1933,6 +2073,24 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     @Internal
     public static void clearMutated() {
         MUTATED_ANNOTATION_METADATA.clear();
+    }
+
+    /**
+     * Used to clear caches at the end of a compilation cycle.
+     */
+    @Internal
+    public static void clearCaches() {
+        ANNOTATION_DEFAULTS.clear();
+    }
+
+    /**
+     * This is used for testing scenarios only where annotation metadata
+     * is created without bean creation. It is needed because at compile time
+     * there are no defaults added via DefaultAnnotationMetadata.
+     */
+    @Internal
+    public static void copyToRuntime() {
+        ANNOTATION_DEFAULTS.forEach(DefaultAnnotationMetadata::registerAnnotationDefaults);
     }
 
     /**

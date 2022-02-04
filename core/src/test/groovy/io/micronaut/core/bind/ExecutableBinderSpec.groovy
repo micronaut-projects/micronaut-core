@@ -20,9 +20,16 @@ import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException
 import io.micronaut.core.type.Argument
 import io.micronaut.core.type.Executable
+import io.micronaut.core.version.SemanticVersion
+import spock.lang.Requires
 import spock.lang.Specification
+import spock.util.environment.Jvm
 
-
+// fails due to https://issues.apache.org/jira/browse/GROOVY-10145
+@Requires({
+    SemanticVersion.isAtLeastMajorMinor(GroovySystem.version, 4, 0) ||
+            !Jvm.current.isJava16Compatible()
+})
 class ExecutableBinderSpec extends Specification {
 
     void "test valid executable binder"() {
@@ -67,7 +74,7 @@ class ExecutableBinderSpec extends Specification {
         given:
 
         AnnotationMetadata annotationMetadata = Mock(AnnotationMetadata)
-        annotationMetadata.hasAnnotation(AnnotationUtil.NULLABLE) >> true
+        annotationMetadata.hasStereotype(AnnotationUtil.NULLABLE) >> true
         annotationMetadata.getAnnotationTypeByStereotype(_) >> Optional.empty()
 
         Executable executable = new Executable() {

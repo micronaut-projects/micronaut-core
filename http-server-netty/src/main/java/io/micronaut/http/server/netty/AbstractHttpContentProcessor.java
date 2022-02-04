@@ -27,7 +27,7 @@ import org.reactivestreams.Subscriber;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Abtract implementation of the {@link HttpContentProcessor} interface that deals with limiting file upload sizes.
+ * Abstract implementation of the {@link HttpContentProcessor} interface that deals with limiting file upload sizes.
  *
  * @param <T> The type
  * @author Graeme Rocher

@@ -15,14 +15,18 @@
  */
 package io.micronaut.jackson.databind;
 
+import com.fasterxml.jackson.annotation.JsonView;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.jackson.ObjectMapperFactory;
@@ -81,7 +85,14 @@ public final class JacksonDatabindMapper implements JsonMapper {
 
     @Override
     public <T> T readValueFromTree(@NonNull JsonNode tree, @NonNull Argument<T> type) throws IOException {
-        return objectMapper.readValue(treeAsTokens(tree), JacksonConfiguration.constructType(type, objectMapper.getTypeFactory()));
+        JsonParser tokens = treeAsTokens(tree);
+        JavaType javaType = JacksonConfiguration.constructType(type, objectMapper.getTypeFactory());
+        Optional<Class> view = type.getAnnotationMetadata().classValue(JsonView.class);
+        if (view.isPresent()) {
+            return objectMapper.readerWithView(view.get()).readValue(tokens, javaType);
+        } else {
+            return objectMapper.readValue(tokens, javaType);
+        }
     }
 
     @Override
@@ -90,6 +101,12 @@ public final class JacksonDatabindMapper implements JsonMapper {
         treeGenerator.setCodec(objectMapper);
         objectMapper.writeValue(treeGenerator, value);
         return treeGenerator.getCompletedValue();
+    }
+
+    @NonNull
+    @Override
+    public <T> JsonNode writeValueToTree(@NonNull Argument<T> type, T value) throws IOException {
+        return writeValueToTree(value);
     }
 
     @Override
@@ -108,8 +125,18 @@ public final class JacksonDatabindMapper implements JsonMapper {
     }
 
     @Override
+    public <T> void writeValue(@NonNull OutputStream outputStream, @NonNull Argument<T> type, T object) throws IOException {
+        writeValue(outputStream, object);
+    }
+
+    @Override
     public byte[] writeValueAsBytes(@Nullable Object object) throws IOException {
         return objectMapper.writeValueAsBytes(object);
+    }
+
+    @Override
+    public <T> byte[] writeValueAsBytes(@NonNull Argument<T> type, T object) throws IOException {
+        return writeValueAsBytes(object);
     }
 
     @Override
@@ -124,6 +151,9 @@ public final class JacksonDatabindMapper implements JsonMapper {
         ObjectMapper objectMapper = this.objectMapper.copy();
         jacksonFeatures.getDeserializationFeatures().forEach(objectMapper::configure);
         jacksonFeatures.getSerializationFeatures().forEach(objectMapper::configure);
+        for (Class<? extends Module> moduleClass : jacksonFeatures.getAdditionalModules()) {
+            objectMapper.registerModule(InstantiationUtils.instantiate(moduleClass));
+        }
 
         return new JacksonDatabindMapper(objectMapper);
     }
@@ -145,7 +175,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
     }
 
     @Override
-    public @NonNull Processor<byte[], JsonNode> createReactiveParser(Consumer<Processor<byte[], JsonNode>> onSubscribe, boolean streamArray) {
+    public @NonNull Processor<byte[], JsonNode> createReactiveParser(@NonNull Consumer<Processor<byte[], JsonNode>> onSubscribe, boolean streamArray) {
         return new JacksonCoreProcessor(streamArray, objectMapper.getFactory(), config) {
             @Override
             public void subscribe(Subscriber<? super JsonNode> downstreamSubscriber) {

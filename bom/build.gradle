@@ -1,213 +1,22 @@
-import io.micronaut.build.internal.pom.VersionCatalogConverter
-import org.gradle.api.plugins.catalog.CatalogPluginExtension
-import org.gradle.api.plugins.catalog.VersionCatalogPlugin
-import io.micronaut.build.internal.pom.PomChecker
-
 plugins {
-    id 'java-platform'
-    id 'version-catalog'
-    id 'maven-publish'
-    id 'io.micronaut.build.internal.publishing'
+    id 'io.micronaut.build.internal.bom'
 }
 
 group projectGroupId
 version projectVersion
 
-def excludedProjects = [
-        "benchmarks",
-        "inject-test-utils",
-        "test-suite",
-        "test-suite-groovy",
-        "test-suite-helper",
-        "test-suite-kotlin",
-        "test-utils"
-]
-
-catalog {
-    versionCatalog {
-        // We're adding the BOM itself to the catalog, see https://github.com/micronaut-projects/micronaut-core/issues/6321
-        alias("micronaut-bom").to(group, "micronaut-${project.name}").versionRef("micronaut.bom")
-        version("micronaut.bom", projectVersion)
-    }
-}
-
-def libsCatalog = project.extensions.findByType(VersionCatalogsExtension).named("libs")
-
-// This map defines the names of the properties found in the POM file
-// which cannot be directly inferred from the version name in the catalog.
-// This is a backwards compatibility fix.
-def legacyVersionNames = [
-        'jakarta.annotation.api': 'jakarta.annotation-api',
-        'javax.annotation.api': 'javax.annotation-api',
-        'methvin.directory.watcher': 'methvin.directory-watcher',
-        'paho.v3': 'pahov3',
-        'paho.v5': 'pahov5',
-        'graal.sdk': 'graalSdk',
-        'neo4j.java.driver': 'neo4j.bolt',
-]
-
-String toPropertyName(String alias) {
-    alias.split("(?=[A-Z])").collect { it.toLowerCase(Locale.US) }.join("-").replace((char) '-', (char) '.')
-}
-
-components.javaPlatform.addVariantsFromConfiguration(
-        configurations.getByName(VersionCatalogPlugin.VERSION_CATALOG_ELEMENTS)
-) { details ->
-    details.mapToMavenScope("compile")
-    details.mapToOptional()
-}
-
-def modelConverter = new VersionCatalogConverter(
-        file("../gradle/libs.versions.toml"),
-        project.extensions.findByType(CatalogPluginExtension)
-)
-
-tasks.named("generateCatalogAsToml") {
-    modelConverter.populateModel()
-}
-
-def bomPropertyName = { String alias ->
-    alias = alias - 'managed.' - 'boms.'
-    String baseName = legacyVersionNames[alias] ?: toPropertyName(alias)
-    "${baseName}.version"
-}
-
-publishing {
-    publications {
-        maven(MavenPublication) {
-            artifactId("micronaut-bom")
-            from components.javaPlatform
-            pom {
-                packaging 'pom'
-                withXml {
-                    def xml = asNode()
-                    xml.children().find {
-                        it.name().localPart == 'packaging'
-                    } + project.ext.pomInfo
-                    modelConverter.model.librariesTable.each { library ->
-                        def alias = library.version.reference.replaceAll('-', '.')
-                        def libraryAlias = library.alias?.replaceAll('-', '.')
-                        if (alias != null && libraryAlias.startsWith("managed.") || libraryAlias.startsWith('boms.')) {
-                            def pomDep = xml.dependencyManagement.dependencies.dependency.find {
-                                it.artifactId.text() == library.name
-                                        && it.groupId.text() == library.group
-                            }
-                            if (pomDep != null) {
-                                pomDep.version.first().setValue("\${${bomPropertyName(alias)}}")
-                            } else {
-                                println "[WARNING] Didn't find dependency ${library.group}:${library.name} in BOM file"
-                            }
-                        }
-                    }
-                    // Add individual module versions as properties
-                    for (Project p : rootProject.subprojects) {
-                        if (!p.subprojects.empty) {
-                            continue
-                        }
-                        if (p.name.contains("bom")) {
-                            continue
-                        }
-                        if (excludedProjects.contains(p.name)) {
-                            continue
-                        }
-                        String propertyName = "micronaut.${p.name.replace((char) '-', (char) '.')}"
-                        def pomDep = xml.dependencyManagement.dependencies.dependency.find {
-                            it.artifactId.text() == "micronaut-${p.name}"
-                                    && it.groupId.text() == group
-                        }
-                        if (pomDep != null) {
-                            pomDep.version.first().setValue("\${${propertyName}.version}")
-                        } else {
-                            println "[WARNING] Didn't find dependency ${group}:micronaut-${p.name} in BOM file"
-                        }
-                    }
-                }
-            }
-            libsCatalog.versionAliases.each { alias ->
-                if (alias.startsWith('managed.')) {
-                    libsCatalog.findVersion(alias).ifPresent { version ->
-                        String propertyName = bomPropertyName(alias)
-                        pom.properties.put(propertyName, version.requiredVersion)
-                    }
-                }
-            }
-            // Add individual module versions as properties
-            for (Project p : rootProject.subprojects) {
-                if (!p.subprojects.empty) {
-                    continue
-                }
-                if (p.name.contains("bom")) {
-                    continue
-                }
-                if (excludedProjects.contains(p.name)) {
-                    continue
-                }
-                String propertyName = "micronaut.${p.name.replace((char) '-', (char) '.')}.version"
-                pom.properties.put(propertyName, p.version)
-            }
-
-        }
-    }
-}
-
-javaPlatform {
-    allowDependencies()
-}
-
-dependencies {
-    libsCatalog.dependencyAliases.each { alias ->
-        if (alias.startsWith("boms.")) {
-            api platform(libsCatalog.findDependency(alias).map {
-                it.get()
-            }.orElseThrow { new RuntimeException("Unexpected missing alias in catalog") })
-        }
-    }
-
-    constraints {
-        for (Project p : rootProject.subprojects) {
-            if (!p.subprojects.empty) {
-                continue
-            }
-            if (p.name.contains("bom")) {
-                continue
-            }
-            if (excludedProjects.contains(p.name)) {
-                continue
-            }
-
-            String moduleGroup = p.group
-            String moduleName = "micronaut-${p.name}"
-            String moduleVersion = p.version
-
-            api "$moduleGroup:$moduleName:$moduleVersion"
-
-            modelConverter.extraVersions.put(moduleName, moduleVersion)
-            modelConverter.extraLibraries.put(moduleName, VersionCatalogConverter.library(moduleGroup, moduleName, moduleName))
-
-        }
-
-        libsCatalog.dependencyAliases.each { alias ->
-            if (alias.startsWith("managed.")) {
-                api libsCatalog.findDependency(alias).map {
-                    it.get()
-                }.orElseThrow { new RuntimeException("Unexpected missing alias in catalog") }
-            }
-        }
-
-    }
-}
-
-def checkBom = tasks.register("checkBom", PomChecker) {
-    String repoUrl = publishing.repositories.findByName("Build").url.toString()
-    repositories.add(repoUrl)
-    pomFile.fileProvider(tasks.named('generatePomFileForMavenPublication', GenerateMavenPom).map { it.destination })
-    pomCoordinates.set("${project.group}:micronaut-${project.name}:$version")
-    checkBomContents = false
-    report = layout.buildDirectory.file("reports/boms/micronaut-bom.txt")
-    failOnSnapshots = !project.version.endsWith('-SNAPSHOT')
-    failOnError = true
-}
-
-tasks.named("check") {
-    dependsOn(checkBom)
+micronautBom {
+    extraExcludedProjects = [
+            "benchmarks",
+            "inject-test-utils"
+    ]
+    catalogToPropertyNameOverrides = [
+            'jakarta.annotation.api': 'jakarta.annotation-api',
+            'javax.annotation.api': 'javax.annotation-api',
+            'methvin.directory.watcher': 'methvin.directory-watcher',
+            'paho.v3': 'pahov3',
+            'paho.v5': 'pahov5',
+            'graal.sdk': 'graalSdk',
+            'neo4j.java.driver': 'neo4j.bolt',
+    ]
 }

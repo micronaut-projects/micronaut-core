@@ -106,7 +106,7 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
             return ByteBufUtil.getBytes(byteBuf);
         } finally {
             if (controlRelease) {
-                byteBuf.release();
+                fileUpload.release();
             }
         }
     }
@@ -130,7 +130,7 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
             return byteBuf.nioBuffer();
         } finally {
             if (controlRelease) {
-                byteBuf.release();
+                fileUpload.release();
             }
         }
     }

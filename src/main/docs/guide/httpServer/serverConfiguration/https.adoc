@@ -4,13 +4,14 @@ Micronaut supports HTTPS out of the box. By default HTTPS is disabled and all re
 [source,yaml]
 ----
 micronaut:
-  ssl:
-    enabled: true
-    buildSelfSigned: true # <1>
+  server:
+    ssl:
+      enabled: true
+      buildSelfSigned: true # <1>
 ----
 <1> Micronaut will create a self-signed certificate.
 
-TIP: By default Micronaut with HTTPS support starts on port `8443` but you can change the port with the property `micronaut.ssl.port`.
+TIP: By default Micronaut with HTTPS support starts on port `8443` but you can change the port with the property `micronaut.server.ssl.port`.
 
 WARNING: This configuration will generate a warning in the browser.
 

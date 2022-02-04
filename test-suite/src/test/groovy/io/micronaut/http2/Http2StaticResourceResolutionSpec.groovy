@@ -42,13 +42,14 @@ class Http2StaticResourceResolutionSpec extends Specification implements TestPro
     Map<String, String> getProperties() {
         return [
                 'micronaut.router.static-resources.default.paths': ['classpath:public', 'file:' + tempFile.parent],
-                'micronaut.ssl.enabled': true,
+                'micronaut.server.ssl.enabled': true,
                 "micronaut.server.http-version" : "2.0",
                 "micronaut.http.client.http-version" : "2.0",
                 "micronaut.http.client.log-level" : "TRACE",
                 "micronaut.server.netty.log-level" : "TRACE",
-                'micronaut.ssl.buildSelfSigned': true,
-                'micronaut.ssl.port': -1
+                'micronaut.server.ssl.buildSelfSigned': true,
+                'micronaut.server.ssl.port': -1,
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true
         ]
     }
 

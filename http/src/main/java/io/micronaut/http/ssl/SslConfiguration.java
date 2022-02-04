@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,9 +15,14 @@
  */
 package io.micronaut.http.ssl;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -56,9 +61,11 @@ public class SslConfiguration implements Toggleable {
     @SuppressWarnings("WeakerAccess")
     public static final String DEFAULT_PROTOCOL = "TLS";
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(SslConfiguration.class);
+
     private boolean enabled = DEFAULT_ENABLED;
-    private int port = DEFAULT_PORT;
-    private boolean buildSelfSigned = DEFAULT_BUILDSELFSIGNED;
+    protected int port = DEFAULT_PORT;
+    protected boolean buildSelfSigned = DEFAULT_BUILDSELFSIGNED;
     private KeyConfiguration key = new KeyConfiguration();
     private KeyStoreConfiguration keyStore = new KeyStoreConfiguration();
     private TrustStoreConfiguration trustStore = new TrustStoreConfiguration();
@@ -66,6 +73,7 @@ public class SslConfiguration implements Toggleable {
     private String[] ciphers;
     private String[] protocols;
     private String protocol = DEFAULT_PROTOCOL;
+    private Duration handshakeTimeout = Duration.ofSeconds(10);
 
     /**
      * @return Whether SSL is enabled.
@@ -148,11 +156,23 @@ public class SslConfiguration implements Toggleable {
     }
 
     /**
+     * @return The timeout for the SSL handshake
+     */
+    @NonNull
+    public Duration getHandshakeTimeout() {
+        return handshakeTimeout;
+    }
+
+    /**
      * Sets the SSL port. Default value ({@value io.micronaut.http.ssl.SslConfiguration#DEFAULT_PORT}).
      *
      * @param port The port
+     *
+     * @deprecated Please use {@code micronaut.server.ssl.port} instead ({@link ServerSslConfiguration#setPort(int)}).
      */
+    @Deprecated
     public void setPort(int port) {
+        LOGGER.warn("The configuration micronaut.ssl.port is deprecated. Use micronaut.server.ssl.port instead.");
         this.port = port;
     }
 
@@ -160,8 +180,12 @@ public class SslConfiguration implements Toggleable {
      * Sets whether to build a self signed certificate. Default value ({@value io.micronaut.http.ssl.SslConfiguration#DEFAULT_BUILDSELFSIGNED}).
      *
      * @param buildSelfSigned True if a certificate should be built
+     *
+     * @deprecated Please use {@code micronaut.server.ssl.build-self-signed} instead ({@link ServerSslConfiguration#buildSelfSigned()}).
      */
+    @Deprecated
     public void setBuildSelfSigned(boolean buildSelfSigned) {
+        LOGGER.warn("The configuration micronaut.ssl.build-self-signed is deprecated. Use micronaut.server.ssl.build-self-signed instead.");
         this.buildSelfSigned = buildSelfSigned;
     }
 
@@ -234,6 +258,13 @@ public class SslConfiguration implements Toggleable {
     }
 
     /**
+     * @param handshakeTimeout The timeout for the SSL handshake
+     */
+    public void setHandshakeTimeout(@NonNull Duration handshakeTimeout) {
+        this.handshakeTimeout = Objects.requireNonNull(handshakeTimeout, "handshakeTimeout");
+    }
+
+    /**
      * Reads an existing config.
      *
      * @param defaultSslConfiguration The default SSL config
@@ -256,13 +287,14 @@ public class SslConfiguration implements Toggleable {
             this.trustStore = defaultTrustStoreConfiguration;
         }
         if (defaultSslConfiguration != null) {
-            this.port = defaultSslConfiguration.getPort();
+            this.port = defaultSslConfiguration.port;
             this.enabled = defaultSslConfiguration.isEnabled();
-            this.buildSelfSigned = defaultSslConfiguration.buildSelfSigned();
+            this.buildSelfSigned = defaultSslConfiguration.buildSelfSigned;
             defaultSslConfiguration.getProtocols().ifPresent(strings -> this.protocols = strings);
             defaultSslConfiguration.getProtocol().ifPresent(protocol -> this.protocol = protocol);
             defaultSslConfiguration.getCiphers().ifPresent(ciphers -> this.ciphers = ciphers);
             defaultSslConfiguration.getClientAuthentication().ifPresent(ca -> this.clientAuthentication = ca);
+            this.handshakeTimeout = defaultSslConfiguration.getHandshakeTimeout();
         }
     }
 

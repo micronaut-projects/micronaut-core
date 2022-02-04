@@ -21,9 +21,11 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.AnyQualifier;
 
 import java.util.Iterator;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
@@ -64,6 +66,16 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
             @Override
             public Object get() {
                 return ((DefaultBeanContext) context).getBean(resolutionContext, argument, finalQualifier);
+            }
+
+            @Override
+            public Optional<Object> find(Qualifier<Object> qualifier) {
+                return ((DefaultBeanContext) context).findBean(resolutionContext, argument, finalQualifier);
+            }
+
+            @Override
+            public BeanDefinition<Object> getDefinition() {
+                return context.getBeanDefinition(argument, finalQualifier);
             }
 
             @Override

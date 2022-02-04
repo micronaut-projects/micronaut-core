@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.ssl;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
@@ -38,15 +39,12 @@ import javax.net.ssl.SSLException;
 import java.security.cert.CertificateException;
 import java.util.Optional;
 
-import static io.micronaut.core.util.StringUtils.FALSE;
-import static io.micronaut.core.util.StringUtils.TRUE;
-
 /**
  * The Netty implementation of {@link SslBuilder} that generates an {@link SslContext} to create a server handler
- * with to SSL support via a generated self signed certificate.
+ * with SSL support via a generated self signed certificate.
  */
-@Requires(property = SslConfiguration.PREFIX + ".enabled", value = TRUE, defaultValue = FALSE)
-@Requires(property = SslConfiguration.PREFIX + ".build-self-signed", value = TRUE, defaultValue = FALSE)
+@Requires(condition = SslEnabledCondition.class)
+@Requires(condition = SelfSignedSslBuilder.SelfSignedConfigured.class)
 @Singleton
 @Internal
 public class SelfSignedSslBuilder extends SslBuilder<SslContext> implements ServerSslBuilder {
@@ -105,6 +103,18 @@ public class SelfSignedSslBuilder extends SslBuilder<SslContext> implements Serv
             return Optional.of(sslBuilder.build());
         } catch (CertificateException | SSLException e) {
             throw new SslConfigurationException("Encountered an error while building a self signed certificate", e);
+        }
+    }
+
+    static class SelfSignedConfigured extends BuildSelfSignedCondition {
+        @Override
+        protected boolean validate(ConditionContext context, boolean deprecatedPropertyFound, boolean newPropertyFound) {
+            if (!deprecatedPropertyFound && !newPropertyFound) {
+                context.fail("Neither the old deprecated " + SslConfiguration.PREFIX + ".build-self-signed, nor the new " + ServerSslConfiguration.PREFIX + ".build-self-signed were enabled.");
+                return false;
+            } else {
+                return true;
+            }
         }
     }
 }

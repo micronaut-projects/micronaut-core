@@ -17,8 +17,9 @@ package io.micronaut.http.server.netty.jackson;
 
 import com.fasterxml.jackson.annotation.JsonView;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
@@ -29,6 +30,7 @@ import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.json.JsonConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
+import io.micronaut.web.router.RouteInfo;
 import jakarta.inject.Named;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
@@ -46,6 +48,7 @@ import java.util.concurrent.ExecutorService;
  * @author graemerocher
  */
 @Requires(beans = JsonConfiguration.class)
+@Requires(classes = JsonView.class)
 @Requires(property = JsonViewServerFilter.PROPERTY_JSON_VIEW_ENABLED)
 @Filter("/**")
 public class JsonViewServerFilter implements HttpServerFilter {
@@ -71,32 +74,37 @@ public class JsonViewServerFilter implements HttpServerFilter {
 
     @Override
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-        Optional<Class> viewClass = request.getAttribute(HttpAttributes.ROUTE_MATCH, AnnotationMetadata.class)                                                          .flatMap(ann -> ann.classValue(JsonView.class));
+        final RouteInfo<?> routeInfo = request.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).orElse(null);
         final Publisher<MutableHttpResponse<?>> responsePublisher = chain.proceed(request);
-        if (viewClass.isPresent()) {
-            return Flux.from(responsePublisher).switchMap(response -> {
-                final Optional<?> optionalBody = response.getBody();
-                if (optionalBody.isPresent()) {
-                    Object body = optionalBody.get();
-                    MediaTypeCodec codec = codecFactory.resolveJsonViewCodec(viewClass.get());
-                    if (Publishers.isConvertibleToPublisher(body)) {
-                        Publisher<?> pub = Publishers.convertPublisher(body, Publisher.class);
-                        response.body(Flux.from(pub)
-                                .map(codec::encode)
-                                .subscribeOn(Schedulers.fromExecutorService(executorService)));
-                    } else {
-                        return Mono.fromCallable(() -> {
-                            final byte[] encoded = codec.encode(body);
-                            response.body(encoded);
-                            return response;
-                        }).subscribeOn(Schedulers.fromExecutorService(executorService));
+        if (routeInfo != null) {
+            final Optional<Class<?>> viewClass = routeInfo.findAnnotation(JsonView.class)
+                    .flatMap(AnnotationValue::classValue);
+            if (viewClass.isPresent()) {
+
+                return Flux.from(responsePublisher).switchMap(response -> {
+                    final Optional<?> optionalBody = response.getBody();
+                    if (optionalBody.isPresent()) {
+                        Object body = optionalBody.get();
+                        MediaTypeCodec codec = codecFactory.resolveJsonViewCodec(viewClass.get());
+                        if (Publishers.isConvertibleToPublisher(body)) {
+                            Publisher<?> pub = Publishers.convertPublisher(body, Publisher.class);
+                            response.body(Flux.from(pub)
+                                                  .map(o -> codec.encode((Argument) routeInfo.getBodyType(), o))
+                                                  .subscribeOn(Schedulers.fromExecutorService(executorService)));
+                        } else {
+                            return Mono.fromCallable(() -> {
+                                @SuppressWarnings({"unchecked", "rawtypes"})
+                                final byte[] encoded = codec.encode((Argument) routeInfo.getBodyType(), body);
+                                response.body(encoded);
+                                return response;
+                            }).subscribeOn(Schedulers.fromExecutorService(executorService));
+                        }
                     }
-                }
-                return Flux.just(response);
-            });
-        } else {
-            return responsePublisher;
+                    return Flux.just(response);
+                });
+            }
         }
+        return responsePublisher;
     }
 
     @Override

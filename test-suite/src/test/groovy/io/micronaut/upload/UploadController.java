@@ -75,6 +75,11 @@ public class UploadController {
         return title + ": " + data.length;
     }
 
+    @Post(value = "/receive-multipart", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
+    public String receiveMultipart(@Body Data data) {
+        return data.toString();
+    }
+
     @Post(value = "/receive-file-upload", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
     public Publisher<MutableHttpResponse<?>> receiveFileUpload(StreamingFileUpload data, String title) {
         long size = data.getDefinedSize();

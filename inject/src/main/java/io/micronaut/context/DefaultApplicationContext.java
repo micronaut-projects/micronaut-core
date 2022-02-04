@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.env.BootstrapPropertySourceLocator;
+import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.DefaultEnvironment;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
@@ -588,7 +589,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
         @Override
         protected String getPropertySourceRootName() {
-            String bootstrapName = System.getProperty(BOOTSTRAP_NAME_PROPERTY);
+            String bootstrapName = CachedEnvironment.getProperty(BOOTSTRAP_NAME_PROPERTY);
             return StringUtils.isNotEmpty(bootstrapName) ? bootstrapName : BOOTSTRAP_NAME;
         }
 

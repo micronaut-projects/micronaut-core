@@ -27,6 +27,7 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.FullHttpMessage;
+import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -37,6 +38,7 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
 
 import java.util.LinkedList;
 import java.util.Queue;
@@ -87,6 +89,12 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
      * doesn't, then we need to write one ourselves.
      */
     private boolean sendLastHttpContent;
+
+    /**
+     * Whether a {@link StreamedHttpMessage} is currently being written, and further messages should be held back until
+     * complete. Used for HTTP pipelining.
+     */
+    private boolean outgoingInFlight;
 
     /**
      * @param inClass  The in class
@@ -200,11 +208,15 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             final In inMsg = inClass.cast(msg);
 
             if (inMsg instanceof FullHttpMessage) {
-
-                // Forward as is
-                ctx.fireChannelRead(inMsg);
+                FullHttpMessage fullMessage = (FullHttpMessage) inMsg;
+                if (!(fullMessage instanceof FullHttpRequest) || fullMessage.content().readableBytes() == 0) {
+                    // Forward as is
+                    ctx.fireChannelRead(inMsg);
+                } else {
+                    // create streamed message with just the data from the request
+                    ctx.fireChannelRead(createStreamedMessage(inMsg, Flux.just(fullMessage)));
+                }
                 consumedInMessage(ctx);
-
             } else if (!hasBody(inMsg)) {
 
                 // Wrap in empty message
@@ -289,9 +301,8 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Calling ctx.read() for cancelled subscription");
             }
+            ctx.read();
             if (isClient()) {
-                ctx.read();
-            } else {
                 ctx.fireChannelWritabilityChanged();
             }
         }
@@ -319,6 +330,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                 }
                 currentlyStreamedMessage = null;
             }
+            ctx.read();
         }
     }
 
@@ -326,7 +338,6 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
         if (ignoreBodyRead) {
             ctx.read();
-            ignoreBodyRead = false;
         } else {
             ctx.fireChannelReadComplete();
         }
@@ -337,11 +348,8 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
         if (isValidOutMessage(msg)) {
 
             receivedOutMessage(ctx);
-            if (ctx.channel().isWritable()) {
-                unbufferedWrite(ctx, (Out) msg, promise);
-            } else {
-                outgoing.add(new Outgoing<>((Out) msg, promise));
-            }
+            outgoing.add(new Outgoing<>((Out) msg, promise));
+            proceedWriteOutgoing(ctx);
 
         } else if (msg instanceof LastHttpContent) {
 
@@ -355,7 +363,11 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
     @Override
     public void channelWritabilityChanged(ChannelHandlerContext ctx) {
-        while (ctx.channel().isWritable() && !outgoing.isEmpty()) {
+        proceedWriteOutgoing(ctx);
+    }
+
+    private void proceedWriteOutgoing(ChannelHandlerContext ctx) {
+        while (!outgoingInFlight && ctx.channel().isWritable() && !outgoing.isEmpty()) {
             Outgoing<Out> out = outgoing.remove();
             unbufferedWrite(ctx, out.message, out.promise);
         }
@@ -373,6 +385,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             ctx.writeAndFlush(message, promise);
             sentOutMessage(ctx);
         } else if (message instanceof StreamedHttpMessage) {
+            outgoingInFlight = true;
 
             StreamedHttpMessage streamed = (StreamedHttpMessage) message;
             HandlerSubscriber<HttpContent> subscriber = new HandlerSubscriber<HttpContent>(ctx.executor()) {
@@ -437,11 +450,15 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT, promise).addListener((f) -> {
                 sentOutMessage(ctx);
                 ctx.read();
+                outgoingInFlight = false;
+                proceedWriteOutgoing(ctx);
             });
         } else {
             promise.setSuccess();
             sentOutMessage(ctx);
             ctx.read();
+            outgoingInFlight = false;
+            proceedWriteOutgoing(ctx);
         }
     }
 

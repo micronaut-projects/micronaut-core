@@ -17,7 +17,6 @@ package io.micronaut.http.client.bind;
 
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
-import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.MutableHttpRequest;
@@ -34,7 +33,6 @@ import java.lang.annotation.Annotation;
  * @author Andriy Dmytruk
  * @since 3.0.0
  */
-@Experimental
 @BootstrapContextCompatible
 @Indexed(AnnotatedClientRequestBinder.class)
 public interface AnnotatedClientRequestBinder<A extends Annotation> extends ClientRequestBinder {

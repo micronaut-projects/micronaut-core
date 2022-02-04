@@ -15,6 +15,7 @@ dependencies {
 
     testImplementation project(":context")
     testImplementation libs.kotlin.test
+    testImplementation libs.kotlinx.coroutines.core
     testImplementation libs.kotlinx.coroutines.rx2
     testImplementation libs.kotlinx.coroutines.slf4j
     testImplementation libs.kotlinx.coroutines.reactor
@@ -41,12 +42,17 @@ dependencies {
     }
     testImplementation project(":function-client")
     testImplementation project(":function-web")
-    testImplementation project(':tracing')
     testImplementation libs.kotlin.kotest.junit5
     testImplementation libs.logbook.netty
     kaptTest project(':inject-java')
     kaptTest project(':validation')
     testImplementation libs.javax.inject
+    testImplementation(libs.managed.micronaut.tracing.zipkin) {
+        exclude module: 'micronaut-bom'
+        exclude module: 'micronaut-http-client'
+        exclude module: 'micronaut-inject'
+        exclude module: 'micronaut-runtime'
+    }
 
     testRuntimeOnly libs.junit.jupiter.engine
     testRuntimeOnly libs.aws.java.sdk.lambda
@@ -57,10 +63,10 @@ dependencies {
     testImplementation libs.managed.reactor
 }
 
-compileTestKotlin {
+tasks.named("compileTestKotlin") {
     kotlinOptions.jvmTarget = "1.8"
 }
 
-test {
+tasks.named("test") {
     useJUnitPlatform()
 }

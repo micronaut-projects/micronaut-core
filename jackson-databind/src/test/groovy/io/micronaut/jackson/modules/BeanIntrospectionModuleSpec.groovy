@@ -3,6 +3,7 @@ package io.micronaut.jackson.modules
 import com.fasterxml.jackson.annotation.JsonAnyGetter
 import com.fasterxml.jackson.annotation.JsonAnySetter
 import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonFormat
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -35,6 +36,7 @@ import spock.lang.Issue
 import spock.lang.Specification
 
 import java.beans.ConstructorProperties
+import java.time.LocalDateTime
 
 class BeanIntrospectionModuleSpec extends Specification {
 
@@ -473,19 +475,41 @@ class BeanIntrospectionModuleSpec extends Specification {
         outerArray.wrapper.inner.length == 0
     }
 
-    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/6309")
-    void "@JsonSerialize annotation"() {
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/6472")
+    void "@JsonProperty annotation on setter"() {
         given:
         ApplicationContext ctx = ApplicationContext.run()
         ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
         ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
 
         expect:
-        objectMapper.readValue('{"foo":"Bar"}', JsonSerializeAnnotated.class).foo == 'bar'
-        objectMapper.writeValueAsString(new JsonSerializeAnnotated(foo: 'Bar')) == '{"foo":"BAR"}'
+        objectMapper.readValue('{"bar":"baz"}', JsonPropertyOnSetter.class).foo == 'baz'
+        objectMapper.writeValueAsString(new JsonPropertyOnSetter(foo: 'baz')) == '{"bar":"baz"}'
+
+        cleanup:
+        ctx.close()
 
         where:
         ignoreReflectiveProperties << [true, false]
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/6309")
+    void "@JsonSerialize annotation"() {
+      given:
+      ApplicationContext ctx = ApplicationContext.run()
+      ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
+      ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+      expect:
+      objectMapper.readValue('{"foo":"Bar"}', JsonSerializeAnnotated.class).foo == 'bar'
+      objectMapper.writeValueAsString(new JsonSerializeAnnotated(foo: 'Bar')) == '{"foo":"BAR"}'
+
+      cleanup:
+      ctx.close()
+
+      where:
+      ignoreReflectiveProperties << [true, false]
+
     }
 
     void "creator property that doesn't have a getter"() {
@@ -749,6 +773,20 @@ class BeanIntrospectionModuleSpec extends Specification {
     }
 
     @Introspected
+    static class JsonPropertyOnSetter {
+        private String foo
+
+        public String getFoo() {
+            return foo
+        }
+
+        @JsonProperty("bar")
+        public void setFoo(String foo) {
+            this.foo = foo
+        }
+    }
+
+    @Introspected
     static class JsonSerializeAnnotated {
         @JsonSerialize(using = UpperCaseSerializer)
         @JsonDeserialize(using = LowerCaseDeserializer)
@@ -796,6 +834,133 @@ class BeanIntrospectionModuleSpec extends Specification {
 
         public String getLabel() {
             name.toUpperCase()
+        }
+    }
+
+    void "JsonFormat"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        def ldt = LocalDateTime.of(2021, 11, 22, 10, 37)
+
+        expect:
+        objectMapper.writeValueAsString(new FormatBean(ldt: ldt)) == '{"ldt":"2021-11-22 10:37:00"}'
+        objectMapper.readValue('{"ldt":"2021-11-22 10:37:00"}', FormatBean).ldt == ldt
+
+        cleanup:
+        ctx.close()
+
+        where:
+        ignoreReflectiveProperties << [true, false]
+    }
+
+    @Introspected
+    static class FormatBean {
+        private LocalDateTime ldt
+
+        @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+        public LocalDateTime getLdt() {
+            return ldt
+        }
+
+        public void setLdt(LocalDateTime ldt) {
+            this.ldt = ldt
+        }
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6625')
+    void "JsonIgnore on main accessor, with secondary override"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        expect:
+        objectMapper.writeValueAsString(new IgnoreBean()) == '{"foo":"bar"}'
+        objectMapper.readValue('{"foo":"bar"}', IgnoreBean).foo == 'foo'
+        objectMapper.readValue('{"foo":"bar"}', IgnoreBean).secondary == 'bar'
+
+        cleanup:
+        ctx.close()
+
+        where:
+        // need reflective access here, because with only introspections, the secondary methods arent available.
+        ignoreReflectiveProperties << [false]//[true, false]
+    }
+
+    @Introspected
+    static class IgnoreBean {
+
+        private String foo = 'foo'
+        private String secondary = 'bar'
+
+        @JsonProperty('foo')
+        public String secondary() {
+            return secondary
+        }
+
+        @JsonProperty('foo')
+        public void secondary(String s) {
+            this.secondary = s
+        }
+
+        @JsonIgnore
+        public String getFoo() {
+            return foo
+        }
+
+        @JsonIgnore
+        public void setFoo(String s) {
+            this.foo = s
+        }
+    }
+
+    void "JsonIgnore on one accessor"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        expect:
+        objectMapper.writeValueAsString(new IgnoreBean2(foo: 'x', bar: 'y')) == '{"bar":"y"}'
+        objectMapper.readValue('{"foo":"x","bar":"y"}', IgnoreBean2).foo == 'x'
+        objectMapper.readValue('{"foo":"x","bar":"y"}', IgnoreBean2).bar == null
+
+        cleanup:
+        ctx.close()
+
+        where:
+        // without reflection we only see JsonIgnore on the whole property
+        ignoreReflectiveProperties << [false]
+    }
+
+    @Introspected
+    static class IgnoreBean2 {
+
+        @JsonIgnore
+        private String foo
+        @JsonIgnore
+        private String bar
+
+        @JsonIgnore
+        public String getFoo() {
+            return foo
+        }
+
+        @JsonProperty('foo')
+        public void setFoo(String s) {
+            this.foo = s
+        }
+
+        @JsonProperty('bar')
+        public String getBar() {
+            return bar
+        }
+
+        @JsonIgnore
+        public void setBar(String s) {
+            this.bar = s
         }
     }
 }

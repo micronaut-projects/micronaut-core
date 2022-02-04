@@ -20,6 +20,7 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanContext;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -30,7 +31,6 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.AdvisedBeanType;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
-import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.*;
@@ -189,12 +189,12 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
 
         if (interceptors == null) {
             final AnnotationMetadataHierarchy hierarchy = new AnnotationMetadataHierarchy(definition.getAnnotationMetadata(), constructor.getAnnotationMetadata());
-            final List<String> annotationNames = InterceptorBindingQualifier.resolveInterceptorValues(hierarchy);
+            final Collection<AnnotationValue<?>> annotationValues = resolveInterceptorValues(hierarchy, InterceptorKind.AROUND_CONSTRUCT);
 
             final Collection<BeanRegistration<Interceptor<?, ?>>> resolved = ((DefaultBeanContext) beanContext).getBeanRegistrations(
                     resolutionContext,
                     Interceptor.ARGUMENT,
-                    Qualifiers.byInterceptorBinding(annotationNames)
+                    Qualifiers.byInterceptorBindingValues(annotationValues)
             );
             interceptors = new ArrayList(resolved);
         }
