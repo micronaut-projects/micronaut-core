@@ -15,6 +15,8 @@
  */
 package io.micronaut.docs.server.upload
 
+import io.micronaut.core.async.annotation.SingleResult
+
 // tag::class[]
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
@@ -29,7 +31,9 @@ import static io.micronaut.http.MediaType.TEXT_PLAIN
 
 @Controller("/upload")
 class UploadController {
+// end::class[]
 
+    // tag::file[]
     @Post(value = "/", consumes = MULTIPART_FORM_DATA, produces = TEXT_PLAIN) // <1>
     Mono<HttpResponse<String>> upload(StreamingFileUpload file) { // <2>
 
@@ -46,5 +50,29 @@ class UploadController {
                 }
             })
     }
+    // end::file[]
+
+    // tag::outputStream[]
+    @Post(value = "/outputStream", consumes = MULTIPART_FORM_DATA, produces = TEXT_PLAIN) // <1>
+    @SingleResult
+    Mono<HttpResponse<String>> uploadOutputStream(StreamingFileUpload file) { // <2>
+
+        OutputStream outputStream = new ByteArrayOutputStream() // <3>
+
+        Publisher<Boolean> uploadPublisher = file.transferTo(outputStream) // <4>
+
+        Mono.from(uploadPublisher)  // <5>
+                .map({ success ->
+                    if (success) {
+                        HttpResponse.ok("Uploaded")
+                    } else {
+                        HttpResponse.<String>status(CONFLICT)
+                                .body("Upload Failed")
+                    }
+                })
+    }
+    // end::outputStream[]
+
+// tag::endclass[]
 }
-// end::class[]
+// end::endclass[]

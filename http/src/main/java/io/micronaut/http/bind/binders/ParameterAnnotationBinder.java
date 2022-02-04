@@ -72,11 +72,11 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
             result = doBind(context, source.getAttributes(), parameterName, BindingResult.UNSATISFIED);
         }
 
-        Class argumentType;
+        Argument<?> argumentType;
         if (argument.getType() == Optional.class) {
-            argumentType = argument.getFirstTypeVariable().orElse(argument).getType();
+            argumentType = argument.getFirstTypeVariable().orElse(argument);
         } else {
-            argumentType = argument.getType();
+            argumentType = argument;
         }
 
         // If there is still no value at this point and no annotation is specified and
@@ -86,11 +86,11 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
             if (body.isPresent()) {
                 result = doBind(context, body.get(), parameterName);
                 if (!result.getValue().isPresent()) {
-                    if (ClassUtils.isJavaLangType(argumentType)) {
+                    if (ClassUtils.isJavaLangType(argumentType.getType())) {
                         return Optional::empty;
                     } else {
                         //noinspection unchecked
-                        return () -> source.getBody(argumentType);
+                        return () -> (Optional<T>) source.getBody(argumentType);
                     }
                 }
             } else {

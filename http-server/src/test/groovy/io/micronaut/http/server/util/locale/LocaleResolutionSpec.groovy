@@ -3,12 +3,20 @@ package io.micronaut.http.server.util.locale
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.util.locale.LocaleResolutionConfiguration
+import io.micronaut.core.version.SemanticVersion
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.server.util.MockHttpHeaders
 import io.micronaut.http.simple.cookies.SimpleCookie
 import io.micronaut.http.simple.cookies.SimpleCookies
+import spock.lang.Requires
 import spock.lang.Specification
+import spock.util.environment.Jvm
 
+// fails due to https://issues.apache.org/jira/browse/GROOVY-10145
+@Requires({
+    SemanticVersion.isAtLeastMajorMinor(GroovySystem.version, 4, 0) ||
+            !Jvm.current.isJava16Compatible()
+})
 class LocaleResolutionSpec extends Specification {
 
     void "test locale resolution via header with header resolution disabled"() {

@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
@@ -37,7 +38,7 @@ public interface ProxyHttpClient {
      * @param request The request
      * @return A publisher that emits the response.
      */
-    Publisher<MutableHttpResponse<?>> proxy(HttpRequest<?> request);
+    Publisher<MutableHttpResponse<?>> proxy(@NonNull HttpRequest<?> request);
 
     /**
      * Create a new {@link ProxyHttpClient}.
@@ -62,7 +63,7 @@ public interface ProxyHttpClient {
      * @return The client
      * @since 2.2.0
      */
-    static ProxyHttpClient create(@Nullable URL url, HttpClientConfiguration configuration) {
+    static ProxyHttpClient create(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
         return ProxyHttpClientFactoryResolver.getFactory().createProxyClient(url, configuration);
     }
 }

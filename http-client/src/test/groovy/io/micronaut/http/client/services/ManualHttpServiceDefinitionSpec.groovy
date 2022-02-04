@@ -189,9 +189,9 @@ class ManualHttpServiceDefinitionSpec extends Specification {
 
     void "test working SSL configuration"() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'micronaut.ssl.enabled': true,
+                'micronaut.server.ssl.enabled': true,
                 // let the HTTPS port be random
-                'micronaut.ssl.port': -1,
+                'micronaut.server.ssl.port': -1,
                 'micronaut.server.ssl.client-authentication': 'NEED',
                 'micronaut.server.ssl.key-store.path': 'classpath:certs/server.p12',
                 'micronaut.server.ssl.key-store.password': 'secret',
@@ -205,14 +205,15 @@ class ManualHttpServiceDefinitionSpec extends Specification {
                 'micronaut.http.services.client1.ssl.enabled': true,
                 'micronaut.http.services.client1.ssl.client-authentication': 'NEED',
                 'micronaut.http.services.client1.ssl.key-store.path': 'classpath:certs/client1.p12',
-                'micronaut.http.services.client1.ssl.key-store.password': 'secret'
+                'micronaut.http.services.client1.ssl.key-store.password': 'secret',
+                'micronaut.http.services.client1.ssl.insecure-trust-all-certificates': true,
         )
         SslClient client1 = ctx.getBean(SslClient)
         final String DN = "CN=client1.test.example.com, OU=IT, O=Whatever, L=Munich, ST=Bavaria, C=DE, EMAILADDRESS=info@example.com"
 
 
         when:
-        def client = new DefaultHttpClient(embeddedServer.getURL(), ctx.getBean(HttpClientConfiguration, Qualifiers.byName("client1")))
+        def client = new DefaultHttpClient(embeddedServer.getURI(), ctx.getBean(HttpClientConfiguration, Qualifiers.byName("client1")))
 
         then:
         client.toBlocking().retrieve(HttpRequest.GET("/ssl-test"), String) == DN

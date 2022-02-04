@@ -39,7 +39,8 @@ class SuspendControllerSpec : StringSpec() {
                 "micronaut.server.cors.enabled" to true,
                 "micronaut.server.cors.configurations.dev.allowedOrigins" to listOf("foo.com"),
                 "micronaut.server.cors.configurations.dev.allowedMethods" to listOf("GET"),
-                "micronaut.server.cors.configurations.dev.allowedHeaders" to listOf(ACCEPT, CONTENT_TYPE)
+                "micronaut.server.cors.configurations.dev.allowedHeaders" to listOf(ACCEPT, CONTENT_TYPE),
+                "tracing.zipkin.enabled" to true
             )
         )
     )
@@ -240,6 +241,40 @@ class SuspendControllerSpec : StringSpec() {
             val response = client.exchange(GET<String>("/suspend/requestContext"), String::class.java).awaitSingle()
             val body = response.body.get()
             body shouldBe "/suspend/requestContext"
+            response.status shouldBe HttpStatus.OK
+        }
+
+        "test request context is available2" {
+            val response = client.exchange(GET<String>("/suspend/requestContext2"), String::class.java).awaitSingle()
+            val body = response.body.get()
+            body shouldBe "test"
+            response.status shouldBe HttpStatus.OK
+        }
+
+        "test keeping tracing context after delay" {
+            val response = client.exchange(GET<Any>("/suspend/keepTracingContextAfterDelay"), String::class.java).awaitSingle()
+            val body = response.body.get()
+
+            val (beforeTraceId, afterTraceId) = body.split(',')
+            beforeTraceId shouldBe afterTraceId
+            response.status shouldBe HttpStatus.OK
+        }
+
+        "test keeping tracing context inside coroutine" {
+            val response = client.exchange(GET<Any>("/suspend/keepTracingContextInsideCoroutine"), String::class.java).awaitSingle()
+            val body = response.body.get()
+
+            val (beforeTraceId, afterTraceId) = body.split(',')
+            beforeTraceId shouldBe afterTraceId
+            response.status shouldBe HttpStatus.OK
+        }
+
+        "test keeping tracing context using CoroutineTracingDispatcher explicitly" {
+            val response = client.exchange(GET<Any>("/suspend/keepTracingContextUsingCoroutineTracingDispatcherExplicitly"), String::class.java).awaitSingle()
+            val body = response.body.get()
+
+            val (beforeTraceId, afterTraceId) = body.split(',')
+            beforeTraceId shouldBe afterTraceId
             response.status shouldBe HttpStatus.OK
         }
     }

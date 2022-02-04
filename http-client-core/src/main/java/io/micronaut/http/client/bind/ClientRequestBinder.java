@@ -16,18 +16,16 @@
 package io.micronaut.http.client.bind;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
-import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Indexed;
 
 /**
- * A binder that binds to a {@link MutableHttpRequest}.
+ * A binder that binds to a {@link io.micronaut.http.MutableHttpRequest}.
  * This class is extended by {@link ClientArgumentRequestBinder} and {@link AnnotatedClientRequestBinder}
  * to account for different binding behaviours
  *
  * @author Andriy Dmytruk
  * @since 3.0.0
  */
-@Experimental
 @BootstrapContextCompatible
 @Indexed(ClientRequestBinder.class)
 public interface ClientRequestBinder {

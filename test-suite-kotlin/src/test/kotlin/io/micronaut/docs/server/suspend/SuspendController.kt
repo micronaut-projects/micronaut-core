@@ -17,17 +17,22 @@ package io.micronaut.docs.server.suspend
 
 import io.micronaut.http.*
 import io.micronaut.http.annotation.*
+import io.micronaut.http.bind.binders.HttpCoroutineContextFactory
+import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.tracing.instrument.kotlin.CoroutineTracingDispatcher
 import kotlinx.coroutines.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicInteger
 import jakarta.inject.Named
+import org.slf4j.MDC
 
 @Controller("/suspend")
 class SuspendController(
     @Named(TaskExecutors.IO) private val executor: ExecutorService,
     private val suspendService: SuspendService,
-    private val suspendRequestScopedService: SuspendRequestScopedService
+    private val suspendRequestScopedService: SuspendRequestScopedService,
+    private val coroutineTracingDispatcherFactory: HttpCoroutineContextFactory<CoroutineTracingDispatcher>
 ) {
 
     private val coroutineDispatcher: CoroutineDispatcher
@@ -140,4 +145,45 @@ class SuspendController(
     suspend fun requestContext(): String {
         return suspendService.requestContext()
     }
+
+    @Get("/requestContext2")
+    suspend fun requestContext2(): String = supervisorScope {
+        require(ServerRequestContext.currentRequest<Any>().isPresent) {
+            "Initial request is not set"
+        }
+        val result = withContext(coroutineContext) {
+            require(ServerRequestContext.currentRequest<Any>().isPresent) {
+                "Request is not available in `withContext`"
+            }
+            "test"
+        }
+        require(ServerRequestContext.currentRequest<Any>().isPresent) {
+            "Request is lost after `withContext`"
+        }
+        result
+    }
+
+    @Get("/keepTracingContextAfterDelay")
+    suspend fun keepTracingContextAfterDelay() = coroutineScope {
+        val before = currentTraceId()
+        delay(1L)
+        val after = currentTraceId()
+        "$before,$after"
+    }
+
+    @Get("/keepTracingContextInsideCoroutine")
+    suspend fun keepTracingContextInsideCoroutine() = coroutineScope {
+        val before = currentTraceId()
+        val after = withContext(Dispatchers.Default) { currentTraceId() }
+        "$before,$after"
+    }
+
+    @Get("/keepTracingContextUsingCoroutineTracingDispatcherExplicitly")
+    fun keepTracingContextUsingCoroutineTracingDispatcherExplicitly() = runBlocking {
+        val before = currentTraceId()
+        val after = withContext(Dispatchers.Default + coroutineTracingDispatcherFactory.create()) { currentTraceId() }
+        "$before,$after"
+    }
+
+    private fun currentTraceId(): String? = MDC.get("traceId")
 }

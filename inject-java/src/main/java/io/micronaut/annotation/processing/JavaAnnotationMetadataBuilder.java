@@ -57,7 +57,6 @@ import java.util.stream.Collectors;
  */
 public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<Element, AnnotationMirror> {
 
-    private static final Map<String, Map<Element, javax.lang.model.element.AnnotationValue>> ANNOTATION_DEFAULTS = new HashMap<>();
     private static final Map<ExecutableElement, List<ExecutableElement>> OVERRIDDEN_METHOD_CACHE = new ConcurrentLinkedHashMap.Builder<ExecutableElement, List<ExecutableElement>>().maximumWeightedCapacity(100).build();
 
     private final Elements elementUtils;
@@ -189,6 +188,40 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
+    protected Map<String, Element> getAnnotationMembers(String annotationType) {
+        final Element element = getAnnotationMirror(annotationType).orElse(null);
+        if (element != null && element.getKind() == ElementKind.ANNOTATION_TYPE) {
+            final List<? extends Element> elements = element.getEnclosedElements();
+            if (elements.isEmpty()) {
+                return Collections.emptyMap();
+            } else {
+                Map<String, Element> members = new LinkedHashMap<>(elements.size());
+                for (Element method : elements) {
+                    members.put(method.getSimpleName().toString(), method);
+                }
+                return Collections.unmodifiableMap(members);
+            }
+        }
+        return Collections.emptyMap();
+    }
+
+    @Override
+    protected boolean hasSimpleAnnotation(Element element, String simpleName) {
+        if (element != null) {
+            final List<? extends AnnotationMirror> mirrors = element.getAnnotationMirrors();
+            for (AnnotationMirror mirror : mirrors) {
+                final String s = mirror.getAnnotationType()
+                        .asElement()
+                        .getSimpleName().toString();
+                if (s.equalsIgnoreCase(simpleName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
     protected boolean isMethodOrClassElement(Element element) {
         return element instanceof TypeElement || element instanceof ExecutableElement;
     }
@@ -243,6 +276,15 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
+    protected boolean isExcludedAnnotation(@NonNull Element element, @NonNull String annotationName) {
+        if (annotationName.startsWith("java.lang.annotation") && element.getKind() == ElementKind.ANNOTATION_TYPE) {
+            return false;
+        } else {
+            return super.isExcludedAnnotation(element, annotationName);
+        }
+    }
+
+    @Override
     protected List<Element> buildHierarchy(Element element, boolean inheritTypeAnnotations, boolean declaredOnly) {
         if (declaredOnly) {
             List<Element> onlyDeclared = new ArrayList<>(1);
@@ -253,6 +295,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         if (element instanceof TypeElement) {
             List<Element> hierarchy = new ArrayList<>();
             hierarchy.add(element);
+            if (element.getKind() == ElementKind.ANNOTATION_TYPE) {
+                return hierarchy;
+            }
             populateTypeHierarchy(element, hierarchy);
             Collections.reverse(hierarchy);
             return hierarchy;
@@ -397,31 +442,23 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Override
     protected Map<? extends Element, ?> readAnnotationDefaultValues(String annotationTypeName, Element element) {
-        Map<String, Map<Element, AnnotationValue>> defaults = JavaAnnotationMetadataBuilder.ANNOTATION_DEFAULTS;
+        Map<Element, AnnotationValue> defaultValues = new LinkedHashMap<>();
         if (element instanceof TypeElement) {
             TypeElement annotationElement = (TypeElement) element;
-            String annotationName = annotationElement.getQualifiedName().toString();
-            if (!defaults.containsKey(annotationName)) {
-
-                Map<Element, AnnotationValue> defaultValues = new LinkedHashMap<>();
-                final List<? extends Element> allMembers = elementUtils.getAllMembers(annotationElement);
-
-                allMembers
-                        .stream()
-                        .filter(member -> member.getEnclosingElement().equals(annotationElement))
-                        .filter(ExecutableElement.class::isInstance)
-                        .map(ExecutableElement.class::cast)
-                        .filter(this::isValidDefaultValue)
-                        .forEach(executableElement -> {
-                                    final AnnotationValue defaultValue = executableElement.getDefaultValue();
-                                    defaultValues.put(executableElement, defaultValue);
-                                }
-                        );
-
-                defaults.put(annotationName, defaultValues);
-            }
+            final List<? extends Element> allMembers = elementUtils.getAllMembers(annotationElement);
+            allMembers
+                    .stream()
+                    .filter(member -> member.getEnclosingElement().equals(annotationElement))
+                    .filter(ExecutableElement.class::isInstance)
+                    .map(ExecutableElement.class::cast)
+                    .filter(this::isValidDefaultValue)
+                    .forEach(executableElement -> {
+                                final AnnotationValue defaultValue = executableElement.getDefaultValue();
+                                defaultValues.put(executableElement, defaultValue);
+                            }
+                    );
         }
-        return ANNOTATION_DEFAULTS.get(annotationTypeName);
+        return defaultValues;
     }
 
     private boolean isValidDefaultValue(ExecutableElement executableElement) {
@@ -582,6 +619,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      */
     public static void clearCaches() {
         OVERRIDDEN_METHOD_CACHE.clear();
+        AbstractAnnotationMetadataBuilder.clearCaches();
     }
 
     /**

@@ -21,13 +21,10 @@ import io.micronaut.annotation.processing.*
 import io.micronaut.annotation.processing.visitor.JavaElementFactory
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext
 import io.micronaut.aop.internal.InterceptorRegistryBean
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.ApplicationContextBuilder
-import io.micronaut.context.ApplicationContextConfiguration
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.Qualifier
+import io.micronaut.context.*
 import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.Experimental
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.beans.BeanIntrospection
@@ -36,10 +33,13 @@ import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.annotation.AnnotationMapper
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import io.micronaut.inject.annotation.AnnotationTransformer
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.GenericPlaceholderElement
+import io.micronaut.inject.ast.WildcardElement
 import io.micronaut.inject.provider.BeanProviderDefinition
 import io.micronaut.inject.provider.JakartaProviderBeanDefinition
 import io.micronaut.inject.visitor.TypeElementVisitor
@@ -56,7 +56,6 @@ import javax.lang.model.element.TypeElement
 import javax.lang.model.element.VariableElement
 import javax.tools.JavaFileObject
 import java.lang.annotation.Annotation
-import java.util.function.Predicate
 import java.util.stream.Collectors
 import java.util.stream.StreamSupport
 /**
@@ -112,6 +111,7 @@ abstract class AbstractTypeElementSpec extends Specification {
         Element element = buildTypeElement(cls)
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = element != null ? builder.build(element) : null
+        AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
 
@@ -120,6 +120,7 @@ abstract class AbstractTypeElementSpec extends Specification {
         Element method = element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = method != null ? builder.buildDeclared(method) : null
+        AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
 
@@ -129,6 +130,7 @@ abstract class AbstractTypeElementSpec extends Specification {
         VariableElement argument = method.parameters.find() { it.simpleName.toString() == argumentName }
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = argument != null ? builder.build(argument) : null
+        AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
 
@@ -209,18 +211,7 @@ class Test {
      */
     ApplicationContext buildContext(String className, @Language("java") String cls, boolean includeAllBeans = false) {
         def files = newJavaParser().generate(className, cls)
-        ClassLoader classLoader = new ClassLoader() {
-            @Override
-            protected Class<?> findClass(String name) throws ClassNotFoundException {
-                String fileName = name.replace('.', '/') + '.class'
-                JavaFileObject generated = files.find { it.name.endsWith(fileName) }
-                if (generated != null) {
-                    def bytes = generated.openInputStream().bytes
-                    return defineClass(name, bytes, 0, bytes.length)
-                }
-                return super.findClass(name)
-            }
-        }
+        ClassLoader classLoader = new JavaFileObjectClassLoader(files)
 
         def builder = ApplicationContext.builder()
         builder.classLoader(classLoader)
@@ -228,7 +219,7 @@ class Test {
         configureContext(builder)
         return new DefaultApplicationContext((ApplicationContextConfiguration) builder) {
             @Override
-            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences(Predicate<BeanDefinitionReference> predicate) {
+            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
                 def references = StreamSupport.stream(files.spliterator(), false)
                         .filter({ JavaFileObject jfo ->
                             jfo.kind == JavaFileObject.Kind.CLASS && jfo.name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX + ".class")
@@ -238,10 +229,9 @@ class Test {
                             name = name.replace('/', '.') - '.class'
                             return (BeanDefinitionReference) classLoader.loadClass(name).newInstance()
                         })
-                        .filter({ bdr -> predicate == null || predicate.test(bdr) })
                         .collect(Collectors.toList())
 
-                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences(predicate) : getBuiltInBeanReferences())
+                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences() : getBuiltInBeanReferences())
             }
         }.start()
     }
@@ -448,46 +438,10 @@ class Test {
         return (BeanConfiguration)classLoader.loadClass(packageName + '.' + BeanConfigurationWriter.CLASS_SUFFIX).newInstance()
     }
 
+    @CompileStatic
     protected ClassLoader buildClassLoader(String className, @Language("java") String cls) {
-        def files = newJavaParser().generate(className, cls)
-        ClassLoader classLoader = new ClassLoader() {
-            @Override
-            protected Class<?> findClass(String name) throws ClassNotFoundException {
-                String fileName = name.replace('.', '/') + '.class'
-                JavaFileObject generated = files.find { it.name.endsWith(fileName) }
-                if (generated != null) {
-                    def bytes = generated.openInputStream().bytes
-                    return defineClass(name, bytes, 0, bytes.length)
-                }
-                return super.findClass(name)
-            }
-
-            @Override
-            protected Enumeration<URL> findResources(String name) {
-                String fileName = "/CLASS_OUTPUT/" + name
-                JavaFileObject generated = files.find { it.name == fileName }
-                if (generated == null) {
-                    return super.findResources(name)
-                } else {
-                    URL url = new URL(null, generated.toUri().toString(), new URLStreamHandler() {
-                        @Override
-                        protected URLConnection openConnection(URL u) throws IOException {
-                            return new URLConnection(u) {
-                                @Override
-                                void connect() throws IOException {
-
-                                }
-                                InputStream getInputStream() throws IOException {
-                                    return generated.openInputStream()
-                                }
-                            }
-                        }
-                    })
-                    return Collections.enumeration(Collections.singletonList(url))
-                }
-            }
-        }
-        classLoader
+        Iterable<? extends JavaFileObject> files = newJavaParser().generate(className, cls)
+        return new JavaFileObjectClassLoader(files)
     }
 
     protected AnnotationMetadata writeAndLoadMetadata(String className, AnnotationMetadata toWrite) {
@@ -570,6 +524,49 @@ class Test {
      * @param contextBuilder The context builder
      */
     protected void configureContext(ApplicationContextBuilder contextBuilder) {
+    }
+
+    /**
+     * Create a rough source signature of the given ClassElement, using {@link ClassElement#getBoundGenericTypes()}.
+     * Can be used to test that {@link ClassElement#getBoundGenericTypes()} returns the right types in the right
+     * context.
+     *
+     * @param classElement The class element to reconstruct
+     * @param typeVarsAsDeclarations Whether type variables should be represented as declarations
+     * @return a String representing the type signature.
+     */
+    @Experimental
+    protected static String reconstructTypeSignature(ClassElement classElement, boolean typeVarsAsDeclarations = false) {
+        if (classElement.isArray()) {
+            return reconstructTypeSignature(classElement.fromArray()) + "[]"
+        } else if (classElement.isGenericPlaceholder()) {
+            def freeVar = (GenericPlaceholderElement) classElement
+            def name = freeVar.variableName
+            if (typeVarsAsDeclarations) {
+                def bounds = freeVar.bounds
+                if (reconstructTypeSignature(bounds[0]) != 'Object') {
+                    name += bounds.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", " extends ", ""))
+                }
+            }
+            return name
+        } else if (classElement.isWildcard()) {
+            def we = (WildcardElement) classElement
+            if (!we.lowerBounds.isEmpty()) {
+                return we.lowerBounds.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(" | ", "? super ", ""))
+            } else if (we.upperBounds.size() == 1 && reconstructTypeSignature(we.upperBounds.get(0)) == "Object") {
+                return "?"
+            } else {
+                return we.upperBounds.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", "? extends ", ""))
+            }
+        } else {
+            def boundTypeArguments = classElement.getBoundGenericTypes()
+            if (boundTypeArguments.isEmpty()) {
+                return classElement.getSimpleName()
+            } else {
+                return classElement.getSimpleName() +
+                        boundTypeArguments.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(", ", "<", ">"))
+            }
+        }
     }
 
     static class TypeElementInfo {

@@ -1,0 +1,17 @@
+Micronaut supports context propagation from Reactor's context to coroutine context. To enable this propagation you need to include following dependency:
+
+dependency:org.jetbrains.kotlinx:kotlinx-coroutines-reactor[]
+
+For more detailed information on how to use the library you can find at the official link:https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-reactor/kotlinx.coroutines.reactor/-reactor-context/index.html[documentation].
+
+Following example shows how to propagate Reactor context from the HTTP filter to the controller's coroutine:
+
+snippet::io.micronaut.docs.reactor.ReactorContextPropagationSpec[tags="simplefilter", indent=0, title="Simple filter which writes into Reactor's context"]
+
+Access Reactor context by retrieving `ReactorContext` from the coroutine context:
+
+snippet::io.micronaut.docs.reactor.ReactorContextPropagationSpec[tags="readctx", indent=0, title="Reading Reactor context in the coroutine"]
+
+It's possible to use coroutines Reactor integration to create a filter using a suspended function:
+
+snippet::io.micronaut.docs.reactor.ReactorContextPropagationSpec[tags="suspendfilter", indent=0, title="Suspended function filter which writes into Reactor's context"]

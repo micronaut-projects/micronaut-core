@@ -7,6 +7,14 @@ pluginManagement {
         id "org.jetbrains.kotlin.plugin.allopen" version getProperty("kotlinVersion")
         id "org.jetbrains.kotlin.plugin.jpa" version getProperty("kotlinVersion")
     }
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+plugins {
+    id 'io.micronaut.build.shared.settings' version '5.1.2'
 }
 
 enableFeaturePreview("VERSION_CATALOGS")
@@ -39,13 +47,15 @@ include "inject-java"
 include "inject-java-test"
 include 'inject-kotlin-test'
 include "inject-test-utils"
+include "jackson-core"
+include "jackson-databind"
+include "json-core"
 include "management"
 include "messaging"
 include "router"
 include "runtime"
 include "runtime-osx"
 include "session"
-include "tracing"
 include "validation"
 include "websocket"
 
@@ -60,3 +70,9 @@ include "test-utils"
 
 // benchmarks
 include "benchmarks"
+
+gradle.beforeProject { p ->
+    p.pluginManager.withPlugin('java-library') {
+        p.plugins.apply('io.micronaut.build.internal.sanity-checks')
+    }
+}

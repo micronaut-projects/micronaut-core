@@ -313,40 +313,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object message) {
         if (acceptInboundMessage(message)) {
-            switch (state) {
-                case IDLE:
-                    if (LOG.isTraceEnabled()) {
-                        Object msg = messageForTrace(message);
-                        LOG.trace("HandlerPublisher (state: IDLE) buffering message: {}", msg);
-                    }
-                    buffer.add(message);
-                    state = BUFFERING;
-                    break;
-                case NO_SUBSCRIBER:
-                case BUFFERING:
-                    if (LOG.isTraceEnabled()) {
-                        Object msg = messageForTrace(message);
-                        LOG.trace("HandlerPublisher (state: BUFFERING) buffering message: {}", msg);
-                    }
-                    buffer.add(message);
-                    break;
-                case DEMANDING:
-                    publishMessage(message);
-                    break;
-                case DRAINING:
-                case DONE:
-                    if (LOG.isTraceEnabled()) {
-                        Object msg = messageForTrace(message);
-                        LOG.trace("HandlerPublisher (state: DONE) releasing message: {}", msg);
-                    }
-                    ReferenceCountUtil.release(message);
-                    break;
-                case NO_CONTEXT:
-                case NO_SUBSCRIBER_OR_CONTEXT:
-                    throw new IllegalStateException("Message received before added to the channel context");
-                default:
-                    // no-op
-            }
+            publishMessageLater(message);
         } else {
             ctx.fireChannelRead(message);
         }
@@ -359,6 +326,45 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
             msg = content.content().toString(StandardCharsets.UTF_8);
         }
         return msg;
+    }
+
+    private void publishMessageLater(Object message) {
+        switch (state) {
+            case IDLE:
+                if (LOG.isTraceEnabled()) {
+                    Object msg = messageForTrace(message);
+                    LOG.trace("HandlerPublisher (state: IDLE) buffering message: {}", msg);
+                }
+                buffer.add(message);
+                state = BUFFERING;
+                break;
+            case NO_SUBSCRIBER:
+            case BUFFERING:
+                if (LOG.isTraceEnabled()) {
+                    Object msg = messageForTrace(message);
+                    LOG.trace("HandlerPublisher (state: BUFFERING) buffering message: {}", msg);
+                }
+                buffer.add(message);
+                break;
+            case DEMANDING:
+                state = BUFFERING;
+                buffer.add(message);
+                flushBuffer();
+                break;
+            case DRAINING:
+            case DONE:
+                if (LOG.isTraceEnabled()) {
+                    Object msg = messageForTrace(message);
+                    LOG.trace("HandlerPublisher (state: DONE) releasing message: {}", msg);
+                }
+                ReferenceCountUtil.release(message);
+                break;
+            case NO_CONTEXT:
+            case NO_SUBSCRIBER_OR_CONTEXT:
+                throw new IllegalStateException("Message received before added to the channel context");
+            default:
+                // no-op
+        }
     }
 
     private void publishMessage(Object message) {
@@ -405,24 +411,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
 
     private void complete() {
         if (completed.compareAndSet(false, true)) {
-            switch (state) {
-                case NO_SUBSCRIBER:
-                case BUFFERING:
-                    buffer.add(COMPLETE);
-                    state = DRAINING;
-                    break;
-                case DEMANDING:
-                case IDLE:
-                    subscriber.onComplete();
-                    state = DONE;
-                    break;
-                case NO_SUBSCRIBER_ERROR:
-                    // Ignore, we're already going to complete the stream with an error
-                    // when the subscriber subscribes.
-                    break;
-                default:
-                    // no-op
-            }
+            publishMessageLater(COMPLETE);
         }
     }
 
@@ -464,6 +453,25 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
         }
     }
 
+    private void flushBuffer() {
+        while (!buffer.isEmpty() && outstandingDemand > 0) {
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("HandlerPublisher (state: {}) release message from buffer to satisfy demand: {}", state, outstandingDemand);
+            }
+            publishMessage(buffer.remove());
+        }
+        if (buffer.isEmpty()) {
+            if (outstandingDemand > 0) {
+                if (state == BUFFERING) {
+                    state = DEMANDING;
+                } // otherwise we're draining
+                requestDemand();
+            } else if (state == BUFFERING) {
+                state = IDLE;
+            }
+        }
+    }
+
     /**
      * A channel subscrition.
      */
@@ -477,25 +485,6 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
         @Override
         public void cancel() {
             executor.execute(HandlerPublisher.this::receivedCancel);
-        }
-
-        private void flushBuffer() {
-            while (!buffer.isEmpty() && (outstandingDemand > 0 || outstandingDemand == Long.MAX_VALUE)) {
-                if (LOG.isTraceEnabled()) {
-                    LOG.trace("HandlerPublisher (state: {}) release message from buffer to satisfy demand: {}", state, outstandingDemand);
-                }
-                publishMessage(buffer.remove());
-            }
-            if (buffer.isEmpty()) {
-                if (outstandingDemand > 0) {
-                    if (state == BUFFERING) {
-                        state = DEMANDING;
-                    } // otherwise we're draining
-                    requestDemand();
-                } else if (state == BUFFERING) {
-                    state = IDLE;
-                }
-            }
         }
 
         private void illegalDemand() {

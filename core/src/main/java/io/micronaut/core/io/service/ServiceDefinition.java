@@ -32,7 +32,9 @@ public interface ServiceDefinition<T> {
     /**
      * @return is the service present
      */
-    boolean isPresent();
+    default boolean isPresent() {
+        return false;
+    }
 
     /**
      * Load the service of throw the given exception.
@@ -42,7 +44,13 @@ public interface ServiceDefinition<T> {
      * @return The instance
      * @throws X The exception concrete type
      */
-    <X extends Throwable> T orElseThrow(Supplier<? extends X> exceptionSupplier) throws X;
+    default <X extends Throwable> T orElseThrow(Supplier<? extends X> exceptionSupplier) throws X {
+        try {
+            return load();
+        } catch (Throwable err) {
+            throw exceptionSupplier.get();
+        }
+    }
 
     /**
      * @return load the service

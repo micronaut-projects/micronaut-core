@@ -83,6 +83,24 @@ public class UploadControllerSpec {
     }
 
     @Test
+    public void testFileUploadOutputStream() {
+        MultipartBody body = MultipartBody.builder()
+                .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".getBytes())
+                .build();
+
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
+                HttpRequest.POST("/upload/outputStream", body)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String.class
+        ));
+        HttpResponse<String> response = flowable.blockFirst();
+
+        assertEquals(HttpStatus.OK.getCode(), response.code());
+        assertEquals("Uploaded", response.getBody().get());
+    }
+
+    @Test
     public void testCompletedFileUpload() {
         MultipartBody body = MultipartBody.builder()
                 .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".getBytes())

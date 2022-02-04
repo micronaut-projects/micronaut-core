@@ -20,50 +20,37 @@ Since browsers don't support `h2c` and in general https://http2.github.io/http2-
 [source,yaml]
 ----
 micronaut:
-  ssl:
-    enabled: true
-    buildSelfSigned: true
   server:
     http-version: 2.0
+    ssl:
+      enabled: true
+      buildSelfSigned: true
 ----
 
 For production, see the <<https, configuring HTTPS>> section of the documentation.
 
 Note that if your deployment environment uses JDK 8, or for improved support for OpenSSL, define the following dependencies on Netty Tomcat Native:
 
-dependency:io.netty:netty-tcnative:2.0.40.Final[scope="runtimeOnly"]
+dependency:io.netty:netty-tcnative:2.0.46.Final[scope="runtimeOnly"]
 
-dependency:io.netty:netty-tcnative-boringssl-static:2.0.40.Final[scope="runtimeOnly"]
+dependency:io.netty:netty-tcnative-boringssl-static:2.0.46.Final[scope="runtimeOnly"]
 
 In addition to a dependency on the appropriate native library for your architecture. For example:
 
 .Configuring Tomcat Native
 [source,groovy]
 ----
-runtimeOnly "io.netty:netty-tcnative-boringssl-static:2.0.40.Final:${Os.isFamily(Os.FAMILY_MAC) ? 'osx-x86_64' : 'linux-x86_64'}"
+runtimeOnly "io.netty:netty-tcnative-boringssl-static:2.0.46.Final:${Os.isFamily(Os.FAMILY_MAC) ? (Os.isArch("aarch64") ? "osx-aarch_64" : "osx-x86_64") : 'linux-x86_64'}"
 ----
 
 See the documentation on https://netty.io/wiki/forked-tomcat-native.html[Tomcat Native] for more information.
 
-==== HTTP/2 Clients
+==== HTTP/2 Server Push Support
 
-By default, Micronaut's HTTP client is configured to support HTTP 1.1. To enable support for HTTP/2, set the supported HTTP version in configuration:
+Support for server push has been added in Micronaut framework 3.2. Server push allows for a single request to trigger multiple responses. This is most often used in the case of browser based resources. The goal is to improve latency for the client, because they do not have to request that resource manually anymore, and can save a round trip.
 
-.Enabling HTTP/2 in Clients
-[source,yaml]
-----
-micronaut:
-  http:
-    client:
-      http-version: 2.0
-----
+A new interface, api:http.PushCapableHttpRequest[], has been created to support the feature. Simply add a api:http.PushCapableHttpRequest[] parameter to a controller method and use its API to trigger additional requests.
 
-Or by specifying the HTTP version to use when injecting the client:
+NOTE: api:http.PushCapableHttpRequest[] extends api:http.HttpRequest[] so its not necessary to have both as arguments in a controller method.
 
-.Injecting a HTTP/2 Client
-[source,java]
-----
-@Inject
-@Client(httpVersion=HttpVersion.HTTP_2_0)
-ReactorHttpClient client;
-----
+Before triggering additional requests, the `isServerPushSupported()` method should be called to ensure the feature is available. Once it's known the feature is supported, use the `serverPush(HttpRequest)` method to trigger additional requests. For example: `request.serverPush(HttpRequest.GET("/static/style.css"))`).

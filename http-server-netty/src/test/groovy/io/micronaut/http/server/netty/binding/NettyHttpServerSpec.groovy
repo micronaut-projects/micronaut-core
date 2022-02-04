@@ -202,8 +202,9 @@ class NettyHttpServerSpec extends Specification {
         int httpPort = SocketUtils.findAvailableTcpPort()
         PropertySource propertySource = PropertySource.of(
                 'micronaut.server.port':httpPort,
-                'micronaut.ssl.enabled': true,
-                'micronaut.ssl.buildSelfSigned': true,
+                'micronaut.server.ssl.enabled': true,
+                'micronaut.server.ssl.buildSelfSigned': true,
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
                 'micronaut.server.dualProtocol':true
         )
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, propertySource, Environment.TEST)
@@ -229,9 +230,9 @@ class NettyHttpServerSpec extends Specification {
         when:
         PropertySource propertySource = PropertySource.of(
                 'micronaut.server.port': unsecurePort,
-                'micronaut.ssl.port': securePort,
-                'micronaut.ssl.enabled': true,
-                'micronaut.ssl.buildSelfSigned': true,
+                'micronaut.server.ssl.port': securePort,
+                'micronaut.server.ssl.enabled': true,
+                'micronaut.server.ssl.buildSelfSigned': true,
                 'micronaut.server.dualProtocol':true
         )
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, propertySource, Environment.TEST)
@@ -265,9 +266,9 @@ class NettyHttpServerSpec extends Specification {
         when:
         PropertySource propertySource = PropertySource.of(
                 'micronaut.server.port': SocketUtils.findAvailableTcpPort(),
-                'micronaut.ssl.port': SocketUtils.findAvailableTcpPort(),
-                'micronaut.ssl.enabled': true,
-                'micronaut.ssl.buildSelfSigned': true,
+                'micronaut.server.ssl.port': SocketUtils.findAvailableTcpPort(),
+                'micronaut.server.ssl.enabled': true,
+                'micronaut.server.ssl.buildSelfSigned': true,
                 'micronaut.server.dualProtocol':true
         )
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, propertySource)

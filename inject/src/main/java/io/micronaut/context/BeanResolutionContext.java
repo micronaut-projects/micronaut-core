@@ -17,6 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.ValueResolver;
 import io.micronaut.inject.*;
@@ -41,6 +42,23 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     default void close() {
         // no-op
     }
+
+    /**
+     * Call back to destroy any {@link io.micronaut.context.annotation.InjectScope} beans.
+     *
+     * @see io.micronaut.context.annotation.InjectScope
+     * @since 3.1.0
+     */
+    @UsedByGeneratedCode
+    void destroyInjectScopedBeans();
+
+    /**
+     * Copy current context to be used later.
+     *
+     * @return The bean resolution context
+     * @since 3.1.0
+     */
+    BeanResolutionContext copy();
 
     /**
      * @return The context

@@ -417,8 +417,8 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @NonNull
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(@NonNull Class<T> annotationType) {
-        List<AnnotationValue<T>> list = new ArrayList<>();
-        Set<AnnotationValue<T>> uniqueValues = new HashSet<>();
+        List<AnnotationValue<T>> list = new ArrayList<>(10);
+        Set<AnnotationValue<T>> uniqueValues = new HashSet<>(10);
         for (AnnotationMetadata am : hierarchy) {
             for (AnnotationValue<T> tAnnotationValue : am.getAnnotationValuesByType(annotationType)) {
                 if (uniqueValues.add(tAnnotationValue)) {
@@ -429,10 +429,32 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         return list;
     }
 
+    @Override
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByName(String annotationType) {
+        if (annotationType == null) {
+            return Collections.emptyList();
+        }
+        List<AnnotationValue<T>> list = new ArrayList<>(10);
+        Set<AnnotationValue<T>> uniqueValues = new HashSet<>(10);
+        for (AnnotationMetadata am : hierarchy) {
+            for (AnnotationValue<T> tAnnotationValue : am.<T>getAnnotationValuesByName(annotationType)) {
+                if (uniqueValues.add(tAnnotationValue)) {
+                    list.add(tAnnotationValue);
+                }
+            }
+        }
+        return Collections.unmodifiableList(list);
+    }
+
     @NonNull
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(@NonNull Class<T> annotationType) {
         return hierarchy[0].getDeclaredAnnotationValuesByType(annotationType);
+    }
+
+    @Override
+    public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByName(String annotationType) {
+        return hierarchy[0].getDeclaredAnnotationValuesByName(annotationType);
     }
 
     @Override
@@ -881,5 +903,47 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
             }
         }
         return true;
+    }
+
+    @Override
+    public boolean isRepeatableAnnotation(Class<? extends Annotation> annotation) {
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (metadata.isRepeatableAnnotation(annotation)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isRepeatableAnnotation(String annotation) {
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (metadata.isRepeatableAnnotation(annotation)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public Optional<String> findRepeatableAnnotation(Class<? extends Annotation> annotation) {
+        for (AnnotationMetadata metadata : hierarchy) {
+            Optional<String> repeatable = metadata.findRepeatableAnnotation(annotation);
+            if (repeatable.isPresent()) {
+                return repeatable;
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<String> findRepeatableAnnotation(String annotation) {
+        for (AnnotationMetadata metadata : hierarchy) {
+            Optional<String> repeatable = metadata.findRepeatableAnnotation(annotation);
+            if (repeatable.isPresent()) {
+                return repeatable;
+            }
+        }
+        return Optional.empty();
     }
 }

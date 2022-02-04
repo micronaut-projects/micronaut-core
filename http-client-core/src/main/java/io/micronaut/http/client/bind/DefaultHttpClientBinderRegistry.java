@@ -24,7 +24,6 @@ import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
@@ -41,10 +40,10 @@ import io.micronaut.http.annotation.RequestAttribute;
 import io.micronaut.http.annotation.RequestBean;
 import io.micronaut.http.client.bind.binders.AttributeClientRequestBinder;
 import io.micronaut.http.client.bind.binders.HeaderClientRequestBinder;
+import io.micronaut.http.client.bind.binders.QueryValueClientArgumentRequestBinder;
 import io.micronaut.http.client.bind.binders.VersionClientRequestBinder;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
-import io.micronaut.http.uri.UriMatchVariable;
 import jakarta.inject.Singleton;
 import kotlin.coroutines.Continuation;
 
@@ -95,38 +94,7 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
         byType.put(Argument.of(Locale.class).typeHashCode(), (ClientArgumentRequestBinder<Locale>) (context, uriContext, value, request) -> {
             request.header(HttpHeaders.ACCEPT_LANGUAGE, value.toLanguageTag());
         });
-        byAnnotation.put(QueryValue.class, (context, uriContext, value, request) -> {
-            String parameterName = context.getAnnotationMetadata().stringValue(QueryValue.class)
-                    .filter (StringUtils::isNotEmpty)
-                    .orElse(context.getArgument().getName());
-
-            final UriMatchVariable uriVariable = uriContext.getUriTemplate().getVariables()
-                    .stream()
-                    .filter(v -> v.getName().equals(parameterName))
-                    .findFirst()
-                    .orElse(null);
-
-            if (uriVariable != null) {
-                if (uriVariable.isExploded()) {
-                    uriContext.setPathParameter(parameterName, value);
-                } else {
-                    String convertedValue
-                            = conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
-                            .filter(StringUtils::isNotEmpty)
-                            .orElse(null);
-                    if (convertedValue != null) {
-                        uriContext.setPathParameter(parameterName, convertedValue);
-                    } else {
-                        uriContext.setPathParameter(parameterName, value);
-                    }
-                }
-            } else {
-                conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
-                        .filter(StringUtils::isNotEmpty)
-                        .ifPresent(convertedValue -> uriContext.addQueryParameter(parameterName, convertedValue));
-            }
-        });
-
+        byAnnotation.put(QueryValue.class, new QueryValueClientArgumentRequestBinder(conversionService));
         byAnnotation.put(PathVariable.class, (context, uriContext, value, request) -> {
             String parameterName = context.getAnnotationMetadata().stringValue(PathVariable.class)
                     .filter (StringUtils::isNotEmpty)
@@ -156,14 +124,20 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
         });
         byAnnotation.put(RequestAttribute.class, (context, uriContext, value, request) -> {
             AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
+            String name = context.getArgument().getName();
             String attributeName = annotationMetadata
                     .stringValue(RequestAttribute.class)
                     .filter(StringUtils::isNotEmpty)
-                    .orElse(NameUtils.hyphenate(context.getArgument().getName()));
+                    .orElse(NameUtils.hyphenate(name));
             request.getAttributes().put(attributeName, value);
 
-            conversionService.convert(value, String.class)
-                    .ifPresent(v -> uriContext.getPathParameters().put(context.getArgument().getName(), v));
+            conversionService.convert(value, ConversionContext.STRING.with(context.getAnnotationMetadata()))
+                    .filter(StringUtils::isNotEmpty)
+                    .ifPresent(param -> {
+                        if (uriContext.getUriTemplate().getVariableNames().contains(name)) {
+                            uriContext.getPathParameters().put(name, param);
+                        }
+                    });
         });
         byAnnotation.put(Body.class, (context, uriContext, value, request) -> {
             request.body(value);

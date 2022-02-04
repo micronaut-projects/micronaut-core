@@ -1,7 +1,7 @@
 dependencies {
     annotationProcessor project(":inject-java")
     implementation project(":inject")
-    implementation project(":http-server-netty")
+    implementation project(":http-server")
     implementation project(":websocket")
 
     testCompileOnly project(":inject-groovy")

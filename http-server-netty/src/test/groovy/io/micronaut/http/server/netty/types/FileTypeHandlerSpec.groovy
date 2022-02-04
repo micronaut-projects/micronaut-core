@@ -30,8 +30,8 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.http.server.netty.types.files.FileTypeHandler
-import io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration
 import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType
 import io.micronaut.http.server.types.files.StreamedFile
@@ -278,7 +278,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
     void "test supports"() {
         when:
-        FileTypeHandler fileTypeHandler = new FileTypeHandler(new FileTypeHandlerConfiguration())
+        FileTypeHandler fileTypeHandler = new FileTypeHandler(new NettyHttpServerConfiguration.FileTypeHandlerConfiguration())
 
         then:
         fileTypeHandler.supports(type) == expected

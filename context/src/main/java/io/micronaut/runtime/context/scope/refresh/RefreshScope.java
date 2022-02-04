@@ -27,12 +27,14 @@ import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.scope.BeanCreationContext;
 import io.micronaut.context.scope.CreatedBean;
 import io.micronaut.context.scope.CustomScope;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.context.scope.Refreshable;
 import io.micronaut.scheduling.TaskExecutors;
+import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
@@ -57,20 +59,29 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 @Singleton
 @Requires(notEnv = {Environment.FUNCTION, Environment.ANDROID})
-public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<RefreshScope>, ApplicationEventListener<RefreshEvent> {
+public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<RefreshScope>, ApplicationEventListener<RefreshEvent>, Ordered {
+
+    public static final int POSITION = RefreshEventListener.DEFAULT_POSITION - 100;
 
     private final Map<BeanIdentifier, CreatedBean<?>> refreshableBeans = new ConcurrentHashMap<>(10);
     private final ConcurrentMap<Object, ReadWriteLock> locks = new ConcurrentHashMap<>();
     private final BeanContext beanContext;
-    private final Executor executorService;
 
     /**
      * @param beanContext     The bean context to allow DI of beans annotated with @Inject
      * @param executorService The executor service
      */
+    @Deprecated
     public RefreshScope(BeanContext beanContext, @Named(TaskExecutors.IO) Executor executorService) {
         this.beanContext = beanContext;
-        this.executorService = executorService;
+    }
+
+    /**
+     * @param beanContext     The bean context to allow DI of beans annotated with @Inject
+     */
+    @Inject
+    public RefreshScope(BeanContext beanContext) {
+        this.beanContext = beanContext;
     }
 
     @Override
@@ -116,7 +127,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
 
     @Override
     public void onApplicationEvent(RefreshEvent event) {
-        executorService.execute(() -> onRefreshEvent(event));
+        onRefreshEvent(event);
     }
 
     /**
@@ -133,6 +144,13 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
             disposeOfBeanSubset(changes.keySet());
             refreshSubsetOfConfigurationProperties(changes.keySet());
         }
+    }
+
+    @Override
+    public int getOrder() {
+        // configuration properties refresh should run first
+        // so use a higher priority
+        return POSITION;
     }
 
     @Override

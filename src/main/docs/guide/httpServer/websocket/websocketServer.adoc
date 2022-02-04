@@ -27,6 +27,7 @@ The ann:websocket.annotation.OnMessage[] method can define a parameter for the m
 * Any Java primitive or simple type (such as `String`). In fact, any type that can be converted from `ByteBuf` (you can register additional api:core.convert.TypeConverter[] beans to support a custom type).
 * A `byte[]`, a `ByteBuf` or a Java NIO `ByteBuffer`.
 * A POJO. In this case, it will be decoded by default as JSON using api:jackson.codec.JsonMediaTypeCodec[]. You can register a custom codec and define the content type of the handler using the ann:http.annotation.Consumes[] annotation.
+* A api:websocket.WebSocketPongMessage[]. This is a special case: The method will not receive regular messages, but instead handle WebSocket pongs that arrive as a reply to a ping sent to the client.
 
 === The @OnError Method
 
@@ -44,9 +45,9 @@ For sending messages asynchronously outside Micronaut annotated handler methods,
 
 === @ServerWebSocket and Scopes
 
-By default, a unique `@ServerWebSocket` instance is created for each WebSocket connection. This lets you retrieve the api:websocket.WebSocketSession[] from the `@OnOpen` handler and assign it to a field of the `@ServerWebSocket` instance.
+By default, the `@ServerWebSocket` instance is shared for all WebSocket connections. Extra care must be taken to synchronize local state to avoid thread safety issues.
 
-If you define the `@ServerWebSocket` as `@Singleton`, extra care must be taken to synchronize local state to avoid thread safety issues.
+If you prefer to have an instance for each connection, annotate the class with ann:context.annotation.Prototype[]. This lets you retrieve the api:websocket.WebSocketSession[] from the `@OnOpen` handler and assign it to a field of the `@ServerWebSocket` instance.
 
 === Sharing Sessions with the HTTP Session
 

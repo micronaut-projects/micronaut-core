@@ -213,7 +213,11 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                     return interceptedMethod.interceptResult();
                 }
                 return interceptedMethod.interceptResult(this);
-            } catch (RuntimeException e) {
+            } catch (Throwable e) {
+                if (!retryState.getCapturedException().isAssignableFrom(e.getClass())) {
+                    throw e;
+                }
+
                 if (!retryState.canRetry(e)) {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Cannot retry anymore. Rethrowing original exception for method: {}", context);

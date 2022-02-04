@@ -14,6 +14,25 @@ micronaut:
         log-format: common # A log format, optional, default is Common Log Format
 ----
 
+==== Filtering access logs
+
+If you wish to not log access to certain paths, you can specify regular expression filters in the configuration:
+
+.Filtering the access logs
+[source,yaml]
+----
+micronaut:
+  server:
+    netty:
+      access-logger:
+        enabled: true # Enables the access logger
+        logger-name: my-access-logger # A logger name, optional, default is `HTTP_ACCESS_LOGGER`
+        log-format: common # A log format, optional, default is Common Log Format
+        exclusions:
+          - /health
+          - /path/.+
+----
+
 ==== Logback Configuration
 
 In addition to enabling the access logger, you must add a logger for the specified or default logger name. For instance using the default logger name for logback:

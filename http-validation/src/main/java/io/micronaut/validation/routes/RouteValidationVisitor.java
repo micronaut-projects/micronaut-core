@@ -15,6 +15,7 @@
  */
 package io.micronaut.validation.routes;
 
+import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver.RawSegment;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver.Segment;
@@ -26,10 +27,7 @@ import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.validation.routes.rules.MissingParameterRule;
-import io.micronaut.validation.routes.rules.NullableParameterRule;
-import io.micronaut.validation.routes.rules.RequestBeanParameterRule;
-import io.micronaut.validation.routes.rules.RouteValidationRule;
+import io.micronaut.validation.routes.rules.*;
 
 import javax.annotation.processing.SupportedOptions;
 import java.util.ArrayList;
@@ -116,6 +114,7 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, Object
         rules.add(new MissingParameterRule());
         rules.add(new NullableParameterRule());
         rules.add(new RequestBeanParameterRule());
+        rules.add(new ClientTypesRule());
     }
 
     /**
@@ -141,7 +140,7 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, Object
     }
 
     private static int getVersion() {
-        String version = System.getProperty("java.version");
+        String version = CachedEnvironment.getProperty("java.version");
         if (version.startsWith("1.")) {
             version = version.substring(2, 3);
         } else {

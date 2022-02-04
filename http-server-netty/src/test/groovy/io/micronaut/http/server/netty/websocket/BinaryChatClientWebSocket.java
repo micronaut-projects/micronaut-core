@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.websocket;
 import io.micronaut.core.async.annotation.SingleResult;
+import io.micronaut.websocket.WebSocketPongMessage;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.annotation.OnMessage;
@@ -23,10 +24,11 @@ import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.websocketx.ContinuationWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Mono;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Future;
 
@@ -37,6 +39,7 @@ public abstract class BinaryChatClientWebSocket implements AutoCloseable{
     private String topic;
     private String username;
     private Collection<String> replies = new ConcurrentLinkedQueue<>();
+    private Collection<String> pingReplies = new ConcurrentLinkedQueue<>();
 
     @OnOpen
     public void onOpen(String topic, String username, WebSocketSession session) {
@@ -58,6 +61,10 @@ public abstract class BinaryChatClientWebSocket implements AutoCloseable{
         return replies;
     }
 
+    public Collection<String> getPingReplies() {
+        return pingReplies;
+    }
+
     public WebSocketSession getSession() {
         return session;
     }
@@ -67,6 +74,11 @@ public abstract class BinaryChatClientWebSocket implements AutoCloseable{
             byte[] message) {
         System.out.println("Client received message = " + new String(message));
         replies.add(new String(message));
+    }
+
+    @OnMessage
+    public void onPong(WebSocketPongMessage pong) {
+        pingReplies.add(pong.getContent().toString(StandardCharsets.UTF_8));
     }
 
     public abstract void send(byte[] message);
@@ -89,5 +101,9 @@ public abstract class BinaryChatClientWebSocket implements AutoCloseable{
         session.sendSync(new ContinuationWebSocketFrame(false, 0, "d"));
         session.sendSync(new ContinuationWebSocketFrame(false, 0, "e"));
         session.sendSync(new ContinuationWebSocketFrame(true, 0, "f"));
+    }
+
+    public CompletableFuture<?> sendPing(String msg) {
+        return session.sendPingAsync(msg.getBytes(StandardCharsets.UTF_8));
     }
 }

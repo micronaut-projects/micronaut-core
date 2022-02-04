@@ -220,7 +220,18 @@ public interface ApplicationContextBuilder {
      * @param args The arguments
      * @return This application
      */
-    default  @NonNull ApplicationContextBuilder args(@Nullable String... args) {
+    default @NonNull ApplicationContextBuilder args(@Nullable String... args) {
+        return this;
+    }
+
+    /**
+     * Sets whether the bootstrap environment should be initialized.
+     *
+     * @param bootstrapEnv True if it should be initialized. Default true
+     * @return This application
+     * @since 3.1.0
+     */
+    default @NonNull ApplicationContextBuilder bootstrapEnvironment(boolean bootstrapEnv) {
         return this;
     }
 

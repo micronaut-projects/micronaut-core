@@ -167,7 +167,7 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
             typeElement = elements.getTypeElement(name.replace('$', '.'));
         }
         return Optional.ofNullable(typeElement).map(typeElement1 ->
-                new JavaClassElement(typeElement1, annotationUtils.getAnnotationMetadata(typeElement1), this, Collections.emptyMap())
+                elementFactory.newClassElement(typeElement1, annotationUtils.getAnnotationMetadata(typeElement1))
         );
     }
 
@@ -373,11 +373,7 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
             if (enclosedElement instanceof TypeElement) {
                 final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(enclosedElement);
                 if (includeAll || Arrays.stream(stereotypes).anyMatch(annotationMetadata::hasStereotype)) {
-                    JavaClassElement classElement = new JavaClassElement(
-                            (TypeElement) enclosedElement,
-                            annotationMetadata,
-                            this
-                    );
+                    JavaClassElement classElement = elementFactory.newClassElement((TypeElement) enclosedElement, annotationMetadata);
 
                     if (!classElement.isAbstract()) {
                         classElements.add(classElement);

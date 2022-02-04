@@ -25,6 +25,7 @@ import io.micronaut.inject.BeanDefinition
  * @since 1.0
  */
 class EachPropertyParseSpec extends AbstractTypeElementSpec {
+
     void "test configuration properties inheritance from non-configuration properties"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''

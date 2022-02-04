@@ -15,6 +15,7 @@
  */
 package io.micronaut.annotation.processing.test
 
+import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.Qualifier
@@ -24,12 +25,11 @@ import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
-import org.intellij.lang.annotations.Language
-import spock.lang.Specification
 import io.micronaut.inject.provider.BeanProviderDefinition
 import io.micronaut.inject.provider.JakartaProviderBeanDefinition
-import io.micronaut.aop.internal.InterceptorRegistryBean
-import java.util.function.Predicate
+import org.intellij.lang.annotations.Language
+import spock.lang.Specification
+
 import java.util.stream.Collectors
 
 class AbstractKotlinCompilerSpec extends Specification {
@@ -63,13 +63,12 @@ class AbstractKotlinCompilerSpec extends Specification {
 
         return new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(classLoader), "test") {
             @Override
-            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences(Predicate<BeanDefinitionReference> predicate) {
+            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
                 // we want only the definitions we just compiled
                 def stream = result.fileNames.stream()
                         .filter(s -> s.endsWith('$Definition$Reference.class'))
                         .map(n -> classLoader.loadClass(n.substring(0, n.size() - 6).replace('/', '.')).newInstance())
-                if (predicate != null) stream = stream.filter(predicate)
-                return stream.collect(Collectors.toList()) + (includeAllBeans ? super.resolveBeanDefinitionReferences(predicate) : [
+                return stream.collect(Collectors.toList()) + (includeAllBeans ? super.resolveBeanDefinitionReferences() : [
                         new InterceptorRegistryBean(),
                         new BeanProviderDefinition(),
                         new JakartaProviderBeanDefinition(),

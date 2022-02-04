@@ -1,8 +1,11 @@
+plugins {
+    id 'io.micronaut.build.internal.functional-test'
+}
+
 dependencies {
     api project(":inject")
     api project(':aop')
     api libs.managed.groovy
-
 //    testImplementation 'javax.validation:validation-api:1.1.0.Final'
     testImplementation project(":context")
     testImplementation libs.javax.inject
@@ -31,9 +34,11 @@ dependencies {
     }
 
     testImplementation libs.managed.reactor
+
+    functionalTestImplementation(testFixtures(project(":test-suite")))
 }
 
-test {
+tasks.named("test") {
     exclude '**/*$_closure*'
 }
 

@@ -49,8 +49,8 @@ public class HttpRequestCertificateHandler extends ChannelInboundHandlerAdapter 
             } else {
                 request.removeAttribute(HttpAttributes.X509_CERTIFICATE, Certificate.class);
             }
-            super.channelRead(ctx, msg);
         }
+        super.channelRead(ctx, msg);
     }
 
     private static Optional<Certificate> getCertificate(final SslHandler handler) {

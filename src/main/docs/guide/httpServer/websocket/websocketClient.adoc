@@ -6,7 +6,7 @@ You can inject a reference to a api:websocket.WebSocketClient[] using the ann:ht
 ----
 @Inject
 @Client("http://localhost:8080")
-RxWebSocketClient webSocketClient;
+WebSocketClient webSocketClient;
 ----
 
 This lets you use the same service discovery and load balancing features for WebSocket clients.

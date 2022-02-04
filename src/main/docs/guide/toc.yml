@@ -124,6 +124,7 @@ httpServer:
     https: Securing the Server with HTTPS
     dualProtocol: Enabling HTTP and HTTPS
     accessLogger: Enabling Access Logger
+    secondaryServers: Starting Secondary Servers
   views:
     title: Server Side View Rendering
   openapi: OpenAPI / Swagger Support
@@ -151,6 +152,7 @@ httpClient:
     clientFallback: Client Fallbacks
     netflixHystrix: Netflix Hystrix Support
   clientFilter: HTTP Client Filters
+  clientHttp2: HTTP/2 Support
   clientSample: HTTP Client Sample
 cloud:
   title: Cloud Native Features
@@ -174,10 +176,7 @@ cloud:
   clientSideLoadBalancing:
     title: Client Side Load Balancing
     netflixRibbon: Netflix Ribbon Support
-  distributedTracing:
-    title: Distributed Tracing
-    zipkin: Tracing with Zipkin
-    jaeger: Tracing with Jaeger
+  distributedTracing: Distributed Tracing
 serverlessFunctions:
   title: Serverless Functions
   awsLambda: AWS Lambda
@@ -235,6 +234,8 @@ languageSupport:
     openandaop: Kotlin and AOP Advice
     kotlinretainparamnames: Kotlin and Retaining Parameter Names
     coroutines: Coroutines Support
+    coroutineTracingContextPropagation: Coroutine Tracing Context Propagation
+    kotlinContextPropagation: Reactive Context Propagation
   graal:
     title: Micronaut for GraalVM
     graalServices: Microservices as GraalVM native images

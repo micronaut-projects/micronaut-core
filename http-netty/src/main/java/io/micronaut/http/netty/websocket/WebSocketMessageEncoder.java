@@ -63,7 +63,7 @@ public class WebSocketMessageEncoder {
             String s = message.toString();
             return new TextWebSocketFrame(s);
         } else if (message instanceof ByteBuf) {
-            return new BinaryWebSocketFrame((ByteBuf) message);
+            return new BinaryWebSocketFrame(((ByteBuf) message).slice());
         } else if (message instanceof ByteBuffer) {
             return new BinaryWebSocketFrame(Unpooled.wrappedBuffer((ByteBuffer) message));
         } else {

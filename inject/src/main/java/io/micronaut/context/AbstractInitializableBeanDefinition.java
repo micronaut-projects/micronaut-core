@@ -894,12 +894,113 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
      */
     @SuppressWarnings({"unused", "unchecked"})
     @Internal
+    @Deprecated
     protected final Object getValueForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex, Qualifier qualifier) {
         MethodReference methodRef = methodInjection[methodIndex];
         Argument argument = methodRef.arguments[argIndex];
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments, methodRef.requiresReflection)) {
             return resolveValue(resolutionContext, context, methodRef.annotationMetadata, argument, qualifier);
+        }
+    }
+
+    /**
+     * Obtains a property value for the given method argument.
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The bean context
+     * @param methodIndex       The method index
+     * @param argIndex          The argument index
+     * @param propertyValue     The property value
+     * @param cliProperty       The cli property
+     * @return The value
+     */
+    @SuppressWarnings({"unused"})
+    @Internal
+    protected final Object getPropertyValueForMethodArgument(BeanResolutionContext resolutionContext,
+                                                             BeanContext context,
+                                                             int methodIndex,
+                                                             int argIndex,
+                                                             String propertyValue,
+                                                             String cliProperty) {
+        MethodReference methodRef = methodInjection[methodIndex];
+        Argument argument = methodRef.arguments[argIndex];
+        try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+                .pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments, methodRef.requiresReflection)) {
+            return resolvePropertyValue(resolutionContext, context, argument, propertyValue, cliProperty, false);
+        }
+    }
+
+    /**
+     * Obtains a placeholder value for the given method argument.
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The bean context
+     * @param methodIndex       The method index
+     * @param argIndex          The argument index
+     * @param value             The property value
+     * @return The value
+     */
+    @SuppressWarnings({"unused"})
+    @Internal
+    protected final Object getPropertyPlaceholderValueForMethodArgument(BeanResolutionContext resolutionContext,
+                                                                        BeanContext context,
+                                                                        int methodIndex,
+                                                                        int argIndex,
+                                                                        String value) {
+        MethodReference methodRef = methodInjection[methodIndex];
+        Argument argument = methodRef.arguments[argIndex];
+        try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+                .pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments, methodRef.requiresReflection)) {
+            return resolvePropertyValue(resolutionContext, context, argument, value, null, true);
+        }
+    }
+
+    /**
+     * Obtains a property value for the given method argument.
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The bean context
+     * @param setterName        The setter name
+     * @param argument          The argument
+     * @param propertyValue     The property value
+     * @param cliProperty       The cli property
+     * @return The value
+     */
+    @SuppressWarnings({"unused"})
+    @Internal
+    protected final Object getPropertyValueForSetter(BeanResolutionContext resolutionContext,
+                                                     BeanContext context,
+                                                     String setterName,
+                                                     Argument<?> argument,
+                                                     String propertyValue,
+                                                     String cliProperty) {
+        try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+                .pushMethodArgumentResolve(this, setterName, argument, new Argument[] {argument}, false)) {
+            return resolvePropertyValue(resolutionContext, context, argument, propertyValue, cliProperty, false);
+        }
+    }
+
+    /**
+     * Obtains a placeholder value for the given method argument.
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The bean context
+     * @param setterName        The setter name
+     * @param argument          The argument
+     * @param value             The value
+     * @return The value
+     */
+    @SuppressWarnings({"unused"})
+    @Internal
+    protected final Object getPropertyPlaceholderValueForSetter(BeanResolutionContext resolutionContext,
+                                                                BeanContext context,
+                                                                String setterName,
+                                                                Argument<?> argument,
+                                                                String value) {
+        try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+                .pushMethodArgumentResolve(this, setterName, argument, new Argument[] {argument}, false)) {
+            return resolvePropertyValue(resolutionContext, context, argument, value, null, true);
         }
     }
 
@@ -915,6 +1016,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
      */
     @Internal
     @UsedByGeneratedCode
+    @Deprecated
     protected final boolean containsValueForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex, boolean isValuePrefix) {
         MethodReference methodRef = methodInjection[methodIndex];
         AnnotationMetadata parentAnnotationMetadata = methodRef.annotationMetadata;
@@ -942,7 +1044,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         Argument argument = resolveArgument(context, argIndex, methodRef.arguments);
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments, methodRef.requiresReflection)) {
-            return resolveBean(resolutionContext, context, argument, qualifier);
+            return resolveBean(resolutionContext, context, argument, qualifier, true);
         }
     }
 
@@ -965,6 +1067,49 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         Argument argument = resolveArgument(context, argumentIndex, methodRef.arguments);
         try (BeanResolutionContext.Path ignored =
                      resolutionContext.getPath().pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments, methodRef.requiresReflection)) {
+            return resolveBeansOfType(resolutionContext, context, argument, resolveEnvironmentArgument(context, genericType), qualifier);
+        }
+    }
+
+    /**
+     * Obtains a bean definition for the method at the given index and the argument at the given index
+     * <p>
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The context
+     * @param setterName        The setter name
+     * @param argument          The argument
+     * @param qualifier         The qualifier
+     * @return The resolved bean
+     */
+    @Internal
+    @SuppressWarnings("WeakerAccess")
+    @UsedByGeneratedCode
+    protected final Object getBeanForSetter(BeanResolutionContext resolutionContext, BeanContext context, String setterName, Argument argument, Qualifier qualifier) {
+        try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+                .pushMethodArgumentResolve(this, setterName, argument, new Argument[] {argument}, false)) {
+            return resolveBean(resolutionContext, context, argument, qualifier, true);
+        }
+    }
+
+    /**
+     * Obtains all bean definitions for a method argument at the given index.
+     * <p>
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The context
+     * @param setterName        The setter name
+     * @param argument          The argument
+     * @param genericType       The generic type
+     * @param qualifier         The qualifier
+     * @return The resolved bean
+     */
+    @Internal
+    @UsedByGeneratedCode
+    protected final Collection<Object> getBeansOfTypeForSetter(BeanResolutionContext resolutionContext, BeanContext context, String setterName, Argument argument, Argument genericType, Qualifier qualifier) {
+        try (BeanResolutionContext.Path ignored =
+                     resolutionContext.getPath().pushMethodArgumentResolve(this, setterName, argument, new Argument[] {argument}, false)) {
             return resolveBeansOfType(resolutionContext, context, argument, resolveEnvironmentArgument(context, genericType), qualifier);
         }
     }
@@ -1058,12 +1203,95 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
      */
     @Internal
     @UsedByGeneratedCode
+    @Deprecated
     protected final Object getValueForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex, Qualifier qualifier) {
         MethodReference constructorRef = (MethodReference) constructor;
         Argument<?> argument = constructorRef.arguments[argIndex];
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(this, argument)) {
             try {
                 Object result = resolveValue(resolutionContext, context, constructorRef.annotationMetadata, argument, qualifier);
+
+                if (this instanceof ValidatedBeanDefinition) {
+                    ((ValidatedBeanDefinition) this).validateBeanArgument(
+                            resolutionContext,
+                            getConstructor(),
+                            argument,
+                            argIndex,
+                            result
+                    );
+                }
+
+                return result;
+            } catch (NoSuchBeanException | BeanInstantiationException e) {
+                throw new DependencyInjectionException(resolutionContext, argument, e);
+            }
+        }
+    }
+
+    /**
+     * Obtains a property value for a bean definition for a constructor at the given index
+     * <p>
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The context
+     * @param argIndex          The argument index
+     * @param propertyValue     The property value
+     * @param cliProperty       The cli property
+     * @return The resolved bean
+     */
+    @Internal
+    @UsedByGeneratedCode
+    protected final Object getPropertyValueForConstructorArgument(BeanResolutionContext resolutionContext,
+                                                                  BeanContext context,
+                                                                  int argIndex,
+                                                                  String propertyValue,
+                                                                  String cliProperty) {
+        MethodReference constructorRef = (MethodReference) constructor;
+        Argument<?> argument = constructorRef.arguments[argIndex];
+        try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(this, argument)) {
+            try {
+                Object result = resolvePropertyValue(resolutionContext, context, argument, propertyValue, cliProperty, false);
+
+                if (this instanceof ValidatedBeanDefinition) {
+                    ((ValidatedBeanDefinition) this).validateBeanArgument(
+                            resolutionContext,
+                            getConstructor(),
+                            argument,
+                            argIndex,
+                            result
+                    );
+                }
+
+                return result;
+            } catch (NoSuchBeanException | BeanInstantiationException e) {
+                throw new DependencyInjectionException(resolutionContext, argument, e);
+            }
+        }
+    }
+
+    /**
+     * Obtains a property value for a bean definition for a constructor at the given index
+     * <p>
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The context
+     * @param argIndex          The argument index
+     * @param propertyValue     The property value
+     * @return The resolved bean
+     */
+    @Internal
+    @UsedByGeneratedCode
+    protected final Object getPropertyPlaceholderValueForConstructorArgument(BeanResolutionContext resolutionContext,
+                                                                             BeanContext context,
+                                                                             int argIndex,
+                                                                             String propertyValue) {
+        MethodReference constructorRef = (MethodReference) constructor;
+        Argument<?> argument = constructorRef.arguments[argIndex];
+        try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(this, argument)) {
+            try {
+                Object result = resolvePropertyValue(resolutionContext, context, argument, propertyValue, null, true);
 
                 if (this instanceof ValidatedBeanDefinition) {
                     ((ValidatedBeanDefinition) this).validateBeanArgument(
@@ -1256,7 +1484,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         final Argument argument = resolveEnvironmentArgument(context, fieldInjection[fieldIndex].argument);
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushFieldResolve(this, argument, fieldInjection[fieldIndex].requiresReflection)) {
-            return resolveBean(resolutionContext, context, argument, qualifier);
+            return resolveBean(resolutionContext, context, argument, qualifier, true);
         }
     }
 
@@ -1273,10 +1501,52 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
      */
     @Internal
     @UsedByGeneratedCode
+    @Deprecated
     protected final Object getValueForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex, Qualifier qualifier) {
         FieldReference fieldRef = fieldInjection[fieldIndex];
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushFieldResolve(this, fieldRef.argument, fieldRef.requiresReflection)) {
             return resolveValue(resolutionContext, context, fieldRef.argument.getAnnotationMetadata(), fieldRef.argument, qualifier);
+        }
+    }
+
+    /**
+     * Obtains a property value for the given field from the bean context
+     * <p>
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The context
+     * @param argument          The argument
+     * @param propertyValue     The property value
+     * @param cliProperty       The clie property name
+     * @return The resolved bean
+     */
+    @Internal
+    @UsedByGeneratedCode
+    @Deprecated
+    protected final Object getPropertyValueForField(BeanResolutionContext resolutionContext, BeanContext context, Argument argument, String propertyValue, String cliProperty) {
+        try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushFieldResolve(this, argument, false)) {
+            return resolvePropertyValue(resolutionContext, context, argument, propertyValue, cliProperty, false);
+        }
+    }
+
+    /**
+     * Obtains a property placeholder value for the given field from the bean context
+     * <p>
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The context
+     * @param argument          The argument
+     * @param placeholder       The placeholder
+     * @return The resolved bean
+     */
+    @Internal
+    @UsedByGeneratedCode
+    @Deprecated
+    protected final Object getPropertyPlaceholderValueForField(BeanResolutionContext resolutionContext, BeanContext context, Argument argument, String placeholder) {
+        try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushFieldResolve(this, argument, false)) {
+            return resolvePropertyValue(resolutionContext, context, argument, placeholder, null, true);
         }
     }
 
@@ -1317,6 +1587,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
      */
     @Internal
     @UsedByGeneratedCode
+    @Deprecated
     protected final boolean containsValueForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex, boolean isValuePrefix) {
         FieldReference fieldRef = fieldInjection[fieldIndex];
         return resolveContainsValue(resolutionContext, context, fieldRef.argument.getAnnotationMetadata(), fieldRef.argument, isValuePrefix);
@@ -1464,6 +1735,30 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         }
     }
 
+    @Internal
+    @UsedByGeneratedCode
+    protected final boolean containsPropertiesValue(BeanResolutionContext resolutionContext, BeanContext context, String value) {
+        if (!(context instanceof ApplicationContext)) {
+            return false;
+        }
+        value = substituteWildCards(resolutionContext, value);
+
+        ApplicationContext applicationContext = (ApplicationContext) context;
+        return applicationContext.containsProperties(value);
+    }
+
+    @Internal
+    @UsedByGeneratedCode
+    protected final boolean containsPropertyValue(BeanResolutionContext resolutionContext, BeanContext context, String value) {
+        if (!(context instanceof ApplicationContext)) {
+            return false;
+        }
+        value = substituteWildCards(resolutionContext, value);
+
+        ApplicationContext applicationContext = (ApplicationContext) context;
+        return applicationContext.containsProperty(value);
+    }
+
     private boolean resolveContainsValue(BeanResolutionContext resolutionContext, BeanContext context, AnnotationMetadata parentAnnotationMetadata, Argument argument, boolean isValuePrefix) {
         if (!(context instanceof ApplicationContext)) {
             return false;
@@ -1545,11 +1840,88 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         }
     }
 
+    private Object resolvePropertyValue(BeanResolutionContext resolutionContext, BeanContext context, Argument<?> argument,
+                                        String stringValue, String cliProperty, boolean isPlaceholder) {
+        if (!(context instanceof PropertyResolver)) {
+            throw new DependencyInjectionException(resolutionContext, "@Value requires a BeanContext that implements PropertyResolver");
+        }
+        ApplicationContext applicationContext = (ApplicationContext) context;
+
+        Argument<?> argumentType = argument;
+        Class<?> wrapperType = null;
+        Class<?> type = argument.getType();
+        if (type == Optional.class) {
+            wrapperType = Optional.class;
+            argumentType = argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+        } else if (type == OptionalInt.class) {
+            wrapperType = OptionalInt.class;
+            argumentType = Argument.INT;
+        } else if (type == OptionalLong.class) {
+            wrapperType = OptionalLong.class;
+            argumentType = Argument.LONG;
+        } else if (type == OptionalDouble.class) {
+            wrapperType = OptionalDouble.class;
+            argumentType = Argument.DOUBLE;
+        }
+
+        ArgumentConversionContext<?> conversionContext = wrapperType != null ? ConversionContext.of(argumentType) : ConversionContext.of(argument);
+
+        Optional<?> value;
+        if (isPlaceholder) {
+            value = applicationContext.resolvePlaceholders(stringValue).flatMap(v -> applicationContext.getConversionService().convert(v, conversionContext));
+        } else {
+            stringValue = substituteWildCards(resolutionContext, stringValue);
+            value = applicationContext.getProperty(stringValue, conversionContext);
+            if (!value.isPresent() && cliProperty != null) {
+                value = applicationContext.getProperty(cliProperty, conversionContext);
+            }
+        }
+
+        if (argument.isOptional()) {
+            if (!value.isPresent()) {
+                return value;
+            } else {
+                Object convertedOptional = value.get();
+                if (convertedOptional instanceof Optional) {
+                    return convertedOptional;
+                } else {
+                    return value;
+                }
+            }
+        } else {
+            if (wrapperType != null) {
+                final Object v = value.orElse(null);
+                if (OptionalInt.class == wrapperType) {
+                    return v instanceof Integer ? OptionalInt.of((Integer) v) : OptionalInt.empty();
+                } else if (OptionalLong.class == wrapperType) {
+                    return v instanceof Long ? OptionalLong.of((Long) v) : OptionalLong.empty();
+                } else if (OptionalDouble.class == wrapperType) {
+                    return v instanceof Double ? OptionalDouble.of((Double) v) : OptionalDouble.empty();
+                }
+            }
+            if (value.isPresent()) {
+                return value.get();
+            } else {
+                if (argument.isDeclaredNullable()) {
+                    return null;
+                }
+                String finalStringValue = stringValue;
+                return argument.getAnnotationMetadata().getValue(Bindable.class, "defaultValue", argument)
+                        .orElseThrow(() -> DependencyInjectionException.missingProperty(resolutionContext, conversionContext, finalStringValue));
+            }
+        }
+    }
+
     private Object resolveBean(BeanResolutionContext resolutionContext, BeanContext context, Argument argument, @Nullable Qualifier qualifier) {
         return resolveBean(resolutionContext, context, argument, qualifier, false);
     }
 
-    private Object resolveBean(BeanResolutionContext resolutionContext, BeanContext context, Argument argument, @Nullable Qualifier qualifier, boolean resolveIsInnerConfiguration) {
+    private Object resolveBean(
+            BeanResolutionContext resolutionContext,
+            BeanContext context,
+            Argument argument,
+            @Nullable Qualifier qualifier,
+            boolean resolveIsInnerConfiguration) {
         qualifier = qualifier == null ? resolveQualifier(resolutionContext, argument, resolveIsInnerConfiguration) : qualifier;
         if (Qualifier.class.isAssignableFrom(argument.getType())) {
             return qualifier;
@@ -1654,7 +2026,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         if (resultGenericType == null) {
             throw new DependencyInjectionException(resolutionContext, "Type " + argument.getType() + " has no generic argument");
         }
-        qualifier = qualifier == null ? resolveQualifier(resolutionContext, argument) : qualifier;
+        qualifier = qualifier == null ? resolveQualifier(resolutionContext, argument, true) : qualifier;
         Collection beansOfType = beanContext.getBeansOfType(resolutionContext, resolveEnvironmentArgument(context, resultGenericType), qualifier);
         return coerceCollectionToCorrectType(argument.getType(), beansOfType, resolutionContext, argument);
     }
@@ -1735,12 +2107,12 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
 
     private Qualifier resolveQualifierWithInnerConfiguration(BeanResolutionContext resolutionContext, Argument argument, boolean innerConfiguration) {
         boolean hasMetadata = argument.getAnnotationMetadata() != AnnotationMetadata.EMPTY_METADATA;
-        Qualifier qualifier = null;
+        Qualifier<?> qualifier = null;
         boolean isIterable = isIterable() || resolutionContext.get(EachProperty.class.getName(), Class.class).map(getBeanType()::equals).orElse(false);
         if (isIterable) {
-            Optional<Qualifier> optional = resolutionContext.get(AnnotationUtil.QUALIFIER, Map.class)
-                    .map(map -> (Qualifier) map.get(argument));
-            qualifier = optional.orElse(null);
+            qualifier = resolutionContext.get(AnnotationUtil.QUALIFIER, Map.class)
+                    .map(map -> (Qualifier<?>) map.get(argument))
+                    .orElse(null);
         }
         if (qualifier == null) {
             if ((hasMetadata && argument.isAnnotationPresent(Parameter.class)) ||

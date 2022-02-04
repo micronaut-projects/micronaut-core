@@ -33,6 +33,7 @@ import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.EmptyByteBuf;
 import io.netty.util.ReferenceCounted;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -46,6 +47,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Singleton
 public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> implements NonBlockingBodyArgumentBinder<Publisher> {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);

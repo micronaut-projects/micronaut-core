@@ -1,3 +1,8 @@
+
+internalSanityChecks {
+    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 16)
+}           
+
 dependencies {
     annotationProcessor project(":inject-java")
 
@@ -11,3 +16,7 @@ dependencies {
     testAnnotationProcessor project(":inject-java")
     testImplementation project(":inject-groovy-test")
 }
+
+
+//compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
+//compileTestGroovy.groovyOptions.fork = true

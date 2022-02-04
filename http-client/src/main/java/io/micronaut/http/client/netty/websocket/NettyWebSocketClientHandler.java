@@ -33,6 +33,7 @@ import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.websocket.CloseReason;
+import io.micronaut.websocket.WebSocketPongMessage;
 import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.bind.WebSocketState;
 import io.micronaut.websocket.bind.WebSocketStateBinderRegistry;
@@ -45,6 +46,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.ssl.SslHandler;
@@ -78,6 +80,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     private final WebSocketStateBinderRegistry webSocketStateBinderRegistry;
     private FullHttpResponse handshakeResponse;
     private Argument<?> clientBodyArgument;
+    private Argument<?> clientPongArgument;
 
     /**
      * Default constructor.
@@ -105,6 +108,8 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
         String clientPath = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class).orElse("");
         UriMatchTemplate matchTemplate = UriMatchTemplate.of(clientPath);
         this.matchInfo = matchTemplate.match(request.getPath()).orElse(null);
+
+        callOpenMethod(null);
     }
 
     @Override
@@ -123,6 +128,11 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     @Override
     public Argument<?> getBodyArgument() {
         return clientBodyArgument;
+    }
+
+    @Override
+    public Argument<?> getPongArgument() {
+        return clientPongArgument;
     }
 
     @Override
@@ -153,9 +163,9 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                 try {
                     emitter.error(new WebSocketClientException("Error finishing WebSocket handshake: " + e.getMessage(), e));
                 } finally {
-                    if (getSession().isOpen()) {
-                        getSession().close(CloseReason.INTERNAL_ERROR);
-                    }
+                    // clientSession isn't set yet, so we do the close manually instead of through session.close
+                    ch.writeAndFlush(new CloseWebSocketFrame(CloseReason.INTERNAL_ERROR.getCode(), CloseReason.INTERNAL_ERROR.getReason()));
+                    ch.close();
                 }
                 return;
             }
@@ -187,6 +197,26 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                     }
                 }
                 return;
+            }
+
+            if (pongHandler != null) {
+                BoundExecutable<?, ?> boundPong = binder.tryBind(pongHandler.getExecutableMethod(), webSocketBinder, new WebSocketState(clientSession, originatingRequest));
+                List<Argument<?>> unboundPongArguments = boundPong.getUnboundArguments();
+
+                if (unboundPongArguments.size() == 1 && unboundPongArguments.get(0).isAssignableFrom(WebSocketPongMessage.class)) {
+                    this.clientPongArgument = unboundPongArguments.get(0);
+                } else {
+                    this.clientPongArgument = null;
+
+                    try {
+                        emitter.error(new WebSocketClientException("WebSocket @OnMessage pong handler method " + targetBean.getClass().getSimpleName() + "." + messageHandler.getExecutableMethod() + " should define exactly 1 pong message parameter, but found: " + unboundArguments));
+                    } finally {
+                        if (getSession().isOpen()) {
+                            getSession().close(CloseReason.INTERNAL_ERROR);
+                        }
+                    }
+                    return;
+                }
             }
 
             Optional<? extends MethodExecutionHandle<?, ?>> opt = webSocketBean.openMethod();

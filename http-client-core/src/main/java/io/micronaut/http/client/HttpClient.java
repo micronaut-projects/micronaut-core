@@ -16,6 +16,7 @@
 package io.micronaut.http.client;
 
 import io.micronaut.context.LifeCycle;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
@@ -67,7 +68,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param <E>      The error type
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
-    <I, O, E> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType);
+    <I, O, E> Publisher<HttpResponse<O>> exchange(@NonNull HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType);
 
     /**
      * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned
@@ -85,7 +86,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param <O>      The response body type
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
-    default <I, O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType) {
+    default <I, O> Publisher<HttpResponse<O>> exchange(@NonNull HttpRequest<I> request, @NonNull Argument<O> bodyType) {
         return exchange(request, bodyType, DEFAULT_ERROR_TYPE);
     }
 
@@ -97,7 +98,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param <I>     The request body type
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
-    default <I> Publisher<HttpResponse<ByteBuffer>> exchange(HttpRequest<I> request) {
+    default <I> Publisher<HttpResponse<ByteBuffer>> exchange(@NonNull HttpRequest<I> request) {
         return exchange(request, ByteBuffer.class);
     }
 
@@ -108,7 +109,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param uri The Uri
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
-    default Publisher<HttpResponse<ByteBuffer>> exchange(String uri) {
+    default Publisher<HttpResponse<ByteBuffer>> exchange(@NonNull String uri) {
         return exchange(HttpRequest.GET(uri), ByteBuffer.class);
     }
 
@@ -121,7 +122,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param <O>      The response body type
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
-    default <O> Publisher<HttpResponse<O>> exchange(String uri, Class<O> bodyType) {
+    default <O> Publisher<HttpResponse<O>> exchange(@NonNull String uri, @NonNull Class<O> bodyType) {
         return exchange(HttpRequest.GET(uri), Argument.of(bodyType));
     }
 
@@ -135,7 +136,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param <O>      The response body type
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
-    default <I, O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, Class<O> bodyType) {
+    default <I, O> Publisher<HttpResponse<O>> exchange(@NonNull HttpRequest<I> request, @NonNull Class<O> bodyType) {
         return exchange(request, Argument.of(bodyType));
     }
 
@@ -151,7 +152,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param <E>      The error type
      * @return A {@link Publisher} that emits a result of the given type
      */
-    default <I, O, E> Publisher<O> retrieve(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
+    default <I, O, E> Publisher<O> retrieve(@NonNull HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType) {
         return Flux.from(exchange(request, bodyType, errorType)).map(response -> {
             if (bodyType.getType() == HttpStatus.class) {
                 return (O) response.getStatus();
@@ -182,7 +183,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param <O>      The response body type
      * @return A {@link Publisher} that emits a result of the given type
      */
-    default <I, O> Publisher<O> retrieve(HttpRequest<I> request, Argument<O> bodyType) {
+    default <I, O> Publisher<O> retrieve(@NonNull HttpRequest<I> request, @NonNull Argument<O> bodyType) {
         return retrieve(request, bodyType, DEFAULT_ERROR_TYPE);
     }
 
@@ -196,7 +197,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param <O>      The response body type
      * @return A {@link Publisher} that emits a result of the given type
      */
-    default <I, O> Publisher<O> retrieve(HttpRequest<I> request, Class<O> bodyType) {
+    default <I, O> Publisher<O> retrieve(@NonNull HttpRequest<I> request, @NonNull Class<O> bodyType) {
         return retrieve(request, Argument.of(bodyType));
     }
 
@@ -208,7 +209,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param <I>     The request body type
      * @return A {@link Publisher} that emits String result
      */
-    default <I> Publisher<String> retrieve(HttpRequest<I> request) {
+    default <I> Publisher<String> retrieve(@NonNull HttpRequest<I> request) {
         return retrieve(request, String.class);
     }
 
@@ -219,7 +220,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param uri The URI
      * @return A {@link Publisher} that emits String result
      */
-    default Publisher<String> retrieve(String uri) {
+    default Publisher<String> retrieve(@NonNull String uri) {
         return retrieve(HttpRequest.GET(uri), String.class);
     }
 
@@ -252,7 +253,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @return The client
      * @since 2.2.0
      */
-    static HttpClient create(@Nullable URL url, HttpClientConfiguration configuration) {
+    static HttpClient create(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
         return HttpClientFactoryResolver.getFactory().createClient(url, configuration);
     }
 }

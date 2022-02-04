@@ -1,0 +1,33 @@
+
+internalSanityChecks {
+    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 18)
+    expectedServiceCount.put('io.micronaut.inject.BeanConfiguration', 1)
+}           
+
+dependencies {
+    annotationProcessor project(":inject-java")
+    annotationProcessor project(":graal")
+
+    api project(":jackson-core")
+
+    api libs.managed.jackson.databind
+    api libs.managed.jackson.datatype.jdk8
+    api libs.managed.jackson.datatype.jsr310
+    compileOnly(libs.managed.jackson.module.kotlin) {
+        transitive = false
+    }
+    compileOnly(libs.managed.jackson.module.afterburner) {
+        transitive = false
+    }
+    compileOnly(libs.managed.jackson.module.parameterNames) {
+        transitive = false
+    }
+
+    testAnnotationProcessor project(":inject-java")
+    testImplementation project(":inject-java")
+    testImplementation project(":inject-java-test")
+    testImplementation project(":inject-groovy")
+    if (!JavaVersion.current().isJava9Compatible()) {
+        testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    }
+}

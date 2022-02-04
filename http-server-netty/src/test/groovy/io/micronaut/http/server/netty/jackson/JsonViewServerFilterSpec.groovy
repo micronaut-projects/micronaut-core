@@ -115,4 +115,15 @@ class JsonViewServerFilterSpec extends Specification {
         then:
         rsp.body() == JsonViewController.TEST_MODEL
     }
+
+    def "hidden properties on the post body to asBody are ignored"() {
+        when:
+        HttpResponse<TestModel> rsp = client.toBlocking().exchange(HttpRequest.POST('/jsonview/asBody', JsonViewController.TEST_MODEL), TestModel)
+
+        then:
+        rsp.body().firstName == JsonViewController.TEST_MODEL.firstName
+        rsp.body().lastName == JsonViewController.TEST_MODEL.lastName
+        rsp.body().birthdate == null
+        rsp.body().password == null
+    }
 }

@@ -34,6 +34,7 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.processing.JavaModelUtils;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassVisitor;
@@ -97,6 +98,15 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                     String.class
             )
     );
+    protected static final Method METHOD_GENERIC_PLACEHOLDER_SIMPLE = Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(
+                    Argument.class,
+                    "ofTypeVariable",
+                    Class.class,
+                    String.class,
+                    String.class
+            )
+    );
     protected static final Method METHOD_CREATE_TYPE_VARIABLE_SIMPLE = Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(
                     Argument.class,
@@ -120,6 +130,17 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                     Argument.class,
                     "ofTypeVariable",
                     Class.class,
+                    String.class,
+                    AnnotationMetadata.class,
+                    Argument[].class
+            )
+    );
+    private static final Method METHOD_CREATE_GENERIC_PLACEHOLDER_WITH_ANNOTATION_METADATA_GENERICS = Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(
+                    Argument.class,
+                    "ofTypeVariable",
+                    Class.class,
+                    String.class,
                     String.class,
                     AnnotationMetadata.class,
                     Argument[].class
@@ -317,13 +338,31 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         generatorAdapter.push(getTypeReference(objectType));
         // 2nd argument: the name
         generatorAdapter.push(argumentName);
-
-        // Argument.create( .. )
-        invokeInterfaceStaticMethod(
-                generatorAdapter,
-                Argument.class,
-                objectType.isTypeVariable() ? METHOD_CREATE_TYPE_VARIABLE_SIMPLE : METHOD_CREATE_ARGUMENT_SIMPLE
-        );
+        boolean isTypeVariable = objectType instanceof GenericPlaceholderElement || objectType.isTypeVariable();
+        if (isTypeVariable) {
+            String variableName = argumentName;
+            if (objectType instanceof GenericPlaceholderElement) {
+                GenericPlaceholderElement gpe = (GenericPlaceholderElement) objectType;
+                variableName = gpe.getVariableName();
+            }
+            boolean hasVariable = !variableName.equals(argumentName);
+            if (hasVariable) {
+                generatorAdapter.push(variableName);
+            }
+            // Argument.create( .. )
+            invokeInterfaceStaticMethod(
+                    generatorAdapter,
+                    Argument.class,
+                    hasVariable ? METHOD_GENERIC_PLACEHOLDER_SIMPLE : METHOD_CREATE_TYPE_VARIABLE_SIMPLE
+            );
+        } else {
+            // Argument.create( .. )
+            invokeInterfaceStaticMethod(
+                    generatorAdapter,
+                    Argument.class,
+                    METHOD_CREATE_ARGUMENT_SIMPLE
+            );
+        }
     }
 
     /**
@@ -544,7 +583,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param declaringClassWriter The declaring class writer
      * @param generatorAdapter     The generator adapter
      * @param argumentName         The argument name
-     * @param classElement         The class name
+     * @param typedElement         The typed element
      * @param annotationMetadata   The annotation metadata
      * @param typeArguments        The type arguments
      * @param defaults             The annotation defaults
@@ -556,12 +595,12 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             ClassWriter declaringClassWriter,
             GeneratorAdapter generatorAdapter,
             String argumentName,
-            ClassElement classElement,
+            TypedElement typedElement,
             AnnotationMetadata annotationMetadata,
             Map<String, ClassElement> typeArguments,
             Map<String, Integer> defaults,
             Map<String, GeneratorAdapter> loadTypeMethods) {
-        Type argumentType = JavaModelUtils.getTypeReference(classElement);
+        Type argumentType = JavaModelUtils.getTypeReference(typedElement);
 
         // 1st argument: The type
         generatorAdapter.push(argumentType);
@@ -569,16 +608,27 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         // 2nd argument: The argument name
         generatorAdapter.push(argumentName);
 
-        boolean hasAnnotations = annotationMetadata instanceof DefaultAnnotationMetadata;
+        boolean hasAnnotations = !annotationMetadata.isEmpty() && annotationMetadata instanceof DefaultAnnotationMetadata;
         boolean hasTypeArguments = typeArguments != null && !typeArguments.isEmpty();
+        boolean isGenericPlaceholder = typedElement instanceof GenericPlaceholderElement;
+        boolean isTypeVariable = isGenericPlaceholder || ((typedElement instanceof ClassElement) && ((ClassElement) typedElement).isTypeVariable());
+        String variableName = argumentName;
+        if (isGenericPlaceholder) {
+            variableName = ((GenericPlaceholderElement) typedElement).getVariableName();
+        }
+        boolean hasVariableName = !variableName.equals(argumentName);
 
-        if (!hasAnnotations && !hasTypeArguments) {
+        if (!hasAnnotations && !hasTypeArguments && !isTypeVariable) {
             invokeInterfaceStaticMethod(
                     generatorAdapter,
                     Argument.class,
                     METHOD_CREATE_ARGUMENT_SIMPLE
             );
             return;
+        }
+
+        if (isTypeVariable && hasVariableName) {
+            generatorAdapter.push(variableName);
         }
 
         // 3rd argument: The annotation metadata
@@ -610,12 +660,22 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             generatorAdapter.visitInsn(ACONST_NULL);
         }
 
-        // Argument.create( .. )
-        invokeInterfaceStaticMethod(
-                generatorAdapter,
-                Argument.class,
-                classElement.isTypeVariable() ? METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
-        );
+        if (isTypeVariable) {
+            // Argument.create( .. )
+            invokeInterfaceStaticMethod(
+                    generatorAdapter,
+                    Argument.class,
+                    hasVariableName ? METHOD_CREATE_GENERIC_PLACEHOLDER_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS
+            );
+        } else {
+
+            // Argument.create( .. )
+            invokeInterfaceStaticMethod(
+                    generatorAdapter,
+                    Argument.class,
+                    METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
+            );
+        }
     }
 
     /**
@@ -947,10 +1007,20 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param size          The size
      */
     protected static void pushNewArray(GeneratorAdapter methodVisitor, Class<?> arrayType, int size) {
+        final Type t = Type.getType(arrayType);
+        pushNewArray(methodVisitor, t, size);
+    }
+
+    /**
+     * @param methodVisitor The method visitor as {@link org.objectweb.asm.commons.GeneratorAdapter}
+     * @param arrayType     The array class
+     * @param size          The size
+     */
+    protected static void pushNewArray(GeneratorAdapter methodVisitor, Type arrayType, int size) {
         // the size of the array
         methodVisitor.push(size);
         // define the array
-        methodVisitor.newArray(Type.getType(arrayType));
+        methodVisitor.newArray(arrayType);
         // add a reference to the array on the stack
         if (size > 0) {
             methodVisitor.visitInsn(DUP);

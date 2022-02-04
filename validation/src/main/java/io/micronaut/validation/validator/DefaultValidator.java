@@ -1012,6 +1012,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             int parameterIndex,
             @NonNull AnnotationMetadata annotationMetadata,
             @Nullable Object parameterValue) {
+
+        final String currentMessageTemplate = context.getMessageTemplate().orElse(null);
         try {
             context.addParameterNode(parameterName, parameterIndex);
             final List<Class<? extends Annotation>> constraintTypes =
@@ -1040,18 +1042,9 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     }
                 }
             }
-
-            // Constraints applied to the class used as a parameter
-            final BeanIntrospection<Object> introspection = getBeanIntrospection(parameterType);
-            if (introspection != null) {
-                final List<Class<? extends Annotation>> pojoConstraints = introspection.getAnnotationTypesByStereotype(Constraint.class);
-
-                for (Class<? extends Annotation> pojoConstraint : pojoConstraints) {
-                    validatePojoInternal(rootClass, object, argumentValues, context, overallViolations, parameterType, parameterValue, pojoConstraint, introspection.getAnnotation(pojoConstraint));
-                }
-            }
         } finally {
             context.removeLast();
+            context.messageTemplate(currentMessageTemplate);
         }
     }
 
@@ -1127,7 +1120,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     null,
                     context,
                     overallViolations,
-                    rootBeanClass,
+                    object.getClass(),
                     object,
                     pojoConstraint,
                     introspection.getAnnotation(pojoConstraint));
@@ -1435,6 +1428,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 constrainedProperty.getName(), container
         );
 
+        final String currentMessageTemplate = context.getMessageTemplate().orElse(null);
         validatePropertyInternal(
                 rootBeanClass,
                 rootBean,
@@ -1446,6 +1440,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 propertyValue
         );
         context.removeLast();
+        context.messageTemplate(currentMessageTemplate);
     }
 
     private <T> void validatePropertyInternal(
@@ -1620,8 +1615,6 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             @NonNull Argument<T> argument,
             int index,
             @Nullable T value) throws BeanInstantiationException {
-
-
         final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
         final boolean hasValid = annotationMetadata.hasStereotype(Valid.class);
         final boolean hasConstraint = annotationMetadata.hasStereotype(Constraint.class);
@@ -2314,7 +2307,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         @Override
         public String toString() {
             return "DefaultConstraintViolation{" +
-                    "rootBean=" + rootBean.getClass() +
+                    "rootBean=" + rootBeanClass +
                     ", invalidValue=" + invalidValue +
                     ", path=" + path +
                     '}';

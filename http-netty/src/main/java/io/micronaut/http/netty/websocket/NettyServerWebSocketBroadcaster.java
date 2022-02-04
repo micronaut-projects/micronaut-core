@@ -16,16 +16,22 @@
 package io.micronaut.http.netty.websocket;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.MediaType;
 import io.micronaut.websocket.WebSocketBroadcaster;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
+import io.netty.channel.Channel;
+import io.netty.channel.group.ChannelGroupException;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.util.Attribute;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
+
+import java.nio.channels.ClosedChannelException;
+import java.util.Map;
 import java.util.function.Predicate;
 
 /**
@@ -76,17 +82,53 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
                     NettyWebSocketSession s = attr.get();
                     return s != null && s.isOpen() && filter.test(s);
                 }).addListener(future -> {
-                    if (future.isSuccess()) {
-                        emitter.next(message);
-                        emitter.complete();
-                    } else {
-                        Throwable cause = future.cause();
-                        emitter.error(new WebSocketSessionException("Broadcast Failure: " + cause.getMessage(), cause));
+                    if (!future.isSuccess()) {
+                        Throwable cause = extractBroadcastFailure(future.cause());
+                        if (cause != null) {
+                            emitter.error(new WebSocketSessionException("Broadcast Failure: " + cause.getMessage(), cause));
+                            return;
+                        }
                     }
+                    emitter.next(message);
+                    emitter.complete();
                 });
             } catch (Throwable e) {
                 emitter.error(new WebSocketSessionException("Broadcast Failure: " + e.getMessage(), e));
             }
         }, FluxSink.OverflowStrategy.BUFFER);
+    }
+
+    /**
+     * Attempt to extract a single failure from a failure of {@link io.netty.channel.group.ChannelGroup#write}
+     * exception. {@link io.netty.channel.group.ChannelGroup} aggregates exceptions into a {@link ChannelGroupException}
+     * that has no useful stacktrace. If there was only one actual failure, we will just forward that instead of the
+     * {@link ChannelGroupException}.
+     *
+     * We also need to ignore {@link ClosedChannelException}s.
+     */
+    @Nullable
+    private Throwable extractBroadcastFailure(Throwable failure) {
+        if (failure instanceof ChannelGroupException) {
+            Throwable singleCause = null;
+            for (Map.Entry<Channel, Throwable> entry : (ChannelGroupException) failure) {
+                Throwable entryCause = extractBroadcastFailure(entry.getValue());
+                if (entryCause != null) {
+                    if (singleCause == null) {
+                        singleCause = entryCause;
+                    } else {
+                        return failure;
+                    }
+                }
+            }
+            return singleCause;
+        } else if (failure instanceof ClosedChannelException) {
+            // ClosedChannelException can happen when there is a race condition between the call to writeAndFlush and
+            // the closing of a channel. session.isOpen will still return true, but when the write is actually
+            // performed, the channel is closed. Since we would have skipped the write anyway had we known the channel
+            // would go away, we can safely ignore this error.
+            return null;
+        } else {
+            return failure;
+        }
     }
 }

@@ -20,7 +20,11 @@ import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.util.StringUtils;
 import jakarta.inject.Named;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
@@ -107,6 +111,7 @@ public class Qualifiers {
      * @param <T>  The component type
      * @return The qualifier
      */
+    @UsedByGeneratedCode
     public static <T> Qualifier<T> byName(String name) {
         return new NameQualifier<>(null, name);
     }
@@ -188,6 +193,36 @@ public class Qualifiers {
                 return byName(n);
             }
         }
+        return new AnnotationMetadataQualifier<>(metadata, type);
+    }
+
+    /**
+     * <p>Builds a qualifier that uses the given repeatable annotation.</p>
+     *
+     * @param metadata The metadata
+     * @param repeatableType  The annotation repeatable type. That is the annotation specified to {@link java.lang.annotation.Repeatable#value()}
+     * @param <T>      The component type
+     * @return The qualifier
+     */
+    @UsedByGeneratedCode
+    public static <T> Qualifier<T> byRepeatableAnnotation(AnnotationMetadata metadata, String repeatableType) {
+        return new RepeatableAnnotationQualifier<>(metadata, repeatableType);
+    }
+
+    /**
+     * <p>Build a qualifier for the given annotation. </p>
+     *
+     * <p>Unlike {@link #byAnnotation(io.micronaut.core.annotation.AnnotationMetadata, String)} this method will not attempt to pick the qualifier strategy to use at runtime based on the passed annotation name.</p>
+     *
+     * @param metadata The metadata
+     * @param type     The annotation type
+     * @param <T>      The component type
+     * @return The qualifier
+     * @since 3.1.0
+     */
+    @UsedByGeneratedCode
+    @Internal
+    public static <T> Qualifier<T> byAnnotationSimple(AnnotationMetadata metadata, String type) {
         return new AnnotationMetadataQualifier<>(metadata, type);
     }
 
@@ -279,9 +314,24 @@ public class Qualifiers {
      * @param <T>                    The bean type
      * @return The qualifier
      * @since 3.0.0
+     * @deprecated Use {@link #byInterceptorBindingValues(java.util.Collection)}
      */
+    @Deprecated
     public static @NonNull
     <T> Qualifier<T> byInterceptorBinding(@NonNull Collection<String> bindingAnnotationNames) {
-        return new InterceptorBindingQualifier<>(bindingAnnotationNames);
+        return new InterceptorBindingQualifier<>(bindingAnnotationNames.toArray(StringUtils.EMPTY_STRING_ARRAY));
+    }
+
+    /**
+     * Reduces bean definitions by the given interceptor binding.
+     *
+     * @param binding The binding values to use
+     * @param <T>     The bean type
+     * @return The qualifier
+     * @since 3.3.0
+     */
+    public static @NonNull
+    <T> Qualifier<T> byInterceptorBindingValues(@NonNull Collection<AnnotationValue<?>> binding) {
+        return new InterceptorBindingQualifier<>(binding);
     }
 }

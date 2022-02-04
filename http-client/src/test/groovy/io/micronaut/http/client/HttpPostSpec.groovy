@@ -29,6 +29,7 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.multipart.CompletedFileUpload
+import io.micronaut.json.tree.JsonObject
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import reactor.core.publisher.Flux
@@ -378,6 +379,22 @@ class HttpPostSpec extends Specification {
         res.status == HttpStatus.NO_CONTENT
     }
 
+    void "test http post getBody should return right type"() {
+        when:
+        def request = HttpRequest.POST('/', JsonObject.createObjectNode([:]))
+
+        then:
+        request.getBody(String).get() == '{}'
+    }
+
+    void "test redirect uses GET"() {
+        when:
+        def res = client.toBlocking().exchange(HttpRequest.POST('/post/redirect', 'abc'), String)
+
+        then:
+        res.getBody(String).get() == 'foo'
+    }
+
     @Requires(property = 'spec.name', value = 'HttpPostSpec')
     @Controller('/post')
     static class PostController {
@@ -481,6 +498,21 @@ class HttpPostSpec extends Specification {
         @Post(uri = "/emptyBody")
         HttpResponse emptyBody() {
             HttpResponse.noContent()
+        }
+
+        @Post(uri = "/redirect")
+        HttpResponse redirect() {
+            return HttpResponse.redirect(URI.create("/post/redirectTarget"))
+        }
+
+        @Get(uri = "/redirectTarget")
+        String redirectTargetGet() {
+            return 'foo'
+        }
+
+        @Post(uri = "/redirectTarget")
+        String redirectTargetPost() {
+            return 'bar'
         }
     }
 

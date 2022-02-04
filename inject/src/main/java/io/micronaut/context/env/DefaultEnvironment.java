@@ -15,20 +15,21 @@
  */
 package io.micronaut.context.env;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.ApplicationContextConfiguration;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.io.file.DefaultFileSystemResourceLoader;
 import io.micronaut.core.io.file.FileSystemResourceLoader;
-import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.scan.BeanIntrospectionScanner;
+import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
@@ -36,15 +37,28 @@ import io.micronaut.inject.BeanConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.lang.annotation.Annotation;
-import java.net.HttpURLConnection;
+import java.net.InetAddress;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -61,6 +75,10 @@ import java.util.stream.Stream;
  */
 public class DefaultEnvironment extends PropertySourcePropertyResolver implements Environment {
 
+    private static final List<PropertySource> CONSTANT_PROPERTY_SOURCES = StaticOptimizations.get(ConstantPropertySources.class)
+            .map(ConstantPropertySources::getSources)
+            .orElse(Collections.emptyList());
+
     private static final String EC2_LINUX_HYPERVISOR_FILE = "/sys/hypervisor/uuid";
     private static final String EC2_LINUX_BIOS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/bios_vendor";
     private static final String EC2_WINDOWS_HYPERVISOR_CMD = "wmic path win32_computersystemproduct get uuid";
@@ -74,7 +92,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final int DEFAULT_READ_TIMEOUT = 500;
     private static final int DEFAULT_CONNECT_TIMEOUT = 500;
     // CHECKSTYLE:OFF
-    private static final String GOOGLE_COMPUTE_METADATA = "http://metadata.google.internal";
+    private static final String GOOGLE_COMPUTE_METADATA = "metadata.google.internal";
     // CHECKSTYLE:ON
     private static final String ORACLE_CLOUD_ASSET_TAG_FILE = "/sys/devices/virtual/dmi/id/chassis_asset_tag";
     private static final String ORACLE_CLOUD_WINDOWS_ASSET_TAG_CMD = "wmic systemenclosure get smbiosassettag";
@@ -114,8 +132,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         Set<String> environments = new LinkedHashSet<>(3);
         List<String> specifiedNames = new ArrayList<>(configuration.getEnvironments());
 
-        specifiedNames.addAll(0, Stream.of(System.getProperty(ENVIRONMENTS_PROPERTY),
-                System.getenv(ENVIRONMENTS_ENV))
+        specifiedNames.addAll(0, Stream.of(CachedEnvironment.getProperty(ENVIRONMENTS_PROPERTY),
+                CachedEnvironment.getenv(ENVIRONMENTS_ENV))
                 .filter(StringUtils::isNotEmpty)
                 .flatMap(s -> Arrays.stream(s.split(",")))
                 .map(String::trim)
@@ -340,8 +358,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
             return deduceEnvironments;
         } else {
-            String deduceProperty = System.getProperty(Environment.DEDUCE_ENVIRONMENT_PROPERTY);
-            String deduceEnv = System.getenv(Environment.DEDUCE_ENVIRONMENT_ENV);
+            String deduceProperty = CachedEnvironment.getProperty(Environment.DEDUCE_ENVIRONMENT_PROPERTY);
+            String deduceEnv = CachedEnvironment.getenv(Environment.DEDUCE_ENVIRONMENT_ENV);
 
             if (StringUtils.isNotEmpty(deduceEnv)) {
                 boolean deduce = Boolean.parseBoolean(deduceEnv);
@@ -389,7 +407,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         refreshablePropertySources.clear();
         List<PropertySource> propertySources = readPropertySourceList(name);
         addDefaultPropertySources(propertySources);
-        String propertySourcesSystemProperty = System.getProperty(Environment.PROPERTY_SOURCES_KEY);
+        String propertySourcesSystemProperty = CachedEnvironment.getProperty(Environment.PROPERTY_SOURCES_KEY);
         if (propertySourcesSystemProperty != null) {
             propertySources.addAll(readPropertySourceListFromFiles(propertySourcesSystemProperty));
         }
@@ -398,6 +416,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             propertySources.addAll(readPropertySourceListFromFiles(propertySourcesEnv));
         }
         refreshablePropertySources.addAll(propertySources);
+        readConstantPropertySources(name, propertySources);
 
         propertySources.addAll(this.propertySources.values());
         OrderUtil.sort(propertySources);
@@ -409,13 +428,28 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
     }
 
+    private void readConstantPropertySources(String name, List<PropertySource> propertySources) {
+        Set<String> propertySourceNames = Stream.concat(Stream.of(name), getActiveNames().stream().map(env -> name + "-" + env))
+                .collect(Collectors.toSet());
+        getConstantPropertySources().stream()
+                .filter(p -> propertySourceNames.contains(p.getName()))
+                .forEach(propertySources::add);
+    }
+
+    /**
+     * @return Property sources created at build time
+     */
+    protected List<PropertySource> getConstantPropertySources() {
+        return CONSTANT_PROPERTY_SOURCES;
+    }
+
     /**
      * Reads the value of MICRONAUT_CONFIG_FILES environment variable.
      *
      * @return The comma-separated list of files
      */
     protected String readPropertySourceListKeyFromEnvironment() {
-        return System.getenv(StringUtils.convertDotToUnderscore(Environment.PROPERTY_SOURCES_KEY));
+        return CachedEnvironment.getenv(StringUtils.convertDotToUnderscore(Environment.PROPERTY_SOURCES_KEY));
     }
 
     /**
@@ -665,25 +699,25 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         if (deduceEnvironments) {
             if (!environments.contains(ANDROID)) {
                 // deduce k8s
-                if (StringUtils.isNotEmpty(System.getenv(K8S_ENV))) {
+                if (StringUtils.isNotEmpty(CachedEnvironment.getenv(K8S_ENV))) {
                     environments.add(Environment.KUBERNETES);
                     environments.add(Environment.CLOUD);
                 }
                 // deduce CF
-                if (StringUtils.isNotEmpty(System.getenv(PCF_ENV))) {
+                if (StringUtils.isNotEmpty(CachedEnvironment.getenv(PCF_ENV))) {
                     environments.add(Environment.CLOUD_FOUNDRY);
                     environments.add(Environment.CLOUD);
                 }
 
                 // deduce heroku
-                if (StringUtils.isNotEmpty(System.getenv(HEROKU_DYNO))) {
+                if (StringUtils.isNotEmpty(CachedEnvironment.getenv(HEROKU_DYNO))) {
                     environments.add(Environment.HEROKU);
                     environments.add(Environment.CLOUD);
                     deduceComputePlatform = false;
                 }
 
                 // deduce GAE
-                if (StringUtils.isNotEmpty(System.getenv(GOOGLE_APPENGINE_ENVIRONMENT))) {
+                if (StringUtils.isNotEmpty(CachedEnvironment.getenv(GOOGLE_APPENGINE_ENVIRONMENT))) {
                     environments.add(Environment.GAE);
                     environments.add(Environment.GOOGLE_COMPUTE);
                     deduceComputePlatform = false;
@@ -734,7 +768,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
         if (deduceFunctionPlatform) {
             // deduce AWS Lambda
-            if (StringUtils.isNotEmpty(System.getenv(AWS_LAMBDA_FUNCTION_NAME_ENV))) {
+            if (StringUtils.isNotEmpty(CachedEnvironment.getenv(AWS_LAMBDA_FUNCTION_NAME_ENV))) {
                 environments.add(Environment.AMAZON_EC2);
                 environments.add(Environment.CLOUD);
             }
@@ -796,7 +830,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     private static ComputePlatform determineCloudProvider() {
-        String computePlatform = System.getProperty(CLOUD_PLATFORM_PROPERTY);
+        String computePlatform = CachedEnvironment.getProperty(CLOUD_PLATFORM_PROPERTY);
         if (computePlatform != null) {
 
             try {
@@ -806,7 +840,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
 
         }
-        boolean isWindows = System.getProperty("os.name")
+        boolean isWindows = CachedEnvironment.getProperty("os.name")
             .toLowerCase().startsWith("windows");
 
         if (isWindows ? isEC2Windows() : isEC2Linux()) {
@@ -835,24 +869,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @SuppressWarnings("MagicNumber")
     private static boolean isGoogleCompute() {
         try {
-            final HttpURLConnection con = createConnection(GOOGLE_COMPUTE_METADATA);
-            con.setRequestMethod("GET");
-            con.setDoOutput(true);
-            BufferedReader in = new BufferedReader(
-                new InputStreamReader(con.getInputStream()));
-            String inputLine;
-            StringBuilder response = new StringBuilder();
-
-            while ((inputLine = in.readLine()) != null) {
-                response.append(inputLine);
-            }
-            in.close();
-            if (con.getHeaderField("Metadata-Flavor") != null &&
-                con.getHeaderField("Metadata-Flavor").equalsIgnoreCase("Google")) {
-                return true;
-            }
-
-        } catch (IOException e) {
+            InetAddress.getByName(GOOGLE_COMPUTE_METADATA);
+            return true;
+        } catch (Exception e) {
             // well not google then
         }
         return false;
@@ -868,7 +887,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             ProcessBuilder builder = new ProcessBuilder();
             builder.command("cmd.exe", "/c", cmd);
             builder.redirectErrorStream(true);
-            builder.directory(new File(System.getProperty("user.home")));
+            builder.directory(new File(CachedEnvironment.getProperty("user.home")));
             Process process = builder.start();
             return Optional.of(process);
         } catch (IOException e) {
@@ -955,14 +974,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             // test negative
         }
         return false;
-    }
-
-    private static HttpURLConnection createConnection(String spec) throws IOException {
-        final URL url = new URL(spec);
-        final HttpURLConnection con = (HttpURLConnection) url.openConnection();
-        con.setReadTimeout(DEFAULT_READ_TIMEOUT);
-        con.setConnectTimeout(DEFAULT_CONNECT_TIMEOUT);
-        return con;
     }
 
     private static boolean isDigitalOcean() {

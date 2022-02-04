@@ -2,12 +2,27 @@ plugins {
     id "org.jetbrains.kotlin.jvm"
 }
 
+internalSanityChecks {
+    expectedServiceCount.put('io.micronaut.core.beans.BeanIntrospectionReference', 4)
+    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 21)
+}
+
+
+internalSanityChecks {
+    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 21)
+    expectedServiceCount.put('io.micronaut.core.beans.BeanIntrospectionReference', 4)
+}           
+
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")
     api project(":inject")
     api project(":core-reactive")
+    implementation libs.managed.reactor
     compileOnly libs.kotlinx.coroutines.core
+    compileOnly libs.kotlinx.coroutines.reactor
+
+    compileOnly libs.managed.jackson.annotations
 
     testCompileOnly project(":inject-groovy")
     testAnnotationProcessor project(":inject-java")
@@ -15,7 +30,7 @@ dependencies {
     testImplementation project(":runtime")
 }
 
-compileKotlin {
+tasks.named("compileKotlin") {
     kotlinOptions.jvmTarget = "1.8"
 }
 

@@ -2,7 +2,7 @@ ext {
     shadowJarEnabled = true
 }
 
-shadowJar {
+tasks.named("shadowJar") {
     exclude "module-info.class"
 }
 
@@ -33,8 +33,10 @@ spotless {
     }
 }
 
-processResources.dependsOn('micronautVersionInfo')
-task micronautVersionInfo(type: WriteProperties) {
-    outputFile = "${buildDir}/resources/main/micronaut-version.properties"
+def versionInfo = tasks.register("micronautVersionInfo", WriteProperties) {
+    outputFile = "${buildDir}/resources/version/micronaut-version.properties"
     property 'micronaut.version', projectVersion
+}
+tasks.named("processResources") {
+    from(versionInfo)
 }

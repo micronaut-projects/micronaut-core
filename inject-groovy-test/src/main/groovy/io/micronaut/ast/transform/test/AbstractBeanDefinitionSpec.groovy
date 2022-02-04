@@ -17,17 +17,24 @@ package io.micronaut.ast.transform.test
 
 import groovy.transform.CompileStatic
 import io.micronaut.aop.internal.InterceptorRegistryBean
+import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
+import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
 import io.micronaut.ast.groovy.visitor.GroovyElementFactory
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.Qualifier
 import io.micronaut.context.event.ApplicationEventPublisherFactory
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.io.scan.ClassPathResourceLoader
+import io.micronaut.core.naming.NameUtils
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
+import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.provider.BeanProviderDefinition
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
@@ -37,12 +44,6 @@ import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.Parameter
-import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
-import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
-import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.core.naming.NameUtils
-import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.ErrorCollector
@@ -50,9 +51,7 @@ import org.codehaus.groovy.control.SourceUnit
 import org.intellij.lang.annotations.Language
 import spock.lang.Specification
 
-import java.util.function.Predicate
 import java.util.stream.Collectors
-
 /**
  * @author graemerocher
  * @since 1.0
@@ -189,6 +188,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         sourceUnit.getErrorCollector() >> new ErrorCollector(new CompilerConfiguration())
         GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(sourceUnit, null)
         AnnotationMetadata metadata = element != null ? builder.build(element) : null
+        AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
 
@@ -199,6 +199,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
             getErrorCollector() >> null
         }, null)
         AnnotationMetadata metadata = method != null ? builder.build(method) : null
+        AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
 
@@ -208,6 +209,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         Parameter parameter = Arrays.asList(method.getParameters()).find { it.name == fieldName }
         GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(null, null)
         AnnotationMetadata metadata = method != null ? builder.build(new ExtendedParameter(method, parameter)) : null
+        AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
 
@@ -269,14 +271,13 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         return new DefaultApplicationContext(
                 ClassPathResourceLoader.defaultLoader(classLoader),"test") {
             @Override
-            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences(Predicate<BeanDefinitionReference> predicate) {
+            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
                 def references =  classLoader.generatedClasses.keySet()
                     .stream()
                     .filter({ name -> name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX) })
                     .map({ name -> (BeanDefinitionReference) classLoader.loadClass(name).newInstance() })
-                    .filter({ bdr -> predicate == null || predicate.test(bdr) })
                     .collect(Collectors.toList())
-                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences(predicate) : [
+                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences() : [
                         new InterceptorRegistryBean(),
                         new BeanProviderDefinition(),
                         new ApplicationEventPublisherFactory<>()

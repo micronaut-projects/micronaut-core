@@ -16,10 +16,12 @@
 package io.micronaut.http.client.stream
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
@@ -50,13 +52,41 @@ class ClientStreamSpec extends Specification {
         books.size() == 2
         books[0].title == "The Stand"
         books[1].title == "The Shining"
+    }
 
+    void "test a stream that produces an error with error type specified"() {
+        when:
+        Flux.from(bookClient.errorStream()).blockFirst()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.response.getBody(Map).get().get("error") == "from server"
+    }
+
+    void "test a stream that produces an error without an error type"() {
+        def client = embeddedServer.applicationContext.getBean(BookClientNoErrorType)
+
+        when:
+        Flux.from(client.errorStream()).blockFirst()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        !ex.response.getBody(Map).isPresent()
     }
 
 
-    @Client('/rxjava/stream')
+    @Client(value = '/rxjava/stream', errorType = Map)
     static interface BookClient extends BookApi {
 
+        @Get("/error")
+        Publisher<Book> errorStream()
+    }
+
+    @Client(value = '/rxjava/stream')
+    static interface BookClientNoErrorType extends BookApi {
+
+        @Get("/error")
+        Publisher<Book> errorStream()
     }
 
     @Controller("/rxjava/stream")
@@ -76,6 +106,11 @@ class ClientStreamSpec extends Specification {
                     new Book(title: "The Stand"),
                     new Book(title: "The Shining"),
             )
+        }
+
+        @Get("/error")
+        HttpResponse<Map> errorStream() {
+            return HttpResponse.serverError([error: "from server"])
         }
     }
 

@@ -8,7 +8,9 @@ import io.micronaut.context.annotation.Factory
 // tag::class[]
 @Factory
 class ProductInterceptors(private val productService: ProductService) {
+// end::class[]
 
+    // tag::constructor-interceptor[]
     @InterceptorBean(ProductBean::class)
     fun aroundConstruct(): ConstructorInterceptor<Product> { // <1>
         return ConstructorInterceptor { context: ConstructorInvocationContext<Product> ->
@@ -22,7 +24,7 @@ class ProductInterceptors(private val productService: ProductService) {
             product
         }
     }
-    // end::class[]
+    // end::constructor-interceptor[]
 
     // tag::method-interceptor[]
     @InterceptorBean(ProductBean::class)
@@ -43,6 +45,7 @@ class ProductInterceptors(private val productService: ProductService) {
         }
     }
     // end::method-interceptor[]
+
 // tag::class[]
 }
 // end::class[]

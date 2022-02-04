@@ -1,8 +1,16 @@
 
+
+internalSanityChecks {
+    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 30)
+    expectedServiceCount.put('io.micronaut.inject.BeanConfiguration', 1)
+}           
+
 dependencies {
     api project(":websocket")
     api project(":runtime")
     api project(":router")
+    compileOnly libs.kotlinx.coroutines.core
+    compileOnly libs.kotlinx.coroutines.reactor
     implementation libs.managed.reactor
     annotationProcessor project(":inject-java")
 }

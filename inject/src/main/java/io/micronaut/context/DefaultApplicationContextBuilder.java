@@ -15,18 +15,31 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.env.CommandLinePropertySource;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.cli.CommandLine;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.StringUtils;
 
 import java.lang.annotation.Annotation;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.ServiceLoader;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 /**
  * Implementation of {@link ApplicationContextBuilder}.
@@ -54,11 +67,13 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private boolean banner = true;
     private ClassPathResourceLoader classPathResourceLoader;
     private boolean allowEmptyProviders = false;
+    private Boolean bootstrapEnvironment = null;
 
     /**
      * Default constructor.
      */
     protected DefaultApplicationContextBuilder() {
+        loadApplicationContextCustomizer().configure(this);
     }
 
     @Override
@@ -90,6 +105,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public boolean isBannerEnabled() {
         return banner;
+    }
+
+    @Nullable
+    @Override
+    public Boolean isBootstrapEnvironmentEnabled() {
+        return bootstrapEnvironment;
     }
 
     @Override
@@ -252,6 +273,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
+    public @NonNull ApplicationContextBuilder bootstrapEnvironment(boolean bootstrapEnv) {
+        this.bootstrapEnvironment = bootstrapEnv;
+        return this;
+    }
+
+    @Override
     @SuppressWarnings("MagicNumber")
     public @NonNull ApplicationContext build() {
         ApplicationContext applicationContext = newApplicationContext();
@@ -286,7 +313,6 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         if (!configurationExcludes.isEmpty()) {
             environment.addConfigurationExcludes(configurationExcludes.toArray(StringUtils.EMPTY_STRING_ARRAY));
         }
-
         return applicationContext;
     }
 
@@ -298,7 +324,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @NonNull
     protected ApplicationContext newApplicationContext() {
         return new DefaultApplicationContext(
-            this
+                this
         );
     }
 
@@ -337,8 +363,39 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
-    public ApplicationContextBuilder allowEmptyProviders(boolean shouldAllow) {
+    public @NonNull ApplicationContextBuilder allowEmptyProviders(boolean shouldAllow) {
         this.allowEmptyProviders = shouldAllow;
         return this;
+    }
+
+    /**
+     * Returns a customizer which is the aggregation of all
+     * customizers found on classpath via service loading.
+     * @return an application customizer
+     */
+    @NonNull
+    private static ApplicationContextConfigurer loadApplicationContextCustomizer() {
+        ServiceLoader<ApplicationContextConfigurer> loader = ServiceLoader.load(
+                ApplicationContextConfigurer.class
+        );
+        List<ApplicationContextConfigurer> configurers = StreamSupport.stream(loader.spliterator(), false)
+                .collect(Collectors.toList());
+        if (configurers.isEmpty()) {
+            return ApplicationContextConfigurer.NO_OP;
+        }
+        if (configurers.size() == 1) {
+            return configurers.get(0);
+        }
+        OrderUtil.sort(configurers);
+        return new ApplicationContextConfigurer() {
+
+            @Override
+            public void configure(ApplicationContextBuilder builder) {
+                for (ApplicationContextConfigurer customizer : configurers) {
+                    customizer.configure(builder);
+                }
+            }
+
+        };
     }
 }

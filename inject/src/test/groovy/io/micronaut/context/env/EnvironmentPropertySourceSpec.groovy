@@ -2,8 +2,16 @@ package io.micronaut.context.env
 
 import com.github.stefanbirkner.systemlambda.SystemLambda
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.version.SemanticVersion
+import spock.lang.Requires
 import spock.lang.Specification
+import spock.util.environment.Jvm
 
+// fails due to https://issues.apache.org/jira/browse/GROOVY-10145
+@Requires({
+    SemanticVersion.isAtLeastMajorMinor(GroovySystem.version, 4, 0) ||
+            !Jvm.current.isJava16Compatible()
+})
 class EnvironmentPropertySourceSpec extends Specification {
 
     void "test disabling environment properties"() {

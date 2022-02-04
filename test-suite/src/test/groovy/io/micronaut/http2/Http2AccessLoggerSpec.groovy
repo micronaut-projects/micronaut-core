@@ -31,14 +31,15 @@ import java.util.concurrent.TimeUnit
 //@IgnoreIf({ !Jvm.current.isJava9Compatible() })
 class Http2AccessLoggerSpec extends Specification {
     @Shared @AutoCleanup EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
-            'micronaut.ssl.enabled': true,
+            'micronaut.server.ssl.enabled': true,
             "micronaut.server.http-version" : "2.0",
             "micronaut.http.client.http-version" : "2.0",
-            'micronaut.ssl.buildSelfSigned': true,
-            'micronaut.ssl.port': -1,
+            'micronaut.server.ssl.buildSelfSigned': true,
+            'micronaut.server.ssl.port': -1,
             "micronaut.http.client.log-level" : "TRACE",
             "micronaut.server.netty.log-level" : "TRACE",
-            'micronaut.server.netty.access-logger.enabled': true
+            'micronaut.server.netty.access-logger.enabled': true,
+            'micronaut.http.client.ssl.insecure-trust-all-certificates': true
     ])
     HttpClient client = server.getApplicationContext().getBean(HttpClient)
     static MemoryAppender appender = new MemoryAppender()
@@ -138,13 +139,14 @@ class Http2AccessLoggerSpec extends Specification {
     void "test HTTP/2 server with HTTP/1 client request works with access logger enabled"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
-                'micronaut.ssl.enabled': true,
+                'micronaut.server.ssl.enabled': true,
                 "micronaut.server.http-version" : "2.0",
-                'micronaut.ssl.buildSelfSigned': true,
-                'micronaut.ssl.port': -1,
+                'micronaut.server.ssl.buildSelfSigned': true,
+                'micronaut.server.ssl.port': -1,
                 "micronaut.http.client.log-level" : "TRACE",
                 "micronaut.server.netty.log-level" : "TRACE",
-                'micronaut.server.netty.access-logger.enabled': true
+                'micronaut.server.netty.access-logger.enabled': true,
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true
         ])
         HttpClient client = server.getApplicationContext().getBean(HttpClient)
         appender.events.clear()

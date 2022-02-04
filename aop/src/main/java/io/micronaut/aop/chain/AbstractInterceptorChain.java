@@ -16,21 +16,32 @@
 package io.micronaut.aop.chain;
 
 import io.micronaut.aop.Interceptor;
+import io.micronaut.aop.InterceptorBinding;
+import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.InvocationContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
+import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * Abstract interceptor chain implementation.
@@ -122,7 +133,7 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
                             }
 
                             @Override
-                            public boolean equalsType(Argument<?> other) {
+                            public boolean equalsType(@Nullable Argument<?> other) {
                                 return argument.equalsType(other);
                             }
 
@@ -161,5 +172,69 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
             }
         }
         throw new IllegalArgumentException("Argument [" + from + "] is not within the interceptor chain");
+    }
+
+    /**
+     * Resolve interceptor binding for the given annotation metadata and kind.
+     * @param annotationMetadata The annotation metadata
+     * @param kind The kind
+     * @return The binding
+     * @since 3.3.0
+     */
+    protected static @NonNull Collection<AnnotationValue<?>> resolveInterceptorValues(@NonNull AnnotationMetadata annotationMetadata,
+                                                                             @NonNull InterceptorKind kind) {
+        if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
+            final List<AnnotationValue<InterceptorBinding>> declaredValues =
+                    annotationMetadata.getDeclaredMetadata().getAnnotationValuesByType(InterceptorBinding.class);
+            final List<AnnotationValue<InterceptorBinding>> parentValues =
+                    ((AnnotationMetadataHierarchy) annotationMetadata).getRootMetadata()
+                    .getAnnotationValuesByType(InterceptorBinding.class);
+            if (CollectionUtils.isNotEmpty(declaredValues) || CollectionUtils.isNotEmpty(parentValues)) {
+                Set<AnnotationValue<?>> resolved = new HashSet<>(declaredValues.size() + parentValues.size());
+                Set<String> declared = new HashSet<>(declaredValues.size());
+                for (AnnotationValue<InterceptorBinding> declaredValue : declaredValues) {
+                    final String annotationName = declaredValue.stringValue().orElse(null);
+                    if (annotationName != null) {
+                        final InterceptorKind specifiedkind = declaredValue.enumValue("kind", InterceptorKind.class).orElse(null);
+                        if (specifiedkind == null || specifiedkind.equals(kind)) {
+                            if (!annotationMetadata.isRepeatableAnnotation(annotationName)) {
+                                declared.add(annotationName);
+                            }
+                            resolved.add(declaredValue);
+                        }
+                    }
+                }
+                for (AnnotationValue<InterceptorBinding> parentValue : parentValues) {
+                    final String annotationName = parentValue.stringValue().orElse(null);
+                    if (annotationName != null && !declared.contains(annotationName)) {
+                        final InterceptorKind specifiedkind = parentValue.enumValue("kind", InterceptorKind.class).orElse(null);
+                        if (specifiedkind == null || specifiedkind.equals(kind)) {
+                            resolved.add(parentValue);
+                        }
+                    }
+                }
+
+                return resolved;
+            } else {
+                return Collections.emptyList();
+            }
+        } else {
+            List<AnnotationValue<InterceptorBinding>> bindings = annotationMetadata
+                    .getAnnotationValuesByType(InterceptorBinding.class);
+            if (CollectionUtils.isNotEmpty(bindings)) {
+                return bindings
+                        .stream()
+                        .filter(av -> {
+                            if (!av.stringValue().isPresent()) {
+                                return false;
+                            }
+                            final InterceptorKind specifiedkind = av.enumValue("kind", InterceptorKind.class).orElse(null);
+                            return specifiedkind == null || specifiedkind.equals(kind);
+                        })
+                        .collect(Collectors.toSet());
+            } else {
+                return Collections.emptyList();
+            }
+        }
     }
 }

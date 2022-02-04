@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,11 @@
 package io.micronaut.http.server.netty.ssl;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceResolver;
+import io.micronaut.core.order.Ordered;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.ssl.ClientAuthentication;
@@ -25,6 +28,8 @@ import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.http.ssl.SslBuilder;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.http.ssl.SslConfigurationException;
+import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
+import io.micronaut.runtime.context.scope.refresh.RefreshEventListener;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ApplicationProtocolNames;
@@ -39,19 +44,17 @@ import javax.net.ssl.SSLException;
 import java.security.KeyStore;
 import java.util.Arrays;
 import java.util.Optional;
-
-import static io.micronaut.core.util.StringUtils.FALSE;
-import static io.micronaut.core.util.StringUtils.TRUE;
+import java.util.Set;
 
 /**
  * The Netty implementation of {@link SslBuilder} that generates an {@link SslContext} to create a server handle with
  * SSL support via user configuration.
  */
-@Requires(property = SslConfiguration.PREFIX + ".enabled", value = TRUE, defaultValue = FALSE)
-@Requires(property = SslConfiguration.PREFIX + ".build-self-signed", value = FALSE, defaultValue = FALSE)
+@Requires(condition = SslEnabledCondition.class)
+@Requires(condition = CertificateProvidedSslBuilder.SelfSignedNotConfigured.class)
 @Singleton
 @Internal
-public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implements ServerSslBuilder {
+public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implements ServerSslBuilder, RefreshEventListener, Ordered {
 
     private final ServerSslConfiguration ssl;
     private final HttpServerConfiguration httpServerConfiguration;
@@ -145,5 +148,40 @@ public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implem
             super.getKeyStore(ssl).ifPresent(keyStore -> keyStoreCache = keyStore);
         }
         return Optional.ofNullable(keyStoreCache);
+    }
+
+    @Override
+    public Set<String> getObservedConfigurationPrefixes() {
+        return CollectionUtils.setOf(
+                SslConfiguration.PREFIX,
+                ServerSslConfiguration.PREFIX
+        );
+    }
+
+    @Override
+    public void onApplicationEvent(RefreshEvent event) {
+        // clear caches
+        keyStoreCache = null;
+        trustStoreCache = null;
+    }
+
+    @Override
+    public int getOrder() {
+        return RefreshEventListener.DEFAULT_POSITION - 10;
+    }
+
+    static class SelfSignedNotConfigured extends BuildSelfSignedCondition {
+        @Override
+        protected boolean validate(ConditionContext context, boolean deprecatedPropertyFound, boolean newPropertyFound) {
+            if (deprecatedPropertyFound) {
+                context.fail("Deprecated  " + SslConfiguration.PREFIX + ".build-self-signed config detected, disabling provided certificate.");
+                return false;
+            } else if (newPropertyFound) {
+                context.fail(ServerSslConfiguration.PREFIX + ".build-self-signed config detected, disabling provided certificate.");
+                return false;
+            } else {
+                return true;
+            }
+        }
     }
 }

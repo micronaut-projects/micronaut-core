@@ -51,8 +51,7 @@ public interface ParameterElement extends TypedElement {
      * @return The parameter element
      */
     static @NonNull ParameterElement of(@NonNull Class<?> type, @NonNull String name) {
-        Objects.requireNonNull(name, "Name cannot be null");
-        return new ReflectParameterElement(ClassElement.of(type), name);
+        return of(ClassElement.of(type), name);
     }
 
     /**

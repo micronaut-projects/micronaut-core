@@ -1,5 +1,10 @@
 import java.time.Duration
 
+
+internalSanityChecks {
+    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 1)
+}           
+
 dependencies {
 	annotationProcessor project(":inject-java")
     api project(":http")
@@ -12,6 +17,6 @@ dependencies {
     testImplementation project(":inject-groovy")
 }
 
-test {
+tasks.named("test") {
     timeout = Duration.ofMinutes(5)
 }

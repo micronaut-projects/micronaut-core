@@ -1,3 +1,10 @@
+
+internalSanityChecks {
+    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 41)
+    expectedServiceCount.put('io.micronaut.core.beans.BeanIntrospectionReference', 2)
+    expectedServiceCount.put('io.micronaut.inject.BeanConfiguration', 1)
+}           
+
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")
