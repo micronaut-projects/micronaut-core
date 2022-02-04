@@ -8,6 +8,7 @@ Refreshed dependencies and the embedded Tomcat server now supports Java 17.
 
 === Other Module Upgrades
 
+- Micronaut RxJava2 1.2.0
 - Micronaut Rxjava3 2.2.0
 - Micronaut Reactor 2.2.0
 
