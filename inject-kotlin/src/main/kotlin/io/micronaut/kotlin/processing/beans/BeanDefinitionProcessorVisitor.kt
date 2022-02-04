@@ -32,6 +32,8 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
     private val configurationMetadataBuilder = KotlinConfigurationMetadataBuilder()
     private var configurationMetadata: ConfigurationMetadata? = null
     private val factoryMethodIndex = AtomicInteger(0)
+    private val readPrefixes: Array<String>
+    private val writePrefixes: Array<String>
 
     init {
         this.isAopProxyType = hasAroundStereotype(classElement.annotationMetadata) &&
@@ -55,6 +57,16 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
                 classElement.hasStereotype(DefaultScope::class.java) ||
                 classElement.hasDeclaredStereotype(Bean::class.java) ||
                 classElement.primaryConstructor.filter { it.hasStereotype(AnnotationUtil.INJECT) }.isPresent
+        this.readPrefixes = classElement.getValue(
+            AccessorsStyle::class.java,
+            "readPrefixes",
+            Array<String>::class.java)
+            .orElse(arrayOf(AccessorsStyle.DEFAULT_READ_PREFIX))
+        this.writePrefixes = classElement.getValue(
+            AccessorsStyle::class.java,
+            "writePrefixes",
+            Array<String>::class.java)
+            .orElse(arrayOf(AccessorsStyle.DEFAULT_WRITE_PREFIX))
     }
 
     companion object {
@@ -119,33 +131,39 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
             }
         } else if (isConfigurationProperties && propertyElement.writeMethod.isPresent) {
             val methodElement = propertyElement.writeMethod.get()
-            val parameterElement = methodElement.parameters[0]
-            val propertyMetadata = configurationMetadataBuilder.visitProperty(
-                classElement,
-                propertyElement.declaringType,
-                parameterElement.type.name,
-                propertyElement.name,
-                null,
-                null
-            )
-
-            propertyElement.annotate(Property::class.qualifiedName!!) { builder: AnnotationValueBuilder<Property> ->
-                builder.member("name", propertyMetadata.path)
-            }
-
-            beanWriter!!.visitSetterValue(
-                methodElement.declaringType,
-                methodElement,
-                false,
-                true
-            )
+            visitConfigPropsSetter(methodElement, propertyElement, propertyElement.name)
         }
     }
 
     private fun visitMethod(methodElement: MethodElement) {
         if (isFactoryClass && methodElement !is ConstructorElement && methodElement.hasDeclaredStereotype(Bean::class.qualifiedName, AnnotationUtil.SCOPE)) {
             visitFactoryMethod(methodElement)
+        } else if (isConfigurationProperties && NameUtils.isWriterName(methodElement.name, writePrefixes) && methodElement.parameters.size == 1) {
+            visitConfigPropsSetter(methodElement, methodElement, NameUtils.getPropertyNameForSetter(methodElement.name, writePrefixes))
         }
+    }
+
+    private fun visitConfigPropsSetter(methodElement: MethodElement, annotatedElement: Element, name: String) {
+        val parameterElement = methodElement.parameters[0]
+        val propertyMetadata = configurationMetadataBuilder.visitProperty(
+            classElement,
+            methodElement.declaringType,
+            parameterElement.type.name,
+            name,
+            null,
+            null
+        )
+
+        annotatedElement.annotate(Property::class.qualifiedName!!) { builder: AnnotationValueBuilder<Property> ->
+            builder.member("name", propertyMetadata.path)
+        }
+
+        beanWriter!!.visitSetterValue(
+            methodElement.declaringType,
+            methodElement,
+            false,
+            true
+        )
     }
 
     private fun visitFactoryMethod(methodElement: MethodElement) {
@@ -222,12 +240,9 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
             } else {
                 configurationMetadata!!.name
             }
-
-            classElement.mutateMember(
-                ConfigurationReader::class.qualifiedName!!,
-                "prefix",
-                computedPrefix
-            )
+            classElement.annotate(ConfigurationReader::class.java) { builder: AnnotationValueBuilder<ConfigurationReader> ->
+                builder.member("prefix", computedPrefix)
+            }
         }
 
         val beanWriter = BeanDefinitionWriter(classElement, configurationMetadataBuilder, visitorContext)
