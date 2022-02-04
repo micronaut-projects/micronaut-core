@@ -1,1 +1,65 @@
+Micronaut is an implementation of the JSR-330 specification for Dependency Injection.
+
+Dependency Injection (or Inversion of Control) is a widely adopted and common pattern in Java that allows loosely decoupling components to allow applications to be easily extended and tested. 
+
+The way in which objects are wired together is decoupled from the objects themselves in this model by a separate programming model. In the case of Micronaut this model is based annotations defined within the JSR-330 specification plus an extended set of annotations located within the https://docs.micronaut.io/latest/api/io/micronaut/context/annotation/package-summary.html[io.micronaut.context.annotation] package.
+
+These annotations are visited by the <<compilerArch, Micronaut Compiler>> which traverses the source code language AST and builds a model used to wire objects together at runtime. 
+
+NOTE: It is important to note that the actual object wiring is deferred until runtime.
+
+For Java code api:annotation.processing.BeanDefinitionInjectProcessor[] (which is a Java Annotation https://docs.oracle.com/en/java/javase/17/docs/api/java.compiler/javax/annotation/processing/Processor.html[Processor]) is invoked from the Java compiler for each class annotated with a bean definition annotation.
+
+NOTE: What constitutes a bean defining annotation is complex as it takes into account meta-annotations, but in general it is any annotation annotated with a JSR-330 bean `@Scope`
+
+The `BeanDefinitionInjectProcessor` will visit each bean in the user code source and generate additional byte code using the ASM byte code generation library that sits along side the annotated class in the same package.
+
 NOTE: For historic reasons the dependency injection processor does not use the api:inject.visitor.TypeElementVisitor[] API but will likely do so in the future
+
+Byte code generation is implemented in the api:inject.writer.BeanDefinitionWriter[] which contains methods to "visit" different aspects of the way is bean is defined (the api:inject.BeanDefinition[]).
+
+The following diagram illustrates the flow:
+
+image::arch/beanwriter.png[]
+
+For example given the following type:
+
+snippet::io.micronaut.docs.inject.intro.Vehicle[tags="class",indent=0]
+
+The following is generated:
+
+* A `example.$Vehicle$Definition$Reference` class that implements the api:inject.BeanDefinitionReference[] interface that allows the application to soft load the bean definition without loading all of the metadata or the class itself (in the case where the introspected class is itself not on the classpath). Since references are loaded via link:{jdkapi}/java/util/ServiceLoader.html[ServiceLoader] An entry in a generated `META-INF/services/io.micronaut.inject.BeanDefinitionReference` referring to this type is also generated at compilation time..
+* A `example.$Vehicle$Definition` which contains the actual api:inject.BeanDefinition[] information.
+
+A api:inject.BeanDefinition[] is a type that holds metadata about the particular type including:
+
+* Class level <<annotationArch, AnnotationMetadata>>
+* The computed JSR-330 `@Scope` and `@Qualifier`
+* Knowledge of the available api:inject.InjectionPoint[] instances
+* References to any api:inject.ExecutableMethod[] defined
+
+In addition the `BeanDefinition` contains logic which knows how the bean is wired together, including how the type is constructed and fields and/or methods injected.
+
+During compilation the ASM byte code library is used to fill out the details of the `BeanDefinition`, including a `build` method that, for the previous example, looks like:
+
+[source,java]
+----
+public Vehicle build(
+    BeanResolutionContext resolution, // <1>
+    BeanContext context, 
+    BeanDefinition definition) {
+    Vehicle bean = new Vehicle(
+        (Engine) super.getBeanForConstructorArgument( // <2>
+            resolution, 
+            context, 
+            0, // <3>
+            (Qualifier)null)
+    );
+    return bean;
+}
+----
+
+<1> The `BeanResolutionContext` is passed around to track circular bean references and improve error reporting. 
+<2> The type is instantiated and each constructor argument looked up by calling methods of api:context.AbstractInitializableBeanDefinition[]
+<3> In this case the index of the constructor argument is tracked
+

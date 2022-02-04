@@ -289,8 +289,8 @@ appendix:
     compilerArch: Compiler         
     annotationArch: Annotation Metadata
     introspectionArch: Bean Introspections
-    iocArch: Inversion of Control (IoC)
-    aopArch: Aspect Oriented Programming (AOP)
+    iocArch: Bean Definitions
+    aopArch: AOP Proxies
     containerArch: Application Container 
     httpServerArch: HTTP Server
     httpClientArch: HTTP Client
