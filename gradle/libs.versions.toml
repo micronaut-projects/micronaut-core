@@ -504,6 +504,10 @@ smallrye = { module = "io.smallrye:smallrye-fault-tolerance", version.ref = "sma
 
 systemlambda = { module = "com.github.stefanbirkner:system-lambda", version.ref = "systemlambda" }
 
+micronaut-tracing-core = { module = "io.micronaut.tracing:micronaut-tracing-core", version.ref = "managed-micronaut-tracing" }
+micronaut-tracing-jaeger = { module = "io.micronaut.tracing:micronaut-tracing-jaeger", version.ref = "managed-micronaut-tracing" }
+micronaut-tracing-zipkin = { module = "io.micronaut.tracing:micronaut-tracing-zipkin", version.ref = "managed-micronaut-tracing" }
+
 testcontainers-spock = { module = "org.testcontainers:spock", version.ref = "managed-testcontainers" }
 
 vertx = { module = "io.vertx:vertx-core", version.ref = "vertx" }
