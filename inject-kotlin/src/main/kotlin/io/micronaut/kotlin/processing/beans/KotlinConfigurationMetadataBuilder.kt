@@ -44,26 +44,14 @@ class KotlinConfigurationMetadataBuilder: ConfigurationMetadataBuilder<ClassElem
         val element = if (owningType.isInterface) owningType else declaringType
         prependSuperclasses(element, path)
         var type = declaringType
-        while (type.isInner) {
+        if (type.isInner) {
             // we have an inner class, so prepend inner class
             type = type.enclosingType.orElse(null)
             if (type != null) {
                 val parentMetadata = type.annotationMetadata
-                val parentConfig = parentMetadata.stringValue(ConfigurationReader::class.java)
-                if (parentConfig.isPresent) {
-                    val parentPath = parentConfig.get()
-                    if (parentMetadata.hasDeclaredAnnotation(EachProperty::class.java)) {
-                        if (parentMetadata.booleanValue(EachProperty::class.java, "list").orElse(false)) {
-                            path.insert(0, "$parentPath[*].")
-                        } else {
-                            path.insert(0, "$parentPath.*.")
-                        }
-                    } else {
-                        path.insert(0, "$parentPath.")
-                    }
-                    prependSuperclasses(declaringType, path)
-                } else {
-                    break
+                val prefix = parentMetadata.stringValue(ConfigurationReader::class.java, "prefix").orElse(null)
+                if (prefix != null && prefix.isNotEmpty()) {
+                    path.insert(0, "$prefix.")
                 }
             }
         }

@@ -70,10 +70,6 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
         return annotationMetadata
     }
 
-    fun mutateMember(annotationType: String, member: String, value: Any) {
-        this.annotationMetadata = DefaultAnnotationMetadata.mutateMember(annotationMetadata, annotationType, member, value)
-    }
-
     @NonNull
     override fun <T : Annotation?> annotate(
         @NonNull annotationType: String,
@@ -140,11 +136,11 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
     }
 
     private fun updateMetadataCaches() {
-        val declaringTypeName: String = if (this is MemberElement) {
+        val declaringTypeName: String = (if (this is MemberElement) {
             this.declaringType.name
         } else {
             this.name
-        }
+        }).replace('$', '.')
         AbstractAnnotationMetadataBuilder.addMutatedMetadata(declaringTypeName, nativeType, annotationMetadata)
         if (declaration is KSDeclaration) {
             visitorContext.getAnnotationUtils().invalidateMetadata(declaration)
