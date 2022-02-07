@@ -66,16 +66,16 @@ class HttpLocalizedMessageSourceSpec extends Specification {
         @Produces(MediaType.TEXT_PLAIN)
         String message() {
             return localizedMessageSource.getMessage("hello").get() + " " +
-            localizedMessageSource.getMessage("welcome.name" , "Sergio").get() + " " +
-            localizedMessageSource.getMessageOrDefault("bye" , "Good Bye")
+                    localizedMessageSource.getMessage("welcome.name", "Sergio").get() + " " +
+                    localizedMessageSource.getMessageOrDefault("bye", "Good Bye")
         }
 
         @Get("/default")
         @Produces(MediaType.TEXT_PLAIN)
         String messageOrDefault() {
             return localizedMessageSource.getMessageOrDefault("hello", "Foo") + " " +
-                    localizedMessageSource.getMessageOrDefault("welcome.name" , "Foo", "Sergio") + " " +
-                    localizedMessageSource.getMessageOrDefault("bye" , "Good Bye", ["foo": "bar"])
+                    localizedMessageSource.getMessageOrDefault("welcome.name", "Foo", "Sergio") + " " +
+                    localizedMessageSource.getMessageOrDefault("bye", "Good Bye", ["foo": "bar"])
         }
     }
 }
