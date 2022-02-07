@@ -15,10 +15,10 @@ The `AnnotationMetadata` API tries to address the following challenges:
 
 When the source for a type is visited an instance of api:inject.ast.ClassElement[] is constructed via the api:inject.ast.ElementFactory[] API.
 
-The `ElementFactory` uses an instance of api:inject.annotation.AbstractAnnotationMetadataBuilder[] which contains language specific implementations to construct `AnnotationMedata` for the underlying native type in the AST. In the case of Java this would be a `javax.model.element.TypeElement`.
+The api:inject.ast.ElementFactory[] uses an instance of api:inject.annotation.AbstractAnnotationMetadataBuilder[] which contains language specific implementations to construct `AnnotationMedata` for the underlying native type in the AST. In the case of Java this would be a `javax.model.element.TypeElement`.
 
 The basic flow is visualized below:
 
 image::arch/annotationmetadata.png[]
 
-Note that at compilation type the api:core.annotation.AnnotationMetadata[] is mutable and can be altered by implementations of api:inject.visitor.TypeElementVisitor[] by invoking the `annotate(..)` method of the api:inject.ast.Element[] API. However, at runtime the api:core.annotation.AnnotationMetadata[] is immutable and fixed. The purpose of this design to allow the compiler to be extended and for Micronaut to be able to interpret different source-level annotation-based programming models. This effectively allows decoupling the source code level annotation model from what is used at runtime such that different annotations can be used to represent the same thing (`javax.inject.Inject` or `jakarata.inject.Inject` or Spring's `@Autowired` etc.).
+Note that at compilation time the api:core.annotation.AnnotationMetadata[] is mutable and can be altered by implementations of api:inject.visitor.TypeElementVisitor[] by invoking the `annotate(..)` method of the api:inject.ast.Element[] API. However, at runtime the api:core.annotation.AnnotationMetadata[] is immutable and fixed. The purpose of this design to allow the compiler to be extended and for Micronaut to be able to interpret different source-level annotation-based programming models. This effectively allows decoupling the source code level annotation model from what is used at runtime such that different annotations can be used to represent the same thing (`javax.inject.Inject` or `jakarata.inject.Inject` or Spring's `@Autowired` etc.).
