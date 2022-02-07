@@ -19,5 +19,12 @@ The api:context.Environment[] is loaded from one or more defined api:context.env
 
 A developer can extend Micronaut to load a api:context.env.PropertySource[] through an entirely custom mechanism by adding an additional implementation and the associated `META-INF/services/io.micronaut.context.env.PropertySourceLoader` file references this class.
 
+A high level different between a api:context.BeanContext[] and an api:context.ApplicationContext[] is illustrated below:
 
+image::arch/applicationcontext.png[]
 
+As seen above the api:context.ApplicationContext[] loads the api:context.Environment[] which is used for multiple purposes including:
+
+* Enabling and disabling beans through <<conditionalBeans, Bean Requirements>>
+* Allowing dependency injection of configuration via <<valueAnnotation, @Value>> or ann:context.annotation.Property[]
+* Allowing binding of <<configurationProperties, Configuration Properties>>
