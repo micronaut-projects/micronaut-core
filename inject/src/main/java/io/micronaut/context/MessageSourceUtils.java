@@ -23,7 +23,7 @@ import java.util.Map;
 /**
  * Utility class used by {@link MessageSource} to create variables maps.
  * @author Sergio del Amo
- * @since 3.4.x
+ * @since 3.4.0
  */
 public class MessageSourceUtils {
     /**

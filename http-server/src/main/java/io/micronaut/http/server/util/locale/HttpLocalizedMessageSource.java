@@ -27,7 +27,7 @@ import java.util.Locale;
 /**
  * A {@link RequestScope} which uses the current {@link HttpRequest} to resolve the locale and hence return the localized messages.
  * @author Sergio del Amo
- * @since 3.4.x
+ * @since 3.4.0
  */
 @RequestScope
 public class HttpLocalizedMessageSource extends AbstractLocalizedMessageSource<HttpRequest<?>> implements RequestAware {

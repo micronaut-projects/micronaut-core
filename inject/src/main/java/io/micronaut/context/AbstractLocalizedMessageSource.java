@@ -25,7 +25,7 @@ import java.util.Optional;
 /**
  * Abstract class which implements {@link LocalizedMessageSource} and leverages {@link LocaleResolver} API.
  * @author Sergio del Amo
- * @since 3.4.x
+ * @since 3.4.0
  * @param <T> The context object which will be used to resolve the locale
  */
 public abstract class AbstractLocalizedMessageSource<T> implements LocalizedMessageSource {
