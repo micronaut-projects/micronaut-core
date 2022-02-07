@@ -45,7 +45,6 @@ public interface UnsafeBeanProperty<B, T> extends BeanProperty<B, T> {
      * @param bean  The bean
      * @param value The new value
      * @return Either the existing instance or the property is mutable or a newly created instance via the copy constructor pattern.
-     * @since 2.3.0
      */
     @NonNull
     B withValueUnsafe(@NonNull B bean, @Nullable T value);

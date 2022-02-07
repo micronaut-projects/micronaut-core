@@ -120,7 +120,7 @@ public abstract class AbstractBeanProperty<B, P> implements UnsafeBeanProperty<B
     }
 
     @Override
-    public P getUnsafe(B bean) {
+    public final P getUnsafe(B bean) {
         return readInternal(bean);
     }
 
@@ -135,7 +135,7 @@ public abstract class AbstractBeanProperty<B, P> implements UnsafeBeanProperty<B
     }
 
     @Override
-    public B withValueUnsafe(B bean, P value) {
+    public final B withValueUnsafe(B bean, P value) {
         if (value == getUnsafe(bean)) {
             return bean;
         } else {
@@ -165,7 +165,7 @@ public abstract class AbstractBeanProperty<B, P> implements UnsafeBeanProperty<B
     }
 
     @Override
-    public void setUnsafe(B bean, P value) {
+    public final void setUnsafe(B bean, P value) {
         writeInternal(bean, value);
     }
 
