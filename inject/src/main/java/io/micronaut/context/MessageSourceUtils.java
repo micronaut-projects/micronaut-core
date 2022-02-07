@@ -37,7 +37,7 @@ public class MessageSourceUtils {
         Map<String, Object> variables = new HashMap<>();
         int count = 0;
         for (Object value : args) {
-            variables.put("" + count, value);
+            variables.put(String.valueOf(count), value);
             count++;
         }
         return variables;
