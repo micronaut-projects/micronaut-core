@@ -291,7 +291,7 @@ appendix:
     introspectionArch: Bean Introspections
     iocArch: Bean Definitions
     aopArch: AOP Proxies
-    containerArch: Application Container 
+    containerArch: Application Context 
     httpServerArch: HTTP Server
     httpClientArch: HTTP Client
   faq: Frequently Asked Questions (FAQ)
