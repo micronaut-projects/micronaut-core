@@ -9,7 +9,7 @@ $ mn create-app my-app --features hibernate-jpa
 ----
 ====
 
-Micronaut includes support for configuring a http://hibernate.org[Hibernate] / JPA `EntityManager` that builds on the <<sqlSupport, SQL DataSource support>>.
+Micronaut includes support for configuring a https://hibernate.org[Hibernate] / JPA `EntityManager` that builds on the <<sqlSupport, SQL DataSource support>>.
 
 Once you have <<sqlSupport, configured one or more DataSources>> to use Hibernate, add the `hibernate-jpa` dependency to your build:
 
@@ -19,7 +19,7 @@ For more information see the https://micronaut-projects.github.io/micronaut-sql/
 
 ==== Using GORM for Hibernate
 
-For Groovy users and users familiar with the Grails framework, special support for http://gorm.grails.org[GORM for Hibernate] is available. To use GORM for Hibernate *do not* include Micronaut's built-in <<sqlSupport, SQL Support>> or the `hibernate-jpa` dependency since GORM itself takes responsibility for creating the `DataSource`, `SessionFactory`, etc.
+For Groovy users and users familiar with the Grails framework, special support for https://gorm.grails.org[GORM for Hibernate] is available. To use GORM for Hibernate *do not* include Micronaut's built-in <<sqlSupport, SQL Support>> or the `hibernate-jpa` dependency since GORM itself takes responsibility for creating the `DataSource`, `SessionFactory`, etc.
 
 [TIP]
 .Using the CLI

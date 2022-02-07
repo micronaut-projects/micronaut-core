@@ -2,7 +2,7 @@ Like Spring and Grails, Micronaut provides caching annotations in the link:{micr
 
 The link:{micronautcacheapi}/io/micronaut/cache/CacheManager.html[CacheManager] interface allows different cache implementations to be plugged in as necessary.
 
-The link:{micronautcacheapi}io/micronaut/cache/SyncCache.html[SyncCache] interface provides a synchronous API for caching, whilst the link:{micronautcacheapi}/io/micronaut/cache/AsyncCache.html[AsyncCache] API allows non-blocking operation.
+The link:{micronautcacheapi}/io/micronaut/cache/SyncCache.html[SyncCache] interface provides a synchronous API for caching, whilst the link:{micronautcacheapi}/io/micronaut/cache/AsyncCache.html[AsyncCache] API allows non-blocking operation.
 
 == Cache Annotations
 

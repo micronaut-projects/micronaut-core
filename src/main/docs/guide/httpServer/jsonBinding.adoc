@@ -1,6 +1,6 @@
-:jackson-annotations: http://fasterxml.github.io/jackson-annotations/javadoc/2.9/
-:jackson-databind: http://fasterxml.github.io/jackson-databind/javadoc/2.9/
-:jackson-core: http://fasterxml.github.io/jackson-core/javadoc/2.9/
+:jackson-annotations: https://fasterxml.github.io/jackson-annotations/javadoc/2.9/
+:jackson-databind: https://fasterxml.github.io/jackson-databind/javadoc/2.9/
+:jackson-core: https://fasterxml.github.io/jackson-core/javadoc/2.9/
 
 The most common data interchange format nowadays is JSON.
 
