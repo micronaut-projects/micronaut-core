@@ -2130,8 +2130,13 @@ public class DefaultHttpClient implements
                         log.trace("HTTP Client Streaming Response Received ({}) for Request: {} {}", msg.status(), nettyRequest.method().name(), nettyRequest.uri());
                         traceHeaders(headers);
                     }
-                    emitter.next(response);
-                    emitter.complete();
+                    boolean errorStatus = statusCode >= 400;
+                    if (errorStatus && failOnError) {
+                        emitter.error(new HttpClientResponseException(response.getStatus().getReason(), response));
+                    } else {
+                        emitter.next(response);
+                        emitter.complete();
+                    }
                 }
             }
         });
