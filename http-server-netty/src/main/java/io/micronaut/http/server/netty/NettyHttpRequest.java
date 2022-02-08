@@ -325,7 +325,8 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             for (ByteBufHolder holder : receivedContent) {
                 ByteBuf content = holder.content();
                 if (content != null) {
-                    byteBufs.addComponent(true, content);
+                    // need to retain content, because for addComponent "ownership of buffer is transferred to this CompositeByteBuf."
+                    byteBufs.addComponent(true, content.retain());
                 }
             }
             return byteBufs;
