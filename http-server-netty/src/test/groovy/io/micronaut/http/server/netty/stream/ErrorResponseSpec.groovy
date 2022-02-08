@@ -28,8 +28,8 @@ class ErrorResponseSpec extends Specification {
         then:
         def e = thrown(HttpClientResponseException)
         verifyAll {
-            e.status == HttpStatus.BAD_REQUEST      // actual is HttpStatus.OK
-            e.message == 'expected flowable error'    // actual is "Empty body"
+            e.status == HttpStatus.BAD_REQUEST
+            e.message == 'expected flowable error'
         }
     }
 
