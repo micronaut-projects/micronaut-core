@@ -32,6 +32,7 @@ import java.util.Locale;
 @RequestScope
 public class HttpLocalizedMessageSource extends AbstractLocalizedMessageSource<HttpRequest<?>> implements RequestAware {
     private Locale locale;
+    
     /**
      * @param localeResolver The locale resolver
      * @param messageSource  The message source
@@ -43,6 +44,9 @@ public class HttpLocalizedMessageSource extends AbstractLocalizedMessageSource<H
     @Override
     @NonNull
     protected Locale getLocale() {
+        if (locale == null) {
+            throw new IllegalStateException("RequestAware::setRequest should have set the locale");
+        }
         return locale;
     }
 
