@@ -195,7 +195,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     // Convert and put as path param
                     if (argument.getAnnotationMetadata().hasStereotype(Format.class)) {
                         ConversionService.SHARED.convert(value,
-                                ConversionContext.of(String.class).with(argument.getAnnotationMetadata()))
+                                ConversionContext.STRING.with(argument.getAnnotationMetadata()))
                                 .ifPresent(v -> pathParams.put(name, v));
                     } else {
                         pathParams.put(name, value);

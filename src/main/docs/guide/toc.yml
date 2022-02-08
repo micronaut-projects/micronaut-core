@@ -176,10 +176,7 @@ cloud:
   clientSideLoadBalancing:
     title: Client Side Load Balancing
     netflixRibbon: Netflix Ribbon Support
-  distributedTracing:
-    title: Distributed Tracing
-    zipkin: Tracing with Zipkin
-    jaeger: Tracing with Jaeger
+  distributedTracing: Distributed Tracing
 serverlessFunctions:
   title: Serverless Functions
   awsLambda: AWS Lambda

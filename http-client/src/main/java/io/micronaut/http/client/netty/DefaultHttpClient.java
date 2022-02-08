@@ -149,6 +149,7 @@ import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.netty.resolver.NoopAddressResolverGroup;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import io.netty.util.CharsetUtil;
@@ -382,6 +383,7 @@ public class DefaultHttpClient implements
                     @Override
                     protected ChannelPool newPool(RequestKey key) {
                         Bootstrap newBootstrap = bootstrap.clone(group);
+                        initBootstrapForProxy(newBootstrap, key.isSecure(), key.getHost(), key.getPort());
                         newBootstrap.remoteAddress(key.getRemoteAddress());
 
                         AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
@@ -403,6 +405,7 @@ public class DefaultHttpClient implements
                     @Override
                     protected ChannelPool newPool(RequestKey key) {
                         Bootstrap newBootstrap = bootstrap.clone(group);
+                        initBootstrapForProxy(newBootstrap, key.isSecure(), key.getHost(), key.getPort());
                         newBootstrap.remoteAddress(key.getRemoteAddress());
 
                         AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
@@ -885,6 +888,7 @@ public class DefaultHttpClient implements
             }
 
             bootstrap.remoteAddress(requestKey.getHost(), requestKey.getPort());
+            initBootstrapForProxy(bootstrap, sslContext != null, requestKey.getHost(), requestKey.getPort());
             bootstrap.handler(new HttpClientInitializer(
                     sslContext,
                     requestKey.getHost(),
@@ -1404,6 +1408,13 @@ public class DefaultHttpClient implements
         return null;
     }
 
+    private void initBootstrapForProxy(Bootstrap bootstrap, boolean ssl, String host, int port) {
+        Proxy proxy = configuration.resolveProxy(ssl, host, port);
+        if (proxy.type() != Type.DIRECT) {
+            bootstrap.resolver(NoopAddressResolverGroup.INSTANCE);
+        }
+    }
+
     /**
      * Creates an initial connection to the given remote host.
      *
@@ -1445,6 +1456,7 @@ public class DefaultHttpClient implements
             boolean isStream,
             Consumer<ChannelHandlerContext> contextConsumer) {
         Bootstrap localBootstrap = this.bootstrap.clone();
+        initBootstrapForProxy(localBootstrap, sslCtx != null, host, port);
         String acceptHeader = request.getHeaders().get(io.micronaut.http.HttpHeaders.ACCEPT);
         localBootstrap.handler(new HttpClientInitializer(
                 sslCtx,
@@ -2933,7 +2945,12 @@ public class DefaultHttpClient implements
     public Publisher<MutableHttpResponse<?>> proxy(@NonNull io.micronaut.http.HttpRequest<?> request) {
         return Flux.from(resolveRequestURI(request))
                 .flatMap(requestURI -> {
-                    AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request instanceof MutableHttpRequest ? request : request.mutate());
+                    io.micronaut.http.MutableHttpRequest<?> httpRequest = request instanceof MutableHttpRequest
+                            ? (io.micronaut.http.MutableHttpRequest<?>) request
+                            : request.mutate();
+                    httpRequest.headers(headers -> headers.remove(HttpHeaderNames.HOST));
+
+                    AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(httpRequest);
                     Flux<MutableHttpResponse<Object>> proxyResponsePublisher = Flux.create(emitter -> {
                         SslContext sslContext = buildSslContext(requestURI);
                         ChannelFuture channelFuture;

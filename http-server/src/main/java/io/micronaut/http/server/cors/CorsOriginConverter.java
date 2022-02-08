@@ -17,6 +17,7 @@ package io.micronaut.http.server.cors;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.ImmutableArgumentConversionContext;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.ConvertibleValuesMap;
@@ -45,7 +46,7 @@ public class CorsOriginConverter implements TypeConverter<Map<String, Object>, C
     private static final String ALLOW_CREDENTIALS = "allow-credentials";
     private static final String MAX_AGE = "max-age";
 
-    private static final ArgumentConversionContext<List<HttpMethod>> CONVERSION_CONTEXT_LIST_OF_HTTP_METHOD = ConversionContext.of(Argument.listOf(HttpMethod.class));
+    private static final ArgumentConversionContext<List<HttpMethod>> CONVERSION_CONTEXT_LIST_OF_HTTP_METHOD = ImmutableArgumentConversionContext.of(Argument.listOf(HttpMethod.class));
 
     @Override
     public Optional<CorsOriginConfiguration> convert(Map<String, Object> object, Class<CorsOriginConfiguration> targetType, ConversionContext context) {

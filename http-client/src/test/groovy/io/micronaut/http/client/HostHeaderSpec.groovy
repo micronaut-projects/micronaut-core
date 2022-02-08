@@ -111,9 +111,9 @@ class HostHeaderSpec extends Specification {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.builder([
                 'spec.name': 'HostHeaderSpec',
-                'micronaut.ssl.enabled': true,
-                'micronaut.ssl.buildSelfSigned': true,
-                'micronaut.ssl.port': 443,
+                'micronaut.server.ssl.enabled': true,
+                'micronaut.server.ssl.buildSelfSigned': true,
+                'micronaut.server.ssl.port': 443,
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
         ]).run(EmbeddedServer)
         def asyncClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
@@ -137,9 +137,9 @@ class HostHeaderSpec extends Specification {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.builder([
                 'spec.name': 'HostHeaderSpec',
-                'micronaut.ssl.port': -1,
-                'micronaut.ssl.enabled': true,
-                'micronaut.ssl.buildSelfSigned': true,
+                'micronaut.server.ssl.port': -1,
+                'micronaut.server.ssl.enabled': true,
+                'micronaut.server.ssl.buildSelfSigned': true,
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
         ]).run(EmbeddedServer)
         def asyncClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())

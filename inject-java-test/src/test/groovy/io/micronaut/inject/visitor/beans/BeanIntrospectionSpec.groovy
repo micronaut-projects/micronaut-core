@@ -1,6 +1,7 @@
 package io.micronaut.inject.visitor.beans
 
 import com.blazebit.persistence.impl.function.entity.ValuesEntity
+import com.fasterxml.jackson.annotation.JsonClassDescription
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -11,7 +12,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Replaces
 import io.micronaut.core.annotation.Introspected
-import io.micronaut.core.beans.BeanConstructor
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
 import io.micronaut.core.beans.BeanIntrospector
@@ -28,9 +28,6 @@ import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.jackson.modules.BeanIntrospectionModule
 import spock.lang.IgnoreIf
 
-//import org.objectweb.asm.ClassReader
-//import org.objectweb.asm.util.ASMifier
-//import org.objectweb.asm.util.TraceClassVisitor
 import spock.lang.Issue
 import spock.lang.Requires
 
@@ -96,17 +93,50 @@ class Test {
     } 
 }
 ''');
+
         when:
         def properties = introspection.getBeanProperties()
         def instance = introspection.instantiate()
         then:
         properties.size() == 2
 
-
         when:'a primitive is changed with copy constructor'
         def one = introspection.getRequiredProperty("one", String)
         instance.one = 'test'
 
+        then:'the new value is reflected'
+        one.get(instance) == 'test'
+        instance.invoked
+    }
+
+    void 'test favor method access with custom getter'() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
+package fieldaccess;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected(accessKind={Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD})
+@AccessorsStyle(readPrefixes = "with")
+class Test {
+    public String one;
+    public boolean invoked = false;
+    public String withOne() {
+        this.invoked = true;
+        return one;
+    }
+}
+''');
+
+        when:
+        def properties = introspection.getBeanProperties()
+        def instance = introspection.instantiate()
+        then:
+        properties.size() == 2
+
+        when:'a primitive is changed with copy constructor'
+        def one = introspection.getRequiredProperty("one", String)
+        instance.one = 'test'
 
         then:'the new value is reflected'
         one.get(instance) == 'test'
@@ -131,17 +161,51 @@ class Test {
     } 
 }
 ''');
+
         when:
         def properties = introspection.getBeanProperties()
         def instance = introspection.instantiate()
         then:
         properties.size() == 2
 
-
         when:'a primitive is changed with copy constructor'
         def one = introspection.getRequiredProperty("one", String)
         one.set(instance, "test")
 
+        then:'the new value is reflected'
+        one.get(instance) == 'test'
+        !instance.invoked
+    }
+
+    void 'test favor field access with custom getter'() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
+package fieldaccess;
+
+import io.micronaut.core.annotation.*;
+
+
+@Introspected(accessKind={Introspected.AccessKind.FIELD, Introspected.AccessKind.METHOD})
+@AccessorsStyle(readPrefixes = "with")
+class Test {
+    public String one;
+    public boolean invoked = false;
+    public String withOne() {
+        this.invoked = true;
+        return one;
+    }
+}
+''');
+
+        when:
+        def properties = introspection.getBeanProperties()
+        def instance = introspection.instantiate()
+        then:
+        properties.size() == 2
+
+        when:'a primitive is changed with copy constructor'
+        def one = introspection.getRequiredProperty("one", String)
+        one.set(instance, "test")
 
         then:'the new value is reflected'
         one.get(instance) == 'test'
@@ -241,8 +305,6 @@ class Test {
         BeanIntrospection introspection = buildBeanIntrospection('beanctor.Test','''\
 package beanctor;
 
-import java.net.URL;
-
 @io.micronaut.core.annotation.Introspected(withPrefix="alter")
 public class Test {
 
@@ -320,6 +382,79 @@ interface SomeInt {
     }
     
     default String getName() {
+        return "ok";
+    }
+}
+''')
+        when:
+        def properties = introspection.getBeanProperties()
+        Collection<BeanMethod> beanMethods = introspection.getBeanMethods()
+
+        then:
+        properties.size() == 1
+        beanMethods*.name as Set == ['invokeMe', 'invokePrim', 'superMethod', 'ok'] as Set
+        beanMethods.every({it.annotationMetadata.hasAnnotation(Executable)})
+        beanMethods.every { it.declaringBean == introspection}
+
+        when:
+
+        def invokeMe = beanMethods.find { it.name == 'invokeMe' }
+        def invokePrim = beanMethods.find { it.name == 'invokePrim' }
+        def itfeMethod = beanMethods.find { it.name == 'ok' }
+        def bean = introspection.instantiate()
+
+        then:
+        invokeMe instanceof ExecutableMethod
+        invokeMe.invoke(bean, "test") == 'test'
+        invokePrim.invoke(bean, 10) == 10
+        itfeMethod.invoke(bean) == true
+    }
+
+    void "test generate bean method for introspected class with custom getter"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.MethodTest', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected
+public class MethodTest extends SuperType implements SomeInt {
+    public boolean nonAnnotated() {
+        return true;
+    }
+
+    @Executable
+    public String invokeMe(String str) {
+        return str;
+    }
+
+    @Executable
+    int invokePrim(int i) {
+        return i;
+    }
+}
+
+class SuperType {
+    @Executable
+    String superMethod(String str) {
+        return str;
+    }
+
+    @Executable
+    public String invokeMe(String str) {
+        return str;
+    }
+}
+
+@io.micronaut.core.annotation.AccessorsStyle(readPrefixes = "read")
+interface SomeInt {
+    @Executable
+    default boolean ok() {
+        return true;
+    }
+
+    default String readName() {
         return "ok";
     }
 }
@@ -697,6 +832,78 @@ class Test {}
         applicationContext.close()
     }
 
+    void "test create bean introspection for interface"() {
+        given:
+        def context = buildContext('itfcetest.MyInterface','''
+package itfcetest;
+
+import com.fasterxml.jackson.annotation.JsonClassDescription;
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected(classes = MyInterface.class)
+class Test {}
+
+@JsonClassDescription
+public interface MyInterface {
+    String getName();
+    @Executable
+    default String name() {
+        return getName();
+    }    
+}
+
+class MyImpl implements MyInterface {
+    @Override public String getName() {
+        return "ok";
+    }
+}
+''')
+        when:"the reference is loaded"
+        def clazz = context.classLoader.loadClass('itfcetest.$Test$IntrospectionRef0')
+        BeanIntrospectionReference reference = clazz.newInstance()
+        BeanIntrospection introspection = reference.load()
+
+        then:
+        introspection.getBeanType().isInterface()
+        introspection.beanProperties.size() == 1
+        introspection.beanMethods.size() == 1
+        introspection.hasAnnotation(JsonClassDescription)
+    }
+
+    void "test create bean introspection for interface - only methods"() {
+        given:
+        def context = buildContext('itfcetest.MyInterface','''
+package itfcetest;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected(classes = MyInterface.class)
+class Test {}
+
+public interface MyInterface {
+    @Executable
+    String name();    
+}
+
+class MyImpl implements MyInterface {
+    @Override public String name() {
+        return "ok";
+    }
+}
+''')
+        when:"the reference is loaded"
+        def clazz = context.classLoader.loadClass('itfcetest.$Test$IntrospectionRef0')
+        BeanIntrospectionReference reference = clazz.newInstance()
+        BeanIntrospection introspection = reference.load()
+
+        then:
+        introspection.getBeanType().isInterface()
+        introspection.beanProperties.size() == 0
+        introspection.beanMethods.size() == 1
+    }
+
     void "test create bean introspection for external inner interface"() {
         given:
         ApplicationContext applicationContext = buildContext('test.Foo', '''
@@ -736,6 +943,7 @@ class Test {}
         cleanup:
         applicationContext.close()
     }
+
     void "test introspection class member configuration works 2"() {
         when:
             BeanIntrospection introspection = BeanIntrospection.getIntrospection(ValuesEntity)
@@ -945,7 +1153,7 @@ import java.net.URL;
 public interface ValidatedConfig {
 
     @NotNull
-    public URL getUrl();
+    URL getUrl();
 
 }
 
@@ -953,6 +1161,33 @@ public interface ValidatedConfig {
 ''')
         expect:
         introspection != null
+        introspection.getProperty("url")
+    }
+
+    void "test generate bean introspection for @ConfigurationProperties interface with custom getter"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig', '''\
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;import io.micronaut.core.annotation.AccessorsStyle;
+
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.NotBlank;
+import java.net.URL;
+
+@ConfigurationProperties("foo.bar")
+@AccessorsStyle(readPrefixes = {"read"})
+public interface ValidatedConfig {
+
+    @NotNull
+    URL readUrl();
+
+}
+
+
+''')
+        expect:
+        introspection != null
+        introspection.getProperty("url")
     }
 
     void "test generate bean introspection for interface"() {
@@ -1041,6 +1276,93 @@ public class ValidatedConfig {
 ''')
         expect:
         introspection != null
+        introspection.getProperty("url")
+        introspection.getProperty("name")
+    }
+
+    void "test generate bean introspection for @ConfigurationProperties with validation rules on getters with custom getters and setters"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig', '''\
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.annotation.AccessorsStyle;
+
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.NotBlank;
+import java.net.URL;
+
+@ConfigurationProperties("foo.bar")
+@AccessorsStyle(readPrefixes = "read", writePrefixes = "with")
+public class ValidatedConfig {
+
+    private URL url;
+    private String name;
+
+    @NotNull
+    public URL readUrl() {
+        return url;
+    }
+
+    public void withUrl(URL url) {
+        this.url = url;
+    }
+
+    @NotBlank
+    public String readName() {
+        return name;
+    }
+
+    public void withName(String name) {
+        this.name = name;
+    }
+}
+''')
+        expect:
+        introspection != null
+        introspection.getProperty("url")
+        introspection.getProperty("name")
+    }
+
+    void "test generate bean introspection for @ConfigurationProperties with validation rules on getters and custom getter"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig','''\
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.NotBlank;
+import java.net.URL;
+
+@ConfigurationProperties("foo.bar")
+@io.micronaut.core.annotation.AccessorsStyle(readPrefixes = "read", writePrefixes = "with")
+public class ValidatedConfig {
+
+    private URL url;
+    private String name;
+
+    @NotNull
+    public URL readUrl() {
+        return url;
+    }
+
+    public void withUrl(URL url) {
+        this.url = url;
+    }
+
+    @NotBlank
+    public String readName() {
+        return name;
+    }
+
+    public void withName(String name) {
+        this.name = name;
+    }
+}
+''')
+        expect:
+        introspection != null
+        introspection.getProperty("url")
+        introspection.getProperty("name")
     }
 
     void "test generate bean introspection for @ConfigurationProperties with validation rules on getters with inner class"() {
@@ -1071,6 +1393,39 @@ public class ValidatedConfig {
     
     }
     
+}
+''')
+        expect:
+        introspection != null
+    }
+
+    void "test generate bean introspection for @ConfigurationProperties with validation rules on getters with inner class and custom getter"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig','''\
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.NotBlank;
+import java.net.URL;
+
+@ConfigurationProperties("foo.bar")
+@io.micronaut.core.annotation.AccessorsStyle(readPrefixes = "read")
+public class ValidatedConfig {
+
+    private URL url;
+
+    @NotNull
+    public URL readUrl() {
+        return url;
+    }
+
+    public void setUrl(URL url) {
+        this.url = url;
+    }
+
+    public static class Inner {
+    }
 }
 ''')
         expect:
@@ -1123,6 +1478,58 @@ class ValidatedConfig {
 ''')
         expect:
         introspection != null
+        introspection.getProperty("url")
+    }
+
+    void "test generate bean introspection for inner @ConfigurationProperties with custom getter"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig$Another', '''\
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.annotation.AccessorsStyle;
+
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.NotBlank;
+import java.net.URL;
+
+@ConfigurationProperties("foo.bar")
+@AccessorsStyle(readPrefixes = "read")
+class ValidatedConfig {
+
+    private URL url;
+
+    @NotNull
+    public URL readUrl() {
+        return url;
+    }
+
+    public void setUrl(URL url) {
+        this.url = url;
+    }
+
+    public static class Inner {
+    }
+
+    @ConfigurationProperties("another")
+    @AccessorsStyle(readPrefixes = "read")
+    static class Another {
+
+        private URL url;
+
+        @NotNull
+        public URL readUrl() {
+            return url;
+        }
+
+        public void setUrl(URL url) {
+            this.url = url;
+        }
+    }
+}
+''')
+        expect:
+        introspection != null
+        introspection.getProperty("url")
     }
 
     void "test generate bean introspection for @ConfigurationProperties with validation rules on fields"() {
@@ -1169,6 +1576,52 @@ public class ValidatedConfig {
         introspection.getIndexedProperties(Constraint.class).size() == 2
     }
 
+    void "test generate bean introspection for @ConfigurationProperties with validation rules on fields and custom getter"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig', '''\
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;import io.micronaut.core.annotation.AccessorsStyle;
+
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.NotBlank;
+import java.net.URL;
+
+@ConfigurationProperties("foo.bar")
+@AccessorsStyle(readPrefixes = "read")
+public class ValidatedConfig {
+
+    @NotNull
+    URL url;
+
+    @NotBlank
+    protected String name;
+
+    public URL readUrl() {
+        return url;
+    }
+
+    public void setUrl(URL url) {
+        this.url = url;
+    }
+
+    public String readName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+
+''')
+
+        expect:
+        introspection != null
+        !introspection.getIndexedProperties(Constraint.class).isEmpty()
+        introspection.getIndexedProperties(Constraint.class).size() == 2
+    }
+
     void "test generate bean introspection for @ConfigurationProperties with validation rules"() {
         BeanIntrospection introspection = buildBeanIntrospection('test.MyConfig','''\
 package test;
@@ -1199,6 +1652,42 @@ class MyConfig {
 ''')
         expect:
         introspection != null
+    }
+
+    void "test generate bean introspection for @ConfigurationProperties with validation rules with custom getter"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.MyConfig', '''\
+package test;
+
+import io.micronaut.context.annotation.*;import io.micronaut.core.annotation.AccessorsStyle;
+import java.time.Duration;
+
+@ConfigurationProperties("foo.bar")
+@AccessorsStyle(readPrefixes = "read")
+class MyConfig {
+    private String host;
+    private int serverPort;
+
+    @ConfigurationInject
+    MyConfig(@javax.validation.constraints.NotBlank String host, int serverPort) {
+        this.host = host;
+        this.serverPort = serverPort;
+    }
+
+    public String readHost() {
+        return host;
+    }
+
+    public int readServerPort() {
+        return serverPort;
+    }
+}
+
+''')
+
+        expect:
+        introspection != null
+        introspection.getProperty("host")
+        introspection.getProperty("serverPort")
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2059')
@@ -1588,6 +2077,56 @@ class Test {
         context?.close()
     }
 
+    void "test write bean introspection with builder style properties with custom getters and setters"() {
+        given:
+        ApplicationContext context = buildContext('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+@AccessorsStyle(readPrefixes = "read", writePrefixes = "with")
+class Test {
+    private String name;
+    public String readName() {
+        return this.name;
+    }
+    public Test withName(String n) {
+        this.name = n;
+        return this;
+    }
+}
+''')
+
+        when:"the reference is loaded"
+        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+        reference.getAnnotationMetadata().hasAnnotation(Introspected)
+        reference.isPresent()
+        reference.beanType.name == 'test.Test'
+
+        when:"the introspection is loaded"
+        BeanIntrospection introspection = reference.load()
+
+        then:"The introspection is valid"
+        introspection != null
+        introspection.hasAnnotation(Introspected)
+        introspection.propertyNames.length == 1
+
+        when:
+        def test = introspection.instantiate()
+        def prop = introspection.getRequiredProperty("name", String)
+        prop.set(test, "Foo")
+
+        then:
+        prop.get(test) == 'Foo'
+
+        cleanup:
+        context?.close()
+    }
 
     void "test write bean introspection with inner classes"() {
         given:
@@ -2126,6 +2665,195 @@ class ParentBean {
         context?.close()
     }
 
+    void "test write bean introspection data with custom getters and setters"() {
+        given:
+        ApplicationContext context = buildContext('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import java.util.*;
+import io.micronaut.core.convert.TypeConverter;
+
+@Introspected
+@AccessorsStyle(readPrefixes = "read", writePrefixes = "with")
+class Test extends ParentBean {
+    private String readOnly;
+    private String name;
+    @Size(max=100)
+    private int age;
+
+    private List<Number> list;
+    private String[] stringArray;
+    private int[] primitiveArray;
+    private boolean flag;
+    private TypeConverter<String, Collection> genericsTest;
+    private TypeConverter<String, Object[]> genericsArrayTest;
+
+    public TypeConverter<String, Collection> readGenericsTest() {
+        return genericsTest;
+    }
+    public TypeConverter<String, Object[]> readGenericsArrayTest() {
+        return genericsArrayTest;
+    }
+
+    public String readReadOnly() {
+        return readOnly;
+    }
+
+    public boolean readFlag() {
+        return flag;
+    }
+    public void withFlag(boolean flag) {
+        this.flag = flag;
+    }
+
+    public String readName() {
+        return this.name;
+    }
+    public void withName(String n) {
+        this.name = n;
+    }
+
+    public int readAge() {
+        return age;
+    }
+    public void withAge(int age) {
+        this.age = age;
+    }
+
+    public List<Number> readList() {
+        return this.list;
+    }
+    public void withList(List<Number> l) {
+        this.list = l;
+    }
+
+    public int[] readPrimitiveArray() {
+        return this.primitiveArray;
+    }
+    public void withPrimitiveArray(int[] a) {
+        this.primitiveArray = a;
+    }
+
+    public String[] readStringArray() {
+        return this.stringArray;
+    }
+    public void withStringArray(String[] s) {
+        this.stringArray = s;
+    }
+}
+
+@AccessorsStyle(readPrefixes = "read", writePrefixes = "with")
+class ParentBean {
+    private List<byte[]> listOfBytes;
+
+    public List<byte[]> readListOfBytes() {
+        return this.listOfBytes;
+    }
+
+    public void withListOfBytes(List<byte[]> list) {
+        this.listOfBytes = list;
+    }
+}
+''')
+
+        when:"the reference is loaded"
+        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+        reference.getAnnotationMetadata().hasAnnotation(Introspected)
+        reference.isPresent()
+        reference.beanType.name == 'test.Test'
+
+        when:"the introspection is loaded"
+        BeanIntrospection introspection = reference.load()
+
+        then:"The introspection is valid"
+        introspection != null
+        introspection.hasAnnotation(Introspected)
+        introspection.instantiate().getClass().name == 'test.Test'
+        introspection.getBeanProperties().size() == 10
+        introspection.getProperty("name").isPresent()
+        introspection.getProperty("name", String).isPresent()
+        !introspection.getProperty("name", Integer).isPresent()
+
+        when:
+        BeanProperty nameProp = introspection.getProperty("name", String).get()
+        BeanProperty boolProp = introspection.getProperty("flag", boolean.class).get()
+        BeanProperty ageProp = introspection.getProperty("age", int.class).get()
+        BeanProperty listProp = introspection.getProperty("list").get()
+        BeanProperty primitiveArrayProp = introspection.getProperty("primitiveArray").get()
+        BeanProperty stringArrayProp = introspection.getProperty("stringArray").get()
+        BeanProperty listOfBytes = introspection.getProperty("listOfBytes").get()
+        BeanProperty genericsTest = introspection.getProperty("genericsTest").get()
+        BeanProperty genericsArrayTest = introspection.getProperty("genericsArrayTest").get()
+        def readOnlyProp = introspection.getProperty("readOnly", String).get()
+        def instance = introspection.instantiate()
+
+        then:
+        readOnlyProp.isReadOnly()
+        nameProp != null
+        !nameProp.isReadOnly()
+        !nameProp.isWriteOnly()
+        nameProp.isReadWrite()
+        boolProp.get(instance) == false
+        nameProp.get(instance) == null
+        ageProp.get(instance) == 0
+        genericsTest != null
+        genericsTest.type == TypeConverter
+        genericsTest.asArgument().typeParameters.size() == 2
+        genericsTest.asArgument().typeParameters[0].type == String
+        genericsTest.asArgument().typeParameters[1].type == Collection
+        genericsTest.asArgument().typeParameters[1].typeParameters.length == 1
+        genericsArrayTest.type == TypeConverter
+        genericsArrayTest.asArgument().typeParameters.size() == 2
+        genericsArrayTest.asArgument().typeParameters[0].type == String
+        genericsArrayTest.asArgument().typeParameters[1].type == Object[].class
+        stringArrayProp.get(instance) == null
+        stringArrayProp.type == String[]
+        primitiveArrayProp.get(instance) == null
+        ageProp.hasAnnotation(Size)
+        listOfBytes.asArgument().getFirstTypeVariable().get().type == byte[].class
+        listProp.asArgument().getFirstTypeVariable().isPresent()
+        listProp.asArgument().getFirstTypeVariable().get().type == Number
+
+        when:
+        boolProp.set(instance, true)
+        nameProp.set(instance, "foo")
+        ageProp.set(instance, 10)
+        primitiveArrayProp.set(instance, [10] as int[])
+        stringArrayProp.set(instance, ['foo'] as String[])
+
+
+        then:
+        boolProp.get(instance) == true
+        nameProp.get(instance) == 'foo'
+        ageProp.get(instance) == 10
+        stringArrayProp.get(instance) == ['foo'] as String[]
+        primitiveArrayProp.get(instance) == [10] as int[]
+
+        when:
+        ageProp.convertAndSet(instance, "20")
+        nameProp.set(instance, "100" )
+
+        then:
+        ageProp.get(instance) == 20
+        nameProp.get(instance, Integer, null) == 100
+
+        when:
+        introspection.instantiate("blah") // illegal argument
+
+        then:
+        def e = thrown(InstantiationException)
+        e.message == 'Argument count [1] doesn\'t match required argument count: 0'
+
+        cleanup:
+        context?.close()
+    }
+
     void "test constructor argument generics"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
@@ -2178,6 +2906,54 @@ class Test {
     }
     
     public String getName() {
+        return name;
+    }
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate("Sally")
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "Sally"
+
+        when:
+        introspection.instantiate(new Object[0])
+
+        then:
+        thrown(InstantiationException)
+
+        when:
+        introspection.instantiate()
+
+        then:
+        thrown(InstantiationException)
+    }
+
+    void "test static creator with custom getter"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+@AccessorsStyle(readPrefixes = "read")
+class Test {
+    private String name;
+
+    private Test(String name) {
+        this.name = name;
+    }
+
+    @Creator
+    public static Test forName(String name) {
+        return new Test(name);
+    }
+
+    public String readName() {
         return name;
     }
 }
@@ -2391,6 +3167,55 @@ public enum Test {
     }
     
     public int getNumber() {
+        return number;
+    }
+}
+''')
+
+        expect:
+        introspection != null
+        introspection.beanProperties.size() == 1
+        introspection.getProperty("number").isPresent()
+
+        when:
+        def instance = introspection.instantiate("A")
+
+        then:
+        instance.name() == "A"
+        introspection.getRequiredProperty("number", int).get(instance) == 0
+
+        when:
+        introspection.instantiate()
+
+        then:
+        thrown(InstantiationException)
+
+        when:
+        introspection.getClass().getClassLoader().loadClass("java.lang.\$Enum\$Introspection")
+
+        then:
+        thrown(ClassNotFoundException)
+    }
+
+    void "test enum bean properties with custom getter"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+@AccessorsStyle(readPrefixes = "read")
+public enum Test {
+
+    A(0), B(1), C(2);
+
+    private final int number;
+
+    Test(int number) {
+        this.number = number;
+    }
+
+    public int readNumber() {
         return number;
     }
 }
@@ -2733,6 +3558,38 @@ class Test extends SuperClass implements IEmail {
         introspection.getIndexedProperties(Constraint).size() == 1
     }
 
+    void "test superclass methods are read before interface methods with custom getter"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.NotNull;
+
+interface IEmail {
+String readEmail();
+}
+@Introspected
+@AccessorsStyle(readPrefixes = "read")
+class SuperClass implements IEmail {
+    @NotNull
+    public String readEmail() {
+        return null;
+    }
+}
+@Introspected
+class SubClass extends SuperClass {
+}
+@Introspected
+class Test extends SuperClass implements IEmail {
+}
+
+''')
+        expect:
+        introspection != null
+        introspection.getProperty("email").isPresent()
+        introspection.getIndexedProperties(Constraint).size() == 1
+    }
+
     void "test introspection with single leading lowercase character"() {
         BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test;
@@ -2749,6 +3606,39 @@ class Test {
     }
     
     public String getXForwardedFor() {
+        return xForwardedFor;
+    }
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def obj = introspection.instantiate("localhost")
+
+        then:
+        noExceptionThrown()
+        introspection.getProperty("xForwardedFor", String).get().get(obj) == "localhost"
+    }
+
+    void "test introspection with single leading lowercase character with custom getter"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+@AccessorsStyle(readPrefixes = "read")
+class Test {
+
+    private final String xForwardedFor;
+
+    Test(String xForwardedFor) {
+        this.xForwardedFor = xForwardedFor;
+    }
+
+    public String readXForwardedFor() {
         return xForwardedFor;
     }
 }
@@ -2799,6 +3689,41 @@ abstract class Test {
         beanIntrospection.getBeanProperties().size() == 2
     }
 
+    void "test introspection on abstract class with custom getter"() {
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+@AccessorsStyle(readPrefixes = "read")
+abstract class Test {
+    private String name;
+    private String author;
+
+    public String readName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String readAuthor() {
+        return author;
+    }
+
+    public void setAuthor(String author) {
+        this.author = author;
+    }
+}
+""")
+
+        expect:
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 2
+    }
+
     void "test targeting abstract class with @Introspected(classes = "() {
         ClassLoader classLoader = buildClassLoader("test.Test", """
 package test;
@@ -2816,6 +3741,27 @@ class MyConfig {
 
         then:
         BeanIntrospection beanIntrospection = beanIntrospector.getIntrospection(TestClass)
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 2
+    }
+
+    void "test targeting abstract class with @Introspected(classes = ) with custom getter"() {
+        ClassLoader classLoader = buildClassLoader("test.Test", """
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(classes = {io.micronaut.inject.visitor.beans.TestCustomGetterClass.class})
+class MyConfig {
+
+}
+""")
+
+        when:
+        BeanIntrospector beanIntrospector = BeanIntrospector.forClassLoader(classLoader)
+
+        then:
+        BeanIntrospection beanIntrospection = beanIntrospector.getIntrospection(TestCustomGetterClass)
         beanIntrospection != null
         beanIntrospection.getBeanProperties().size() == 2
     }
@@ -2848,6 +3794,45 @@ abstract class Test {
     }
     
     public int getAge() {
+        return 0;
+    }
+}
+""")
+
+        expect:
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 3
+    }
+
+    void "test introspection on abstract class with extra getter and custom getter/setter"() {
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+@AccessorsStyle(readPrefixes = "read")
+abstract class Test {
+    private String name;
+    private String author;
+
+    public String readName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String readAuthor() {
+        return author;
+    }
+
+    public void setAuthor(String author) {
+        this.author = author;
+    }
+
+    public int readAge() {
         return 0;
     }
 }
@@ -2927,6 +3912,34 @@ public class Test {
         beanIntrospection.getBeanProperties()[0].annotationMetadata.hasAnnotation(JsonProperty)
     }
 
+    void "test annotation on setter with custom setter"() {
+        when:
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
+package test;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.*;
+
+@Introspected
+@AccessorsStyle(writePrefixes = "with")
+public class Test {
+    public String getFoo() {
+        return "bar";
+    }
+
+    @JsonProperty
+    public void withFoo(String s) {
+    }
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 1
+        beanIntrospection.getBeanProperties()[0].annotationMetadata.hasAnnotation(JsonProperty)
+    }
+
     void "test annotation on field"() {
         when:
         BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
@@ -2944,6 +3957,37 @@ public class Test {
         return foo;
     }
     
+    public void setFoo(String s) {
+        this.foo = s;
+    }
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 1
+        beanIntrospection.getBeanProperties()[0].annotationMetadata.hasAnnotation(JsonProperty)
+    }
+
+    void "test annotation on field with custom getter"() {
+        when:
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
+package test;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.*;
+
+@Introspected
+@AccessorsStyle(readPrefixes = "read")
+public class Test {
+    @JsonProperty
+    String foo;
+
+    public String readFoo() {
+        return foo;
+    }
+
     public void setFoo(String s) {
         this.foo = s;
     }
@@ -2989,6 +4033,39 @@ public class Test {
         beanIntrospection.getBeanProperties()[0].annotationMetadata.getAnnotation(JsonProperty).stringValue().get() == 'getter'
     }
 
+    void "test getter annotation overrides setter and field with custom setter"() {
+        when:
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
+package test;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.*;
+
+@Introspected
+@AccessorsStyle(writePrefixes = "with")
+public class Test {
+    @JsonProperty("field")
+    String foo;
+
+    @JsonProperty("getter")
+    public String getFoo() {
+        return foo;
+    }
+
+    @JsonProperty("setter")
+    public void withFoo(String s) {
+        this.foo = s;
+    }
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 1
+        beanIntrospection.getBeanProperties()[0].annotationMetadata.getAnnotation(JsonProperty).stringValue().get() == 'getter'
+    }
+
     void "test field annotation overrides setter"() {
         when:
         BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
@@ -3018,6 +4095,74 @@ public class Test {
         beanIntrospection != null
         beanIntrospection.getBeanProperties().size() == 1
         beanIntrospection.getBeanProperties()[0].annotationMetadata.getAnnotation(JsonProperty).stringValue().get() == 'field'
+    }
+
+    void "test field annotation overrides setter with custom setter"() {
+        when:
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
+package test;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.*;
+
+@Introspected
+@AccessorsStyle(writePrefixes = "with")
+public class Test {
+    @JsonProperty("field")
+    String foo;
+
+    public String getFoo() {
+        return foo;
+    }
+
+    @JsonProperty("setter")
+    public void withFoo(String s) {
+        this.foo = s;
+    }
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 1
+        beanIntrospection.getBeanProperties()[0].annotationMetadata.getAnnotation(JsonProperty).stringValue().get() == 'field'
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/6756")
+    def "covariant property is not read only"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+@io.micronaut.core.annotation.Introspected
+class Test implements B {
+
+    private AImpl a;
+
+    @Override
+    public AImpl getA() {
+        return a;
+    }
+
+    public void setA(AImpl a) {
+        this.a = a;
+    }
+}
+
+interface A {}
+
+interface B {
+    A getA();
+}
+
+class AImpl implements A {
+}
+''')
+        def property = introspection.getProperty("a").get()
+
+        then:
+        property.isReadWrite()
     }
 
     @Override

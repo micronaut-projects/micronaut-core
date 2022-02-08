@@ -24,6 +24,7 @@ import io.micronaut.scheduling.annotation.ExecuteOn
 import jakarta.inject.Inject
 import spock.lang.AutoCleanup
 import spock.lang.Issue
+import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -39,6 +40,7 @@ class InputStreamBodySpec2 extends Specification {
              'micronaut.http.client.read-timeout': '60s',
              'micronaut.netty.event-loops.default.num-threads': '1'])
 
+    @Retry
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6100')
     void "test apply load to InputStream read"() {
         given:

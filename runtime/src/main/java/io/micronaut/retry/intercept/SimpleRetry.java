@@ -41,6 +41,7 @@ class SimpleRetry implements RetryState, MutableRetryState {
     private final AtomicInteger attemptNumber = new AtomicInteger(0);
     private final AtomicLong overallDelay = new AtomicLong(0);
     private final RetryPredicate predicate;
+    private final Class<? extends Throwable> capturedException;
 
     /**
      * @param maxAttempts The maximum number of attemps
@@ -48,19 +49,22 @@ class SimpleRetry implements RetryState, MutableRetryState {
      * @param delay The overall delay so far
      * @param maxDelay The maximum overall delay
      * @param predicate Predicate to check retry necessity
+     * @param capturedException The capture exception types
      */
     SimpleRetry(
         int maxAttempts,
         double multiplier,
         Duration delay,
         Duration maxDelay,
-        RetryPredicate predicate) {
+        RetryPredicate predicate,
+        Class<? extends Throwable> capturedException) {
 
         this.maxAttempts = maxAttempts;
         this.multiplier = multiplier;
         this.delay = delay;
         this.maxDelay = maxDelay;
         this.predicate = predicate;
+        this.capturedException = capturedException;
     }
 
     /**
@@ -69,8 +73,8 @@ class SimpleRetry implements RetryState, MutableRetryState {
      * @param delay The overall delay so far
      * @param maxDelay The maximum overall delay
      */
-    SimpleRetry(int maxAttempts, double multiplier, Duration delay, Duration maxDelay) {
-        this(maxAttempts, multiplier, delay, maxDelay, new DefaultRetryPredicate());
+    SimpleRetry(int maxAttempts, double multiplier, Duration delay, Duration maxDelay, Class<? extends Throwable> capturedException) {
+        this(maxAttempts, multiplier, delay, maxDelay, new DefaultRetryPredicate(), capturedException);
     }
 
     /**
@@ -79,7 +83,7 @@ class SimpleRetry implements RetryState, MutableRetryState {
      * @param delay       The overall delay so far
      */
     SimpleRetry(int maxAttempts, double multiplier, Duration delay) {
-        this(maxAttempts, multiplier, delay, null);
+        this(maxAttempts, multiplier, delay, null, null);
     }
 
     /**
@@ -151,6 +155,11 @@ class SimpleRetry implements RetryState, MutableRetryState {
     @Override
     public RetryPredicate getRetryPredicate() {
         return predicate;
+    }
+
+    @Override
+    public Class<? extends Throwable> getCapturedException() {
+        return capturedException;
     }
 
     /**

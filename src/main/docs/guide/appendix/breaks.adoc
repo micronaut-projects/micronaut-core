@@ -1,5 +1,36 @@
 This section documents breaking changes between Micronaut versions
 
+== 3.3.0
+
+- The <<environmentEndpoint, environmental endpoint>> is now disabled by default. To enable it, you must update your endpoint config:
+
+[source,yaml]
+----
+endpoints:
+  env:
+    enabled: true
+----
+
+This will then be available, but mask all values.  To restore the previous functionality, you can add a bean that implements api:management.endpoint.env.EnvironmentEndpointFilter[]:
+
+.Legacy Environment Filtering Bean
+[source,java]
+----
+@Singleton
+public class LegacyEnvEndpointFilter implements EnvironmentEndpointFilter {
+    @Override
+    public void specifyFiltering(@NotNull EnvironmentFilterSpecification specification) {
+        specification.legacyMasking();
+    }
+}
+----
+
+See the <<environmentEndpoint, documentation>> for more filtering options.
+
+== 3.2.4
+
+- The link:{api}/io/micronaut/http/client/ProxyHttpClient.html[ProxyHttpClient] now sends the Host header of the proxied service https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.23[as per the RFC], instead of the originating service.
+
 == 3.2.0
 
 - The HTTP client now does SSL certificate verification by default. The old insecure behavior can be re-enabled by setting the `micronaut.http.client.ssl.insecureTrustAllCertificates` property to `true`, but consider using a trust store instead if you're using self-signed certificates.

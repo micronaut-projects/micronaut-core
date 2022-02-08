@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
@@ -153,6 +154,20 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
                     av
             );
         }
+    }
+
+    @Override
+    protected <T extends Annotation> void annotate(AnnotationMetadata annotationMetadata, AnnotationValue<T> annotationValue) {
+        ArgumentUtils.requireNonNull("annotationMetadata", annotationMetadata);
+        ArgumentUtils.requireNonNull("annotationValue", annotationValue);
+
+        final GroovyAnnotationMetadataBuilder annotationBuilder = new GroovyAnnotationMetadataBuilder(
+                visitorContext.getSourceUnit(),
+                visitorContext.getCompilationUnit());
+        annotationBuilder.annotate(
+                annotationMetadata,
+                annotationValue
+        );
     }
 
     @Override

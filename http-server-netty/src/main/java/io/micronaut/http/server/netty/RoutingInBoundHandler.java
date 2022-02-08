@@ -144,6 +144,9 @@ import java.util.stream.Collectors;
 class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.http.HttpRequest<?>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(RoutingInBoundHandler.class);
+    /*
+     * Also present in {@link RouteExecutor}.
+     */
     private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
             "^.*(?:connection.*(?:reset|closed|abort|broken)|broken.*pipe).*$", Pattern.CASE_INSENSITIVE);
     private static final Argument ARGUMENT_PART_DATA = Argument.of(PartData.class);
@@ -245,9 +248,18 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        // short-circuit ignorable exceptions: This is also handled by RouteExecutor, but handling this early avoids
+        // running any filters
+        if (isIgnorable(cause)) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Swallowed an IOException caused by client connectivity: " + cause.getMessage(), cause);
+            }
+            return;
+        }
+
         NettyHttpRequest<?> nettyHttpRequest = NettyHttpRequest.remove(ctx);
         if (nettyHttpRequest == null) {
-            if (cause instanceof SSLException || cause.getCause() instanceof SSLException || isIgnorable(cause)) {
+            if (cause instanceof SSLException || cause.getCause() instanceof SSLException) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Micronaut Server Error - No request state present. Cause: " + cause.getMessage(), cause);
                 }
@@ -956,6 +968,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         toNettyResponse(response),
                         mapToHttpContent(nettyRequest, response, body, context)
                 );
+                nettyRequest.prepareHttp2ResponseIfNecessary(streamedResponse);
                 context.writeAndFlush(streamedResponse);
                 context.read();
             } else {
@@ -1090,7 +1103,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         } else {
             MediaType mediaType = message.getContentType().orElse(null);
             if (mediaType == null) {
-                mediaType = message.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).map(routeInfo -> routeExecutor.resolveDefaultResponseContentType(request, routeInfo)).orElse(null);
+                mediaType = message.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class)
+                        .map(routeInfo -> routeExecutor.resolveDefaultResponseContentType(request, routeInfo))
+                        // RouteExecutor will pick json by default, so we do too
+                        .orElse(MediaType.APPLICATION_JSON_TYPE);
                 message.contentType(mediaType);
             }
             if (body instanceof CharSequence) {

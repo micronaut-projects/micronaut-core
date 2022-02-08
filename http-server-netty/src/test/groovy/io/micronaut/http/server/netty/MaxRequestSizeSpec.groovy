@@ -11,11 +11,53 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.multipart.CompletedFileUpload
 import io.micronaut.runtime.server.EmbeddedServer
+import io.netty.bootstrap.Bootstrap
+import io.netty.buffer.Unpooled
+import io.netty.channel.Channel
+import io.netty.channel.ChannelHandlerContext
+import io.netty.channel.ChannelInboundHandlerAdapter
+import io.netty.channel.ChannelInitializer
+import io.netty.channel.ChannelOption
+import io.netty.channel.SimpleChannelInboundHandler
+import io.netty.channel.nio.NioEventLoopGroup
+import io.netty.channel.socket.SocketChannel
+import io.netty.channel.socket.nio.NioSocketChannel
+import io.netty.handler.codec.http.DefaultFullHttpRequest
+import io.netty.handler.codec.http.DefaultHttpRequest
+import io.netty.handler.codec.http.FullHttpResponse
+import io.netty.handler.codec.http.HttpClientCodec
+import io.netty.handler.codec.http.HttpHeaderNames
+import io.netty.handler.codec.http.HttpHeaderValues
+import io.netty.handler.codec.http.HttpMethod
+import io.netty.handler.codec.http.HttpObjectAggregator
+import io.netty.handler.codec.http.HttpResponseStatus
+import io.netty.handler.codec.http.HttpVersion
+import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder
+import io.netty.handler.codec.http.multipart.MemoryFileUpload
+import io.netty.handler.codec.http2.DefaultHttp2Connection
+import io.netty.handler.codec.http2.DelegatingDecompressorFrameListener
+import io.netty.handler.codec.http2.Http2SecurityUtil
+import io.netty.handler.codec.http2.Http2Settings
+import io.netty.handler.codec.http2.HttpConversionUtil
+import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder
+import io.netty.handler.codec.http2.InboundHttp2ToHttpAdapterBuilder
+import io.netty.handler.ssl.ApplicationProtocolConfig
+import io.netty.handler.ssl.ApplicationProtocolNames
+import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler
+import io.netty.handler.ssl.SslContextBuilder
+import io.netty.handler.ssl.SupportedCipherSuiteFilter
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory
+import org.jetbrains.annotations.NotNull
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import io.micronaut.core.async.annotation.SingleResult
 import spock.lang.Ignore
+import spock.lang.Issue
+import spock.lang.PendingFeature
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
+
+import java.util.concurrent.CopyOnWriteArrayList
 
 class MaxRequestSizeSpec extends Specification {
 
@@ -207,11 +249,192 @@ class MaxRequestSizeSpec extends Specification {
         embeddedServer.close()
     }
 
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/4864')
+    void 'large request should keep the keep-alive connection valid'() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.server.maxRequestSize': '10KB',
+                'micronaut.server.port': -1
+        ])
+
+        def responses = new CopyOnWriteArrayList<FullHttpResponse>()
+        Bootstrap bootstrap = new Bootstrap()
+                .group(new NioEventLoopGroup())
+                .channel(NioSocketChannel)
+                .handler(new ChannelInitializer<Channel>() {
+                    @Override
+                    protected void initChannel(@NotNull Channel ch) throws Exception {
+                        ch.pipeline()
+                                .addLast(new HttpClientCodec())
+                                .addLast(new HttpObjectAggregator(1024))
+                                .addLast(new ChannelInboundHandlerAdapter() {
+                                    @Override
+                                    void channelRead(@NotNull ChannelHandlerContext ctx, @NotNull Object msg) throws Exception {
+                                        responses.add(msg)
+                                    }
+                                })
+                    }
+                })
+                .remoteAddress(embeddedServer.host, embeddedServer.port)
+
+        def request1 = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, '/test-max-size/multipart-body')
+        request1.headers().add(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE)
+        def requestEncoder1 = new HttpPostRequestEncoder(request1, true)
+        def upload = new MemoryFileUpload('foo', 'foo', 'text/plain', '', null, 100_000)
+        upload.setContent(Unpooled.wrappedBuffer(new byte[100_000]))
+        requestEncoder1.addBodyHttpData(upload)
+
+        def request2 = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, '/test-max-size/text')
+        request2.headers().add(HttpHeaderNames.CONTENT_LENGTH, 0)
+
+        when:
+        def channel = (SocketChannel) bootstrap.connect().sync().channel()
+        channel.writeAndFlush(requestEncoder1.finalizeRequest())
+        while (true) {
+            def chunk = requestEncoder1.readChunk(channel.alloc())
+            if (chunk == null) break
+            channel.writeAndFlush(chunk)
+        }
+        channel.read()
+
+        then:
+        new PollingConditions(timeout: 5).eventually {
+            responses.size() == 1
+        }
+        responses[0].status() == HttpResponseStatus.REQUEST_ENTITY_TOO_LARGE
+
+        // there are two valid things for the server to do:
+        // - blackhole the remaining request data and keep the connection alive for the next request
+        // - kill the connection
+        when:
+        if (!channel.isOutputShutdown()) {
+            channel.writeAndFlush(request2)
+            channel.read()
+        }
+        then:
+        if (!channel.isOutputShutdown()) {
+            new PollingConditions(timeout: 5).eventually {
+                responses.size() == 2
+            }
+            responses[1].status() == HttpResponseStatus.OK
+        }
+
+        cleanup:
+        channel.close()
+        embeddedServer.close()
+    }
+
+    @PendingFeature
+    void 'large request should not affect other http2 connections'() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.server.maxRequestSize': '10KB',
+                'micronaut.server.http-version': '2.0',
+                'micronaut.server.ssl.enabled': true,
+                'micronaut.server.netty.log-level': 'TRACE',
+                'micronaut.server.ssl.port': -1,
+                'micronaut.server.ssl.buildSelfSigned': true
+        ])
+
+        def request1 = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, '/test-max-size/multipart-body')
+        request1.headers().add(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), 'https')
+        def requestEncoder1 = new HttpPostRequestEncoder(request1, true)
+        def upload = new MemoryFileUpload('foo', 'foo', 'text/plain', '', null, 100_000)
+        upload.setContent(Unpooled.wrappedBuffer(new byte[100_000]))
+        requestEncoder1.addBodyHttpData(upload)
+
+        def request2 = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, '/test-max-size/text')
+        request2.headers().add(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), 'https')
+
+        def responses = new CopyOnWriteArrayList<FullHttpResponse>()
+        def sslContext = SslContextBuilder.forClient()
+                .ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE)
+                .trustManager(InsecureTrustManagerFactory.INSTANCE)
+                .applicationProtocolConfig(new ApplicationProtocolConfig(
+                        ApplicationProtocolConfig.Protocol.ALPN,
+                        // NO_ADVERTISE is currently the only mode supported by both OpenSsl and JDK providers.
+                        ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
+                        // ACCEPT is currently the only mode supported by both OpenSsl and JDK providers.
+                        ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
+                        ApplicationProtocolNames.HTTP_2))
+                .build()
+        def bootstrap = new Bootstrap()
+                .remoteAddress(embeddedServer.host, embeddedServer.port)
+                .group(new NioEventLoopGroup())
+                .channel(NioSocketChannel.class)
+                .option(ChannelOption.AUTO_READ, true)
+                .handler(new ChannelInitializer<SocketChannel>() {
+                    @Override
+                    protected void initChannel(@NotNull SocketChannel ch) throws Exception {
+                        def connection = new DefaultHttp2Connection(false)
+                        def connectionHandler = new HttpToHttp2ConnectionHandlerBuilder()
+                                .initialSettings(Http2Settings.defaultSettings())
+                                .frameListener(new DelegatingDecompressorFrameListener(
+                                        connection,
+                                        new InboundHttp2ToHttpAdapterBuilder(connection)
+                                                .maxContentLength(Integer.MAX_VALUE)
+                                                .propagateSettings(false)
+                                                .build()
+                                ))
+                                .connection(connection)
+                                .build()
+                        ch.pipeline()
+                                .addLast(sslContext.newHandler(ch.alloc(), embeddedServer.host, embeddedServer.port))
+                                .addLast(new ApplicationProtocolNegotiationHandler('') {
+                                    @Override
+                                    protected void configurePipeline(ChannelHandlerContext ctx, String protocol) throws Exception {
+                                        if (ApplicationProtocolNames.HTTP_2 != protocol) {
+                                            throw new AssertionError((Object) protocol)
+                                        }
+                                        ctx.pipeline()
+                                                .addLast(connectionHandler)
+                                                .addLast(new SimpleChannelInboundHandler<FullHttpResponse>() {
+                                                    @Override
+                                                    protected void channelRead0(ChannelHandlerContext ctx_, FullHttpResponse msg) throws Exception {
+                                                        responses.add(msg.retain())
+                                                    }
+                                                })
+
+                                        ctx.channel().writeAndFlush(requestEncoder1.finalizeRequest())
+                                        while (true) {
+                                            def chunk = requestEncoder1.readChunk(ctx.alloc())
+                                            if (chunk == null) break
+                                            ctx.channel().writeAndFlush(chunk)
+                                        }
+                                    }
+                                })
+                    }
+                })
+
+        when:
+        def channel = (SocketChannel) bootstrap.connect().sync().channel()
+        channel.read()
+
+        then:
+        new PollingConditions(timeout: 5).eventually {
+            responses.size() == 1
+        }
+        responses[0].status() == HttpResponseStatus.REQUEST_ENTITY_TOO_LARGE
+
+        when:
+        channel.writeAndFlush(request2)
+        channel.read()
+        then:
+        new PollingConditions(timeout: 5).eventually {
+            responses.size() == 2
+        }
+        responses[1].status() == HttpResponseStatus.OK
+
+        cleanup:
+        channel.close()
+        embeddedServer.close()
+    }
+
     @Controller("/test-max-size")
     static class TestController {
 
         @Post(uri = "/text", consumes = MediaType.TEXT_PLAIN)
-        String multipart(@Body String body) {
+        String text(@Body String body) {
             "OK"
         }
 

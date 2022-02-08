@@ -10,6 +10,7 @@ import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.filter.FilterChain
@@ -52,6 +53,12 @@ class ProxyHttpClientMutableRequestSpec extends Specification {
 
         then:
         'Hello Sally' == result
+
+        when:
+        result = client.retrieve(HttpRequest.GET('/hello/host').accept(MediaType.TEXT_PLAIN))
+
+        then:
+        result == "Host: $helloEmbeddedServer.host:$helloEmbeddedServer.port"
 
         cleanup:
         helloEmbeddedServer.close()
@@ -109,6 +116,11 @@ class ProxyHttpClientMutableRequestSpec extends Specification {
         @Post(uri = "/name", processes = MediaType.TEXT_PLAIN)
         Publisher<String> name(@Body Publisher<String> name) {
             Flux.from(name).map(str -> "Hello " + str)
+        }
+
+        @Get(uri = "/host", processes = MediaType.TEXT_PLAIN)
+        String host(@Header String host) {
+            "Host: $host"
         }
     }
 }
