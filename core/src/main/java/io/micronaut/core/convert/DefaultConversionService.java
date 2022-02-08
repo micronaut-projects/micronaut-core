@@ -940,19 +940,6 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         TypeConverter typeConverter = UNCONVERTIBLE;
         List<Class> sourceHierarchy = ClassUtils.resolveHierarchy(sourceType);
         List<Class> targetHierarchy = ClassUtils.resolveHierarchy(targetType);
-
-
-        if (targetType == Optional.class) {
-            for (Class sourceSuperType : sourceHierarchy) {
-                ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetType, formattingAnnotation);
-                typeConverter = typeConverters.get(pair);
-                if (typeConverter != null) {
-                    converterCache.put(pair, typeConverter);
-                    return typeConverter;
-                }
-            }
-        }
-
         for (Class sourceSuperType : sourceHierarchy) {
             for (Class targetSuperType : targetHierarchy) {
                 ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType, formattingAnnotation);
