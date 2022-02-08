@@ -412,15 +412,12 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                         if (LOG.isErrorEnabled()) {
                             LOG.error("Error occurred writing stream response: " + error.getMessage(), error);
                         }
+                        HttpResponseStatus responseStatus = HttpResponseStatus.INTERNAL_SERVER_ERROR;
                         if (error instanceof HttpStatusException) {
-                            final HttpStatus status = ((HttpStatusException) error).getStatus();
-                            final String message = error.getMessage();
-                            ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(status.getCode(), message)))
-                                            .addListener(ChannelFutureListener.CLOSE);
-                        } else {
-                            ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR))
-                                    .addListener(ChannelFutureListener.CLOSE);
+                            responseStatus = HttpResponseStatus.valueOf(((HttpStatusException) error).getStatus().getCode(), error.getMessage());
                         }
+                        ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, responseStatus))
+                                .addListener(ChannelFutureListener.CLOSE);
                     } finally {
                         ctx.read();
                     }
