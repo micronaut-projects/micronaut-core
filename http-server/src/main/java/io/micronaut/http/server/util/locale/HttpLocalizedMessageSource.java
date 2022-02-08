@@ -33,11 +33,15 @@ import java.util.Locale;
 public class HttpLocalizedMessageSource extends AbstractLocalizedMessageSource<HttpRequest<?>> implements RequestAware {
     private Locale locale;
     /**
+     * @param httpLocaleResolutionConfiguration The locale resolution configuration
      * @param localeResolver The locale resolver
      * @param messageSource  The message source
      */
-    public HttpLocalizedMessageSource(LocaleResolver<HttpRequest<?>> localeResolver, MessageSource messageSource) {
+    public HttpLocalizedMessageSource(HttpLocaleResolutionConfiguration httpLocaleResolutionConfiguration,
+                                      LocaleResolver<HttpRequest<?>> localeResolver,
+                                      MessageSource messageSource) {
         super(localeResolver, messageSource);
+        locale = httpLocaleResolutionConfiguration.getDefaultLocale();
     }
 
     @Override
