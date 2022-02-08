@@ -20,6 +20,11 @@ import io.micronaut.core.annotation.NonNull;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * Retrieve messages for the resolved locale.
+ * @author Sergio del Amo
+ * @since 3.4.0
+ */
 public interface LocalizedMessageSource {
     /**
      * Resolve a message for the given code.
