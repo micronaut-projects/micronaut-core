@@ -59,7 +59,7 @@ class FormDataDiskSpec extends Specification {
         then:
         response.status == HttpStatus.OK
         response.body.isPresent()
-        response.body.get() == 'Fred'
+        response.body.get() == '{"name":"Fred"}'
 
         cleanup:
         server.stop()
