@@ -1,4 +1,4 @@
-To use Eclipse IDE, it is recommended you import your Micronaut project into Eclipse using either https://projects.eclipse.org/projects/tools.buildship[Gradle BuildShip] for Gradle or http://www.eclipse.org/m2e/[M2Eclipse] for Maven.
+To use Eclipse IDE, it is recommended you import your Micronaut project into Eclipse using either https://projects.eclipse.org/projects/tools.buildship[Gradle BuildShip] for Gradle or https://www.eclipse.org/m2e/[M2Eclipse] for Maven.
 
 NOTE: Micronaut requires Eclipse IDE 4.9 or higher
 
@@ -10,7 +10,7 @@ Once you have set up Eclipse 4.9 or higher with https://projects.eclipse.org/pro
 
 For Eclipse 4.9 and above with Maven you need the following Eclipse plugins:
 
-* http://www.eclipse.org/m2e/[M2Eclipse for Maven]
+* https://www.eclipse.org/m2e/[M2Eclipse for Maven]
 * https://github.com/jbosstools/m2e-apt[Maven integration with Eclipse JDT Annotation Processor Toolkit]
 
 Once these are installed, import the project by selecting `File -> Import` and choosing `Maven -> Existing Maven Project` and navigating to the root directory of your project (where the `pom.xml` file is located).

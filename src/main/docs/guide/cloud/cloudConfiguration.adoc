@@ -76,7 +76,7 @@ Note that you can have multiple environments active, for example when running in
 
 In addition, using the value of the constants defined in the table above you can create environment-specific configuration files. For example if you create a `src/main/resources/application-gcp.yml` file, it is only loaded when running on Google Compute.
 
-TIP: Any configuration property in the api:context.env.Environment[] can also be set via an environment variable. For example, setting the `CONSUL_CLIENT_HOST` environment variable overrides the `host` property in link:{micronautdiscoveryapi}/consul/ConsulConfiguration.html[ConsulConfiguration].
+TIP: Any configuration property in the api:context.env.Environment[] can also be set via an environment variable. For example, setting the `CONSUL_CLIENT_HOST` environment variable overrides the `host` property in link:{micronautdiscoveryapi}/io/micronaut/discovery/consul/ConsulConfiguration.html[ConsulConfiguration].
 
 == Using Cloud Instance Metadata
 

@@ -47,7 +47,7 @@ dependencies {
     kaptTest project(':inject-java')
     kaptTest project(':validation')
     testImplementation libs.javax.inject
-    testImplementation(libs.managed.micronaut.tracing.zipkin) {
+    testImplementation(libs.micronaut.tracing.zipkin) {
         exclude module: 'micronaut-bom'
         exclude module: 'micronaut-http-client'
         exclude module: 'micronaut-inject'
