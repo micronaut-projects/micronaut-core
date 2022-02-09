@@ -403,6 +403,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     public void setBody(T body) {
+        this.bodyUnwrapped = body;
         this.body = () -> Optional.ofNullable(body);
         bodyConvertor.cleanup();
     }
