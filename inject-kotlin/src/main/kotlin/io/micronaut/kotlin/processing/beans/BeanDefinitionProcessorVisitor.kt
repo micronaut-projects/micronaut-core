@@ -129,9 +129,13 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
                     visitorContext
                 )
             }
-        } else if (isConfigurationProperties && propertyElement.writeMethod.isPresent) {
-            val methodElement = propertyElement.writeMethod.get()
-            visitConfigPropsSetter(methodElement, propertyElement, propertyElement.name)
+        } else if (isConfigurationProperties) {
+            if (propertyElement.hasStereotype(ConfigurationBuilder::class.java)) {
+                visitConfigurationBuilder(propertyElement)
+            } else if (propertyElement.writeMethod.isPresent) {
+                val methodElement = propertyElement.writeMethod.get()
+                visitConfigPropsSetter(methodElement, propertyElement, propertyElement.name)
+            }
         }
     }
 
@@ -144,6 +148,9 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
     }
 
     private fun visitConfigPropsSetter(methodElement: MethodElement, annotatedElement: Element, name: String) {
+        if (shouldExclude(configurationMetadata!!, name)) {
+            return
+        }
         val parameterElement = methodElement.parameters[0]
         val propertyMetadata = configurationMetadataBuilder.visitProperty(
             classElement,
@@ -164,6 +171,36 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
             false,
             true
         )
+    }
+
+    private fun visitConfigurationBuilder(propertyElement: PropertyElement) {
+        propertyElement.readMethod.ifPresent { readMethod ->
+            beanWriter!!.visitConfigBuilderMethod(
+                propertyElement.type,
+                readMethod.name,
+                readMethod.annotationMetadata,
+                configurationMetadataBuilder,
+                propertyElement.type.isInterface)
+            try {
+                KotlinConfigurationBuilderVisitor(propertyElement, configurationMetadataBuilder, beanWriter!!).visit()
+            } finally {
+                beanWriter!!.visitConfigBuilderEnd()
+            }
+        }
+    }
+
+    private fun shouldExclude(includes: Set<String>, excludes: Set<String>, propertyName: String): Boolean {
+        if (includes.isNotEmpty() && !includes.contains(propertyName)) {
+            return true
+        }
+        if (excludes.isNotEmpty() && excludes.contains(propertyName)) {
+            return true
+        }
+        return false
+    }
+
+    private fun shouldExclude(configurationMetadata: ConfigurationMetadata, propertyName: String): Boolean {
+        return shouldExclude(configurationMetadata.includes, configurationMetadata.excludes, propertyName)
     }
 
     private fun visitFactoryMethod(methodElement: MethodElement) {
