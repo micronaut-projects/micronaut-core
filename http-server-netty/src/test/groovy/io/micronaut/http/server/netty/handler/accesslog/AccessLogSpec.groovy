@@ -13,6 +13,7 @@ import io.micronaut.http.annotation.Post
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.bootstrap.Bootstrap
+import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import io.netty.channel.Channel
 import io.netty.channel.ChannelHandlerContext
@@ -120,6 +121,7 @@ class AccessLogSpec extends Specification {
         listAppender.list[1].message.contains('/interleave/finish')
 
         cleanup:
+        responses*.content().forEach(ByteBuf::release)
         server.close()
         channel.close()
         bootstrap.config().group().shutdownGracefully()
@@ -185,6 +187,7 @@ class AccessLogSpec extends Specification {
         listAppender.list[0].message.contains('/interleave/finish')
 
         cleanup:
+        responses*.content().forEach(ByteBuf::release)
         server.close()
         channel.close()
         bootstrap.config().group().shutdownGracefully()
@@ -254,6 +257,7 @@ class AccessLogSpec extends Specification {
         listAppender.list[1].message.contains('/interleave/simple')
 
         cleanup:
+        responses*.content().forEach(ByteBuf::release)
         server.close()
         channel.close()
         bootstrap.config().group().shutdownGracefully()
@@ -365,6 +369,7 @@ class AccessLogSpec extends Specification {
         listAppender.list[2].message.contains('/interleave/finish')
 
         cleanup:
+        responses*.content().forEach(ByteBuf::release)
         server.close()
         channel.close()
         bootstrap.config().group().shutdownGracefully()
@@ -462,6 +467,7 @@ class AccessLogSpec extends Specification {
         listAppender.list[3].message.contains('/interleave/finish')
 
         cleanup:
+        responses*.content().forEach(ByteBuf::release)
         server.close()
         channel.close()
         bootstrap.config().group().shutdownGracefully()
@@ -557,6 +563,7 @@ class AccessLogSpec extends Specification {
         listAppender.list[0].message.contains('/interleave/open')
 
         cleanup:
+        responses*.content().forEach(ByteBuf::release)
         server.close()
         channel.close()
         bootstrap.config().group().shutdownGracefully()
