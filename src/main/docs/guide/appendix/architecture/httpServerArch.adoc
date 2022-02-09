@@ -32,3 +32,49 @@ image::arch/embeddedserver.png[]
 
 In the case of the Netty implementation the api:runtime.server.EmbeddedServer[] interface is implemented by api:http.server.netty.NettyHttpServer[].
 
+=== Server Configuration
+
+The api:http.server.netty.NettyHttpServer[] reads the <<serverConfiguration, Server Configuration>> including:
+
+* api:http.server.netty.configuration.NettyHttpServerConfiguration[] - An extended version of api:http.server.HttpServerConfiguration[] which defines Netty-specific configuration options beyond the host, port etc.
+* api:http.netty.channel.EventLoopGroupConfiguration[] - configures one or more Netty https://netty.io/4.1/api/io/netty/channel/EventLoopGroup.html[EventLoopGroup] that can be configured to be either unique to the server or shared with one or more HTTP clients.
+* api:http.ssl.ServerSslConfiguration[] - Provides configuration for the api:http.server.netty.ssl.ServerSslBuilder[] for to configure the Netty https://netty.io/4.1/api/io/netty/handler/ssl/SslContext.html[SslContext] to use for HTTPS. 
+
+=== Server Configuration Security Considerations
+
+Netty's https://netty.io/4.1/api/io/netty/handler/ssl/SslContext.html[SslContext] provides an abstraction which allows using either the JDK-provided `javax.net.ssl.SSLContext` or an https://netty.io/4.1/api/io/netty/handler/ssl/OpenSslEngine.html[OpenSslEngine] that requires the the developer to additionally add https://netty.io/wiki/forked-tomcat-native.html[netty-tcnative] as a dependency (`netty-tcnative` is a fork of of https://tomcat.apache.org/native-doc/[Tomcat's OpenSSL binding]).
+
+The api:http.ssl.ServerSslConfiguration[] allows configuring the application to a secure, readable location on disk where valid certificates exist to correctly configure the `javax.net.ssl.TrustManagerFactory` and `javax.net.ssl.KeyManagerFactory` by loading the configurtion from disk.
+
+=== Netty Server Initialization
+
+When the api:http.server.netty.NettyHttpServer[] executes the `start()` sequence, it will perform the following steps:
+
+1. Read the api:http.netty.channel.EventLoopGroupConfiguration[] and create a the parent and worker https://netty.io/4.1/api/io/netty/channel/EventLoopGroup.html[EventLoopGroup] instances required to start a Netty server.
+2. Compute a platform specific https://netty.io/4.1/api/io/netty/channel/socket/ServerSocketChannel.html[ServerSocketChannel] to use (depending on Operating System this could either be Epoll or KQueue, falling back to Java NIO if no native binding is possible)
+3. Creates the instance of https://netty.io/4.1/api/io/netty/bootstrap/ServerBootstrap.html[ServerBootstrap] used to initialze the the https://netty.io/4.1/api/io/netty/channel/socket/SocketChannel.html[SocketChannel] (the connection between client and server).
+4. The `SocketChannel` is initialized by a Netty https://netty.io/4.1/api/io/netty/channel/ChannelInitializer.html[ChannelInitializer] that creates the customized Netty https://netty.io/4.1/api/io/netty/channel/ChannelPipeline.html[ChannelPipeline] used to Micronaut to server HTTP/1.1 or HTTP/2 requests depending on configuration.
+5. The Netty https://netty.io/4.1/api/io/netty/bootstrap/ServerBootstrap.html[ServerBootstrap] is bound to one or more configured ports, effectively making the server available to receive requests.
+6. Two <<events, Bean Events>> are fired, first api:runtime.server.event.ServerStartupEvent[] to indicate the server has started, then finally once all these events are processed a api:discovery.event.ServiceReadyEvent[] only if the property `micronaut.application.name` is set.
+
+This startup sequence is illustrated below:
+
+image::arch/nettybootstrap.png[]
+
+A `NettyHttpServerInitializer` class is used to initialize the https://netty.io/4.1/api/io/netty/channel/ChannelPipeline.html[ChannelPipeline] that handles incoming HTTP/1.1 or HTTP/2 requests.
+
+=== ChannelPipeline Security Considerations
+
+The `ChannelPipeline` can be customized by the user by implementing a bean that implements the api:http.netty.ChannelPipelineCustomizer[] interface and adding a new Netty https://netty.io/4.1/api/io/netty/channel/ChannelHandler.html[ChannelHandler] to the pipeline.
+
+Adding a `ChannelHandler` allows performing tasks such as wire-level logging of incoming and outgoing data packets and may be used when wire-level security requirements are required such as validating the bytes of the incoming request body or outgoing response body.
+
+=== Netty Server Routing
+
+Micronaut defines a set of https://docs.micronaut.io/latest/api/io/micronaut/http/annotation/package-summary.html[HTTP annotations] that that allow binding user code to incoming api:http.HttpRequest[] instances and customizing the resulting api:http.HttpResponse[].
+
+One or many configured api:web.router.RouteBuilder[] implementations construct instances of api:web.router.UriRoute[] which is used by the api:web.router.Router[] components to route incoming requests methods of annotated classes such as:
+
+snippet::io.micronaut.docs.server.intro.HelloController[tags="imports,class"]
+
+<<binding, Request binding annotations>> can be used to bind method parameters to the HTTP body, headers, parameters etc. and the framework will automatically deal with correctly escaping the data before it passed to the receiving method.

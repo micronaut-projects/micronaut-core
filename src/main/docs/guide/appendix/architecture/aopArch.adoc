@@ -109,3 +109,15 @@ Note that the default behaviour of the the ann:aop.Around[] annotation is to inv
 However, this behaviour can be customized, for example using `@Around(proxyTarget=true)` will result two api:inject.BeanDefinition[] instances, one of the proxy and one for the proxy target. In this case the proxy becomes the primary bean and lookups up the proxy target and there are effectively two instances of the type.
 
 The default behaviour (`proxyTarget=false`) is more efficient memory wise as only a single api:inject.BeanDefinition[] is required.
+
+=== Security Considerations
+
+Method interception via `AROUND` advice is typically used to define logic that addresses cross cutting concerns, one of which is security.
+
+When multiple api:aop.Interceptor[] instances apply to a single method it may be important from a security perspective that these interceptors execute in a specific order.
+
+The api:aop.Interceptor[] interface extends the api:core.order.Ordered[] interface to enable the developer to control interceptor ordering by overriding the `getOrder()` method. 
+
+When the api:aop.chain.MethodInterceptorChain[] is constructed and multiple interceptors are present they are ordered with `HIGHEST` priority interceptors executed first.
+
+To aid the developer who defines their own <<aroundAdvice, Around Advice>> the api:aop.InterceptPhase[] enumeration defines various constants that can be used to correctly declare the value of `getOrder()` (for example security typically falls within the `VALIDATE` phase).
