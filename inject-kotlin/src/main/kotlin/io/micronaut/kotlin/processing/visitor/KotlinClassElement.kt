@@ -372,6 +372,10 @@ open class KotlinClassElement(val classType: KSType,
 
         elementLoop@ for (enclosingElement in enclosedElements) {
 
+            if (enclosingElement is KSClassDeclaration && enclosingElement.classKind == ClassKind.ENUM_ENTRY) {
+                continue
+            }
+
             if (result.isOnlyAccessible) {
                 if (enclosingElement is KSPropertyDeclaration) {
                     // the backing fields of properties are always private
@@ -380,6 +384,9 @@ open class KotlinClassElement(val classType: KSType,
                     }
                 }
                 if (enclosingElement.modifiers.contains(Modifier.PRIVATE)) {
+                    continue
+                }
+                if (enclosingElement is KSClassDeclaration && Modifier.INNER in enclosingElement.modifiers) {
                     continue
                 }
 //                val onlyAccessibleFrom = result.onlyAccessibleFromType.orElse(this)
