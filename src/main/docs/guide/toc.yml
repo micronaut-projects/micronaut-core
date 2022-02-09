@@ -293,7 +293,6 @@ appendix:
     aopArch: AOP Proxies
     containerArch: Application Context 
     httpServerArch: HTTP Server
-    httpClientArch: HTTP Client
   faq: Frequently Asked Questions (FAQ)
   usingsnapshots: Using Snapshots
   problems: Common Problems

@@ -78,3 +78,27 @@ One or many configured api:web.router.RouteBuilder[] implementations construct i
 snippet::io.micronaut.docs.server.intro.HelloController[tags="imports,class"]
 
 <<binding, Request binding annotations>> can be used to bind method parameters to the HTTP body, headers, parameters etc. and the framework will automatically deal with correctly escaping the data before it passed to the receiving method.
+
+An incoming request is received by Netty and a `ChannelPipeline` initialized by `NettyHttpServerInitializer`. The incoming raw packets are transformed into a Netty https://netty.io/4.1/api/io/netty/handler/codec/http/HttpRequest.html[HttpRequest] which is subsequently wrapped in a Micronaut api:http.server.netty.NettyHttpRequest[] which abstracts over the underlying Netty request.
+
+The `NettyHttpRequest` is passed through the chain of Netty https://netty.io/4.1/api/io/netty/channel/ChannelHandler.html[ChannelHandler] instances until it arrives at `RoutingInBoundHandler` which uses the aforementioned api:web.router.Router[] to match the request a method of an annotated ann:http.annotation.Controller[] type.
+
+
+The `RoutingInBoundHandler` delegates to api:http.server.RouteExecutor[] for actual execution of the route, which deals with all the logic to dispatch to a method of an annotated ann:http.annotation.Controller[] type. 
+
+Once executed, if the return value is not `null` an appropriate api:http.codec.MediaTypeCodec[] is looked up from the api:http.codec.MediaTypeCodecRegistry[] for the response https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type[Content-Type] (defaulting to `application/json`). The `MediaTypeCodec` is used to encode the return value into a `byte[]` and include it as the body of the resulting api:http.HttpResponse[].  
+
+The following diagram illustrates this flow for an incoming request:
+
+image::arch/http-server-requestflow.png[]
+
+The `RouteExecutor` will construct a api:http.filter.FilterChain[] to execute one or many api:http.filter.HttpServerFilter[] prior executing the target method of an annotated ann:http.annotation.Controller[] type.
+
+Once all of the api:http.filter.HttpServerFilter[] instances have been executed the api:http.server.RouteExecutor[] will attempt to satisify the requirements of the target method's parameters, including any <<binding, Request binding annotations>>. If the parameters cannot be satisfied then a `HTTP 400 - Bad Request` api:http.HttpStatus[] response is returned to the calling client.
+
+=== Netty Server Routing Security Considerations
+
+A api:http.filter.HttpServerFilter[] instance can be used by the developer to control access to server resources. By not proceeding with the api:http.filter.FilterChain[] an alternative response (such as a `403 - Forbidden`) can be returned the client barring access to sensitive resources.
+
+Note that the api:http.filter.HttpServerFilter[] interface extends from the api:core.order.Ordered[] interface since it is frequently the case that multiple filters exist within a api:http.filter.FilterChain[]. By implementing the `getOrder()` method the developer can return an appropriate priority to control ordering. In addition, the api:http.filter.ServerFilterPhase[] enum provides a set of constants developers can use to correctly position a filter, including a `SECURITY` phase where security rules are commonly placed.
+
