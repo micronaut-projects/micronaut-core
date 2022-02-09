@@ -337,27 +337,19 @@ class MyProperties {
         ((Engine.Builder) bean.engine).build().manufacturer == 'Subaru'
         ((Engine.Builder) bean.getEngine2()).build().manufacturer == 'Subaru'
     }
-/*
+
     void "test name is correct with inner classes of non config props class"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition("test.Test\$TestNestedConfig", '''
-package test;
+package test
 
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.annotation.ConfigurationProperties
 
 class Test {
 
     @ConfigurationProperties("test")
-    static class TestNestedConfig {
-        private String val;
-
-        public String getVal() {
-            return val;
-        }
-
-        public void setVal(String val) {
-            this.val = val;
-        }
+    class TestNestedConfig {
+        var x: String? = null
     }
 
 }
@@ -365,46 +357,22 @@ class Test {
 
         then:
         noExceptionThrown()
-        beanDefinition.injectedMethods[0].annotationMetadata.getAnnotationValuesByType(Property.class).get(0).stringValue("name").get() == "test.val"
+        beanDefinition.injectedMethods[0].annotationMetadata.getAnnotationValuesByType(Property.class).get(0).stringValue("name").get() == "test.x"
     }
 
     void "test property names with numbers"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.AwsConfig', '''
-package test;
+package test
 
-import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.ConfigurationProperties
 
 @ConfigurationProperties("aws")
 class AwsConfig {
 
-    private String disableEc2Metadata;
-    private String disableEcMetadata;
-    private String disableEc2instanceMetadata;
-
-    public String getDisableEc2Metadata() {
-        return disableEc2Metadata;
-    }
-
-    public void setDisableEc2Metadata(String disableEc2Metadata) {
-        this.disableEc2Metadata = disableEc2Metadata;
-    }
-
-    public String getDisableEcMetadata() {
-        return disableEcMetadata;
-    }
-
-    public void setDisableEcMetadata(String disableEcMetadata) {
-        this.disableEcMetadata = disableEcMetadata;
-    }
-
-    public String getDisableEc2instanceMetadata() {
-        return disableEc2instanceMetadata;
-    }
-
-    public void setDisableEc2instanceMetadata(String disableEc2instanceMetadata) {
-        this.disableEc2instanceMetadata = disableEc2instanceMetadata;
-    }
+    var disableEc2Metadata: String? = null
+    var disableEcMetadata: String? = null
+    var disableEc2instanceMetadata: String? = null
 }
 ''')
 
@@ -415,35 +383,23 @@ class AwsConfig {
         beanDefinition.injectedMethods[2].getAnnotationMetadata().getAnnotationValuesByType(Property.class).get(0).stringValue("name").get() == "aws.disable-ec2instance-metadata"
     }
 
-    void "test inner interface EachProperty list = true"() {
+    void "test inner class EachProperty list = true"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.Parent$Child$Intercepted', '''
-package test;
+        BeanDefinition beanDefinition = buildBeanDefinition('test.Parent$Child', '''
+package test
 
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.ConfigurationProperties
+import io.micronaut.context.annotation.EachProperty
 
-import jakarta.inject.Inject;
-import java.util.List;
+import jakarta.inject.Inject
 
 @ConfigurationProperties("parent")
-class Parent {
-
-    private final List<Child> children;
-
-    @Inject
-    public Parent(List<Child> children) {
-        this.children = children;
-    }
-
-    public List<Child> getChildren() {
-        return children;
-    }
+class Parent(val children: List<Child>) {
 
     @EachProperty(value = "children", list = true)
-    interface Child {
-        String getPropA();
-        String getPropB();
+    class Child {
+        var propA: String? = null
+        var propB: String? = null
     }
 }
 ''')
@@ -452,34 +408,26 @@ class Parent {
         noExceptionThrown()
         beanDefinition != null
         beanDefinition.getAnnotationMetadata().stringValue(ConfigurationReader.class, "prefix").get() == "parent.children[*]"
-        beanDefinition.getRequiredMethod("getPropA").getAnnotationMetadata().getAnnotationValuesByType(Property.class).get(0).stringValue("name").get() == "parent.children[*].prop-a"
+        beanDefinition.injectedMethods[0].getAnnotationMetadata().getAnnotationValuesByType(Property.class).get(0).stringValue("name").get() == "parent.children[*].prop-a"
     }
 
     void "test config props with post construct first in file"() {
         given:
-        BeanContext context = buildContext("test.EntityProperties", """
-package test;
+        BeanContext context = buildContext("""
+package test
 
-import io.micronaut.context.annotation.ConfigurationProperties;
-import jakarta.annotation.PostConstruct;
+import io.micronaut.context.annotation.ConfigurationProperties
+import jakarta.annotation.PostConstruct
 
 @ConfigurationProperties("app.entity")
-public class EntityProperties {
-
-    private String prop;
+class EntityProperties {
 
     @PostConstruct
-    public void init() {
-        System.out.println("prop = " + prop);
+    fun init() {
+        println("prop = \$prop")
     }
-
-    public String getProp() {
-        return prop;
-    }
-
-    public void setProp(String prop) {
-        this.prop = prop;
-    }
+    
+    var prop: String? = null
 }
 """)
 
@@ -488,5 +436,5 @@ public class EntityProperties {
 
         then:
         noExceptionThrown()
-    }*/
+    }
 }

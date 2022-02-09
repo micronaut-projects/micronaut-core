@@ -101,9 +101,9 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
                 .forEach(this::visitProperty)
             classElement.getEnclosedElements(ElementQuery.of(MethodElement::class.java).onlyAccessible())
                 .forEach(this::visitMethod)
-            classElement.getEnclosedElements(ElementQuery.of(ClassElement::class.java).onlyAccessible())
-                .forEach(this::visitInnerClass)
         }
+        classElement.getEnclosedElements(ElementQuery.of(ClassElement::class.java).onlyAccessible())
+            .forEach(this::visitInnerClass)
     }
 
     private fun visitInnerClass(classElement: ClassElement) {

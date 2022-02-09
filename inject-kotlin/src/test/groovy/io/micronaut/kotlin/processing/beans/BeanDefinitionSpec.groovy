@@ -313,4 +313,40 @@ class TestBean
         noExceptionThrown()
         definition != null
     }
+
+    void "test a bean definition inner static class"() {
+        when:
+        def definition = buildBeanDefinition('test.TestBean$TestBeanInner', '''
+package test
+
+class TestBean {
+    
+    @jakarta.inject.Singleton
+    class TestBeanInner {
+        
+    }
+}
+''')
+        then:
+        noExceptionThrown()
+        definition != null
+    }
+
+    void "test a bean definition is not created for inner class"() {
+        when:
+        def definition = buildBeanDefinition('test.TestBean$TestBeanInner', '''
+package test
+
+class TestBean {
+    
+    @jakarta.inject.Singleton
+    inner class TestBeanInner {
+        
+    }
+}
+''')
+        then:
+        noExceptionThrown()
+        definition == null
+    }
 }
