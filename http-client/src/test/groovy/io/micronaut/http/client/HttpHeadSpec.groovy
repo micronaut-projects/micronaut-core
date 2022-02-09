@@ -389,6 +389,46 @@ class HttpHeadSpec extends Specification {
         !body.isPresent()
     }
 
+    void 'test that HEAD request will preserve content-type'() {
+        when:
+        HttpResponse<String> resp = client.toBlocking().exchange(
+                HttpRequest.HEAD("/head/content-type-1"), String
+        )
+
+        then:
+        resp.status() == HttpStatus.OK
+        resp.body() == null
+        resp.contentType.present
+        resp.contentType.get() == MediaType.IMAGE_PNG_TYPE
+        resp.contentLength == 10
+    }
+
+    void 'test that HEAD request of GET endpoint will preserve content-type'() {
+        when:
+        HttpResponse<String> resp = client.toBlocking().exchange(
+                HttpRequest.HEAD('/head/content-type-2'), String
+        )
+
+        then:
+        resp.status() == HttpStatus.OK
+        resp.body() == null
+        resp.contentType.present
+        resp.contentType.get() == MediaType.IMAGE_JPEG_TYPE
+        resp.contentLength == 12
+    }
+
+    void 'test that HEAD request with exception handler will return expected content-type'() {
+        when:
+        HttpResponse<String> resp = client.toBlocking().exchange(
+                HttpRequest.HEAD('/head/content-type-3'), String
+        )
+
+        then:
+        HttpClientResponseException ex = thrown()
+        ex.response.contentType.present
+        ex.response.contentType.get() == MediaType.IMAGE_WEBP_TYPE
+    }
+
     @Requires(property = 'spec.name', value = 'HttpHeadSpec')
     @Controller("/get")
     static class GetController {
@@ -491,7 +531,35 @@ class HttpHeadSpec extends Specification {
         @Head("/no-content")
         @Status(HttpStatus.NO_CONTENT)
         void noContent() {}
+
+        @Head("/content-type-1")
+        HttpResponse<String> contentTypeHead() {
+            return HttpResponse.ok('ok')
+                    .contentType(MediaType.IMAGE_PNG_TYPE)
+                    .contentLength(10)
+        }
+
+        @Get('/content-type-2')
+        HttpResponse<String> contentTypeGet() {
+            return HttpResponse.ok('ok')
+                    .contentType(MediaType.IMAGE_JPEG_TYPE)
+                    .contentLength(12)
+        }
+
+        @Head('/content-type-3')
+        HttpResponse<String> contentTypeHeadWithEH() {
+            throw new ContentTypeException()
+        }
+
+        @io.micronaut.http.annotation.Error
+        HttpResponse contentTypeError(HttpRequest request, ContentTypeException ignored) {
+            return HttpResponse.status(HttpStatus.I_AM_A_TEAPOT)
+                    .contentType(MediaType.IMAGE_WEBP_TYPE)
+                    .contentLength(43)
+        }
     }
+
+    static class ContentTypeException extends RuntimeException { }
 
     static class Book {
         String title
