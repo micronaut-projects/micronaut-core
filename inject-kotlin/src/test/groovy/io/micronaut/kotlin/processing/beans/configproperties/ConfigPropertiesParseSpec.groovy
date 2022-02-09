@@ -131,8 +131,6 @@ class HttpClientConfiguration {
         beanDefinition.injectedMethods[0].arguments[0].synthesize(ReadableBytes)
     }
 
-
-
     void "test different inject types for config properties"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
@@ -252,201 +250,74 @@ open class Parent {
         bean.@fieldTest == "bar"
         bean.parentTest == "baz"
     }
-/*
-    void "test boolean fields starting with is[A-Z] map to set methods"() {
-        when:
-        BeanDefinition beanDefinition = buildBeanDefinition("micronaut.issuer.FooConfigurationProperties", """
-package micronaut.issuer;
 
-import io.micronaut.context.annotation.ConfigurationProperties;
-
-@ConfigurationProperties("foo")
-public class FooConfigurationProperties {
-
-    private String issuer;
-    private boolean isEnabled;
-    protected Boolean isOther;
-
-
-    public void setIssuer(String issuer) {
-        this.issuer = issuer;
-    }
-
-    //isEnabled field maps to setEnabled method
-    public void setEnabled(boolean enabled) {
-        this.isEnabled = enabled;
-    }
-
-    //isOther field does not map to setOther method because its the class and not primitive
-    public void setOther(Boolean other) {
-        this.isOther = other;
-    }
-}
-
-""")
-        then:
-        noExceptionThrown()
-        beanDefinition.injectedMethods[0].name == "setIssuer"
-        beanDefinition.injectedMethods[1].name == "setEnabled"
-        beanDefinition.injectedFields[0].name == "isOther"
-    }
-
-    void "test configuration properties returns self"() {
-        when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig', '''
-package test;
-
-import io.micronaut.context.annotation.ConfigurationProperties;
-
-@ConfigurationProperties("my")
-class MyConfig {
-    String host;
-    public String getHost() {
-        return host;
-    }
-    public MyConfig setHost(String host) {
-        this.host = host;
-        return this;
-    }
-}''')
-        BeanFactory factory = beanDefinition
-        ApplicationContext applicationContext = ApplicationContext.builder(["my.host": "abc"]).start()
-        def bean = factory.build(applicationContext, beanDefinition)
-
-        then:
-        bean.getHost() == "abc"
-    }
-
-    void "test includes on fields"() {
+    void "test includes on properties"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
-package test;
+package test
 
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.annotation.ConfigurationProperties
 
-@ConfigurationProperties(value = "foo", includes = {"publicField", "parentPublicField"})
-class MyProperties extends Parent {
-    public String publicField;
-    public String anotherPublicField;
+@ConfigurationProperties(value = "foo", includes = ["publicField", "parentPublicField"])
+class MyProperties: Parent() {
+    var publicField: String? = null
+    var anotherPublicField: String? = null
 }
 
-class Parent {
-    public String parentPublicField;
-    public String anotherParentPublicField;
-}
-''')
-        then:
-        noExceptionThrown()
-        beanDefinition.injectedFields.size() == 2
-        beanDefinition.injectedFields[0].name == "parentPublicField"
-        beanDefinition.injectedFields[1].name == "publicField"
-    }
-
-    void "test includes on methods"() {
-        when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
-package test;
-
-import io.micronaut.context.annotation.*;
-
-@ConfigurationProperties(value = "foo", includes = {"publicMethod", "parentPublicMethod"})
-class MyProperties extends Parent {
-
-    public void setPublicMethod(String value) {}
-    public void setAnotherPublicMethod(String value) {}
-}
-
-class Parent {
-    public void setParentPublicMethod(String value) {}
-    public void setAnotherParentPublicMethod(String value) {}
+open class Parent {
+    var parentPublicField: String? = null
+    var anotherParentPublicField: String? = null
 }
 ''')
         then:
         noExceptionThrown()
         beanDefinition.injectedMethods.size() == 2
-        beanDefinition.injectedMethods[0].name == "setParentPublicMethod"
-        beanDefinition.injectedMethods[1].name == "setPublicMethod"
+        beanDefinition.injectedMethods[0].name == "setPublicField"
+        beanDefinition.injectedMethods[1].name == "setParentPublicField"
     }
 
-    void "test excludes on fields"() {
+    void "test excludes on properties"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
-package test;
+package test
 
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.annotation.ConfigurationProperties
 
-@ConfigurationProperties(value = "foo", excludes = {"anotherPublicField", "anotherParentPublicField"})
-class MyProperties extends Parent {
-    public String publicField;
-    public String anotherPublicField;
+@ConfigurationProperties(value = "foo", excludes = ["anotherPublicField", "anotherParentPublicField"])
+class MyProperties: Parent() {
+    var publicField: String? = null
+    var anotherPublicField: String? = null
 }
 
-class Parent {
-    public String parentPublicField;
-    public String anotherParentPublicField;
-}
-''')
-        then:
-        noExceptionThrown()
-        beanDefinition.injectedFields.size() == 2
-        beanDefinition.injectedFields[0].name == "parentPublicField"
-        beanDefinition.injectedFields[1].name == "publicField"
-    }
-
-    void "test excludes on methods"() {
-        when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
-package test;
-
-import io.micronaut.context.annotation.*;
-
-@ConfigurationProperties(value = "foo", excludes = {"anotherPublicMethod", "anotherParentPublicMethod"})
-class MyProperties extends Parent {
-
-    public void setPublicMethod(String value) {}
-    public void setAnotherPublicMethod(String value) {}
-}
-
-class Parent {
-    public void setParentPublicMethod(String value) {}
-    public void setAnotherParentPublicMethod(String value) {}
+open class Parent {
+    var parentPublicField: String? = null
+    var anotherParentPublicField: String? = null
 }
 ''')
         then:
         noExceptionThrown()
         beanDefinition.injectedMethods.size() == 2
-        beanDefinition.injectedMethods[0].name == "setParentPublicMethod"
-        beanDefinition.injectedMethods[1].name == "setPublicMethod"
+        beanDefinition.injectedMethods[0].name == "setPublicField"
+        beanDefinition.injectedMethods[1].name == "setParentPublicField"
     }
+
 
     void "test excludes on configuration builder"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
-package test;
+package test
 
-import io.micronaut.context.annotation.*;
-import io.micronaut.inject.configuration.Engine;
+import io.micronaut.context.annotation.*
+import io.micronaut.kotlin.processing.beans.configuration.Engine
 
-@ConfigurationProperties(value = "foo", excludes = {"engine", "engine2"})
-class MyProperties extends Parent {
+@ConfigurationProperties(value = "foo", excludes = ["engine", "engine2"])
+class MyProperties {
 
-    @ConfigurationBuilder(prefixes = "with")
-    Engine.Builder engine = Engine.builder();
+    @ConfigurationBuilder(prefixes = ["with"])
+    var engine = Engine.builder()
 
-    private Engine.Builder engine2 = Engine.builder();
-
-    @ConfigurationBuilder(configurationPrefix = "two", prefixes = "with")
-    public void setEngine2(Engine.Builder engine3) {
-        this.engine2 = engine3;
-    }
-
-    public Engine.Builder getEngine2() {
-        return engine2;
-    }
-}
-
-class Parent {
-    void setEngine(Engine.Builder engine) {}
+    @ConfigurationBuilder(configurationPrefix = "two", prefixes = ["with"])
+    var engine2 = Engine.builder()
 }
 ''')
         then:
@@ -466,7 +337,7 @@ class Parent {
         ((Engine.Builder) bean.engine).build().manufacturer == 'Subaru'
         ((Engine.Builder) bean.getEngine2()).build().manufacturer == 'Subaru'
     }
-
+/*
     void "test name is correct with inner classes of non config props class"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition("test.Test\$TestNestedConfig", '''

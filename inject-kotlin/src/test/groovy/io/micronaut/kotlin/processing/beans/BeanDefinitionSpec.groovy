@@ -106,13 +106,9 @@ class Test {
     }
 }
 
-interface X {
-    
-}
-class Y: X {
-    
-}
+interface X 
 
+class Y: X 
 ''')
 
         then:
