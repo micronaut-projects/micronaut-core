@@ -405,6 +405,19 @@ class HttpHeadSpec extends Specification {
         response.contentLength == 10
     }
 
+    void "test that content-type header is not present for head request when error results"() {
+        when:
+        Flux.from(client.exchange(
+                HttpRequest.HEAD("/head/empty"), String
+        )).blockFirst()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        def response = ex.response
+        !response.body.present
+        !response.contentType.present
+    }
+
     @Requires(property = 'spec.name', value = 'HttpHeadSpec')
     @Controller("/get")
     static class GetController {

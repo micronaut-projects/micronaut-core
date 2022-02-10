@@ -425,7 +425,7 @@ public final class RouteExecutor {
                 ErrorContext.builder(request)
                         .errorMessage("Page Not Found")
                         .build(), HttpResponse.notFound());
-        if (!response.getContentType().isPresent()) {
+        if (!response.getContentType().isPresent() && !request.getMethod().equals(HttpMethod.HEAD)) {
             return response.contentType(MediaType.APPLICATION_JSON_TYPE);
         }
         return response;
