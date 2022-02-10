@@ -9,6 +9,7 @@ import io.micronaut.http.annotation.Post
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.netty.bootstrap.Bootstrap
+import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import io.netty.channel.Channel
 import io.netty.channel.ChannelHandlerContext
@@ -96,6 +97,7 @@ class HttpPipeliningSpec extends Specification {
         responses[1].content().toString(StandardCharsets.UTF_8) == '[bar1,bar2]'
 
         cleanup:
+        responses*.content().forEach(ByteBuf::release)
         eventLoopGroup.shutdownGracefully()
     }
 
@@ -135,7 +137,9 @@ class HttpPipeliningSpec extends Specification {
             responses.size() == 10
         }
         for (def r : responses) {
-            r.content().toString(StandardCharsets.UTF_8) == 'foo'
+            def content = r.content()
+            assert content.toString(StandardCharsets.UTF_8) == 'foo'
+            content.release()
         }
 
         cleanup:
