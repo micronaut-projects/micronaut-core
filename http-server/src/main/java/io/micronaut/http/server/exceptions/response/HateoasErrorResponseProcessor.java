@@ -59,7 +59,7 @@ public class HateoasErrorResponseProcessor implements ErrorResponseProcessor<Jso
     @Override
     @NonNull
     public MutableHttpResponse<JsonError> processResponse(@NonNull ErrorContext errorContext, @NonNull MutableHttpResponse<?> response) {
-        if (errorContext.getRequest().getMethod().equals(HttpMethod.HEAD)) {
+        if (errorContext.getRequest().getMethod() == HttpMethod.HEAD) {
             return (MutableHttpResponse<JsonError>) response;
         }
         JsonError error;
