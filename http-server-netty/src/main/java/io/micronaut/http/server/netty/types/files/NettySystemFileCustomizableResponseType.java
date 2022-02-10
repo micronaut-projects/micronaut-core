@@ -68,6 +68,9 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
      */
     public NettySystemFileCustomizableResponseType(File file) {
         super(file);
+        if (!file.canRead()) {
+            throw new CustomizableResponseTypeException("Could not find file");
+        }
     }
 
     /**
