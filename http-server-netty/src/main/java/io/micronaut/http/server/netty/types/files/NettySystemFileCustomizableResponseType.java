@@ -139,7 +139,7 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
      * Wrapper class around {@link RandomAccessFile} with two purposes: Leak detection, and implementation of
      * {@link ChannelFutureListener} that closes the file when called.
      */
-    private static class FileHolder implements ChannelFutureListener {
+    private static final class FileHolder implements ChannelFutureListener {
         private static final ResourceLeakDetector<RandomAccessFile> LEAK_DETECTOR =
                 ResourceLeakDetectorFactory.instance().newResourceLeakDetector(RandomAccessFile.class);
 
