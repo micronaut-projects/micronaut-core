@@ -30,6 +30,7 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import spock.lang.Issue
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 import java.time.LocalDate
@@ -389,18 +390,19 @@ class HttpHeadSpec extends Specification {
         !body.isPresent()
     }
 
-    void "test that content type header is present in head request"() {
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/3685')
+    void "test that content-type header is present in head request"() {
         when:
-        HttpResponse<String> resp = client.toBlocking().exchange(
-                HttpRequest.HEAD("/head/content-type-1"), String
-        )
+        HttpResponse response = Flux.from(client.exchange(
+                HttpRequest.HEAD("/head/content-type"), String
+        )).blockFirst()
 
         then:
-        resp.status() == HttpStatus.OK
-        resp.body() == null
-        resp.contentType.present
-        resp.contentType.get() == MediaType.IMAGE_PNG_TYPE
-        resp.contentLength == 10
+        response.status == HttpStatus.OK
+        !response.body.present
+        response.contentType.present
+        response.contentType.get() == MediaType.IMAGE_PNG_TYPE
+        response.contentLength == 10
     }
 
     @Requires(property = 'spec.name', value = 'HttpHeadSpec')
@@ -506,8 +508,8 @@ class HttpHeadSpec extends Specification {
         @Status(HttpStatus.NO_CONTENT)
         void noContent() {}
 
-        @Head("/content-type-1")
-        HttpResponse<String> contentType1() {
+        @Head("/content-type")
+        HttpResponse<String> contentType() {
             return HttpResponse.ok("ok")
                     .contentType(MediaType.IMAGE_PNG_TYPE)
                     .contentLength(10)
