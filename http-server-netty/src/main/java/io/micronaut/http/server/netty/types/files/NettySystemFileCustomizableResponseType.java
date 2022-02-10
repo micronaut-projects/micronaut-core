@@ -146,12 +146,12 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
         private static final ResourceLeakDetector<RandomAccessFile> LEAK_DETECTOR =
                 ResourceLeakDetectorFactory.instance().newResourceLeakDetector(RandomAccessFile.class);
 
+        final RandomAccessFile raf;
+        final long length;
+
         private final ResourceLeakTracker<RandomAccessFile> tracker;
 
         private final File file;
-
-        final RandomAccessFile raf;
-        final long length;
 
         FileHolder(File file) {
             this.file = file;
