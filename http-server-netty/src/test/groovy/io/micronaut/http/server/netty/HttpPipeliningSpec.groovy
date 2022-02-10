@@ -97,7 +97,7 @@ class HttpPipeliningSpec extends Specification {
         responses[1].content().toString(StandardCharsets.UTF_8) == '[bar1,bar2]'
 
         cleanup:
-        responses*.content().forEach(ByteBuf::release)
+        responses.forEach(r -> r.release())
         eventLoopGroup.shutdownGracefully()
     }
 
@@ -143,6 +143,7 @@ class HttpPipeliningSpec extends Specification {
         }
 
         cleanup:
+        responses.forEach(r -> r.release())
         eventLoopGroup.shutdownGracefully()
     }
 
