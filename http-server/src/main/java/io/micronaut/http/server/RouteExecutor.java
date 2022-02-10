@@ -305,7 +305,7 @@ public final class RouteExecutor {
                         .errorMessage("Internal Server Error: " + cause.getMessage())
                         .build(), response);
         applyConfiguredHeaders(mutableHttpResponse.getHeaders());
-        if (!mutableHttpResponse.getContentType().isPresent()) {
+        if (!mutableHttpResponse.getContentType().isPresent() && !httpRequest.getMethod().equals(HttpMethod.HEAD)) {
             return mutableHttpResponse.contentType(MediaType.APPLICATION_JSON_TYPE);
         }
         return mutableHttpResponse;

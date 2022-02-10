@@ -418,6 +418,19 @@ class HttpHeadSpec extends Specification {
         !response.contentType.present
     }
 
+    void "test that content-type header is not present for head request when error route throws"() {
+        when:
+        Flux.from(client.exchange(
+                HttpRequest.HEAD("/head/thrownError"), String
+        )).blockFirst()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        def response = ex.response
+        !response.body.present
+        !response.contentType.present
+    }
+
     @Requires(property = 'spec.name', value = 'HttpHeadSpec')
     @Controller("/get")
     static class GetController {
@@ -527,7 +540,19 @@ class HttpHeadSpec extends Specification {
                     .contentType(MediaType.IMAGE_PNG_TYPE)
                     .contentLength(10)
         }
+
+        @Get("/thrownError")
+        HttpResponse<String> thrownError() {
+            throw new CustomErrorException();
+        }
+
+        @io.micronaut.http.annotation.Error
+        HttpResponse thrownErrorHandler(HttpRequest request, CustomErrorException ignored) {
+            throw new RuntimeException('error thrown: CustomErrorException')
+        }
     }
+
+    static class CustomErrorException extends RuntimeException { }
 
     static class Book {
         String title
