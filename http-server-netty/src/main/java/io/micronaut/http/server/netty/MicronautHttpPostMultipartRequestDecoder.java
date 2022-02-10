@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.multipart.HttpDataFactory;
 import io.netty.handler.codec.http.multipart.HttpPostMultipartRequestDecoder;
+import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.util.ReferenceCountUtil;
 
@@ -44,7 +45,10 @@ class MicronautHttpPostMultipartRequestDecoder extends HttpPostMultipartRequestD
             be released after they are read or when the request
             terminates
          */
-        getBodyHttpDatas().clear();
+        try {
+            getBodyHttpDatas().clear();
+        } catch (HttpPostRequestDecoder.NotEnoughDataDecoderException ignored) {
+        }
         super.destroy();
         // release any data partially uploaded but not completed
         final InterfaceHttpData data = currentPartialHttpData();

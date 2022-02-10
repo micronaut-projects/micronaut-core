@@ -50,6 +50,19 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
     private final long partMaxSize;
 
     /**
+     * Set to true to request a destroy by any thread.
+     */
+    private volatile boolean pleaseDestroy = false;
+    /**
+     * {@code true} during {@link #doOnNext}, can't destroy while that's running.
+     */
+    private volatile boolean inFlight = false;
+    /**
+     * {@code true} if the decoder has been destroyed or will be destroyed in the near future.
+     */
+    private boolean destroyed = false;
+
+    /**
      * @param nettyHttpRequest The {@link NettyHttpRequest}
      * @param configuration    The {@link NettyHttpServerConfiguration}
      */
@@ -102,12 +115,28 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
             @Override
             public void cancel() {
                 subscription.cancel();
+                pleaseDestroy = true;
+                destroyIfRequested();
             }
         });
     }
 
     @Override
     protected void onData(ByteBufHolder message) {
+        boolean skip;
+        synchronized (this) {
+            if (destroyed) {
+                skip = true;
+            } else {
+                skip = false;
+                inFlight = true;
+            }
+        }
+        if (skip) {
+            message.release();
+            return;
+        }
+
         Subscriber<? super HttpData> subscriber = getSubscriber();
 
         if (message instanceof HttpContent) {
@@ -172,16 +201,35 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
         } else {
             message.release();
         }
+        inFlight = false;
+        destroyIfRequested();
     }
 
     @Override
     protected void doAfterOnError(Throwable throwable) {
-        decoder.destroy();
+        pleaseDestroy = true;
+        destroyIfRequested();
     }
 
     @Override
     protected void doAfterComplete() {
-        decoder.destroy();
+        pleaseDestroy = true;
+        destroyIfRequested();
+    }
+
+    private void destroyIfRequested() {
+        boolean destroy;
+        synchronized (this) {
+            if (pleaseDestroy && !destroyed && !inFlight) {
+                destroy = true;
+                destroyed = true;
+            } else {
+                destroy = false;
+            }
+        }
+        if (destroy) {
+            decoder.destroy();
+        }
     }
 
 }
