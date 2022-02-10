@@ -330,6 +330,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             for (ByteBufHolder holder : receivedContent) {
                 ByteBuf content = holder.content();
                 if (content != null) {
+                    content.touch();
                     // need to retain content, because for addComponent "ownership of buffer is transferred to this CompositeByteBuf."
                     byteBufs.addComponent(true, content.retain());
                 }
@@ -421,6 +422,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     public void addContent(ByteBufHolder httpContent) {
+        httpContent.touch();
         if (httpContent instanceof AbstractHttpData || httpContent instanceof MixedAttribute) {
             receivedData.computeIfAbsent(new IdentityWrapper(httpContent), key -> {
                 httpContent.retain();
