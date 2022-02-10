@@ -47,7 +47,7 @@ And the api:aop.writer.AopProxyWriter[] will decorate this behaviour and generat
 * `$NotNullExample$Definition$Intercepted$Definition$Reference.class` - A api:inject.BeanDefinitionReference[] that is capable of soft loading the intercepted api:inject.BeanDefinition[]. (see (see <<iocArch, Bean Definitions>>))
 
 
-The majority of the classes generated are metadata for loading and resolving the api:inject.BeanDefinition[]. The actual build time proxy is the class that ends with `$Intercepted`. This class implements the api:aop.Intercepted[] and subclasses the proxied type, overridding any non-final and non-private methods to invoke the api:aop.chain.MethodInterceptorChain[].
+The majority of the classes generated are metadata for loading and resolving the api:inject.BeanDefinition[]. The actual build time proxy is the class that ends with `$Intercepted`. This class implements the api:aop.Intercepted[] interface and subclasses the proxied type, overridding any non-final and non-private methods to invoke the api:aop.chain.MethodInterceptorChain[].
 
 An implementation will create a constructor which is used to wire in the dependencies on the intercepted type that looks like:
 
@@ -104,11 +104,24 @@ public void doWork(String taskName) {
 <2> A new api:aop.chain.MethodInterceptorChain[] is constructed with the interceptors, a reference to the intercepted instance, the method and the arguments.
 <3> The `proceed()` method is invoked on the api:aop.chain.MethodInterceptorChain[].
 
-Note that the default behaviour of the the ann:aop.Around[] annotation is to invoke methods on the intercepted super type that is subclassed so there is effectively only a single instance of the `NotNullExample` in the example above.
+Note that the default behaviour of the the ann:aop.Around[] annotation is to invoke the original overriden method of the target type by calling the super implementation via a generated synthetic bridge method that allows access to the super implementation (in the above case `NotNullExample`).
 
-However, this behaviour can be customized, for example using `@Around(proxyTarget=true)` will result two api:inject.BeanDefinition[] instances, one of the proxy and one for the proxy target. In this case the proxy becomes the primary bean and lookups up the proxy target and there are effectively two instances of the type.
+In this arrangement the proxy and the proxy target are the same object, with interceptors being invoked and the call to `proceed()` invoke the original implementation via a call to `super.doWork()` in the case above.
 
-The default behaviour (`proxyTarget=false`) is more efficient memory wise as only a single api:inject.BeanDefinition[] is required.
+However, this behaviour can be customized using the ann:aop.Around[] annotation.
+
+By setting `@Around(proxyTarget=true)` the generated code will also implement the api:aop.InterceptedProxy[] interface which defines a single method called `interceptedTarget()` that resolves the target object the proxy should delegate method calls to. 
+
+NOTE: The default behaviour (`proxyTarget=false`) is more efficient memory wise as only a single api:inject.BeanDefinition[] is required and a single instance of the proxied type.
+
+The evaluation of the proxy target is eager and done when the proxy is first created, however it can be made lazy by setting `@Around(lazy=true, proxyTarget=true)` in which case the proxy will only be retrieved when a proxied method is invoked.
+
+The difference in behaviour between proxying the target with `proxyTarget=true` is illustrated in the following diagram:
+
+image::arch/aop-proxies.png[]
+
+The sequence on the left hand side of the diagram (`proxyTarget=false`) invokes the proxied method via a call to `super` whilst the sequence on the right looks up an proxy target from the api:context.BeanContext[] and invokes the method on the target.
+
 
 === Security Considerations
 
@@ -121,3 +134,5 @@ The api:aop.Interceptor[] interface extends the api:core.order.Ordered[] interfa
 When the api:aop.chain.MethodInterceptorChain[] is constructed and multiple interceptors are present they are ordered with `HIGHEST` priority interceptors executed first.
 
 To aid the developer who defines their own <<aroundAdvice, Around Advice>> the api:aop.InterceptPhase[] enumeration defines various constants that can be used to correctly declare the value of `getOrder()` (for example security typically falls within the `VALIDATE` phase).
+
+TIP: Trace level logging can be enabled for the `io.micronaut.aop.chain` package to debug resolved interceptor order.
