@@ -389,6 +389,20 @@ class HttpHeadSpec extends Specification {
         !body.isPresent()
     }
 
+    void "test that content type header is present in head request"() {
+        when:
+        HttpResponse<String> resp = client.toBlocking().exchange(
+                HttpRequest.HEAD("/head/content-type-1"), String
+        )
+
+        then:
+        resp.status() == HttpStatus.OK
+        resp.body() == null
+        resp.contentType.present
+        resp.contentType.get() == MediaType.IMAGE_PNG_TYPE
+        resp.contentLength == 10
+    }
+
     @Requires(property = 'spec.name', value = 'HttpHeadSpec')
     @Controller("/get")
     static class GetController {
@@ -491,6 +505,13 @@ class HttpHeadSpec extends Specification {
         @Head("/no-content")
         @Status(HttpStatus.NO_CONTENT)
         void noContent() {}
+
+        @Head("/content-type-1")
+        HttpResponse<String> contentType1() {
+            return HttpResponse.ok("ok")
+                    .contentType(MediaType.IMAGE_PNG_TYPE)
+                    .contentLength(10)
+        }
     }
 
     static class Book {
