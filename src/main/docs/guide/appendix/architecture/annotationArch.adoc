@@ -25,4 +25,4 @@ Note that at compilation time the api:core.annotation.AnnotationMetadata[] is mu
 
 In practise this effectively allows decoupling the source code level annotation model from what is used at runtime such that different annotations can be used to represent the same annotation.
 
-For example `jakarata.inject.Inject` or Spring's `@Autowired` are supported as synonyms for ``javax.inject.Inject` by transforming the source level annotation to `javax.inject.Inject` which is the only annotation represented at runtime.
+For example `jakarata.inject.Inject` or Spring's `@Autowired` are supported as synonyms for `javax.inject.Inject` by transforming the source level annotation to `javax.inject.Inject` which is the only annotation represented at runtime.
