@@ -74,12 +74,22 @@ class ClientStreamSpec extends Specification {
         !ex.response.getBody(Map).isPresent()
     }
 
+    void "test a stream that returns an error response"() {
+        when:
+        Flux.from(bookClient.errorStream2()).blockFirst()
+
+        then:
+        thrown(HttpClientResponseException)
+    }
 
     @Client(value = '/rxjava/stream', errorType = Map)
     static interface BookClient extends BookApi {
 
         @Get("/error")
         Publisher<Book> errorStream()
+
+        @Get("/error2")
+        Publisher<Book> errorStream2()
     }
 
     @Client(value = '/rxjava/stream')
@@ -111,6 +121,12 @@ class ClientStreamSpec extends Specification {
         @Get("/error")
         HttpResponse<Map> errorStream() {
             return HttpResponse.serverError([error: "from server"])
+        }
+
+        @Get("/error2")
+        HttpResponse<Map> errorStream2() {
+            return HttpResponse.serverError()
+                    .contentLength(0)
         }
     }
 

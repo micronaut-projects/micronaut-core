@@ -39,7 +39,7 @@ import java.util.Objects;
  */
 @UsedByGeneratedCode
 @Internal
-public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
+public abstract class AbstractBeanProperty<B, P> implements UnsafeBeanProperty<B, P> {
 
     private final BeanIntrospection<B> introspection;
     private final Class<B> beanType;
@@ -47,6 +47,7 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
     private final String name;
     private final AnnotationMetadata annotationMetadata;
     private final Argument[] typeArguments;
+    private final Class<?> typeOrWrapperType;
 
     /**
      * Default constructor.
@@ -70,6 +71,7 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
         this.name = name;
         this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata;
         this.typeArguments = typeArguments;
+        this.typeOrWrapperType = ReflectionUtils.getWrapperType(type);
     }
 
     @Override public @NonNull String getName() {
@@ -118,13 +120,23 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
     }
 
     @Override
+    public final P getUnsafe(B bean) {
+        return readInternal(bean);
+    }
+
+    @Override
     public B withValue(@NonNull B bean, @Nullable P value) {
         ArgumentUtils.requireNonNull("bean", bean);
 
         if (!beanType.isInstance(bean)) {
             throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + introspection.getBeanType());
         }
-        if (value == get(bean)) {
+        return withValueUnsafe(bean, value);
+    }
+
+    @Override
+    public final B withValueUnsafe(B bean, P value) {
+        if (value == getUnsafe(bean)) {
             return bean;
         } else {
             return withValueInternal(bean, value);
@@ -136,12 +148,12 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
         ArgumentUtils.requireNonNull("bean", bean);
 
         if (!beanType.isInstance(bean)) {
-            throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + introspection.getBeanType());
+            throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + beanType);
         }
         if (isReadOnly()) {
             throw new UnsupportedOperationException("Cannot write a read-only property: " + getName());
         }
-        if (value != null && !ReflectionUtils.getWrapperType(getType()).isInstance(value)) {
+        if (value != null && !typeOrWrapperType.isInstance(value)) {
             throw new IllegalArgumentException("Specified value [" + value + "] is not of the correct type: " + getType());
         }
         /*
@@ -152,6 +164,10 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
         writeInternal(bean, value);
     }
 
+    @Override
+    public final void setUnsafe(B bean, P value) {
+        writeInternal(bean, value);
+    }
 
     /**
      * Mutates a property value.
@@ -164,7 +180,7 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
     @UsedByGeneratedCode
     @Internal
     protected B withValueInternal(B bean, P value) {
-        return BeanProperty.super.withValue(bean, value);
+        return UnsafeBeanProperty.super.withValue(bean, value);
     }
 
     /**
