@@ -1,0 +1,139 @@
+
+Micronaut supports annotation-based <<aop, Aspect Oriented Programming>> (AOP) which allows decorating or introducing type behaviour through the use of interceptors defined in user code.
+
+NOTE: The use of the https://en.wikipedia.org/wiki/Aspect-oriented_programming[AOP terminogy] originates from AspectJ and historical use in Spring.
+
+Any annotation defined by the framework can be meta-annotated with the ann:aop.InterceptorBinding[] annotation which supports different kinds of intereption including:
+
+* `AROUND` - A annotation can be used to decorate an existing method invocation
+* `AROUND_CONSTRUCT` - An annotation can be used to intercept the construction of an type
+* `INTRODUCTION` - An annotation can be used to "introduce" new behaviour to abstract or interface types
+* `POST_CONSTRUCT` - An annotation can be used to intercept `@PostConstruct` calls which are invoked after the object is instantiated.
+* `PRE_DESTROY` - An annotation can be used to intercept `@PreDestroy` calls which are invoked after the object is about to be disposed of.
+
+One or many instances of api:aop.Interceptor[] can be associated with an ann:aop.InterceptorBinding[] allowing the user to implement behaviour that applies cross cutting concerns.
+
+At an implementation level, the <<compilerArch, Micronaut Compiler>> will visit types that are meta-annotated with ann:aop.InterceptorBinding[] and construct a new instance of api:aop.writer.AopProxyWriter[] which uses the ASM bytecode generation library to generate a subclass (or an implementation in the case of interfaces) of the annotated type.
+
+NOTE: Micronaut at no point modifies existing user byte code, the use of build-time generated proxies allows Micronaut to generate additional code that sits along side user code and enhances behaviour. This approach does have limitations however, for example it is required that annotated types are non-final and AOP advice cannot be applied to final or effectively final types such as Java 17 Records.
+
+For example given the following annotation:
+
+snippet::io.micronaut.docs.aop.around.NotNull[tags="imports,annotation", indent=0, title="Around Advice Annotation Example"]
+
+<1> The retention policy of the annotation must be `RUNTIME`
+<2> Generally you want to be able to apply advice at the class or method level so the target types are `TYPE` and `METHOD`
+<3> The ann:aop.Around[] annotation is used here which itself is annotated with `@InterceptorBinding(kind=AROUND)` and can be thought of as a simple shortcut for defining an ann:aop.InterceptorBinding[] for `AROUND` advice.
+
+When this annotation is used on a type or method, for example:
+
+snippet::io.micronaut.docs.aop.around.NotNullExample[tags="example", indent=0, title="Around Advice Usage Example"]
+
+The compiler will visit the type and the api:aop.writer.AopProxyWriter[] will generate additional bytecode using the ASM bytecode generation library.
+
+During compilation the api:aop.writer.AopProxyWriter[] instance essentially proxies the `BeanDefinitionWriter` (see <<iocArch, Bean Definitions>>), decorating the existing bytecode generation with additional behaviour. This is illustrated with the below diagram:
+
+image::arch/aop.png[]
+
+The api:inject.writer.BeanDefinitionWriter[] will generate the regular classes generated for every bean including:
+
+* `$NotNullExample$Definition.class` - The original undecorated bean definition (see <<iocArch, Bean Definitions>>)
+* `$NotNullExample$Definition$Exec.class` - An implementation of api:context.ExecutableMethodsDefinition[] containing logic that allows dispatching to each intercepted method without using reflection.
+
+And the api:aop.writer.AopProxyWriter[] will decorate this behaviour and generate 3 additional classes:
+
+* `$NotNullExample$Definition$Intercepted.class` - A subclass of the decorated class that holds references to applied api:aop.MethodInterceptor[] instances and overrides all the intercepted methods, constructing the api:aop.chain.MethodInterceptorChain[] instance and invoking the applied interceptors
+* `$NotNullExample$Definition$Intercepted$Definition.class` - A api:inject.BeanDefinition[] that subclasses the original undecorated bean definition. (see <<iocArch, Bean Definitions>>)
+* `$NotNullExample$Definition$Intercepted$Definition$Reference.class` - A api:inject.BeanDefinitionReference[] that is capable of soft loading the intercepted api:inject.BeanDefinition[]. (see (see <<iocArch, Bean Definitions>>))
+
+
+The majority of the classes generated are metadata for loading and resolving the api:inject.BeanDefinition[]. The actual build time proxy is the class that ends with `$Intercepted`. This class implements the api:aop.Intercepted[] interface and subclasses the proxied type, overridding any non-final and non-private methods to invoke the api:aop.chain.MethodInterceptorChain[].
+
+An implementation will create a constructor which is used to wire in the dependencies on the intercepted type that looks like:
+
+.An intercepted type constructor
+[source,java]
+----
+@Generated
+class $NotNullExample$Definition$Intercepted 
+extends NotNullExample implements Intercepted { // <1>
+    private final Interceptor[][] $interceptors = new Interceptor[1][];
+    private final ExecutableMethod[] $proxyMethods = new ExecutableMethod[1];
+
+    public $NotNullExample$Definition$Intercepted(
+        BeanResolutionContext resolution, 
+        BeanContext context, 
+        Qualifier qualifier, 
+        List<Interceptor> interceptors) {
+        Exec executableMethods = new Exec(true); // <2>
+        this.$proxyMethods[0] = executableMethods.getExecutableMethodByIndex(0); // <3>
+        this.$interceptors[0] = InterceptorChain
+            .resolveAroundInterceptors(
+                context, 
+                this.$proxyMethods[0], 
+                interceptors
+        );  // <4>
+    }
+}
+----
+
+<1> The `@Generated` subclass extends from the decorated type and implements the api:aop.Interepted[] interface
+<2> An instance of api:context.ExecutableMethodsDefinition[] is constructed to resolve reflection-free dispatchers to the original method.
+<3> An internal array called `$proxyMethods` holds a reference for to each api:inject.ExecutableMethod[] instance used to proxy the invocation.
+<4> An internal array called `$interceptors` holds references to which api:aop.Interceptor[] instances apply to each method since an ann:aop.InterceptorBinding[] can be type or method level these may differ for each method.
+
+Each non-final and non-private method of the proxied type that has an ann:aop.InterceptorBinding[] associated with it (either type level or method level) is overridden with logic that proxies the original method, for example:
+
+[source,java]
+----
+@Overrides
+public void doWork(String taskName) {
+    ExecutableMethod method = this.$proxyMethods[0];
+    Interceptor[] interceptors = this.$interceptors[0]; // <1>
+    MethodInterceptorChain chain = new MethodInterceptorChain( // <2>
+        interceptors, 
+        this, 
+        method, 
+        new Object[]{taskName}
+    );
+    chain.proceed(); // <3>
+}
+----
+
+<1> The api:inject.ExecutableMethod[] and array of api:aop.Interceptor[] instances for the method is located.
+<2> A new api:aop.chain.MethodInterceptorChain[] is constructed with the interceptors, a reference to the intercepted instance, the method and the arguments.
+<3> The `proceed()` method is invoked on the api:aop.chain.MethodInterceptorChain[].
+
+Note that the default behaviour of the the ann:aop.Around[] annotation is to invoke the original overriden method of the target type by calling the super implementation via a generated synthetic bridge method that allows access to the super implementation (in the above case `NotNullExample`).
+
+In this arrangement the proxy and the proxy target are the same object, with interceptors being invoked and the call to `proceed()` invoke the original implementation via a call to `super.doWork()` in the case above.
+
+However, this behaviour can be customized using the ann:aop.Around[] annotation.
+
+By setting `@Around(proxyTarget=true)` the generated code will also implement the api:aop.InterceptedProxy[] interface which defines a single method called `interceptedTarget()` that resolves the target object the proxy should delegate method calls to. 
+
+NOTE: The default behaviour (`proxyTarget=false`) is more efficient memory wise as only a single api:inject.BeanDefinition[] is required and a single instance of the proxied type.
+
+The evaluation of the proxy target is eager and done when the proxy is first created, however it can be made lazy by setting `@Around(lazy=true, proxyTarget=true)` in which case the proxy will only be retrieved when a proxied method is invoked.
+
+The difference in behaviour between proxying the target with `proxyTarget=true` is illustrated in the following diagram:
+
+image::arch/aop-proxies.png[]
+
+The sequence on the left hand side of the diagram (`proxyTarget=false`) invokes the proxied method via a call to `super` whilst the sequence on the right looks up an proxy target from the api:context.BeanContext[] and invokes the method on the target.
+
+One final customization option is `@Around(hotswap=true)` which triggers the compiler to produce a compile-time proxy that implements api:aop.HotSwappableInterceptedProxy[] which defines a single method called `swap(..)` that allows swapping out the target of the proxy with a new instance (to allow this to be thread safe the generated code uses a `ReentrantReadWriteLock`).
+
+=== Security Considerations
+
+Method interception via `AROUND` advice is typically used to define logic that addresses cross cutting concerns, one of which is security.
+
+When multiple api:aop.Interceptor[] instances apply to a single method it may be important from a security perspective that these interceptors execute in a specific order.
+
+The api:aop.Interceptor[] interface extends the api:core.order.Ordered[] interface to enable the developer to control interceptor ordering by overriding the `getOrder()` method. 
+
+When the api:aop.chain.MethodInterceptorChain[] is constructed and multiple interceptors are present they are ordered with `HIGHEST` priority interceptors executed first.
+
+To aid the developer who defines their own <<aroundAdvice, Around Advice>> the api:aop.InterceptPhase[] enumeration defines various constants that can be used to correctly declare the value of `getOrder()` (for example security typically falls within the `VALIDATE` phase).
+
+TIP: Trace level logging can be enabled for the `io.micronaut.aop.chain` package to debug resolved interceptor order.

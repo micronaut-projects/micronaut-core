@@ -18,6 +18,7 @@ import spock.lang.Specification
  * HTTP inputs generated from fuzzing.
  */
 class FuzzyInputSpec extends Specification {
+
     def 'http1 cleartext buffer leaks'() {
         given:
         BufferLeakDetection.startTracking()
