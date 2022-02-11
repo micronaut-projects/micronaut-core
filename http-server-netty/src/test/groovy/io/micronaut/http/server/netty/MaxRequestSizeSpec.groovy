@@ -320,6 +320,7 @@ class MaxRequestSizeSpec extends Specification {
         }
 
         cleanup:
+        responses.forEach(r -> r.release())
         channel.close()
         embeddedServer.close()
     }
