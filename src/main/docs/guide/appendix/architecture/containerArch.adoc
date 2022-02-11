@@ -1,0 +1,30 @@
+Once the job of the <<compilerArch, Micronaut Compiler>> is complete and the required classes generated, it is up to the api:inject.BeanContext[] to load the classes for runtime execution.
+
+Whilst the https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/ServiceLoader.html[standard Java service loader mechanism] is used to define instances of api:inject.BeanDefinitionReference[], the instances themselves are instead loaded with api:core.io.service.SoftServiceLoader[] which is a more lenient implementation that allows checking if the service is actually present before loading and also allows parallel loading of services.
+
+The api:inject.BeanContext[] performs the following steps:
+
+1. Soft load all api:inject.BeanDefinitionReference[] instances in parallel
+2. Instantiate all beans annotated with ann:context.annotation.Context[] (beans scoped to the whole context)
+3. Run each api:context.processor.ExecutableMethodProcessor[] for each discovered processed api:inject.ExecutableMethod[]. A method is regarded as "processed" if it is meta-annotated with `@Executable(processOnStartup = true)`
+4. Publish an event on type api:context.event.StartupEvent[] for when the context is started.
+
+The basic flow is illustrated below:
+
+image::arch/beancontext.png[]
+
+The api:context.ApplicationContext[] is a specialized version of the api:context.BeanContext[] that adds the notion of one or more active environments (encapsulated by api:context.Environment[]) and <<conditionalBeans, conditional bean loading>> based on this environment.
+
+The api:context.Environment[] is loaded from one or more defined api:context.env.PropertySource[] instances that are discovered via the https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/ServiceLoader.html[standard Java service loader mechanism] by loading instances of api:context.env.PropertySourceLoader[].
+
+A developer can extend Micronaut to load a api:context.env.PropertySource[] through an entirely custom mechanism by adding an additional implementation and the associated `META-INF/services/io.micronaut.context.env.PropertySourceLoader` file referencing this class.
+
+A high level different between a api:context.BeanContext[] and an api:context.ApplicationContext[] is illustrated below:
+
+image::arch/applicationcontext.png[]
+
+As seen above the api:context.ApplicationContext[] loads the api:context.Environment[] which is used for multiple purposes including:
+
+* Enabling and disabling beans through <<conditionalBeans, Bean Requirements>>
+* Allowing dependency injection of configuration via <<valueAnnotation, @Value>> or ann:context.annotation.Property[]
+* Allowing binding of <<configurationProperties, Configuration Properties>>
