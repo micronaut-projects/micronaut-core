@@ -1,0 +1,104 @@
+The Micronaut HTTP server can be considered a Micronaut Module - that is a component of Micronaut that builds on the fundamental building blocks including <<iocArch, Dependency Injection>> and the lifecycle of the <<containerArch, ApplicationContext>>.
+
+The HTTP server includes a set of abstract interfaces and common code contained with the `micronaut-http` and `micronaut-http-server` modules respectively (the former includes HTTP primitives shared aross the client and the server).
+
+A default implementation of these interfaces is provided based on the https://netty.io/[Netty I/O toolkit] the architecture of which is described in the image below:
+
+image::https://netty.io/images/components.png[]
+
+The Netty API is in general a very low-level I/O networking API designed for integrators to use to build clients and servers that present a higher abstraction layer. The Micronaut HTTP server is one such abstraction layer.
+
+An architecture diagram of the Micronaut HTTP server and the components used in it's implementation is described below:
+
+image::arch/httpserver.png[]
+
+The main entry point for running the server is the api:runtime.Micronaut[] class which implements api:context.ApplicationContextBuilder[]. Typically the developer places the following call into the `main` entry point of their application:
+
+.Defining a `main` entry point
+[source,java]
+----
+public static void main(String[] args) {
+    Micronaut.run(Application.class, args);
+}
+----
+
+NOTE: The passed arguments a transformed into a api:context.env.CommandLinePropertySource[] and available for dependency injection via <<valueAnnotation, @Value>>.
+
+Executing `run` will start the Micronaut <<containerArch, ApplicationContext>> with the default settings and then search for a bean of type api:runtime.server.EmbeddedServer[] which is an interface that exposes information about a runnable server including host and port information. This design decouples Micronaut from the actual server implementation and whilst the default server is Netty (described above), other servers can be implemented by third-parties simply by providing an implementation of api:runtime.server.EmbeddedServer[].
+
+A sequence diagram for how the server is started is illustrated below:
+
+image::arch/embeddedserver.png[]
+
+In the case of the Netty implementation the api:runtime.server.EmbeddedServer[] interface is implemented by api:http.server.netty.NettyHttpServer[].
+
+=== Server Configuration
+
+The api:http.server.netty.NettyHttpServer[] reads the <<serverConfiguration, Server Configuration>> including:
+
+* api:http.server.netty.configuration.NettyHttpServerConfiguration[] - An extended version of api:http.server.HttpServerConfiguration[] which defines Netty-specific configuration options beyond the host, port etc.
+* api:http.netty.channel.EventLoopGroupConfiguration[] - configures one or more Netty https://netty.io/4.1/api/io/netty/channel/EventLoopGroup.html[EventLoopGroup] that can be configured to be either unique to the server or shared with one or more HTTP clients.
+* api:http.ssl.ServerSslConfiguration[] - Provides configuration for the api:http.server.netty.ssl.ServerSslBuilder[] for to configure the Netty https://netty.io/4.1/api/io/netty/handler/ssl/SslContext.html[SslContext] to use for HTTPS. 
+
+=== Server Configuration Security Considerations
+
+Netty's https://netty.io/4.1/api/io/netty/handler/ssl/SslContext.html[SslContext] provides an abstraction which allows using either the JDK-provided `javax.net.ssl.SSLContext` or an https://netty.io/4.1/api/io/netty/handler/ssl/OpenSslEngine.html[OpenSslEngine] that requires the the developer to additionally add https://netty.io/wiki/forked-tomcat-native.html[netty-tcnative] as a dependency (`netty-tcnative` is a fork of of https://tomcat.apache.org/native-doc/[Tomcat's OpenSSL binding]).
+
+The api:http.ssl.ServerSslConfiguration[] allows configuring the application to a secure, readable location on disk where valid certificates exist to correctly configure the `javax.net.ssl.TrustManagerFactory` and `javax.net.ssl.KeyManagerFactory` by loading the configurtion from disk.
+
+=== Netty Server Initialization
+
+When the api:http.server.netty.NettyHttpServer[] executes the `start()` sequence, it will perform the following steps:
+
+1. Read the api:http.netty.channel.EventLoopGroupConfiguration[] and create the parent and worker https://netty.io/4.1/api/io/netty/channel/EventLoopGroup.html[EventLoopGroup] instances required to start a Netty server.
+2. Compute a platform specific https://netty.io/4.1/api/io/netty/channel/socket/ServerSocketChannel.html[ServerSocketChannel] to use (depending on Operating System this could either be Epoll or KQueue, falling back to Java NIO if no native binding is possible)
+3. Creates the instance of https://netty.io/4.1/api/io/netty/bootstrap/ServerBootstrap.html[ServerBootstrap] used to initialze the the https://netty.io/4.1/api/io/netty/channel/socket/SocketChannel.html[SocketChannel] (the connection between client and server).
+4. The `SocketChannel` is initialized by a Netty https://netty.io/4.1/api/io/netty/channel/ChannelInitializer.html[ChannelInitializer] that creates the customized Netty https://netty.io/4.1/api/io/netty/channel/ChannelPipeline.html[ChannelPipeline] used to Micronaut to server HTTP/1.1 or HTTP/2 requests depending on configuration.
+5. The Netty https://netty.io/4.1/api/io/netty/bootstrap/ServerBootstrap.html[ServerBootstrap] is bound to one or more configured ports, effectively making the server available to receive requests.
+6. Two <<events, Bean Events>> are fired, first api:runtime.server.event.ServerStartupEvent[] to indicate the server has started, then finally once all these events are processed a api:discovery.event.ServiceReadyEvent[] only if the property `micronaut.application.name` is set.
+
+This startup sequence is illustrated below:
+
+image::arch/nettybootstrap.png[]
+
+A `NettyHttpServerInitializer` class is used to initialize the https://netty.io/4.1/api/io/netty/channel/ChannelPipeline.html[ChannelPipeline] that handles incoming HTTP/1.1 or HTTP/2 requests.
+
+=== ChannelPipeline Security Considerations
+
+The `ChannelPipeline` can be customized by the user by implementing a bean that implements the api:http.netty.ChannelPipelineCustomizer[] interface and adding a new Netty https://netty.io/4.1/api/io/netty/channel/ChannelHandler.html[ChannelHandler] to the pipeline.
+
+Adding a `ChannelHandler` allows performing tasks such as wire-level logging of incoming and outgoing data packets and may be used when wire-level security requirements are required such as validating the bytes of the incoming request body or outgoing response body.
+
+=== Netty Server Routing
+
+Micronaut defines a set of https://docs.micronaut.io/latest/api/io/micronaut/http/annotation/package-summary.html[HTTP annotations] that that allow binding user code to incoming api:http.HttpRequest[] instances and customizing the resulting api:http.HttpResponse[].
+
+One or many configured api:web.router.RouteBuilder[] implementations construct instances of api:web.router.UriRoute[] which is used by the api:web.router.Router[] components to route incoming requests methods of annotated classes such as:
+
+snippet::io.micronaut.docs.server.intro.HelloController[tags="imports,class"]
+
+<<binding, Request binding annotations>> can be used to bind method parameters to the HTTP body, headers, parameters etc. and the framework will automatically deal with correctly escaping the data before it passed to the receiving method.
+
+An incoming request is received by Netty and a `ChannelPipeline` initialized by `NettyHttpServerInitializer`. The incoming raw packets are transformed into a Netty https://netty.io/4.1/api/io/netty/handler/codec/http/HttpRequest.html[HttpRequest] which is subsequently wrapped in a Micronaut api:http.server.netty.NettyHttpRequest[] which abstracts over the underlying Netty request.
+
+The `NettyHttpRequest` is passed through the chain of Netty https://netty.io/4.1/api/io/netty/channel/ChannelHandler.html[ChannelHandler] instances until it arrives at `RoutingInBoundHandler` which uses the aforementioned api:web.router.Router[] to match the request a method of an annotated ann:http.annotation.Controller[] type.
+
+
+The `RoutingInBoundHandler` delegates to api:http.server.RouteExecutor[] for actual execution of the route, which deals with all the logic to dispatch to a method of an annotated ann:http.annotation.Controller[] type. 
+
+Once executed, if the return value is not `null` an appropriate api:http.codec.MediaTypeCodec[] is looked up from the api:http.codec.MediaTypeCodecRegistry[] for the response https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type[Content-Type] (defaulting to `application/json`). The `MediaTypeCodec` is used to encode the return value into a `byte[]` and include it as the body of the resulting api:http.HttpResponse[].  
+
+The following diagram illustrates this flow for an incoming request:
+
+image::arch/http-server-requestflow.png[]
+
+The `RouteExecutor` will construct a api:http.filter.FilterChain[] to execute one or many api:http.filter.HttpServerFilter[] prior executing the target method of an annotated ann:http.annotation.Controller[] type.
+
+Once all of the api:http.filter.HttpServerFilter[] instances have been executed the api:http.server.RouteExecutor[] will attempt to satisify the requirements of the target method's parameters, including any <<binding, Request binding annotations>>. If the parameters cannot be satisfied then a `HTTP 400 - Bad Request` api:http.HttpStatus[] response is returned to the calling client.
+
+=== Netty Server Routing Security Considerations
+
+A api:http.filter.HttpServerFilter[] instance can be used by the developer to control access to server resources. By not proceeding with the api:http.filter.FilterChain[] an alternative response (such as a `403 - Forbidden`) can be returned to the client barring access to sensitive resources.
+
+Note that the api:http.filter.HttpServerFilter[] interface extends from the api:core.order.Ordered[] interface since it is frequently the case that multiple filters exist within a api:http.filter.FilterChain[]. By implementing the `getOrder()` method the developer can return an appropriate priority to control ordering. In addition, the api:http.filter.ServerFilterPhase[] enum provides a set of constants developers can use to correctly position a filter, including a `SECURITY` phase where security rules are commonly placed.
+

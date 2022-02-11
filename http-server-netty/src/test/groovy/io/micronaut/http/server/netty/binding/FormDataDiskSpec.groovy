@@ -41,6 +41,31 @@ class FormDataDiskSpec extends Specification {
         client.stop()
     }
 
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6705')
+    void "test parsing form to map with mixed attributes"() {
+        given:
+        def server = (EmbeddedServer) ApplicationContext.run(EmbeddedServer, [
+                'micronaut.server.multipart.mixed': true,
+                'micronaut.server.thread-selection': 'IO',
+                'netty.resource-leak-detector-level': 'paranoid'
+        ])
+        def client = server.applicationContext.createBean(HttpClient, server.URI)
+
+        when:
+        HttpResponse<?> response = Flux.from(client.exchange(HttpRequest.POST('/form-disk/object', [
+                name:"Fred",
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst()
+
+        then:
+        response.status == HttpStatus.OK
+        response.body.isPresent()
+        response.body.get() == '{"name":"Fred"}'
+
+        cleanup:
+        server.stop()
+        client.stop()
+    }
+
     @Controller(value = '/form-disk', consumes = MediaType.APPLICATION_FORM_URLENCODED)
     static class FormController {
         @Post('/object')

@@ -48,7 +48,7 @@ dependencies {
     }
 
     testImplementation libs.managed.jcache
-    testImplementation(libs.managed.micronaut.tracing.jaeger) {
+    testImplementation(libs.micronaut.tracing.jaeger) {
         exclude module: 'micronaut-bom'
         exclude module: 'micronaut-http-client'
         exclude module: 'micronaut-inject'

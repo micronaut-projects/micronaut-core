@@ -38,8 +38,8 @@ import static io.micronaut.http.HttpHeaders.*
 
 class StaticResourceResolutionSpec extends AbstractMicronautSpec {
 
-    private static File tempFile
-    private static File tempSubDir
+    static File tempFile
+    static File tempSubDir
 
     static {
         tempFile = File.createTempFile("staticResourceResolutionSpec", ".html")

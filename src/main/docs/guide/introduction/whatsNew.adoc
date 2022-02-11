@@ -391,7 +391,7 @@ Micronaut 3 to simplify instrumentation, thanks to https://projectreactor.io/doc
 
 ==== Micronaut Micrometer 4.0.0
 
-The https://micronaut-projects.github.io/micronaut-micrometer/latest/guide/[Micrometer module] has been upgraded and now supports repeated definitions of the https://micrometer.io/docs/concepts#_the_timed_annotation[@Timed] annotation as well as also supporting the `@Counted` annotation for counters when you add the `micronaut-micrometer-annotation` dependency to your annotation processor classpath.
+The https://micronaut-projects.github.io/micronaut-micrometer/latest/guide/[Micrometer module] has been upgraded and now supports repeated definitions of the https://micrometer.io/?/docs/concepts#_the_timed_annotation[@Timed] annotation as well as also supporting the `@Counted` annotation for counters when you add the `micronaut-micrometer-annotation` dependency to your annotation processor classpath.
 
 ==== Micronaut Oracle Cloud 2.0.0
 
