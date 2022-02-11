@@ -143,7 +143,6 @@ class HttpPipeliningSpec extends Specification {
         }
 
         cleanup:
-        responses.forEach(r -> r.release())
         eventLoopGroup.shutdownGracefully()
     }
 
