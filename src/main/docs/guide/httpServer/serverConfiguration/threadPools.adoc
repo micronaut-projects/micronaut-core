@@ -1,4 +1,4 @@
-The HTTP server is built on http://netty.io[Netty] which is designed as a non-blocking I/O toolkit in an event loop model.
+The HTTP server is built on https://netty.io[Netty] which is designed as a non-blocking I/O toolkit in an event loop model.
 
 The Netty worker event loop uses the "default" named event loop group. This can be configured through `micronaut.netty.event-loops.default`.
 

@@ -19,17 +19,31 @@ class BufferLeakDetection<T> extends ResourceLeakDetector<T> {
     private static volatile boolean canaryDetected = false
 
     static void startTracking() {
+        triggerGc()
+
         leakDetected = false
-        canaryDetected = false
 
         LOG.debug("Starting resource leak tracking")
         if (level != Level.PARANOID) {
             LOG.warn("Resource leaks can't be detected properly below leak detection level 'paranoid'")
         }
-        Canary.CANARY_LEAK_DETECTOR.track(new Canary())
     }
 
     static void stopTrackingAndReportLeaks() {
+        triggerGc()
+
+        if (leakDetected) {
+            throw new RuntimeException("Detected a resource leak. Please check logs")
+        } else {
+            LOG.debug("No resource leak detected")
+        }
+    }
+
+    private static void triggerGc() {
+        canaryDetected = false
+
+        Canary.CANARY_LEAK_DETECTOR.track(new Canary())
+
         // this seems to be reasonably reliable to trigger collection of remaining buffers
         System.gc()
         try {
@@ -43,13 +57,8 @@ class BufferLeakDetection<T> extends ResourceLeakDetector<T> {
             detector.track(obj).close(obj)
         }
 
-        if (leakDetected) {
-            throw new RuntimeException("Detected a resource leak. Please check logs")
-        } else {
-            LOG.debug("No resource leak detected")
-            if (!canaryDetected) {
-                LOG.warn("Canary resource leak wasn't detected. Leak detection not functional")
-            }
+        if (!canaryDetected) {
+            LOG.warn("Canary resource leak wasn't detected. Leak detection not functional")
         }
     }
 

@@ -17,7 +17,7 @@ dependency:io.micronaut.netflix:micronaut-netflix-ribbon[]
 
 The api:http.client.LoadBalancer[] implementations will now be link:{micronautribbonapi}/io/micronaut/configuration/ribbon/RibbonLoadBalancer.html[RibbonLoadBalancer] instances.
 
-Ribbon's http://netflix.github.io/ribbon/ribbon-core-javadoc/com/netflix/client/config/CommonClientConfigKey.html[Configuration options] can be set using the `ribbon` namespace in configuration. For example in `application.yml`:
+Ribbon's https://netflix.github.io/ribbon/ribbon-core-javadoc/com/netflix/client/config/CommonClientConfigKey.html[Configuration options] can be set using the `ribbon` namespace in configuration. For example in `application.yml`:
 
 .Configuring Ribbon
 [source,yaml]
