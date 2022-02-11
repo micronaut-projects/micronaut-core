@@ -212,7 +212,7 @@ class Http2ServerPushSpec extends Specification {
         class InboundHandler extends SimpleChannelInboundHandler<FullHttpResponse> {
             @Override
             protected void channelRead0(ChannelHandlerContext ctx, FullHttpResponse msg) throws Exception {
-                responses.add(msg.retain())
+                responses.add(msg)
                 if (--expectedResponses == 0 || msg.status().code() >= 400) {
                     ctx.close()
                     completion.complete(null)
