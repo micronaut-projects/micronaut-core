@@ -988,7 +988,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             }
         } else {
             response.body(null);
-            response.contentType(null);
             writeFinalNettyResponse(
                     response,
                     nettyRequest,
