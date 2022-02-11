@@ -122,7 +122,7 @@ image::arch/aop-proxies.png[]
 
 The sequence on the left hand side of the diagram (`proxyTarget=false`) invokes the proxied method via a call to `super` whilst the sequence on the right looks up an proxy target from the api:context.BeanContext[] and invokes the method on the target.
 
-One final customization option is `@Around(hotswap=true)` which which triggers the compiler to produce a compile-time proxy that implements api:aop.HotSwappableInterceptedProxy[] which defines a single method called `swap(..)` that allows swapping out the target of the proxy with a new instance (to allow this to be thread safe the generated code uses a `ReentrantReadWriteLock`).
+One final customization option is `@Around(hotswap=true)` which triggers the compiler to produce a compile-time proxy that implements api:aop.HotSwappableInterceptedProxy[] which defines a single method called `swap(..)` that allows swapping out the target of the proxy with a new instance (to allow this to be thread safe the generated code uses a `ReentrantReadWriteLock`).
 
 === Security Considerations
 
