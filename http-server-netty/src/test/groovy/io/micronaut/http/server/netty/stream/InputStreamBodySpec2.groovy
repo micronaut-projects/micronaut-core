@@ -49,7 +49,7 @@ class InputStreamBodySpec2 extends Specification {
         when:
         int max = 1
         CountDownLatch latch = new CountDownLatch(max)
-
+        List<Throwable> errors = []
         ExecutorService pool = Executors.newCachedThreadPool()
         ConcurrentLinkedQueue<HttpStatus> responses = new ConcurrentLinkedQueue()
         for (int i = 0; i < max; i++) {
@@ -66,12 +66,8 @@ class InputStreamBodySpec2 extends Specification {
                     responses.add(response.status())
                     System.out.println(response.getStatus())
                     System.out.println(response.getHeaders().asMap())
-
-                } catch (ReadTimeoutException e) {
-                    println 'RTE outer'
-                    e.printStackTrace()
                 } catch (Throwable e) {
-                    e.printStackTrace()
+                    errors.add(e)
                 } finally {
                     latch.countDown()
                 }
@@ -81,6 +77,7 @@ class InputStreamBodySpec2 extends Specification {
         latch.await()
 
         then:
+        errors.isEmpty()
         responses.size() == max
         responses.every({ it == HttpStatus.OK})
     }
