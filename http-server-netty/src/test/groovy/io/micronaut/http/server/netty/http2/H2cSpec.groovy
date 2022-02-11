@@ -206,8 +206,14 @@ class H2cSpec extends Specification {
 
         CompletableFuture responseFuture = requestUpgrade(request)
 
-        expect:
-        ((FullHttpResponse) responseFuture.get(10, TimeUnit.SECONDS)).content().toString(StandardCharsets.UTF_8) == 'Example response: foo'
+        when:
+        def content = ((FullHttpResponse) responseFuture.get(10, TimeUnit.SECONDS)).content()
+
+        then:
+        content.toString(StandardCharsets.UTF_8) == 'Example response: foo'
+
+        cleanup:
+        content.release()
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6299')
@@ -219,8 +225,14 @@ class H2cSpec extends Specification {
 
         CompletableFuture responseFuture = requestUpgrade(request)
 
-        expect:
-        ((FullHttpResponse) responseFuture.get(10, TimeUnit.SECONDS)).content().toString(StandardCharsets.UTF_8) == 'Example response: foo'
+        when:
+        def content = ((FullHttpResponse) responseFuture.get(10, TimeUnit.SECONDS)).content()
+
+        then:
+        content.toString(StandardCharsets.UTF_8) == 'Example response: foo'
+
+        cleanup:
+        content.release()
     }
 
     @Controller("/h2c")

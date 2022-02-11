@@ -1,4 +1,4 @@
-In the spirit of http://httpd.apache.org/docs/current/mod/mod_log_config.html[apache mod_log_config] and https://tomcat.apache.org/tomcat-10.0-doc/config/valve.html#Access_Logging[Tomcat Access Log Valve], it is possible to enable an access logger for the HTTP server (this works for both HTTP/1 and HTTP/2).
+In the spirit of https://httpd.apache.org/docs/current/mod/mod_log_config.html[apache mod_log_config] and https://tomcat.apache.org/tomcat-10.0-doc/config/valve.html#Access_Logging[Tomcat Access Log Valve], it is possible to enable an access logger for the HTTP server (this works for both HTTP/1 and HTTP/2).
 
 To enable and configure the access logger, in `application.yml` set:
 
@@ -67,7 +67,7 @@ The pattern should only have the message marker, as other elements will be proce
 
 ==== Log Format
 
-The syntax is based on http://httpd.apache.org/docs/current/mod/mod_log_config.html[Apache httpd log format].
+The syntax is based on https://httpd.apache.org/docs/current/mod/mod_log_config.html[Apache httpd log format].
 
 These are the supported markers:
 
@@ -98,5 +98,5 @@ These are the supported markers:
 
 In addition, you can use the following aliases for common patterns:
 
-* *common* - `%h %l %u %t "%r" %s %b` for https://httpd.apache.org/docs/1.3/logs.html#common[Common Log Format] (CLF)
-* *combined* - `%h %l %u %t "%r" %s %b "%{Referer}i" "%{User-Agent}i"` for https://httpd.apache.org/docs/1.3/logs.html#combined[Combined Log Format]
+* *common* - `%h %l %u %t "%r" %s %b` for https://httpd.apache.org/docs/2.4/logs.html#common[Common Log Format] (CLF)
+* *combined* - `%h %l %u %t "%r" %s %b "%{Referer}i" "%{User-Agent}i"` for https://httpd.apache.org/docs/2.4/logs.html#combined[Combined Log Format]

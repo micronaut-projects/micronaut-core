@@ -2,7 +2,7 @@ To use the logback library, add the following dependency to your build.
 
 dependency:ch.qos.logback:logback-classic[gradleScope="implementation"]
 
-If it does not exist yet, place a link:http://logback.qos.ch/manual/configuration.html[logback.xml] file in the resources folder and modify the content for your needs. For example:
+If it does not exist yet, place a link:https://logback.qos.ch/manual/configuration.html[logback.xml] file in the resources folder and modify the content for your needs. For example:
 
 .src/main/resources/logback.xml
 [source,xml]
