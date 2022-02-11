@@ -1,5 +1,4 @@
 The following sections walk you through a Quick Start on how to use Micronaut to setup a basic "Hello World" application.
 
-Before getting started ensure you have a Java 8 or higher JDK installed, and it is recommended that you use a suitable IDE such as IntelliJ IDEA.
+Before getting started ensure you have a Java 8 or higher JDK installed, and it is recommended that you use a <<ideSetup,suitable IDE>> such as IntelliJ IDEA.
 
-To follow the Quick Start it is also recommended that you have the Micronaut CLI installed.
