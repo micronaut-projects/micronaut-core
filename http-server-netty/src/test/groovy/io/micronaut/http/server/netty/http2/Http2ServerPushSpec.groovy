@@ -80,7 +80,7 @@ class Http2ServerPushSpec extends Specification {
         runner.responses.any { it.content().toString(StandardCharsets.UTF_8) == 'baz' }
 
         cleanup:
-        runner.responses*.content().forEach(ByteBuf::release)
+        runner.responses.forEach(FullHttpResponse::release)
     }
 
     def 'check headers'() {
@@ -112,6 +112,9 @@ class Http2ServerPushSpec extends Specification {
                     it.get("proxy-authorization") == null &&
                     it.get("referer") == '/serverPush/automatic'
         }
+
+        cleanup:
+        runner.responses.forEach(FullHttpResponse::release)
     }
 
     def 'with push disabled'() {
@@ -124,7 +127,7 @@ class Http2ServerPushSpec extends Specification {
         runner.responses[0].content().toString(StandardCharsets.UTF_8) == 'push supported: false'
 
         cleanup:
-        runner.responses*.content().forEach(ByteBuf::release)
+        runner.responses.forEach(FullHttpResponse::release)
     }
 
     private class Runner {
@@ -212,7 +215,7 @@ class Http2ServerPushSpec extends Specification {
         class InboundHandler extends SimpleChannelInboundHandler<FullHttpResponse> {
             @Override
             protected void channelRead0(ChannelHandlerContext ctx, FullHttpResponse msg) throws Exception {
-                responses.add(msg)
+                responses.add(msg.retain())
                 if (--expectedResponses == 0 || msg.status().code() >= 400) {
                     ctx.close()
                     completion.complete(null)
