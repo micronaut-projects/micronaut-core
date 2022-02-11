@@ -60,8 +60,7 @@ class InputStreamBodySpec2 extends Specification {
                             .exchange(request, JsonNode)
                     def len = response.body.get().get("payload").get("length").asInt()
                     if (len != 9 * 1024 * 1024) {
-                        println "FAIL: wrong length: $len"
-                        return
+                        throw new RuntimeException("FAIL: wrong length: $len")
                     }
                     responses.add(response.status())
                     System.out.println(response.getStatus())
