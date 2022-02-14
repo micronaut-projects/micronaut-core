@@ -305,7 +305,7 @@ public final class RouteExecutor {
                         .errorMessage("Internal Server Error: " + cause.getMessage())
                         .build(), response);
         applyConfiguredHeaders(mutableHttpResponse.getHeaders());
-        if (!mutableHttpResponse.getContentType().isPresent()) {
+        if (!mutableHttpResponse.getContentType().isPresent() && httpRequest.getMethod() != HttpMethod.HEAD) {
             return mutableHttpResponse.contentType(MediaType.APPLICATION_JSON_TYPE);
         }
         return mutableHttpResponse;
@@ -425,7 +425,7 @@ public final class RouteExecutor {
                 ErrorContext.builder(request)
                         .errorMessage("Page Not Found")
                         .build(), HttpResponse.notFound());
-        if (!response.getContentType().isPresent()) {
+        if (!response.getContentType().isPresent() && request.getMethod() != HttpMethod.HEAD) {
             return response.contentType(MediaType.APPLICATION_JSON_TYPE);
         }
         return response;
