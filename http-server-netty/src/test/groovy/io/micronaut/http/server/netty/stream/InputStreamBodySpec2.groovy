@@ -89,7 +89,6 @@ class InputStreamBodySpec2 extends Specification {
         @Client("/")
         private HttpClient httpClient
 
-
         @Post("/hello")
         @Produces(MediaType.APPLICATION_JSON)
         @Consumes(MediaType.ALL)
@@ -110,8 +109,8 @@ class InputStreamBodySpec2 extends Specification {
                 def here = payload.read(b)
                 if (here == -1) break
                 n += here
-                //TimeUnit.MILLISECONDS.sleep(1)
             }
+            payload.close()
 
             String responsePayload = "{\"payload\" : {\"length\" : $n}}"
             return HttpResponse.ok().body(responsePayload).contentType(MediaType.APPLICATION_JSON)
