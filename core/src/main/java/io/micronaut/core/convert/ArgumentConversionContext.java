@@ -82,7 +82,7 @@ public interface ArgumentConversionContext<T> extends ConversionContext, Annotat
         ArgumentConversionContext<T> thisContext = this;
         return new DefaultArgumentConversionContext(getArgument(), thisContext.getLocale(), thisContext.getCharset()) {
             @Override
-            public Optional<String> defaultFormat() {
+            public Optional<String> getDefaultFormat() {
                 return Optional.ofNullable(format);
             }
         };

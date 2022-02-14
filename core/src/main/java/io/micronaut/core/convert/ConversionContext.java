@@ -242,17 +242,17 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
      *
      * @return the default format for this context
      */
-    default Optional<String> defaultFormat() {
+    default Optional<String> getDefaultFormat() {
         return Optional.empty();
     }
 
     /**
-     * Gets the current format (if any) from the annotation metadata. Falls back to {@link #defaultFormat()} if there is none.
+     * Gets the current format (if any) from the annotation metadata. Falls back to {@link #getDefaultFormat()} if there is none.
      *
      * @return The current format
      */
     default Optional<String> getFormat() {
         Optional<String> format = getAnnotationMetadata().stringValue(Format.class);
-        return format.isPresent() ? format : defaultFormat();
+        return format.isPresent() ? format : getDefaultFormat();
     }
 }
