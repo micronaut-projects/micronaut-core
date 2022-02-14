@@ -808,7 +808,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         // ByteBuffer, we need to retain the data until the route is executed. Adding
                                         // the data to the request ensures it is cleaned up after the route completes.
                                         if (!alwaysAddContent && fulfillParamter instanceof ByteBufHolder) {
-                                            request.addContent((ByteBufHolder) fulfillParamter);
+                                            request.addForRelease((ByteBufHolder) fulfillParamter);
                                         }
                                     }
                                     if (isPublisher && chunkedProcessing) {
