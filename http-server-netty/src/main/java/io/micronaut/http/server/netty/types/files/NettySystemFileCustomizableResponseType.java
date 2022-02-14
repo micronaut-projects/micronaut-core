@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
@@ -47,6 +48,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * Writes a {@link File} to the Netty context.
@@ -143,8 +145,9 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
      * {@link ChannelFutureListener} that closes the file when called.
      */
     private static final class FileHolder implements ChannelFutureListener {
-        private static final ResourceLeakDetector<RandomAccessFile> LEAK_DETECTOR =
-                ResourceLeakDetectorFactory.instance().newResourceLeakDetector(RandomAccessFile.class);
+        //to avoid initializing Netty at build time
+        private static final Supplier<ResourceLeakDetector<RandomAccessFile>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
+                ResourceLeakDetectorFactory.instance().newResourceLeakDetector(RandomAccessFile.class));
 
         final RandomAccessFile raf;
         final long length;
@@ -160,7 +163,7 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
             } catch (FileNotFoundException e) {
                 throw new CustomizableResponseTypeException("Could not find file", e);
             }
-            this.tracker = LEAK_DETECTOR.track(raf);
+            this.tracker = LEAK_DETECTOR.get().track(raf);
             try {
                 this.length = raf.length();
             } catch (IOException e) {
