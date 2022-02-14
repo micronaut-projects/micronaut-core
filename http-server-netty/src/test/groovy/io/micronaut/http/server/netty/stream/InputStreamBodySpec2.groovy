@@ -52,10 +52,11 @@ class InputStreamBodySpec2 extends Specification {
         List<Throwable> errors = []
         ExecutorService pool = Executors.newCachedThreadPool()
         ConcurrentLinkedQueue<HttpStatus> responses = new ConcurrentLinkedQueue()
+        byte[] body = ("largefile" * 1024 * 1024).bytes
         for (int i = 0; i < max; i++) {
             pool.submit(() -> {
                 try {
-                    HttpRequest request = HttpRequest.POST("/input-stream-test/hello", ("largefile" * 1024 * 1024).bytes)
+                    HttpRequest request = HttpRequest.POST("/input-stream-test/hello", body)
                     HttpResponse response = client.toBlocking()
                             .exchange(request, JsonNode)
                     def len = response.body.get().get("payload").get("length").asInt()
@@ -70,7 +71,6 @@ class InputStreamBodySpec2 extends Specification {
                 } finally {
                     latch.countDown()
                 }
-
             })
         }
         latch.await()
@@ -96,6 +96,7 @@ class InputStreamBodySpec2 extends Specification {
         MutableHttpResponse<String> stream(@Body @Nullable InputStream payload) throws IOException {
 
             long n = 0;
+            def b = new byte[1024 * 1024]
             while (true) {
                 //blocking read on injected http client
                 try {
@@ -105,7 +106,6 @@ class InputStreamBodySpec2 extends Specification {
                     e.printStackTrace()
                 }
 
-                def b = new byte[1024 * 1024]
                 def here = payload.read(b)
                 if (here == -1) break
                 n += here
