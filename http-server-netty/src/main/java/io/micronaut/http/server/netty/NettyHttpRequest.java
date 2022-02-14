@@ -66,6 +66,7 @@ import io.netty.handler.codec.http.multipart.MixedAttribute;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ReferenceCounted;
 import org.jetbrains.annotations.NotNull;
 
@@ -322,7 +323,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
                         return values;
                     }
                 });
-                data.release();
             }
             return body;
         } else if (!receivedContent.isEmpty()) {
@@ -374,10 +374,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         getBody().ifPresent(releaseIfNecessary);
         receivedContent.forEach(releaseIfNecessary);
         receivedData.values().forEach(releaseIfNecessary);
-        if (bodyUnwrapped instanceof ReferenceCounted) {
-            ReferenceCounted referenceCounted = (ReferenceCounted) bodyUnwrapped;
-            releaseIfNecessary(referenceCounted);
-        }
+        releaseIfNecessary(bodyUnwrapped);
         if (attributes != null) {
             attributes.values().forEach(releaseIfNecessary);
         }
@@ -406,6 +403,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     public void setBody(T body) {
+        ReferenceCountUtil.retain(body);
         this.bodyUnwrapped = body;
         this.body = () -> Optional.ofNullable(body);
         bodyConvertor.cleanup();
@@ -441,7 +439,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      * @param referenceCounted The object to be released.
      */
     @Internal
-    public void addForRelease(ReferenceCounted referenceCounted) {
+    void addForRelease(ReferenceCounted referenceCounted) {
         referenceCounted.touch();
         forRelease.add(referenceCounted);
     }

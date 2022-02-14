@@ -95,6 +95,7 @@ import io.netty.handler.codec.http2.Http2Error;
 import io.netty.handler.codec.http2.Http2Exception;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import org.reactivestreams.Publisher;
@@ -663,6 +664,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                 @Override
                 protected void doOnNext(Object message) {
+                    try {
+                        doOnNext0(message);
+                    } finally {
+                        // the upstream processor gives us ownership of the message, so we need to release it.
+                        ReferenceCountUtil.release(message);
+                    }
+                }
+
+                private void doOnNext0(Object message) {
                     boolean executed = this.executed.get();
                     if (message instanceof ByteBufHolder) {
                         if (message instanceof HttpData) {
@@ -808,7 +818,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         // ByteBuffer, we need to retain the data until the route is executed. Adding
                                         // the data to the request ensures it is cleaned up after the route completes.
                                         if (!alwaysAddContent && fulfillParamter instanceof ByteBufHolder) {
-                                            request.addForRelease((ByteBufHolder) fulfillParamter);
+                                            request.addContent((ByteBufHolder) fulfillParamter);
                                         }
                                     }
                                     if (isPublisher && chunkedProcessing) {
@@ -894,6 +904,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         ((NettyHttpRequest) request).setBody(message);
                         s.request(1);
                     }
+                    ReferenceCountUtil.release(message);
                 }
 
                 @Override

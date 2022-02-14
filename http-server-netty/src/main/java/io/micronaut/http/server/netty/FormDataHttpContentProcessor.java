@@ -152,13 +152,15 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
                     switch (data.getHttpDataType()) {
                         case Attribute:
                             Attribute attribute = (Attribute) data;
-                            messages.add(attribute);
+                            // bodyListHttpData keeps a copy and releases it later
+                            messages.add(attribute.retain());
                             postRequestDecoder.removeHttpDataFromClean(attribute);
                             break;
                         case FileUpload:
                             FileUpload fileUpload = (FileUpload) data;
                             if (fileUpload.isCompleted()) {
-                                messages.add(fileUpload);
+                                // bodyListHttpData keeps a copy and releases it later
+                                messages.add(fileUpload.retain());
                                 postRequestDecoder.removeHttpDataFromClean(fileUpload);
                             }
                             break;
@@ -169,7 +171,8 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
 
                 InterfaceHttpData currentPartialHttpData = postRequestDecoder.currentPartialHttpData();
                 if (currentPartialHttpData instanceof HttpData) {
-                    messages.add(currentPartialHttpData);
+                    // can't give away ownership of this data yet, so retain it
+                    messages.add(currentPartialHttpData.retain());
                 }
 
             } catch (HttpPostRequestDecoder.EndOfDataDecoderException e) {
