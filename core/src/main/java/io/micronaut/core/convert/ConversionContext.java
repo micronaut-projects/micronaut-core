@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package io.micronaut.core.convert;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.TypeVariableResolver;
 import io.micronaut.core.util.ArgumentUtils;
@@ -34,6 +35,11 @@ import java.util.*;
  * @since 1.0
  */
 public interface ConversionContext extends AnnotationMetadataProvider, TypeVariableResolver, ErrorsContext {
+
+    /**
+     * A constant to define a {@link java.time.format.DateTimeFormatter#RFC_1123_DATE_TIME} formatter.
+     */
+    String RFC_1123_FORMAT = "RFC_1123_FORMAT";
 
     /**
      * The default conversion context.
@@ -228,5 +234,25 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
         Charset finalCharset = charset != null ? charset : StandardCharsets.UTF_8;
         Locale finalLocale = locale != null ? locale : Locale.getDefault();
         return new DefaultArgumentConversionContext<>(argument, finalLocale, finalCharset);
+    }
+
+    /**
+     * Gets the default format for the current conversion.  Can be overridden if required (for example Headers have a specific
+     * timestamp format no matter what the attribute type).
+     *
+     * @return the default format for this context
+     */
+    default Optional<String> defaultFormat() {
+        return Optional.empty();
+    }
+
+    /**
+     * Gets the current format (if any) from the annotation metadata. Falls back to {@link #defaultFormat()} if there is none.
+     *
+     * @return The current format
+     */
+    default Optional<String> getFormat() {
+        Optional<String> format = getAnnotationMetadata().stringValue(Format.class);
+        return format.isPresent() ? format : defaultFormat();
     }
 }

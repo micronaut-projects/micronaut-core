@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
-import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.util.StringUtils;
 import jakarta.inject.Singleton;
 
@@ -221,8 +220,8 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
     }
 
     private Optional<DateTimeFormatter> resolveFormatter(ConversionContext context) {
-        Optional<String> format = context.getAnnotationMetadata().stringValue(Format.class);
-        return format
-            .map(pattern -> DateTimeFormatter.ofPattern(pattern, context.getLocale()));
+        return context.getFormat().map(pattern -> ConversionContext.RFC_1123_FORMAT.equals(pattern) ?
+                DateTimeFormatter.RFC_1123_DATE_TIME :
+                DateTimeFormatter.ofPattern(pattern, context.getLocale()));
     }
 }

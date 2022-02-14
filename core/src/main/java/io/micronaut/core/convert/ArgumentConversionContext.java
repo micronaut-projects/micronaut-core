@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,11 @@ package io.micronaut.core.convert;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Extended version of the {@link ConversionContext} specifically for conversion {@link Argument} instances.
@@ -64,6 +66,24 @@ public interface ArgumentConversionContext<T> extends ConversionContext, Annotat
             @Override
             public AnnotationMetadata getAnnotationMetadata() {
                 return annotationMetadata;
+            }
+        };
+    }
+
+    /**
+     * Augment this context with a default format string.
+     *
+     * @param format The format
+     * @return The conversion context
+     */
+    @SuppressWarnings("unchecked")
+    default ArgumentConversionContext<T> withDefaultFormat(@Nullable String format) {
+
+        ArgumentConversionContext<T> thisContext = this;
+        return new DefaultArgumentConversionContext(getArgument(), thisContext.getLocale(), thisContext.getCharset()) {
+            @Override
+            public Optional<String> defaultFormat() {
+                return Optional.ofNullable(format);
             }
         };
     }

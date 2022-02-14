@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2021 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -254,8 +254,7 @@ public class MultiValuesConverterFactory {
             ConvertibleMultiValues<String> parameters = (ConvertibleMultiValues<String>) object;
             ArgumentConversionContext<T> context = (ArgumentConversionContext<T>) conversionContext;
 
-            String format = conversionContext.getAnnotationMetadata()
-                    .getValue(Format.class, String.class).orElse(null);
+            String format = conversionContext.getFormat().orElse(null);
             if (format == null) {
                 return Optional.empty();
             }
@@ -306,7 +305,6 @@ public class MultiValuesConverterFactory {
          *                          (including type and annotations)
          * @param name the name of the parameter
          * @param parameters all the parameters from which the parameter of given name needs to be retrieved
-         * @param defaultValue default value
          * @return the converted value if conversion was successful
          */
         protected abstract Optional<T> retrieveMultiValue(ArgumentConversionContext<T> conversionContext,
@@ -574,7 +572,7 @@ public class MultiValuesConverterFactory {
             // noinspection unchecked
             ArgumentConversionContext<Object> context = (ArgumentConversionContext<Object>) conversionContext;
 
-            String format = conversionContext.getAnnotationMetadata().getValue(Format.class, String.class).orElse(null);
+            String format = conversionContext.getFormat().orElse(null);
             if (format == null) {
                 return Optional.empty();
             }

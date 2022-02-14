@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -968,7 +968,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
     private SimpleDateFormat resolveFormat(ConversionContext context) {
         AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
-        Optional<String> format = annotationMetadata.stringValue(Format.class);
+        Optional<String> format = context.getFormat();
         return format
             .map(pattern -> new SimpleDateFormat(pattern, context.getLocale()))
             .orElseGet(() -> new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", context.getLocale()));

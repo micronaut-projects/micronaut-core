@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package io.micronaut.http.bind.binders;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.bind.annotation.AbstractAnnotatedArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.naming.NameUtils;
@@ -48,7 +49,8 @@ public class HeaderAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<H
         ConvertibleMultiValues<String> parameters = source.getHeaders();
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
         String parameterName = annotationMetadata.stringValue(Header.class).orElse(argument.getArgument().getName());
-        return doBind(argument, parameters, parameterName);
+        // We use this as "EEE, d MMM yyyy HH:mm:ss zzz" as a pattern returns a different result (with a timezone)
+        return doBind(argument.withDefaultFormat(ConversionContext.RFC_1123_FORMAT), parameters, parameterName);
     }
 
     @Override
