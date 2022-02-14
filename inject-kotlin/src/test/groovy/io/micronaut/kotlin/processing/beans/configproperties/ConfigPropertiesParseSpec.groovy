@@ -301,7 +301,6 @@ open class Parent {
         beanDefinition.injectedMethods[1].name == "setParentPublicField"
     }
 
-
     void "test excludes on configuration builder"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
@@ -436,5 +435,31 @@ class EntityProperties {
 
         then:
         noExceptionThrown()
+    }
+
+    void "test configuration properties inheriting config props class"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
+package test
+
+import io.micronaut.context.annotation.ConfigurationProperties
+
+@ConfigurationProperties(value = "child")
+class MyProperties: Parent() {
+    var childProp: String? = null
+}
+
+@ConfigurationProperties(value = "parent")
+open class Parent {
+    var prop: String? = null
+}
+''')
+        then:
+        noExceptionThrown()
+        beanDefinition.injectedMethods.size() == 2
+        beanDefinition.injectedMethods[0].name == "setChildProp"
+        beanDefinition.injectedMethods[0].annotationMetadata.stringValue(Property, "name").get() == "parent.child.child-prop"
+        beanDefinition.injectedMethods[1].name == "setProp"
+        beanDefinition.injectedMethods[1].annotationMetadata.stringValue(Property, "name").get() == "parent.prop"
     }
 }

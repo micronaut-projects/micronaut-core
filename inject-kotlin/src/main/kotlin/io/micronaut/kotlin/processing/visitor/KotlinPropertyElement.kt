@@ -54,22 +54,8 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 return@map visitorContext.elementFactory.newMethodElement(classElement, method, annotationMetadata)
             }
         this.getter = Optional.of(visitorContext.elementFactory.newMethodElement(classElement, getter, annotationMetadata))
-        this.abstract = getter.isAbstract || setter?.isAbstract == true;
+        this.abstract = getter.isAbstract || setter?.isAbstract == true
     }
-
-//    constructor(classElement: ClassElement,
-//                type: ClassElement,
-//                name: String,
-//                getter: KotlinMethodElement,
-//                setter: MethodElement?,
-//                annotationMetadata: AnnotationMetadata,
-//                visitorContext: KotlinVisitorContext) : super(getter.nativeType, annotationMetadata, visitorContext) {
-//        this.name = name
-//        this.type = type
-//        this.classElement = classElement
-//        this.setter = Optional.ofNullable(setter)
-//        this.getter = Optional.of(getter)
-//    }
 
     override fun getName(): String = name
 
