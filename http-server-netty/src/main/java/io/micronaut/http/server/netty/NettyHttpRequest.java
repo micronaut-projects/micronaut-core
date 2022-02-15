@@ -141,6 +141,8 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         // we do copy the weight and dependency id
     }
 
+    boolean destroyed = false;
+
     private final NettyHttpHeaders headers;
     private final ChannelHandlerContext channelHandlerContext;
     private final HttpServerConfiguration serverConfiguration;
@@ -153,7 +155,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private Supplier<Optional<T>> body;
     private RouteMatch<?> matchedRoute;
     private boolean bodyRequired;
-    boolean destroyed = false;
 
     private final BodyConvertor bodyConvertor = newBodyConvertor();
 
