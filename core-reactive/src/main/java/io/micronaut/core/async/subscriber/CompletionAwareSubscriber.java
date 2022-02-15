@@ -17,6 +17,8 @@ package io.micronaut.core.async.subscriber;
 
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -28,6 +30,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @since 1.0
  */
 public abstract class CompletionAwareSubscriber<T> implements Subscriber<T>, Emitter<T> {
+    private static final Logger LOG = LoggerFactory.getLogger(CompletionAwareSubscriber.class);
+
     protected Subscription subscription;
 
     private final AtomicBoolean complete = new AtomicBoolean(false);
@@ -61,6 +65,10 @@ public abstract class CompletionAwareSubscriber<T> implements Subscriber<T>, Emi
         if (subscription != null && complete.compareAndSet(false, true)) {
             subscription.cancel();
             doOnError(t);
+        } else {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Discarding error because subscriber has already completed", t);
+            }
         }
     }
 
