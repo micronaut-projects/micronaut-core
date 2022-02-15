@@ -425,10 +425,12 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         httpContent.touch();
         if (httpContent instanceof AbstractHttpData || httpContent instanceof MixedAttribute) {
             receivedData.computeIfAbsent(new IdentityWrapper(httpContent), key -> {
+                // released in release()
                 httpContent.retain();
                 return (HttpData) httpContent;
             });
         } else {
+            // released in release()
             receivedContent.add(httpContent.retain());
         }
     }
