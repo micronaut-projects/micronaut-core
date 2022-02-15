@@ -46,7 +46,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
 
     private final InterfaceHttpPostRequestDecoder decoder;
     private final boolean enabled;
-    private AtomicLong extraMessages = new AtomicLong(0);
+    private final AtomicLong extraMessages = new AtomicLong(0);
     private final long partMaxSize;
 
     /**
@@ -149,6 +149,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
 
                 while (postRequestDecoder.hasNext()) {
                     InterfaceHttpData data = postRequestDecoder.next();
+                    data.touch();
                     switch (data.getHttpDataType()) {
                         case Attribute:
                             Attribute attribute = (Attribute) data;
