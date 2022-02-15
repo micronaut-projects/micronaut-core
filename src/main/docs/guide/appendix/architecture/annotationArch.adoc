@@ -8,9 +8,9 @@ When visiting source code within the <<compilerArch, Micronaut Compiler>> using 
 
 The `AnnotationMetadata` API tries to address the following challenges:
 
-* Annotations can be inherited from types and interfaces into implementations. To avoid the need to traverse the class/interface hierarchy at runtime Micronaut will at build time compute inherited annotations and deal with member overridding rules
+* Annotations can be inherited from types and interfaces into implementations. To avoid the need to traverse the class/interface hierarchy at runtime Micronaut will at build time compute inherited annotations and deal with member overriding rules
 * Annotations can be annotated with other annotations. These annotations are often referred to as meta-annotations or stereotypes. The `AnnotationMetadata` API provides methods to understand whether a particular annotation is declared as meta-annotation and to find out what annotations are meta-annotated with other annotations
-* It is often necessary to fuse annotation metadata together from different sources. For example, for JavaBean properties you want to combine the metadata from the private field, public getter and public setters into a single view otherewise you have to run logic to runtime to somehow combine this metadata from 3 distinct sources. 
+* It is often necessary to fuse annotation metadata together from different sources. For example, for JavaBean properties you want to combine the metadata from the private field, public getter and public setters into a single view otherwise you have to run logic to runtime to somehow combine this metadata from 3 distinct sources. 
 * Repeatable annotations are combined and normalized. If inherited the annotations are combined from parent interfaces or classes providing a single API to evaluate repeatable annotations instead of requiring runtime logic to perform normalization.
 
 When the source for a type is visited an instance of api:inject.ast.ClassElement[] is constructed via the api:inject.ast.ElementFactory[] API.
@@ -29,7 +29,7 @@ Additionally, the api:inject.annotation.AbstractAnnotationMetadataBuilder[] will
 
 Note that at compilation time the api:core.annotation.AnnotationMetadata[] is mutable and can be further altered by implementations of api:inject.visitor.TypeElementVisitor[] by invoking the `annotate(..)` method of the api:inject.ast.Element[] API. However, at runtime the api:core.annotation.AnnotationMetadata[] is immutable and fixed. The purpose of this design to allow the compiler to be extended and for Micronaut to be able to interpret different source-level annotation-based programming models. 
 
-In practise this effectively allows decoupling the source code level annotation model from what is used at runtime such that different annotations can be used to represent the same annotation.
+In practice this effectively allows decoupling the source code level annotation model from what is used at runtime such that different annotations can be used to represent the same annotation.
 
 For example `jakarata.inject.Inject` or Spring's `@Autowired` are supported as synonyms for `javax.inject.Inject` by transforming the source level annotation to `javax.inject.Inject` which is the only annotation represented at runtime.
 
