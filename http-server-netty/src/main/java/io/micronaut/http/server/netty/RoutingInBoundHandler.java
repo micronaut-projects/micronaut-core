@@ -673,6 +673,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 }
 
                 private void doOnNext0(Object message) {
+                    if (request.destroyed) {
+                        // we don't want this message anymore
+                        return;
+                    }
+
                     boolean executed = this.executed.get();
                     if (message instanceof ByteBufHolder) {
                         if (message instanceof HttpData) {
@@ -831,7 +836,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     }
                                 }
 
-                                if (alwaysAddContent) {
+                                if (alwaysAddContent && !request.destroyed) {
                                     request.addContent(data);
                                 }
 

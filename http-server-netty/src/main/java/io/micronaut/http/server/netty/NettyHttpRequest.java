@@ -148,12 +148,12 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private NettyCookies nettyCookies;
     private List<ByteBufHolder> receivedContent = new ArrayList<>();
     private Map<IdentityWrapper, HttpData> receivedData = new LinkedHashMap<>();
-    private List<ReferenceCounted> forRelease = new ArrayList<>();
 
     private T bodyUnwrapped;
     private Supplier<Optional<T>> body;
     private RouteMatch<?> matchedRoute;
     private boolean bodyRequired;
+    boolean destroyed = false;
 
     private final BodyConvertor bodyConvertor = newBodyConvertor();
 
@@ -369,7 +369,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     public void release() {
-        forRelease.forEach(ReferenceCounted::release);
+        destroyed = true;
         Consumer<Object> releaseIfNecessary = this::releaseIfNecessary;
         getBody().ifPresent(releaseIfNecessary);
         receivedContent.forEach(releaseIfNecessary);
@@ -431,17 +431,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         } else {
             receivedContent.add(httpContent.retain());
         }
-    }
-
-    /**
-     * Add an object to be released on {@link #release()}.
-     *
-     * @param referenceCounted The object to be released.
-     */
-    @Internal
-    void addForRelease(ReferenceCounted referenceCounted) {
-        referenceCounted.touch();
-        forRelease.add(referenceCounted);
     }
 
     /**
