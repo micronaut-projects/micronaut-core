@@ -25,6 +25,7 @@ import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
@@ -55,6 +56,7 @@ import io.micronaut.http.server.exceptions.InternalServerException;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
 import io.micronaut.http.server.netty.multipart.NettyStreamingFileUpload;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
@@ -861,6 +863,18 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 @Override
                 protected void doOnError(Throwable t) {
                     s.cancel();
+                    // discard parameters that have already been bound
+                    for (Object toDiscard : routeMatch.getVariableValues().values()) {
+                        if (toDiscard instanceof ReferenceCounted) {
+                            ((ReferenceCounted) toDiscard).release();
+                        }
+                        if (toDiscard instanceof io.netty.util.ReferenceCounted) {
+                            ((io.netty.util.ReferenceCounted) toDiscard).release();
+                        }
+                        if (toDiscard instanceof NettyCompletedFileUpload) {
+                            ((NettyCompletedFileUpload) toDiscard).discard();
+                        }
+                    }
                     for (Sinks.Many<Object> subject : downstreamSubscribers) {
                         subject.tryEmitError(t);
                     }
