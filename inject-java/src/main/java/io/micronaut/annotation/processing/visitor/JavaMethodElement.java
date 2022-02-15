@@ -23,13 +23,13 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 
 import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
@@ -289,14 +289,12 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
             return null;    // not within a class
         }
 
-        final String expectedFieldName = NameUtils.getPropertyNameForSetter(methodName, writerPrefixes);
+        final String fieldName = NameUtils.getPropertyNameForSetter(methodName, writerPrefixes);
 
         // Return the field corresponding to this writer.
-        return classElement.getEnclosedElements()
-                .stream()
-                .filter(element -> element.getKind() == ElementKind.FIELD)
-                .filter(field -> field.getSimpleName().contentEquals(expectedFieldName))
-                .findFirst()
+        return (Element) getDeclaringType()
+                .getEnclosedElement(ElementQuery.ALL_FIELDS.named(fieldName::equals))
+                .map(io.micronaut.inject.ast.Element::getNativeType)
                 .orElse(null);
     }
 }
