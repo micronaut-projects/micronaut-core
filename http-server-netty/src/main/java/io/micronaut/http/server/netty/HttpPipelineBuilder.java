@@ -240,16 +240,16 @@ final class HttpPipelineBuilder {
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK, new ChunkedWriteHandler());
             pipeline.addLast(HttpRequestDecoder.ID, requestDecoder);
             if (server.getServerConfiguration().isDualProtocol() && server.getServerConfiguration().isHttpToHttpsRedirect() && !ssl) {
-                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_TO_HTTPS_REDIRECT, new HttpToHttpsRedirectHandler(server.getSslConfiguration(), server.getHostResolver()));
+                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_TO_HTTPS_REDIRECT, new HttpToHttpsRedirectHandler(sslConfiguration, hostResolver));
             }
             if (ssl) {
-                pipeline.addLast("request-certificate-handler", server.getRequestCertificateHandler());
+                pipeline.addLast("request-certificate-handler", requestCertificateHandler);
             }
             pipeline.addLast(HttpResponseEncoder.ID, responseEncoder);
             pipeline.addLast(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
-                    server.getNettyEmbeddedServices(),
+                    embeddedServices,
                     server.getWebSocketSessionRepository()));
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, server.getRoutingHandler());
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, routingInBoundHandler);
         }
 
         /**
@@ -277,9 +277,7 @@ final class HttpPipelineBuilder {
             registerMicronautChannelHandlers();
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_FLOW_CONTROL, new FlowControlHandler());
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_KEEP_ALIVE, new HttpServerKeepAliveHandler());
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_COMPRESSOR, new SmartHttpContentCompressor(
-                    server.getNettyEmbeddedServices().getHttpCompressionStrategy()
-            ));
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_COMPRESSOR, new SmartHttpContentCompressor(embeddedServices.getHttpCompressionStrategy()));
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
 
             insertMicronautHandlers();
