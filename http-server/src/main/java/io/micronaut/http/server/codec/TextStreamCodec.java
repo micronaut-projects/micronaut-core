@@ -171,9 +171,9 @@ public class TextStreamCodec implements MediaTypeCodec {
         while (start < body.length) {
             int end = indexOf(body, (byte) '\n', start);
             if (end == -1) {
-                end = body.length;
+                end = body.length - 1;
             }
-            eventData.write(DATA_PREFIX).write(body, start, end - start);
+            eventData.write(DATA_PREFIX).write(body, start, end - start + 1);
             start = end + 1;
         }
 
