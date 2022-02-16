@@ -30,6 +30,5 @@ class ParentEachPropsCtor internal constructor(
     @ConfigurationProperties("manager")
     class ManagerProps internal constructor(@Parameter val name: String) {
         var age: Int? = null
-
     }
 }

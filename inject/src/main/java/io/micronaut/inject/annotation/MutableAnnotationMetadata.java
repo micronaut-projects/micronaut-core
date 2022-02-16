@@ -49,6 +49,15 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     public MutableAnnotationMetadata() {
     }
 
+    MutableAnnotationMetadata(DefaultAnnotationMetadata annotationMetadata) {
+        this(newMapOrNull(annotationMetadata.declaredAnnotations),
+                newMapOrNull(annotationMetadata.declaredStereotypes),
+                newMapOrNull(annotationMetadata.allStereotypes),
+                newMapOrNull(annotationMetadata.allAnnotations),
+                newMapOrNull(annotationMetadata.annotationsByStereotype),
+                annotationMetadata.hasPropertyExpressions());
+    }
+
     private MutableAnnotationMetadata(@Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
                                      @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
                                      @Nullable Map<String, Map<CharSequence, Object>> allStereotypes,
@@ -72,17 +81,25 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     @Override
     public MutableAnnotationMetadata clone() {
         final MutableAnnotationMetadata cloned = new MutableAnnotationMetadata(
-                declaredAnnotations != null ? new HashMap<>(declaredAnnotations) : null,
-                declaredStereotypes != null ? new HashMap<>(declaredStereotypes) : null,
-                allStereotypes != null ? new HashMap<>(allStereotypes) : null,
-                allAnnotations != null ? new HashMap<>(allAnnotations) : null,
-                annotationsByStereotype != null ? new HashMap<>(annotationsByStereotype) : null,
+                newMapOrNull(declaredAnnotations),
+                newMapOrNull(declaredStereotypes),
+                newMapOrNull(allStereotypes),
+                newMapOrNull(allAnnotations),
+                newMapOrNull(annotationsByStereotype),
                 hasPropertyExpressions
         );
         if (annotationDefaultValues != null) {
             cloned.annotationDefaultValues = new LinkedHashMap<>(annotationDefaultValues);
         }
         return cloned;
+    }
+
+    private static <K, V> Map<K, V> newMapOrNull(Map<K, V> map) {
+        if (map == null) {
+            return null;
+        } else {
+            return new HashMap<>(map);
+        }
     }
 
     @NotNull

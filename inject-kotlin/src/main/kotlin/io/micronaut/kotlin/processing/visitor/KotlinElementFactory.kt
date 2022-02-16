@@ -83,7 +83,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
                 KotlinGenericPlaceholderElement(declaration, annotationMetadata, visitorContext)
             }
         }
-        if (allowPrimitive) {
+        if (allowPrimitive && !type.isMarkedNullable) {
             element = primitives[qualifiedName]
             if (element != null) {
                 return element
@@ -145,7 +145,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         return KotlinMethodElement(
             method,
             declaringClass,
-            newClassElement(returnType, annotationUtils.getAnnotationMetadata(returnType.declaration), declaringClass.typeArguments),
+            newClassElement(returnType, annotationUtils.newAnnotationBuilder().buildDeclared(returnType.declaration, returnType.annotations.toList(), false), declaringClass.typeArguments),
             method.parameters.map { param ->
                 KotlinParameterElement(newClassElement(param.type.resolve()), param, annotationUtils.getAnnotationMetadata(param), visitorContext)
             },

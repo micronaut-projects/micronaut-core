@@ -136,7 +136,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata buildDeclared(T element) {
-        DefaultAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
+        MutableAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
 
         try {
             AnnotationMetadata metadata = buildInternal(null, element, annotationMetadata, true, true, true);
@@ -167,7 +167,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             return AnnotationMetadata.EMPTY_METADATA;
         }
 
-        DefaultAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
+        MutableAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
         if (includeTypeAnnotations) {
             buildInternal(element, element, annotationMetadata, false, true, true);
         }
@@ -200,7 +200,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             return existing;
         } else {
 
-            DefaultAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
+            MutableAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
 
             try {
                 AnnotationMetadata metadata = buildInternal(null, element, annotationMetadata, false, false, true);
@@ -243,7 +243,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             return existing;
         } else {
 
-            DefaultAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
+            MutableAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
 
             try {
                 AnnotationMetadata metadata = buildInternal(null, element, annotationMetadata, true, false, true);
@@ -290,7 +290,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (existing != null) {
             return existing;
         } else {
-            DefaultAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
+            MutableAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
             return buildInternal(null, element, annotationMetadata, false, false, true);
         }
     }
@@ -346,14 +346,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     public AnnotationMetadata buildForParents(String declaringType, List<T> parents, T element) {
         final AnnotationMetadata existing = lookupExisting(declaringType, element);
-        DefaultAnnotationMetadata annotationMetadata;
+        MutableAnnotationMetadata annotationMetadata;
         if (existing instanceof DefaultAnnotationMetadata) {
             // ugly, but will have to do
-            annotationMetadata = ((DefaultAnnotationMetadata) existing).clone();
+            annotationMetadata = new MutableAnnotationMetadata((DefaultAnnotationMetadata) existing);
         } else if (existing instanceof AnnotationMetadataHierarchy) {
             final AnnotationMetadata declaredMetadata = ((AnnotationMetadataHierarchy) existing).getDeclaredMetadata();
             if (declaredMetadata instanceof DefaultAnnotationMetadata) {
-                annotationMetadata = ((DefaultAnnotationMetadata) declaredMetadata).clone();
+                annotationMetadata = new MutableAnnotationMetadata((DefaultAnnotationMetadata) declaredMetadata);
             } else {
                 annotationMetadata = new MutableAnnotationMetadata();
             }
@@ -374,14 +374,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     public AnnotationMetadata buildForParent(T parent, T element, boolean inheritTypeAnnotations) {
         String declaringType = getDeclaringType(element);
         final AnnotationMetadata existing = lookupExisting(declaringType, element);
-        DefaultAnnotationMetadata annotationMetadata;
+        MutableAnnotationMetadata annotationMetadata;
         if (existing instanceof DefaultAnnotationMetadata) {
             // ugly, but will have to do
-            annotationMetadata = ((DefaultAnnotationMetadata) existing).clone();
+            annotationMetadata = new MutableAnnotationMetadata((DefaultAnnotationMetadata) existing);
         } else if (existing instanceof AnnotationMetadataHierarchy) {
             final AnnotationMetadata declaredMetadata = existing.getDeclaredMetadata();
             if (declaredMetadata instanceof DefaultAnnotationMetadata) {
-                annotationMetadata = ((DefaultAnnotationMetadata) declaredMetadata).clone();
+                annotationMetadata = new MutableAnnotationMetadata((DefaultAnnotationMetadata) declaredMetadata);
             } else {
                 annotationMetadata = new MutableAnnotationMetadata();
             }
@@ -1131,7 +1131,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private AnnotationMetadata buildInternal(
             T parent,
             T element,
-            DefaultAnnotationMetadata annotationMetadata,
+            MutableAnnotationMetadata annotationMetadata,
             boolean inheritTypeAnnotations,
             boolean declaredOnly,
             boolean allowAliases) {
@@ -1145,7 +1145,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private AnnotationMetadata buildInternalMulti(
             List<T> parents,
             T element,
-            DefaultAnnotationMetadata annotationMetadata,
+            MutableAnnotationMetadata annotationMetadata,
             boolean inheritTypeAnnotations,
             boolean declaredOnly,
             boolean allowAliases) {
@@ -1183,7 +1183,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             Optional<String> value = annotationMetadata.stringValue(DefaultScope.class);
             value.ifPresent(name -> annotationMetadata.addDeclaredAnnotation(name, Collections.emptyMap()));
         }
+        postProcess(annotationMetadata, element);
         return annotationMetadata;
+    }
+
+    protected void postProcess(MutableAnnotationMetadata mutableAnnotationMetadata,
+                               T element) {
+        //no-op
     }
 
     private void includeAnnotations(DefaultAnnotationMetadata annotationMetadata,
