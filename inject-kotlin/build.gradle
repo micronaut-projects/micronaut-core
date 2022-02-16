@@ -20,6 +20,12 @@ dependencies {
     testImplementation libs.managed.validation
     testImplementation project(":validation")
     testImplementation libs.javax.persistence
+    testImplementation project(":runtime")
+    testImplementation(libs.managed.neo4j.bolt) {
+        version {
+            require "1.4.5"
+        }
+    }
 }
 
 afterEvaluate {
