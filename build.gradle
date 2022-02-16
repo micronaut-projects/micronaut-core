@@ -8,20 +8,10 @@ buildscript {
         classpath "org.aim42:htmlSanityCheck:${libs.versions.htmlSanityCheck.get()}"
         classpath 'javax.xml.bind:jaxb-api:2.3.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${libs.versions.managed.kotlin.asProvider().get()}"
-        classpath "org.sonarsource.scanner.gradle:sonarqube-gradle-plugin:3.3"
     }
 }
 
 apply plugin: 'org.aim42.htmlSanityCheck'
-apply plugin: "org.sonarqube"
-
-sonarqube {
-    properties {
-        property "sonar.projectKey", "micronaut-projects_micronaut-core"
-        property "sonar.organization", "micronaut-projects"
-        property "sonar.host.url", "https://sonarcloud.io"
-    }
-}
 
 repositories {
     mavenCentral()
@@ -193,6 +183,7 @@ subprojects { Project subproject ->
 }
 apply plugin: "io.micronaut.build.internal.docs"
 apply plugin: "io.micronaut.build.internal.version-catalog-updates"
+apply plugin: "io.micronaut.build.internal.quality-checks"
 
 allprojects {
 

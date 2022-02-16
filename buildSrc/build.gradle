@@ -7,6 +7,6 @@ repositories {
 }
 
 dependencies {
-    implementation "io.micronaut.build.internal:micronaut-gradle-plugins:4.2.6"
+    implementation "io.micronaut.build.internal:micronaut-gradle-plugins:5.1.2"
     implementation "org.tomlj:tomlj:1.0.0"
 }
