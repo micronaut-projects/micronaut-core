@@ -41,6 +41,7 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -160,7 +161,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata buildDeclared(T element) {
-        DefaultAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
+        MutableAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
         try {
             AnnotationMetadata metadata = buildInternalMulti(
                 Collections.emptyList(),
@@ -188,7 +189,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (CollectionUtils.isEmpty(annotations)) {
             return AnnotationMetadata.EMPTY_METADATA;
         }
-        DefaultAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
+        MutableAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
         if (includeTypeAnnotations) {
             buildInternalMulti(
                 Collections.emptyList(),
@@ -259,7 +260,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     private AnnotationMetadata buildInternal(boolean inheritTypeAnnotations, boolean declaredOnly, T element) {
-        DefaultAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
+        MutableAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
         try {
             return buildInternalMulti(
                 Collections.emptyList(),
@@ -1070,7 +1071,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private AnnotationMetadata buildInternalMulti(
         List<T> parents,
         T element,
-        DefaultAnnotationMetadata annotationMetadata,
+        MutableAnnotationMetadata annotationMetadata,
         boolean inheritTypeAnnotations,
         boolean declaredOnly,
         boolean allowAliases) {
@@ -1109,7 +1110,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             Optional<String> value = annotationMetadata.stringValue(DefaultScope.class);
             value.ifPresent(name -> annotationMetadata.addDeclaredAnnotation(name, Collections.emptyMap()));
         }
+        postProcess(annotationMetadata, element);
         return annotationMetadata;
+    }
+
+    protected void postProcess(MutableAnnotationMetadata mutableAnnotationMetadata,
+                               T element) {
+        //no-op
     }
 
     private void includeAnnotations(DefaultAnnotationMetadata annotationMetadata,

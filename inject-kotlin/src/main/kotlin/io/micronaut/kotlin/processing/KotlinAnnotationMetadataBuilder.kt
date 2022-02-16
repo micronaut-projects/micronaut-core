@@ -6,14 +6,14 @@ import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationClassValue
-import io.micronaut.core.annotation.AnnotationValue
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
+import io.micronaut.inject.annotation.MutableAnnotationMetadata
 import io.micronaut.inject.visitor.VisitorContext
 import java.lang.annotation.Inherited
 import java.lang.annotation.RetentionPolicy
 import java.util.*
-import javax.lang.model.element.AnnotationMirror
 
 class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUtils,
                                       private val resolver: Resolver): AbstractAnnotationMetadataBuilder<KSAnnotated, KSAnnotation>() {
@@ -38,28 +38,21 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
     }
 
     override fun getDeclaringType(element: KSAnnotated): String {
-        if (element is KSDeclaration) {
-            val closestClassDeclaration = element.closestClassDeclaration()
-            if (closestClassDeclaration != null) {
-                return closestClassDeclaration.qualifiedName!!.asString()
+        val declaration = when (element) {
+            is KSDeclaration -> { element }
+            is KSValueParameter -> {
+                when (val parent = element.parent) {
+                    is KSPropertyAccessor -> { parent.receiver }
+                    is KSFunctionDeclaration -> { parent }
+                    else -> { null }
+                }
             }
-            return element.simpleName.asString()
+            is KSPropertyAccessor -> { element.receiver }
+            else -> { null }
         }
-        if (element is KSValueParameter) {
-            val parent = element.parent
-            var closestClassDeclaration: KSClassDeclaration? = null
-            if (parent is KSPropertyAccessor) {
-                closestClassDeclaration = parent.receiver.closestClassDeclaration()
-            }
-            if (parent is KSFunctionDeclaration) {
-                closestClassDeclaration = parent.closestClassDeclaration()
-            }
-            if (closestClassDeclaration != null) {
-                return closestClassDeclaration.qualifiedName!!.asString()
-            }
-        }
-        if (element is KSPropertyAccessor) {
-            val closestClassDeclaration = element.receiver.closestClassDeclaration()
+
+        if (declaration != null) {
+            val closestClassDeclaration = declaration.closestClassDeclaration()
             if (closestClassDeclaration != null) {
                 return closestClassDeclaration.qualifiedName!!.asString()
             }
@@ -104,6 +97,12 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
 
     override fun getAnnotationsForType(element: KSAnnotated): MutableList<out KSAnnotation> {
         return element.annotations.toMutableList()
+    }
+
+    override fun postProcess(annotationMetadata: MutableAnnotationMetadata, element: KSAnnotated) {
+        if (element is KSValueParameter && element.type.resolve().isMarkedNullable) {
+            annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, emptyMap())
+        }
     }
 
     override fun buildHierarchy(

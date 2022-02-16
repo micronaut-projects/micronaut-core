@@ -19,11 +19,14 @@ class KotlinConfigurationMetadataBuilder: ConfigurationMetadataBuilder<ClassElem
         declaringType: ClassElement,
         propertyName: String
     ): String {
-        val value = declaringType.stringValue(ConfigurationReader::class.java, "prefix")
-            .orElseGet {
-                owningType.stringValue(ConfigurationReader::class.java, "prefix").get()
-            }
-        return "$value.$propertyName"
+        val prefix =  if (declaringType.hasStereotype(ConfigurationReader::class.java)) {
+             declaringType.stringValue(ConfigurationReader::class.java, "prefix")
+                .filter(String::isNotEmpty)
+                .orElseGet { buildTypePath(owningType, declaringType) }
+        } else {
+            owningType.stringValue(ConfigurationReader::class.java, "prefix").get()
+        }
+        return "$prefix.$propertyName"
     }
 
     override fun buildTypePath(owningType: ClassElement, declaringType: ClassElement): String {

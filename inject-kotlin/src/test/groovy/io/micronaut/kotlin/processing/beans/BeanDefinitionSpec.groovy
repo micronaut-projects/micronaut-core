@@ -349,4 +349,20 @@ class TestBean {
         noExceptionThrown()
         definition == null
     }
+
+    void "test nullable constructor arg"() {
+        when:
+        def definition = buildBeanDefinition('test.TestBean', '''
+package test
+
+@jakarta.inject.Singleton
+class TestBean(private val other: Other?) {
+}
+
+class Other
+''')
+        then:
+        noExceptionThrown()
+        definition.constructor.arguments[0].isDeclaredNullable()
+    }
 }

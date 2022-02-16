@@ -462,4 +462,30 @@ open class Parent {
         beanDefinition.injectedMethods[1].name == "setProp"
         beanDefinition.injectedMethods[1].annotationMetadata.stringValue(Property, "name").get() == "parent.prop"
     }
+
+    void "test inner each bean internal constructor"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition("test.ParentEachPropsCtor\$ManagerProps", """
+package test
+
+import io.micronaut.context.annotation.*
+
+@EachProperty("teams")
+class ParentEachPropsCtor internal constructor(
+    @Parameter val name: String,
+    val manager: ManagerProps?
+) {
+    var wins: Int? = null
+
+    @ConfigurationProperties("manager")
+    class ManagerProps internal constructor(@Parameter val name: String) {
+        var age: Int? = null
+    }
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanDefinition != null
+    }
 }
