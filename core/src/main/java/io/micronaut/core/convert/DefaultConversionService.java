@@ -68,8 +68,11 @@ import java.util.function.Function;
  */
 public class DefaultConversionService implements ConversionService<DefaultConversionService> {
 
+    public static final SimpleDateFormat RFC_1123_SIMPLE_DATE_FORMAT = new SimpleDateFormat("EEE, d MMM yyyy HH:mm:ss 'GMT'");
+
     private static final int CACHE_MAX = 150;
     private static final TypeConverter UNCONVERTIBLE = (object, targetType, context) -> Optional.empty();
+    private static final String DEFAULT_DATE_TO_STRING_FORMAT = "EEE MMM d HH:mm:ss zzz yyyy";
 
     private final Map<ConvertiblePair, TypeConverter> typeConverters = new ConcurrentHashMap<>();
     private final Map<ConvertiblePair, TypeConverter> converterCache = new ConcurrentLinkedHashMap.Builder<ConvertiblePair, TypeConverter>()
@@ -967,11 +970,10 @@ public class DefaultConversionService implements ConversionService<DefaultConver
     }
 
     private SimpleDateFormat resolveFormat(ConversionContext context) {
-        AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
         Optional<String> format = context.getFormat();
         return format
-            .map(pattern -> new SimpleDateFormat(pattern, context.getLocale()))
-            .orElseGet(() -> new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", context.getLocale()));
+            .map(pattern -> ConversionContext.RFC_1123_FORMAT.equals(pattern) ? RFC_1123_SIMPLE_DATE_FORMAT : new SimpleDateFormat(pattern, context.getLocale()))
+            .orElseGet(() -> new SimpleDateFormat(DEFAULT_DATE_TO_STRING_FORMAT, context.getLocale()));
     }
 
     private <S, T> ConvertiblePair newPair(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {

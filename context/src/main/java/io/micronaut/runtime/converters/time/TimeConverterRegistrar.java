@@ -52,6 +52,7 @@ import java.util.regex.Pattern;
                 TemporalAmount.class,
                 Instant.class,
                 LocalDate.class,
+                LocalTime.class,
                 LocalDateTime.class,
                 MonthDay.class,
                 OffsetDateTime.class,
@@ -152,6 +153,22 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
             }
         );
 
+        // CharSequence -> Instant
+        conversionService.addConverter(
+                CharSequence.class,
+                Instant.class,
+                (object, targetType, context) -> {
+                    try {
+                        return Optional.of(resolveFormatter(context)
+                                .map(formatter -> ZonedDateTime.parse(object, formatter).toInstant())
+                                .orElseGet(() -> Instant.parse(object)));
+                    } catch (DateTimeParseException e) {
+                        context.reject(object, e);
+                        return Optional.empty();
+                    }
+                }
+        );
+
         // TemporalAccessor - CharSequence
         final TypeConverter<TemporalAccessor, CharSequence> temporalConverter = (object, targetType, context) -> {
             try {
@@ -185,6 +202,21 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
             }
         );
 
+        // CharSequence -> LocalTime
+        conversionService.addConverter(
+                CharSequence.class,
+                LocalTime.class,
+                (object, targetType, context) -> {
+                    try {
+                        return Optional.of(resolveFormatter(context)
+                                .map(formatter -> LocalTime.parse(object, formatter))
+                                .orElseGet(() -> LocalTime.parse(object)));
+                    } catch (DateTimeParseException e) {
+                        context.reject(object, e);
+                        return Optional.empty();
+                    }
+                }
+        );
 
         // CharSequence -> ZonedDateTime
         conversionService.addConverter(
@@ -211,6 +243,22 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                         return Optional.of(resolveFormatter(context)
                                 .map(formatter -> OffsetDateTime.parse(object, formatter))
                                 .orElseGet(() -> OffsetDateTime.parse(object)));
+                    } catch (DateTimeParseException e) {
+                        context.reject(object, e);
+                        return Optional.empty();
+                    }
+                }
+        );
+
+        // CharSequence -> OffsetTime
+        conversionService.addConverter(
+                CharSequence.class,
+                OffsetTime.class,
+                (object, targetType, context) -> {
+                    try {
+                        return Optional.of(resolveFormatter(context)
+                                .map(formatter -> OffsetTime.parse(object, formatter))
+                                .orElseGet(() -> OffsetTime.parse(object)));
                     } catch (DateTimeParseException e) {
                         context.reject(object, e);
                         return Optional.empty();
