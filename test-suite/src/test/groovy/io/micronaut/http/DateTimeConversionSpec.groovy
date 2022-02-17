@@ -2,6 +2,7 @@ package io.micronaut.http
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.convert.DefaultConversionService
 import io.micronaut.core.convert.format.Format
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -12,6 +13,7 @@ import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Specification
 
+import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -36,6 +38,21 @@ class DateTimeConversionSpec extends Specification {
     def setup() {
         server = ApplicationContext.run(EmbeddedServer, ['spec.name': getClass().simpleName, "micronaut.http.client.readTimeout": '300s'])
         client = server.applicationContext.getBean(HttpClient).toBlocking()
+    }
+
+    def "default date conversion accounts for timezone"() {
+        given:
+        def sent = "Thu Feb 17 18:10:33 MSK 2022"
+        def expected = new SimpleDateFormat(DefaultConversionService.DEFAULT_DATE_TO_STRING_FORMAT).parse(sent).toString()
+
+        when:
+        def response = client.exchange(
+                HttpRequest.GET("$server.URL/dates/date?date=${URLEncoder.encode(sent, "UTF-8")}"),
+                String
+        )
+
+        then:
+        response.body() == expected
     }
 
     def "timestamped headers can be converted to a #desc"() {
