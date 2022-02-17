@@ -69,12 +69,12 @@ import java.util.function.Function;
 public class DefaultConversionService implements ConversionService<DefaultConversionService> {
 
     /**
-     * SimpleDateFormat instance to parseHeader timestamps into Dates
+     * The pattern for parsing Header standard timestamps into Dates.
      */
-    public static final SimpleDateFormat RFC_1123_SIMPLE_DATE_FORMAT = new SimpleDateFormat("EEE, d MMM yyyy HH:mm:ss 'GMT'");
+    public static final String RFC_1123_FORMAT = "EEE, d MMM yyyy HH:mm:ss z";
 
     /**
-     * The pattern for parsing standard java.util.Dates from their toString representation
+     * The pattern for parsing standard java.util.Dates from their toString representation.
      */
     public static final String DEFAULT_DATE_TO_STRING_FORMAT = "EEE MMM d HH:mm:ss zzz yyyy";
 
@@ -979,7 +979,15 @@ public class DefaultConversionService implements ConversionService<DefaultConver
     private SimpleDateFormat resolveFormat(ConversionContext context) {
         Optional<String> format = context.getFormat();
         return format
-            .map(pattern -> ConversionContext.RFC_1123_FORMAT.equals(pattern) ? RFC_1123_SIMPLE_DATE_FORMAT : new SimpleDateFormat(pattern, context.getLocale()))
+            .map(pattern -> {
+                if (ConversionContext.RFC_1123_FORMAT.equals(pattern)) {
+                    SimpleDateFormat dateFormat = new SimpleDateFormat(RFC_1123_FORMAT);
+                    dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
+                    return dateFormat;
+                } else {
+                    return new SimpleDateFormat(pattern, context.getLocale());
+                }
+            })
             .orElseGet(() -> new SimpleDateFormat(DEFAULT_DATE_TO_STRING_FORMAT, context.getLocale()));
     }
 
