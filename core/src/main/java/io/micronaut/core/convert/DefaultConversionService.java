@@ -68,11 +68,18 @@ import java.util.function.Function;
  */
 public class DefaultConversionService implements ConversionService<DefaultConversionService> {
 
+    /**
+     * SimpleDateFormat instance to parseHeader timestamps into Dates
+     */
     public static final SimpleDateFormat RFC_1123_SIMPLE_DATE_FORMAT = new SimpleDateFormat("EEE, d MMM yyyy HH:mm:ss 'GMT'");
+
+    /**
+     * The pattern for parsing standard java.util.Dates from their toString representation
+     */
+    public static final String DEFAULT_DATE_TO_STRING_FORMAT = "EEE MMM d HH:mm:ss zzz yyyy";
 
     private static final int CACHE_MAX = 150;
     private static final TypeConverter UNCONVERTIBLE = (object, targetType, context) -> Optional.empty();
-    private static final String DEFAULT_DATE_TO_STRING_FORMAT = "EEE MMM d HH:mm:ss zzz yyyy";
 
     private final Map<ConvertiblePair, TypeConverter> typeConverters = new ConcurrentHashMap<>();
     private final Map<ConvertiblePair, TypeConverter> converterCache = new ConcurrentLinkedHashMap.Builder<ConvertiblePair, TypeConverter>()
