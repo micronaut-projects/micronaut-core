@@ -183,7 +183,7 @@ subprojects { Project subproject ->
 }
 apply plugin: "io.micronaut.build.internal.docs"
 apply plugin: "io.micronaut.build.internal.version-catalog-updates"
-apply plugin: "io.micronaut.build.internal.quality-checks"
+apply plugin: "io.micronaut.build.internal.quality-reporting"
 
 allprojects {
 
