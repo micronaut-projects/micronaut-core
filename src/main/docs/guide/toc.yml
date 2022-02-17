@@ -4,7 +4,7 @@ introduction:
   upgrading: Upgrading to Micronaut 3.x
 quickStart:
   title: Quick Start
-  buildCLI: Build/Install the CLI
+  buildCLI: Install the CLI
   creatingServer: Creating a Server Application
   ideSetup:
     title: Setting up an IDE
@@ -176,10 +176,7 @@ cloud:
   clientSideLoadBalancing:
     title: Client Side Load Balancing
     netflixRibbon: Netflix Ribbon Support
-  distributedTracing:
-    title: Distributed Tracing
-    zipkin: Tracing with Zipkin
-    jaeger: Tracing with Jaeger
+  distributedTracing: Distributed Tracing
 serverlessFunctions:
   title: Serverless Functions
   awsLambda: AWS Lambda
@@ -287,6 +284,15 @@ i18n:
   bundle: Resource Bundles
 appendix:
   title: Appendices
+  architecture: 
+    title: Micronaut Architecture
+    compilerArch: Compiler         
+    annotationArch: Annotation Metadata
+    introspectionArch: Bean Introspections
+    iocArch: Bean Definitions
+    aopArch: AOP Proxies
+    containerArch: Application Context 
+    httpServerArch: HTTP Server
   faq: Frequently Asked Questions (FAQ)
   usingsnapshots: Using Snapshots
   problems: Common Problems

@@ -19,9 +19,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.reflect.ClassUtils;
-import io.micronaut.core.util.SupplierUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -44,7 +41,6 @@ import java.util.Optional;
 import java.util.ServiceConfigurationError;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -62,8 +58,6 @@ import java.util.stream.Stream;
  */
 public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>> {
     public static final String META_INF_SERVICES = "META-INF/services";
-
-    private static final Supplier<Logger> LOGGER = SupplierUtil.memoized(() -> LoggerFactory.getLogger(SoftServiceLoader.class));
 
     private static final Map<String, SoftServiceLoader.StaticServiceLoader<?>> STATIC_SERVICES =
             StaticOptimizations.get(Optimizations.class)
@@ -155,16 +149,6 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         return Optional.empty();
     }
 
-    private static void measure(String label, Runnable op) {
-        long sd = System.nanoTime();
-        try {
-            op.run();
-        } finally {
-            long dur = System.nanoTime() - sd;
-            LOGGER.get().debug(label + " took " + TimeUnit.MILLISECONDS.convert(dur, TimeUnit.NANOSECONDS) + "ms");
-        }
-    }
-
     /**
      * Collects all initialized instances.
      *
@@ -174,15 +158,12 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     @SuppressWarnings("unchecked")
     public void collectAll(@NonNull Collection<S> values, @Nullable Predicate<S> predicate) {
         String name = serviceType.getName();
-        measure("Loading " + name + " services", () -> {
-            SoftServiceLoader.StaticServiceLoader<?> serviceLoader = STATIC_SERVICES.get(name);
-            if (serviceLoader != null) {
-                collectStaticServices(values, predicate, (StaticServiceLoader<S>) serviceLoader);
-            } else {
-                collectDynamicServices(values, predicate, name);
-            }
-            LOGGER.get().debug("Loaded {} services of type {}", values.size(), name);
-        });
+        SoftServiceLoader.StaticServiceLoader<?> serviceLoader = STATIC_SERVICES.get(name);
+        if (serviceLoader != null) {
+            collectStaticServices(values, predicate, (StaticServiceLoader<S>) serviceLoader);
+        } else {
+            collectDynamicServices(values, predicate, name);
+        }
     }
 
     private void collectDynamicServices(Collection<S> values, Predicate<S> predicate, String name) {

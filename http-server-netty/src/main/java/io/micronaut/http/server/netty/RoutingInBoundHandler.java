@@ -968,6 +968,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         toNettyResponse(response),
                         mapToHttpContent(nettyRequest, response, body, context)
                 );
+                nettyRequest.prepareHttp2ResponseIfNecessary(streamedResponse);
                 context.writeAndFlush(streamedResponse);
                 context.read();
             } else {
@@ -987,7 +988,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             }
         } else {
             response.body(null);
-            response.contentType(null);
             writeFinalNettyResponse(
                     response,
                     nettyRequest,
@@ -1102,7 +1102,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         } else {
             MediaType mediaType = message.getContentType().orElse(null);
             if (mediaType == null) {
-                mediaType = message.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).map(routeInfo -> routeExecutor.resolveDefaultResponseContentType(request, routeInfo)).orElse(null);
+                mediaType = message.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class)
+                        .map(routeInfo -> routeExecutor.resolveDefaultResponseContentType(request, routeInfo))
+                        // RouteExecutor will pick json by default, so we do too
+                        .orElse(MediaType.APPLICATION_JSON_TYPE);
                 message.contentType(mediaType);
             }
             if (body instanceof CharSequence) {

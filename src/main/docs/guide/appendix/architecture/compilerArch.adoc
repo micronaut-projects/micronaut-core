@@ -1,0 +1,18 @@
+The Micronaut Compiler is a set of extensions to existing language compilers:
+
+* Java - the https://docs.oracle.com/en/java/javase/17/docs/api/java.compiler/javax/annotation/processing/package-summary.html[Java Annotation Processing (APT) API] is used for Java & Kotlin code (a future version of Micronaut will support KSP for Kotlin)
+* Groovy - Groovy https://docs.groovy-lang.org/latest/html/api/org/codehaus/groovy/transform/ASTTransformation.html[AST Transformations] are used participate in the compilation of Groovy code.
+
+To keep this documentation simple, the remaining sections will describe the interaction with the Java compiler. 
+
+The Micronaut Compiler visits end user code and generates additional bytecode that sits alongside the user code in the same package structure.
+
+The AST of user source is visited using implementations of api:inject.visitor.TypeElementVisitor[] which are loaded via the https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/ServiceLoader.html[standard Java service loader mechanism].
+
+Each api:inject.visitor.TypeElementVisitor[] implementation can override one or more of the `visit*` methods which receive an instance of api:inject.ast.Element[].
+
+The https://docs.micronaut.io/latest/api/io/micronaut/inject/ast/package-summary.html[Element API] provides a language-neutral abstraction over the AST and computation of the api:core.annotation.AnnotationMetadata[] for a given element (class, method, field etc.).
+
+
+
+

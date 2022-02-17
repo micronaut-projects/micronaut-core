@@ -5,10 +5,12 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Order
 import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.http.filter.HttpServerFilter
@@ -324,6 +326,45 @@ class FiltersSpec extends Specification {
                     response
                 }
             })
+        }
+    }
+
+    def 'filter should pick json content type by default'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'spec.name': 'FiltersSpec'
+        ])
+        def embeddedServer = ctx.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = ctx.createBean(HttpClient, embeddedServer.URI)
+
+        when:
+        def response = client.toBlocking().exchange('/home', String)
+        then:
+        // response should be json
+        response.body() == '{"foo":"bar"}'
+        response.header('Content-Type') == 'application/json'
+
+        cleanup:
+        embeddedServer.close()
+        client.close()
+    }
+
+    @Requires(property = 'spec.name', value = 'FiltersSpec')
+    @Controller('/home')
+    static class HomeController {
+        @Get
+        def get() {
+            return 'not reached'
+        }
+    }
+
+    @Requires(property = 'spec.name', value = 'FiltersSpec')
+    @Filter('/home')
+    static class HomeFilter implements HttpServerFilter {
+        @Override
+        Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+            return Publishers.just(HttpResponse.ok(['foo': 'bar']))
         }
     }
 }

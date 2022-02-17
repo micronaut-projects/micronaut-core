@@ -10,6 +10,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.netty.bootstrap.Bootstrap
+import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelInitializer
@@ -54,9 +55,9 @@ import java.util.concurrent.CompletableFuture
 @Property(name = "micronaut.server.http-version", value = "2.0")
 @Property(name = "micronaut.server.netty.log-level", value = "TRACE")
 @Property(name = "micronaut.http.client.log-level", value = "TRACE")
-@Property(name = "micronaut.ssl.enabled", value = "true")
-@Property(name = "micronaut.ssl.port", value = "-1")
-@Property(name = "micronaut.ssl.buildSelfSigned", value = "true")
+@Property(name = "micronaut.server.ssl.enabled", value = "true")
+@Property(name = "micronaut.server.ssl.port", value = "-1")
+@Property(name = "micronaut.server.ssl.buildSelfSigned", value = "true")
 @Property(name = "spec.name", value = "Http2ServerPushSpec")
 class Http2ServerPushSpec extends Specification {
     @Inject
@@ -77,6 +78,9 @@ class Http2ServerPushSpec extends Specification {
 
         runner.pushPromiseHeaders.any { it.scheme() == 'https' && it.path() == '/serverPush/resource2' }
         runner.responses.any { it.content().toString(StandardCharsets.UTF_8) == 'baz' }
+
+        cleanup:
+        runner.responses*.content().forEach(ByteBuf::release)
     }
 
     def 'check headers'() {
@@ -117,8 +121,10 @@ class Http2ServerPushSpec extends Specification {
 
         expect:
         runner.responses.size() == 1
-
         runner.responses[0].content().toString(StandardCharsets.UTF_8) == 'push supported: false'
+
+        cleanup:
+        runner.responses*.content().forEach(ByteBuf::release)
     }
 
     private class Runner {

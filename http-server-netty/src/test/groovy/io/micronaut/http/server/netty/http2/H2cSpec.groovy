@@ -53,7 +53,7 @@ import java.util.concurrent.TimeUnit
 @Property(name = "micronaut.server.http-version", value = "2.0")
 //@Property(name = "micronaut.server.port", value = "8912")
 @Property(name = "micronaut.http.client.http-version", value = "2.0")
-@Property(name = "micronaut.ssl.enabled", value = "false")
+@Property(name = "micronaut.server.ssl.enabled", value = "false")
 @Issue('https://github.com/micronaut-projects/micronaut-core/issues/5005')
 class H2cSpec extends Specification {
     @Inject
@@ -206,8 +206,14 @@ class H2cSpec extends Specification {
 
         CompletableFuture responseFuture = requestUpgrade(request)
 
-        expect:
-        ((FullHttpResponse) responseFuture.get(10, TimeUnit.SECONDS)).content().toString(StandardCharsets.UTF_8) == 'Example response: foo'
+        when:
+        def content = ((FullHttpResponse) responseFuture.get(10, TimeUnit.SECONDS)).content()
+
+        then:
+        content.toString(StandardCharsets.UTF_8) == 'Example response: foo'
+
+        cleanup:
+        content.release()
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6299')
@@ -219,8 +225,14 @@ class H2cSpec extends Specification {
 
         CompletableFuture responseFuture = requestUpgrade(request)
 
-        expect:
-        ((FullHttpResponse) responseFuture.get(10, TimeUnit.SECONDS)).content().toString(StandardCharsets.UTF_8) == 'Example response: foo'
+        when:
+        def content = ((FullHttpResponse) responseFuture.get(10, TimeUnit.SECONDS)).content()
+
+        then:
+        content.toString(StandardCharsets.UTF_8) == 'Example response: foo'
+
+        cleanup:
+        content.release()
     }
 
     @Controller("/h2c")

@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.NonNull;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.ServiceLoader;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -34,8 +35,26 @@ import java.util.concurrent.ConcurrentHashMap;
 @Internal
 public abstract class StaticOptimizations {
 
+    private static final boolean CAPTURE_STACKTRACE_ON_READ = Boolean.getBoolean("micronaut.optimizations.capture.read.trace");
+
     private static final Map<Class<?>, Object> OPTIMIZATIONS = new ConcurrentHashMap<>();
+    private static final Map<Class<?>, StackTraceElement[]> CHECKED = new ConcurrentHashMap<>();
+
     private static boolean cacheEnvironment = false;
+
+    static {
+        reset();
+    }
+
+    /**
+     * Resets the internal state of the optimization container.
+     * Visible for testing.
+     */
+    static void reset() {
+        OPTIMIZATIONS.clear();
+        CHECKED.clear();
+        ServiceLoader.load(Loader.class).forEach(loader -> set(loader.load()));
+    }
 
     /**
      * Enables environment caching. If enabled, both the environment variables
@@ -56,8 +75,16 @@ public abstract class StaticOptimizations {
      */
     @NonNull
     public static <T> Optional<T> get(@NonNull Class<T> optimizationClass) {
+        CHECKED.put(optimizationClass, maybeCaptureStackTrace());
         T value = (T) OPTIMIZATIONS.get(optimizationClass);
         return Optional.ofNullable(value);
+    }
+
+    private static StackTraceElement[] maybeCaptureStackTrace() {
+        if (CAPTURE_STACKTRACE_ON_READ) {
+            return new Exception().getStackTrace();
+        }
+        return new StackTraceElement[0];
     }
 
     /**
@@ -69,6 +96,17 @@ public abstract class StaticOptimizations {
      */
     public static <T> void set(@NonNull T value) {
         Class<?> optimizationClass = value.getClass();
+        if (CHECKED.containsKey(optimizationClass)) {
+            if (!CAPTURE_STACKTRACE_ON_READ) {
+                throw new IllegalStateException("Optimization state for " + optimizationClass + " was read before it was set. Run with -Dmicronaut.optimizations.capture.read.trace=true to enable stack trace capture.");
+            }
+            StringBuilder sb = new StringBuilder("Optimization state for " + optimizationClass + " was read before it was set. Stack trace:\n");
+            StackTraceElement[] stackTrace = CHECKED.get(optimizationClass);
+            for (StackTraceElement element : stackTrace) {
+                sb.append("\t").append(element.toString()).append("\n");
+            }
+            throw new IllegalStateException(sb.toString());
+        }
         OPTIMIZATIONS.put(optimizationClass, value);
     }
 
@@ -80,5 +118,22 @@ public abstract class StaticOptimizations {
      */
     public static boolean isEnvironmentCached() {
         return cacheEnvironment;
+    }
+
+    /**
+     * Interface for an optimization which will be injected via
+     * service loading.
+     *
+     * @param <T> the type of the optimization
+     * @since 3.3.0
+     */
+    @FunctionalInterface
+    public interface Loader<T> {
+        /**
+         * The static optimization to be injected. The {@link StaticOptimizations#set(Object)} method
+         * will automatically be called with the value returned by this method.
+         * @return the optimization value.
+         */
+        T load();
     }
 }
