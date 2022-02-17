@@ -32,6 +32,7 @@ import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.TaskScheduler;
 import io.micronaut.scheduling.annotation.Scheduled;
 import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
+import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -184,6 +185,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     }
 
     @Override
+    @PreDestroy
     public void close() {
         for (ScheduledFuture<?> scheduledTask : scheduledTasks) {
             if (!scheduledTask.isCancelled()) {
