@@ -80,7 +80,7 @@ class ScheduledFixedRateSpec extends Specification {
 
         then:
         conditions.eventually {
-            myTask.cronEvents.get() == 2
+            myTask.cronEvents.get() == 3
         }
 
         cleanup:
@@ -138,6 +138,7 @@ class ScheduledFixedRateSpec extends Specification {
 
         @Scheduled(cron = '1/3 0/1 * 1/1 * ?')
         @Scheduled(cron = '1/4 0/1 * 1/1 * ?')
+        @Scheduled(cron = '1/5 0/1 * 1/1 * ?', timezone = "America/Chicago", scheduler = "dispatcher")
         void runCron() {
             cronEvents.incrementAndGet()
         }
