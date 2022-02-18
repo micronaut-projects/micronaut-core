@@ -90,7 +90,7 @@ open class KotlinClassElement(val classType: KSType,
             if (kotlinName != null) {
                 ksType = visitorContext.resolver.getKotlinClassByName(kotlinName)?.asStarProjectedType()
                 if (ksType != null) {
-                    if (ksType.isAssignableFrom(classType)) {
+                    if (classType.starProjection().isAssignableFrom(ksType)) {
                         return true
                     }
                 }
@@ -454,7 +454,8 @@ open class KotlinClassElement(val classType: KSType,
                     element = elementFactory.newMethodElement(
                         declaringClass,
                         enclosingElement,
-                        metadata
+                        metadata,
+                        allTypeArguments[declaringClass.name] ?: emptyMap()
                     ) as T
                 }
             } else if (enclosingElement is KSPropertyDeclaration) {
@@ -537,7 +538,7 @@ open class KotlinClassElement(val classType: KSType,
     private fun <T : Element?> getElementKind(elementType: Class<T>): Predicate<KSDeclaration> {
         return when (elementType) {
             MethodElement::class.java -> {
-                Predicate { declaration -> declaration is KSFunctionDeclaration }
+                Predicate { declaration -> declaration is KSFunctionDeclaration && !declaration.isConstructor() }
             }
             FieldElement::class.java -> {
                 Predicate { declaration -> declaration is KSPropertyDeclaration && declaration.hasBackingField }
