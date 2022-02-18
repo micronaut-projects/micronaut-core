@@ -24,7 +24,7 @@ class ScheduledCustomExecutorSpec extends Specification {
         then:
         conditions.eventually {
             bean.ran
-            bean.cronEvents.get() >= 2
+            bean.cronEvents.get() >= 3
         }
     }
 
@@ -42,6 +42,7 @@ class ScheduledCustomExecutorSpec extends Specification {
 
         @Scheduled(cron = '1/3 0/1 * 1/1 * ?', scheduler = "dispatcher")
         @Scheduled(cron = '1/4 0/1 * 1/1 * ?', scheduler = "dispatcher")
+        @Scheduled(cron = '1/5 0/1 * 1/1 * ?', timezone = "America/Chicago", scheduler = "dispatcher")
         void runCron() {
             cronEvents.incrementAndGet()
         }

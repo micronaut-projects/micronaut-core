@@ -16,6 +16,7 @@
 package io.micronaut.scheduling;
 
 import java.time.Duration;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.function.Supplier;
 
@@ -42,6 +43,15 @@ final class NextFireTime implements Supplier<Duration> {
     NextFireTime(CronExpression cron) {
         this.cron = cron;
         nextFireTime = ZonedDateTime.now();
+    }
+
+    /**
+     * @param cron A cron expression
+     * @param zoneId The zoneId to base the cron expression on
+     */
+    NextFireTime(CronExpression cron, ZoneId zoneId) {
+        this.cron = cron;
+        nextFireTime = ZonedDateTime.now(zoneId);
     }
 
     @Override

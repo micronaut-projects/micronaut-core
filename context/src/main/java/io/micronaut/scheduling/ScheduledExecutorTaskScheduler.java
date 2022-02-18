@@ -20,10 +20,12 @@ import static io.micronaut.core.util.ArgumentUtils.check;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.cron.CronExpression;
+import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
 import java.time.Duration;
+import java.time.ZoneId;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -54,27 +56,35 @@ public class ScheduledExecutorTaskScheduler implements TaskScheduler {
     }
 
     @Override
-    public ScheduledFuture<?> schedule(String cron, Runnable command) {
-        if (StringUtils.isEmpty(cron)) {
-            throw new IllegalArgumentException("Blank cron expression not allowed");
-        }
-        check("command", command).notNull();
-
-        NextFireTime delaySupplier = new NextFireTime(CronExpression.create(cron));
-        return new ReschedulingTask<>(() -> {
+    public ScheduledFuture<?> schedule(String cron, String timezone, Runnable command) {
+        return schedule(cron, timezone, () -> {
             command.run();
             return null;
-        }, this, delaySupplier);
+        });
     }
 
     @Override
-    public <V> ScheduledFuture<V> schedule(String cron, Callable<V> command) {
+    public <V> ScheduledFuture<V> schedule(String cron, String timezone, Callable<V> command) {
         if (StringUtils.isEmpty(cron)) {
             throw new IllegalArgumentException("Blank cron expression not allowed");
         }
         check("command", command).notNull();
 
-        NextFireTime delaySupplier = new NextFireTime(CronExpression.create(cron));
+        ZoneId zoneId;
+        if (timezone == null || timezone.equals("")) {
+            zoneId = ZoneId.systemDefault();
+        } else {
+            try {
+                zoneId = ZoneId.of(timezone);
+            } catch (Exception e) {
+                zoneId = null;
+            }
+        }
+        if (zoneId == null) {
+            throw new IllegalArgumentException("Invalid zone id for cron expression");
+        }
+
+        NextFireTime delaySupplier = new NextFireTime(CronExpression.create(cron), zoneId);
         return new ReschedulingTask<>(command, this, delaySupplier);
     }
 
