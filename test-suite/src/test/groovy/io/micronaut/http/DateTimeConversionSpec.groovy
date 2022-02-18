@@ -1,15 +1,22 @@
 package io.micronaut.http
 
-import io.micronaut.context.ApplicationContext
+import groovy.transform.TupleConstructor
+import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.convert.DefaultConversionService
 import io.micronaut.core.convert.format.Format
+import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
+import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.BlockingHttpClient
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import jakarta.inject.Inject
 import spock.lang.AutoCleanup
 import spock.lang.Specification
 
@@ -25,19 +32,23 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
+@MicronautTest
+@Property(name = 'spec.name', value = 'DateTimeConversionSpec')
 class DateTimeConversionSpec extends Specification {
 
     private static final String FORMAT = "'TS':yyyyMMdd:HHmmss:X"
 
-    @AutoCleanup
+    @Inject
     EmbeddedServer server
 
     @AutoCleanup
     BlockingHttpClient client
 
+    DateClient dateClient
+
     def setup() {
-        server = ApplicationContext.run(EmbeddedServer, ['spec.name': getClass().simpleName, "micronaut.http.client.readTimeout": '300s'])
-        client = server.applicationContext.getBean(HttpClient).toBlocking()
+        client = server.applicationContext.createBean(HttpClient, server.getURI().resolve("/dates")).toBlocking()
+        dateClient = server.applicationContext.createBean(DateClient, client)
     }
 
     def "default date conversion accounts for timezone"() {
@@ -47,7 +58,7 @@ class DateTimeConversionSpec extends Specification {
 
         when:
         def response = client.exchange(
-                HttpRequest.GET("$server.URL/dates/date?date=${URLEncoder.encode(sent, "UTF-8")}"),
+                HttpRequest.GET("/date?date=${URLEncoder.encode(sent, "UTF-8")}"),
                 String
         )
 
@@ -67,7 +78,7 @@ class DateTimeConversionSpec extends Specification {
 
         when:
         def response = client.exchange(
-                HttpRequest.GET("$server.URL/dates/$endpoint")
+                HttpRequest.GET("/$endpoint")
                         .header('X-Test', header),
                 String
         )
@@ -87,10 +98,10 @@ class DateTimeConversionSpec extends Specification {
         'java.time.Instant'        | 'header-instant'       | DateTimeFormatter.ISO_DATE_TIME | null
     }
 
-    def "timestamped can parse the default format for #desc"() {
+    def "timestamped query param can parse the default format for #desc"() {
         when:
         def response = client.exchange(
-                HttpRequest.GET("$server.URL/dates/$endpoint?date=${URLEncoder.encode(value.toString(), 'UTF-8')}"),
+                HttpRequest.GET("/$endpoint?date=${URLEncoder.encode(value.toString(), 'UTF-8')}"),
                 String
         )
 
@@ -109,7 +120,23 @@ class DateTimeConversionSpec extends Specification {
         'java.time.Instant'        | 'instant'       | Instant.now()
     }
 
-    def "timestamp custom format works for #desc"() {
+    def "test serialized post bodies for #desc"() {
+        when:
+        def date = new Date()
+        def response = client.exchange(HttpRequest.POST("/date", new DateBody(date)), String)
+
+        then:
+        response.body() == DateTimeConversionSpec.response(date)
+
+        when:
+        def zonedDate = ZonedDateTime.now(ZoneOffset.ofHours(8)).truncatedTo(ChronoUnit.SECONDS)
+        response = client.exchange(HttpRequest.POST("/zoned", new ZonedDateTimeBody(zonedDate)), String)
+
+        then:
+        ZonedDateTime.parse(response.body()).isEqual(zonedDate)
+    }
+
+    def "timestamp custom format query works for #desc"() {
         given:
         def now = ZonedDateTime.now(ZoneOffset.UTC)
 
@@ -121,7 +148,7 @@ class DateTimeConversionSpec extends Specification {
 
         when:
         def response = client.exchange(
-                HttpRequest.GET("$server.URL/dates/$endpoint?date=$sent"),
+                HttpRequest.GET("/$endpoint?date=$sent"),
                 String
         )
 
@@ -140,10 +167,63 @@ class DateTimeConversionSpec extends Specification {
         'java.time.Instant'        | 'formatted-instant'       | DateTimeFormatter.ISO_DATE_TIME | null
     }
 
+    private static final String CLIENT_HEADER_TIMESTAMP = "Fri, 18 Feb 2022 10:42:06 GMT"
+
+    def "declarative client header works as expected"() {
+        given:
+        def isoDateTime = ZonedDateTime.parse(CLIENT_HEADER_TIMESTAMP, DateTimeFormatter.RFC_1123_DATE_TIME).format(DateTimeFormatter.ISO_DATE_TIME)
+        def isoTime = ZonedDateTime.parse(CLIENT_HEADER_TIMESTAMP, DateTimeFormatter.RFC_1123_DATE_TIME).format(DateTimeFormatter.ISO_TIME)
+
+        def localDate = ZonedDateTime.parse(CLIENT_HEADER_TIMESTAMP, DateTimeFormatter.RFC_1123_DATE_TIME).format(DateTimeFormatter.ISO_LOCAL_DATE)
+        def localTime = ZonedDateTime.parse(CLIENT_HEADER_TIMESTAMP, DateTimeFormatter.RFC_1123_DATE_TIME).format(DateTimeFormatter.ISO_LOCAL_TIME)
+        def localDateTime = ZonedDateTime.parse(CLIENT_HEADER_TIMESTAMP, DateTimeFormatter.RFC_1123_DATE_TIME).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+
+        expect:
+        dateClient.headerDate() == isoDateTime
+        dateClient.headerOffset() == isoDateTime
+        dateClient.headerOffsetTime() == isoTime
+        dateClient.headerZoned() == isoDateTime
+        dateClient.headerLocalDate() == localDate
+        dateClient.headerLocalTime() == localTime
+        dateClient.headerLocalDateTime() == localDateTime
+        dateClient.headerInstant() == isoDateTime
+    }
+
+    @Requires(property = 'spec.name', value = 'DateTimeConversionSpec')
+    @Client('/dates')
+    @Header(name = "X-Test", value = CLIENT_HEADER_TIMESTAMP)
+    static interface DateClient {
+
+        @Get('/header-date')
+        String headerDate()
+
+        @Get('/header-offset')
+        String headerOffset()
+
+        @Get('/header-offsettime')
+        String headerOffsetTime()
+
+        @Get('/header-zoned')
+        String headerZoned()
+
+        @Get('/header-localdate')
+        String headerLocalDate()
+
+        @Get('/header-localtime')
+        String headerLocalTime()
+
+        @Get('/header-localdatetime')
+        String headerLocalDateTime()
+
+        @Get('/header-instant')
+        String headerInstant()
+    }
+
     @Controller("/dates")
     @Requires(property = 'spec.name', value = 'DateTimeConversionSpec')
     @SuppressWarnings('GrMethodMayBeStatic')
     static class DateFormattingController {
+
         @Get('/header-date')
         def headerDate(@Header('X-Test') Date date) {
             response(date)
@@ -155,7 +235,7 @@ class DateTimeConversionSpec extends Specification {
         }
 
         @Get('/header-offsettime')
-        def headerOffset(@Header('X-Test') OffsetTime date) {
+        def headerOffsetTime(@Header('X-Test') OffsetTime date) {
             response(date)
         }
 
@@ -265,36 +345,58 @@ class DateTimeConversionSpec extends Specification {
             response(date)
         }
 
-        private String response(Date date) {
-            date.toInstant().atZone(ZoneOffset.UTC).truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_DATE_TIME)
+        @Post('/date')
+        String datePost(@Body DateBody value) {
+            response(value.body)
         }
 
-        private String response(OffsetDateTime date) {
-            date.toZonedDateTime().truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_DATE_TIME)
+        @Post('/zoned')
+        String zonedPost(@Body ZonedDateTimeBody value) {
+            response(value.body)
         }
+    }
 
-        private String response(OffsetTime date) {
-            date.truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_TIME)
-        }
+    @Introspected
+    @TupleConstructor
+    static class DateBody {
+        Date body
+    }
 
-        private String response(ZonedDateTime date) {
-            date.truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_DATE_TIME)
-        }
+    @Introspected
+    @TupleConstructor
+    static class ZonedDateTimeBody {
+        ZonedDateTime body
+    }
 
-        private String response(LocalDate date) {
-            date.format(DateTimeFormatter.ISO_DATE)
-        }
+    static String response(Date date) {
+        date.toInstant().atZone(ZoneOffset.UTC).truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_DATE_TIME)
+    }
 
-        private String response(LocalTime date) {
-            date.truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_TIME)
-        }
+    static String response(OffsetDateTime date) {
+        date.toZonedDateTime().truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_DATE_TIME)
+    }
 
-        private String response(LocalDateTime date) {
-            date.truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_DATE_TIME)
-        }
+    static String response(OffsetTime date) {
+        date.truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_TIME)
+    }
 
-        private String response(Instant date) {
-            date.atZone(ZoneOffset.UTC).truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_DATE_TIME)
-        }
+    static String response(ZonedDateTime date) {
+        date.truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_DATE_TIME)
+    }
+
+    static String response(LocalDate date) {
+        date.format(DateTimeFormatter.ISO_DATE)
+    }
+
+    static String response(LocalTime date) {
+        date.truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_TIME)
+    }
+
+    static String response(LocalDateTime date) {
+        date.truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_DATE_TIME)
+    }
+
+    static String response(Instant date) {
+        date.atZone(ZoneOffset.UTC).truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_DATE_TIME)
     }
 }
