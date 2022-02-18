@@ -17,6 +17,7 @@ import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.inject.writer.OriginatingElements
 import io.micronaut.kotlin.processing.visitor.KotlinClassElement
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
+import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 
 class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElement,
@@ -70,6 +71,13 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
     }
 
     companion object {
+        private const val ANN_CONSTRAINT = "javax.validation.Constraint"
+        private const val ANN_VALID = "javax.validation.Valid"
+        private val IS_CONSTRAINT: (AnnotationMetadata) -> Boolean = { am: AnnotationMetadata ->
+            am.hasStereotype(ANN_CONSTRAINT) || am.hasStereotype(ANN_VALID)
+        }
+        private const val ANN_VALIDATED = "io.micronaut.validation.Validated"
+
         fun hasAroundStereotype(annotationMetadata: AnnotationMetadata): Boolean {
             if (annotationMetadata.hasStereotype(AnnotationUtil.ANN_AROUND)) {
                 return true
@@ -136,15 +144,83 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
                 val methodElement = propertyElement.writeMethod.get()
                 visitConfigPropsSetter(methodElement, propertyElement, propertyElement.name)
             }
+            if (!beanWriter!!.isValidated) {
+                beanWriter!!.isValidated = IS_CONSTRAINT.invoke(propertyElement)
+            }
         }
     }
 
     private fun visitMethod(methodElement: MethodElement) {
+        var hasConstraints = false
+        if (isDeclaredBean && !methodElement.hasStereotype(ANN_VALIDATED)) {
+            if (methodElement.parameters.any(IS_CONSTRAINT)) {
+                hasConstraints = true
+                methodElement.annotate(ANN_VALIDATED)
+            }
+        }
         if (isFactoryClass && methodElement !is ConstructorElement && methodElement.hasDeclaredStereotype(Bean::class.qualifiedName, AnnotationUtil.SCOPE)) {
             visitFactoryMethod(methodElement)
-        } else if (isConfigurationProperties && NameUtils.isWriterName(methodElement.name, writePrefixes) && methodElement.parameters.size == 1) {
-            visitConfigPropsSetter(methodElement, methodElement, NameUtils.getPropertyNameForSetter(methodElement.name, writePrefixes))
+        } else if (isDeclaredBean && methodElement.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT)) {
+            beanWriter!!.visitPostConstructMethod(
+                methodElement.declaringType,
+                methodElement,
+                false,
+                visitorContext
+            )
+        } else if (isDeclaredBean && methodElement.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)) {
+            beanWriter!!.visitPreDestroyMethod(
+                methodElement.declaringType,
+                methodElement,
+                false,
+                visitorContext
+            )
+        } else if (methodElement.hasStereotype(AnnotationUtil.INJECT)) {
+            beanWriter!!.visitMethodInjectionPoint(
+                methodElement.declaringType,
+                methodElement,
+                false,
+                visitorContext
+            )
+        } else if (isConfigurationProperties) {
+            if (NameUtils.isWriterName(methodElement.name, writePrefixes) && methodElement.parameters.size == 1) {
+                visitConfigPropsSetter(
+                    methodElement,
+                    methodElement,
+                    NameUtils.getPropertyNameForSetter(methodElement.name, writePrefixes)
+                )
+            } else if (NameUtils.isReaderName(methodElement.name, readPrefixes) && methodElement.parameters.isEmpty()) {
+                if (!beanWriter!!.isValidated) {
+                    beanWriter!!.isValidated = IS_CONSTRAINT.invoke(methodElement)
+                }
+            }
+        } else {
+            val isExecutable = isExecutable(methodElement) || hasAroundStereotype(methodElement)
+
+            if (isExecutable || (isDeclaredBean && hasConstraints)) {
+                val preprocess = methodElement.booleanValue(Executable::class.java, "processOnStartup").orElse(false)
+                if (preprocess) {
+                    beanWriter!!.setRequiresMethodProcessing(true)
+                }
+
+                beanWriter!!.visitExecutableMethod(
+                    methodElement.declaringType,
+                    methodElement,
+                    visitorContext
+                )
+            }
         }
+    }
+
+    private fun isExecutable(methodElement: MethodElement): Boolean {
+        if (methodElement.hasDeclaredStereotype(Executable::class.java)) {
+            return true
+        }
+        if (isExecutableType) {
+            if (classElement == methodElement.declaringType || methodElement.isPublic) {
+                return true
+            }
+        }
+        return false
     }
 
     private fun visitConfigPropsSetter(methodElement: MethodElement, annotatedElement: Element, name: String) {

@@ -147,7 +147,26 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
             declaringClass,
             newClassElement(returnType, annotationUtils.newAnnotationBuilder().buildDeclared(returnType.declaration, returnType.annotations.toList(), false), declaringClass.typeArguments),
             method.parameters.map { param ->
-                KotlinParameterElement(newClassElement(param.type.resolve()), param, annotationUtils.getAnnotationMetadata(param), visitorContext)
+                KotlinParameterElement(newClassElement(param.type.resolve(), declaringClass.typeArguments), param, annotationUtils.getAnnotationMetadata(param), visitorContext)
+            },
+            AnnotationMetadataHierarchy(declaringClass.annotationMetadata, annotationMetadata),
+            visitorContext)
+    }
+
+    fun newMethodElement(
+        declaringClass: ClassElement,
+        method: KSFunctionDeclaration,
+        annotationMetadata: AnnotationMetadata,
+        typeArguments: Map<String, ClassElement>
+    ): KotlinMethodElement {
+        val annotationUtils = visitorContext.getAnnotationUtils()
+        val returnType = method.returnType!!.resolve()
+        return KotlinMethodElement(
+            method,
+            declaringClass,
+            newClassElement(returnType, annotationUtils.newAnnotationBuilder().buildDeclared(returnType.declaration, returnType.annotations.toList(), false), typeArguments),
+            method.parameters.map { param ->
+                KotlinParameterElement(newClassElement(param.type.resolve(), typeArguments), param, annotationUtils.getAnnotationMetadata(param), visitorContext)
             },
             AnnotationMetadataHierarchy(declaringClass.annotationMetadata, annotationMetadata),
             visitorContext)

@@ -122,6 +122,15 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
             populateTypeHierarchy(element, hierarchy)
             hierarchy.reverse()
             return hierarchy
+        } else if (element is KSFunctionDeclaration) {
+            val hierarchy = mutableListOf<KSAnnotated>()
+            hierarchy.add(element)
+            var overidden = element.findOverridee()
+            while (overidden != null) {
+                hierarchy.add(overidden)
+                overidden = (overidden as KSFunctionDeclaration).findOverridee()
+            }
+            return hierarchy
         } else {
             return mutableListOf(element)
         }

@@ -26,7 +26,9 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
         val visitorContext = KotlinVisitorContext(environment, resolver)
 
         val elements = resolver.getAllFiles()
-            .flatMap { file: KSFile -> file.declarations }
+            .flatMap { file: KSFile ->
+                file.declarations
+            }
             .filterIsInstance<KSClassDeclaration>()
             .filter { declaration: KSClassDeclaration ->
                 declaration.annotations.none { ksAnnotation ->

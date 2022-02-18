@@ -1,6 +1,7 @@
 package io.micronaut.kotlin.processing.beans.configproperties
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.PropertySource
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 import org.neo4j.driver.v1.Config
@@ -391,4 +392,74 @@ class Neo4jProperties {
         config.idleTimeBeforeConnectionTest() == 6000
     }
 
+    void "test configuration builder that are interfaces"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+package test
+
+import io.micronaut.context.annotation.*
+import io.micronaut.kotlin.processing.beans.configproperties.AnnWithClass
+
+@ConfigurationProperties("pool")    
+class PoolConfig { 
+    
+    @ConfigurationBuilder(prefixes = [""])
+    var builder: ConnectionPool.Builder = DefaultConnectionPool.builder()
+    
+}
+
+interface ConnectionPool {
+    
+    interface Builder {
+        fun maxConcurrency(maxConcurrency: Int?): Builder
+        fun foo(foo: Foo): Builder
+        fun build(): ConnectionPool
+    }
+    
+    fun getMaxConcurrency(): Int?
+}
+
+class DefaultConnectionPool(private val maxConcurrency: Int?): ConnectionPool {
+  
+    companion object {
+        @JvmStatic
+        fun builder(): ConnectionPool.Builder {
+            return DefaultBuilder()
+        }
+    }
+    
+    override fun getMaxConcurrency(): Int? = maxConcurrency
+
+    private class DefaultBuilder: ConnectionPool.Builder {
+    
+        private var maxConcurrency: Int? = null
+    
+        override fun maxConcurrency(maxConcurrency: Int?): ConnectionPool.Builder{
+            this.maxConcurrency = maxConcurrency
+            return this
+        }
+        
+        override fun foo(foo: Foo): ConnectionPool.Builder {
+            return this
+        }
+
+        override fun build(): ConnectionPool{
+            return DefaultConnectionPool(maxConcurrency)
+        }      
+    }
+}
+
+@AnnWithClass(String::class)
+interface Foo
+''')
+        ctx.getEnvironment().addPropertySource(PropertySource.of(["pool.max-concurrency": 123]))
+
+        when:
+        Class testProps = ctx.classLoader.loadClass("test.PoolConfig")
+        def testPropBean = ctx.getBean(testProps)
+
+        then:
+        noExceptionThrown()
+        testPropBean.builder.build().getMaxConcurrency() == 123
+    }
 }
