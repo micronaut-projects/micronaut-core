@@ -236,6 +236,10 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
                 subscriber.onSubscribe(new ChannelSubscription());
                 subscriber.onError(noSubscriberError);
                 break;
+            case DONE:
+                subscriber.onSubscribe(new ChannelSubscription());
+                subscriber.onComplete();
+                break;
             default:
                 // no-op
         }

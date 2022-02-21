@@ -25,6 +25,7 @@ import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
@@ -1369,10 +1370,17 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Encoding emitted response object [{}] using codec: {}", body, codec);
             }
+            ByteBuffer<ByteBuf> wrapped;
             if (bodyType != null && bodyType.isInstance(body)) {
-                byteBuf = codec.encode(bodyType, body, new NettyByteBufferFactory(context.alloc())).asNativeBuffer();
+                wrapped = codec.encode(bodyType, body, new NettyByteBufferFactory(context.alloc()));
             } else {
-                byteBuf = codec.encode(body, new NettyByteBufferFactory(context.alloc())).asNativeBuffer();
+                wrapped = codec.encode(body, new NettyByteBufferFactory(context.alloc()));
+            }
+            // keep the ByteBuf, release the wrapper
+            // this is probably a no-op, but it's the right thing to do anyway
+            byteBuf = wrapped.asNativeBuffer().retain();
+            if (wrapped instanceof ReferenceCounted) {
+                ((ReferenceCounted) wrapped).release();
             }
         }
         return byteBuf;
