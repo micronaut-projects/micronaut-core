@@ -91,6 +91,10 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
 
     @Override
     protected boolean hasBody(HttpRequest request) {
+        // if there's a decoder failure (e.g. invalid header), don't expect the body to come in
+        if (request.decoderResult().isFailure()) {
+            return false;
+        }
         // Http requests don't have a body if they define 0 content length, or no content length and no transfer
         // encoding
         return HttpUtil.getContentLength(request, 0) != 0 || HttpUtil.isTransferEncodingChunked(request);
