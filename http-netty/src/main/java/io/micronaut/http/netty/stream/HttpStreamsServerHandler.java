@@ -93,7 +93,14 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
     protected boolean hasBody(HttpRequest request) {
         // Http requests don't have a body if they define 0 content length, or no content length and no transfer
         // encoding
-        return HttpUtil.getContentLength(request, 0) != 0 || HttpUtil.isTransferEncodingChunked(request);
+        int contentLength;
+        try {
+            contentLength = HttpUtil.getContentLength(request, 0);
+        } catch (NumberFormatException e) {
+            // handle invalid content length, https://github.com/netty/netty/issues/12113
+            contentLength = 0;
+        }
+        return contentLength != 0 || HttpUtil.isTransferEncodingChunked(request);
     }
 
     @Override
