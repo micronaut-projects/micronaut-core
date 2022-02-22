@@ -97,11 +97,6 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
     }
 
     @Override
-    public boolean isPrimitive() {
-        return getType().isPrimitive();
-    }
-
-    @Override
     public boolean isArray() {
         return getType().isArray();
     }

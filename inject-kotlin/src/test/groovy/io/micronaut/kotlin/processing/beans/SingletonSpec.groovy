@@ -97,4 +97,19 @@ abstract class AbstractBean {
         then:
         beanDefinition.isAbstract()
     }
+
+    void "test that using @Singleton on an enum results in a compilation error"() {
+        when:
+        buildBeanDefinition('test.Test','''\
+package test
+
+@jakarta.inject.Singleton
+enum class Test {
+}
+
+''')
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains('Enum types cannot be defined as beans')
+    }
 }

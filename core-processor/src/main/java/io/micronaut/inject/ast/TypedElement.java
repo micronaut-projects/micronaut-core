@@ -52,7 +52,7 @@ public interface TypedElement extends Element {
      * @return True if it is
      */
     default boolean isPrimitive() {
-        return false;
+        return getType().isPrimitive();
     }
 
     /**

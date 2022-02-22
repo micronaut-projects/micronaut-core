@@ -99,15 +99,19 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
                 visitorContext.fail("Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + classElement.name, classElement)
                 return
             }
+            if (classElement.isEnum) {
+                visitorContext.fail("Enum types cannot be defined as beans", classElement)
+                return
+            }
             if (classElement.packageName.isEmpty()) {
                 visitorContext.fail("Micronaut beans cannot be in the default package", classElement)
                 return
             }
             defineBeanDefinition()
 
-            classElement.getEnclosedElements(ElementQuery.of(PropertyElement::class.java).onlyAccessible())
+            classElement.getEnclosedElements(ElementQuery.of(PropertyElement::class.java))
                 .forEach(this::visitProperty)
-            classElement.getEnclosedElements(ElementQuery.of(MethodElement::class.java).onlyAccessible())
+            classElement.getEnclosedElements(ElementQuery.of(MethodElement::class.java))
                 .forEach(this::visitMethod)
         }
         classElement.getEnclosedElements(ElementQuery.of(ClassElement::class.java).onlyAccessible())
@@ -124,6 +128,10 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         if (isFactoryClass && propertyElement.isFinal && propertyElement.hasDeclaredStereotype(Bean::class.java)) {
             if (propertyElement.isPrivate) {
                 visitorContext.fail("Beans produced from properties cannot be private", propertyElement)
+                return
+            } else if (propertyElement.isProtected) {
+                visitorContext.fail("Beans produced from properties cannot be protected", propertyElement)
+                return
             } else {
                 visitFactoryProperty(propertyElement)
             }
@@ -224,6 +232,9 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
     }
 
     private fun visitConfigPropsSetter(methodElement: MethodElement, annotatedElement: Element, name: String) {
+        if (annotatedElement.isPrivate) {
+            return
+        }
         if (shouldExclude(configurationMetadata!!, name)) {
             return
         }
@@ -320,6 +331,14 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
             .filter { method -> method.isNotEmpty() }
 
         if (preDestroy.isPresent) {
+            if (producedType.isPrimitive) {
+                visitorContext.fail("Using 'preDestroy' is not allowed on primitive type beans", element)
+                return
+            } else if (producedType.isArray) {
+                visitorContext.fail("Using 'preDestroy' is not allowed on array type beans", element)
+                return
+            }
+
             val destroyMethodName = preDestroy.get()
             val destroyMethod = producedType
                 .getEnclosedElement(ElementQuery.ALL_METHODS

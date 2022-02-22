@@ -72,5 +72,4 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
     }
 
     override fun isAbstract() = abstract
-
 }
