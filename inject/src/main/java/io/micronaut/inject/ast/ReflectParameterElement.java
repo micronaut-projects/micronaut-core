@@ -41,11 +41,6 @@ final class ReflectParameterElement implements ParameterElement {
     }
 
     @Override
-    public boolean isPrimitive() {
-        return classElement.isPrimitive();
-    }
-
-    @Override
     public boolean isArray() {
         return classElement.isArray();
     }

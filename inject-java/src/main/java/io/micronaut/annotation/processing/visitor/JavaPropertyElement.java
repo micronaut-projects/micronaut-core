@@ -108,11 +108,6 @@ class JavaPropertyElement extends AbstractJavaElement implements PropertyElement
     }
 
     @Override
-    public boolean isPrimitive() {
-        return type.isPrimitive();
-    }
-
-    @Override
     public boolean isArray() {
         return type.isArray();
     }

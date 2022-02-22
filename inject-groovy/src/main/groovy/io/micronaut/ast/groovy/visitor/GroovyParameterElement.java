@@ -57,11 +57,6 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     }
 
     @Override
-    public boolean isPrimitive() {
-        return getType().isPrimitive();
-    }
-
-    @Override
     public boolean isArray() {
         return getType().isArray();
     }

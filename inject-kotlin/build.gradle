@@ -40,4 +40,8 @@ tasks.named("compileTestGroovy") {
 
 tasks.named("test") {
     classpath += files(tasks.compileTestKotlin)
+    testLogging {
+        showStandardStreams = true
+    }
 }
+
