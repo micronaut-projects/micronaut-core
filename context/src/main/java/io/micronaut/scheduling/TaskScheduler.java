@@ -32,8 +32,8 @@ public interface TaskScheduler {
      * Creates and executes a one-shot action that becomes enabled
      * after the given delay.
      *
-     * @param cron     The cron expression
-     * @param command  the task to execute
+     * @param cron    The cron expression
+     * @param command the task to execute
      * @return a ScheduledFuture representing pending completion of
      * the task and whose {@code get()} method will return
      * {@code null} upon completion
@@ -47,9 +47,9 @@ public interface TaskScheduler {
      * Creates and executes a one-shot action that becomes enabled
      * after the given delay.
      *
-     * @param cron     The cron expression
-     * @param command  The task to execute
-     * @param <V>      The type of the callable's result
+     * @param cron    The cron expression
+     * @param command The task to execute
+     * @param <V>     The type of the callable's result
      * @return a ScheduledFuture representing pending completion of
      * the task and whose {@code get()} method will return
      * {@code null} upon completion
