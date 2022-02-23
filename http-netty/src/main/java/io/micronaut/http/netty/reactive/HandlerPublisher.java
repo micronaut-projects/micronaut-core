@@ -160,7 +160,9 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
             LOG.trace("Demand received for next message (state = " + state + "). Calling context.read()");
         }
 
-        ctx.read();
+        if (!completed.get()) {
+            ctx.read();
+        }
     }
 
     /**
@@ -464,10 +466,8 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
             if (outstandingDemand > 0) {
                 if (state == BUFFERING) {
                     state = DEMANDING;
-                } // otherwise we're draining
-                if (!completed.get()) {
-                    requestDemand();
-                }
+                } // otherwise we're draining or done
+                requestDemand();
             } else if (state == BUFFERING) {
                 state = IDLE;
             }
