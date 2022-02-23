@@ -60,7 +60,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     private static final String MEMBER_FIXED_RATE = "fixedRate";
     private static final String MEMBER_INITIAL_DELAY = "initialDelay";
     private static final String MEMBER_CRON = "cron";
-    private static final String MEMBER_TIMEZONE = "timezone";
+    private static final String MEMBER_ZONE_ID = "zoneId";
     private static final String MEMBER_FIXED_DELAY = "fixedDelay";
     private static final String MEMBER_SCHEDULER = "scheduler";
 
@@ -142,7 +142,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
             };
 
             String cronExpr = scheduledAnnotation.get(MEMBER_CRON, String.class, null);
-            String timezoneStr = scheduledAnnotation.get(MEMBER_TIMEZONE, String.class, null);
+            String zoneIdStr = scheduledAnnotation.get(MEMBER_ZONE_ID, String.class, null);
             String fixedDelay = scheduledAnnotation.get(MEMBER_FIXED_DELAY, String.class).orElse(null);
 
             if (StringUtils.isNotEmpty(cronExpr)) {
@@ -150,7 +150,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                     LOG.debug("Scheduling cron task [{}] for method: {}", cronExpr, method);
                 }
 
-                ScheduledFuture<?> scheduledFuture = taskScheduler.schedule(cronExpr, timezoneStr, task);
+                ScheduledFuture<?> scheduledFuture = taskScheduler.schedule(cronExpr, zoneIdStr, task);
                 scheduledTasks.add(scheduledFuture);
             } else if (StringUtils.isNotEmpty(fixedRate)) {
                 Optional<Duration> converted = conversionService.convert(fixedRate, Duration.class);
