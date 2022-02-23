@@ -338,7 +338,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             void accept(ClassNode classNode, MethodNode methodNode) {
                 AnnotationMetadata annotationMetadata
                 if (AstAnnotationUtils.isAnnotated(node.name, methodNode) || AstAnnotationUtils.hasAnnotation(methodNode, Override)) {
-                    annotationMetadata = AstAnnotationUtils.newBuilder(source, unit).buildForParent(node.name, node, methodNode)
+                    // Class annotations are referenced by concreteClassAnnotationMetadata
+                    annotationMetadata = AstAnnotationUtils.newBuilder(source, unit).buildForParent(node.name, null, methodNode)
                     annotationMetadata = new AnnotationMetadataHierarchy(concreteClassAnnotationMetadata, annotationMetadata)
                 } else {
                     annotationMetadata = new AnnotationMetadataReference(
