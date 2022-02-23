@@ -42,7 +42,7 @@ class ScheduledCustomExecutorSpec extends Specification {
 
         @Scheduled(cron = '1/3 0/1 * 1/1 * ?', scheduler = "dispatcher")
         @Scheduled(cron = '1/4 0/1 * 1/1 * ?', scheduler = "dispatcher")
-        @Scheduled(cron = '1/5 0/1 * 1/1 * ?', timezone = "America/Chicago", scheduler = "dispatcher")
+        @Scheduled(cron = '1/5 0/1 * 1/1 * ?', zoneId = "America/Chicago", scheduler = "dispatcher")
         void runCron() {
             cronEvents.incrementAndGet()
         }

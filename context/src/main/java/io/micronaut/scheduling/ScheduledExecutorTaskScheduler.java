@@ -56,8 +56,33 @@ public class ScheduledExecutorTaskScheduler implements TaskScheduler {
     }
 
     @Override
-    public ScheduledFuture<?> schedule(String cron, String timezone, Runnable command) {
-        return schedule(cron, timezone, () -> {
+    public ScheduledFuture<?> schedule(String cron, Runnable command) {
+        if (StringUtils.isEmpty(cron)) {
+            throw new IllegalArgumentException("Blank cron expression not allowed");
+        }
+        check("command", command).notNull();
+
+        NextFireTime delaySupplier = new NextFireTime(CronExpression.create(cron));
+        return new ReschedulingTask<>(() -> {
+            command.run();
+            return null;
+        }, this, delaySupplier);
+    }
+
+    @Override
+    public <V> ScheduledFuture<V> schedule(String cron, Callable<V> command) {
+        if (StringUtils.isEmpty(cron)) {
+            throw new IllegalArgumentException("Blank cron expression not allowed");
+        }
+        check("command", command).notNull();
+
+        NextFireTime delaySupplier = new NextFireTime(CronExpression.create(cron));
+        return new ReschedulingTask<>(command, this, delaySupplier);
+    }
+
+    @Override
+    public ScheduledFuture<?> schedule(String cron, String zoneId, Runnable command) {
+        return schedule(cron, zoneId, () -> {
             command.run();
             return null;
         });

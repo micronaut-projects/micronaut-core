@@ -49,9 +49,10 @@ public @interface Scheduled {
     /**
      * A String representation of the {@link java.time.ZoneId} to base our cron expression on.
      * Defaults to {@link java.time.ZoneId#systemDefault}
-     * @return The timezone to base the cron expression on
+     *
+     * @return The ZoneId to base the cron expression on
      */
-    String timezone() default "";
+    String zoneId() default "";
 
     /**
      * A String representation of the {@link java.time.Duration} between the time of the last execution and the
