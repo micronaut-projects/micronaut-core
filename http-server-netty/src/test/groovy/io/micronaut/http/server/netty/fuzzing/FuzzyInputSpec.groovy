@@ -5,6 +5,7 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry
 import io.micronaut.http.server.netty.NettyHttpServer
@@ -100,7 +101,8 @@ class FuzzyInputSpec extends Specification {
         BufferLeakDetection.stopTrackingAndReportLeaks()
 
         cleanup:
-        embeddedServer.stop()
+        // normally this is set on the event loop and so doesn't persist across tests, but with EmbeddedChannel we don't make a new thread
+        ServerRequestContext.set(null)
 
         where:
         input << [
