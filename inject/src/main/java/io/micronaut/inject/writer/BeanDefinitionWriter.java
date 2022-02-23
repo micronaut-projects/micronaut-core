@@ -1812,12 +1812,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 .getValue(AccessorsStyle.class, "readPrefixes", String[].class)
                 .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
 
-            memberPropertyGetter = annotationMemberClassElement.getEnclosedElements(ElementQuery.ALL_METHODS)
-                .stream()
-                .filter(methodElement -> NameUtils.getPropertyNameForGetter(methodElement.getSimpleName(), readPrefixes).equals(annotationMemberProperty))
-                .filter(this::isMethodAccessible)
-                .findFirst()
-                .orElse(null);
+            memberPropertyGetter = annotationMemberClassElement.getEnclosedElement(
+                    ElementQuery.ALL_METHODS
+                            .onlyAccessible(beanTypeElement)
+                            .onlyInstance()
+                            .named((name) -> name.equals(NameUtils.getterNameFor(annotationMemberProperty, readPrefixes)))
+                            .filter((e) -> !e.hasParameters())
+            ).orElse(null);
         }
 
         if (memberPropertyGetter == null) {
@@ -1827,16 +1828,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             Type injectedType = JavaModelUtils.getTypeReference(annotationMemberClassElement);
             annotationInjectionPoints.computeIfAbsent(injectedType, type -> new ArrayList<>(2))
                                          .add(new AnnotationVisitData(annotationMemberBeanType, annotationMemberProperty, memberPropertyGetter , requiredValue, notEqualsValue));
-        }
-    }
-
-    private boolean isMethodAccessible(MethodElement methodElement) {
-        if (methodElement.isPublic()) {
-            return true;
-        } else if (methodElement.isPrivate()) {
-            return false;
-        } else {
-            return beanTypeElement.getPackage().equals(methodElement.getDeclaringType().getPackage());
         }
     }
 

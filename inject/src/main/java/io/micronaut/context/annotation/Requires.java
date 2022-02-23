@@ -209,7 +209,7 @@ public @interface Requires {
      * Can be used in combination with {@link #beanProperty()} to specify the required bean property
      *
      * @return The configuration properties class
-     * @since 3.3.0
+     * @since 3.4.0
      */
     Class bean() default void.class;
 
@@ -219,7 +219,7 @@ public @interface Requires {
      * set for the bean to load.
      *
      * @return The configuration property that should be set.
-     * @since 3.3.0
+     * @since 3.4.0
      */
     String beanProperty() default "";
 
