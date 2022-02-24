@@ -114,9 +114,12 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
 
             @Override
             public void cancel() {
-                subscription.cancel();
-                pleaseDestroy = true;
-                destroyIfRequested();
+                try {
+                    subscription.cancel();
+                } finally {
+                    pleaseDestroy = true;
+                    destroyIfRequested();
+                }
             }
         });
     }

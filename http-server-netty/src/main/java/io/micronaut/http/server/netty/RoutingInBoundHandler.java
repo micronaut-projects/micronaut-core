@@ -867,11 +867,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     for (Object toDiscard : routeMatch.getVariableValues().values()) {
                         if (toDiscard instanceof ReferenceCounted) {
                             ((ReferenceCounted) toDiscard).release();
-                        }
-                        if (toDiscard instanceof io.netty.util.ReferenceCounted) {
+                        } else if (toDiscard instanceof io.netty.util.ReferenceCounted) {
                             ((io.netty.util.ReferenceCounted) toDiscard).release();
-                        }
-                        if (toDiscard instanceof NettyCompletedFileUpload) {
+                        } else if (toDiscard instanceof NettyCompletedFileUpload) {
                             ((NettyCompletedFileUpload) toDiscard).discard();
                         }
                     }
@@ -916,14 +914,17 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                 @Override
                 protected void doOnNext(Object message) {
-                    if (message instanceof ByteBufHolder) {
-                        request.addContent((ByteBufHolder) message);
-                        s.request(1);
-                    } else {
-                        ((NettyHttpRequest) request).setBody(message);
-                        s.request(1);
+                    try {
+                        if (message instanceof ByteBufHolder) {
+                            request.addContent((ByteBufHolder) message);
+                            s.request(1);
+                        } else {
+                            ((NettyHttpRequest) request).setBody(message);
+                            s.request(1);
+                        }
+                    } finally {
+                        ReferenceCountUtil.release(message);
                     }
-                    ReferenceCountUtil.release(message);
                 }
 
                 @Override
