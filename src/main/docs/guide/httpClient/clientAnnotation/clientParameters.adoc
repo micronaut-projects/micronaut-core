@@ -184,3 +184,9 @@ snippet::io.micronaut.docs.http.client.bind.method.NameAuthorizationBinder[tags=
 <2> It implements the `AnnotatedClientRequestBinder<NameAuthorization>`
 <3> The custom `bind` method is used to implement the behaviour of the binder
 
+[IMPORTANT]
+.Locale conversion
+====
+A `java.util.Locale` as argument is automatically converted to an `Accept-Language` header. +
+If you need the locale in your path or query and not converted, add the appropriate annotation (ann:io.micronaut.http.annotation.PathVariable[] or ann:io.micronaut.http.annotation.QueryValue[]])
+====
