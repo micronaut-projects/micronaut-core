@@ -644,122 +644,139 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             boolean deduceFunctionPlatform
         ) {
 
-
         EnvironmentsAndPackage environmentsAndPackage = new EnvironmentsAndPackage();
         Set<String> environments = environmentsAndPackage.enviroments;
 
         if (inspectTrace) {
-            StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
-            int len = stackTrace.length;
-            for (int i = 0; i < len; i++) {
-                StackTraceElement stackTraceElement = stackTrace[i];
-                String className = stackTraceElement.getClassName();
-
-                if (className.startsWith("io.micronaut")) {
-                    int nextIndex = i + 1;
-                    if (nextIndex < len) {
-                        StackTraceElement next = stackTrace[nextIndex];
-                        if (!next.getClassName().startsWith("io.micronaut")) {
-                            environmentsAndPackage.aPackage = NameUtils.getPackageName(next.getClassName());
-                        }
-                    }
-                }
-
-                if (stackTraceElement.getMethodName().contains("$spock_")) {
-                    environmentsAndPackage.aPackage = NameUtils.getPackageName(className);
-                }
-
-                if (deduceEnvironments) {
-                    if (Stream.of("org.spockframework", "org.junit", "io.kotlintest", "io.kotest").anyMatch(className::startsWith)) {
-                        environments.add(TEST);
-                    }
-
-                    if (className.startsWith("com.android")) {
-                        environments.add(ANDROID);
-                    }
-                }
-            }
+            performStackTraceInspection(deduceEnvironments, environmentsAndPackage, environments);
         }
 
-        if (deduceEnvironments) {
-            if (!environments.contains(ANDROID)) {
-                // deduce k8s
-                if (StringUtils.isNotEmpty(CachedEnvironment.getenv(K8S_ENV))) {
-                    environments.add(Environment.KUBERNETES);
-                    environments.add(Environment.CLOUD);
-                }
-                // deduce CF
-                if (StringUtils.isNotEmpty(CachedEnvironment.getenv(PCF_ENV))) {
-                    environments.add(Environment.CLOUD_FOUNDRY);
-                    environments.add(Environment.CLOUD);
-                }
-
-                // deduce heroku
-                if (StringUtils.isNotEmpty(CachedEnvironment.getenv(HEROKU_DYNO))) {
-                    environments.add(Environment.HEROKU);
-                    environments.add(Environment.CLOUD);
-                    deduceComputePlatform = false;
-                }
-
-                // deduce GAE
-                if (StringUtils.isNotEmpty(CachedEnvironment.getenv(GOOGLE_APPENGINE_ENVIRONMENT))) {
-                    environments.add(Environment.GAE);
-                    environments.add(Environment.GOOGLE_COMPUTE);
-                    deduceComputePlatform = false;
-                }
-
-                if (deduceComputePlatform) {
-                    ComputePlatform computePlatform = determineCloudProvider();
-                    if (computePlatform != null) {
-                        switch (computePlatform) {
-                            case GOOGLE_COMPUTE:
-                                //instantiate bean for GC metadata discovery
-                                environments.add(GOOGLE_COMPUTE);
-                                environments.add(Environment.CLOUD);
-                                break;
-                            case AMAZON_EC2:
-                                //instantiate bean for ec2 metadata discovery
-                                environments.add(AMAZON_EC2);
-                                environments.add(Environment.CLOUD);
-                                break;
-                            case ORACLE_CLOUD:
-                                environments.add(ORACLE_CLOUD);
-                                environments.add(Environment.CLOUD);
-                                break;
-                            case AZURE:
-                                // not yet implemented
-                                environments.add(AZURE);
-                                environments.add(Environment.CLOUD);
-                                break;
-                            case IBM:
-                                // not yet implemented
-                                environments.add(IBM);
-                                environments.add(Environment.CLOUD);
-                                break;
-                            case DIGITAL_OCEAN:
-                                environments.add(DIGITAL_OCEAN);
-                                environments.add(Environment.CLOUD);
-                                break;
-                            case OTHER:
-                                // do nothing here
-                                break;
-                            default:
-                                // no-op
-                        }
-                    }
-                }
-            }
+        if (deduceEnvironments && !environments.contains(ANDROID)) {
+            performEnvironmentDeduction(deduceComputePlatform, environments);
         }
 
         if (deduceFunctionPlatform) {
-            // deduce AWS Lambda
-            if (StringUtils.isNotEmpty(CachedEnvironment.getenv(AWS_LAMBDA_FUNCTION_NAME_ENV))) {
-                environments.add(Environment.AMAZON_EC2);
-                environments.add(Environment.CLOUD);
-            }
+            performFunctionDeduction(environments);
         }
 
         return environmentsAndPackage;
+    }
+
+    private static void performFunctionDeduction(Set<String> environments) {
+        // deduce AWS Lambda
+        if (StringUtils.isNotEmpty(CachedEnvironment.getenv(AWS_LAMBDA_FUNCTION_NAME_ENV))) {
+            environments.add(Environment.AMAZON_EC2);
+            environments.add(Environment.CLOUD);
+        }
+    }
+
+    private static void performEnvironmentDeduction(boolean deduceComputePlatform, Set<String> environments) {
+        // deduce k8s
+        if (StringUtils.isNotEmpty(CachedEnvironment.getenv(K8S_ENV))) {
+            environments.add(Environment.KUBERNETES);
+            environments.add(Environment.CLOUD);
+        }
+        // deduce CF
+        if (StringUtils.isNotEmpty(CachedEnvironment.getenv(PCF_ENV))) {
+            environments.add(Environment.CLOUD_FOUNDRY);
+            environments.add(Environment.CLOUD);
+        }
+
+        // deduce heroku
+        if (StringUtils.isNotEmpty(CachedEnvironment.getenv(HEROKU_DYNO))) {
+            environments.add(Environment.HEROKU);
+            environments.add(Environment.CLOUD);
+            deduceComputePlatform = false;
+        }
+
+        // deduce GAE
+        if (StringUtils.isNotEmpty(CachedEnvironment.getenv(GOOGLE_APPENGINE_ENVIRONMENT))) {
+            environments.add(Environment.GAE);
+            environments.add(Environment.GOOGLE_COMPUTE);
+            deduceComputePlatform = false;
+        }
+
+        if (deduceComputePlatform) {
+            performComputePlatformDeduction(environments);
+        }
+    }
+
+    private static void performComputePlatformDeduction(Set<String> environments) {
+        ComputePlatform computePlatform = determineCloudProvider();
+        if (computePlatform != null) {
+            switch (computePlatform) {
+                case GOOGLE_COMPUTE:
+                    //instantiate bean for GC metadata discovery
+                    environments.add(GOOGLE_COMPUTE);
+                    environments.add(Environment.CLOUD);
+                    break;
+                case AMAZON_EC2:
+                    //instantiate bean for ec2 metadata discovery
+                    environments.add(AMAZON_EC2);
+                    environments.add(Environment.CLOUD);
+                    break;
+                case ORACLE_CLOUD:
+                    environments.add(ORACLE_CLOUD);
+                    environments.add(Environment.CLOUD);
+                    break;
+                case AZURE:
+                    // not yet implemented
+                    environments.add(AZURE);
+                    environments.add(Environment.CLOUD);
+                    break;
+                case IBM:
+                    // not yet implemented
+                    environments.add(IBM);
+                    environments.add(Environment.CLOUD);
+                    break;
+                case DIGITAL_OCEAN:
+                    environments.add(DIGITAL_OCEAN);
+                    environments.add(Environment.CLOUD);
+                    break;
+                case OTHER:
+                    // do nothing here
+                    break;
+                default:
+                    // no-op
+            }
+        }
+    }
+
+    private static void performStackTraceInspection(boolean deduceEnvironments, EnvironmentsAndPackage environmentsAndPackage, Set<String> environments) {
+        StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+        int len = stackTrace.length;
+        for (int i = 0; i < len; i++) {
+            StackTraceElement stackTraceElement = stackTrace[i];
+            String className = stackTraceElement.getClassName();
+
+            analyzeStackTraceElement(deduceEnvironments, environmentsAndPackage, environments, stackTrace, len, i, stackTraceElement, className);
+        }
+    }
+
+    private static void analyzeStackTraceElement(boolean deduceEnvironments, EnvironmentsAndPackage environmentsAndPackage, Set<String> environments, StackTraceElement[] stackTrace, int len, int i, StackTraceElement stackTraceElement, String className) {
+        if (className.startsWith("io.micronaut")) {
+            int nextIndex = i + 1;
+            if (nextIndex < len) {
+                StackTraceElement next = stackTrace[nextIndex];
+                if (!next.getClassName().startsWith("io.micronaut")) {
+                    environmentsAndPackage.aPackage = NameUtils.getPackageName(next.getClassName());
+                }
+            }
+        }
+
+        if (stackTraceElement.getMethodName().contains("$spock_")) {
+            environmentsAndPackage.aPackage = NameUtils.getPackageName(className);
+        }
+
+        if (deduceEnvironments) {
+            if (Stream.of("org.spockframework", "org.junit", "io.kotlintest", "io.kotest").anyMatch(className::startsWith)) {
+                environments.add(TEST);
+            }
+
+            if (className.startsWith("com.android")) {
+                environments.add(ANDROID);
+            }
+        }
     }
 
     private Map<String, Object> diffCatalog(Map<String, Object>[] original, Map<String, Object>[] newCatalog) {
