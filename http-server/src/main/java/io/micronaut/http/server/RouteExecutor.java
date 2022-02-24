@@ -96,7 +96,7 @@ public final class RouteExecutor {
      * Also present in netty RoutingInBoundHandler.
      */
     private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
-            "^.*(?:connection.*(?:reset|closed|abort|broken)|broken.*pipe).*$", Pattern.CASE_INSENSITIVE);
+            "^.*(?:connection (?:reset|closed|abort|broken)|broken pipe).*$", Pattern.CASE_INSENSITIVE);
 
     private final Router router;
     private final BeanContext beanContext;
