@@ -307,7 +307,7 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
     }
 
     override fun isInheritedAnnotation(annotationMirror: KSAnnotation): Boolean {
-        return annotationMirror.annotationType.annotations.any {
+        return annotationMirror.annotationType.resolve().declaration.annotations.any {
             it.annotationType.resolve().declaration.qualifiedName?.asString() == Inherited::class.qualifiedName
         }
     }
