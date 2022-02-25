@@ -608,6 +608,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
                 return new AnnotationClassValue[]{(AnnotationClassValue) o};
             } else if (o instanceof AnnotationClassValue[]) {
                 return (AnnotationClassValue<?>[]) o;
+            } else if (o instanceof Collection) {
+                return ((Collection<AnnotationClassValue<?>>) o).toArray(new AnnotationClassValue<?>[0]);
             }
         }
         return AnnotationClassValue.EMPTY_ARRAY;
@@ -623,6 +625,11 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
                 AnnotationClassValue[] a = (AnnotationClassValue[]) o;
                 if (a.length > 0) {
                     return Optional.of(a[0]);
+                }
+            } else if (o instanceof List) {
+                List<AnnotationClassValue<?>> a = (List) o;
+                if (a.size() > 0) {
+                    return Optional.of(a.get(0));
                 }
             }
         }

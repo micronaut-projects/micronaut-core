@@ -115,7 +115,6 @@ class StatusController: GenericController<String, Int>() {
         definition.getExecutableMethods().size() == 3
     }
 
-    @PendingFeature(reason = "https://github.com/google/ksp/issues/856")
     void "test multiple inheritance"() {
         BeanDefinition definition = buildBeanDefinition("test.Z", """
 package test

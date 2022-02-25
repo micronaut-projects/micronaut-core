@@ -1,10 +1,8 @@
 package io.micronaut.kotlin.processing.beans
 
-import com.google.devtools.ksp.getClassDeclarationByName
 import io.micronaut.aop.Interceptor
 import io.micronaut.aop.InterceptorBinding
 import io.micronaut.aop.InterceptorKind
-import io.micronaut.aop.Introduction
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil
 import io.micronaut.aop.writer.AopProxyWriter
 import io.micronaut.context.annotation.*
@@ -12,7 +10,6 @@ import io.micronaut.core.annotation.*
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.core.util.ArrayUtils
 import io.micronaut.core.util.StringUtils
-import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.configuration.ConfigurationMetadata
 import io.micronaut.inject.writer.BeanDefinitionVisitor
@@ -244,6 +241,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
                     } else {
                         if (aopProxyWriter == null) {
                             aopProxyWriter = createProxyWriter(methodElement, beanWriter!!)
+                            visitConstructor(aopProxyWriter!!, classElement)
                         }
                         aopProxyWriter!!.visitAroundMethod(
                             classElement,
@@ -262,7 +260,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
     }
 
     private fun isExecutable(methodElement: MethodElement): Boolean {
-        if (methodElement.hasDeclaredStereotype(Executable::class.java)) {
+        if (methodElement.hasStereotype(Executable::class.java)) {
             return true
         }
         if (isExecutableType) {
@@ -429,7 +427,6 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
             if (classElement.hasStereotype(AnnotationUtil.ANN_AROUND)) {
                 aopProxyWriter = createProxyWriter(classElement, beanDefinitionWriter)
                 visitConstructor(aopProxyWriter!!, classElement)
-                beanDefinitionWriters.add(aopProxyWriter!!)
             }
             beanDefinitionWriter
         }
@@ -526,6 +523,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         } else {
             aopProxyWriter.visitSuperBeanDefinition(beanDefinitionName)
         }
+        beanDefinitionWriters.add(aopProxyWriter)
         return aopProxyWriter
     }
 }

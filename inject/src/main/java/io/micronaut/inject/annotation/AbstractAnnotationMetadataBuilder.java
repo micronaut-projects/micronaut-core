@@ -1451,6 +1451,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 if (values.length > 0) {
                     interceptorType = values[0];
                 }
+            } else if (o instanceof List) {
+                final List<AnnotationClassValue<?>> annotations = (List<AnnotationClassValue<?>>) o;
+                if (annotations.size() > 0) {
+                    interceptorType = annotations.get(0);
+                }
             }
             if (interceptorType != null) {
                 for (AnnotationValueBuilder<?> interceptorBinding : interceptorBindings) {

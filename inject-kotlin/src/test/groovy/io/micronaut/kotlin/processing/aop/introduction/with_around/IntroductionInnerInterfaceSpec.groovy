@@ -4,7 +4,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.writer.BeanDefinitionVisitor
-import spock.lang.Ignore
 import spock.lang.Specification
 
 import static io.micronaut.kotlin.processing.KotlinCompiler.*
