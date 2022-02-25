@@ -53,6 +53,7 @@ class StaticResourceResolutionSpec2 extends Specification {
         server.stop()
 
         BufferLeakDetection.stopTrackingAndReportLeaks()
+
     }
 
     @Requires(property = 'spec.name', value = 'StaticResourceResolutionSpec2')

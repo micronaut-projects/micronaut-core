@@ -177,8 +177,8 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                 return result;
             } catch (NoClassDefFoundError | ClassNotFoundException | NoSuchMethodException e) {
                 // Ignore
-            } catch (Throwable e) {
-                throw new RuntimeException(e);
+            } catch (Exception e) {
+                throw new ServiceLoadingException(e);
             }
             return null;
         });
@@ -291,7 +291,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             try {
                 return (S) LOOKUP.findConstructor(clazz, VOID_TYPE).invoke();
             } catch (Throwable e) {
-                throw new RuntimeException(e);
+                throw new ServiceLoadingException(e);
             }
         }
     }
@@ -586,4 +586,12 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         }
     }
 
+    /**
+     * Exception thrown when a service cannot be loaded.
+     */
+    private static class ServiceLoadingException extends RuntimeException {
+        public ServiceLoadingException(Throwable cause) {
+            super(cause);
+        }
+    }
 }
