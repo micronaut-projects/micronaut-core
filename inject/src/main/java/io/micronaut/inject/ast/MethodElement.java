@@ -85,6 +85,10 @@ public interface MethodElement extends MemberElement {
      */
     @NonNull MethodElement withNewParameters(@NonNull ParameterElement...newParameters);
 
+    default @NonNull MethodElement withNewMetadata(AnnotationMetadata annotationMetadata) {
+        throw new UnsupportedOperationException("testing");
+    }
+
     /**
      * This method adds an associated bean using this method element as the originating element.
      *

@@ -20,7 +20,7 @@ import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 
 class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironment): SymbolProcessor {
 
-    private val beanDefinitionWriters = mutableListOf<BeanDefinitionWriter>()
+    private val beanDefinitionWriters = mutableListOf<BeanDefinitionVisitor>()
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val visitorContext = KotlinVisitorContext(environment, resolver)
@@ -73,7 +73,7 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
         }
     }
 
-    private fun visit(classElement: KotlinClassElement, beanDefinitionWriters: MutableList<BeanDefinitionWriter>, visitorContext: KotlinVisitorContext) {
+    private fun visit(classElement: KotlinClassElement, beanDefinitionWriters: MutableList<BeanDefinitionVisitor>, visitorContext: KotlinVisitorContext) {
         val visitor = BeanDefinitionProcessorVisitor(classElement, visitorContext)
         visitor.visit()
         beanDefinitionWriters.addAll(visitor.beanDefinitionWriters)

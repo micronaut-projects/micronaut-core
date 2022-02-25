@@ -23,7 +23,7 @@ import jakarta.inject.Singleton
  * @since 1.0
  */
 @Singleton
-class SimpleClass<A : CharSequence?>(private val bar: Bar?) {
+open class SimpleClass<A : CharSequence?>(private val bar: Bar?) {
     var isPostConstructInvoked = false
         private set
 
@@ -37,151 +37,151 @@ class SimpleClass<A : CharSequence?>(private val bar: Bar?) {
     }
 
     @Mutating("name")
-    fun test(name: String): String {
+    open fun test(name: String): String {
         return "Name is $name"
     }
 
     @Mutating("age")
-    fun test(age: Int): String {
+    open fun test(age: Int): String {
         return "Age is $age"
     }
 
     @Mutating("name")
-    fun test(name: String, age: Int): String {
+    open fun test(name: String, age: Int): String {
         return "Name is $name and age is $age"
     }
 
     @Mutating("name")
-    fun test(): String {
+    open fun test(): String {
         return "noargs"
     }
 
     @Mutating("name")
-    fun testVoid(name: String) {
+    open fun testVoid(name: String) {
         assert(name == "changed")
     }
 
     @Mutating("name")
-    fun testVoid(name: String, age: Int) {
+    open fun testVoid(name: String, age: Int) {
         assert(name == "changed")
         assert(age == 10)
     }
 
     @Mutating("name")
-    fun testBoolean(name: String): Boolean {
+    open fun testBoolean(name: String): Boolean {
         return name == "changed"
     }
 
     @Mutating("name")
-    fun testBoolean(name: String, age: Int): Boolean {
+    open fun testBoolean(name: String, age: Int): Boolean {
         assert(age == 10)
         return name == "changed"
     }
 
     @Mutating("name")
-    fun testInt(name: String): Int {
+    open fun testInt(name: String): Int {
         return if (name == "changed") 1 else 0
     }
 
     @Mutating("age")
-    fun testInt(name: String, age: Int): Int {
+    open fun testInt(name: String, age: Int): Int {
         assert(name == "test")
         return age
     }
 
     @Mutating("name")
-    fun testLong(name: String): Long {
+    open fun testLong(name: String): Long {
         return if (name == "changed") 1 else 0
     }
 
     @Mutating("age")
-    fun testLong(name: String, age: Int): Long {
+    open fun testLong(name: String, age: Int): Long {
         assert(name == "test")
         return age.toLong()
     }
 
     @Mutating("name")
-    fun testShort(name: String): Short {
+    open fun testShort(name: String): Short {
         return (if (name == "changed") 1 else 0).toShort()
     }
 
     @Mutating("age")
-    fun testShort(name: String, age: Int): Short {
+    open fun testShort(name: String, age: Int): Short {
         assert(name == "test")
         return age.toShort()
     }
 
     @Mutating("name")
-    fun testByte(name: String): Byte {
+    open fun testByte(name: String): Byte {
         return (if (name == "changed") 1 else 0).toByte()
     }
 
     @Mutating("age")
-    fun testByte(name: String, age: Int): Byte {
+    open fun testByte(name: String, age: Int): Byte {
         assert(name == "test")
         return age.toByte()
     }
 
     @Mutating("name")
-    fun testDouble(name: String): Double {
+    open fun testDouble(name: String): Double {
         return if (name == "changed") 1.0 else 0.0
     }
 
     @Mutating("age")
-    fun testDouble(name: String, age: Int): Double {
+    open fun testDouble(name: String, age: Int): Double {
         assert(name == "test")
         return age.toDouble()
     }
 
     @Mutating("name")
-    fun testFloat(name: String): Float {
+    open fun testFloat(name: String): Float {
         return if (name == "changed") 1F else 0F
     }
 
     @Mutating("age")
-    fun testFloat(name: String, age: Int): Float {
+    open fun testFloat(name: String, age: Int): Float {
         assert(name == "test")
         return age.toFloat()
     }
 
     @Mutating("name")
-    fun testChar(name: String): Char {
+    open fun testChar(name: String): Char {
         return (if (name == "changed") 1 else 0).toChar()
     }
 
     @Mutating("age")
-    fun testChar(name: String, age: Int): Char {
+    open fun testChar(name: String, age: Int): Char {
         assert(name == "test")
         return age.toChar()
     }
 
     @Mutating("name")
-    fun testByteArray(name: String, data: ByteArray): ByteArray {
+    open fun testByteArray(name: String, data: ByteArray): ByteArray {
         assert(name == "changed")
         return data
     }
 
     @Mutating("name")
-    fun <T : CharSequence?> testGenericsWithExtends(name: T, age: Int): T {
+    open fun <T : CharSequence?> testGenericsWithExtends(name: T, age: Int): T {
         return "Name is $name" as T
     }
 
     @Mutating("name")
-    fun <T> testListWithWildCardIn(name: T, p2: CovariantClass<in String>): CovariantClass<in String> {
+    open fun <T> testListWithWildCardIn(name: T, p2: CovariantClass<in String>): CovariantClass<in String> {
         return CovariantClass(name.toString())
     }
 
     @Mutating("name")
-    fun <T> testListWithWildCardOut(name: T, p2: CovariantClass<out String>): CovariantClass<out String> {
+    open fun <T> testListWithWildCardOut(name: T, p2: CovariantClass<out String>): CovariantClass<out String> {
         return CovariantClass(name.toString())
     }
 
     @Mutating("name")
-    fun testGenericsFromType(name: A, age: Int): A {
+    open fun testGenericsFromType(name: A, age: Int): A {
         return "Name is $name" as A
     }
 
     @Invalid
-    internal fun invalidInterceptor() {
+    internal open fun invalidInterceptor() {
     }
 }

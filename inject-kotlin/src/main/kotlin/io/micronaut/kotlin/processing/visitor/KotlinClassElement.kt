@@ -5,8 +5,10 @@ import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Creator
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.ast.*
+import io.micronaut.kotlin.processing.KotlinAnnotationMetadataBuilder
 import io.micronaut.kotlin.processing.toClassName
 import java.util.*
 import java.util.function.Predicate
@@ -331,7 +333,7 @@ open class KotlinClassElement(val classType: KSType,
         return Optional.empty()
     }
 
-    override fun <T : Element> getEnclosedElements(query: ElementQuery<T>): MutableList<T> {
+    override fun <T : Element?> getEnclosedElements(@NonNull query: ElementQuery<T>): MutableList<T> {
         val result = query.result()
         val kind = getElementKind(result.elementType)
         val classDeclarationElements = mutableMapOf<KSClassDeclaration, ClassElement>(declaration to this)
@@ -632,6 +634,31 @@ open class KotlinClassElement(val classType: KSType,
             }
         }
         return propertyList
+    }
+
+    fun getIntroductionInterfaces(): MutableList<ClassElement> {
+        val elements: MutableList<ClassElement> = mutableListOf()
+        getIntroductionInterfaces(declaration.annotations, elements, mutableListOf())
+        return elements
+    }
+
+    private fun getIntroductionInterfaces(annotations: Sequence<KSAnnotation>, elements: MutableList<ClassElement>, visited: MutableList<KSAnnotation>) {
+        annotations.forEach { ann ->
+            if (KotlinAnnotationMetadataBuilder.getAnnotationTypeName(ann) == "io.micronaut.aop.Introduction") {
+                val value = ann.arguments
+                    .find { arg -> arg.name!!.asString() == "interfaces" }
+                    ?.value
+                if (value != null) {
+                    if (value is List<*>) {
+                        elements.addAll(value.filterIsInstance<KSType>()
+                            .map { visitorContext.elementFactory.newClassElement(it) })
+                    }
+                }
+            } else if (!visited.contains(ann)) {
+                visited.add(ann)
+                getIntroductionInterfaces(ann.annotationType.resolve().declaration.annotations, elements, visited)
+            }
+        }
     }
 
     private class GetterAndSetter(val type: ClassElement,
