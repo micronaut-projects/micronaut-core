@@ -29,7 +29,7 @@ import java.util.ServiceLoader;
 @Internal
 final class StreamingHttpClientFactoryResolver {
 
-    private volatile static StreamingHttpClientFactory factory;
+    private static volatile StreamingHttpClientFactory factory;
 
     static StreamingHttpClientFactory getFactory() {
         if (factory == null) {
