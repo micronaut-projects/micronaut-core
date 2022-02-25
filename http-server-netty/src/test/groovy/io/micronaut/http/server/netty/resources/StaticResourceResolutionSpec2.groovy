@@ -48,11 +48,12 @@ class StaticResourceResolutionSpec2 extends Specification {
         response.header(CONTENT_TYPE) == "text/plain"
         response.body() == "discarded"
 
-        BufferLeakDetection.stopTrackingAndReportLeaks()
-
         cleanup:
         client.close()
         server.stop()
+
+        BufferLeakDetection.stopTrackingAndReportLeaks()
+
     }
 
     @Requires(property = 'spec.name', value = 'StaticResourceResolutionSpec2')

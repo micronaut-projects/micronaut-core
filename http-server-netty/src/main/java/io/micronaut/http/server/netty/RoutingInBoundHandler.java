@@ -25,6 +25,7 @@ import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
@@ -988,7 +989,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             }
         } else {
             response.body(null);
-            response.contentType(null);
             writeFinalNettyResponse(
                     response,
                     nettyRequest,
@@ -1146,12 +1146,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         final io.micronaut.http.HttpVersion httpVersion = request.getHttpVersion();
         final boolean isHttp2 = httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0;
 
+        boolean decodeError = request instanceof NettyHttpRequest &&
+                ((NettyHttpRequest<?>) request).getNativeRequest().decoderResult().isFailure();
+
         final Object body = message.body();
         if (body instanceof NettyCustomizableResponseTypeHandlerInvoker) {
             // default Connection header if not set explicitly
             if (!isHttp2) {
                 if (!message.getHeaders().contains(HttpHeaders.CONNECTION)) {
-                    if (httpStatus.getCode() < 500 || serverConfiguration.isKeepAliveOnServerError()) {
+                    if (!decodeError && (httpStatus.getCode() < 500 || serverConfiguration.isKeepAliveOnServerError())) {
                         message.getHeaders().set(HttpHeaders.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
                     } else {
                         message.getHeaders().set(HttpHeaders.CONNECTION, HttpHeaderValues.CLOSE);
@@ -1169,7 +1172,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (!isHttp2) {
                 if (!nettyHeaders.contains(HttpHeaderNames.CONNECTION)) {
                     boolean expectKeepAlive = nettyResponse.protocolVersion().isKeepAliveDefault() || request.getHeaders().isKeepAlive();
-                    if (expectKeepAlive || httpStatus.getCode() < 500 || serverConfiguration.isKeepAliveOnServerError()) {
+                    if (!decodeError && (expectKeepAlive || httpStatus.getCode() < 500 || serverConfiguration.isKeepAliveOnServerError())) {
                         nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
                     } else {
                         nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
@@ -1370,10 +1373,17 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Encoding emitted response object [{}] using codec: {}", body, codec);
             }
+            ByteBuffer<ByteBuf> wrapped;
             if (bodyType != null && bodyType.isInstance(body)) {
-                byteBuf = codec.encode(bodyType, body, new NettyByteBufferFactory(context.alloc())).asNativeBuffer();
+                wrapped = codec.encode(bodyType, body, new NettyByteBufferFactory(context.alloc()));
             } else {
-                byteBuf = codec.encode(body, new NettyByteBufferFactory(context.alloc())).asNativeBuffer();
+                wrapped = codec.encode(body, new NettyByteBufferFactory(context.alloc()));
+            }
+            // keep the ByteBuf, release the wrapper
+            // this is probably a no-op, but it's the right thing to do anyway
+            byteBuf = wrapped.asNativeBuffer().retain();
+            if (wrapped instanceof ReferenceCounted) {
+                ((ReferenceCounted) wrapped).release();
             }
         }
         return byteBuf;

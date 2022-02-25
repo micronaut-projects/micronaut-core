@@ -16,6 +16,8 @@
 package io.micronaut.http.netty.stream;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.reactive.HandlerPublisher;
 import io.micronaut.http.netty.reactive.HandlerSubscriber;
@@ -410,8 +412,14 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                         if (LOG.isErrorEnabled()) {
                             LOG.error("Error occurred writing stream response: " + error.getMessage(), error);
                         }
-                        ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR))
-                           .addListener(ChannelFutureListener.CLOSE);
+                        HttpResponseStatus responseStatus;
+                        if (error instanceof HttpStatusException) {
+                            responseStatus = HttpResponseStatus.valueOf(((HttpStatusException) error).getStatus().getCode(), error.getMessage());
+                        } else {
+                            responseStatus = HttpResponseStatus.INTERNAL_SERVER_ERROR;
+                        }
+                        ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, responseStatus))
+                                .addListener(ChannelFutureListener.CLOSE);
                     } finally {
                         ctx.read();
                     }

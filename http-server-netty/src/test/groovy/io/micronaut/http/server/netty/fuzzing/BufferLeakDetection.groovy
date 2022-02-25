@@ -1,7 +1,8 @@
 package io.micronaut.http.server.netty.fuzzing
 
+import io.netty.buffer.ByteBuf
+import io.netty.buffer.PooledByteBufAllocator
 import io.netty.util.ResourceLeakDetector
-import io.netty.util.ResourceLeakDetectorFactory
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -15,8 +16,13 @@ class BufferLeakDetection<T> extends ResourceLeakDetector<T> {
 
     private static final List<ResourceLeakDetector<?>> allDetectors = new CopyOnWriteArrayList<>()
 
+    private static volatile String canaryString = null
+
     private static volatile boolean leakDetected = false
     private static volatile boolean canaryDetected = false
+
+    @SuppressWarnings("unused")
+    private static volatile int sink
 
     static void startTracking() {
         triggerGc()
@@ -39,27 +45,34 @@ class BufferLeakDetection<T> extends ResourceLeakDetector<T> {
         }
     }
 
-    private static void triggerGc() {
+    private static void leakCanary() {
+        ByteBuf resource = PooledByteBufAllocator.DEFAULT.directBuffer()
+        resource.touch(canaryString)
+    }
+
+    // adapted from https://github.com/netty/netty/blob/86603872776e3ff5a60dea3c104358e486eed588/common/src/test/java/io/netty/util/ResourceLeakDetectorTest.java
+    private static synchronized void triggerGc() {
+        // need to randomize this every time, since ResourceLeakDetector will deduplicate leaks
+        canaryString = "canary-" + UUID.randomUUID()
         canaryDetected = false
 
-        Canary.CANARY_LEAK_DETECTOR.track(new Canary())
+        leakCanary()
 
-        // this seems to be reasonably reliable to trigger collection of remaining buffers
-        System.gc()
-        try {
-            //noinspection GroovyUnusedAssignment
-            byte[] unused = new byte[(int) Runtime.getRuntime().freeMemory()]
-        } catch (OutOfMemoryError ignored) {}
+        do {
+            // Trigger GC.
+            System.gc();
 
-        // trigger detectors – ref queue collection is only done on track()
-        for (ResourceLeakDetector<?> detector : allDetectors) {
-            def obj = new Object()
-            detector.track(obj).close(obj)
-        }
+            // trigger detectors – ref queue collection is only done on track()
+            for (ResourceLeakDetector<?> detector : allDetectors) {
+                def obj = new Object()
+                detector.track(obj).close(obj)
+            }
 
-        if (!canaryDetected) {
-            LOG.warn("Canary resource leak wasn't detected. Leak detection not functional")
-        }
+            // Give the GC something to work on.
+            for (int i = 0; i < 1000; i++) {
+                sink = System.identityHashCode(new byte[10000]);
+            }
+        } while (!canaryDetected && !Thread.interrupted());
     }
 
     @SuppressWarnings('unused')
@@ -81,7 +94,8 @@ class BufferLeakDetection<T> extends ResourceLeakDetector<T> {
 
     @Override
     protected void reportTracedLeak(String resourceType, String records) {
-        if (resourceType.contains(Canary.class.getSimpleName())) {
+        def canary = canaryString
+        if (canary != null && records.contains(canary)) {
             canaryDetected = true
             return
         }
@@ -92,16 +106,7 @@ class BufferLeakDetection<T> extends ResourceLeakDetector<T> {
 
     @Override
     protected void reportUntracedLeak(String resourceType) {
-        if (resourceType.contains(Canary.class.getSimpleName())) {
-            canaryDetected = true
-            return
-        }
-
         leakDetected = true
         super.reportUntracedLeak(resourceType)
-    }
-
-    private static class Canary {
-        private static final ResourceLeakDetector<Canary> CANARY_LEAK_DETECTOR = ResourceLeakDetectorFactory.instance().newResourceLeakDetector(Canary)
     }
 }

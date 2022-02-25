@@ -3,10 +3,10 @@ Micronaut supports annotation-based <<aop, Aspect Oriented Programming>> (AOP) w
 
 NOTE: The use of the https://en.wikipedia.org/wiki/Aspect-oriented_programming[AOP terminogy] originates from AspectJ and historical use in Spring.
 
-Any annotation defined by the framework can be meta-annotated with the ann:aop.InterceptorBinding[] annotation which supports different kinds of intereption including:
+Any annotation defined by the framework can be meta-annotated with the ann:aop.InterceptorBinding[] annotation which supports different kinds of interception including:
 
 * `AROUND` - A annotation can be used to decorate an existing method invocation
-* `AROUND_CONSTRUCT` - An annotation can be used to intercept the construction of an type
+* `AROUND_CONSTRUCT` - An annotation can be used to intercept the construction of any type
 * `INTRODUCTION` - An annotation can be used to "introduce" new behaviour to abstract or interface types
 * `POST_CONSTRUCT` - An annotation can be used to intercept `@PostConstruct` calls which are invoked after the object is instantiated.
 * `PRE_DESTROY` - An annotation can be used to intercept `@PreDestroy` calls which are invoked after the object is about to be disposed of.
@@ -47,7 +47,7 @@ And the api:aop.writer.AopProxyWriter[] will decorate this behaviour and generat
 * `$NotNullExample$Definition$Intercepted$Definition$Reference.class` - A api:inject.BeanDefinitionReference[] that is capable of soft loading the intercepted api:inject.BeanDefinition[]. (see (see <<iocArch, Bean Definitions>>))
 
 
-The majority of the classes generated are metadata for loading and resolving the api:inject.BeanDefinition[]. The actual build time proxy is the class that ends with `$Intercepted`. This class implements the api:aop.Intercepted[] interface and subclasses the proxied type, overridding any non-final and non-private methods to invoke the api:aop.chain.MethodInterceptorChain[].
+The majority of the classes generated are metadata for loading and resolving the api:inject.BeanDefinition[]. The actual build time proxy is the class that ends with `$Intercepted`. This class implements the api:aop.Intercepted[] interface and subclasses the proxied type, overriding any non-final and non-private methods to invoke the api:aop.chain.MethodInterceptorChain[].
 
 An implementation will create a constructor which is used to wire in the dependencies on the intercepted type that looks like:
 
@@ -77,7 +77,7 @@ extends NotNullExample implements Intercepted { // <1>
 }
 ----
 
-<1> The `@Generated` subclass extends from the decorated type and implements the api:aop.Interepted[] interface
+<1> The `@Generated` subclass extends from the decorated type and implements the api:aop.Intercepted[] interface
 <2> An instance of api:context.ExecutableMethodsDefinition[] is constructed to resolve reflection-free dispatchers to the original method.
 <3> An internal array called `$proxyMethods` holds a reference for to each api:inject.ExecutableMethod[] instance used to proxy the invocation.
 <4> An internal array called `$interceptors` holds references to which api:aop.Interceptor[] instances apply to each method since an ann:aop.InterceptorBinding[] can be type or method level these may differ for each method.
@@ -104,7 +104,7 @@ public void doWork(String taskName) {
 <2> A new api:aop.chain.MethodInterceptorChain[] is constructed with the interceptors, a reference to the intercepted instance, the method and the arguments.
 <3> The `proceed()` method is invoked on the api:aop.chain.MethodInterceptorChain[].
 
-Note that the default behaviour of the the ann:aop.Around[] annotation is to invoke the original overriden method of the target type by calling the super implementation via a generated synthetic bridge method that allows access to the super implementation (in the above case `NotNullExample`).
+Note that the default behaviour of the ann:aop.Around[] annotation is to invoke the original overridden method of the target type by calling the super implementation via a generated synthetic bridge method that allows access to the super implementation (in the above case `NotNullExample`).
 
 In this arrangement the proxy and the proxy target are the same object, with interceptors being invoked and the call to `proceed()` invoke the original implementation via a call to `super.doWork()` in the case above.
 
