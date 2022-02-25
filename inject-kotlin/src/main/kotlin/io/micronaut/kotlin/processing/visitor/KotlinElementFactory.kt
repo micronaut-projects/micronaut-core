@@ -149,7 +149,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
             method.parameters.map { param ->
                 KotlinParameterElement(newClassElement(param.type.resolve(), declaringClass.typeArguments), param, annotationUtils.getAnnotationMetadata(param), visitorContext)
             },
-            AnnotationMetadataHierarchy(declaringClass.annotationMetadata, annotationMetadata),
+            annotationMetadata,
             visitorContext)
     }
 
@@ -168,7 +168,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
             method.parameters.map { param ->
                 KotlinParameterElement(newClassElement(param.type.resolve(), typeArguments), param, annotationUtils.getAnnotationMetadata(param), visitorContext)
             },
-            AnnotationMetadataHierarchy(declaringClass.annotationMetadata, annotationMetadata),
+            annotationMetadata,
             visitorContext)
     }
 
@@ -178,7 +178,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         type: ClassElement,
         annotationMetadata: AnnotationMetadata
     ): MethodElement {
-        return KotlinMethodElement(method, declaringClass, type, AnnotationMetadataHierarchy(declaringClass.annotationMetadata, annotationMetadata), visitorContext)
+        return KotlinMethodElement(method, declaringClass, type, annotationMetadata, visitorContext)
     }
 
     fun newMethodElement(
@@ -188,7 +188,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         annotationMetadata: AnnotationMetadata
     ): MethodElement {
         val annotationUtils = visitorContext.getAnnotationUtils()
-        return KotlinMethodElement(method, declaringClass, AnnotationMetadataHierarchy(declaringClass.annotationMetadata, annotationMetadata), visitorContext, KotlinParameterElement(type, method.parameter, AnnotationMetadataHierarchy(annotationMetadata, annotationUtils.getAnnotationMetadata(method.parameter)), visitorContext))
+        return KotlinMethodElement(method, declaringClass, annotationMetadata, visitorContext, KotlinParameterElement(type, method.parameter, AnnotationMetadataHierarchy(annotationMetadata, annotationUtils.getAnnotationMetadata(method.parameter)), visitorContext))
     }
 
     override fun newConstructorElement(

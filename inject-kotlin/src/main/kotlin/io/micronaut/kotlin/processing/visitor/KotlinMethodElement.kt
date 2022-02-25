@@ -91,8 +91,14 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
         return parameters.toTypedArray()
     }
 
+    override fun isAbstract(): Boolean = abstract
+
     override fun withNewParameters(vararg newParameters: ParameterElement): MethodElement {
         return KotlinMethodElement(declaration, name, declaringType, annotationMetadata, visitorContext, returnType, newParameters.toList(), abstract)
+    }
+
+    override fun withNewMetadata(annotationMetadata: AnnotationMetadata): MethodElement {
+        return KotlinMethodElement(declaration, name, declaringType, annotationMetadata, visitorContext, returnType, parameters, abstract)
     }
 
 }

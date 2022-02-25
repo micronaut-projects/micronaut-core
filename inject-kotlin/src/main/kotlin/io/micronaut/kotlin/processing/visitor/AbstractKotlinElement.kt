@@ -11,6 +11,7 @@ import io.micronaut.core.annotation.AnnotationValueBuilder
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.util.ArgumentUtils
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
