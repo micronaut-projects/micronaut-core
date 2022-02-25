@@ -29,7 +29,7 @@ import java.util.ServiceLoader;
 @Internal
 final class ProxyHttpClientFactoryResolver {
 
-    private static ProxyHttpClientFactory factory;
+    private volatile static ProxyHttpClientFactory factory;
 
     static ProxyHttpClientFactory getFactory() {
         if (factory == null) {
