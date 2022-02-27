@@ -4,6 +4,7 @@ import com.tschuchort.compiletesting.KotlinCompilation;
 import com.tschuchort.compiletesting.KspKt;
 import com.tschuchort.compiletesting.SourceFile;
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.BeanContext;
 import io.micronaut.context.DefaultApplicationContext;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
@@ -122,6 +123,10 @@ public class KotlinCompiler {
                 return beanDefinitions;
             }*/
         }.start();
+    }
+
+    public static Object getBean(BeanContext beanContext, String className) throws ClassNotFoundException {
+        return beanContext.getBean(beanContext.getClassLoader().loadClass(className));
     }
 
     private static Object loadDefinition(ClassLoader classLoader, String name) throws NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {

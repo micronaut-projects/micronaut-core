@@ -121,7 +121,7 @@ class MyBean(@Named("totals") val totals: ${primitiveType}Array) {
 }
 """)
 
-        def bean = context.getBean(context.classLoader.loadClass('primitive.fields.factory.MyBean'))
+        def bean = getBean(context, 'primitive.fields.factory.MyBean')
 
         expect:
         bean.totals[0] == 10
@@ -167,7 +167,7 @@ class MyBean(@Named("totals") val totals: Array<${primitiveType}Array>) {
 }
 """)
 
-        def bean = context.getBean(context.classLoader.loadClass('primitive.fields.factory.MyBean'))
+        def bean = getBean(context, 'primitive.fields.factory.MyBean')
 
         expect:
         bean.totals[0][0] == 10
@@ -213,7 +213,7 @@ class MyBean(@Named("total") val total: ${primitiveType}) {
 }
 """)
 
-        def bean = context.getBean(context.classLoader.loadClass('primitive.fields.factory.MyBean'))
+        def bean = getBean(context, 'primitive.fields.factory.MyBean')
 
         expect:
         bean.total == 10
