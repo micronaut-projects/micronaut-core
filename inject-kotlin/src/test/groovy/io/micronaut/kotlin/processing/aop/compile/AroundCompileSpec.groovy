@@ -63,8 +63,8 @@ class TestInterceptor: Interceptor<Any, Any> {
 } 
 
 ''')
-        def instance = context.getBean(context.classLoader.loadClass('annbinding2.MyBean'))
-        def interceptor = context.getBean(context.classLoader.loadClass('annbinding2.TestInterceptor'))
+        def instance = getBean(context, 'annbinding2.MyBean')
+        def interceptor = getBean(context, 'annbinding2.TestInterceptor')
 
         when:
         instance.test()
@@ -72,49 +72,47 @@ class TestInterceptor: Interceptor<Any, Any> {
         then:"the interceptor was invoked"
         instance instanceof Intercepted
         interceptor.invoked
-
 
         cleanup:
         context.close()
     }
-/*
+
     void 'test apply interceptor binder with annotation mapper'() {
         given:
         ApplicationContext context = buildContext('''
-package mapperbinding;
+package mapperbinding
 
-import java.lang.annotation.*;
-import io.micronaut.aop.*;
-import jakarta.inject.*;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import io.micronaut.aop.InterceptorBean
+import io.micronaut.aop.Interceptor
+import io.micronaut.aop.InvocationContext
+import jakarta.inject.Singleton
 
 @Singleton
-class MyBean {
+open class MyBean {
+
     @TestAnn
-    void test() {
-
-    }
-
-}
-
-@Retention(RUNTIME)
-@Target({ElementType.METHOD, ElementType.TYPE})
-@interface TestAnn {
-}
-
-@InterceptorBean(TestAnn.class)
-class TestInterceptor implements Interceptor {
-    boolean invoked = false;
-    @Override
-    public Object intercept(InvocationContext context) {
-        invoked = true;
-        return context.proceed();
+    open fun test() {
     }
 }
+
+@Retention
+@Target(AnnotationTarget.FUNCTION, AnnotationTarget.ANNOTATION_CLASS)
+annotation class TestAnn
+
+
+@InterceptorBean(TestAnn::class)
+class TestInterceptor: Interceptor<Any, Any> {
+    var invoked = false
+    
+    override fun intercept(context: InvocationContext<Any, Any>): Any? {
+        invoked = true
+        return context.proceed()
+    }
+} 
 
 ''')
-        def instance = getBean(context, 'mapperbinding.MyBean')
-        def interceptor = getBean(context, 'mapperbinding.TestInterceptor')
+        def instance = getBean(context,'mapperbinding.MyBean')
+        def interceptor = getBean(context,'mapperbinding.TestInterceptor')
 
         when:
         instance.test()
@@ -122,60 +120,55 @@ class TestInterceptor implements Interceptor {
         then:"the interceptor was invoked"
         instance instanceof Intercepted
         interceptor.invoked
-
     }
 
     void 'test apply interceptor binder with annotation mapper - plus members'() {
         given:
         ApplicationContext context = buildContext('''
-package mapperbindingmembers;
+package mapperbindingmembers
 
-import java.lang.annotation.*;
-import io.micronaut.aop.*;
-import jakarta.inject.*;
-import jakarta.inject.Singleton;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import io.micronaut.aop.InterceptorBean
+import io.micronaut.aop.Interceptor
+import io.micronaut.aop.InvocationContext
+import jakarta.inject.Singleton
 
 @Singleton
-class MyBean {
+open class MyBean {
     @TestAnn(num=1)
-    void test() {
+    open fun test() {
     }
 }
 
-@Retention(RUNTIME)
-@Target({ElementType.ANNOTATION_TYPE})
-@interface MyInterceptorBinding {
-}
+@Retention
+@Target(AnnotationTarget.ANNOTATION_CLASS)
+annotation class MyInterceptorBinding
 
-@Retention(RUNTIME)
-@Target({ElementType.METHOD, ElementType.TYPE})
+@Retention
+@Target(AnnotationTarget.FUNCTION, AnnotationTarget.CLASS)
 @MyInterceptorBinding
-@interface TestAnn {
-    int num();
-}
+annotation class TestAnn(val num: Int)
 
 @Singleton
 @TestAnn(num=1)
-class TestInterceptor implements Interceptor {
-    boolean invoked = false;
-    @Override
-    public Object intercept(InvocationContext context) {
-        invoked = true;
-        return context.proceed();
+class TestInterceptor: Interceptor<Any, Any> {
+    var invoked = false
+    
+    override fun intercept(context: InvocationContext<Any, Any>): Any? {
+        invoked = true
+        return context.proceed()
     }
-}
+} 
 
 @Singleton
 @TestAnn(num=2)
-class TestInterceptor2 implements Interceptor {
-    boolean invoked = false;
-    @Override
-    public Object intercept(InvocationContext context) {
-        invoked = true;
-        return context.proceed();
+class TestInterceptor2: Interceptor<Any, Any> {
+    var invoked = false
+    
+    override fun intercept(context: InvocationContext<Any, Any>): Any? {
+        invoked = true
+        return context.proceed()
     }
-}
+} 
 
 ''')
         def instance = getBean(context, 'mapperbindingmembers.MyBean')
@@ -189,64 +182,59 @@ class TestInterceptor2 implements Interceptor {
         instance instanceof Intercepted
         interceptor.invoked
         !interceptor2.invoked
-
     }
 
     void 'test method level interceptor matching'() {
         given:
         ApplicationContext context = buildContext('''
-package annbinding2;
+package annbinding2
 
-import java.lang.annotation.*;
-import io.micronaut.aop.*;
-import jakarta.inject.*;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-import io.micronaut.aop.simple.*;
+import io.micronaut.aop.*
+import jakarta.inject.Singleton
 
 @Singleton
-class MyBean {
+open class MyBean {
+
     @TestAnn
-    void test() {
+    open fun test() {
 
     }
 
     @TestAnn2
-    void test2() {
+    open fun test2() {
 
     }
 }
 
-@Retention(RUNTIME)
-@Target({ElementType.METHOD, ElementType.TYPE})
+@Retention
+@Target(AnnotationTarget.FUNCTION)
 @Around
-@interface TestAnn {
-}
+annotation class TestAnn
 
-@Retention(RUNTIME)
-@Target({ElementType.METHOD, ElementType.TYPE})
+@Retention
+@Target(AnnotationTarget.FUNCTION)
 @Around
-@interface TestAnn2 {
-}
+annotation class TestAnn2
 
-@InterceptorBean(TestAnn.class)
-class TestInterceptor implements Interceptor {
-    boolean invoked = false;
-    @Override
-    public Object intercept(InvocationContext context) {
-        invoked = true;
-        return context.proceed();
+@InterceptorBean(TestAnn::class)
+class TestInterceptor: Interceptor<Any, Any> {
+    var invoked = false
+    
+    override fun intercept(context: InvocationContext<Any, Any>): Any? {
+        invoked = true
+        return context.proceed()
     }
-}
+} 
 
-@InterceptorBean(TestAnn2.class)
-class AnotherInterceptor implements Interceptor {
-    boolean invoked = false;
-    @Override
-    public Object intercept(InvocationContext context) {
-        invoked = true;
-        return context.proceed();
+@InterceptorBean(TestAnn2::class)
+class AnotherInterceptor: Interceptor<Any, Any> {
+    var invoked = false
+    
+    override fun intercept(context: InvocationContext<Any, Any>): Any? {
+        invoked = true
+        return context.proceed()
     }
-}
+} 
 ''')
         def instance = getBean(context, 'annbinding2.MyBean')
         def interceptor = getBean(context, 'annbinding2.TestInterceptor')
@@ -266,11 +254,10 @@ class AnotherInterceptor implements Interceptor {
         then:
         anotherInterceptor.invoked
 
-
         cleanup:
         context.close()
     }
-
+/*
     void 'test annotation with just interceptor binding'() {
         given:
         ApplicationContext context = buildContext('''

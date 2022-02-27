@@ -431,7 +431,7 @@ class EntityProperties {
 """)
 
         when:
-        context.getBean(context.classLoader.loadClass("test.EntityProperties"))
+        getBean(context, "test.EntityProperties")
 
         then:
         noExceptionThrown()

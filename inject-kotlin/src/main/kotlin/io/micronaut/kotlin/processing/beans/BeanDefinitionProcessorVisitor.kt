@@ -243,6 +243,12 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
                             aopProxyWriter = createProxyWriter(methodElement, beanWriter!!)
                             visitConstructor(aopProxyWriter!!, classElement)
                         }
+                        if (hasAroundStereotype(methodElement)) {
+                            val interceptorTypeReferences = InterceptedMethodUtil
+                                    .resolveInterceptorBinding(methodElement, InterceptorKind.AROUND)
+                            aopProxyWriter!!.visitInterceptorBinding(*interceptorTypeReferences)
+                        }
+
                         aopProxyWriter!!.visitAroundMethod(
                             classElement,
                             methodElement

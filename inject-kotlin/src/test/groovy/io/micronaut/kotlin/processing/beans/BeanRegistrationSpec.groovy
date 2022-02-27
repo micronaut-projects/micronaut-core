@@ -46,7 +46,7 @@ class Foo1: Foo
 class Foo2: Foo
 ''')
 
-        def bean = context.getBean(context.classLoader.loadClass(className))
+        def bean = getBean(context, className)
 
         Collection<BeanRegistration> registrations = bean.registrations
         Collection<BeanRegistration> fieldRegistrations = bean.fieldRegistrations
