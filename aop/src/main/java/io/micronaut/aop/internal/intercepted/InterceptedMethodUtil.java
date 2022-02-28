@@ -36,8 +36,9 @@ import java.util.concurrent.Future;
  * @since 2.1.0
  */
 @Internal
-public class InterceptedMethodUtil {
-    private InterceptedMethodUtil() {}
+public final class InterceptedMethodUtil {
+    private InterceptedMethodUtil() {
+    }
 
     /**
      * Find possible {@link InterceptedMethod} implementation.
