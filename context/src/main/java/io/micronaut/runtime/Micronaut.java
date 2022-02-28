@@ -135,7 +135,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                         try {
                             countDownLatch.await();
                         } catch (InterruptedException e) {
-                            // ignore
+                            Thread.currentThread().interrupt();
                         }
                         if (LOG.isInfoEnabled()) {
                             LOG.info("Embedded Application shutting down");
