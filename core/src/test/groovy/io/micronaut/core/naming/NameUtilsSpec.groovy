@@ -143,6 +143,8 @@ class NameUtilsSpec extends Specification {
         "ABC"   | "ABC"
         "AB"    | "AB"
         "ABc"   | "aBc"
+        "S3abc" | "s3abc"
+        "S3a"   | "s3a"
     }
 
     void "test decapitalize returns same ref"() {
