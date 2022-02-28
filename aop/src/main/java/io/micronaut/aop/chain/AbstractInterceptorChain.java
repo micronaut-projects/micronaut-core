@@ -53,6 +53,11 @@ import java.util.stream.Collectors;
  */
 @Internal
 abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R> {
+    /**
+     * Used by subclasses!
+     */
+    protected static final Logger LOG = LoggerFactory.getLogger(InterceptorChain.class);
+
     protected final Interceptor<B, R>[] interceptors;
     protected final Object[] originalParameters;
     protected final int interceptorCount;
