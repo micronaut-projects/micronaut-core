@@ -89,7 +89,7 @@ public class ExecutorFactory {
         return executorConfiguration
                 .getThreadFactoryClass()
                 .flatMap(InstantiationUtils::tryInstantiate)
-                .map(tf -> (ThreadFactory) tf)
+                .map(ThreadFactory.class::cast)
                 .orElseGet(() -> {
                     if (beanLocator != null) {
                         if (executorConfiguration.getName() == null) {
