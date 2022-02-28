@@ -430,7 +430,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
             createIntroductionAdviceWriter()
         } else {
             val beanDefinitionWriter = BeanDefinitionWriter(classElement, configurationMetadataBuilder, visitorContext)
-            if (classElement.hasStereotype(AnnotationUtil.ANN_AROUND)) {
+            if (isAopProxyType) {
                 aopProxyWriter = createProxyWriter(classElement, beanDefinitionWriter)
                 visitConstructor(aopProxyWriter!!, classElement)
             }
