@@ -92,7 +92,7 @@ public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
                     );
                 case COMPLETION_STAGE:
                     return interceptedMethod.handleResult(
-                            CompletableFuture.supplyAsync(interceptedMethod::interceptResultAsCompletionStage, executorService).thenCompose(Function.identity())
+                            CompletableFuture.supplyAsync(() -> interceptedMethod.interceptResultAsCompletionStage(), executorService).thenCompose(Function.identity())
                     );
                 case SYNCHRONOUS:
                     ReturnType<Object> rt = context.getReturnType();
