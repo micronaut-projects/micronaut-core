@@ -27,6 +27,7 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.OffsetDateTime
 import java.time.OffsetTime
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -169,54 +170,40 @@ class DateTimeConversionSpec extends Specification {
 
     private static final String CLIENT_HEADER_TIMESTAMP = "Fri, 18 Feb 2022 10:42:06 GMT"
 
-    def "declarative client header works as expected"() {
+    def "declarative client header works as expected for #method timestamp"() {
         given:
-        def isoDateTime = ZonedDateTime.parse(CLIENT_HEADER_TIMESTAMP, DateTimeFormatter.RFC_1123_DATE_TIME).format(DateTimeFormatter.ISO_DATE_TIME)
-        def isoTime = ZonedDateTime.parse(CLIENT_HEADER_TIMESTAMP, DateTimeFormatter.RFC_1123_DATE_TIME).format(DateTimeFormatter.ISO_TIME)
-
-        def localDate = ZonedDateTime.parse(CLIENT_HEADER_TIMESTAMP, DateTimeFormatter.RFC_1123_DATE_TIME).format(DateTimeFormatter.ISO_LOCAL_DATE)
-        def localTime = ZonedDateTime.parse(CLIENT_HEADER_TIMESTAMP, DateTimeFormatter.RFC_1123_DATE_TIME).format(DateTimeFormatter.ISO_LOCAL_TIME)
-        def localDateTime = ZonedDateTime.parse(CLIENT_HEADER_TIMESTAMP, DateTimeFormatter.RFC_1123_DATE_TIME).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+        ZonedDateTime now = ZonedDateTime.now().withZoneSameInstant(ZoneId.of("America/New_York")).truncatedTo(ChronoUnit.SECONDS)
 
         expect:
-        dateClient.headerDate() == isoDateTime
-        dateClient.headerOffset() == isoDateTime
-        dateClient.headerOffsetTime() == isoTime
-        dateClient.headerZoned() == isoDateTime
-        dateClient.headerLocalDate() == localDate
-        dateClient.headerLocalTime() == localTime
-        dateClient.headerLocalDateTime() == localDateTime
-        dateClient.headerInstant() == isoDateTime
+        dateClient."header$method"(value(now)) == expected(now)
+
+        where:
+        method          | value                                           | expected
+        "Date"          | { ZonedDateTime v -> Date.from(v.toInstant()) } | { ZonedDateTime v -> v.withZoneSameInstant(ZoneOffset.UTC).toString() }
+        "Offset"        | { ZonedDateTime v -> v.toOffsetDateTime() }     | { ZonedDateTime v -> v.withZoneSameInstant(ZoneOffset.UTC).toString() }
+        "Zoned"         | { ZonedDateTime v -> v }                        | { ZonedDateTime v -> v.withZoneSameInstant(ZoneOffset.UTC).toString() }
+        "LocalDateTime" | { ZonedDateTime v -> v.toLocalDateTime() }      | { ZonedDateTime v -> v.toLocalDateTime().toString() }
+        "Instant"       | { ZonedDateTime v -> v.toInstant() }            | { ZonedDateTime v -> v.withZoneSameInstant(ZoneOffset.UTC).toString() }
     }
 
     @Requires(property = 'spec.name', value = 'DateTimeConversionSpec')
     @Client('/dates')
-    @Header(name = "X-Test", value = CLIENT_HEADER_TIMESTAMP)
     static interface DateClient {
 
         @Get('/header-date')
-        String headerDate()
+        String headerDate(@Header('X-Test') Date date)
 
         @Get('/header-offset')
-        String headerOffset()
-
-        @Get('/header-offsettime')
-        String headerOffsetTime()
+        String headerOffset(@Header('X-Test') OffsetDateTime date)
 
         @Get('/header-zoned')
-        String headerZoned()
-
-        @Get('/header-localdate')
-        String headerLocalDate()
-
-        @Get('/header-localtime')
-        String headerLocalTime()
+        String headerZoned(@Header('X-Test') ZonedDateTime date)
 
         @Get('/header-localdatetime')
-        String headerLocalDateTime()
+        String headerLocalDateTime(@Header('X-Test') LocalDateTime date)
 
         @Get('/header-instant')
-        String headerInstant()
+        String headerInstant(@Header('X-Test') Instant date)
     }
 
     @Controller("/dates")

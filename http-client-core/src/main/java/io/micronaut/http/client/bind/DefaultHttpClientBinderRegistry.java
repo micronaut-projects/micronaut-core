@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,6 +48,12 @@ import jakarta.inject.Singleton;
 import kotlin.coroutines.Continuation;
 
 import java.lang.annotation.Annotation;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -119,8 +125,47 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
                     .filter(StringUtils::isNotEmpty)
                     .orElse(NameUtils.hyphenate(context.getArgument().getName()));
 
-            conversionService.convert(value, String.class)
-                    .ifPresent(header -> request.getHeaders().set(headerName, header));
+            // Header dates must be in GMT
+            if (value instanceof Date) {
+                conversionService.convert(
+                                ((Date) value).toInstant().atZone(ZoneId.of("GMT")),
+                                String.class,
+                                context.withDefaultFormat(ConversionContext.RFC_1123_FORMAT)
+                        )
+                        .ifPresent(header -> request.getHeaders().set(headerName, header));
+            } else if (value instanceof ZonedDateTime) {
+                conversionService.convert(
+                                ((ZonedDateTime) value).withZoneSameInstant(ZoneId.of("GMT")),
+                                String.class,
+                                context.withDefaultFormat(ConversionContext.RFC_1123_FORMAT)
+                        )
+                        .ifPresent(header -> request.getHeaders().set(headerName, header));
+            } else if (value instanceof OffsetDateTime) {
+                conversionService.convert(
+                                ((OffsetDateTime) value).atZoneSameInstant(ZoneId.of("GMT")),
+                                String.class,
+                                context.withDefaultFormat(ConversionContext.RFC_1123_FORMAT)
+                        )
+                        .ifPresent(header -> request.getHeaders().set(headerName, header));
+            } else if (value instanceof LocalDateTime) {
+                conversionService.convert(
+                                ((LocalDateTime) value).atZone(ZoneId.of("GMT")),
+                                String.class,
+                                context.withDefaultFormat(ConversionContext.RFC_1123_FORMAT)
+                        )
+                        .ifPresent(header -> request.getHeaders().set(headerName, header));
+            } else if (value instanceof Instant) {
+                conversionService.convert(
+                                ((Instant) value).atZone(ZoneId.of("GMT")),
+                                String.class,
+                                context.withDefaultFormat(ConversionContext.RFC_1123_FORMAT)
+                        )
+                        .ifPresent(header -> request.getHeaders().set(headerName, header));
+            } else {
+                // Not a timestamp header
+                conversionService.convert(value, String.class, context)
+                        .ifPresent(header -> request.getHeaders().set(headerName, header));
+            }
         });
         byAnnotation.put(RequestAttribute.class, (context, uriContext, value, request) -> {
             AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
@@ -160,11 +205,12 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
 
         if (KOTLIN_COROUTINES_SUPPORTED) {
             //Clients should do nothing with the continuation
-            byType.put(Argument.of(Continuation.class).typeHashCode(),  (context, uriContext, value, request) -> { });
+            byType.put(Argument.of(Continuation.class).typeHashCode(), (context, uriContext, value, request) -> {
+            });
         }
 
         if (CollectionUtils.isNotEmpty(binders)) {
-            for (ClientRequestBinder binder: binders) {
+            for (ClientRequestBinder binder : binders) {
                 addBinder(binder);
             }
         }

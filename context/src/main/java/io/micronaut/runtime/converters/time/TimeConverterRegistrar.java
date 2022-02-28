@@ -186,6 +186,22 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                 temporalConverter
         );
 
+        // ZonedDateTime -> CharSequence
+        conversionService.addConverter(
+                ZonedDateTime.class,
+                CharSequence.class,
+                (object, targetType, context) -> {
+                    try {
+                        return Optional.of(resolveFormatter(context)
+                                .map(object::format)
+                                .orElseGet(object::toString));
+                    } catch (DateTimeParseException e) {
+                        context.reject(object, e);
+                        return Optional.empty();
+                    }
+                }
+        );
+
         // CharSequence -> LocalDate
         conversionService.addConverter(
             CharSequence.class,
