@@ -89,7 +89,7 @@ class BindingController {
 
     // tag::format1[]
     @Get("/date")
-    fun date(@Header date: ZonedDateTime): String {
+    fun rfcDate(@Header date: ZonedDateTime): String {
         // ...
         // end::format1[]
         return date.toString()
@@ -99,7 +99,7 @@ class BindingController {
 
     // tag::format2[]
     @Get("/dateFormat")
-    fun dateFormat(@Format("dd/MM/yyyy hh:mm:ss a z") @Header date: ZonedDateTime): String {
+    fun customDateFormat(@Format("dd/MM/yyyy hh:mm:ss a z") @Header date: ZonedDateTime): String {
         // ...
         // end::format2[]
         return date.toString()
