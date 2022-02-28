@@ -2185,7 +2185,7 @@ class Test {
 ''')
 
         then:
-            introspection.properties.size() == 2
+            introspection.beanProperties.size() == 2
     }
 
 }
