@@ -1,10 +1,8 @@
 package io.micronaut.kotlin.processing.visitor;
 
+import com.google.devtools.ksp.getVisibility
 import com.google.devtools.ksp.isOpen
-import com.google.devtools.ksp.symbol.KSDeclaration
-import com.google.devtools.ksp.symbol.KSModifierListOwner
-import com.google.devtools.ksp.symbol.KSNode
-import com.google.devtools.ksp.symbol.Modifier
+import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.AnnotationValueBuilder
@@ -28,24 +26,24 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
     }
 
     override fun isProtected(): Boolean {
-        return if (declaration is KSModifierListOwner) {
-            declaration.modifiers.contains(Modifier.PROTECTED)
+        return if (declaration is KSDeclaration) {
+            declaration.getVisibility() == Visibility.PROTECTED
         } else {
             false
         }
     }
 
     override fun isPublic(): Boolean {
-        return if (declaration is KSModifierListOwner) {
-            declaration.modifiers.isEmpty() || declaration.modifiers.contains(Modifier.PUBLIC)
+        return if (declaration is KSDeclaration) {
+            declaration.getVisibility() == Visibility.PUBLIC
         } else {
             false
         }
     }
 
     override fun isPrivate(): Boolean {
-        return if (declaration is KSModifierListOwner) {
-            declaration.modifiers.contains(Modifier.PRIVATE)
+        return if (declaration is KSDeclaration) {
+            declaration.getVisibility() == Visibility.PRIVATE
         } else {
             false
         }

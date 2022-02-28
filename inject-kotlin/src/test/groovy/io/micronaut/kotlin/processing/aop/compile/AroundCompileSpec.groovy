@@ -257,50 +257,48 @@ class AnotherInterceptor: Interceptor<Any, Any> {
         cleanup:
         context.close()
     }
-/*
+
     void 'test annotation with just interceptor binding'() {
         given:
         ApplicationContext context = buildContext('''
-package annbinding1;
+package annbinding1
 
-import java.lang.annotation.*;
-import io.micronaut.aop.*;
-import jakarta.inject.*;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import io.micronaut.aop.*
+import jakarta.inject.Singleton
 
 @Singleton
 @TestAnn
-class MyBean {
-    void test() {
+open class MyBean {
+
+    open fun test() {
     }
 }
 
-@Retention(RUNTIME)
-@Target({ElementType.METHOD, ElementType.TYPE})
+@Retention
+@Target(AnnotationTarget.CLASS)
 @InterceptorBinding
-@interface TestAnn {
-}
+annotation class TestAnn
 
 @Singleton
-@InterceptorBinding(TestAnn.class)
-class TestInterceptor implements Interceptor {
-    boolean invoked = false;
-    @Override
-    public Object intercept(InvocationContext context) {
-        invoked = true;
-        return context.proceed();
+@InterceptorBinding(TestAnn::class)
+class TestInterceptor: Interceptor<Any, Any> {
+    var invoked = false
+    
+    override fun intercept(context: InvocationContext<Any, Any>): Any? {
+        invoked = true
+        return context.proceed()
     }
-}
+} 
 
 @Singleton
-class AnotherInterceptor implements Interceptor {
-    boolean invoked = false;
-    @Override
-    public Object intercept(InvocationContext context) {
-        invoked = true;
-        return context.proceed();
+class AnotherInterceptor: Interceptor<Any, Any> {
+    var invoked = false
+    
+    override fun intercept(context: InvocationContext<Any, Any>): Any? {
+        invoked = true
+        return context.proceed()
     }
-}
+} 
 ''')
         def instance = getBean(context, 'annbinding1.MyBean')
         def interceptor = getBean(context, 'annbinding1.TestInterceptor')
@@ -315,7 +313,7 @@ class AnotherInterceptor implements Interceptor {
         cleanup:
         context.close()
     }
-
+/*
     void 'test multiple interceptor binding'() {
         given:
         ApplicationContext context = buildContext('''
