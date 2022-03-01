@@ -10,6 +10,7 @@ import io.micronaut.core.annotation.*
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.core.util.ArrayUtils
 import io.micronaut.core.util.StringUtils
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.configuration.ConfigurationMetadata
 import io.micronaut.inject.writer.BeanDefinitionVisitor
@@ -251,7 +252,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
 
                         aopProxyWriter!!.visitAroundMethod(
                             classElement,
-                            methodElement
+                            methodElement.withNewMetadata(AnnotationMetadataHierarchy(methodElement.declaringType.annotationMetadata, methodElement.annotationMetadata))
                         )
                     }
                 } else {
