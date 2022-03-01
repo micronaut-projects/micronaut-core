@@ -217,6 +217,15 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
             val isExecutable = isExecutable(methodElement) || hasAround
 
             if (isExecutable || (isDeclaredBean && hasConstraints)) {
+
+                if (methodElement.isPrivate) {
+                    if (methodElement.hasDeclaredStereotype(Executable::class.java) ||
+                        hasAroundStereotype(methodElement, true)) {
+                        visitorContext.fail("Method annotated as executable but is declared private. Change the method to be non-private in order for AOP advice to be applied.", methodElement)
+                        return
+                    }
+                }
+
                 val preprocess = methodElement.booleanValue(Executable::class.java, "processOnStartup").orElse(false)
                 if (preprocess) {
                     beanWriter!!.setRequiresMethodProcessing(true)
