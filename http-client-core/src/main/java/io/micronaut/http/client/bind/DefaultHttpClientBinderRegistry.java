@@ -46,6 +46,8 @@ import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import jakarta.inject.Singleton;
 import kotlin.coroutines.Continuation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.annotation.Annotation;
 import java.util.LinkedHashMap;
@@ -66,6 +68,8 @@ import static io.micronaut.core.util.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
 @Singleton
 @Internal
 public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry {
+
+    private static final Logger LOG = LoggerFactory.getLogger(HttpClientBinderRegistry.class);
 
     private final Map<Class<? extends Annotation>, ClientArgumentRequestBinder<?>> byAnnotation = new LinkedHashMap<>();
     private final Map<Integer, ClientArgumentRequestBinder<?>> byType = new LinkedHashMap<>();
@@ -217,6 +221,10 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
                 for (Class<?> superType : superTypes) {
                     byType.put(Argument.of(superType).typeHashCode(), typedRequestArgumentBinder);
                 }
+            }
+        } else {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("The client request binder {} was rejected because it does not implement {}, {}, or {}", binder.getClass().getName(), TypedClientArgumentRequestBinder.class.getName(), AnnotatedClientArgumentRequestBinder.class.getName(), AnnotatedClientRequestBinder.class.getName());
             }
         }
     }

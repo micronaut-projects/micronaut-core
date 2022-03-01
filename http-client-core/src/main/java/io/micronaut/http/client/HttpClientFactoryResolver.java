@@ -29,7 +29,7 @@ import java.util.ServiceLoader;
 @Internal
 final class HttpClientFactoryResolver {
 
-    private static HttpClientFactory factory;
+    private static volatile HttpClientFactory factory;
 
     static HttpClientFactory getFactory() {
         if (factory == null) {
