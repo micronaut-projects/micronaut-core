@@ -362,7 +362,11 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
     }
 
     override fun hasSimpleAnnotation(element: KSAnnotated, simpleName: String): Boolean {
-        return element.annotations.any {
+        val annotationMirrors: MutableList<KSAnnotation> = element.annotations.toMutableList()
+        if (element is KSPropertyDeclaration) {
+            annotationMirrors.addAll(element.getter!!.annotations)
+        }
+        return annotationMirrors.any {
             it.annotationType.resolve().declaration.simpleName.asString() == simpleName
         }
     }
