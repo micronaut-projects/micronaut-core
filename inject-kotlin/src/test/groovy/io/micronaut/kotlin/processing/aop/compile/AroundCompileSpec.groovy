@@ -521,49 +521,46 @@ class AnotherInterceptor: Interceptor<Any, Any> {
         context.close()
     }
 
-    /*
+
     void 'test annotation with just around'() {
         given:
         ApplicationContext context = buildContext('''
-package justaround;
+package justaround
 
-import java.lang.annotation.*;
-import io.micronaut.aop.*;
-import jakarta.inject.*;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import io.micronaut.aop.*
+import jakarta.inject.Singleton
 
 @Singleton
 @TestAnn
-class MyBean {
-    void test() {
+open class MyBean {
+    open fun test() {
     }
 }
 
-@Retention(RUNTIME)
-@Target({ElementType.METHOD, ElementType.TYPE})
+@Retention
+@Target(AnnotationTarget.CLASS)
 @Around
-@interface TestAnn {
-}
+annotation class TestAnn
 
-@InterceptorBean(TestAnn.class)
-class TestInterceptor implements Interceptor {
-    boolean invoked = false;
-    @Override
-    public Object intercept(InvocationContext context) {
-        invoked = true;
-        return context.proceed();
+@InterceptorBean(TestAnn::class)
+class TestInterceptor: Interceptor<Any, Any> {
+    var invoked = false
+    
+    override fun intercept(context: InvocationContext<Any, Any>): Any? {
+        invoked = true
+        return context.proceed()
     }
-}
+} 
 
 @Singleton
-class AnotherInterceptor implements Interceptor {
-    boolean invoked = false;
-    @Override
-    public Object intercept(InvocationContext context) {
-        invoked = true;
-        return context.proceed();
+class AnotherInterceptor: Interceptor<Any, Any> {
+    var invoked = false
+    
+    override fun intercept(context: InvocationContext<Any, Any>): Any? {
+        invoked = true
+        return context.proceed()
     }
-}
+} 
 ''')
         def instance = getBean(context, 'justaround.MyBean')
         def interceptor = getBean(context, 'justaround.TestInterceptor')
@@ -583,32 +580,29 @@ class AnotherInterceptor implements Interceptor {
     void 'test Around annotation on private method fails'() {
         when:
         buildContext('''
-package around.priv.method;
+package around.priv.method
 
-import java.lang.annotation.*;
-import io.micronaut.aop.*;
-import jakarta.inject.*;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import io.micronaut.aop.*
+import jakarta.inject.Singleton
 
 @Singleton
-class MyBean {
+open class MyBean {
     @TestAnn
-    private void test() {
+    private fun test() {
     }
 }
 
-@Retention(RUNTIME)
-@Target({ElementType.METHOD, ElementType.TYPE})
+@Retention
+@Target(AnnotationTarget.FUNCTION)
 @Around
-@interface TestAnn {
-}
+annotation class TestAnn
 ''')
 
         then:
         Throwable t = thrown()
         t.message.contains 'Method annotated as executable but is declared private'
     }
-
+/*
     void 'test byte[] return compile'() {
         given:
         ApplicationContext context = buildContext('''
