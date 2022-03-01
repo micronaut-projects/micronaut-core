@@ -59,6 +59,7 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.socket.SocketChannel;
@@ -635,6 +636,17 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
     }
 
+    private HttpPipelineBuilder createPipelineBuilder() {
+        return new HttpPipelineBuilder(NettyHttpServer.this, nettyEmbeddedServices, sslConfiguration, routingHandler, hostResolver);
+    }
+
+    @Internal
+    public EmbeddedChannel buildEmbeddedChannel(boolean ssl) {
+        EmbeddedChannel embeddedChannel = new EmbeddedChannel();
+        createPipelineBuilder().new ConnectionPipeline(embeddedChannel, ssl).initChannel();
+        return embeddedChannel;
+    }
+
     static Predicate<String> inclusionPredicate(NettyHttpServerConfiguration.AccessLogger config) {
         List<String> exclusions = config.getExclusions();
         if (CollectionUtils.isEmpty(exclusions)) {
@@ -657,26 +669,14 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
 
         void initHttpCoders() {
-            httpPipelineBuilder = new HttpPipelineBuilder(NettyHttpServer.this, nettyEmbeddedServices, sslConfiguration, routingHandler, hostResolver);
+            httpPipelineBuilder = createPipelineBuilder();
         }
 
         @Override
         protected void initChannel(SocketChannel ch) {
             int port = ch.localAddress().getPort();
             boolean ssl = httpPipelineBuilder.supportsSsl() && sslConfiguration != null && port == serverPort;
-            HttpPipelineBuilder.ConnectionPipeline pipelineBuilder = httpPipelineBuilder.new ConnectionPipeline(ch, ssl);
-
-            pipelineBuilder.insertOuterTcpHandlers();
-
-            if (serverConfiguration.getHttpVersion() != io.micronaut.http.HttpVersion.HTTP_2_0) {
-                pipelineBuilder.configureForHttp1();
-            } else {
-                if (ssl) {
-                    pipelineBuilder.configureForAlpn();
-                } else {
-                    pipelineBuilder.configureForH2cSupport();
-                }
-            }
+            httpPipelineBuilder.new ConnectionPipeline(ch, ssl).initChannel();
         }
     }
 }

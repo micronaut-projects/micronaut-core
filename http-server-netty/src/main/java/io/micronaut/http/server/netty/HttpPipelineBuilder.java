@@ -193,6 +193,20 @@ final class HttpPipelineBuilder {
             return s;
         }
 
+        void initChannel() {
+            insertOuterTcpHandlers();
+
+            if (server.getServerConfiguration().getHttpVersion() != io.micronaut.http.HttpVersion.HTTP_2_0) {
+                configureForHttp1();
+            } else {
+                if (ssl) {
+                    configureForAlpn();
+                } else {
+                    configureForH2cSupport();
+                }
+            }
+        }
+
         /**
          * Insert handlers that wrap the outermost TCP stream. This is SSL and potentially packet capture.
          */

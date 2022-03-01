@@ -469,7 +469,9 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
                 if (state == BUFFERING) {
                     state = DEMANDING;
                 } // otherwise we're draining
-                requestDemand();
+                if (!completed.get()) {
+                    requestDemand();
+                }
             } else if (state == BUFFERING) {
                 state = IDLE;
             }
