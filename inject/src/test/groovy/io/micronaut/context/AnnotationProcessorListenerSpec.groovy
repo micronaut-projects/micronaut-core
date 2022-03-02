@@ -38,7 +38,7 @@ class AnnotationProcessorListenerSpec extends Specification {
         when: 'the bean context is closed'
         context.close()
 
-        then: 'ExecutableMethodProcessor is closed before the task'
+        then: 'the ExecutableMethodProcessor is closed before the task'
         recorder.closeOrder == [processor, task]
     }
 

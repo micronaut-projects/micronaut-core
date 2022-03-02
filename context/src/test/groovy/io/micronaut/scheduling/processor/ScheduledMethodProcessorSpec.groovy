@@ -23,22 +23,24 @@ class ScheduledMethodProcessorSpec extends Specification {
         ApplicationContext context = ApplicationContext.run(
                 'spec.name': 'ScheduledMethodProcessorSpec',
         )
-
-        when:
         Recorder recorder = context.getBean(Recorder)
+        ScheduledMethodProcessor processor = context.getBean(ScheduledMethodProcessor)
+
+        when: 'the bean context is closed'
         context.close()
 
-        then:
-        recorder.closed.size() == 3     // two tasks, one processor
-        recorder.closed.first() instanceof ScheduledMethodProcessor
+        then: 'the ExecutableMethodProcessor is closed before the tasks'
+        recorder.closeOrder.size() == 3     // two tasks, one processor
+        recorder.closeOrder.first() == processor
     }
 
     @Singleton
     @Requires(property = 'spec.name', value = 'ScheduledMethodProcessorSpec')
     static class Recorder {
-        List closed = []
+        List closeOrder = []
+
         void closed(Object instance) {
-            closed << instance
+            closeOrder << instance
         }
     }
 
@@ -49,9 +51,9 @@ class ScheduledMethodProcessorSpec extends Specification {
         private int count = 0
 
         // Inject some needless beans to inflate the bean's required component count. This affects the initial ordering
-        // of beans in DefaultBeanContext.topologicalSort such that, without considering of runtime required components,
-        // the task typically would be closed before the ScheduledMethodProcessor. When runtime required components are
-        // considered, the ScheduledMethodProcessor will be closed (appropriately) before the task.
+        // of beans in DefaultBeanContext.topologicalSort such that, without considering the runtime required components,
+        // the task typically would be closed before the ExecutableMethodProcessor. When runtime required components are
+        // considered, the ExecutableMethodProcessor will be closed (appropriately) before the task.
         AlphaTask(Recorder recorder,
                   BeanContext beanContext,
                   BeanResolutionContext beanResolutionContext,
@@ -83,9 +85,9 @@ class ScheduledMethodProcessorSpec extends Specification {
         private Recorder recorder
         private int count = 0
 
-        // Contrary to AlphaTask above, this would likely be closed before the ScheduledMethodProcessor even without
-        // tracking runtime required components. Keeping it here to ensure behavior remains the same even after the
-        // changes needed to support the case below.
+        // Contrary to AlphaTask above, this bean would likely be closed before the ExecutableMethodProcessor even
+        // without tracking runtime required components. Keeping it here to ensure behavior remains the same even after
+        // the changes needed to support the case above.
         BetaTask(Recorder recorder) {
             this.recorder = recorder
         }
