@@ -96,16 +96,6 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
         return this.genericType;
     }
 
-    @Override
-    public boolean isArray() {
-        return getType().isArray();
-    }
-
-    @Override
-    public int getArrayDimensions() {
-        return getType().getArrayDimensions();
-    }
-
     @NonNull
     @Override
     public ClassElement getType() {

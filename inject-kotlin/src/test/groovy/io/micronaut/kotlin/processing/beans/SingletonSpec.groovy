@@ -14,7 +14,7 @@ class SingletonSpec extends Specification {
         def context = buildContext("""
 package test
 
- import jakarta.inject.Singleton
+import jakarta.inject.Singleton
 
 @Singleton
 class Test

@@ -9,9 +9,6 @@ import io.micronaut.core.annotation.AnnotationValueBuilder
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.util.ArgumentUtils
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata
-import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.MemberElement
 import java.util.function.Consumer
@@ -60,6 +57,14 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
     override fun isAbstract(): Boolean {
         return if (declaration is KSModifierListOwner) {
             declaration.modifiers.contains(Modifier.ABSTRACT)
+        } else {
+            false
+        }
+    }
+
+    override fun isPackagePrivate(): Boolean {
+        return if (declaration is KSModifierListOwner) {
+            declaration.modifiers.contains(Modifier.INTERNAL)
         } else {
             false
         }

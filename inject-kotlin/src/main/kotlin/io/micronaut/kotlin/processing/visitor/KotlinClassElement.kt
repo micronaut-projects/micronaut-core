@@ -158,6 +158,7 @@ open class KotlinClassElement(val classType: KSType,
     override fun getAllTypeArguments(): Map<String, Map<String, ClassElement>> {
         val allTypeArguments = mutableMapOf<String, Map<String, ClassElement>>()
         val resolvedArguments = mutableMapOf<String, ClassElement>()
+        populateTypeArguments(allTypeArguments, resolvedArguments, this)
         var superType = this.superType.orElse(null)
         while (superType != null) {
             populateTypeArguments(allTypeArguments, resolvedArguments, superType)
@@ -166,7 +167,6 @@ open class KotlinClassElement(val classType: KSType,
             }
             superType = superType.superType.orElse(null)
         }
-        populateTypeArguments(allTypeArguments, resolvedArguments, this)
         interfaces.forEach {
             populateTypeArguments(allTypeArguments, resolvedArguments, it)
         }

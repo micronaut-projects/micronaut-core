@@ -20,6 +20,8 @@ class KotlinGenericPlaceholderElement(
 
     override fun isAssignable(type: String?): Boolean = false
 
+    override fun isArray(): Boolean = arrayDimensions > 0
+
     override fun getArrayDimensions(): Int = arrayDimensions
 
     override fun withArrayDimensions(arrayDimensions: Int): ClassElement {

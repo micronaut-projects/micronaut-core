@@ -60,7 +60,7 @@ public interface TypedElement extends Element {
      * @return True if it is.
      */
     default boolean isArray() {
-        return getArrayDimensions() != 0;
+        return getType().isArray();
     }
 
     /**
@@ -69,6 +69,6 @@ public interface TypedElement extends Element {
      * @return The number of dimensions
      */
     default int getArrayDimensions() {
-        return 0;
+        return getType().getArrayDimensions();
     }
 }

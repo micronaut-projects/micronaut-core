@@ -6,13 +6,9 @@ import io.micronaut.aop.InterceptorKind
 import io.micronaut.kotlin.processing.aop.simple.Mutating
 import io.micronaut.kotlin.processing.aop.simple.TestBinding
 import io.micronaut.context.ApplicationContext
-import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
-import io.micronaut.inject.annotation.NamedAnnotationMapper
-import io.micronaut.inject.annotation.NamedAnnotationTransformer
-import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Issue
 import spock.lang.PendingFeature
@@ -602,23 +598,25 @@ annotation class TestAnn
         Throwable t = thrown()
         t.message.contains 'Method annotated as executable but is declared private'
     }
-/*
+
     void 'test byte[] return compile'() {
         given:
         ApplicationContext context = buildContext('''
-package test;
+package test
 
-import io.micronaut.aop.proxytarget.*;
+import io.micronaut.kotlin.processing.aop.simple.Mutating
 
 @jakarta.inject.Singleton
 @Mutating("someVal")
-class MyBean {
-    byte[] test(byte[] someVal) {
-        return null;
-    };
+open class MyBean {
+
+    open fun test(someVal: ByteArray): ByteArray? {
+        return null
+    }
 }
 ''')
         def instance = getBean(context, 'test.MyBean')
+
         expect:
         instance != null
 
@@ -629,28 +627,28 @@ class MyBean {
     void 'compile simple AOP advice'() {
         given:
         BeanDefinition beanDefinition = buildInterceptedBeanDefinition('test.MyBean', '''
-package test;
+package test
 
-import io.micronaut.aop.simple.*;
+import io.micronaut.kotlin.processing.aop.simple.*
 
 @jakarta.inject.Singleton
 @Mutating("someVal")
 @TestBinding
-class MyBean {
-    void test() {};
+open class MyBean {
+    open fun test() {}
 }
 ''')
 
         BeanDefinitionReference ref = buildInterceptedBeanDefinitionReference('test.MyBean', '''
-package test;
+package test
 
-import io.micronaut.aop.simple.*;
+import io.micronaut.kotlin.processing.aop.simple.*
 
 @jakarta.inject.Singleton
 @Mutating("someVal")
 @TestBinding
-class MyBean {
-    void test() {};
+open class MyBean {
+    open fun test() {}
 }
 ''')
 
@@ -675,55 +673,49 @@ class MyBean {
     void 'test multiple annotations on a single method'() {
         given:
         ApplicationContext context = buildContext('''
-package annbinding2;
+package annbinding2
 
-import java.lang.annotation.*;
-import io.micronaut.aop.*;
-import jakarta.inject.*;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-import io.micronaut.aop.simple.*;
+import io.micronaut.aop.*
+import jakarta.inject.Singleton
 
 @Singleton
-class MyBean {
+open class MyBean {
+
     @TestAnn
     @TestAnn2
-    void test() {
-
+    open fun test() {
     }
-
 }
 
-@Retention(RUNTIME)
-@Target({ElementType.METHOD, ElementType.TYPE})
+@Retention
+@Target(AnnotationTarget.FUNCTION)
 @Around
-@interface TestAnn {
-}
+annotation class TestAnn
 
-@Retention(RUNTIME)
-@Target({ElementType.METHOD, ElementType.TYPE})
+@Retention
+@Target(AnnotationTarget.FUNCTION)
 @Around
-@interface TestAnn2 {
-}
+annotation class TestAnn2
 
-@InterceptorBean(TestAnn.class)
-class TestInterceptor implements Interceptor {
-    boolean invoked = false;
-    @Override
-    public Object intercept(InvocationContext context) {
-        invoked = true;
-        return context.proceed();
+@InterceptorBean(TestAnn::class)
+class TestInterceptor: Interceptor<Any, Any> {
+    var invoked = false
+    
+    override fun intercept(context: InvocationContext<Any, Any>): Any? {
+        invoked = true
+        return context.proceed()
     }
-}
+} 
 
-@InterceptorBean(TestAnn2.class)
-class AnotherInterceptor implements Interceptor {
-    boolean invoked = false;
-    @Override
-    public Object intercept(InvocationContext context) {
-        invoked = true;
-        return context.proceed();
+@InterceptorBean(TestAnn2::class)
+class AnotherInterceptor: Interceptor<Any, Any> {
+    var invoked = false
+    
+    override fun intercept(context: InvocationContext<Any, Any>): Any? {
+        invoked = true
+        return context.proceed()
     }
-}
+} 
 ''')
         def instance = getBean(context, 'annbinding2.MyBean')
         def interceptor = getBean(context, 'annbinding2.TestInterceptor')
@@ -744,47 +736,40 @@ class AnotherInterceptor implements Interceptor {
     void 'test multiple annotations on an interceptor and method'() {
         given:
         ApplicationContext context = buildContext('''
-package annbinding2;
+package annbinding2
 
-import java.lang.annotation.*;
-import io.micronaut.aop.*;
-import jakarta.inject.*;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-import io.micronaut.aop.simple.*;
+import io.micronaut.aop.*
+import jakarta.inject.Singleton
 
 @Singleton
-class MyBean {
+open class MyBean {
 
     @TestAnn
     @TestAnn2
-    void test() {
+    open fun test() {
 
     }
-
 }
 
-@Retention(RUNTIME)
-@Target({ElementType.METHOD, ElementType.TYPE})
+@Retention
+@Target(AnnotationTarget.FUNCTION)
 @Around
-@interface TestAnn {
-}
+annotation class TestAnn
 
-@Retention(RUNTIME)
-@Target({ElementType.METHOD, ElementType.TYPE})
+@Retention
+@Target(AnnotationTarget.FUNCTION)
 @Around
-@interface TestAnn2 {
-}
+annotation class TestAnn2
 
-
-@InterceptorBean({ TestAnn.class, TestAnn2.class })
-class TestInterceptor implements Interceptor {
-    long count = 0;
-    @Override
-    public Object intercept(InvocationContext context) {
-        count++;
-        return context.proceed();
+@InterceptorBean(TestAnn::class, TestAnn2::class)
+class TestInterceptor: Interceptor<Any, Any> {
+    var count = 0
+    
+    override fun intercept(context: InvocationContext<Any, Any>): Any? {
+        count++
+        return context.proceed()
     }
-}
+} 
 ''')
         def instance = getBean(context, 'annbinding2.MyBean')
         def interceptor = getBean(context, 'annbinding2.TestInterceptor')
@@ -802,51 +787,42 @@ class TestInterceptor implements Interceptor {
     void 'test multiple annotations on an interceptor'() {
         given:
         ApplicationContext context = buildContext('''
-package annbinding2;
+package annbinding2
 
-import java.lang.annotation.*;
-import io.micronaut.aop.*;
-import jakarta.inject.*;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-import io.micronaut.aop.simple.*;
+import io.micronaut.aop.*
+import jakarta.inject.Singleton
 
 @Singleton
-class MyBean {
+open class MyBean {
 
     @TestAnn
-    void test() {
-
+    open fun test() {
     }
 
     @TestAnn2
-    void test2() {
-
-    }
-
-}
-
-@Retention(RUNTIME)
-@Target({ElementType.METHOD, ElementType.TYPE})
-@Around
-@interface TestAnn {
-}
-
-@Retention(RUNTIME)
-@Target({ElementType.METHOD, ElementType.TYPE})
-@Around
-@interface TestAnn2 {
-}
-
-
-@InterceptorBean({ TestAnn.class, TestAnn2.class })
-class TestInterceptor implements Interceptor {
-    long count = 0;
-    @Override
-    public Object intercept(InvocationContext context) {
-        count++;
-        return context.proceed();
+    open fun test2() {
     }
 }
+
+@Retention
+@Target(AnnotationTarget.FUNCTION)
+@Around
+annotation class TestAnn
+
+@Retention
+@Target(AnnotationTarget.FUNCTION)
+@Around
+annotation class TestAnn2
+
+@InterceptorBean(TestAnn::class, TestAnn2::class)
+class TestInterceptor: Interceptor<Any, Any> {
+    var count = 0
+    
+    override fun intercept(context: InvocationContext<Any, Any>): Any? {
+        count++
+        return context.proceed()
+    }
+} 
 ''')
         def instance = getBean(context, 'annbinding2.MyBean')
         def interceptor = getBean(context, 'annbinding2.TestInterceptor')
@@ -870,20 +846,19 @@ class TestInterceptor implements Interceptor {
     void "test validated on class with generics"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.$BaseEntityService' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, """
-package test;
+package test
 
 @io.micronaut.validation.Validated
-class BaseEntityService<T extends BaseEntity> extends BaseService<T> {
+open class BaseEntityService<T: BaseEntity>: BaseService<T>()
+
+class BaseEntity
+
+abstract class BaseService<T>: IBeanValidator<T> {
+    override fun isValid(entity: T) = true
 }
 
-class BaseEntity {}
-abstract class BaseService<T> implements IBeanValidator<T> {
-    public boolean isValid(T entity) {
-        return true;
-    }
-}
 interface IBeanValidator<T> {
-    boolean isValid(T entity);
+    fun isValid(entity: T): Boolean
 }
 """)
 
@@ -891,6 +866,6 @@ interface IBeanValidator<T> {
         noExceptionThrown()
         beanDefinition != null
         beanDefinition.getTypeArguments('test.BaseService')[0].type.name == 'test.BaseEntity'
-    }*/
+    }
 
 }

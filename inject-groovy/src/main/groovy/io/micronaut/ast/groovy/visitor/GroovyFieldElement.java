@@ -106,16 +106,6 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     }
 
     @Override
-    public boolean isArray() {
-        return getType().isArray();
-    }
-
-    @Override
-    public int getArrayDimensions() {
-        return getType().getArrayDimensions();
-    }
-
-    @Override
     public String getName() {
         return fieldNode.getName();
     }

@@ -52,7 +52,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
                 annotationMetadata: AnnotationMetadata,
                 visitorContext: KotlinVisitorContext,
     ) : super(method, annotationMetadata, visitorContext) {
-        this.name = method.simpleName.asString()
+        this.name = visitorContext.resolver.getJvmName(method)!!
         this.declaringType = declaringType
         this.parameters = parameters
         this.returnType = returnType

@@ -47,6 +47,16 @@ final class ReflectWildcardElement extends ReflectTypeElement<WildcardType> impl
         throw new UnsupportedOperationException();
     }
 
+    @Override
+    public boolean isArray() {
+        return false;
+    }
+
+    @Override
+    public int getArrayDimensions() {
+        return 0;
+    }
+
     @NonNull
     @Override
     public List<? extends ClassElement> getUpperBounds() {

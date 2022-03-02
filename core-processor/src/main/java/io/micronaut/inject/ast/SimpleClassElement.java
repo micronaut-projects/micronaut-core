@@ -111,6 +111,16 @@ final class SimpleClassElement implements ClassElement {
         return false;
     }
 
+    @Override
+    public boolean isArray() {
+        return false;
+    }
+
+    @Override
+    public int getArrayDimensions() {
+        return 0;
+    }
+
     @NonNull
     @Override
     public Object getNativeType() {

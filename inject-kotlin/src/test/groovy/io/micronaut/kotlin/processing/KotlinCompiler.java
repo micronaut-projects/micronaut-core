@@ -13,6 +13,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
+import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
 import io.micronaut.kotlin.processing.beans.BeanDefinitionProcessorProvider;
 import io.micronaut.kotlin.processing.visitor.TypeElementSymbolProcessorProvider;
@@ -82,12 +83,28 @@ public class KotlinCompiler {
     }
 
     public static BeanDefinitionReference<?> buildBeanDefinitionReference(String name, @Language("kotlin") String clazz) throws InstantiationException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
-        final URLClassLoader classLoader = buildClassLoader(name, clazz);
-        String simpleName = NameUtils.getSimpleName(name);
-        String beanDefName = (simpleName.startsWith("$") ? "" : '$') + simpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX;
-        String packageName = NameUtils.getPackageName(name);
+        return loadReference(name, clazz, BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX);
+    }
+
+    public static BeanDefinition<?> buildInterceptedBeanDefinition(String className, @Language("kotlin") String cls) throws InstantiationException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        return loadReference(className, cls, BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX);
+    }
+
+    public static BeanDefinitionReference<?> buildInterceptedBeanDefinitionReference(String className, @Language("kotlin") String cls) throws InstantiationException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        return loadReference(className, cls, BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX);
+    }
+
+    private static <T> T loadReference(String className,
+                                       @Language("kotlin") String cls,
+                                       String suffix
+                                       ) throws InstantiationException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        String simpleName = NameUtils.getSimpleName(className);
+        String beanDefName= (simpleName.startsWith("$") ? "" : '$') + simpleName + suffix;
+        String packageName = NameUtils.getPackageName(className);
         String beanFullName = packageName + "." + beanDefName;
-        return (BeanDefinitionReference<?>) loadDefinition(classLoader, beanFullName);
+
+        ClassLoader classLoader = buildClassLoader(className, cls);
+        return (T) loadDefinition(classLoader, beanFullName);
     }
 
     public static ApplicationContext buildContext(@Language("kotlin") String clazz) {
