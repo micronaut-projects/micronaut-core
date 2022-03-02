@@ -148,6 +148,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private List<ByteBufHolder> receivedContent = new ArrayList<>();
     private Map<IdentityWrapper, HttpData> receivedData = new LinkedHashMap<>();
 
+    private T bodyUnwrapped;
     private Supplier<Optional<T>> body;
     private RouteMatch<?> matchedRoute;
     private boolean bodyRequired;
@@ -176,7 +177,11 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         this.serverConfiguration = serverConfiguration;
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
-        this.body = SupplierUtil.memoizedNonEmpty(() -> Optional.ofNullable((T) buildBody()));
+        this.body = SupplierUtil.memoizedNonEmpty(() -> {
+            T built = (T) buildBody();
+            this.bodyUnwrapped = built;
+            return Optional.ofNullable(built);
+        });
     }
 
     /**
@@ -325,8 +330,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             for (ByteBufHolder holder : receivedContent) {
                 ByteBuf content = holder.content();
                 if (content != null) {
-                    // need to retain content, because for addComponent "ownership of buffer is transferred to this CompositeByteBuf."
-                    byteBufs.addComponent(true, content.retain());
+                    byteBufs.addComponent(true, content);
                 }
             }
             return byteBufs;
@@ -366,8 +370,8 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         getBody().ifPresent(releaseIfNecessary);
         receivedContent.forEach(releaseIfNecessary);
         receivedData.values().forEach(releaseIfNecessary);
-        if (this.body instanceof ReferenceCounted) {
-            ReferenceCounted referenceCounted = (ReferenceCounted) this.body;
+        if (bodyUnwrapped instanceof ReferenceCounted) {
+            ReferenceCounted referenceCounted = (ReferenceCounted) bodyUnwrapped;
             releaseIfNecessary(referenceCounted);
         }
         if (attributes != null) {
@@ -398,6 +402,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     public void setBody(T body) {
+        this.bodyUnwrapped = body;
         this.body = () -> Optional.ofNullable(body);
         bodyConvertor.cleanup();
     }

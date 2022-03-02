@@ -25,7 +25,7 @@ import java.util.Locale;
  */
 public final class OperatingSystem {
 
-    private static OperatingSystem instance;
+    private static volatile OperatingSystem instance;
     private final Family family;
 
     private OperatingSystem(Family family) {

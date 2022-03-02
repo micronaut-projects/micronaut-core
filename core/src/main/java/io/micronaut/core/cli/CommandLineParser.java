@@ -163,7 +163,7 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
         arg = (arg.charAt(1) == '-' ? arg.substring(2, arg.length()) : arg.substring(1, arg.length())).trim();
 
         if (arg.contains("=")) {
-            String[] split = arg.split("=");
+            String[] split = arg.split("=", 2);
             String name = split[0].trim();
             validateOptionName(name);
             String value = split.length > 1 ? split[1].trim() : "";

@@ -49,10 +49,10 @@ class MessageUtils {
         String ls = CachedEnvironment.getProperty("line.separator");
         StringBuilder builder = new StringBuilder("Error instantiating bean of type  [");
         builder
-            .append(declaringType.getName())
-            .append("]")
-            .append(ls)
-            .append(ls);
+                .append(declaringType.getName())
+                .append("]")
+                .append(ls)
+                .append(ls);
 
         if (message != null) {
             builder.append("Message: ").append(message).append(ls);
@@ -93,12 +93,12 @@ class MessageUtils {
         StringBuilder builder = new StringBuilder("Failed to inject value for parameter [");
         String ls = CachedEnvironment.getProperty("line.separator");
         builder
-            .append(argument.getName()).append("] of method [")
-            .append(methodName)
-            .append("] of class: ")
-            .append(declaringType.getName())
-            .append(ls)
-            .append(ls);
+                .append(argument.getName()).append("] of method [")
+                .append(methodName)
+                .append("] of class: ")
+                .append(declaringType.getName())
+                .append(ls)
+                .append(ls);
 
         if (message != null) {
             builder.append("Message: ").append(message).append(ls);
@@ -121,10 +121,10 @@ class MessageUtils {
         StringBuilder builder = new StringBuilder("Failed to inject value for field [");
         String ls = CachedEnvironment.getProperty("line.separator");
         builder
-            .append(fieldName).append("] of class: ")
-            .append(declaringType.getName())
-            .append(ls)
-            .append(ls);
+                .append(fieldName).append("] of class: ")
+                .append(declaringType.getName())
+                .append(ls)
+                .append(ls);
 
         if (message != null) {
             builder.append("Message: ").append(message).append(ls);
@@ -147,10 +147,10 @@ class MessageUtils {
         String ls = CachedEnvironment.getProperty("line.separator");
         BeanResolutionContext.Path path = resolutionContext.getPath();
         builder
-            .append(argument.getName()).append("] of class: ")
-            .append(path.peek().getDeclaringType().getName())
-            .append(ls)
-            .append(ls);
+                .append(argument.getName()).append("] of class: ")
+                .append(path.peek().getDeclaringType().getName())
+                .append(ls)
+                .append(ls);
         if (message != null) {
             builder.append("Message: ").append(message).append(ls);
         }
