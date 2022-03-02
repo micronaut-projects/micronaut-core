@@ -108,16 +108,6 @@ class JavaPropertyElement extends AbstractJavaElement implements PropertyElement
     }
 
     @Override
-    public boolean isArray() {
-        return type.isArray();
-    }
-
-    @Override
-    public int getArrayDimensions() {
-        return type.getArrayDimensions();
-    }
-
-    @Override
     public String getName() {
         return this.name;
     }

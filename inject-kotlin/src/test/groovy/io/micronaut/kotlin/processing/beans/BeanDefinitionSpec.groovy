@@ -272,6 +272,7 @@ annotation class MyQualifier (
     val named: String = ""
 )
 ''')
+
         expect:
         definition.getDeclaredQualifier() == Qualifiers.byAnnotation(definition.getAnnotationMetadata(), "test.MyQualifier")
         definition.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).get() == "test.MyQualifier"

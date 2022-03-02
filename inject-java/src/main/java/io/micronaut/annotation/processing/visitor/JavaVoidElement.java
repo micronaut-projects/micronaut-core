@@ -59,6 +59,16 @@ final class JavaVoidElement implements ClassElement, AnnotationMetadataDelegate 
     }
 
     @Override
+    public boolean isArray() {
+        return false;
+    }
+
+    @Override
+    public int getArrayDimensions() {
+        return 0;
+    }
+
+    @Override
     public String getName() {
         return "void";
     }

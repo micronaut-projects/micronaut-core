@@ -1,8 +1,5 @@
 package io.micronaut.kotlin.processing.beans.factory.beanproperty
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.inject.qualifiers.Qualifiers
-import spock.lang.PendingFeature
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -10,7 +7,6 @@ import static io.micronaut.kotlin.processing.KotlinCompiler.*
 
 class FactoryBeanFieldSpec extends Specification {
 
-    @PendingFeature(reason = "AOP support")
     void "test fail compilation for AOP advice for primitive array type from field"() {
         when:
         buildBeanDefinition('primitive.fields.factory.errors.PrimitiveFactory',"""
@@ -36,7 +32,6 @@ class PrimitiveFactory {
         e.message.contains("Cannot apply AOP advice to arrays")
     }
 
-    @PendingFeature(reason = "AOP support")
     void "test fail compilation for AOP advice to primitive type from field"() {
         when:
         buildBeanDefinition('primitive.fields.factory.errors.PrimitiveFactory',"""

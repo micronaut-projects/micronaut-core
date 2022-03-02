@@ -54,16 +54,6 @@ class JavaParameterElement extends AbstractJavaElement implements ParameterEleme
     }
 
     @Override
-    public boolean isArray() {
-        return getType().isArray();
-    }
-
-    @Override
-    public int getArrayDimensions() {
-        return getType().getArrayDimensions();
-    }
-
-    @Override
     @NonNull
     public ClassElement getType() {
         if (typeElement == null) {

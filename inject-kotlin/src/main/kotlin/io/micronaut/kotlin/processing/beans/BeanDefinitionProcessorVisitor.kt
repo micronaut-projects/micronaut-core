@@ -231,7 +231,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
                     beanWriter!!.setRequiresMethodProcessing(true)
                 }
 
-                val isPublicMethodInProxyType = isAopProxyType && methodElement.isPublic
+                val isPublicMethodInProxyType = isAopProxyType && (methodElement.isPublic || methodElement.isPackagePrivate)
                 val hasAroundNotAbstractNotInterceptor = hasAround && !classElement.isAbstract && !classElement.isAssignable(Interceptor::class.java)
 
                 if (isPublicMethodInProxyType || hasAroundNotAbstractNotInterceptor) {
@@ -250,18 +250,23 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
                         return
                     } else {
                         if (aopProxyWriter == null) {
-                            aopProxyWriter = createProxyWriter(methodElement, beanWriter!!)
-                            visitConstructor(aopProxyWriter!!, classElement)
+                            createClassProxyWriter(beanWriter!!)
                         }
-                        if (hasAroundStereotype(methodElement)) {
+                        val aopMethod = if (isPublicMethodInProxyType && !hasAroundNotAbstractNotInterceptor) {
+                            methodElement.withNewMetadata(AnnotationMetadataHierarchy(methodElement.declaringType.annotationMetadata, methodElement.annotationMetadata))
+                        } else {
+                            methodElement
+                        }
+
+                        if (hasAroundStereotype(aopMethod)) {
                             val interceptorTypeReferences = InterceptedMethodUtil
-                                    .resolveInterceptorBinding(methodElement, InterceptorKind.AROUND)
+                                    .resolveInterceptorBinding(aopMethod, InterceptorKind.AROUND)
                             aopProxyWriter!!.visitInterceptorBinding(*interceptorTypeReferences)
                         }
 
                         aopProxyWriter!!.visitAroundMethod(
                             classElement,
-                            methodElement.withNewMetadata(AnnotationMetadataHierarchy(methodElement.declaringType.annotationMetadata, methodElement.annotationMetadata))
+                            aopMethod
                         )
                     }
                 } else {
@@ -379,7 +384,33 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
             propertyElement.readMethod.get()
         )
         handlePreDestroy(propertyElement, propertyElement.genericType, beanDefinitionWriter)
+        if (hasAroundStereotype(propertyElement)) {
+            handleFactoryPropertyAroundAdvice(propertyElement)
+        } else if (propertyElement.hasStereotype(Executable::class.java)) {
+            handleFactoryPropertyExecutable(propertyElement)
+        }
         beanDefinitionWriters.add(beanDefinitionWriter)
+    }
+
+    private fun handleFactoryPropertyAroundAdvice(propertyElement: PropertyElement) {
+        if (propertyElement.isPrimitive) {
+            visitorContext.fail("Cannot apply AOP advice to primitive beans", propertyElement)
+            return
+        } else if (propertyElement.isArray) {
+            visitorContext.fail("Cannot apply AOP advice to arrays", propertyElement)
+            return
+        }
+    }
+
+    private fun handleFactoryPropertyExecutable(propertyElement: PropertyElement) {
+        if (propertyElement.isPrimitive) {
+            visitorContext.fail("Using '@Executable' is not allowed on primitive type beans", propertyElement)
+            return
+        }
+        if (propertyElement.isArray) {
+            visitorContext.fail("Using '@Executable' is not allowed on array type beans", propertyElement)
+            return
+        }
     }
 
     private fun handlePreDestroy(element: Element, producedType: ClassElement, beanDefinitionWriter: BeanDefinitionWriter) {
@@ -441,8 +472,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         } else {
             val beanDefinitionWriter = BeanDefinitionWriter(classElement, configurationMetadataBuilder, visitorContext)
             if (isAopProxyType) {
-                aopProxyWriter = createProxyWriter(classElement, beanDefinitionWriter)
-                visitConstructor(aopProxyWriter!!, classElement)
+                createClassProxyWriter(beanDefinitionWriter)
             }
             beanDefinitionWriter
         }
@@ -509,11 +539,23 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         )
         aopProxyWriter.visitTypeArguments(classElement.allTypeArguments)
 
+        if (classElement.isAbstract) {
+            KotlinIntroductionInterfaceVisitor(classElement, classElement, aopProxyWriter).visit()
+        }
         for (interfaceType in interfaceTypes) {
             KotlinIntroductionInterfaceVisitor(interfaceType, classElement, aopProxyWriter).visit()
         }
 
         return aopProxyWriter
+    }
+
+    private fun createClassProxyWriter(beanDefinitionVisitor: BeanDefinitionVisitor) {
+        if (classElement.isFinal) {
+            visitorContext.fail("Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + classElement.name, classElement);
+            return
+        }
+        aopProxyWriter = createProxyWriter(classElement, beanDefinitionVisitor)
+        visitConstructor(aopProxyWriter!!, classElement)
     }
 
     private fun createProxyWriter(annotationMetadata: AnnotationMetadata,

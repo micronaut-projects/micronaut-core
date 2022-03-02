@@ -315,6 +315,10 @@ public interface ClassElement extends TypedElement {
         return false;
     }
 
+    boolean isArray();
+
+    int getArrayDimensions();
+
     /**
      * The list of type arguments bound to this type, or an empty list if there are no type arguments or this is a raw
      * type.

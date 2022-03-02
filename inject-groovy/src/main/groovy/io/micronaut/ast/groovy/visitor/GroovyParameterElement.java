@@ -56,16 +56,6 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
         this.methodElement = methodElement;
     }
 
-    @Override
-    public boolean isArray() {
-        return getType().isArray();
-    }
-
-    @Override
-    public int getArrayDimensions() {
-        return getType().getArrayDimensions();
-    }
-
     @Nullable
     @Override
     public ClassElement getGenericType() {
