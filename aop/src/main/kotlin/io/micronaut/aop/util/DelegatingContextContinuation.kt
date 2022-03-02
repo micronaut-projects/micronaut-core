@@ -17,7 +17,6 @@ package io.micronaut.aop.util
 
 import io.micronaut.core.annotation.Experimental
 import io.micronaut.core.annotation.Internal
-import java.util.concurrent.CompletableFuture
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.jvm.internal.CoroutineStackFrame
