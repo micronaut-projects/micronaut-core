@@ -16,6 +16,8 @@
 package io.micronaut.core.reflect;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.exception.InvocationException;
@@ -406,5 +408,24 @@ public class ReflectionUtils {
         String argsAsText = stringStream.collect(Collectors.joining(","));
 
         return new NoSuchMethodError("Micronaut constructor " + declaringType.getName() + "(" + argsAsText + ") not found. Most likely reason for this issue is that you are running a newer version of Micronaut with code compiled against an older version. Please recompile the offending classes");
+    }
+
+    /**
+     * Sets the value of the given field reflectively.
+     * @param field The field
+     * @param instance The instance
+     * @param value The value
+     */
+    public static void setField(
+            @NonNull Field field,
+            @NonNull Object instance,
+            @Nullable Object value) {
+        try {
+            ClassUtils.REFLECTION_LOGGER.debug("Reflectively setting field {} to value {} on object {}", field, value, value);
+            field.setAccessible(true);
+            field.set(instance, value);
+        } catch (Throwable e) {
+            throw new InvocationException("Exception occurred setting field [" + field + "]: " + e.getMessage(), e);
+        }
     }
 }
