@@ -84,4 +84,30 @@ class Key {
             idWithMapped.getDeclaredAnnotationNames() == idWithoutMapped.getDeclaredAnnotationNames()
     }
 
+    void "test @NonNull stereotype from @Nullable"() {
+        when:
+        def pojo = buildBeanIntrospection('test.Pojo', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.annotation.mapping.NonNullStereotyped;
+
+@Introspected
+public final class Pojo {
+    @NonNullStereotyped
+    private final String surname;
+
+    public Pojo(String surname) {
+        this.surname = surname;
+    }
+
+    public String getSurname() {
+        return this.surname;
+    }
+}
+''')
+        then:
+        !pojo.getProperty("surname").get().isNonNull()
+    }
+
 }

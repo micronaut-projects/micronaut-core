@@ -1430,6 +1430,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             interceptorBindings.getLast().members(data);
             return;
         }
+        // special case: don't add stereotype for @Nonnull when it's marked as UNKNOWN/MAYBE/NEVER.
+        // https://github.com/micronaut-projects/micronaut-core/issues/6795
+        if (annotationName.equals("javax.annotation.Nonnull")) {
+            String when = Objects.toString(data.get("when"));
+            if (when.equals("UNKNOWN") || when.equals("MAYBE") || when.equals("NEVER")) {
+                return;
+            }
+        }
         if (hasInterceptorBinding && Type.class.getName().equals(annotationName)) {
             final Object o = data.get(AnnotationMetadata.VALUE_MEMBER);
             AnnotationClassValue<?> interceptorType = null;
