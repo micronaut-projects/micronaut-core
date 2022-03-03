@@ -45,7 +45,7 @@ public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
 
     public static final String CONFIGURATION_QUALIFIER = "json-stream";
 
-    private final List<MediaType> additionalTypes;
+    private final List<MediaType> streamAdditionalTypes;
 
     /**
      * @param jsonMapper                To read/write JSON
@@ -57,9 +57,9 @@ public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
                                     @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
         super(jsonMapper, applicationConfiguration, null);
         if (codecConfiguration != null) {
-            this.additionalTypes = codecConfiguration.getAdditionalTypes();
+            this.streamAdditionalTypes = codecConfiguration.getAdditionalTypes();
         } else {
-            this.additionalTypes = Collections.emptyList();
+            this.streamAdditionalTypes = Collections.emptyList();
         }
     }
 
@@ -74,9 +74,9 @@ public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
                                     @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
         super(jsonCodec, applicationConfiguration, null);
         if (codecConfiguration != null) {
-            this.additionalTypes = codecConfiguration.getAdditionalTypes();
+            this.streamAdditionalTypes = codecConfiguration.getAdditionalTypes();
         } else {
-            this.additionalTypes = Collections.emptyList();
+            this.streamAdditionalTypes = Collections.emptyList();
         }
     }
 
@@ -84,7 +84,7 @@ public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
     public Collection<MediaType> getMediaTypes() {
         List<MediaType> mediaTypes = new ArrayList<>();
         mediaTypes.add(MediaType.APPLICATION_JSON_STREAM_TYPE);
-        mediaTypes.addAll(additionalTypes);
+        mediaTypes.addAll(streamAdditionalTypes);
         return mediaTypes;
     }
 

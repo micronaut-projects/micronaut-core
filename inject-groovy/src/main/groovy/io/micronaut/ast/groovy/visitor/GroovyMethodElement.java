@@ -30,7 +30,6 @@ import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
-import org.codehaus.groovy.control.SourceUnit;
 
 import io.micronaut.core.annotation.NonNull;
 
@@ -46,7 +45,6 @@ import java.util.stream.Collectors;
  */
 public class GroovyMethodElement extends AbstractGroovyElement implements MethodElement {
 
-    private final SourceUnit sourceUnit;
     private final MethodNode methodNode;
     private final GroovyClassElement declaringClass;
     private Map<String, ClassNode> genericsSpec = null;
@@ -62,7 +60,6 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     GroovyMethodElement(GroovyClassElement declaringClass, GroovyVisitorContext visitorContext, MethodNode methodNode, AnnotationMetadata annotationMetadata) {
         super(visitorContext, methodNode, annotationMetadata);
         this.methodNode = methodNode;
-        this.sourceUnit = visitorContext.getSourceUnit();
         this.declaringClass = declaringClass;
     }
 

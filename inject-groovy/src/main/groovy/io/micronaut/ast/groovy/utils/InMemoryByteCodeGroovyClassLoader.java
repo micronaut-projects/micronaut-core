@@ -113,7 +113,9 @@ public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
             protected URLConnection openConnection(URL u) {
                 return new URLConnection(u) {
                     @Override
-                    public void connect() { }
+                    public void connect() {
+                        // only implement getInputStream
+                    }
 
                     @Override
                     public InputStream getInputStream() {
