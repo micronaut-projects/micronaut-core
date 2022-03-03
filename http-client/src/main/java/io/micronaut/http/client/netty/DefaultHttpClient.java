@@ -218,7 +218,10 @@ public class DefaultHttpClient implements
         Closeable,
         AutoCloseable {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
+    /**
+     * Default logger, use {@link #log} where possible.
+     */
+    private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
     private static final AttributeKey<Http2Stream> STREAM_KEY = AttributeKey.valueOf("micronaut.http2.stream");
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
@@ -434,7 +437,7 @@ public class DefaultHttpClient implements
             }
         }
         this.mediaTypeCodecRegistry = codecRegistry;
-        this.log = configuration.getLoggerName().map(LoggerFactory::getLogger).orElse(LOG);
+        this.log = configuration.getLoggerName().map(LoggerFactory::getLogger).orElse(DEFAULT_LOG);
         this.filterResolver = filterResolver;
         if (clientFilterEntries != null) {
             this.clientFilterEntries = clientFilterEntries;
@@ -2360,8 +2363,8 @@ public class DefaultHttpClient implements
                             if (!emitter.isCancelled()) {
                                 emitter.error(e);
                             }
-                        } else if (LOG.isWarnEnabled()) {
-                            LOG.warn("Unsupported http status after handler completed: " + e.getMessage(), e);
+                        } else if (log.isWarnEnabled()) {
+                            log.warn("Unsupported http status after handler completed: " + e.getMessage(), e);
                         }
                         return;
                     }
@@ -2513,8 +2516,8 @@ public class DefaultHttpClient implements
                                 }
                             }
                         } else {
-                            if (LOG.isWarnEnabled()) {
-                                LOG.warn("Exception fired after handler completed: " + t.getMessage(), t);
+                            if (log.isWarnEnabled()) {
+                                log.warn("Exception fired after handler completed: " + t.getMessage(), t);
                             }
                         }
                     }
@@ -2523,8 +2526,8 @@ public class DefaultHttpClient implements
                         try {
                             ReferenceCountUtil.release(fullResponse);
                         } catch (Throwable e) {
-                            if (LOG.isDebugEnabled()) {
-                                LOG.debug("Failed to release response: {}", fullResponse);
+                            if (log.isDebugEnabled()) {
+                                log.debug("Failed to release response: {}", fullResponse);
                             }
                         }
                     }

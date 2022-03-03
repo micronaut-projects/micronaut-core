@@ -118,10 +118,12 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
             subscriber.onSubscribe(new Subscription() {
                 @Override
                 public void request(long n) {
+                    // no-op subscription
                 }
 
                 @Override
                 public void cancel() {
+                    // no-op subscription
                 }
             });
             subscriber.onError(new IllegalStateException("This publisher only supports one subscriber"));
@@ -304,6 +306,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
             case DEMANDING:
             case IDLE:
                 cancelled();
+                // fall through
             case DRAINING:
                 state = DONE;
                 break;
