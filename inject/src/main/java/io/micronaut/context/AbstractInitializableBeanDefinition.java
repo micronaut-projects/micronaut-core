@@ -138,9 +138,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     @Nullable
     private List<MethodInjectionPoint<T, ?>> preDestroyMethods;
     @Nullable
-    private Collection<Class<?>> requiredComponents;
-    @Nullable
-    private Collection<Class<?>> runtimeRequiredComponents;
+    private Set<Class<?>> requiredComponents;
     @Nullable
     private Argument<?>[] requiredParametrizedArguments;
 
@@ -427,24 +425,19 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
                     }
                 }
             }
-            this.requiredComponents = Collections.unmodifiableSet(requiredComponents);
+            this.requiredComponents = requiredComponents;
         }
 
-        if (runtimeRequiredComponents == null || runtimeRequiredComponents.isEmpty()) {
-            return this.requiredComponents;
-        } else {
-            Set<Class<?>> allRequiredComponents = new HashSet<>(this.requiredComponents);
-            allRequiredComponents.addAll(runtimeRequiredComponents);
-            return Collections.unmodifiableSet(allRequiredComponents);
-        }
+        return Collections.unmodifiableSet(this.requiredComponents);
     }
 
     @Override
     public void addRequiredComponent(Class<?> clazz) {
-        if (runtimeRequiredComponents == null) {
-            runtimeRequiredComponents = new HashSet<>();
+        if (requiredComponents == null) {
+            // Build the initial component set using getRequiredComponents.
+            getRequiredComponents();
         }
-        runtimeRequiredComponents.add(clazz);
+        requiredComponents.add(clazz);
     }
 
     @Override
