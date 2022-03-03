@@ -21,11 +21,6 @@ Micronaut by default contains `PropertySourceLoader` implementations that load p
 
 TIP: `.properties`, `.json`, `.yml` are supported out of the box. For Groovy users `.groovy` is supported as well.
 
-=== Secrets and Sensitive Configuration
-
-It is important to note that it is not recommended to store sensitive configuration such as passwords and tokens within configuration files that can potentially be checked into source control systems. 
-
-It is good practise to instead externalize sensitive configuration completely from the application code using preferably a external secret manager system (there are many options here, many provided by Cloud providers) or environment variables that are set during the deployment of the application.
 
 === Supplying Configuration via Command Line
 
@@ -57,9 +52,35 @@ public class Application {
 }
 ----
 
+=== Secrets and Sensitive Configuration
+
+It is important to note that it is not recommended to store sensitive configuration such as passwords and tokens within configuration files that can potentially be checked into source control systems. 
+
+It is good practise to instead externalize sensitive configuration completely from the application code using preferably a external secret manager system (there are many options here, many provided by Cloud providers) or environment variables that are set during the deployment of the application. You can also use property placeholders (see the following section), to customize names of the environment variables to use and supply default values:
+
+.Using Property Value Placeholders to Define Secure Configuration
+[source,java]
+----
+datasources:
+  default:
+    url: ${JDBC_URL:`jdbc:mysql://localhost:3306/db`}
+    username: ${JDBC_USER:root}
+    password: ${JDBC_PASSWORD:}
+    dialect: MYSQL
+    driverClassName: ${JDBC_DRIVER:com.mysql.cj.jdbc.Driver}
+----
+
+To securely externalize configuration consider using a secrets manager system supported by Micronaut such as:
+
+* [AWS Secrets Manager](https://micronaut-projects.github.io/micronaut-aws/latest/guide/#secretsmanager) 
+* [Google Cloud Secrets Manager](https://micronaut-projects.github.io/micronaut-gcp/latest/guide/#secretManager)
+* [HashiCorp Vault](https://docs.micronaut.io/latest/guide/#distributedConfigurationVault)
+* [Kubernetes Secrets](https://micronaut-projects.github.io/micronaut-kubernetes/latest/guide/index.html#config-client)
+* [Oracle Cloud Vault](https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/guide/#vault)
+
 === Property Value Placeholders
 
-Micronaut includes a property placeholder syntax to reference configuration properties both within configuration values and with any Micronaut annotation. See ann:io.micronaut.context.annotation.Value[] and the section on <<valueAnnotation,Configuration Injection>>.
+As mentioned in the previous section, Micronaut includes a property placeholder syntax to reference configuration properties both within configuration values and with any Micronaut annotation. See ann:io.micronaut.context.annotation.Value[] and the section on <<valueAnnotation,Configuration Injection>>.
 
 TIP: Programmatic usage is also possible via the api:io.micronaut.context.env.PropertyPlaceholderResolver[] interface.
 
