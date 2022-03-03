@@ -82,7 +82,7 @@ managed-micronaut-discovery = "3.1.0"
 managed-micronaut-elasticsearch = "4.2.0"
 managed-micronaut-email = "1.1.0"
 managed-micronaut-flyway = "5.1.3"
-managed-micronaut-gcp = "4.0.0"
+managed-micronaut-gcp = "4.1.0"
 managed-micronaut-graphql = "3.0.0"
 managed-micronaut-groovy = "3.0.0"
 managed-micronaut-grpc = "3.1.3"
@@ -159,6 +159,7 @@ boms-micronaut-cache = { module = "io.micronaut.cache:micronaut-cache-bom", vers
 boms-micronaut-coherence = { module = "io.micronaut.coherence:micronaut-coherence-bom", version.ref = "managed-micronaut-coherence" }
 boms-micronaut-email = { module = "io.micronaut.email:micronaut-email-bom", version.ref = "managed-micronaut-email" }
 boms-micronaut-data = { module = "io.micronaut.data:micronaut-data-bom", version.ref = "managed-micronaut-data" }
+boms-micronaut-gcp = { module = "io.micronaut.gcp:micronaut-gcp-bom", version.ref = "managed-micronaut-groovy" }
 boms-micronaut-groovy = { module = "io.micronaut.groovy:micronaut-groovy-bom", version.ref = "managed-micronaut-groovy" }
 boms-micronaut-kotlin = { module = "io.micronaut.kotlin:micronaut-kotlin-bom", version.ref = "managed-micronaut-kotlin" }
 boms-micronaut-kubernetes = { module = "io.micronaut.kubernetes:micronaut-kubernetes-bom", version.ref = "managed-micronaut-kubernetes" }
@@ -290,15 +291,6 @@ managed-micronaut-acme = { module = "io.micronaut.acme:micronaut-acme", version.
 managed-micronaut-cassandra = { module = "io.micronaut.cassandra:micronaut-cassandra", version.ref = "managed-micronaut-cassandra" }
 managed-micronaut-discovery = { module = "io.micronaut.discovery:micronaut-discovery-client", version.ref = "managed-micronaut-discovery" }
 managed-micronaut-elasticsearch = { module = "io.micronaut.elasticsearch:micronaut-elasticsearch", version.ref = "managed-micronaut-elasticsearch" }
-managed-micronaut-gcp = { module = "io.micronaut.gcp:micronaut-gcp-common", version.ref = "managed-micronaut-gcp" }
-managed-micronaut-gcp-tracing = { module = "io.micronaut.gcp:micronaut-gcp-tracing", version.ref = "managed-micronaut-gcp" }
-managed-micronaut-gcp-function = { module = "io.micronaut.gcp:micronaut-gcp-function", version.ref = "managed-micronaut-gcp" }
-managed-micronaut-gcp-function-http = { module = "io.micronaut.gcp:micronaut-gcp-function-http", version.ref = "managed-micronaut-gcp" }
-managed-micronaut-gcp-function-http-test = { module = "io.micronaut.gcp:micronaut-gcp-function-http-test", version.ref = "managed-micronaut-gcp" }
-managed-micronaut-gcp-http-client = { module = "io.micronaut.gcp:micronaut-gcp-http-client", version.ref = "managed-micronaut-gcp" }
-managed-micronaut-gcp-logging = { module = "io.micronaut.gcp:micronaut-gcp-logging", version.ref = "managed-micronaut-gcp" }
-managed-micronaut-gcp-pubsub = { module = "io.micronaut.gcp:micronaut-gcp-pubsub", version.ref = "managed-micronaut-gcp" }
-managed-micronaut-gcp-secret-manager = { module = "io.micronaut.gcp:micronaut-gcp-secret-manager", version.ref = "managed-micronaut-gcp" }
 managed-micronaut-graphql = { module = "io.micronaut.graphql:micronaut-graphql", version.ref = "managed-micronaut-graphql" }
 managed-micronaut-grpc = { module = "io.micronaut.grpc:micronaut-grpc-runtime", version.ref = "managed-micronaut-grpc" }
 managed-micronaut-grpc-annotation = { module = "io.micronaut.grpc:micronaut-grpc-annotation", version.ref = "managed-micronaut-grpc" }
