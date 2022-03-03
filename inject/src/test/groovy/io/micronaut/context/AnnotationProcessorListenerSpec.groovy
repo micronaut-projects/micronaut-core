@@ -1,7 +1,6 @@
 package io.micronaut.context
 
 import io.micronaut.context.annotation.Executable
-import io.micronaut.context.annotation.Parallel
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.processor.ExecutableMethodProcessor
 import io.micronaut.core.convert.ConversionService
@@ -25,33 +24,14 @@ import java.lang.annotation.Target
 
 class AnnotationProcessorListenerSpec extends Specification {
 
-    void 'test shutdown order of ExecutableMethodProcessor and (non-parallel) beans with executable methods'() {
+    void 'test shutdown order of ExecutableMethodProcessor and beans with executable methods'() {
         given:
         ApplicationContext context = ApplicationContext.run(
                 'spec.name': 'AnnotationProcessorListenerSpec',
-                'spec.variant': 'non-parallel'
         )
         Recorder recorder = context.getBean(Recorder)
         RenderMethodProcessor processor = context.getBean(RenderMethodProcessor)
-        NonParallelRenderTask task = context.getBean(NonParallelRenderTask)
-
-        when: 'the bean context is closed'
-        context.close()
-
-        then: 'the ExecutableMethodProcessor is closed before the task'
-        recorder.closeOrder == [processor, task]
-    }
-
-    void 'test shutdown order of ExecutableMethodProcessor and (parallel) beans with executable methods'() {
-        given:
-        ApplicationContext context = ApplicationContext.run(
-                'spec.name': 'AnnotationProcessorListenerSpec',
-                'spec.variant': 'parallel'
-        )
-
-        Recorder recorder = context.getBean(Recorder)
-        RenderMethodProcessor processor = context.getBean(RenderMethodProcessor)
-        ParallelRenderTask task = context.getBean(ParallelRenderTask)
+        RenderTask task = context.getBean(RenderTask)
 
         when: 'the bean context is closed'
         context.close()
@@ -73,58 +53,22 @@ class AnnotationProcessorListenerSpec extends Specification {
     @Singleton
     @Renderer
     @Requires(property = 'spec.name', value = 'AnnotationProcessorListenerSpec')
-    @Requires(property = 'spec.variant', value = 'non-parallel')
-    static class NonParallelRenderTask implements Closeable {
+    static class RenderTask implements Closeable {
         private Recorder recorder
 
         // Inject some needless beans to inflate the bean's required component count. This affects the initial ordering
         // of beans in DefaultBeanContext.topologicalSort such that, without considering the runtime required components,
         // the task typically would be closed before the ExecutableMethodProcessor. When runtime required components are
         // considered, the ExecutableMethodProcessor will be closed (appropriately) before the task.
-        NonParallelRenderTask(Recorder recorder,
-                              BeanContext beanContext,
-                              BeanResolutionContext beanResolutionContext,
-                              Optional<ConversionService<?>> conversionService,
-                              TaskExceptionHandler<?, ?> taskExceptionHandler,
-                              RefreshInterceptor refreshInterceptor,
-                              RefreshScope refreshScope,
-                              TimeConverterRegistrar timeConverterRegistrar,
-                              DefaultThreadFactory threadFactory
-        ) {
-            this.recorder = recorder
-        }
-
-        // Need at least one method (other than constructor/close) to process.
-        void render() { }
-
-        @Override
-        @PreDestroy
-        void close() throws IOException {
-            recorder.closed(this)
-        }
-    }
-
-    @Singleton
-    @Parallel
-    @Renderer
-    @Requires(property = 'spec.name', value = 'AnnotationProcessorListenerSpec')
-    @Requires(property = 'spec.variant', value = 'parallel')
-    static class ParallelRenderTask implements Closeable {
-        private Recorder recorder
-
-        // Inject some needless beans to inflate the bean's required component count. This affects the initial ordering
-        // of beans in DefaultBeanContext.topologicalSort such that, without considering the runtime required components,
-        // the task typically would be closed before the ExecutableMethodProcessor. When runtime required components are
-        // considered, the ExecutableMethodProcessor will be closed (appropriately) before the task.
-        ParallelRenderTask(Recorder recorder,
-                           BeanContext beanContext,
-                           BeanResolutionContext beanResolutionContext,
-                           Optional<ConversionService<?>> conversionService,
-                           TaskExceptionHandler<?, ?> taskExceptionHandler,
-                           RefreshInterceptor refreshInterceptor,
-                           RefreshScope refreshScope,
-                           TimeConverterRegistrar timeConverterRegistrar,
-                           DefaultThreadFactory threadFactory
+        RenderTask(Recorder recorder,
+                   BeanContext beanContext,
+                   BeanResolutionContext beanResolutionContext,
+                   Optional<ConversionService<?>> conversionService,
+                   TaskExceptionHandler<?, ?> taskExceptionHandler,
+                   RefreshInterceptor refreshInterceptor,
+                   RefreshScope refreshScope,
+                   TimeConverterRegistrar timeConverterRegistrar,
+                   DefaultThreadFactory threadFactory
         ) {
             this.recorder = recorder
         }
