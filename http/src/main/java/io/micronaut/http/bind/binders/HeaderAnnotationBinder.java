@@ -26,6 +26,9 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.Header;
 
+import java.time.temporal.TemporalAccessor;
+import java.util.Date;
+
 /**
  * An {@link io.micronaut.core.bind.annotation.AnnotatedArgumentBinder} implementation that uses the {@link Header}
  * annotation to trigger binding from an HTTP header.
@@ -45,12 +48,15 @@ public class HeaderAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<H
     }
 
     @Override
-    public BindingResult<T> bind(ArgumentConversionContext<T> argument, HttpRequest<?> source) {
+    public BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {
         ConvertibleMultiValues<String> parameters = source.getHeaders();
-        AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
-        String parameterName = annotationMetadata.stringValue(Header.class).orElse(argument.getArgument().getName());
-        // We use this as "EEE, d MMM yyyy HH:mm:ss zzz" as a pattern returns a different result (with a timezone)
-        return doBind(argument.withDefaultFormat(ConversionContext.RFC_1123_FORMAT), parameters, parameterName);
+        AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
+        Argument<T> argument = context.getArgument();
+        String parameterName = annotationMetadata.stringValue(Header.class).orElse(argument.getName());
+        if (TemporalAccessor.class.isAssignableFrom(argument.getType()) || argument.getType() == Date.class) {
+            context = context.withDefaultFormat(ConversionContext.RFC_1123_FORMAT);
+        }
+        return doBind(context, parameters, parameterName);
     }
 
     @Override

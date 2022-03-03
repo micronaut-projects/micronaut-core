@@ -53,6 +53,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.temporal.TemporalAccessor;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -126,46 +127,11 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
                     .orElse(NameUtils.hyphenate(context.getArgument().getName()));
 
             // Header dates must be in GMT
-            if (value instanceof Date) {
-                conversionService.convert(
-                                ((Date) value).toInstant().atZone(ZoneId.of("GMT")),
-                                String.class,
-                                context.withDefaultFormat(ConversionContext.RFC_1123_FORMAT)
-                        )
-                        .ifPresent(header -> request.getHeaders().set(headerName, header));
-            } else if (value instanceof ZonedDateTime) {
-                conversionService.convert(
-                                ((ZonedDateTime) value).withZoneSameInstant(ZoneId.of("GMT")),
-                                String.class,
-                                context.withDefaultFormat(ConversionContext.RFC_1123_FORMAT)
-                        )
-                        .ifPresent(header -> request.getHeaders().set(headerName, header));
-            } else if (value instanceof OffsetDateTime) {
-                conversionService.convert(
-                                ((OffsetDateTime) value).atZoneSameInstant(ZoneId.of("GMT")),
-                                String.class,
-                                context.withDefaultFormat(ConversionContext.RFC_1123_FORMAT)
-                        )
-                        .ifPresent(header -> request.getHeaders().set(headerName, header));
-            } else if (value instanceof LocalDateTime) {
-                conversionService.convert(
-                                ((LocalDateTime) value).atZone(ZoneId.of("GMT")),
-                                String.class,
-                                context.withDefaultFormat(ConversionContext.RFC_1123_FORMAT)
-                        )
-                        .ifPresent(header -> request.getHeaders().set(headerName, header));
-            } else if (value instanceof Instant) {
-                conversionService.convert(
-                                ((Instant) value).atZone(ZoneId.of("GMT")),
-                                String.class,
-                                context.withDefaultFormat(ConversionContext.RFC_1123_FORMAT)
-                        )
-                        .ifPresent(header -> request.getHeaders().set(headerName, header));
-            } else {
-                // Not a timestamp header
-                conversionService.convert(value, String.class, context)
-                        .ifPresent(header -> request.getHeaders().set(headerName, header));
+            if (value instanceof Date || value instanceof TemporalAccessor) {
+                context = context.withDefaultFormat(ConversionContext.RFC_1123_FORMAT);
             }
+            conversionService.convert(value, String.class, context)
+                    .ifPresent(header -> request.getHeaders().set(headerName, header));
         });
         byAnnotation.put(RequestAttribute.class, (context, uriContext, value, request) -> {
             AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();

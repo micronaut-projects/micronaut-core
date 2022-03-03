@@ -33,6 +33,7 @@ import java.time.temporal.TemporalAccessor;
 import java.time.temporal.TemporalAmount;
 import java.util.Optional;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -143,9 +144,10 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
             LocalDateTime.class,
             (object, targetType, context) -> {
                 try {
-                    return Optional.of(resolveFormatter(context)
-                            .map(formatter -> LocalDateTime.parse(object, formatter))
-                            .orElseGet(() -> LocalDateTime.parse(object)));
+                    return format(context,
+                            object,
+                            LocalDateTime::parse,
+                            LocalDateTime::parse);
                 } catch (DateTimeParseException e) {
                     context.reject(object, e);
                     return Optional.empty();
@@ -159,9 +161,10 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                 Instant.class,
                 (object, targetType, context) -> {
                     try {
-                        return Optional.of(resolveFormatter(context)
-                                .map(formatter -> ZonedDateTime.parse(object, formatter).toInstant())
-                                .orElseGet(() -> Instant.parse(object)));
+                        return format(context,
+                                object,
+                                (obj, formatter) -> ZonedDateTime.parse(object, formatter).toInstant(),
+                                Instant::parse);
                     } catch (DateTimeParseException e) {
                         context.reject(object, e);
                         return Optional.empty();
@@ -172,9 +175,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
         // TemporalAccessor - CharSequence
         final TypeConverter<TemporalAccessor, CharSequence> temporalConverter = (object, targetType, context) -> {
             try {
-                return Optional.of(resolveFormatter(context)
-                        .map(formatter -> formatter.format(object))
-                        .orElseGet(() -> object.toString()));
+                return format(context, object, (obj, formatter) -> formatter.format(obj), Object::toString);
             } catch (DateTimeParseException e) {
                 context.reject(object, e);
                 return Optional.empty();
@@ -186,31 +187,16 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                 temporalConverter
         );
 
-        // ZonedDateTime -> CharSequence
-        conversionService.addConverter(
-                ZonedDateTime.class,
-                CharSequence.class,
-                (object, targetType, context) -> {
-                    try {
-                        return Optional.of(resolveFormatter(context)
-                                .map(object::format)
-                                .orElseGet(object::toString));
-                    } catch (DateTimeParseException e) {
-                        context.reject(object, e);
-                        return Optional.empty();
-                    }
-                }
-        );
-
         // CharSequence -> LocalDate
         conversionService.addConverter(
             CharSequence.class,
             LocalDate.class,
             (object, targetType, context) -> {
                 try {
-                    return Optional.of(resolveFormatter(context)
-                            .map(formatter -> LocalDate.parse(object, formatter))
-                            .orElseGet(() -> LocalDate.parse(object)));
+                    return format(context,
+                            object,
+                            LocalDate::parse,
+                            LocalDate::parse);
                 } catch (DateTimeParseException e) {
                     context.reject(object, e);
                     return Optional.empty();
@@ -224,9 +210,10 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                 LocalTime.class,
                 (object, targetType, context) -> {
                     try {
-                        return Optional.of(resolveFormatter(context)
-                                .map(formatter -> LocalTime.parse(object, formatter))
-                                .orElseGet(() -> LocalTime.parse(object)));
+                        return format(context,
+                                object,
+                                LocalTime::parse,
+                                LocalTime::parse);
                     } catch (DateTimeParseException e) {
                         context.reject(object, e);
                         return Optional.empty();
@@ -240,9 +227,10 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
             ZonedDateTime.class,
             (object, targetType, context) -> {
                 try {
-                    return Optional.of(resolveFormatter(context)
-                            .map(formatter -> ZonedDateTime.parse(object, formatter))
-                            .orElseGet(() -> ZonedDateTime.parse(object)));
+                    return format(context,
+                            object,
+                            ZonedDateTime::parse,
+                            ZonedDateTime::parse);
                 } catch (DateTimeParseException e) {
                     context.reject(object, e);
                     return Optional.empty();
@@ -256,9 +244,10 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                 OffsetDateTime.class,
                 (object, targetType, context) -> {
                     try {
-                        return Optional.of(resolveFormatter(context)
-                                .map(formatter -> OffsetDateTime.parse(object, formatter))
-                                .orElseGet(() -> OffsetDateTime.parse(object)));
+                        return format(context,
+                                object,
+                                OffsetDateTime::parse,
+                                OffsetDateTime::parse);
                     } catch (DateTimeParseException e) {
                         context.reject(object, e);
                         return Optional.empty();
@@ -272,9 +261,10 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                 OffsetTime.class,
                 (object, targetType, context) -> {
                     try {
-                        return Optional.of(resolveFormatter(context)
-                                .map(formatter -> OffsetTime.parse(object, formatter))
-                                .orElseGet(() -> OffsetTime.parse(object)));
+                        return format(context,
+                                object,
+                                OffsetTime::parse,
+                                OffsetTime::parse);
                     } catch (DateTimeParseException e) {
                         context.reject(object, e);
                         return Optional.empty();
@@ -283,9 +273,34 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
         );
     }
 
-    private Optional<DateTimeFormatter> resolveFormatter(ConversionContext context) {
-        return context.getFormat().map(pattern -> ConversionContext.RFC_1123_FORMAT.equals(pattern) ?
-                DateTimeFormatter.RFC_1123_DATE_TIME :
-                DateTimeFormatter.ofPattern(pattern, context.getLocale()));
+    private <Y, T> Optional<Y> format(ConversionContext context,
+                                      T value,
+                                      BiFunction<T, DateTimeFormatter, Y> formatDate,
+                                      Function<T, Y> defaultFormat) {
+        return Optional.of(context.getFormat().map(pattern -> {
+            if (ConversionContext.RFC_1123_FORMAT.equals(pattern)) {
+                T converted = value;
+                if (converted instanceof TemporalAccessor) {
+                    converted = (T) toGmt((TemporalAccessor) converted);
+                }
+                return formatDate.apply(converted, DateTimeFormatter.RFC_1123_DATE_TIME);
+            } else {
+                return formatDate.apply(value, DateTimeFormatter.ofPattern(pattern, context.getLocale()));
+            }
+        }).orElseGet(() -> defaultFormat.apply(value)));
+    }
+
+    private TemporalAccessor toGmt(TemporalAccessor value) {
+        ZoneId gmt = ZoneId.of("GMT");
+        if (value instanceof ZonedDateTime) {
+            return ((ZonedDateTime) value).withZoneSameInstant(gmt);
+        } else if (value instanceof OffsetDateTime) {
+            return ((OffsetDateTime) value).atZoneSameInstant(gmt);
+        } else if (value instanceof LocalDateTime) {
+            return ((LocalDateTime) value).atZone(gmt);
+        } else if (value instanceof Instant) {
+            return ((Instant) value).atZone(gmt);
+        }
+        return value;
     }
 }
