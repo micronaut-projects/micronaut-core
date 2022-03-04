@@ -53,7 +53,11 @@ public class HeaderAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<H
         AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
         Argument<T> argument = context.getArgument();
         String parameterName = annotationMetadata.stringValue(Header.class).orElse(argument.getName());
-        if (TemporalAccessor.class.isAssignableFrom(argument.getType()) || argument.getType() == Date.class) {
+        Argument<?> type = argument;
+        if (argument.isWrapperType()) {
+            type = argument.getWrappedType();
+        }
+        if (TemporalAccessor.class.isAssignableFrom(type.getType()) || type.getType() == Date.class) {
             context = context.withDefaultFormat(ConversionContext.RFC_1123_FORMAT);
         }
         return doBind(context, parameters, parameterName);

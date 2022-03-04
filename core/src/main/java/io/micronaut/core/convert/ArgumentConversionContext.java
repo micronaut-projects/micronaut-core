@@ -60,14 +60,8 @@ public interface ArgumentConversionContext<T> extends ConversionContext, Annotat
      */
     @SuppressWarnings("unchecked")
     default ArgumentConversionContext<T> with(AnnotationMetadata annotationMetadata) {
-
         ConversionContext thisContext = this;
-        return new DefaultArgumentConversionContext(getArgument(), thisContext.getLocale(), thisContext.getCharset()) {
-            @Override
-            public AnnotationMetadata getAnnotationMetadata() {
-                return annotationMetadata;
-            }
-        };
+        return new DefaultArgumentConversionContext(getArgument(), thisContext.getLocale(), thisContext.getCharset(), annotationMetadata, getDefaultFormat().orElse(null));
     }
 
     /**
@@ -78,13 +72,7 @@ public interface ArgumentConversionContext<T> extends ConversionContext, Annotat
      */
     @SuppressWarnings("unchecked")
     default ArgumentConversionContext<T> withDefaultFormat(@Nullable String format) {
-
         ArgumentConversionContext<T> thisContext = this;
-        return new DefaultArgumentConversionContext(getArgument(), thisContext.getLocale(), thisContext.getCharset()) {
-            @Override
-            public Optional<String> getDefaultFormat() {
-                return Optional.ofNullable(format);
-            }
-        };
+        return new DefaultArgumentConversionContext(getArgument(), thisContext.getLocale(), thisContext.getCharset(), getAnnotationMetadata(), format);
     }
 }

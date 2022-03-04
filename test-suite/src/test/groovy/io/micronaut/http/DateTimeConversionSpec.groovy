@@ -90,6 +90,8 @@ class DateTimeConversionSpec extends Specification {
         where:
         desc                       | endpoint               | formatter                       | converter
         'java.util.Date'           | 'header-date'          | DateTimeFormatter.ISO_DATE_TIME | null
+        'java.util.Date'           | 'optional-date'        | DateTimeFormatter.ISO_DATE_TIME | null
+        'java.time.ZonedDateTime'  | 'optional-temporal'    | DateTimeFormatter.ISO_DATE_TIME | null
         'java.time.OffsetDateTime' | 'header-offset'        | DateTimeFormatter.ISO_DATE_TIME | null
         'java.time.OffsetTime'     | 'header-offsettime'    | DateTimeFormatter.ISO_TIME      | null
         'java.time.ZonedDateTime'  | 'header-zoned'         | DateTimeFormatter.ISO_DATE_TIME | null
@@ -340,6 +342,16 @@ class DateTimeConversionSpec extends Specification {
         @Post('/zoned')
         String zonedPost(@Body ZonedDateTimeBody value) {
             response(value.body)
+        }
+
+        @Get('/optional-date')
+        def optionalDate(@Header('X-Test') Optional<Date> date) {
+            response(date.get())
+        }
+
+        @Get('/optional-temporal')
+        def optionalTemporal(@Header('X-Test') Optional<ZonedDateTime> date) {
+            response(date.get())
         }
     }
 

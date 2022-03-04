@@ -15,7 +15,9 @@
  */
 package io.micronaut.core.convert;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 
 import java.nio.charset.Charset;
@@ -34,6 +36,9 @@ class DefaultArgumentConversionContext<T> implements ArgumentConversionContext<T
     private final Argument<T> argument;
     private final Locale finalLocale;
     private final Charset finalCharset;
+    private final AnnotationMetadata annotationMetadata;
+    @Nullable
+    private final String defaultFormat;
     private final List<ConversionError> conversionErrors = new ArrayList<>(3);
 
     /**
@@ -42,9 +47,15 @@ class DefaultArgumentConversionContext<T> implements ArgumentConversionContext<T
      * @param finalCharset The final charset
      */
     DefaultArgumentConversionContext(Argument<T> argument, Locale finalLocale, Charset finalCharset) {
+        this(argument, finalLocale, finalCharset, argument.getAnnotationMetadata(), null);
+    }
+
+    DefaultArgumentConversionContext(Argument<T> argument, Locale finalLocale, Charset finalCharset, AnnotationMetadata annotationMetadata, @Nullable String defaultFormat) {
         this.argument = argument;
         this.finalLocale = finalLocale;
         this.finalCharset = finalCharset;
+        this.annotationMetadata = annotationMetadata;
+        this.defaultFormat = defaultFormat;
     }
 
     @Override
@@ -55,6 +66,16 @@ class DefaultArgumentConversionContext<T> implements ArgumentConversionContext<T
     @Override
     public Charset getCharset() {
         return finalCharset;
+    }
+
+    @Override
+    public Optional<String> getDefaultFormat() {
+        return Optional.ofNullable(defaultFormat);
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return annotationMetadata;
     }
 
     @Override
