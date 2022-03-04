@@ -18,11 +18,13 @@ package io.micronaut.inject.processing;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.TypedElement;
 import org.objectweb.asm.Type;
 
 import javax.lang.model.element.*;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -284,6 +286,12 @@ public class JavaModelUtils {
                 Class<?> t = (Class<?>) nativeType;
                 return Type.getType(t);
             } else {
+                if (classElement instanceof GenericPlaceholderElement) {
+                    List<? extends ClassElement> bounds = ((GenericPlaceholderElement) classElement).getBounds();
+                    if (bounds.size() > 0) {
+                        type = bounds.get(0);
+                    }
+                }
                 String internalName = type.getType().getName().replace('.', '/');
                 if (internalName.isEmpty()) {
                     return Type.getType(Object.class);

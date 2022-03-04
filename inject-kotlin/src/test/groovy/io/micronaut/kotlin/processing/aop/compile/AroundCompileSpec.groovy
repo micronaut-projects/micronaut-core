@@ -868,4 +868,36 @@ interface IBeanValidator<T> {
         beanDefinition.getTypeArguments('test.BaseService')[0].type.name == 'test.BaseEntity'
     }
 
+    void "test aop with generics"() {
+        ApplicationContext context = buildContext( '''
+package test
+
+import io.micronaut.kotlin.processing.aop.simple.*
+import jakarta.inject.Singleton
+
+@Singleton
+open class Test {
+
+    @Mutating("name")
+    open fun <T : CharSequence?> testGenericsWithExtends(name: T, age: Int): T {
+        return "Name is $name" as T
+    }
+
+    @Mutating("name")
+    open fun <T> testListWithWildCardIn(name: T, p2: CovariantClass<in String>): CovariantClass<in String> {
+        return CovariantClass(name.toString())
+    }
+
+    @Mutating("name")
+    open fun <T> testListWithWildCardOut(name: T, p2: CovariantClass<out String>): CovariantClass<out String> {
+        return CovariantClass(name.toString())
+    }
+}
+''')
+        def instance = getBean(context, 'test.Test')
+
+        expect:
+        instance.testGenericsWithExtends("abc", 0) == "Name is changed"
+    }
+
 }

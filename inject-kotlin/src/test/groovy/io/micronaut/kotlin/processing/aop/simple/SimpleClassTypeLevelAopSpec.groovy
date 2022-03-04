@@ -60,8 +60,8 @@ class SimpleClassTypeLevelAopSpec extends Specification {
         'testByteArray'               | ['test', 'test'.bytes] | 'test'.bytes        // test for byte array
         'testGenericsWithExtends'     | ['test', 10]           | 'Name is changed'        // test for generics
         'testGenericsFromType'        | ['test', 10]           | 'Name is changed'        // test for generics
-        'testListWithWildCardSuper'   | ['test', []]           | ['changed']        // test for generics
-        'testListWithWildCardExtends' | ['test', []]           | ['changed']        // test for generics
+        'testListWithWildCardIn'      | ['test', new CovariantClass<>()]           | new CovariantClass<>('changed')        // test for generics
+        'testListWithWildCardOut'     | ['test', new CovariantClass<>()]           | new CovariantClass<>('changed')
     }
 
 }
