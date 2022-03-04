@@ -83,21 +83,11 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
     protected DefaultHttpClientBinderRegistry(ConversionService<?> conversionService,
                                               List<ClientRequestBinder> binders,
                                               BeanContext beanContext) {
-        byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (ClientArgumentRequestBinder<HttpHeaders>) (context, uriContext, value, request) -> {
-            value.forEachValue(request::header);
-        });
-        byType.put(Argument.of(Cookies.class).typeHashCode(), (ClientArgumentRequestBinder<Cookies>) (context, uriContext, value, request) -> {
-            request.cookies(value.getAll());
-        });
-        byType.put(Argument.of(Cookie.class).typeHashCode(), (ClientArgumentRequestBinder<Cookie>) (context, uriContext, value, request) -> {
-            request.cookie(value);
-        });
-        byType.put(Argument.of(BasicAuth.class).typeHashCode(), (ClientArgumentRequestBinder<BasicAuth>) (context, uriContext, value, request) -> {
-            request.basicAuth(value.getUsername(), value.getPassword());
-        });
-        byType.put(Argument.of(Locale.class).typeHashCode(), (ClientArgumentRequestBinder<Locale>) (context, uriContext, value, request) -> {
-            request.header(HttpHeaders.ACCEPT_LANGUAGE, value.toLanguageTag());
-        });
+        byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (ClientArgumentRequestBinder<HttpHeaders>) (context, uriContext, value, request) -> value.forEachValue(request::header));
+        byType.put(Argument.of(Cookies.class).typeHashCode(), (ClientArgumentRequestBinder<Cookies>) (context, uriContext, value, request) -> request.cookies(value.getAll()));
+        byType.put(Argument.of(Cookie.class).typeHashCode(), (ClientArgumentRequestBinder<Cookie>) (context, uriContext, value, request) -> request.cookie(value));
+        byType.put(Argument.of(BasicAuth.class).typeHashCode(), (ClientArgumentRequestBinder<BasicAuth>) (context, uriContext, value, request) -> request.basicAuth(value.getUsername(), value.getPassword()));
+        byType.put(Argument.of(Locale.class).typeHashCode(), (ClientArgumentRequestBinder<Locale>) (context, uriContext, value, request) -> request.header(HttpHeaders.ACCEPT_LANGUAGE, value.toLanguageTag()));
         byAnnotation.put(QueryValue.class, new QueryValueClientArgumentRequestBinder(conversionService));
         byAnnotation.put(PathVariable.class, (context, uriContext, value, request) -> {
             String parameterName = context.getAnnotationMetadata().stringValue(PathVariable.class)
@@ -143,9 +133,7 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
                         }
                     });
         });
-        byAnnotation.put(Body.class, (context, uriContext, value, request) -> {
-            request.body(value);
-        });
+        byAnnotation.put(Body.class, (context, uriContext, value, request) -> request.body(value));
         byAnnotation.put(RequestBean.class, (context, uriContext, value, request) -> {
             BeanIntrospection<Object> introspection = BeanIntrospection.getIntrospection(context.getArgument().getType());
             for (BeanProperty<Object, Object> beanProperty : introspection.getBeanProperties()) {

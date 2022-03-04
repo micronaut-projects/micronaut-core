@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
 import org.codehaus.groovy.ast.Parameter;
-import org.codehaus.groovy.control.SourceUnit;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -35,7 +34,6 @@ import io.micronaut.core.annotation.Nullable;
 @Internal
 public class GroovyParameterElement extends AbstractGroovyElement implements ParameterElement {
 
-    private final SourceUnit sourceUnit;
     private final Parameter parameter;
     private final GroovyMethodElement methodElement;
     private ClassElement typeElement;
@@ -52,7 +50,6 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     GroovyParameterElement(GroovyMethodElement methodElement, GroovyVisitorContext visitorContext, Parameter parameter, AnnotationMetadata annotationMetadata) {
         super(visitorContext, parameter, annotationMetadata);
         this.parameter = parameter;
-        this.sourceUnit = visitorContext.getSourceUnit();
         this.methodElement = methodElement;
     }
 

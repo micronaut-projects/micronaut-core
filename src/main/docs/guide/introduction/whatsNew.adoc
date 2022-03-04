@@ -346,13 +346,13 @@ For the performance reasons it's advised to inject an instance of `ApplicationEv
 
 It is now possible to intercept bean construction invocations through the api:aop.ConstructorInterceptor[] interface and ann:aop.AroundConstruct[] annotation.
 
-See the section on <<lifecycleAdvise, Bean Life Cycle Advice>> for more information.
+See the section on <<lifecycleAdvice, Bean Life Cycle Advice>> for more information.
 
 ==== Support for `@PostConstruct` & `@PreDestroy` Interception
 
 It is now possible to intercept `@PostConstruct` and `@PreDestroy` method invocations through the api:aop.MethodInterceptor[] interface and ann:aop.InterceptorBinding[] annotation.
 
-See the section on <<lifecycleAdvise, Bean Life Cycle Advice>> for more information.
+See the section on <<lifecycleAdvice, Bean Life Cycle Advice>> for more information.
 
 
 ==== Random Configuration Values
