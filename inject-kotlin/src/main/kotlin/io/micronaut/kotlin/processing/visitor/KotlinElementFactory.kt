@@ -140,17 +140,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         method: KSFunctionDeclaration,
         annotationMetadata: AnnotationMetadata
     ): KotlinMethodElement {
-        val annotationUtils = visitorContext.getAnnotationUtils()
-        val returnType = method.returnType!!.resolve()
-        return KotlinMethodElement(
-            method,
-            declaringClass,
-            newClassElement(returnType, annotationUtils.newAnnotationBuilder().buildDeclared(returnType.declaration, returnType.annotations.toList(), false), declaringClass.typeArguments),
-            method.parameters.map { param ->
-                KotlinParameterElement(newClassElement(param.type.resolve(), declaringClass.typeArguments), param, annotationUtils.getAnnotationMetadata(param), visitorContext)
-            },
-            annotationMetadata,
-            visitorContext)
+        return newMethodElement(declaringClass, method, annotationMetadata, declaringClass.typeArguments)
     }
 
     fun newMethodElement(
@@ -161,12 +151,19 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
     ): KotlinMethodElement {
         val annotationUtils = visitorContext.getAnnotationUtils()
         val returnType = method.returnType!!.resolve()
+
+        val allTypeArguments = mutableMapOf<String, ClassElement>()
+        allTypeArguments.putAll(typeArguments)
+        method.typeParameters.forEach {
+            allTypeArguments[it.name.asString()] = KotlinGenericPlaceholderElement(it, annotationUtils.getAnnotationMetadata(it), visitorContext)
+        }
+
         return KotlinMethodElement(
             method,
             declaringClass,
-            newClassElement(returnType, annotationUtils.newAnnotationBuilder().buildDeclared(returnType.declaration, returnType.annotations.toList(), false), typeArguments),
+            newClassElement(returnType, annotationUtils.newAnnotationBuilder().buildDeclared(returnType.declaration, returnType.annotations.toList(), false), allTypeArguments),
             method.parameters.map { param ->
-                KotlinParameterElement(newClassElement(param.type.resolve(), typeArguments), param, annotationUtils.getAnnotationMetadata(param), visitorContext)
+                KotlinParameterElement(newClassElement(param.type.resolve(), allTypeArguments), param, annotationUtils.getAnnotationMetadata(param), visitorContext)
             },
             annotationMetadata,
             visitorContext)
