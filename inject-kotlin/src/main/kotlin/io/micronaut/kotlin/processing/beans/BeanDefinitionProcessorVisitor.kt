@@ -62,7 +62,8 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
                 classElement.hasStereotype(AnnotationUtil.SCOPE) ||
                 classElement.hasStereotype(DefaultScope::class.java) ||
                 classElement.hasDeclaredStereotype(Bean::class.java) ||
-                classElement.primaryConstructor.filter { it.hasStereotype(AnnotationUtil.INJECT) }.isPresent
+                classElement.primaryConstructor.filter { it.hasStereotype(AnnotationUtil.INJECT) }.isPresent ||
+                classElement.hasStereotype(AnnotationUtil.ANN_INTRODUCTION)
         this.readPrefixes = classElement.getValue(
             AccessorsStyle::class.java,
             "readPrefixes",
@@ -549,7 +550,14 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         } else {
             val defaultConstructor = classElement.defaultConstructor.orElse(null)
             if (defaultConstructor == null) {
-                visitorContext.fail("Class must have at least one non private constructor in order to be a candidate for dependency injection", classElement)
+                if (classElement.isInterface) {
+                    beanDefinitionVisitor.visitDefaultConstructor(AnnotationMetadata.EMPTY_METADATA, visitorContext)
+                } else {
+                    visitorContext.fail(
+                        "Class must have at least one non private constructor in order to be a candidate for dependency injection",
+                        classElement
+                    )
+                }
             } else {
                 beanDefinitionVisitor.visitDefaultConstructor(defaultConstructor.annotationMetadata, visitorContext)
             }
