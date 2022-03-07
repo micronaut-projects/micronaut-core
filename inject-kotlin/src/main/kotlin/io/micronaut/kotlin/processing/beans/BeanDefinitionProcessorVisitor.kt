@@ -234,11 +234,11 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
                     beanWriter!!.setRequiresMethodProcessing(true)
                 }
 
-                val isPublicMethodInProxyType = isAopProxyType && (methodElement.isPublic || methodElement.isPackagePrivate)
-                val hasAroundNotAbstractNotInterceptor = hasAround && !classElement.isAbstract && !classElement.isAssignable(Interceptor::class.java)
+                val declaredAround = hasAround && !classElement.isAbstract && !classElement.isAssignable(Interceptor::class.java)
+                val inheritedAround = isAopProxyType && (methodElement.isPublic || methodElement.isPackagePrivate) && !declaredAround
 
-                if (isPublicMethodInProxyType || hasAroundNotAbstractNotInterceptor) {
-                    visitAroundMethod(methodElement, isPublicMethodInProxyType && !hasAroundNotAbstractNotInterceptor)
+                if (inheritedAround || declaredAround) {
+                    visitAroundMethod(methodElement, inheritedAround)
                 } else {
                     beanWriter!!.visitExecutableMethod(
                         methodElement.declaringType,
@@ -262,7 +262,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         return false
     }
 
-    private fun visitAroundMethod(methodElement: MethodElement, inheritClassMetadata: Boolean) {
+    private fun visitAroundMethod(methodElement: MethodElement, inheritedAround: Boolean) {
         if (methodElement.isFinal) {
             if (hasAroundStereotype(methodElement, true)) {
                 visitorContext.fail(
@@ -270,6 +270,9 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
                     methodElement
                 )
             } else {
+                if (inheritedAround && methodElement.declaringType != classElement) {
+                    return
+                }
                 visitorContext.fail(
                     "Public method inherits AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.",
                     methodElement
@@ -281,7 +284,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         if (aopProxyWriter == null) {
             createClassProxyWriter(beanWriter!!)
         }
-        val aopMethod = if (inheritClassMetadata) {
+        val aopMethod = if (inheritedAround) {
             methodElement.withNewMetadata(AnnotationMetadataHierarchy(methodElement.declaringType.annotationMetadata, methodElement.annotationMetadata))
         } else {
             methodElement
@@ -381,7 +384,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         handlePreDestroy(methodElement, producedClassElement, beanMethodWriter)
         if (methodElement.hasStereotype(AnnotationUtil.ANN_AROUND) && !classElement.isAbstract) {
             if (producedClassElement.isFinal) {
-                visitorContext.fail("Cannot apply AOP advice to final class. Class must be made non-final to support proxying", methodElement)
+                visitorContext.fail("Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + producedClassElement.name, methodElement)
                 return
             }
             val proxyWriter = createProxyWriter(methodElement, beanMethodWriter,true)
