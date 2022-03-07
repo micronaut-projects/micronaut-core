@@ -108,7 +108,7 @@ class Test {
 
 interface X 
 
-class Y: X 
+open class Y: X 
 ''')
 
         then:

@@ -161,7 +161,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         return KotlinMethodElement(
             method,
             declaringClass,
-            newClassElement(returnType, annotationUtils.newAnnotationBuilder().buildDeclared(returnType.declaration, returnType.annotations.toList(), false), allTypeArguments),
+            newClassElement(returnType, annotationUtils.getAnnotationMetadata(returnType.declaration), allTypeArguments),
             method.parameters.map { param ->
                 KotlinParameterElement(newClassElement(param.type.resolve(), allTypeArguments), param, annotationUtils.getAnnotationMetadata(param), visitorContext)
             },
