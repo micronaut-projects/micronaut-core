@@ -422,74 +422,71 @@ class AnotherInterceptor: Interceptor<Any, Any> {
         where:
         proxyTarget << [true, false]
     }
-/*
+
     void 'test around construct without around interception'() {
         given:
         ApplicationContext context = buildContext("""
-package annbinding1;
+package annbinding1
 
-import java.lang.annotation.*;
-import io.micronaut.aop.*;
-import jakarta.inject.*;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import io.micronaut.aop.*
+import jakarta.inject.Singleton
 
 @Singleton
 @TestAnn
-class MyBean {
-    MyBean(io.micronaut.context.env.Environment env) {}
-    void test() {
+open class MyBean(private val env: io.micronaut.context.env.Environment) {
+    
+    open fun test() {
     }
 }
 
 @io.micronaut.context.annotation.Factory
-class MyFactory {
+open class MyFactory {
+
     @TestAnn
     @Singleton
-    MyOtherBean test(io.micronaut.context.env.Environment env) {
-        return new MyOtherBean();
+    open fun test(env: io.micronaut.context.env.Environment): MyOtherBean {
+        return MyOtherBean()
     }
 }
 
-class MyOtherBean {}
+open class MyOtherBean
 
-@Retention(RUNTIME)
-@Target({ElementType.METHOD, ElementType.TYPE})
+@Retention
+@Target(AnnotationTarget.FUNCTION, AnnotationTarget.CLASS)
 @AroundConstruct
-@interface TestAnn {
-}
+annotation class TestAnn
 
 @Singleton
-@InterceptorBean(TestAnn.class)
-class TestConstructInterceptor implements ConstructorInterceptor<Object> {
-    boolean invoked = false;
-    Object[] parameters;
+@InterceptorBean(TestAnn::class)
+class TestConstructInterceptor: ConstructorInterceptor<Any> {
+    var invoked = false
+    var parameters: Array<Any>? = null
 
-    @Override
-    public Object intercept(ConstructorInvocationContext<Object> context) {
-        invoked = true;
-        parameters = context.getParameterValues();
-        return context.proceed();
+    override fun intercept(context: ConstructorInvocationContext<Any>): Any {
+        invoked = true
+        parameters = context.parameterValues
+        return context.proceed()
     }
 }
 
 @Singleton
-@InterceptorBinding(TestAnn.class)
-class TestInterceptor implements MethodInterceptor {
-    boolean invoked = false;
-    @Override
-    public Object intercept(MethodInvocationContext context) {
-        invoked = true;
-        return context.proceed();
+@InterceptorBinding(TestAnn::class)
+class TestInterceptor: MethodInterceptor<Any, Any> {
+    var invoked = false
+    
+    override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
+        invoked = true
+        return context.proceed()
     }
 }
 
 @Singleton
-class AnotherInterceptor implements Interceptor {
-    boolean invoked = false;
-    @Override
-    public Object intercept(InvocationContext context) {
-        invoked = true;
-        return context.proceed();
+class AnotherInterceptor: Interceptor<Any, Any> {
+    var invoked = false
+    
+    override fun intercept(context: InvocationContext<Any, Any>): Any? {
+        invoked = true
+        return context.proceed()
     }
 }
 """)
@@ -543,46 +540,39 @@ class AnotherInterceptor implements Interceptor {
 
         cleanup:
         context.close()
-
     }
 
     void 'test around construct declared on constructor only'() {
         given:
         ApplicationContext context = buildContext("""
-package annbinding1;
+package annbinding1
 
-import java.lang.annotation.*;
-import io.micronaut.aop.*;
-import jakarta.inject.*;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import io.micronaut.aop.*
+import jakarta.inject.Singleton
 
 @Singleton
-class MyBean {
-    @TestAnn
-    MyBean(io.micronaut.context.env.Environment env) {}
+class MyBean @TestAnn constructor(env: io.micronaut.context.env.Environment) {
 
-    void test() {
+    fun test() {
     }
 }
 
-@Retention(RUNTIME)
-@Target({ElementType.CONSTRUCTOR})
+@Retention
+@Target(AnnotationTarget.CONSTRUCTOR)
 @AroundConstruct
 @Around
-@interface TestAnn {
-}
+annotation class TestAnn
 
 @Singleton
-@InterceptorBean(TestAnn.class)
-class TestConstructInterceptor implements ConstructorInterceptor<Object> {
-    boolean invoked = false;
-    Object[] parameters;
+@InterceptorBean(TestAnn::class)
+class TestConstructInterceptor: ConstructorInterceptor<Any> {
+    var invoked = false
+    var parameters: Array<Any>? = null
 
-    @Override
-    public Object intercept(ConstructorInvocationContext<Object> context) {
-        invoked = true;
-        parameters = context.getParameterValues();
-        return context.proceed();
+    override fun intercept(context: ConstructorInvocationContext<Any>): Any {
+        invoked = true
+        parameters = context.parameterValues
+        return context.proceed()
     }
 }
 
@@ -601,63 +591,44 @@ class TestConstructInterceptor implements ConstructorInterceptor<Object> {
         constructorInterceptor.invoked
         constructorInterceptor.parameters.size() == 1
 
-
         cleanup:
         context.close()
-
     }
 
     void 'test around construct without around interception - interceptors from factory'() {
         given:
         ApplicationContext context = buildContext("""
-package annbinding1;
+package annbinding1
 
-import java.lang.annotation.*;
-import io.micronaut.aop.*;
-import io.micronaut.context.annotation.*;
-import jakarta.inject.*;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import io.micronaut.aop.*
+import io.micronaut.context.annotation.*
+import jakarta.inject.Singleton
 
 @Singleton
 @TestAnn
-class MyBean {
-    MyBean(io.micronaut.context.env.Environment env) {}
-    void test() {
+class MyBean(env: io.micronaut.context.env.Environment) {
+
+    fun test() {
     }
 }
 
-@io.micronaut.context.annotation.Factory
-class MyFactory {
-    @TestAnn
-    @Singleton
-    MyOtherBean test(io.micronaut.context.env.Environment env) {
-        return new MyOtherBean();
-    }
-}
-
-class MyOtherBean {}
-
-@Retention(RUNTIME)
-@Target({ElementType.METHOD, ElementType.TYPE})
+@Retention
+@Target(AnnotationTarget.FUNCTION, AnnotationTarget.CLASS)
 @AroundConstruct
-@interface TestAnn {
-}
-
+annotation class TestAnn
 
 @Factory
 class InterceptorFactory {
-    boolean aroundConstructInvoked = false;
+    var aroundConstructInvoked = false
 
-    @InterceptorBean(TestAnn.class)
-    ConstructorInterceptor<Object> aroundIntercept() {
-        return (context) -> {
-            this.aroundConstructInvoked = true;
-            return context.proceed();
-        };
+    @InterceptorBean(TestAnn::class)
+    fun aroundIntercept(): ConstructorInterceptor<Any> {
+        return ConstructorInterceptor { context -> 
+            this.aroundConstructInvoked = true
+            context.proceed()
+        }
     }
-
 }
-
 """)
         when:
         def factory = getBean(context, 'annbinding1.InterceptorFactory')
@@ -672,12 +643,11 @@ class InterceptorFactory {
         !(instance instanceof Intercepted)
         factory.aroundConstructInvoked
 
-
         cleanup:
         context.close()
-
     }
 
+    /*
     void 'test around construct with introduction advice'() {
         given:
         ApplicationContext context = buildContext("""

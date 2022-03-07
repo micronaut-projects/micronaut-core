@@ -356,8 +356,13 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         return shouldExclude(configurationMetadata.includes, configurationMetadata.excludes, propertyName)
     }
 
-    private fun visitFactoryMethod(methodElement: MethodElement) {
-        val producedClassElement = methodElement.genericReturnType
+    private fun visitFactoryMethod(methodElement_: MethodElement) {
+        val producedClassElement = methodElement_.genericReturnType
+        val newMetadata = AnnotationMetadataHierarchy(
+            producedClassElement.annotationMetadata,
+            methodElement_.annotationMetadata
+        )
+        val methodElement = methodElement_.withNewMetadata(newMetadata)
         val beanMethodWriter = BeanDefinitionWriter(
             methodElement,
             OriginatingElements.of(methodElement),

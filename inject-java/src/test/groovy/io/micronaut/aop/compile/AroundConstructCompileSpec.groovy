@@ -676,23 +676,11 @@ class MyBean {
     }
 }
 
-@io.micronaut.context.annotation.Factory
-class MyFactory {
-    @TestAnn
-    @Singleton
-    MyOtherBean test(io.micronaut.context.env.Environment env) {
-        return new MyOtherBean();
-    }
-}
-
-class MyOtherBean {}
-
 @Retention(RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE})
 @AroundConstruct
 @interface TestAnn {
 }
-
 
 @Factory
 class InterceptorFactory {
@@ -722,10 +710,8 @@ class InterceptorFactory {
         !(instance instanceof Intercepted)
         factory.aroundConstructInvoked
 
-
         cleanup:
         context.close()
-
     }
 
     void 'test around construct with introduction advice'() {
