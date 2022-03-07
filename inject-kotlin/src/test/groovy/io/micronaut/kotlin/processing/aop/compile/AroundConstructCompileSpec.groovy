@@ -2,6 +2,8 @@ package io.micronaut.kotlin.processing.aop.compile
 
 import io.micronaut.aop.Intercepted
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
+import spock.lang.PendingFeature
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -647,64 +649,58 @@ class InterceptorFactory {
         context.close()
     }
 
-    /*
+    @PendingFeature(reason = "annotation defaults")
     void 'test around construct with introduction advice'() {
         given:
         ApplicationContext context = buildContext("""
-package annbinding1;
+package annbinding1
 
-import java.lang.annotation.*;
-import io.micronaut.aop.*;
-import jakarta.inject.*;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import io.micronaut.aop.*
+import jakarta.inject.Singleton
 
 @Singleton
 @TestAnn
-abstract class MyBean {
-    MyBean(io.micronaut.context.env.Environment env) {}
-    abstract String test();
+abstract class MyBean(env: io.micronaut.context.env.Environment) {
+    abstract fun test(): String
 }
 
-
-@Retention(RUNTIME)
-@Target({ElementType.METHOD, ElementType.TYPE})
+@Retention
+@Target(AnnotationTarget.FUNCTION, AnnotationTarget.CLASS)
 @Introduction
 @AroundConstruct
-@interface TestAnn {
-}
+annotation class TestAnn
 
 @Singleton
-@InterceptorBean(TestAnn.class)
-class TestConstructInterceptor implements ConstructorInterceptor<Object> {
-    boolean invoked = false;
-    Object[] parameters;
+@InterceptorBean(TestAnn::class)
+class TestConstructInterceptor: ConstructorInterceptor<Any> {
+    var invoked = false
+    var parameters: Array<Any>? = null
 
-    @Override
-    public Object intercept(ConstructorInvocationContext<Object> context) {
-        invoked = true;
-        parameters = context.getParameterValues();
-        return context.proceed();
+    override fun intercept(context: ConstructorInvocationContext<Any>): Any {
+        invoked = true
+        parameters = context.parameterValues
+        return context.proceed()
     }
 }
 
 @Singleton
-@InterceptorBinding(TestAnn.class)
-class TestInterceptor implements MethodInterceptor {
-    boolean invoked = false;
-    @Override
-    public Object intercept(MethodInvocationContext context) {
-        invoked = true;
-        return "good";
+@InterceptorBinding(TestAnn::class)
+class TestInterceptor: MethodInterceptor<Any, Any> {
+    var invoked = false
+    
+    override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
+        invoked = true
+        return "good"
     }
 }
 
 @Singleton
-class AnotherInterceptor implements Interceptor {
-    boolean invoked = false;
-    @Override
-    public Object intercept(InvocationContext context) {
-        invoked = true;
-        return context.proceed();
+class AnotherInterceptor: Interceptor<Any, Any> {
+    var invoked = false
+    
+    override fun intercept(context: InvocationContext<Any, Any>): Any? {
+        invoked = true
+        return context.proceed()
     }
 }
 """)
@@ -731,7 +727,6 @@ class AnotherInterceptor implements Interceptor {
         !interceptor.invoked
         !anotherInterceptor.invoked
 
-
         when:"A method with interception is invoked"
         constructorInterceptor.invoked = false
         def result = instance.test()
@@ -746,8 +741,7 @@ class AnotherInterceptor implements Interceptor {
 
         cleanup:
         context.close()
-
     }
-*/
+
 }
 

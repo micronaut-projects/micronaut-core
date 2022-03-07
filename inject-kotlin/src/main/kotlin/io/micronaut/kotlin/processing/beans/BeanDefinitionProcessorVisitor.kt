@@ -12,8 +12,10 @@ import io.micronaut.core.util.ArrayUtils
 import io.micronaut.core.util.StringUtils
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
+import io.micronaut.inject.annotation.AnnotationMetadataReference
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.configuration.ConfigurationMetadata
+import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.inject.writer.OriginatingElements
@@ -385,6 +387,8 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
             val proxyWriter = createProxyWriter(methodElement, beanMethodWriter,true)
             visitConstructor(proxyWriter, producedClassElement)
             proxyWriter.visitTypeArguments(allTypeArguments)
+        } else if (methodElement.hasStereotype(Executable::class.java)) {
+            handleFactoryExecutable(methodElement.genericReturnType, methodElement, beanMethodWriter)
         }
         beanDefinitionWriters.add(beanMethodWriter)
     }
@@ -406,7 +410,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         if (hasAroundStereotype(propertyElement)) {
             handleFactoryPropertyAroundAdvice(propertyElement)
         } else if (propertyElement.hasStereotype(Executable::class.java)) {
-            handleFactoryPropertyExecutable(propertyElement)
+            handleFactoryExecutable(propertyElement.genericType, propertyElement, beanDefinitionWriter)
         }
         beanDefinitionWriters.add(beanDefinitionWriter)
     }
@@ -421,15 +425,34 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         }
     }
 
-    private fun handleFactoryPropertyExecutable(propertyElement: PropertyElement) {
-        if (propertyElement.isPrimitive) {
-            visitorContext.fail("Using '@Executable' is not allowed on primitive type beans", propertyElement)
+    private fun handleFactoryExecutable(classElement: ClassElement,
+                                        source: Element,
+                                        beanMethodWriter: BeanDefinitionWriter) {
+
+        if (classElement.isPrimitive) {
+            visitorContext.fail("Using '@Executable' is not allowed on primitive type beans", source)
             return
         }
-        if (propertyElement.isArray) {
-            visitorContext.fail("Using '@Executable' is not allowed on array type beans", propertyElement)
+        if (classElement.isArray) {
+            visitorContext.fail("Using '@Executable' is not allowed on array type beans", source)
             return
         }
+
+        val newMetadata: AnnotationMetadata = AnnotationMetadataReference(
+            beanMethodWriter.beanDefinitionName + BeanDefinitionReferenceWriter.REF_SUFFIX,
+            source.annotationMetadata
+        )
+
+        classElement.getEnclosedElements(ElementQuery.ALL_METHODS
+            .onlyAccessible()
+            .modifiers { !it.contains(ElementModifier.FINAL) })
+            .forEach { method ->
+                beanMethodWriter.visitExecutableMethod(
+                    method.declaringType,
+                    method.withNewMetadata(newMetadata),
+                    visitorContext
+                )
+            }
     }
 
     private fun handlePreDestroy(element: Element, producedType: ClassElement, beanDefinitionWriter: BeanDefinitionWriter) {

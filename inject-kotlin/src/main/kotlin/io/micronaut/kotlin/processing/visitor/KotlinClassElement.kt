@@ -509,10 +509,15 @@ open class KotlinClassElement(val classType: KSType,
     }
 
     private fun getAllDeclarations(): Set<KSDeclaration>  {
-        return getAllDeclarations(declaration, mutableListOf())
+        val excluded = mutableListOf<KSDeclaration>()
+        val declarations = getDeclarations(declaration, excluded)
+        declaration.getAllSuperTypes().forEach { superType ->
+            declarations.addAll(getDeclarations(superType.declaration as KSClassDeclaration, excluded))
+        }
+        return declarations
     }
 
-    private fun getAllDeclarations(declaration: KSClassDeclaration, excluded: MutableList<KSDeclaration>): Set<KSDeclaration>  {
+    private fun getDeclarations(declaration: KSClassDeclaration, excluded: MutableList<KSDeclaration>): MutableSet<KSDeclaration>  {
         val declarations = declaration.declarations
             .filter { !excluded.contains(it) }
             .toMutableSet()
@@ -530,9 +535,6 @@ open class KotlinClassElement(val classType: KSType,
                     overridee = overridee.findOverridee()
                 }
             }
-        }
-        declaration.getAllSuperTypes().forEach { superType ->
-            declarations.addAll(getAllDeclarations(superType.declaration as KSClassDeclaration, excluded))
         }
         return declarations
     }
