@@ -19,9 +19,15 @@ import io.micronaut.kotlin.processing.beans.BeanDefinitionProcessorProvider;
 import io.micronaut.kotlin.processing.visitor.TypeElementSymbolProcessorProvider;
 import org.intellij.lang.annotations.Language;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Arrays;
 import java.util.Collections;
@@ -99,12 +105,41 @@ public class KotlinCompiler {
                                        String suffix
                                        ) throws InstantiationException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
         String simpleName = NameUtils.getSimpleName(className);
-        String beanDefName= (simpleName.startsWith("$") ? "" : '$') + simpleName + suffix;
+        String beanDefName = (simpleName.startsWith("$") ? "" : '$') + simpleName + suffix;
         String packageName = NameUtils.getPackageName(className);
         String beanFullName = packageName + "." + beanDefName;
 
         ClassLoader classLoader = buildClassLoader(className, cls);
         return (T) loadDefinition(classLoader, beanFullName);
+    }
+
+    public static byte[] getClassBytes(String name, @Language("kotlin") String clazz) throws FileNotFoundException, IOException {
+        String simpleName = NameUtils.getSimpleName(name);
+        String className = (simpleName.startsWith("$") ? "" : '$') + simpleName;
+        String packageName = NameUtils.getPackageName(name);
+        String fileName = packageName.replace('.', '/') + '/' + className + ".class";
+        URLClassLoader classLoader = buildClassLoader(className, clazz);
+        File file = null;
+        for (URL url: classLoader.getURLs()) {
+            file = new File(url.getFile(), fileName);
+            if (file.exists()) {
+                break;
+            } else {
+                file = null;
+            }
+        }
+        if (file != null) {
+            try (InputStream is = new FileInputStream(file)) {
+                ByteArrayOutputStream answer = new ByteArrayOutputStream();
+                byte[] byteBuffer = new byte[8192];
+                int nbByteRead;
+                while ((nbByteRead = is.read(byteBuffer)) != -1) {
+                    answer.write(byteBuffer, 0, nbByteRead);
+                }
+                return answer.toByteArray();
+            }
+        }
+        return null;
     }
 
     public static ApplicationContext buildContext(@Language("kotlin") String clazz) {

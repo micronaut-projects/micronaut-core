@@ -5,6 +5,7 @@ import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil
 import io.micronaut.aop.writer.AopProxyWriter
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.annotation.AnnotationMetadataReference
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementQuery
@@ -26,13 +27,16 @@ class KotlinIntroductionInterfaceVisitor(private val classElement: ClassElement,
     }
 
     private fun visitMethod(methodElement: MethodElement) {
-        val annotationMetadata = AnnotationMetadataReference(
-            aopProxyWriter.beanDefinitionName + BeanDefinitionReferenceWriter.REF_SUFFIX,
-            annotationMetadata
-        )
+        val annotationMetadata = if (methodElement.annotationMetadata.isEmpty) {
+            AnnotationMetadataReference(
+                aopProxyWriter.beanDefinitionName + BeanDefinitionReferenceWriter.REF_SUFFIX,
+                annotationMetadata
+            )
+        } else {
+           AnnotationMetadataHierarchy(annotationMetadata, methodElement.annotationMetadata)
+        }
 
-        if (annotationMetadata.hasStereotype(AnnotationUtil.ANN_AROUND) || annotationMetadata.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)
-        ) {
+        if (annotationMetadata.hasStereotype(AnnotationUtil.ANN_AROUND) || annotationMetadata.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
             val interceptorTypes =
                 InterceptedMethodUtil.resolveInterceptorBinding(annotationMetadata, InterceptorKind.AROUND)
             aopProxyWriter.visitInterceptorBinding(*interceptorTypes)
