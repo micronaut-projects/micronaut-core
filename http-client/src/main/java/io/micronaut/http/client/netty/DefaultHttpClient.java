@@ -3298,10 +3298,9 @@ public class DefaultHttpClient implements
 
         private void addEventStreamHandlerIfNecessary(ChannelPipeline p) {
             // if the content type is a SSE event stream we add a decoder
-            // to delimit the content by lines
-            if (acceptsEventStream()) {
-                // If we are proxying, we should not strip the delimiter (see #6985)
-                p.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_EVENT_STREAM, new LineBasedFrameDecoder(configuration.getMaxContentLength(), !proxy, true) {
+            // to delimit the content by lines (unless we are proxying the stream)
+            if (acceptsEventStream() && !proxy) {
+                p.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_EVENT_STREAM, new LineBasedFrameDecoder(configuration.getMaxContentLength(), true, true) {
 
                     @Override
                     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
