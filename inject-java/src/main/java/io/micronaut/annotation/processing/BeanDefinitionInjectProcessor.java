@@ -713,7 +713,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         AnnotationMetadata annotationMetadata;
 
                         if (annotationUtils.isAnnotated(introductionType.getName(), method) || JavaAnnotationMetadataBuilder.hasAnnotation(method, Override.class)) {
-                            annotationMetadata = annotationUtils.newAnnotationBuilder().buildForParent(introductionType.getName(), classElement, method);
+                            // Class annotations are referenced by typeAnnotationMetadata
+                            annotationMetadata = annotationUtils.newAnnotationBuilder().buildForParent(introductionType.getName(), null, method);
                             annotationMetadata = new AnnotationMetadataHierarchy(typeAnnotationMetadata, annotationMetadata);
                         } else {
                             annotationMetadata = new AnnotationMetadataReference(

@@ -25,6 +25,7 @@ class RequestCertificateSpec extends AbstractMicronautSpec {
     Map<String, Object> getConfiguration() {
         super.getConfiguration() << [
                 'micronaut.server.ssl.enabled': true,
+                'micronaut.server.ssl.port': -1,
                 // Cannot be true!
                 'micronaut.server.ssl.buildSelfSigned': false,
                 'micronaut.ssl.clientAuthentication': "need",

@@ -282,6 +282,7 @@ cli:
 i18n:
   title: Internationalization
   bundle: Resource Bundles
+  localizedMessageSource: Localized Message Source
 appendix:
   title: Appendices
   architecture: 

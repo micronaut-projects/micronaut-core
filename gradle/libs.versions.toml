@@ -28,7 +28,6 @@ log4j = "2.17.1"
 mongo-javadriver = "3.12.10"
 mysql-driver = "8.0.27"
 powermock = "2.0.9"
-rxjava3 = "3.0.13"
 selenium = "3.141.59"
 smallrye = "5.1.0"
 systemlambda = "1.2.1"
@@ -39,7 +38,6 @@ wiremock = "2.27.2"
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
-managed-azure-function = "1.4.2"
 managed-commons-dbcp = "2.9.0"
 managed-dekorate = "1.0.3"
 managed-elasticsearch = "7.16.3"
@@ -74,17 +72,17 @@ managed-maven-native-plugin = "0.9.7.1"
 managed-methvin-directory-watcher = "0.15.0"
 managed-micrometer = "1.8.0"
 managed-micronaut-acme = "3.0.1"
-managed-micronaut-aws = "3.1.1"
-managed-micronaut-azure = "3.0.1"
+managed-micronaut-aws = "3.2.0"
+managed-micronaut-azure = "3.1.0"
 managed-micronaut-cache = "3.1.1"
 managed-micronaut-cassandra = "4.0.0"
 managed-micronaut-coherence = "3.0.1"
 managed-micronaut-data = "3.2.2"
 managed-micronaut-discovery = "3.1.0"
 managed-micronaut-elasticsearch = "4.2.0"
-managed-micronaut-email = "1.0.1"
+managed-micronaut-email = "1.1.0"
 managed-micronaut-flyway = "5.1.3"
-managed-micronaut-gcp = "4.0.0"
+managed-micronaut-gcp = "4.1.0"
 managed-micronaut-graphql = "3.0.0"
 managed-micronaut-groovy = "3.0.0"
 managed-micronaut-grpc = "3.1.3"
@@ -94,7 +92,7 @@ managed-micronaut-jaxrs = "3.1.0"
 managed-micronaut-jms = "2.0.0-M1"
 managed-micronaut-jmx = "3.0.0"
 managed-micronaut-kafka = "4.1.1"
-managed-micronaut-kotlin = "3.1.0"
+managed-micronaut-kotlin = "3.2.0"
 managed-micronaut-kubernetes = "3.3.0"
 managed-micronaut-liquibase = "5.1.1"
 managed-micronaut-micrometer = "4.1.1"
@@ -110,15 +108,15 @@ managed-micronaut-picocli = "4.1.0"
 managed-micronaut-problem = "2.2.0"
 managed-micronaut-rabbitmq = "3.1.0"
 managed-micronaut-r2dbc = "2.0.0"
-managed-micronaut-reactor = "2.1.1"
+managed-micronaut-reactor = "2.2.0"
 managed-micronaut-redis = "5.1.0"
 managed-micronaut-rss = "3.0.0"
 managed-micronaut-rxjava1 = "1.0.0"
-managed-micronaut-rxjava2 = "1.1.0"
-managed-micronaut-rxjava3 = "2.1.1"
-managed-micronaut-security = "3.3.0"
+managed-micronaut-rxjava2 = "1.2.0"
+managed-micronaut-rxjava3 = "2.2.0"
+managed-micronaut-security = "3.4.1"
 managed-micronaut-serialization = "1.0.0-RC2"
-managed-micronaut-servlet = "3.1.1"
+managed-micronaut-servlet = "3.2.0"
 managed-micronaut-spring = "4.0.1"
 managed-micronaut-sql = "4.1.1"
 managed-micronaut-test = "3.1.0"
@@ -138,10 +136,10 @@ managed-picocli = "4.6.1"
 managed-protobuf = "3.17.2"
 managed-reactive-pg-client = "0.11.4"
 managed-reactive-streams = "1.0.3"
+# This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
 managed-reactor = "3.4.14"
 managed-rxjava1 = "1.3.8"
 managed-rxjava1-interop = "0.13.7"
-managed-rxjava2 = "2.2.10"
 managed-slf4j = "1.7.29"
 managed-spock = "2.0-groovy-3.0"
 managed-spotbugs = "4.0.3"
@@ -156,17 +154,23 @@ micronaut-docs = "2.0.0"
 [libraries]
 # Libraries prefixed with bom- are BOM files
 boms-micronaut-aws = { module = "io.micronaut.aws:micronaut-aws-bom", version.ref = "managed-micronaut-aws" }
+boms-micronaut-azure = { module = "io.micronaut.azure:micronaut-azure-bom", version.ref = "managed-micronaut-azure" }
 boms-micronaut-cache = { module = "io.micronaut.cache:micronaut-cache-bom", version.ref = "managed-micronaut-cache" }
 boms-micronaut-coherence = { module = "io.micronaut.coherence:micronaut-coherence-bom", version.ref = "managed-micronaut-coherence" }
 boms-micronaut-email = { module = "io.micronaut.email:micronaut-email-bom", version.ref = "managed-micronaut-email" }
 boms-micronaut-data = { module = "io.micronaut.data:micronaut-data-bom", version.ref = "managed-micronaut-data" }
 boms-micronaut-groovy = { module = "io.micronaut.groovy:micronaut-groovy-bom", version.ref = "managed-micronaut-groovy" }
+boms-micronaut-kotlin = { module = "io.micronaut.kotlin:micronaut-kotlin-bom", version.ref = "managed-micronaut-kotlin" }
 boms-micronaut-kubernetes = { module = "io.micronaut.kubernetes:micronaut-kubernetes-bom", version.ref = "managed-micronaut-kubernetes" }
 boms-micronaut-micrometer = { module = "io.micronaut.micrometer:micronaut-micrometer-bom", version.ref = "managed-micronaut-micrometer" }
 boms-micronaut-oraclecloud = { module = "io.micronaut.oraclecloud:micronaut-oraclecloud-bom", version.ref = "managed-micronaut-oraclecloud" }
 boms-micronaut-problem-json = { module = "io.micronaut.problem:micronaut-problem-json-bom", version.ref = "managed-micronaut-problem" }
+boms-micronaut-rxjava2 = { module = "io.micronaut.rxjava2:micronaut-rxjava2-bom", version.ref = "managed-micronaut-rxjava2" }
+boms-micronaut-rxjava3 = { module = "io.micronaut.rxjava3:micronaut-rxjava3-bom", version.ref = "managed-micronaut-rxjava3" }
+boms-micronaut-reactor = { module = "io.micronaut.reactor:micronaut-reactor-bom", version.ref = "managed-micronaut-reactor" }
 boms-micronaut-security = { module = "io.micronaut.security:micronaut-security-bom", version.ref = "managed-micronaut-security" }
 boms-micronaut-serialization = { module = "io.micronaut.serde:micronaut-serde-bom", version.ref = "managed-micronaut-serialization" }
+boms-micronaut-servlet = { module = "io.micronaut.servlet:micronaut-servlet-bom", version.ref = "managed-micronaut-servlet" }
 boms-micronaut-sql = { module = "io.micronaut.sql:micronaut-sql-bom", version.ref = "managed-micronaut-sql" }
 boms-micronaut-test = { module = "io.micronaut.test:micronaut-test-bom", version.ref = "managed-micronaut-test" }
 boms-micronaut-tracing = { module = "io.micronaut.tracing:micronaut-tracing-bom", version.ref = "managed-micronaut-tracing" }
@@ -190,9 +194,6 @@ boms-testcontainers = { module = "org.testcontainers:testcontainers-bom", versio
 # Libraries which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM
 #
-
-managed-azure-functions = { module = "com.microsoft.azure.functions:azure-functions-java-library", version.ref = "managed-azure-function" }
-
 managed-commons-dbcp = { module = "org.apache.commons:commons-dbcp2", version.ref = "managed-commons-dbcp" }
 
 managed-dekorate = { module = "io.dekorate:dekorate-project", version.ref = "managed-dekorate" }
@@ -286,9 +287,6 @@ managed-netty-transport-native-epoll = { module = "io.netty:netty-transport-nati
 managed-netty-transport-native-kqueue = { module = "io.netty:netty-transport-native-kqueue", version.ref = "managed-netty" }
 
 managed-micronaut-acme = { module = "io.micronaut.acme:micronaut-acme", version.ref = "managed-micronaut-acme" }
-managed-micronaut-azure-function = { module = "io.micronaut.azure:micronaut-azure-function", version.ref = "managed-micronaut-azure" }
-managed-micronaut-azure-function-http = { module = "io.micronaut.azure:micronaut-azure-function-http", version.ref = "managed-micronaut-azure" }
-managed-micronaut-azure-function-http-test = { module = "io.micronaut.azure:micronaut-azure-function-http-test", version.ref = "managed-micronaut-azure" }
 managed-micronaut-cassandra = { module = "io.micronaut.cassandra:micronaut-cassandra", version.ref = "managed-micronaut-cassandra" }
 managed-micronaut-discovery = { module = "io.micronaut.discovery:micronaut-discovery-client", version.ref = "managed-micronaut-discovery" }
 managed-micronaut-elasticsearch = { module = "io.micronaut.elasticsearch:micronaut-elasticsearch", version.ref = "managed-micronaut-elasticsearch" }
@@ -320,9 +318,6 @@ managed-micronaut-jms-sqs = { module = "io.micronaut.jms:micronaut-jms-sqs", ver
 managed-micronaut-jmx = { module = "io.micronaut.jmx:micronaut-jmx", version.ref = "managed-micronaut-jmx" }
 managed-micronaut-kafka = { module = "io.micronaut.kafka:micronaut-kafka", version.ref = "managed-micronaut-kafka" }
 managed-micronaut-kafka-streams = { module = "io.micronaut.kafka:micronaut-kafka-streams", version.ref = "managed-micronaut-kafka" }
-managed-micronaut-kotlin = { module = "io.micronaut.kotlin:micronaut-kotlin-runtime", version.ref = "managed-micronaut-kotlin" }
-managed-micronaut-kotlin-ktor = { module = "io.micronaut.kotlin:micronaut-ktor", version.ref = "managed-micronaut-kotlin" }
-managed-micronaut-kotlin-extension-functions = { module = "io.micronaut.kotlin:micronaut-kotlin-extension-functions", version.ref = "managed-micronaut-kotlin" }
 managed-micronaut-liquibase = { module = "io.micronaut.liquibase:micronaut-liquibase", version.ref = "managed-micronaut-liquibase" }
 managed-micronaut-mongo = { module = "io.micronaut.mongodb:micronaut-mongo-reactive", version.ref = "managed-micronaut-mongo" }
 managed-micronaut-mongo-core = { module = "io.micronaut.mongodb:micronaut-mongo-core", version.ref = "managed-micronaut-mongo" }
@@ -340,8 +335,6 @@ managed-micronaut-netflix-ribbon = { module = "io.micronaut.netflix:micronaut-ne
 managed-micronaut-openapi = { module = "io.micronaut.openapi:micronaut-openapi", version.ref = "managed-micronaut-openapi" }
 managed-micronaut-picocli = { module = "io.micronaut.picocli:micronaut-picocli", version.ref = "managed-micronaut-picocli" }
 managed-micronaut-rabbitmq = { module = "io.micronaut.rabbitmq:micronaut-rabbitmq", version.ref = "managed-micronaut-rabbitmq" }
-managed-micronaut-reactor = { module = "io.micronaut.reactor:micronaut-reactor", version.ref = "managed-micronaut-reactor" }
-managed-micronaut-reactor-http-client = { module = "io.micronaut.reactor:micronaut-reactor-http-client", version.ref = "managed-micronaut-reactor" }
 managed-micronaut-redis = { module = "io.micronaut.redis:micronaut-redis-lettuce", version.ref = "managed-micronaut-redis" }
 managed-micronaut-rss = { module = "io.micronaut.rss:micronaut-rss", version.ref = "managed-micronaut-rss" }
 managed-micronaut-rss-core = { module = "io.micronaut.rss:micronaut-rss-core", version.ref = "managed-micronaut-rss" }
@@ -350,15 +343,6 @@ managed-micronaut-rss-itunespodcast = { module = "io.micronaut.rss:micronaut-itu
 managed-micronaut-rss-jsonfeed-core = { module = "io.micronaut.rss:micronaut-jsonfeed-core", version.ref = "managed-micronaut-rss" }
 managed-micronaut-rss-jsonfeed = { module = "io.micronaut.rss:micronaut-jsonfeed", version.ref = "managed-micronaut-rss" }
 managed-micronaut-rxjava1 = { module = "io.micronaut.rxjava1:micronaut-rxjava1", version.ref = "managed-micronaut-rxjava1" }
-managed-micronaut-rxjava2 = { module = "io.micronaut.rxjava2:micronaut-rxjava2", version.ref = "managed-micronaut-rxjava2" }
-managed-micronaut-rxjava2-http-client = { module = "io.micronaut.rxjava2:micronaut-rxjava2-http-client", version.ref = "managed-micronaut-rxjava2" }
-managed-micronaut-rxjava2-http-server-netty = { module = "io.micronaut.rxjava2:micronaut-rxjava2-http-server-netty", version.ref = "managed-micronaut-rxjava2" }
-managed-micronaut-rxjava3 = { module = "io.micronaut.rxjava3:micronaut-rxjava3", version.ref = "managed-micronaut-rxjava3" }
-managed-micronaut-rxjava3-http-client = { module = "io.micronaut.rxjava3:micronaut-rxjava3-http-client", version.ref = "managed-micronaut-rxjava3" }
-managed-micronaut-servlet = { module = "io.micronaut.servlet:micronaut-servlet-core", version.ref = "managed-micronaut-servlet" }
-managed-micronaut-servlet-http-server-tomcat = { module = "io.micronaut.servlet:micronaut-http-server-tomcat", version.ref = "managed-micronaut-servlet" }
-managed-micronaut-servlet-http-server-jetty = { module = "io.micronaut.servlet:micronaut-http-server-jetty", version.ref = "managed-micronaut-servlet" }
-managed-micronaut-servlet-http-server-undertow = { module = "io.micronaut.servlet:micronaut-http-server-undertow", version.ref = "managed-micronaut-servlet" }
 managed-micronaut-spring = { module = "io.micronaut.spring:micronaut-spring", version.ref = "managed-micronaut-spring" }
 managed-micronaut-spring-annotation = { module = "io.micronaut.spring:micronaut-spring-annotation", version.ref = "managed-micronaut-spring" }
 managed-micronaut-spring-boot = { module = "io.micronaut.spring:micronaut-spring-boot", version.ref = "managed-micronaut-spring" }
@@ -390,7 +374,6 @@ managed-reactor = { module = "io.projectreactor:reactor-core", version.ref = "ma
 
 managed-rxjava1 = { module = "io.reactivex:rxjava", version.ref = "managed-rxjava1" }
 managed-rxjava1-interop = { module = "com.github.akarnokd:rxjava2-interop", version.ref = "managed-rxjava1-interop" }
-managed-rxjava2 = { module = "io.reactivex.rxjava2:rxjava", version.ref = "managed-rxjava2" }
 
 managed-slf4j = { module = "org.slf4j:slf4j-api", version.ref = "managed-slf4j" }
 managed-slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "managed-slf4j" }

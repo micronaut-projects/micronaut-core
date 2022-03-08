@@ -316,8 +316,8 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             if (bodyPublisher != null) {
                 ctx.fireChannelRead(content);
                 if (content instanceof LastHttpContent) {
-                    removeHandlerIfActive(ctx, HANDLER_BODY_PUBLISHER);
                     currentlyStreamedMessage = null;
+                    removeHandlerIfActive(ctx, HANDLER_BODY_PUBLISHER);
                     consumedInMessage(ctx);
                 }
             } else {
