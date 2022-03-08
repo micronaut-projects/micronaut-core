@@ -90,7 +90,7 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
                 if (LOG.isTraceEnabled()) {
                     LOG.trace("Resolved {} {} interceptors out of a possible {} for method: {} - {}", resolvedInterceptors.length, interceptorKind, interceptors.size(), method.getDeclaringType(), method instanceof Described ? ((Described) method).getDescription(true) : method.toString());
                     for (int i = 0; i < resolvedInterceptors.length; i++) {
-                        Interceptor resolvedInterceptor = resolvedInterceptors[i];
+                        Interceptor<?, ?> resolvedInterceptor = resolvedInterceptors[i];
                         LOG.trace("Interceptor {} - {}", i, resolvedInterceptor);
                     }
                 }
@@ -101,9 +101,9 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
     }
 
     @SuppressWarnings("rawtypes")
-    private <T> Interceptor[] resolveToNone(ExecutableMethod<?, ?> method,
-                                            InterceptorKind interceptorKind,
-                                            AnnotationMetadata annotationMetadata) {
+    private Interceptor[] resolveToNone(ExecutableMethod<?, ?> method,
+                                        InterceptorKind interceptorKind,
+                                        AnnotationMetadata annotationMetadata) {
         if (interceptorKind == InterceptorKind.INTRODUCTION) {
             if (annotationMetadata.hasStereotype(Adapter.class)) {
                 return new MethodInterceptor[] { new AdapterIntroduction(beanContext, method) };
@@ -254,7 +254,7 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
         if (LOG.isTraceEnabled()) {
             LOG.trace("Resolved {} {} interceptors out of a possible {} for constructor: {} - {}", resolvedInterceptors.length, InterceptorKind.AROUND_CONSTRUCT, interceptors.size(), constructor.getDeclaringBeanType(), constructor.getDescription(true));
             for (int i = 0; i < resolvedInterceptors.length; i++) {
-                Interceptor resolvedInterceptor = resolvedInterceptors[i];
+                Interceptor<?, ?> resolvedInterceptor = resolvedInterceptors[i];
                 LOG.trace("Interceptor {} - {}", i, resolvedInterceptor);
             }
         }

@@ -544,7 +544,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> Locale
-        addConverter(CharSequence.class, Locale.class, (object) -> StringUtils.parseLocale(object.toString()));
+        addConverter(CharSequence.class, Locale.class, object -> StringUtils.parseLocale(object.toString()));
 
         // String -> UUID
         addConverter(CharSequence.class, UUID.class, (CharSequence object, Class<UUID> targetType, ConversionContext context) -> {
@@ -641,9 +641,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> Char Array
-        addConverter(String.class, char[].class, (String object, Class<char[]> targetType, ConversionContext context) -> {
-            return Optional.of(object.toCharArray());
-        });
+        addConverter(String.class, char[].class, (String object, Class<char[]> targetType, ConversionContext context) -> Optional.of(object.toCharArray()));
 
         // Object[] -> String[]
         addConverter(Object[].class, String[].class, (Object[] object, Class<String[]> targetType, ConversionContext context) -> {
