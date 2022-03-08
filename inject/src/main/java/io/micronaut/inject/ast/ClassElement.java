@@ -383,6 +383,10 @@ public interface ClassElement extends TypedElement {
         return this;
     }
 
+    default ClassElement withNewMetadata(@NonNull AnnotationMetadata annotationMetadata) {
+        throw new UnsupportedOperationException();
+    }
+
     /**
      * Perform a fold operation on the type arguments (type arguments, wildcard bounds, resolved via {@link #getBoundGenericTypes()}), and then on this
      * type. For {@code List<? extends String>}, this returns {@code f(List<f(? extends f(String))>)}. The bounds of

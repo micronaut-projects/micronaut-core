@@ -92,7 +92,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         return if (declaration is KSClassDeclaration && declaration.classKind == ClassKind.ENUM_CLASS) {
             KotlinEnumElement(type, annotationMetadata, visitorContext)
         } else {
-            KotlinClassElement(type, annotationMetadata, visitorContext)
+            KotlinClassElement(type, annotationMetadata, visitorContext, resolvedGenerics)
         }
     }
 
@@ -158,12 +158,16 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
             allTypeArguments[it.name.asString()] = KotlinGenericPlaceholderElement(it, annotationUtils.getAnnotationMetadata(it), visitorContext)
         }
 
+        val returnTypeElement = newClassElement(returnType, annotationUtils.getAnnotationMetadata(returnType.declaration))
+        val genericReturnTypeElement = newClassElement(returnType, annotationUtils.getAnnotationMetadata(returnType.declaration), allTypeArguments)
+
         return KotlinMethodElement(
             method,
             declaringClass,
-            newClassElement(returnType, annotationUtils.getAnnotationMetadata(returnType.declaration), allTypeArguments),
+            returnTypeElement,
+            genericReturnTypeElement,
             method.parameters.map { param ->
-                KotlinParameterElement(newClassElement(param.type.resolve(), allTypeArguments), param, annotationUtils.getAnnotationMetadata(param), visitorContext)
+                KotlinParameterElement(newClassElement(param.type.resolve(), allTypeArguments), newClassElement(param.type.resolve()), param, annotationUtils.getAnnotationMetadata(param), visitorContext)
             },
             annotationMetadata,
             visitorContext)
@@ -185,7 +189,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         annotationMetadata: AnnotationMetadata
     ): MethodElement {
         val annotationUtils = visitorContext.getAnnotationUtils()
-        return KotlinMethodElement(method, declaringClass, annotationMetadata, visitorContext, KotlinParameterElement(type, method.parameter, AnnotationMetadataHierarchy(annotationMetadata, annotationUtils.getAnnotationMetadata(method.parameter)), visitorContext))
+        return KotlinMethodElement(method, declaringClass, annotationMetadata, visitorContext, KotlinParameterElement(type, type, method.parameter, AnnotationMetadataHierarchy(annotationMetadata, annotationUtils.getAnnotationMetadata(method.parameter)), visitorContext))
     }
 
     override fun newConstructorElement(
@@ -195,7 +199,7 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
     ): ConstructorElement {
         val annotationUtils = visitorContext.getAnnotationUtils()
         return KotlinConstructorElement(constructor, declaringClass, annotationMetadata, visitorContext, declaringClass, constructor.parameters.map { param ->
-            KotlinParameterElement(newClassElement(param.type.resolve(), declaringClass.typeArguments), param, annotationUtils.getAnnotationMetadata(param), visitorContext)
+            KotlinParameterElement(newClassElement(param.type.resolve(), declaringClass.typeArguments), newClassElement(param.type.resolve()), param, annotationUtils.getAnnotationMetadata(param), visitorContext)
         })
     }
 

@@ -286,20 +286,24 @@ public class JavaModelUtils {
                 Class<?> t = (Class<?>) nativeType;
                 return Type.getType(t);
             } else {
+                boolean isArray = type.isArray();
+                int arrayDimensions = type.getArrayDimensions();
                 if (classElement instanceof GenericPlaceholderElement) {
                     List<? extends ClassElement> bounds = ((GenericPlaceholderElement) classElement).getBounds();
                     if (bounds.size() > 0) {
                         type = bounds.get(0);
+                        isArray = classElement.isArray();
+                        arrayDimensions = classElement.getArrayDimensions();
                     }
                 }
                 String internalName = type.getType().getName().replace('.', '/');
                 if (internalName.isEmpty()) {
                     return Type.getType(Object.class);
                 }
-                if (type.isArray()) {
+                if (isArray) {
                     StringBuilder name = new StringBuilder(internalName);
                     name.insert(0, "L");
-                    for (int i = 0; i < type.getArrayDimensions(); i++) {
+                    for (int i = 0; i < arrayDimensions; i++) {
                         name.insert(0, "[");
                     }
                     name.append(";");

@@ -17,6 +17,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
     private val declaringType: ClassElement
     private val parameters: List<ParameterElement>
     private val returnType: ClassElement
+    private val genericReturnType: ClassElement
     private val abstract: Boolean
 
     constructor(method: KSPropertySetter,
@@ -29,6 +30,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
         this.declaringType = declaringType
         this.parameters = listOf(parameter)
         this.returnType = PrimitiveElement.VOID
+        this.genericReturnType = PrimitiveElement.VOID
         this.abstract = method.modifiers.contains(Modifier.ABSTRACT)
     }
 
@@ -42,12 +44,14 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
         this.declaringType = declaringType
         this.parameters = emptyList()
         this.returnType = returnType
+        this.genericReturnType = returnType
         this.abstract = method.modifiers.contains(Modifier.ABSTRACT)
     }
 
     constructor(method: KSFunctionDeclaration,
                 declaringType: ClassElement,
                 returnType: ClassElement,
+                genericReturnType: ClassElement,
                 parameters: List<ParameterElement>,
                 annotationMetadata: AnnotationMetadata,
                 visitorContext: KotlinVisitorContext,
@@ -56,6 +60,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
         this.declaringType = declaringType
         this.parameters = parameters
         this.returnType = returnType
+        this.genericReturnType = genericReturnType
         this.abstract = method.isAbstract
     }
 
@@ -65,6 +70,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
                           annotationMetadata: AnnotationMetadata,
                           visitorContext: KotlinVisitorContext,
                           returnType: ClassElement,
+                          genericReturnType: ClassElement,
                           parameters: List<ParameterElement>,
                           abstract: Boolean
     ) : super(method, annotationMetadata, visitorContext) {
@@ -72,6 +78,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
         this.declaringType = declaringType
         this.parameters = parameters
         this.returnType = returnType
+        this.genericReturnType = genericReturnType
         this.abstract = abstract
     }
 
@@ -87,6 +94,10 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
         return returnType
     }
 
+    override fun getGenericReturnType(): ClassElement {
+        return genericReturnType
+    }
+
     override fun getParameters(): Array<ParameterElement> {
         return parameters.toTypedArray()
     }
@@ -94,11 +105,11 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
     override fun isAbstract(): Boolean = abstract
 
     override fun withNewParameters(vararg newParameters: ParameterElement): MethodElement {
-        return KotlinMethodElement(declaration, name, declaringType, annotationMetadata, visitorContext, returnType, newParameters.toList(), abstract)
+        return KotlinMethodElement(declaration, name, declaringType, annotationMetadata, visitorContext, returnType, genericReturnType, newParameters.toList(), abstract)
     }
 
     override fun withNewMetadata(annotationMetadata: AnnotationMetadata): MethodElement {
-        return KotlinMethodElement(declaration, name, declaringType, annotationMetadata, visitorContext, returnType, parameters, abstract)
+        return KotlinMethodElement(declaration, name, declaringType, annotationMetadata, visitorContext, returnType, genericReturnType, parameters, abstract)
     }
 
 }
