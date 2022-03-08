@@ -7,7 +7,7 @@ import io.micronaut.inject.ast.EnumElement
 import io.micronaut.inject.ast.MethodElement
 import java.util.*
 
-class KotlinEnumElement(classType: KSType, annotationMetadata: AnnotationMetadata, visitorContext: KotlinVisitorContext): KotlinClassElement(classType, annotationMetadata, visitorContext), EnumElement {
+class KotlinEnumElement(classType: KSType, annotationMetadata: AnnotationMetadata, visitorContext: KotlinVisitorContext): KotlinClassElement(classType, annotationMetadata, visitorContext, emptyMap()), EnumElement {
 
     override fun values(): List<String> {
         return declaration.declarations

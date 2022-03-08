@@ -58,7 +58,7 @@ abstract class MyBean {
     abstract fun test()
     
     fun test2(): String {
-        return "good";
+        return "good"
     }
     
     @Mutating("arg")
@@ -84,35 +84,34 @@ abstract class MyBean {
         then:
         bean.test2() == 'good'
         bean.test3() == 'changed'
-        notImplementedAdvice.invoked
+        !notImplementedAdvice.invoked
 
         cleanup:
         context.close()
     }
-/*
+
     void "test @Min annotation"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
-package test;
+package test
 
-import io.micronaut.aop.introduction.*;
-import io.micronaut.context.annotation.*;
-import java.net.*;
-import javax.validation.constraints.*;
+import io.micronaut.kotlin.processing.aop.introduction.Stub
+import io.micronaut.context.annotation.Executable
+import javax.validation.constraints.Min
+import javax.validation.constraints.NotBlank
 
 interface MyInterface{
     @Executable
-    void save(@NotBlank String name, @Min(1L) int age);
+    fun save(@NotBlank name: String, @Min(1L) age: Int)
+    
     @Executable
-    void saveTwo(@Min(1L) String name);
+    fun saveTwo(@Min(1L) name: String)
 }
 
 
 @Stub
 @jakarta.inject.Singleton
-interface MyBean extends MyInterface {
-}
-
+interface MyBean: MyInterface
 ''')
         then:
         !beanDefinition.isAbstract()
@@ -128,7 +127,6 @@ interface MyBean extends MyInterface {
         beanDefinition.executableMethods[1].methodName == 'saveTwo'
         beanDefinition.executableMethods[1].returnType.type == void.class
         beanDefinition.executableMethods[1].arguments[0].getAnnotationMetadata().hasAnnotation(Min)
-
     }
-*/
+
 }

@@ -16,6 +16,7 @@ import java.util.function.Predicate
 open class KotlinClassElement(val classType: KSType,
                               annotationMetadata: AnnotationMetadata,
                               visitorContext: KotlinVisitorContext,
+                              private val resolvedGenerics: Map<String, ClassElement>,
                               private val arrayDimensions: Int = 0,
                               private val typeVariable: Boolean = false): AbstractKotlinElement<KSClassDeclaration>(classType.declaration as KSClassDeclaration, annotationMetadata, visitorContext), ArrayableClassElement {
 
@@ -121,7 +122,7 @@ open class KotlinClassElement(val classType: KSType,
     }
 
     override fun withArrayDimensions(arrayDimensions: Int): ClassElement {
-        return KotlinClassElement(classType, annotationMetadata, visitorContext, arrayDimensions)
+        return KotlinClassElement(classType, annotationMetadata, visitorContext, resolvedGenerics, arrayDimensions)
     }
 
     override fun isInner(): Boolean {
@@ -139,12 +140,20 @@ open class KotlinClassElement(val classType: KSType,
             }
         } else {
             classType.arguments.forEachIndexed { i, argument ->
-                val type = argument.type!!
-                val typeElement = elementFactory.newClassElement(
-                    type.resolve(),
-                    annotationUtils.getAnnotationMetadata(name, type),
-                    emptyMap(),
-                    false)
+                val typeReference = argument.type!!
+                val type = typeReference.resolve()
+                val declaration = type.declaration
+                val key = declaration.simpleName.asString()
+                val metadata = annotationUtils.getAnnotationMetadata(name, typeReference)
+                val typeElement = if (declaration is KSTypeParameter && resolvedGenerics.containsKey(key)) {
+                    resolvedGenerics[key]!!.withNewMetadata(metadata)
+                } else {
+                    elementFactory.newClassElement(
+                        type,
+                        metadata,
+                        resolvedGenerics,
+                        false)
+                }
                 typeArguments[typeParameters[i].name.asString()] = typeElement
             }
         }
@@ -661,6 +670,10 @@ open class KotlinClassElement(val classType: KSType,
                 getIntroductionInterfaces(ann.annotationType.resolve().declaration.annotations, elements, visited)
             }
         }
+    }
+
+    override fun withNewMetadata(annotationMetadata: AnnotationMetadata): ClassElement {
+        return KotlinClassElement(classType, annotationMetadata, visitorContext, resolvedGenerics, arrayDimensions, typeVariable)
     }
 
     private class GetterAndSetter(val type: ClassElement,

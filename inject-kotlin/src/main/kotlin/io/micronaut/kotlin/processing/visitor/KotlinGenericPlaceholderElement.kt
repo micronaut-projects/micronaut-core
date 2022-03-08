@@ -44,4 +44,8 @@ class KotlinGenericPlaceholderElement(
     override fun getDeclaringElement(): Optional<Element> {
         return Optional.empty()
     }
+
+    override fun withNewMetadata(annotationMetadata: AnnotationMetadata): ClassElement {
+        return KotlinGenericPlaceholderElement(declaration, annotationMetadata, visitorContext, arrayDimensions)
+    }
 }

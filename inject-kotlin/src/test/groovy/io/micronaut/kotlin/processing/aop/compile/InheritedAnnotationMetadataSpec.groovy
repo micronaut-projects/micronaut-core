@@ -49,11 +49,12 @@ package test
 
 import io.micronaut.kotlin.processing.aop.simple.Mutating
 import io.micronaut.context.annotation.Executable
+import io.micronaut.context.annotation.Value
 import io.micronaut.core.annotation.Blocking
 
 @Mutating("someVal")
 @jakarta.inject.Singleton
-class MyBean(@Value("\\${foo.bar}") private val myValue: String): MyInterface {
+open class MyBean(@Value("\\${foo.bar}") private val myValue: String): MyInterface {
 
     override fun someMethod(): String {
         return myValue
