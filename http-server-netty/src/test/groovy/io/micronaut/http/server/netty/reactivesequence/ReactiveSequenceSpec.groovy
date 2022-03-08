@@ -1,8 +1,8 @@
 package io.micronaut.http.server.netty.reactivesequence
 
-import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -12,18 +12,22 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.DefaultHttpClientConfiguration
-import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
-import reactor.core.publisher.Mono
+import spock.lang.IgnoreIf
 import spock.lang.Specification
+import spock.util.environment.Jvm
+
 import java.time.Duration
 
 class ReactiveSequenceSpec extends Specification {
 
+    //Ignored because it is flaky for JDK 17 and CI
+    @IgnoreIf({ env["GITHUB_WORKFLOW"] && Jvm.current.isJava17Compatible() })
     void "test reactive sequence"() {
         given:
         Map<String, Object> inventoryConfig = [
