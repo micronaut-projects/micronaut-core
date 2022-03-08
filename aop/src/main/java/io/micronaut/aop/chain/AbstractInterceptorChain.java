@@ -53,13 +53,17 @@ import java.util.stream.Collectors;
  */
 @Internal
 abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R> {
+    /**
+     * Used by subclasses!
+     */
     protected static final Logger LOG = LoggerFactory.getLogger(InterceptorChain.class);
+
     protected final Interceptor<B, R>[] interceptors;
     protected final Object[] originalParameters;
     protected final int interceptorCount;
-    protected MutableConvertibleValues<Object> attributes;
+    protected volatile MutableConvertibleValues<Object> attributes;
     protected int index = 0;
-    protected Map<String, MutableArgumentValue<?>> parameters;
+    protected volatile Map<String, MutableArgumentValue<?>> parameters;
 
     AbstractInterceptorChain(Interceptor<B, R>[] interceptors, Object... originalParameters) {
         this.interceptors = interceptors;
@@ -74,32 +78,32 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
 
     @Override
     public @NonNull MutableConvertibleValues<Object> getAttributes() {
-        MutableConvertibleValues<Object> attributes = this.attributes;
-        if (attributes == null) {
+        MutableConvertibleValues<Object> localAttributes = this.attributes;
+        if (localAttributes == null) {
             synchronized (this) { // double check
-                attributes = this.attributes;
-                if (attributes == null) {
-                    attributes = MutableConvertibleValues.of(new ConcurrentHashMap<>(5));
-                    this.attributes = attributes;
+                localAttributes = this.attributes;
+                if (localAttributes == null) {
+                    localAttributes = MutableConvertibleValues.of(new ConcurrentHashMap<>(5));
+                    this.attributes = localAttributes;
                 }
             }
         }
-        return attributes;
+        return localAttributes;
     }
 
     @Override
     public @NonNull Map<String, MutableArgumentValue<?>> getParameters() {
-        Map<String, MutableArgumentValue<?>>  parameters = this.parameters;
-        if (parameters == null) {
+        Map<String, MutableArgumentValue<?>>  localParameters = this.parameters;
+        if (localParameters == null) {
             synchronized (this) { // double check
-                parameters = this.parameters;
-                if (parameters == null) {
+                localParameters = this.parameters;
+                if (localParameters == null) {
                     Argument[] arguments = getArguments();
-                    parameters = new LinkedHashMap<>(arguments.length);
+                    localParameters = new LinkedHashMap<>(arguments.length);
                     for (int i = 0; i < arguments.length; i++) {
                         Argument argument = arguments[i];
                         int finalIndex = i;
-                        parameters.put(argument.getName(), new MutableArgumentValue<Object>() {
+                        localParameters.put(argument.getName(), new MutableArgumentValue<Object>() {
                             @Override
                             public AnnotationMetadata getAnnotationMetadata() {
                                 return argument.getAnnotationMetadata();
@@ -153,12 +157,12 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
                             }
                         });
                     }
-                    parameters = Collections.unmodifiableMap(parameters);
-                    this.parameters = parameters;
+                    localParameters = Collections.unmodifiableMap(localParameters);
+                    this.parameters = localParameters;
                 }
             }
         }
-        return parameters;
+        return localParameters;
     }
 
     @Override

@@ -33,8 +33,8 @@ import io.micronaut.core.order.Ordered;
  * @author graemerocher
  * @since 3.3.0
  */
-@ConfigurationProperties(DefaultByteBufAllocatorConfiguration.DEFAULT_ALLOCATOR)
-@Requires(property = DefaultByteBufAllocatorConfiguration.DEFAULT_ALLOCATOR)
+@ConfigurationProperties(ByteBufAllocatorConfiguration.DEFAULT_ALLOCATOR)
+@Requires(property = ByteBufAllocatorConfiguration.DEFAULT_ALLOCATOR)
 @Context
 @BootstrapContextCompatible
 @Internal

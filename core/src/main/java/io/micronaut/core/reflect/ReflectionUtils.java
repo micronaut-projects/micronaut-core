@@ -52,35 +52,37 @@ public class ReflectionUtils {
     @UsedByGeneratedCode
     public static final Class[] EMPTY_CLASS_ARRAY = new Class[0];
 
-    private static final Map<Class<?>, Class<?>> PRIMITIVES_TO_WRAPPERS =
-        Collections.unmodifiableMap(new LinkedHashMap<Class<?>, Class<?>>() {
-            {
-                put(boolean.class, Boolean.class);
-                put(byte.class, Byte.class);
-                put(char.class, Character.class);
-                put(double.class, Double.class);
-                put(float.class, Float.class);
-                put(int.class, Integer.class);
-                put(long.class, Long.class);
-                put(short.class, Short.class);
-                put(void.class, Void.class);
-            }
-        });
+    private static final Map<Class<?>, Class<?>> PRIMITIVES_TO_WRAPPERS;
 
-    private static final Map<Class<?>, Class<?>> WRAPPER_TO_PRIMITIVE =
-        Collections.unmodifiableMap(new LinkedHashMap<Class<?>, Class<?>>() {
-            {
-                put(Boolean.class, boolean.class);
-                put(Byte.class, byte.class);
-                put(Character.class, char.class);
-                put(Double.class, double.class);
-                put(Float.class, float.class);
-                put(Integer.class, int.class);
-                put(Long.class, long.class);
-                put(Short.class, short.class);
-                put(Void.class, void.class);
-            }
-        });
+    static {
+        LinkedHashMap<Class<?>, Class<?>> m = new LinkedHashMap<>();
+        m.put(boolean.class, Boolean.class);
+        m.put(byte.class, Byte.class);
+        m.put(char.class, Character.class);
+        m.put(double.class, Double.class);
+        m.put(float.class, Float.class);
+        m.put(int.class, Integer.class);
+        m.put(long.class, Long.class);
+        m.put(short.class, Short.class);
+        m.put(void.class, Void.class);
+        PRIMITIVES_TO_WRAPPERS = Collections.unmodifiableMap(m);
+    }
+
+    private static final Map<Class<?>, Class<?>> WRAPPER_TO_PRIMITIVE;
+
+    static {
+        LinkedHashMap<Class<?>, Class<?>> m = new LinkedHashMap<>();
+        m.put(Boolean.class, boolean.class);
+        m.put(Byte.class, byte.class);
+        m.put(Character.class, char.class);
+        m.put(Double.class, double.class);
+        m.put(Float.class, float.class);
+        m.put(Integer.class, int.class);
+        m.put(Long.class, long.class);
+        m.put(Short.class, short.class);
+        m.put(Void.class, void.class);
+        WRAPPER_TO_PRIMITIVE = Collections.unmodifiableMap(m);
+    }
 
     /**
      * Is the method a setter.
