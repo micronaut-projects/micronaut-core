@@ -10,11 +10,13 @@ import io.micronaut.inject.annotation.AnnotationMetadataReference
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 
 class KotlinIntroductionInterfaceVisitor(private val classElement: ClassElement,
                                          private val annotationMetadata: AnnotationMetadata,
-                                         private val aopProxyWriter: AopProxyWriter) {
+                                         private val aopProxyWriter: AopProxyWriter,
+                                         private val visitorContext: VisitorContext) {
 
     fun visit() {
         classElement.getEnclosedElements(
@@ -55,6 +57,24 @@ class KotlinIntroductionInterfaceVisitor(private val classElement: ClassElement,
                 classElement
             } else {
                 methodElement.declaringType
+            }
+
+            if (methodElement.isFinal) {
+                if (BeanDefinitionProcessorVisitor.hasAroundStereotype(methodElement, true)) {
+                    visitorContext.fail(
+                        "Method defines AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.",
+                        methodElement
+                    )
+                } else {
+                    if (methodElement.declaringType != classElement) {
+                        return
+                    }
+                    visitorContext.fail(
+                        "Public method inherits AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.",
+                        methodElement
+                    )
+                }
+                return
             }
 
             // only apply around advise to non-abstract methods of introduction advise
