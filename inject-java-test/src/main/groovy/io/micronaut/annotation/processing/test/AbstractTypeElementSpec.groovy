@@ -464,7 +464,7 @@ class Test {
         return metadata
     }
 
-    private JavaAnnotationMetadataBuilder newJavaAnnotationBuilder() {
+    protected JavaAnnotationMetadataBuilder newJavaAnnotationBuilder() {
         JavaParser parser = newJavaParser()
         JavacTask javacTask = parser.getJavacTask()
         def elements = javacTask.elements

@@ -15,21 +15,43 @@
  */
 package io.micronaut.docs.i18n;
 
+import io.micronaut.context.MessageSource;
 import io.micronaut.context.MessageSource.MessageContext;
-import io.micronaut.context.i18n.ResourceBundleMessageSource;
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
+import java.util.Collections;
 import java.util.Locale;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@MicronautTest(startApplication = false)
 class I18nSpec {
+
+    @Inject
+    MessageSource messageSource;
+
     @Test
     void itIsPossibleToCreateAMessageSourceFromResourceBundle() {
         //tag::test[]
-        ResourceBundleMessageSource ms = new ResourceBundleMessageSource("io.micronaut.docs.i18n.messages");
-        assertEquals("Hola", ms.getMessage("hello", MessageContext.of(new Locale("es"))).get());
-        assertEquals("Hello", ms.getMessage("hello", MessageContext.of(Locale.ENGLISH)).get());
+        assertEquals("Hola", messageSource.getMessage("hello", MessageContext.of(new Locale("es"))).get());
+        assertEquals("Hello", messageSource.getMessage("hello", MessageContext.of(Locale.ENGLISH)).get());
         //end::test[]
+
+        assertTrue(messageSource.getMessage("hello", new Locale("es")).isPresent());
+        assertEquals("Hola", messageSource.getMessage("hello", new Locale("es")).get());
+        assertEquals("Hello", messageSource.getMessage("hello", Locale.ENGLISH).get());
+        assertTrue(messageSource.getMessage("hello", Locale.ENGLISH).isPresent());
+
+        assertTrue(messageSource.getMessage("hello.name", new Locale("es"), "Sergio").isPresent());
+        assertEquals("Hola Sergio", messageSource.getMessage("hello.name", new Locale("es"), "Sergio").get());
+        assertTrue(messageSource.getMessage("hello.name", Locale.ENGLISH, "Sergio").isPresent());
+        assertEquals("Hello Sergio", messageSource.getMessage("hello.name", Locale.ENGLISH, "Sergio").get());
+
+        assertTrue(messageSource.getMessage("hello.name", new Locale("es"), Collections.singletonMap("0", "Sergio")).isPresent());
+        assertEquals("Hola Sergio", messageSource.getMessage("hello.name", new Locale("es"), Collections.singletonMap("0", "Sergio")).get());
+        assertTrue(messageSource.getMessage("hello.name", Locale.ENGLISH, Collections.singletonMap("0", "Sergio")).isPresent());
+        assertEquals("Hello Sergio", messageSource.getMessage("hello.name", Locale.ENGLISH, Collections.singletonMap("0", "Sergio")).get());
     }
 }

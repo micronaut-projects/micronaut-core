@@ -14,7 +14,7 @@ snippet::io.micronaut.docs.server.sse.HeadlineController[tags="imports,class", i
 
 <1> The controller method returns a rs:Publisher[] of api:http.sse.Event[]
 <2> A headline is emitted for each version of Micronaut
-<3> The reactor:Flux[] type's `generate` method generates a rs:Publisher[]. The `generate` method accepts an initial value and a lambda that accepts the value and a rx:Emitter[]. Note that this example executes on the same thread as the controller action, but you could use `subscribeOn` or map an existing "hot" rx:Flux[].
+<3> The reactor:Flux[] type's `generate` method generates a rs:Publisher[]. The `generate` method accepts an initial value and a lambda that accepts the value and a rx:Emitter[]. Note that this example executes on the same thread as the controller action, but you could use `subscribeOn` or map an existing "hot" reactor:Flux[].
 <4> The rx:Emitter[] interface `onNext` method emits objects of type api:http.sse.Event[]. The api:http.sse.Event.of(ET)[] factory method constructs the event.
 <5> The rx:Emitter[] interface `onComplete` method indicates when to finish sending server sent events.
 

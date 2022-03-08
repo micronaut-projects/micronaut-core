@@ -4,7 +4,7 @@ introduction:
   upgrading: Upgrading to Micronaut 3.x
 quickStart:
   title: Quick Start
-  buildCLI: Build/Install the CLI
+  buildCLI: Install the CLI
   creatingServer: Creating a Server Application
   ideSetup:
     title: Setting up an IDE
@@ -282,8 +282,18 @@ cli:
 i18n:
   title: Internationalization
   bundle: Resource Bundles
+  localizedMessageSource: Localized Message Source
 appendix:
   title: Appendices
+  architecture: 
+    title: Micronaut Architecture
+    compilerArch: Compiler         
+    annotationArch: Annotation Metadata
+    introspectionArch: Bean Introspections
+    iocArch: Bean Definitions
+    aopArch: AOP Proxies
+    containerArch: Application Context 
+    httpServerArch: HTTP Server
   faq: Frequently Asked Questions (FAQ)
   usingsnapshots: Using Snapshots
   problems: Common Problems

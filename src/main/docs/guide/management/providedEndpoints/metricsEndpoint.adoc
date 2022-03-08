@@ -1,4 +1,4 @@
-Micronaut can expose application metrics via integration with http://micrometer.io[Micrometer].
+Micronaut can expose application metrics via integration with https://micrometer.io[Micrometer].
 
 [TIP]
 .Using the CLI

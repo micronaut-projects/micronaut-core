@@ -236,6 +236,10 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
                 subscriber.onSubscribe(new ChannelSubscription());
                 subscriber.onError(noSubscriberError);
                 break;
+            case DONE:
+                subscriber.onSubscribe(new ChannelSubscription());
+                subscriber.onComplete();
+                break;
             default:
                 // no-op
         }
@@ -465,7 +469,9 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
                 if (state == BUFFERING) {
                     state = DEMANDING;
                 } // otherwise we're draining
-                requestDemand();
+                if (!completed.get()) {
+                    requestDemand();
+                }
             } else if (state == BUFFERING) {
                 state = IDLE;
             }
