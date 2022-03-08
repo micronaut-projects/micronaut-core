@@ -283,7 +283,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         }
 
         if (aopProxyWriter == null) {
-            createClassProxyWriter(beanWriter!!)
+            createClassProxyWriter(methodElement.annotationMetadata, beanWriter!!)
         }
         val aopMethod = if (inheritedAround) {
             methodElement.withNewMetadata(AnnotationMetadataHierarchy(methodElement.declaringType.annotationMetadata, methodElement.annotationMetadata))
@@ -518,7 +518,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         } else {
             val beanDefinitionWriter = BeanDefinitionWriter(classElement, configurationMetadataBuilder, visitorContext)
             if (isAopProxyType) {
-                createClassProxyWriter(beanDefinitionWriter)
+                createClassProxyWriter(classElement.annotationMetadata, beanDefinitionWriter)
             }
             beanDefinitionWriter
         }
@@ -591,21 +591,22 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         aopProxyWriter.visitTypeArguments(classElement.allTypeArguments)
 
         if (classElement.isAbstract) {
-            KotlinIntroductionInterfaceVisitor(classElement, classElement, aopProxyWriter).visit()
+            KotlinIntroductionInterfaceVisitor(classElement, classElement, aopProxyWriter, visitorContext).visit()
         }
         for (interfaceType in interfaceTypes) {
-            KotlinIntroductionInterfaceVisitor(interfaceType, classElement, aopProxyWriter).visit()
+            KotlinIntroductionInterfaceVisitor(interfaceType, classElement, aopProxyWriter, visitorContext).visit()
         }
 
         return aopProxyWriter
     }
 
-    private fun createClassProxyWriter(beanDefinitionVisitor: BeanDefinitionVisitor) {
+    private fun createClassProxyWriter(annotationMetadata: AnnotationMetadata,
+                                       beanDefinitionVisitor: BeanDefinitionVisitor) {
         if (classElement.isFinal) {
             visitorContext.fail("Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + classElement.name, classElement);
             return
         }
-        aopProxyWriter = createProxyWriter(classElement, beanDefinitionVisitor)
+        aopProxyWriter = createProxyWriter(annotationMetadata, beanDefinitionVisitor)
         visitConstructor(aopProxyWriter!!, classElement)
     }
 
