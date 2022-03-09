@@ -1,5 +1,5 @@
-ext {
-    shadowJarEnabled = true
+plugins {
+    id "io.micronaut.build.internal.convention-core-library"
 }
 
 internalSanityChecks {

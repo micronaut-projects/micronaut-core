@@ -17,8 +17,6 @@ plugins {
     id 'io.micronaut.build.shared.settings' version '5.2.3'
 }
 
-enableFeaturePreview("VERSION_CATALOGS")
-
 rootProject.name = 'micronaut'
 
 include "aop"
@@ -70,9 +68,3 @@ include "test-utils"
 
 // benchmarks
 include "benchmarks"
-
-gradle.beforeProject { p ->
-    p.pluginManager.withPlugin('java-library') {
-        p.plugins.apply('io.micronaut.build.internal.sanity-checks')
-    }
-}
