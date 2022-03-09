@@ -1025,4 +1025,47 @@ class Person {
         !element.getBeanProperties()
     }
 
+    void "test find enum fields using ElementQuery"() {
+        given:
+            ClassElement classElement = buildClassElement('''
+package elementquery;
+
+enum Test {
+
+    A, B, C;
+
+    public static final String publicStaticFinalField = "";
+    public static String publicStaticField;
+    public final String publicFinalField = "";
+    public String publicField;
+
+    protected static final String protectedStaticFinalField = "";
+    protected static String protectedStaticField;
+    protected final String protectedFinalField = "";
+    protected String protectedField;
+
+    static final String packagePrivateStaticFinalField = "";
+    static String packagePrivateStaticField;
+    final String packagePrivateFinalField = "";
+    String packagePrivateField;
+
+    private static final String privateStaticFinalField = "";
+    private static String privateStaticField;
+    private final String privateFinalField = "";
+    private String privateField;
+}
+''')
+        when:
+            def allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
+
+        then:
+            allFields.size() == 16
+
+        when:
+            def allFieldsWithEnums = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.includeEnumConstants())
+
+        then:
+            allFieldsWithEnums.size() == 19
+    }
+
 }

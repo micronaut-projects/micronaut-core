@@ -26,7 +26,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
-import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.ClassElement;
@@ -536,6 +535,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         boolean onlyAbstract = result.isOnlyAbstract();
         boolean onlyConcrete = result.isOnlyConcrete();
         boolean onlyInstance = result.isOnlyInstance();
+        boolean includeEnumConstants = result.isIncludeEnumConstants();
 
         if (!onlyDeclared) {
             Elements elements = visitorContext.getElements();
@@ -681,7 +681,9 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         elementLoop:
         for (Element enclosedElement : enclosedElements) {
             ElementKind enclosedElementKind = enclosedElement.getKind();
-            if (enclosedElementKind == kind || (enclosedElementKind == ElementKind.ENUM && kind == ElementKind.CLASS)) {
+            if (enclosedElementKind == kind
+                    || includeEnumConstants && kind == ElementKind.FIELD && enclosedElementKind == ElementKind.ENUM_CONSTANT
+                    || (enclosedElementKind == ElementKind.ENUM && kind == ElementKind.CLASS)) {
                 String elementName = enclosedElement.getSimpleName().toString();
                 if (onlyAccessible) {
                     // exclude private members
@@ -750,6 +752,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         );
                     break;
                     case FIELD:
+                    case ENUM_CONSTANT:
                         //noinspection unchecked
                         element = (T) elementFactory.newFieldElement(
                                 this,
