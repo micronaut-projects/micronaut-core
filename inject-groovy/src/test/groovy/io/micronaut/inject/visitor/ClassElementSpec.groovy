@@ -22,6 +22,7 @@ import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.EnumElement
+import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PackageElement
 import spock.lang.Issue
@@ -591,15 +592,46 @@ enum Test {
 }
 ''')
         when:
-            def allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
+        List<FieldElement> allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
+        List<String> expected = [
+                'A',
+                'B',
+                'C',
+                'publicStaticFinalField',
+                'publicStaticField',
+                'publicFinalField',
+                'publicField',
+                'protectedStaticFinalField',
+                'protectedStaticField',
+                'protectedFinalField',
+                'protectedField',
+                'packagePrivateStaticFinalField',
+                'packagePrivateStaticField',
+                'packagePrivateFinalField',
+                'packagePrivateField',
+                'privateStaticFinalField',
+                'privateStaticField',
+                'privateFinalField',
+                'privateField',
+                'MIN_VALUE',
+                'MAX_VALUE',
+                'name',
+                'ordinal',
+        ]
 
         then:
-            allFields.size() == 23 // + A, B, C, MIN_VALUE, MAX_VALUE, name, ordinal
+        for (String name : allFields*.name) {
+            assert expected.contains(name)
+        }
+        allFields.size() == expected.size()
 
         when:
-            def allFieldsWithEnums = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.includeEnumConstants())
+        allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.includeEnumConstants())
 
         then:
-            allFieldsWithEnums.size() == 23
+        for (String name : allFields*.name) {
+            assert expected.contains(name)
+        }
+        allFields.size() == expected.size()
     }
 }

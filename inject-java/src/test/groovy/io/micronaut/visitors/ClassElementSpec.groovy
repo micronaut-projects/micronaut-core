@@ -24,6 +24,7 @@ import io.micronaut.inject.ast.ConstructorElement
 import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.EnumElement
+import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PackageElement
 import jakarta.inject.Singleton
@@ -1056,16 +1057,42 @@ enum Test {
 }
 ''')
         when:
-            def allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
+        List<FieldElement>  allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
+
+        List<String> expected = [
+                'publicStaticFinalField',
+                'publicStaticField',
+                'publicFinalField',
+                'publicField',
+                'protectedStaticFinalField',
+                'protectedStaticField',
+                'protectedFinalField',
+                'protectedField',
+                'packagePrivateStaticFinalField',
+                'packagePrivateStaticField',
+                'packagePrivateFinalField',
+                'packagePrivateField',
+                'privateStaticFinalField',
+                'privateStaticField',
+                'privateFinalField',
+                'privateField',
+        ]
 
         then:
-            allFields.size() == 16
+        for (String name : allFields*.name) {
+            assert expected.contains(name)
+        }
+        allFields.size() == expected.size()
 
         when:
-            def allFieldsWithEnums = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.includeEnumConstants())
+        allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.includeEnumConstants())
+        expected = ['A', 'B', 'C'] + expected
 
         then:
-            allFieldsWithEnums.size() == 19
+        for (String name : allFields*.name) {
+            assert expected.contains(name)
+        }
+        allFields.size() == expected.size()
     }
 
 }
