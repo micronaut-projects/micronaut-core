@@ -16,7 +16,6 @@
 package io.micronaut.http.netty.stream;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.reactive.HandlerPublisher;

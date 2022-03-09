@@ -30,6 +30,9 @@ import javax.lang.model.element.TypeElement;
 import javax.tools.FileObject;
 import javax.tools.StandardLocation;
 
+/**
+ * Annotation processor for test generation.
+ */
 @SupportedAnnotationTypes("*")
 @SupportedSourceVersion(RELEASE_8)
 public class TestGeneratingAnnotationProcessor extends AbstractProcessor {
