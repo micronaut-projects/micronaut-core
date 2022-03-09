@@ -21,11 +21,15 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 
-import java.util.*;
-import java.util.function.Predicate;
-
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.Predicate;
 
 @Internal
 final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, ElementQuery.Result<T> {
@@ -42,9 +46,10 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
     private final List<Predicate<T>> elementPredicates;
     private final List<Predicate<ClassElement>> typePredicates;
     private final boolean onlyInstance;
+    private final boolean includeEnumConstants;
 
     DefaultElementQuery(Class<T> elementType) {
-        this(elementType, null, false, false, false, false, false, null, null, null, null, null);
+        this(elementType, null, false, false, false, false, false, false, null, null, null, null, null);
     }
 
     DefaultElementQuery(
@@ -55,6 +60,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             boolean onlyConcrete,
             boolean onlyInjected,
             boolean onlyInstance,
+            boolean includeEnumConstants,
             List<Predicate<AnnotationMetadata>> annotationPredicates,
             List<Predicate<Set<ElementModifier>>> modifiersPredicates,
             List<Predicate<T>> elementPredicates,
@@ -70,6 +76,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         this.modifiersPredicates = modifiersPredicates;
         this.elementPredicates = elementPredicates;
         this.onlyInstance = onlyInstance;
+        this.includeEnumConstants = includeEnumConstants;
         this.typePredicates = typePredicates;
     }
 
@@ -114,6 +121,11 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
     @Override
     public boolean isOnlyInstance() {
         return onlyInstance;
+    }
+
+    @Override
+    public boolean isIncludeEnumConstants() {
+        return includeEnumConstants;
     }
 
     @Override
@@ -165,7 +177,9 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
                 true,
                 onlyAbstract, onlyConcrete,
                 onlyInjected,
-                onlyInstance, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+                onlyInstance,
+                includeEnumConstants,
+                annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
                 typePredicates);
     }
 
@@ -180,9 +194,12 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         return new DefaultElementQuery<>(
                 elementType, onlyAccessibleType,
                 onlyDeclared,
-                onlyAbstract, onlyConcrete,
+                onlyAbstract,
+                onlyConcrete,
                 true,
-                onlyInstance, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+                onlyInstance,
+                includeEnumConstants,
+                annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
                 typePredicates);
     }
 
@@ -194,7 +211,9 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
                 onlyDeclared,
                 onlyAbstract, true,
                 onlyInjected,
-                onlyInstance, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+                onlyInstance,
+                includeEnumConstants,
+                annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
                 typePredicates);
     }
 
@@ -206,7 +225,9 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
                 onlyDeclared,
                 true, onlyConcrete,
                 onlyInjected,
-                onlyInstance, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+                onlyInstance,
+                includeEnumConstants,
+                annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
                 typePredicates);
     }
 
@@ -219,7 +240,9 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
                 onlyDeclared,
                 onlyAbstract, onlyConcrete,
                 onlyInjected,
-                onlyInstance, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+                onlyInstance,
+                includeEnumConstants,
+                annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
                 typePredicates);
     }
 
@@ -232,7 +255,9 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
                 onlyDeclared,
                 onlyAbstract, onlyConcrete,
                 onlyInjected,
-                onlyInstance, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+                onlyInstance,
+                includeEnumConstants,
+                annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
                 typePredicates);
     }
 
@@ -243,7 +268,22 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
                 onlyDeclared,
                 onlyAbstract, onlyConcrete,
                 onlyInjected,
-                true, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+                true,
+                includeEnumConstants,
+                annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+                typePredicates);
+    }
+
+    @Override
+    public ElementQuery<T> includeEnumConstants() {
+        return new DefaultElementQuery<>(
+                elementType, onlyAccessibleType,
+                onlyDeclared,
+                onlyAbstract, onlyConcrete,
+                onlyInjected,
+                onlyInstance,
+                true,
+                annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
                 typePredicates);
     }
 
@@ -264,7 +304,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
                 onlyDeclared,
                 onlyAbstract,
                 onlyConcrete,
-                onlyInjected, onlyInstance,
+                onlyInjected, onlyInstance, includeEnumConstants,
                 annotationPredicates,
                 modifiersPredicates,
                 elementPredicates,
@@ -289,7 +329,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
                 onlyDeclared,
                 onlyAbstract,
                 onlyConcrete,
-                onlyInjected, onlyInstance,
+                onlyInjected, onlyInstance, includeEnumConstants,
                 annotationPredicates,
                 modifiersPredicates,
                 elementPredicates,
@@ -313,7 +353,8 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
                 onlyDeclared,
                 onlyAbstract, onlyConcrete,
                 onlyInjected,
-                onlyInstance, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+                onlyInstance, includeEnumConstants,
+                annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
                 typePredicates);
     }
 
@@ -332,7 +373,8 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
                 elementType, onlyAccessibleType,
                 onlyDeclared, onlyAbstract, onlyConcrete,
                 onlyInjected,
-                onlyInstance, annotationPredicates, modifierPredicates, elementPredicates, namePredicates,
+                onlyInstance, includeEnumConstants,
+                annotationPredicates, modifierPredicates, elementPredicates, namePredicates,
                 typePredicates);
     }
 
@@ -351,7 +393,8 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
                 elementType, onlyAccessibleType,
                 onlyDeclared, onlyAbstract, onlyConcrete,
                 onlyInjected,
-                onlyInstance, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+                onlyInstance, includeEnumConstants,
+                annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
                 typePredicates);
     }
 

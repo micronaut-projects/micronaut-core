@@ -117,6 +117,13 @@ public interface ElementQuery<T extends Element> {
     ElementQuery<T> onlyInstance();
 
     /**
+     * Indicates to include enum constants, only applicable for fields query.
+     * @since 3.4.0
+     * @return The query
+     */
+    ElementQuery<T> includeEnumConstants();
+
+    /**
      * Allows filtering elements by name.
      * @param predicate The predicate to use. Should return true to include the element.
      * @return This query
@@ -216,6 +223,12 @@ public interface ElementQuery<T extends Element> {
          * @return Whether to return only instance methods
          */
         boolean isOnlyInstance();
+
+        /**
+         * @return Whether to include enum constants
+         * @since 3.4.0
+         */
+        boolean isIncludeEnumConstants();
 
         /**
          * @return The name predicates

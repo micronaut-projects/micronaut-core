@@ -24,6 +24,7 @@ import io.micronaut.inject.ast.ConstructorElement
 import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.EnumElement
+import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PackageElement
 import jakarta.inject.Singleton
@@ -1023,6 +1024,75 @@ class Person {
 
         then: 'no bean properties are found'
         !element.getBeanProperties()
+    }
+
+    void "test find enum fields using ElementQuery"() {
+        given:
+            ClassElement classElement = buildClassElement('''
+package elementquery;
+
+enum Test {
+
+    A, B, C;
+
+    public static final String publicStaticFinalField = "";
+    public static String publicStaticField;
+    public final String publicFinalField = "";
+    public String publicField;
+
+    protected static final String protectedStaticFinalField = "";
+    protected static String protectedStaticField;
+    protected final String protectedFinalField = "";
+    protected String protectedField;
+
+    static final String packagePrivateStaticFinalField = "";
+    static String packagePrivateStaticField;
+    final String packagePrivateFinalField = "";
+    String packagePrivateField;
+
+    private static final String privateStaticFinalField = "";
+    private static String privateStaticField;
+    private final String privateFinalField = "";
+    private String privateField;
+}
+''')
+        when:
+        List<FieldElement>  allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
+
+        List<String> expected = [
+                'publicStaticFinalField',
+                'publicStaticField',
+                'publicFinalField',
+                'publicField',
+                'protectedStaticFinalField',
+                'protectedStaticField',
+                'protectedFinalField',
+                'protectedField',
+                'packagePrivateStaticFinalField',
+                'packagePrivateStaticField',
+                'packagePrivateFinalField',
+                'packagePrivateField',
+                'privateStaticFinalField',
+                'privateStaticField',
+                'privateFinalField',
+                'privateField',
+        ]
+
+        then:
+        for (String name : allFields*.name) {
+            assert expected.contains(name)
+        }
+        allFields.size() == expected.size()
+
+        when:
+        allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.includeEnumConstants())
+        expected = ['A', 'B', 'C'] + expected
+
+        then:
+        for (String name : allFields*.name) {
+            assert expected.contains(name)
+        }
+        allFields.size() == expected.size()
     }
 
 }

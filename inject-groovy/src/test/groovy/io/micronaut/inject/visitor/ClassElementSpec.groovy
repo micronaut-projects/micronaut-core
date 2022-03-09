@@ -22,6 +22,7 @@ import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.EnumElement
+import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PackageElement
 import spock.lang.Issue
@@ -558,5 +559,79 @@ class InvoicePO extends TransactionPO {
 
         expect:
         classElement.getBeanProperties().find { it.name == "discount" }.getType().hasAnnotation(SomeAnn)
+    }
+
+    void "test find enum fields using ElementQuery"() {
+        given:
+            ClassElement classElement = buildClassElement('''
+package elementquery;
+
+enum Test {
+
+    A, B, C;
+
+    public static final String publicStaticFinalField = "";
+    public static String publicStaticField;
+    public final String publicFinalField = "";
+    public String publicField;
+
+    protected static final String protectedStaticFinalField = "";
+    protected static String protectedStaticField;
+    protected final String protectedFinalField = "";
+    protected String protectedField;
+
+    static final String packagePrivateStaticFinalField = "";
+    static String packagePrivateStaticField;
+    final String packagePrivateFinalField = "";
+    String packagePrivateField;
+
+    private static final String privateStaticFinalField = "";
+    private static String privateStaticField;
+    private final String privateFinalField = "";
+    private String privateField;
+}
+''')
+        when:
+        List<FieldElement> allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
+        List<String> expected = [
+                'A',
+                'B',
+                'C',
+                'publicStaticFinalField',
+                'publicStaticField',
+                'publicFinalField',
+                'publicField',
+                'protectedStaticFinalField',
+                'protectedStaticField',
+                'protectedFinalField',
+                'protectedField',
+                'packagePrivateStaticFinalField',
+                'packagePrivateStaticField',
+                'packagePrivateFinalField',
+                'packagePrivateField',
+                'privateStaticFinalField',
+                'privateStaticField',
+                'privateFinalField',
+                'privateField',
+                'MIN_VALUE',
+                'MAX_VALUE',
+                'name',
+                'ordinal',
+        ]
+
+        then:
+        for (String name : allFields*.name) {
+            assert expected.contains(name)
+        }
+        allFields.size() == expected.size()
+
+        when:
+        allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.includeEnumConstants())
+
+        then:
+        for (String name : allFields*.name) {
+            assert expected.contains(name)
+        }
+        allFields.size() == expected.size()
     }
 }
