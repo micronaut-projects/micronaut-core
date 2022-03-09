@@ -82,6 +82,10 @@
         <property name="file" value="${config_loc}/suppressions.xml"/>
         <property name="optional" value="false"/>
     </module>
+    <module name="SuppressionFilter">
+        <property name="file" value="${config_loc}/custom-suppressions.xml"/>
+        <property name="optional" value="true"/>
+    </module>
 
     <module name="TreeWalker">
         <module name="SuppressionCommentFilter"/>

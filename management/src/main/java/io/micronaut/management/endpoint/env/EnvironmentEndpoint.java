@@ -22,8 +22,6 @@ import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
 import io.micronaut.management.endpoint.annotation.Selector;
 import jakarta.inject.Inject;
-
-import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
