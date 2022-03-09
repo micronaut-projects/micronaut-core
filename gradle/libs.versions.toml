@@ -97,7 +97,7 @@ managed-micronaut-kubernetes = "3.3.0"
 managed-micronaut-liquibase = "5.1.1"
 managed-micronaut-micrometer = "4.1.1"
 managed-micronaut-mongo = "4.0.0"
-managed-micronaut-mqtt = "2.0.0"
+managed-micronaut-mqtt = "2.1.0"
 managed-micronaut-multitenancy = "4.1.0"
 managed-micronaut-neo4j = "5.0.0"
 managed-micronaut-nats = "3.0.0"
@@ -130,8 +130,6 @@ managed-mongo-reactive = "4.3.0"
 managed-neo4j = "3.5.29"
 managed-neo4j-java-driver = "4.2.7"
 managed-netty = "4.1.73.Final"
-managed-paho-v3 = "1.2.5"
-managed-paho-v5 = "1.2.5"
 managed-picocli = "4.6.1"
 managed-protobuf = "3.17.2"
 managed-reactive-pg-client = "0.11.4"
@@ -164,6 +162,7 @@ boms-micronaut-groovy = { module = "io.micronaut.groovy:micronaut-groovy-bom", v
 boms-micronaut-kotlin = { module = "io.micronaut.kotlin:micronaut-kotlin-bom", version.ref = "managed-micronaut-kotlin" }
 boms-micronaut-kubernetes = { module = "io.micronaut.kubernetes:micronaut-kubernetes-bom", version.ref = "managed-micronaut-kubernetes" }
 boms-micronaut-micrometer = { module = "io.micronaut.micrometer:micronaut-micrometer-bom", version.ref = "managed-micronaut-micrometer" }
+boms-micronaut-mqtt = { module = "io.micronaut.mqtt:micronaut-mqtt-bom", version.ref = "managed-micronaut-mqtt" }
 boms-micronaut-oraclecloud = { module = "io.micronaut.oraclecloud:micronaut-oraclecloud-bom", version.ref = "managed-micronaut-oraclecloud" }
 boms-micronaut-problem-json = { module = "io.micronaut.problem:micronaut-problem-json-bom", version.ref = "managed-micronaut-problem" }
 boms-micronaut-rxjava2 = { module = "io.micronaut.rxjava2:micronaut-rxjava2-bom", version.ref = "managed-micronaut-rxjava2" }
@@ -314,10 +313,6 @@ managed-micronaut-liquibase = { module = "io.micronaut.liquibase:micronaut-liqui
 managed-micronaut-mongo = { module = "io.micronaut.mongodb:micronaut-mongo-reactive", version.ref = "managed-micronaut-mongo" }
 managed-micronaut-mongo-core = { module = "io.micronaut.mongodb:micronaut-mongo-core", version.ref = "managed-micronaut-mongo" }
 managed-micronaut-mongo-sync = { module = "io.micronaut.mongodb:micronaut-mongo-sync", version.ref = "managed-micronaut-mongo" }
-managed-micronaut-mqtt-core = { module = "io.micronaut.mqtt:micronaut-mqtt-core", version.ref = "managed-micronaut-mqtt" }
-managed-micronaut-mqtt-ssl = { module = "io.micronaut.mqtt:micronaut-mqtt-ssl", version.ref = "managed-micronaut-mqtt" }
-managed-micronaut-mqttv3 = { module = "io.micronaut.mqtt:micronaut-mqttv3", version.ref = "managed-micronaut-mqtt" }
-managed-micronaut-mqttv5 = { module = "io.micronaut.mqtt:micronaut-mqttv5", version.ref = "managed-micronaut-mqtt" }
 managed-micronaut-multitenancy = { module = "io.micronaut.multitenancy:micronaut-multitenancy", version.ref = "managed-micronaut-multitenancy" }
 managed-micronaut-nats = { module = "io.micronaut.nats:micronaut-nats", version.ref = "managed-micronaut-nats" }
 managed-micronaut-neo4j = { module = "io.micronaut.neo4j:micronaut-neo4j-bolt", version.ref = "managed-micronaut-neo4j" }
@@ -352,9 +347,6 @@ managed-micronaut-test-spock = { module = "io.micronaut.test:micronaut-test-spoc
 managed-micronaut-toml = { module = "io.micronaut.toml:micronaut-toml", version.ref = "managed-micronaut-toml" }
 managed-micronaut-tracing-legacy = { module = "io.micronaut:micronaut-tracing", version.ref = "managed-micronaut-tracing-legacy" }
 managed-micronaut-xml = { module = "io.micronaut.xml:micronaut-jackson-xml", version.ref = "managed-micronaut-xml" }
-
-managed-paho-v3 = { module = "org.eclipse.paho:org.eclipse.paho.client.mqttv3", version.ref = "managed-paho-v3" }
-managed-paho-v5 = { module = "org.eclipse.paho:org.eclipse.paho.mqttv5.client", version.ref = "managed-paho-v5" }
 
 managed-picocli = { module = "info.picocli:picocli", version.ref = "managed-picocli" }
 managed-picocli-codegen = { module = "info.picocli:picocli-codegen", version.ref = "managed-picocli" }
