@@ -1,5 +1,9 @@
 This section documents breaking changes between Micronaut versions
 
+== 4.0.0
+
+- Previously, all date-time parameters used the `RFC_1123_DATE_TIME` format as the default.  This has now changed to use the default format of the specified type.
+
 == 3.2.4
 
 - The link:{api}/io/micronaut/http/client/ProxyHttpClient.html[ProxyHttpClient] now sends the Host header of the proxied service https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.23[as per the RFC], instead of the originating service.

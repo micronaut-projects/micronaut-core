@@ -90,7 +90,7 @@ class BindingController {
 
     // tag::format1[]
     @Get("/date")
-    String date(@Header ZonedDateTime date) {
+    String rfcDate(@Header ZonedDateTime date) {
         // ...
         // end::format1[]
         date.toString()
@@ -100,7 +100,7 @@ class BindingController {
 
     // tag::format2[]
     @Get("/dateFormat")
-    String dateFormat(@Format("dd/MM/yyyy hh:mm:ss a z") @Header ZonedDateTime date) {
+    String customDateFormat(@Format("dd/MM/yyyy hh:mm:ss a z") @Header ZonedDateTime date) {
         // ...
         // end::format2[]
         date.toString()

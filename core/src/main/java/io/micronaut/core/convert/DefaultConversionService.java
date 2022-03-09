@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,6 +67,16 @@ import java.util.function.Function;
  * @since 1.0
  */
 public class DefaultConversionService implements ConversionService<DefaultConversionService> {
+
+    /**
+     * The pattern for parsing Header standard timestamps into Dates.
+     */
+    public static final String RFC_1123_FORMAT = "EEE, d MMM yyyy HH:mm:ss z";
+
+    /**
+     * The pattern for parsing standard java.util.Dates from their toString representation.
+     */
+    public static final String DEFAULT_DATE_TO_STRING_FORMAT = "EEE MMM d HH:mm:ss zzz yyyy";
 
     private static final int CACHE_MAX = 150;
     private static final TypeConverter UNCONVERTIBLE = (object, targetType, context) -> Optional.empty();
@@ -967,11 +977,18 @@ public class DefaultConversionService implements ConversionService<DefaultConver
     }
 
     private SimpleDateFormat resolveFormat(ConversionContext context) {
-        AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
-        Optional<String> format = annotationMetadata.stringValue(Format.class);
+        Optional<String> format = context.getFormat();
         return format
-            .map(pattern -> new SimpleDateFormat(pattern, context.getLocale()))
-            .orElseGet(() -> new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", context.getLocale()));
+            .map(pattern -> {
+                if (ConversionContext.RFC_1123_FORMAT.equals(pattern)) {
+                    SimpleDateFormat dateFormat = new SimpleDateFormat(RFC_1123_FORMAT);
+                    dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
+                    return dateFormat;
+                } else {
+                    return new SimpleDateFormat(pattern, context.getLocale());
+                }
+            })
+            .orElseGet(() -> new SimpleDateFormat(DEFAULT_DATE_TO_STRING_FORMAT, context.getLocale()));
     }
 
     private <S, T> ConvertiblePair newPair(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {

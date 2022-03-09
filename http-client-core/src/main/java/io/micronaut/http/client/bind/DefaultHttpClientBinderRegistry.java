@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,6 +48,8 @@ import jakarta.inject.Singleton;
 import kotlin.coroutines.Continuation;
 
 import java.lang.annotation.Annotation;
+import java.time.temporal.TemporalAccessor;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -119,7 +121,11 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
                     .filter(StringUtils::isNotEmpty)
                     .orElse(NameUtils.hyphenate(context.getArgument().getName()));
 
-            conversionService.convert(value, String.class)
+            // Header dates must be in GMT
+            if (value instanceof Date || value instanceof TemporalAccessor) {
+                context = context.withDefaultFormat(ConversionContext.RFC_1123_FORMAT);
+            }
+            conversionService.convert(value, String.class, context)
                     .ifPresent(header -> request.getHeaders().set(headerName, header));
         });
         byAnnotation.put(RequestAttribute.class, (context, uriContext, value, request) -> {
@@ -160,11 +166,12 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
 
         if (KOTLIN_COROUTINES_SUPPORTED) {
             //Clients should do nothing with the continuation
-            byType.put(Argument.of(Continuation.class).typeHashCode(),  (context, uriContext, value, request) -> { });
+            byType.put(Argument.of(Continuation.class).typeHashCode(), (context, uriContext, value, request) -> {
+            });
         }
 
         if (CollectionUtils.isNotEmpty(binders)) {
-            for (ClientRequestBinder binder: binders) {
+            for (ClientRequestBinder binder : binders) {
                 addBinder(binder);
             }
         }

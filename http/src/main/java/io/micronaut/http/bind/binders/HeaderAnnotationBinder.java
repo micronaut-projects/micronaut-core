@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,12 +18,16 @@ package io.micronaut.http.bind.binders;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.bind.annotation.AbstractAnnotatedArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.Header;
+
+import java.time.temporal.TemporalAccessor;
+import java.util.Date;
 
 /**
  * An {@link io.micronaut.core.bind.annotation.AnnotatedArgumentBinder} implementation that uses the {@link Header}
@@ -44,11 +48,19 @@ public class HeaderAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<H
     }
 
     @Override
-    public BindingResult<T> bind(ArgumentConversionContext<T> argument, HttpRequest<?> source) {
+    public BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {
         ConvertibleMultiValues<String> parameters = source.getHeaders();
-        AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
-        String parameterName = annotationMetadata.stringValue(Header.class).orElse(argument.getArgument().getName());
-        return doBind(argument, parameters, parameterName);
+        AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
+        Argument<T> argument = context.getArgument();
+        String parameterName = annotationMetadata.stringValue(Header.class).orElse(argument.getName());
+        Argument<?> type = argument;
+        if (argument.isWrapperType()) {
+            type = argument.getWrappedType();
+        }
+        if (TemporalAccessor.class.isAssignableFrom(type.getType()) || type.getType() == Date.class) {
+            context = context.withDefaultFormat(ConversionContext.RFC_1123_FORMAT);
+        }
+        return doBind(context, parameters, parameterName);
     }
 
     @Override
