@@ -57,50 +57,27 @@ public class ScheduledExecutorTaskScheduler implements TaskScheduler {
 
     @Override
     public ScheduledFuture<?> schedule(String cron, Runnable command) {
-        if (StringUtils.isEmpty(cron)) {
-            throw new IllegalArgumentException("Blank cron expression not allowed");
-        }
-        check("command", command).notNull();
-
-        NextFireTime delaySupplier = new NextFireTime(CronExpression.create(cron));
-        return new ReschedulingTask<>(() -> {
-            command.run();
-            return null;
-        }, this, delaySupplier);
+        return schedule(cron, null, command);
     }
 
     @Override
     public <V> ScheduledFuture<V> schedule(String cron, Callable<V> command) {
-        if (StringUtils.isEmpty(cron)) {
-            throw new IllegalArgumentException("Blank cron expression not allowed");
-        }
-        check("command", command).notNull();
-
-        NextFireTime delaySupplier = new NextFireTime(CronExpression.create(cron));
-        return new ReschedulingTask<>(command, this, delaySupplier);
+        return schedule(cron, null, command);
     }
 
     @Override
-    public ScheduledFuture<?> schedule(String cron, String zoneId, Runnable command) {
-        return schedule(cron, zoneId, () -> {
-            command.run();
-            return null;
-        });
-    }
-
-    @Override
-    public <V> ScheduledFuture<V> schedule(String cron, String timezone, Callable<V> command) {
+    public <V> ScheduledFuture<V> schedule(String cron, String timezoneId, Callable<V> command) {
         if (StringUtils.isEmpty(cron)) {
             throw new IllegalArgumentException("Blank cron expression not allowed");
         }
         check("command", command).notNull();
 
         ZoneId zoneId;
-        if (timezone == null || timezone.equals("")) {
+        if (timezoneId == null || timezoneId.equals("")) {
             zoneId = ZoneId.systemDefault();
         } else {
             try {
-                zoneId = ZoneId.of(timezone);
+                zoneId = ZoneId.of(timezoneId);
             } catch (Exception e) {
                 zoneId = null;
             }

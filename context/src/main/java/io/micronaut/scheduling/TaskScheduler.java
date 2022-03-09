@@ -64,7 +64,7 @@ public interface TaskScheduler {
      * after the given delay.
      *
      * @param cron     The cron expression
-     * @param zoneId The zoneId to base the cron expression on. Defaults to system time zone
+     * @param timezoneId The timezoneId to base the cron expression on. Defaults to system time zone
      * @param command  the task to execute
      * @return a ScheduledFuture representing pending completion of
      * the task and whose {@code get()} method will return
@@ -73,14 +73,19 @@ public interface TaskScheduler {
      *                                                         scheduled for execution
      * @throws NullPointerException                            if command or delay is null
      */
-    ScheduledFuture<?> schedule(String cron, String zoneId, Runnable command);
+    default ScheduledFuture<?> schedule(String cron, String timezoneId, Runnable command) {
+        return schedule(cron, timezoneId, () -> {
+            command.run();
+            return null;
+        });
+    }
 
     /**
      * Creates and executes a one-shot action that becomes enabled
      * after the given delay.
      *
      * @param cron     The cron expression
-     * @param timezone The time zone to base the cron expression on. Defaults to system time zone
+     * @param timezoneId The time zone to base the cron expression on. Defaults to system time zone
      * @param command  The task to execute
      * @param <V>      The type of the callable's result
      * @return a ScheduledFuture representing pending completion of
@@ -90,7 +95,7 @@ public interface TaskScheduler {
      *                                    scheduled for execution
      * @throws NullPointerException       if command or delay is null
      */
-    <V> ScheduledFuture<V> schedule(String cron, String timezone, Callable<V> command);
+    <V> ScheduledFuture<V> schedule(String cron, String timezoneId, Callable<V> command);
 
     /**
      * Creates and executes a one-shot action that becomes enabled
