@@ -1239,7 +1239,7 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
         ]
 
         when:
-        def interfaceStaticMethod1 = collectMethods(allMethods, "interfaceStaticMethod1")
+        Collection<MethodElement> interfaceStaticMethod1 = collectMethods(allMethods, "interfaceStaticMethod1")
 
         then:
         interfaceStaticMethod1.size() == 2
@@ -1247,7 +1247,7 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
         oneMethodPresentWithDeclaringType(interfaceStaticMethod1, "SuperInterfaceWithMethods")
 
         when:
-        def interfaceStaticMethod2 = collectMethods(allMethods, "interfaceStaticMethod2")
+        Collection<MethodElement> interfaceStaticMethod2 = collectMethods(allMethods, "interfaceStaticMethod2")
 
         then:
         interfaceStaticMethod2.size() == 2
@@ -1255,7 +1255,7 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
         oneMethodPresentWithDeclaringType(interfaceStaticMethod2, "SuperInterfaceWithMethods")
 
         when:
-        def interfaceMethod1 = collectMethods(allMethods, "interfaceMethod1")
+        Collection<MethodElement> interfaceMethod1 = collectMethods(allMethods, "interfaceMethod1")
 
         then:
         interfaceMethod1.size() == 3
@@ -1264,7 +1264,7 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
         oneMethodPresentWithDeclaringType(interfaceMethod1, "InheritedMethods")
 
         when:
-        def interfaceMethod2 = collectMethods(allMethods, "interfaceMethod2")
+        Collection<MethodElement> interfaceMethod2 = collectMethods(allMethods, "interfaceMethod2")
 
         then:
         interfaceMethod2.size() == 3
@@ -1273,7 +1273,7 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
         oneMethodPresentWithDeclaringType(interfaceMethod2, "InheritedMethods")
 
         when:
-        def interfaceMethod3 = collectMethods(allMethods, "interfaceMethod3")
+        Collection<MethodElement> interfaceMethod3 = collectMethods(allMethods, "interfaceMethod3")
 
         then:
         interfaceMethod3.size() == 2
@@ -1281,7 +1281,7 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
         oneMethodPresentWithDeclaringType(interfaceMethod3, "SuperInterfaceWithMethods")
 
         when:
-        def staticMethod = collectMethods(allMethods, "staticMethod")
+        Collection<MethodElement> staticMethod = collectMethods(allMethods, "staticMethod")
 
         then:
         staticMethod.size() == 2
@@ -1289,7 +1289,7 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
         oneMethodPresentWithDeclaringType(staticMethod, "SuperClassWithMethods")
 
         when:
-        def instanceMethod1 = collectMethods(allMethods, "instanceMethod1")
+        Collection<MethodElement> instanceMethod1 = collectMethods(allMethods, "instanceMethod1")
 
         then:
         instanceMethod1.size() == 2
@@ -1297,7 +1297,7 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
         oneMethodPresentWithDeclaringType(instanceMethod1, "SuperClassWithMethods")
 
         when:
-        def instanceMethod2 = collectMethods(allMethods, "instanceMethod2")
+        Collection<MethodElement> instanceMethod2 = collectMethods(allMethods, "instanceMethod2")
 
         then:
         instanceMethod2.size() == 2
@@ -1305,7 +1305,7 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
         oneMethodPresentWithDeclaringType(instanceMethod2, "SuperClassWithMethods")
 
         when:
-        def instanceMethod3 = collectMethods(allMethods, "instanceMethod3")
+        Collection<MethodElement> instanceMethod3 = collectMethods(allMethods, "instanceMethod3")
 
         then:
         instanceMethod3.size() == 1
