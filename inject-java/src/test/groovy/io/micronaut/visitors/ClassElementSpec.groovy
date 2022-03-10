@@ -1195,7 +1195,7 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
 
         then:
         methods.size() == 13
-        methods.collect {it.getName()} == [
+        methods*.name == [
                 "interfaceMethod1",
                 "interfaceMethod2",
                 "instanceMethod3",
@@ -1216,7 +1216,7 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
 
         then:
         allMethods.size() == 19
-        allMethods.collect {it.getName()} == [
+        allMethods*.name == [
                 "interfaceMethod1",
                 "interfaceMethod2",
                 "instanceMethod3",
