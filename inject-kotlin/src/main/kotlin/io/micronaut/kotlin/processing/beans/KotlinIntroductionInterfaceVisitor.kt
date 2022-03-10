@@ -22,9 +22,6 @@ class KotlinIntroductionInterfaceVisitor(private val classElement: ClassElement,
         classElement.getEnclosedElements(
             ElementQuery.of(MethodElement::class.java)
                 .onlyAccessible()
-                .filter { method ->
-                    method.isAbstract || BeanDefinitionProcessorVisitor.hasAroundStereotype(method, true)
-                }
         ).forEach(this::visitMethod)
     }
 
@@ -50,38 +47,38 @@ class KotlinIntroductionInterfaceVisitor(private val classElement: ClassElement,
                 methodElement.withNewMetadata(annotationMetadata)
             )
         } else {
-            val isInterface: Boolean = classElement.isInterface
-            val isDefault: Boolean = methodElement.isDefault
-            val owningType = if (isInterface && isDefault) {
-                // Default methods cannot be "super" accessed on the defined type
-                classElement
-            } else {
-                methodElement.declaringType
-            }
+            val hasAround = BeanDefinitionProcessorVisitor.hasAroundStereotype(methodElement, true)
+            val isExecutable = BeanDefinitionProcessorVisitor.isExecutable(methodElement, classElement)
+            if (hasAround) {
+                val isInterface: Boolean = classElement.isInterface
+                val isDefault: Boolean = methodElement.isDefault
+                val owningType = if (isInterface && isDefault) {
+                    // Default methods cannot be "super" accessed on the defined type
+                    classElement
+                } else {
+                    methodElement.declaringType
+                }
 
-            if (methodElement.isFinal) {
-                if (BeanDefinitionProcessorVisitor.hasAroundStereotype(methodElement, true)) {
+                if (methodElement.isFinal) {
                     visitorContext.fail(
                         "Method defines AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.",
                         methodElement
                     )
-                } else {
-                    if (methodElement.declaringType != classElement) {
-                        return
-                    }
-                    visitorContext.fail(
-                        "Public method inherits AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.",
-                        methodElement
-                    )
+                    return
                 }
-                return
-            }
 
-            // only apply around advise to non-abstract methods of introduction advise
-            aopProxyWriter.visitAroundMethod(
-                owningType,
-                methodElement.withNewMetadata(annotationMetadata)
-            )
+                // only apply around advise to non-abstract methods of introduction advise
+                aopProxyWriter.visitAroundMethod(
+                    owningType,
+                    methodElement.withNewMetadata(annotationMetadata)
+                )
+            } else if (isExecutable) {
+                aopProxyWriter.visitExecutableMethod(
+                    methodElement.declaringType,
+                    methodElement,
+                    visitorContext
+                )
+            }
         }
     }
 }

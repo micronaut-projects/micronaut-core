@@ -18,6 +18,7 @@ import io.micronaut.inject.writer.BeanDefinitionWriter;
 import io.micronaut.kotlin.processing.beans.BeanDefinitionProcessorProvider;
 import io.micronaut.kotlin.processing.visitor.TypeElementSymbolProcessorProvider;
 import org.intellij.lang.annotations.Language;
+import org.jetbrains.kotlin.config.JvmDefaultMode;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -41,6 +42,7 @@ public class KotlinCompiler {
     public static KotlinCompilation.Result compile(String name, @Language("kotlin") String clazz) {
         KotlinCompilation compilation = new KotlinCompilation();
         compilation.setSources(Collections.singletonList(SourceFile.Companion.kotlin(name + ".kt", clazz, true)));
+        compilation.setJvmDefault("all");
         compilation.setInheritClassPath(true);
 
         KotlinCompilation.Result result = compilation.compile();
