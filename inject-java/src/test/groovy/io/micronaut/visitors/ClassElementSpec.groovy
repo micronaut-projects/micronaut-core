@@ -1244,78 +1244,24 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
         }
         expected.size() == allMethods.size()
 
-        when:
-        Collection<MethodElement> interfaceStaticMethod1 = collectMethods(allMethods, "interfaceStaticMethod1")
+        and:
+        assertMethodsByName(allMethods, "interfaceStaticMethod1", ["SuperSuperInterfaceWithMethods", "SuperInterfaceWithMethods"])
+        assertMethodsByName(allMethods, "interfaceStaticMethod2", ["SuperSuperInterfaceWithMethods", "SuperInterfaceWithMethods"])
+        assertMethodsByName(allMethods, "interfaceMethod1", ["SuperSuperInterfaceWithMethods", "SuperInterfaceWithMethods", "InheritedMethods"])
+        assertMethodsByName(allMethods, "interfaceMethod2", ["SuperSuperInterfaceWithMethods", "SuperInterfaceWithMethods", "InheritedMethods"])
+        assertMethodsByName(allMethods, "interfaceMethod3", ["SuperSuperInterfaceWithMethods", "SuperInterfaceWithMethods"])
+        assertMethodsByName(allMethods, "staticMethod", ["SuperSuperClassWithMethods", "SuperClassWithMethods"])
+        assertMethodsByName(allMethods, "instanceMethod1", ["SuperSuperClassWithMethods", "SuperClassWithMethods"])
+        assertMethodsByName(allMethods, "instanceMethod2", ["SuperSuperClassWithMethods", "SuperClassWithMethods"])
+        assertMethodsByName(allMethods, "instanceMethod3", ["InheritedMethods"])
+    }
 
-        then:
-        interfaceStaticMethod1.size() == 2
-        oneMethodPresentWithDeclaringType(interfaceStaticMethod1, "SuperSuperInterfaceWithMethods")
-        oneMethodPresentWithDeclaringType(interfaceStaticMethod1, "SuperInterfaceWithMethods")
-
-        when:
-        Collection<MethodElement> interfaceStaticMethod2 = collectMethods(allMethods, "interfaceStaticMethod2")
-
-        then:
-        interfaceStaticMethod2.size() == 2
-        oneMethodPresentWithDeclaringType(interfaceStaticMethod2, "SuperSuperInterfaceWithMethods")
-        oneMethodPresentWithDeclaringType(interfaceStaticMethod2, "SuperInterfaceWithMethods")
-
-        when:
-        Collection<MethodElement> interfaceMethod1 = collectMethods(allMethods, "interfaceMethod1")
-
-        then:
-        interfaceMethod1.size() == 3
-        oneMethodPresentWithDeclaringType(interfaceMethod1, "SuperSuperInterfaceWithMethods")
-        oneMethodPresentWithDeclaringType(interfaceMethod1, "SuperInterfaceWithMethods")
-        oneMethodPresentWithDeclaringType(interfaceMethod1, "InheritedMethods")
-
-        when:
-        Collection<MethodElement> interfaceMethod2 = collectMethods(allMethods, "interfaceMethod2")
-
-        then:
-        interfaceMethod2.size() == 3
-        oneMethodPresentWithDeclaringType(interfaceMethod2, "SuperSuperInterfaceWithMethods")
-        oneMethodPresentWithDeclaringType(interfaceMethod2, "SuperInterfaceWithMethods")
-        oneMethodPresentWithDeclaringType(interfaceMethod2, "InheritedMethods")
-
-        when:
-        Collection<MethodElement> interfaceMethod3 = collectMethods(allMethods, "interfaceMethod3")
-
-        then:
-        interfaceMethod3.size() == 2
-        oneMethodPresentWithDeclaringType(interfaceMethod3, "SuperSuperInterfaceWithMethods")
-        oneMethodPresentWithDeclaringType(interfaceMethod3, "SuperInterfaceWithMethods")
-
-        when:
-        Collection<MethodElement> staticMethod = collectMethods(allMethods, "staticMethod")
-
-        then:
-        staticMethod.size() == 2
-        oneMethodPresentWithDeclaringType(staticMethod, "SuperSuperClassWithMethods")
-        oneMethodPresentWithDeclaringType(staticMethod, "SuperClassWithMethods")
-
-        when:
-        Collection<MethodElement> instanceMethod1 = collectMethods(allMethods, "instanceMethod1")
-
-        then:
-        instanceMethod1.size() == 2
-        oneMethodPresentWithDeclaringType(instanceMethod1, "SuperSuperClassWithMethods")
-        oneMethodPresentWithDeclaringType(instanceMethod1, "SuperClassWithMethods")
-
-        when:
-        Collection<MethodElement> instanceMethod2 = collectMethods(allMethods, "instanceMethod2")
-
-        then:
-        instanceMethod2.size() == 2
-        oneMethodPresentWithDeclaringType(instanceMethod2, "SuperSuperClassWithMethods")
-        oneMethodPresentWithDeclaringType(instanceMethod2, "SuperClassWithMethods")
-
-        when:
-        Collection<MethodElement> instanceMethod3 = collectMethods(allMethods, "instanceMethod3")
-
-        then:
-        instanceMethod3.size() == 1
-        oneMethodPresentWithDeclaringType(instanceMethod3, "InheritedMethods")
+    private void assertMethodsByName(List<MethodElement> allMethods, String name, List<String> expectedDeclaringTypeSimpleNames) {
+        Collection<MethodElement> methods = collectMethods(allMethods, name)
+        assert expectedDeclaringTypeSimpleNames.size() == methods.size()
+        for (String expectedDeclaringTypeSimpleName : expectedDeclaringTypeSimpleNames) {
+            assert oneMethodPresentWithDeclaringType(methods, expectedDeclaringTypeSimpleName)
+        }
     }
 
     private boolean oneMethodPresentWithDeclaringType(Collection<MethodElement> methods, String declaringTypeSimpleName) {
@@ -1325,7 +1271,7 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
     }
 
     static Collection<MethodElement> collectMethods(List<MethodElement> allMethods, String name) {
-        return allMethods.findAll { it.getName().equals(name) }
+        return allMethods.findAll { it.name == name }
     }
 
 }
