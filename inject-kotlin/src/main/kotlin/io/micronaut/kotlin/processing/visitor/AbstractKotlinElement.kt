@@ -10,6 +10,7 @@ import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.util.ArgumentUtils
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.ast.Element
+import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.MemberElement
 import java.util.function.Consumer
 import java.util.function.Predicate
@@ -48,7 +49,7 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
 
     override fun isFinal(): Boolean {
         return if (declaration is KSDeclaration) {
-            !declaration.isOpen()
+            !declaration.isOpen() || declaration.modifiers.contains(Modifier.FINAL)
         } else {
             false
         }

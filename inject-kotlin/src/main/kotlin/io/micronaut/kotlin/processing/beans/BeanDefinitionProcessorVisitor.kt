@@ -1,5 +1,6 @@
 package io.micronaut.kotlin.processing.beans
 
+import io.micronaut.aop.Adapter
 import io.micronaut.aop.Interceptor
 import io.micronaut.aop.InterceptorBinding
 import io.micronaut.aop.InterceptorKind
@@ -15,6 +16,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.annotation.AnnotationMetadataReference
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.configuration.ConfigurationMetadata
+import io.micronaut.inject.processing.JavaModelUtils
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.inject.writer.BeanDefinitionWriter
@@ -38,6 +40,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
     private val configurationMetadataBuilder = KotlinConfigurationMetadataBuilder()
     private var configurationMetadata: ConfigurationMetadata? = null
     private val factoryMethodIndex = AtomicInteger(0)
+    private val adaptedMethodIndex = AtomicInteger(0)
     private val readPrefixes: Array<String>
     private val writePrefixes: Array<String>
 
@@ -181,19 +184,21 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
                 methodElement.annotate(ANN_VALIDATED)
             }
         }
+        val inheritedClassMetadata = AnnotationMetadataHierarchy(classElement.annotationMetadata, methodElement.annotationMetadata)
+
         if (isFactoryClass && methodElement !is ConstructorElement && methodElement.hasDeclaredStereotype(Bean::class.qualifiedName, AnnotationUtil.SCOPE)) {
             visitFactoryMethod(methodElement)
         } else if (isDeclaredBean && methodElement.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT)) {
             beanWriter!!.visitPostConstructMethod(
                 methodElement.declaringType,
-                methodElement,
+                methodElement.withNewMetadata(inheritedClassMetadata),
                 false,
                 visitorContext
             )
         } else if (isDeclaredBean && methodElement.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)) {
             beanWriter!!.visitPreDestroyMethod(
                 methodElement.declaringType,
-                methodElement,
+                methodElement.withNewMetadata(inheritedClassMetadata),
                 false,
                 visitorContext
             )
@@ -219,13 +224,18 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         } else {
             val hasAround = hasAroundStereotype(methodElement)
             val isExecutable = isExecutable(methodElement) || hasAround
+            val isAdapted = methodElement.hasStereotype(Adapter::class.java)
 
-            if (isExecutable || (isDeclaredBean && hasConstraints)) {
+            if (isAdapted || isExecutable || (isDeclaredBean && hasConstraints)) {
 
                 if (methodElement.isPrivate) {
                     if (methodElement.hasDeclaredStereotype(Executable::class.java) ||
-                        hasAroundStereotype(methodElement, true)) {
-                        visitorContext.fail("Method annotated as executable but is declared private. Change the method to be non-private in order for AOP advice to be applied.", methodElement)
+                        hasAroundStereotype(methodElement, true)
+                    ) {
+                        visitorContext.fail(
+                            "Method annotated as executable but is declared private. Change the method to be non-private in order for AOP advice to be applied.",
+                            methodElement
+                        )
                         return
                     }
                 }
@@ -235,12 +245,20 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
                     beanWriter!!.setRequiresMethodProcessing(true)
                 }
 
-                val declaredAround = hasAround && !classElement.isAbstract && !classElement.isAssignable(Interceptor::class.java)
-                val inheritedAround = isAopProxyType && (methodElement.isPublic || methodElement.isPackagePrivate) && !declaredAround
+                val declaredAround =
+                    hasAround && !classElement.isAbstract && !classElement.isAssignable(Interceptor::class.java)
+                val inheritedAround =
+                    isAopProxyType && (methodElement.isPublic || methodElement.isPackagePrivate) && !declaredAround
 
                 if (inheritedAround || declaredAround) {
                     visitAroundMethod(methodElement, inheritedAround)
-                } else {
+                }
+
+                if (isAdapted) {
+                    visitAdaptedMethod(methodElement)
+                }
+
+                if (!isAdapted && !inheritedAround && !declaredAround) {
                     beanWriter!!.visitExecutableMethod(
                         methodElement.declaringType,
                         methodElement,
@@ -376,23 +394,19 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
             visitorContext,
             factoryMethodIndex.getAndIncrement())
 
-        val allTypeArguments = producedClassElement.allTypeArguments
-        beanMethodWriter.visitTypeArguments(allTypeArguments)
+        beanMethodWriter.visitTypeArguments(producedClassElement.allTypeArguments)
         beanMethodWriter.visitBeanFactoryMethod(
             classElement,
             methodElement
         )
-        handlePreDestroy(methodElement, producedClassElement, beanMethodWriter)
+        visitPreDestroy(methodElement, producedClassElement, beanMethodWriter)
         if (methodElement.hasStereotype(AnnotationUtil.ANN_AROUND) && !classElement.isAbstract) {
-            if (producedClassElement.isFinal) {
-                visitorContext.fail("Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + producedClassElement.name, methodElement)
-                return
-            }
-            val proxyWriter = createProxyWriter(methodElement, beanMethodWriter,true)
-            visitConstructor(proxyWriter, producedClassElement)
-            proxyWriter.visitTypeArguments(allTypeArguments)
+            visitFactoryMethodAroundAdvice(methodElement, beanMethodWriter)
         } else if (methodElement.hasStereotype(Executable::class.java)) {
-            handleFactoryExecutable(methodElement.genericReturnType, methodElement, beanMethodWriter)
+            visitFactoryExecutable(methodElement.genericReturnType, methodElement, beanMethodWriter)
+        }
+        if (hasAroundStereotype(classElement)) {
+            visitAroundMethod(methodElement, true)
         }
         beanDefinitionWriters.add(beanMethodWriter)
     }
@@ -410,16 +424,16 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
             classElement,
             propertyElement.readMethod.get()
         )
-        handlePreDestroy(propertyElement, propertyElement.genericType, beanDefinitionWriter)
+        visitPreDestroy(propertyElement, propertyElement.genericType, beanDefinitionWriter)
         if (hasAroundStereotype(propertyElement)) {
-            handleFactoryPropertyAroundAdvice(propertyElement)
+            visitFactoryPropertyAroundAdvice(propertyElement)
         } else if (propertyElement.hasStereotype(Executable::class.java)) {
-            handleFactoryExecutable(propertyElement.genericType, propertyElement, beanDefinitionWriter)
+            visitFactoryExecutable(propertyElement.genericType, propertyElement, beanDefinitionWriter)
         }
         beanDefinitionWriters.add(beanDefinitionWriter)
     }
 
-    private fun handleFactoryPropertyAroundAdvice(propertyElement: PropertyElement) {
+    private fun visitFactoryPropertyAroundAdvice(propertyElement: PropertyElement) {
         if (propertyElement.isPrimitive) {
             visitorContext.fail("Cannot apply AOP advice to primitive beans", propertyElement)
             return
@@ -429,9 +443,74 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         }
     }
 
-    private fun handleFactoryExecutable(classElement: ClassElement,
-                                        source: Element,
-                                        beanMethodWriter: BeanDefinitionWriter) {
+    private fun visitFactoryMethodAroundAdvice(methodElement: MethodElement, beanMethodWriter: BeanDefinitionWriter) {
+        val producedClassElement = methodElement.genericReturnType
+        if (producedClassElement.isPrimitive) {
+            visitorContext.fail("Cannot apply AOP advice to primitive beans", methodElement)
+            return
+        } else if (producedClassElement.isArray) {
+            visitorContext.fail("Cannot apply AOP advice to arrays", methodElement)
+            return
+        }
+        if (producedClassElement.isFinal) {
+            visitorContext.fail("Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + producedClassElement.name, methodElement)
+            return
+        }
+        val constructor = producedClassElement.primaryConstructor.orElse(null)
+        if (!producedClassElement.isInterface && constructor != null && constructor.parameters.isNotEmpty()) {
+            val proxyTargetMode: String =
+                methodElement.stringValue(AnnotationUtil.ANN_AROUND, "proxyTargetMode")
+                    .orElseGet {
+                        // temporary workaround until micronaut-test can be upgraded to 3.0
+                        if (methodElement.hasAnnotation("io.micronaut.test.annotation.MockBean")) {
+                            "WARN"
+                        } else {
+                            "ERROR"
+                        }
+                    }
+            when (proxyTargetMode) {
+                "ALLOW" -> allowProxyConstruction(constructor)
+                "WARN" -> {
+                    allowProxyConstruction(constructor)
+                    visitorContext.warn("The produced type of a @Factory method has constructor arguments and is proxied. This can lead to unexpected behaviour. See the javadoc for Around.ProxyTargetConstructorMode for more information: $methodElement", methodElement)
+                }
+                "ERROR" -> {
+                    visitorContext.fail(
+                        "The produced type from a factory which has AOP proxy advice specified must define an accessible no arguments constructor. Proxying types with constructor arguments can lead to unexpected behaviour. See the javadoc for for Around.ProxyTargetConstructorMode for more information and possible solutions: $methodElement", methodElement)
+                    return
+                }
+                else -> {
+                    visitorContext.fail(
+                        "The produced type from a factory which has AOP proxy advice specified must define an accessible no arguments constructor. Proxying types with constructor arguments can lead to unexpected behaviour. See the javadoc for for Around.ProxyTargetConstructorMode for more information and possible solutions: $methodElement", methodElement)
+                    return
+                }
+            }
+        }
+        val proxyWriter = createProxyWriter(methodElement, beanMethodWriter,true)
+        visitConstructor(proxyWriter, producedClassElement)
+        proxyWriter.visitTypeArguments(producedClassElement.allTypeArguments)
+
+        val newMetadata: AnnotationMetadata = AnnotationMetadataReference(
+            beanMethodWriter.beanDefinitionName + BeanDefinitionReferenceWriter.REF_SUFFIX,
+            methodElement.annotationMetadata
+        )
+
+        producedClassElement.getEnclosedElements(
+            ElementQuery.ALL_METHODS
+                .filter {
+                    it.isPublic && !it.isFinal
+                })
+            .forEach { beanMethod ->
+                proxyWriter.visitAroundMethod(
+                    beanMethod.declaringType,
+                    beanMethod.withNewMetadata(newMetadata)
+                )
+            }
+    }
+
+    private fun visitFactoryExecutable(classElement: ClassElement,
+                                       source: Element,
+                                       beanMethodWriter: BeanDefinitionWriter) {
 
         if (classElement.isPrimitive) {
             visitorContext.fail("Using '@Executable' is not allowed on primitive type beans", source)
@@ -448,8 +527,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         )
 
         classElement.getEnclosedElements(ElementQuery.ALL_METHODS
-            .onlyAccessible()
-            .modifiers { !it.contains(ElementModifier.FINAL) })
+            .filter { it.isPublic && !it.isFinal })
             .forEach { method ->
                 beanMethodWriter.visitExecutableMethod(
                     method.declaringType,
@@ -459,7 +537,29 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
             }
     }
 
-    private fun handlePreDestroy(element: Element, producedType: ClassElement, beanDefinitionWriter: BeanDefinitionWriter) {
+    private fun allowProxyConstruction(constructor: MethodElement) {
+        val parameters = constructor.parameters
+        for (parameter in parameters) {
+            if (parameter.isPrimitive && !parameter.isArray) {
+                val name = parameter.type.name
+                if ("boolean" == name) {
+                    parameter.annotate(Value::class.java) { builder: AnnotationValueBuilder<Value?> ->
+                        builder.value(false)
+                    }
+                } else {
+                    parameter.annotate(Value::class.java) { builder: AnnotationValueBuilder<Value?> ->
+                        builder.value(0)
+                    }
+                }
+            } else {
+                // allow null
+                parameter.annotate(AnnotationUtil.NULLABLE)
+                parameter.removeAnnotation(AnnotationUtil.NON_NULL)
+            }
+        }
+    }
+
+    private fun visitPreDestroy(element: Element, producedType: ClassElement, beanDefinitionWriter: BeanDefinitionWriter) {
         val preDestroy = element.stringValue(Bean::class.java, "preDestroy")
             .filter { method -> method.isNotEmpty() }
 
@@ -494,6 +594,113 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
                 )
             }
         }
+    }
+
+    private fun visitAdaptedMethod(methodElement: MethodElement) {
+        val targetType: Optional<ClassElement> = methodElement.stringValue(Adapter::class.java)
+            .flatMap { className -> visitorContext.getClassElement(className) }
+            .filter { classElement -> classElement.isInterface }
+
+        if (targetType.isPresent) {
+            val typeElement = targetType.get()
+            val beanClassName = generateAdaptedMethodClassName(methodElement, typeElement)
+            val aopProxyWriter = AopProxyWriter(
+                classElement.packageName,
+                beanClassName,
+                true,
+                false,
+                methodElement,
+                AnnotationMetadataHierarchy(classElement.annotationMetadata, methodElement.annotationMetadata),
+                arrayOf(typeElement),
+                visitorContext,
+                configurationMetadataBuilder,
+                null
+            )
+            aopProxyWriter.visitDefaultConstructor(methodElement.annotationMetadata, visitorContext)
+            beanDefinitionWriters.add(aopProxyWriter)
+
+            val methodElements = typeElement.getEnclosedElements(
+                ElementQuery.of(MethodElement::class.java)
+                    .onlyAccessible()
+                    .onlyAbstract()
+            )
+
+            if (methodElements.size > 1) {
+                visitorContext.fail("Interface to adapt [${typeElement.name}] is not a SAM type. More than one abstract method declared.", methodElement)
+                return
+            }
+
+            val targetMethod = methodElements.firstOrNull()
+
+            if (targetMethod == null) {
+                visitorContext.fail("Interface to adapt [${typeElement.name}] is not a SAM type. There are no abstract methods declared.", methodElement)
+                return
+            }
+
+            if (methodElement.parameters.size != targetMethod.parameters.size) {
+                visitorContext.fail("Cannot adapt method [$methodElement] to target method [${targetMethod}]. Argument lengths don't match.", methodElement)
+                return
+            }
+
+            val generics = mutableMapOf<String, ClassElement>()
+            val paramLen = methodElement.parameters.size
+            for (i in 0 until paramLen) {
+                val sourceParamType = methodElement.parameters[i].genericType
+                val targetParamType = targetMethod.parameters[i].genericType
+
+                if (!sourceParamType.isAssignable(targetParamType)) {
+                    visitorContext.fail(
+                        "Cannot adapt method [" + methodElement + "] to target method [" + targetMethod + "]. Type [" + sourceParamType.name + "] is not a subtype of type [" + targetParamType.name + "] for argument at position " + i, methodElement)
+                    return
+                }
+                val targetParamRealType = targetMethod.parameters[i].type
+                if (targetParamRealType.isGenericPlaceholder) {
+                    generics[(targetParamRealType as GenericPlaceholderElement).variableName] = sourceParamType
+                }
+            }
+
+            if (generics.isNotEmpty()) {
+                aopProxyWriter.visitTypeArguments(
+                    mapOf(typeElement.name to generics)
+                )
+            }
+
+            methodElement.annotate(
+                Adapter::class.java
+            ) { builder: AnnotationValueBuilder<Adapter> ->
+                val acv: AnnotationClassValue<Any> =
+                    AnnotationClassValue<Any>(classElement.name)
+                builder.member(Adapter.InternalAttributes.ADAPTED_BEAN, acv)
+                builder.member(
+                    Adapter.InternalAttributes.ADAPTED_METHOD,
+                    methodElement.name
+                )
+                builder.member(
+                    Adapter.InternalAttributes.ADAPTED_ARGUMENT_TYPES,
+                    *methodElement.parameters.map { param -> AnnotationClassValue<Any>(JavaModelUtils.getClassname(param.genericType)) }.toTypedArray()
+                )
+                val qualifier = classElement.stringValue(AnnotationUtil.NAMED).orElse(null)
+                if (qualifier != null && qualifier.isNotEmpty()) {
+                    builder.member(Adapter.InternalAttributes.ADAPTED_QUALIFIER, qualifier)
+                }
+            }
+
+            aopProxyWriter.visitAroundMethod(
+                typeElement,
+                targetMethod.withNewMetadata(methodElement.annotationMetadata)
+            )
+            beanWriter!!.visitExecutableMethod(
+                methodElement.declaringType,
+                methodElement,
+                visitorContext
+            )
+        }
+    }
+
+    private fun generateAdaptedMethodClassName(method: MethodElement,
+                                               typeElement: ClassElement): String {
+        val rootName = classElement.simpleName + '$' + typeElement.simpleName + '$' + method.simpleName
+        return rootName + adaptedMethodIndex.incrementAndGet()
     }
 
     private fun defineBeanDefinition() {

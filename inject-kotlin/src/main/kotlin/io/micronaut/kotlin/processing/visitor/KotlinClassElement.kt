@@ -354,9 +354,21 @@ open class KotlinClassElement(val classType: KSType,
         }
 
         if (result.isOnlyAbstract) {
-            enclosedElements = enclosedElements.filter { declaration -> declaration.modifiers.contains(Modifier.ABSTRACT) }
+            enclosedElements = enclosedElements.filter { declaration ->
+                if (declaration is KSFunctionDeclaration) {
+                    declaration.isAbstract
+                } else {
+                    declaration.modifiers.contains(Modifier.ABSTRACT)
+                }
+            }
         } else if (result.isOnlyConcrete) {
-            enclosedElements = enclosedElements.filter { declaration -> !declaration.modifiers.contains(Modifier.ABSTRACT) }
+            enclosedElements = enclosedElements.filter { declaration ->
+                if (declaration is KSFunctionDeclaration) {
+                    !declaration.isAbstract
+                } else {
+                    !declaration.modifiers.contains(Modifier.ABSTRACT)
+                }
+            }
         } else if (result.isOnlyInstance) {
             enclosedElements = enclosedElements.filter { declaration ->
                 val parent = declaration.parentDeclaration
