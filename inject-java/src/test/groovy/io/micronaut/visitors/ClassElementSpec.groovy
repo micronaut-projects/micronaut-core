@@ -30,6 +30,7 @@ import io.micronaut.inject.ast.PackageElement
 import jakarta.inject.Singleton
 import spock.lang.IgnoreIf
 import spock.lang.Issue
+import spock.lang.Requires
 import spock.lang.Unroll
 import spock.util.environment.Jvm
 
@@ -1093,6 +1094,232 @@ enum Test {
             assert expected.contains(name)
         }
         allFields.size() == expected.size()
+    }
+
+    @Requires({ jvm.isJava9Compatible() }) // private static Since Java 9
+    void "test inherited methods using ElementQuery"() {
+        given:
+            // https://github.com/eclipse-ee4j/cdi-tck/blob/master/lang-model/src/main/java/org/jboss/cdi/lang/model/tck/InheritedMethods.java
+            ClassElement classElement = buildClassElement('''
+package elementquery;
+
+class InheritedMethods extends SuperClassWithMethods implements SuperInterfaceWithMethods {
+    @Override
+    public String interfaceMethod1() {
+        return null;
+    }
+
+    @Override
+    public String interfaceMethod2() {
+        return null;
+    }
+
+    public String instanceMethod3() {
+        return null;
+    }
+    
+}
+
+interface SuperSuperInterfaceWithMethods {
+    static String interfaceStaticMethod1() {
+        return null;
+    }
+
+    private static String interfaceStaticMethod2() {
+        return null;
+    }
+
+    String interfaceMethod1();
+
+    default String interfaceMethod2() {
+        return null;
+    }
+
+    private String interfaceMethod3() {
+        return null;
+    }
+}
+
+interface SuperInterfaceWithMethods extends SuperSuperInterfaceWithMethods {
+    static String interfaceStaticMethod1() {
+        return null;
+    }
+
+    private static String interfaceStaticMethod2() {
+        return null;
+    }
+
+    @Override
+    String interfaceMethod1();
+
+    @Override
+    default String interfaceMethod2() {
+        return null;
+    }
+
+    private String interfaceMethod3() {
+        return null;
+    }
+}
+
+class SuperSuperClassWithMethods {
+    public static void staticMethod() {
+    }
+
+    private String instanceMethod1() {
+        return null;
+    }
+
+    public String instanceMethod2() {
+        return null;
+    }
+}
+
+abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implements SuperSuperInterfaceWithMethods {
+    public static void staticMethod() {
+    }
+
+    private String instanceMethod1() {
+        return null;
+    }
+
+    @Override
+    public String instanceMethod2() {
+        return null;
+    }
+}
+
+''')
+        when:
+        List<MethodElement> methods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
+
+        then:
+        methods.size() == 13
+        methods.collect {it.getName()} == [
+                "interfaceMethod1",
+                "interfaceMethod2",
+                "instanceMethod3",
+                "staticMethod",
+                "instanceMethod1",
+                "instanceMethod2",
+                "instanceMethod1",
+                "interfaceStaticMethod1",
+                "interfaceStaticMethod2",
+                "interfaceMethod3",
+                "interfaceStaticMethod1",
+                "interfaceStaticMethod2",
+                "interfaceMethod3"
+        ]
+
+        when:
+        List<MethodElement> allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.includeOverriddenMethods().includeHiddenMethods())
+
+        then:
+        allMethods.size() == 19
+        allMethods.collect {it.getName()} == [
+                "interfaceMethod1",
+                "interfaceMethod2",
+                "instanceMethod3",
+                "staticMethod",
+                "instanceMethod1",
+                "instanceMethod2",
+                "staticMethod",
+                "instanceMethod1",
+                "instanceMethod2",
+                "interfaceStaticMethod1",
+                "interfaceStaticMethod2",
+                "interfaceMethod1",
+                "interfaceMethod2",
+                "interfaceMethod3",
+                "interfaceStaticMethod1",
+                "interfaceStaticMethod2",
+                "interfaceMethod1",
+                "interfaceMethod2",
+                "interfaceMethod3"
+        ]
+
+        when:
+        def interfaceStaticMethod1 = collectMethods(allMethods, "interfaceStaticMethod1")
+
+        then:
+        interfaceStaticMethod1.size() == 2
+        oneMethodPresentWithDeclaringType(interfaceStaticMethod1, "SuperSuperInterfaceWithMethods")
+        oneMethodPresentWithDeclaringType(interfaceStaticMethod1, "SuperInterfaceWithMethods")
+
+        when:
+        def interfaceStaticMethod2 = collectMethods(allMethods, "interfaceStaticMethod2")
+
+        then:
+        interfaceStaticMethod2.size() == 2
+        oneMethodPresentWithDeclaringType(interfaceStaticMethod2, "SuperSuperInterfaceWithMethods")
+        oneMethodPresentWithDeclaringType(interfaceStaticMethod2, "SuperInterfaceWithMethods")
+
+        when:
+        def interfaceMethod1 = collectMethods(allMethods, "interfaceMethod1")
+
+        then:
+        interfaceMethod1.size() == 3
+        oneMethodPresentWithDeclaringType(interfaceMethod1, "SuperSuperInterfaceWithMethods")
+        oneMethodPresentWithDeclaringType(interfaceMethod1, "SuperInterfaceWithMethods")
+        oneMethodPresentWithDeclaringType(interfaceMethod1, "InheritedMethods")
+
+        when:
+        def interfaceMethod2 = collectMethods(allMethods, "interfaceMethod2")
+
+        then:
+        interfaceMethod2.size() == 3
+        oneMethodPresentWithDeclaringType(interfaceMethod2, "SuperSuperInterfaceWithMethods")
+        oneMethodPresentWithDeclaringType(interfaceMethod2, "SuperInterfaceWithMethods")
+        oneMethodPresentWithDeclaringType(interfaceMethod2, "InheritedMethods")
+
+        when:
+        def interfaceMethod3 = collectMethods(allMethods, "interfaceMethod3")
+
+        then:
+        interfaceMethod3.size() == 2
+        oneMethodPresentWithDeclaringType(interfaceMethod3, "SuperSuperInterfaceWithMethods")
+        oneMethodPresentWithDeclaringType(interfaceMethod3, "SuperInterfaceWithMethods")
+
+        when:
+        def staticMethod = collectMethods(allMethods, "staticMethod")
+
+        then:
+        staticMethod.size() == 2
+        oneMethodPresentWithDeclaringType(staticMethod, "SuperSuperClassWithMethods")
+        oneMethodPresentWithDeclaringType(staticMethod, "SuperClassWithMethods")
+
+        when:
+        def instanceMethod1 = collectMethods(allMethods, "instanceMethod1")
+
+        then:
+        instanceMethod1.size() == 2
+        oneMethodPresentWithDeclaringType(instanceMethod1, "SuperSuperClassWithMethods")
+        oneMethodPresentWithDeclaringType(instanceMethod1, "SuperClassWithMethods")
+
+        when:
+        def instanceMethod2 = collectMethods(allMethods, "instanceMethod2")
+
+        then:
+        instanceMethod2.size() == 2
+        oneMethodPresentWithDeclaringType(instanceMethod2, "SuperSuperClassWithMethods")
+        oneMethodPresentWithDeclaringType(instanceMethod2, "SuperClassWithMethods")
+
+        when:
+        def instanceMethod3 = collectMethods(allMethods, "instanceMethod3")
+
+        then:
+        instanceMethod3.size() == 1
+        oneMethodPresentWithDeclaringType(instanceMethod3, "InheritedMethods")
+    }
+
+    private boolean oneMethodPresentWithDeclaringType(Collection<MethodElement> methods, String declaringTypeSimpleName) {
+        methods.stream()
+                .filter { it -> it.getDeclaringType().getSimpleName() == declaringTypeSimpleName}
+                .count() == 1
+    }
+
+    static Collection<MethodElement> collectMethods(List<MethodElement> allMethods, String name) {
+        return allMethods.findAll { it.getName().equals(name) }
     }
 
 }
