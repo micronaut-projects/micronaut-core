@@ -2,6 +2,7 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.*
 import com.google.devtools.ksp.symbol.*
+import io.micronaut.aop.Introduction
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Creator
@@ -662,6 +663,14 @@ open class KotlinClassElement(val classType: KSType,
     fun getIntroductionInterfaces(): MutableList<ClassElement> {
         val elements: MutableList<ClassElement> = mutableListOf()
         getIntroductionInterfaces(declaration.annotations, elements, mutableListOf())
+        val names = elements.map { it.name }.toSet()
+
+        annotationMetadata.stringValues(Introduction::class.java, "interfaces")
+            .forEach { name ->
+                if (name != null && name.isNotEmpty() && !names.contains(name)) {
+                    visitorContext.getClassElement(name).ifPresent(elements::add)
+                }
+            }
         return elements
     }
 

@@ -45,9 +45,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
     private val writePrefixes: Array<String>
 
     init {
-        this.isAopProxyType = hasAroundStereotype(classElement.annotationMetadata) &&
-                !classElement.isAbstract &&
-                !classElement.isAssignable(Interceptor::class.java)
+        this.isAopProxyType = isAopProxyType(classElement)
         this.isExecutableType = isAopProxyType || classElement.hasStereotype(Executable::class.java)
         this.isConfigurationProperties = classElement.hasDeclaredStereotype(ConfigurationReader::class.java)
         if (isConfigurationProperties) {
@@ -94,6 +92,28 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
             } else {
                 hasAroundStereotype(annotationMetadata::hasStereotype, annotationMetadata::getAnnotationValuesByType)
             }
+        }
+
+        fun isExecutable(methodElement: MethodElement, classElement: ClassElement): Boolean {
+            if (methodElement.hasStereotype(Executable::class.java)) {
+                return true
+            }
+            if (isExecutableType(classElement)) {
+                if (classElement == methodElement.declaringType || methodElement.isPublic) {
+                    return true
+                }
+            }
+            return false
+        }
+
+        private fun isAopProxyType(classElement: ClassElement): Boolean {
+            return hasAroundStereotype(classElement.annotationMetadata) &&
+                    !classElement.isAbstract &&
+                    !classElement.isAssignable(Interceptor::class.java)
+        }
+
+        private fun isExecutableType(classElement: ClassElement): Boolean {
+            return isAopProxyType(classElement) || classElement.hasStereotype(Executable::class.java)
         }
 
         private fun <T: Annotation> hasAroundStereotype(hasAnnotation: (String) -> Boolean, annotationValues: (Class<T>) -> List<AnnotationValue<T>>): Boolean {
@@ -720,7 +740,14 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
             }
         }
 
-        val beanWriter = if (classElement.hasStereotype(AnnotationUtil.ANN_INTRODUCTION)) {
+        val hasIntroduction = classElement.hasStereotype(AnnotationUtil.ANN_INTRODUCTION)
+
+        if (hasIntroduction && classElement.isFinal) {
+            visitorContext.fail("Cannot apply introduction advice to a final class", classElement)
+            return
+        }
+
+        val beanWriter = if (hasIntroduction) {
             createIntroductionAdviceWriter()
         } else {
             val beanDefinitionWriter = BeanDefinitionWriter(classElement, configurationMetadataBuilder, visitorContext)
