@@ -19,6 +19,7 @@ dependencies {
     testImplementation libs.managed.jackson.annotations
     testImplementation libs.managed.validation
     testImplementation libs.managed.reactor
+    testImplementation libs.hibernate
     testImplementation project(":validation")
     testImplementation libs.javax.persistence
     testImplementation project(":runtime")

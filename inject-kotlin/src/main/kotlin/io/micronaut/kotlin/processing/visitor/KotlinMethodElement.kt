@@ -6,6 +6,7 @@ import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.ParameterElement
 import io.micronaut.inject.ast.PrimitiveElement
@@ -103,6 +104,16 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
     }
 
     override fun isAbstract(): Boolean = abstract
+
+    override fun toString(): String {
+        return "$simpleName(" + parameters.joinToString(",") {
+            if (it.type.isGenericPlaceholder) {
+                (it.type as GenericPlaceholderElement).variableName
+            } else {
+                it.genericType.name
+            }
+        } + ")"
+    }
 
     override fun withNewParameters(vararg newParameters: ParameterElement): MethodElement {
         return KotlinMethodElement(declaration, name, declaringType, annotationMetadata, visitorContext, returnType, genericReturnType, newParameters.toList(), abstract)
