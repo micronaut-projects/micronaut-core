@@ -251,6 +251,11 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         return new DefaultServiceCollector<>(serviceName, lineCondition, classLoader, transformer);
     }
 
+    /**
+     * A {@link ServiceDefinition} implementation that uses a {@link MethodHandles.Lookup} object to find a public constructor.
+     *
+     * @param <S> The service type
+     */
     public static final class StaticDefinition<S> implements ServiceDefinition<S> {
         private static final MethodHandles.Lookup LOOKUP = MethodHandles.publicLookup();
         private static final MethodType VOID_TYPE = MethodType.methodType(void.class);
@@ -393,6 +398,11 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         }
     }
 
+    /**
+     * Service collector for loading services of the given type.
+     *
+     * @param <S> The service type
+     */
     public interface ServiceCollector<S> {
         void collect(Collection<S> values);
 
@@ -559,6 +569,11 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
 
     }
 
+    /**
+     * Service loader that uses {@link StaticDefinition}.
+     *
+     * @param <S> The service type
+     */
     public interface StaticServiceLoader<S> {
         Stream<StaticDefinition<S>> findAll(Predicate<String> predicate);
 
@@ -574,6 +589,9 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         }
     }
 
+    /**
+     * Static optimizations for service loaders.
+     */
     public static final class Optimizations {
         private final Map<String, SoftServiceLoader.StaticServiceLoader<?>> serviceLoaders;
 

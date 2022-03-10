@@ -71,7 +71,7 @@ import java.util.Optional;
 public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandler {
     private final WebSocketClientHandshaker handshaker;
     /**
-     * Generic version of {@link #webSocketBean}
+     * Generic version of {@link #webSocketBean}.
      */
     private final WebSocketBean<T> genericWebSocketBean;
     private final FluxSink<T> emitter;
