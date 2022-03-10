@@ -1192,10 +1192,7 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
 ''')
         when:
         List<MethodElement> methods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
-
-        then:
-        methods.size() == 13
-        methods*.name == [
+        List<String> expected = [
                 "interfaceMethod1",
                 "interfaceMethod2",
                 "instanceMethod3",
@@ -1210,13 +1207,16 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
                 "interfaceStaticMethod2",
                 "interfaceMethod3"
         ]
+
+        then:
+        for (String name : methods*.name) {
+            assert expected.contains(name)
+        }
+        expected.size() == methods.size()
 
         when:
         List<MethodElement> allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.includeOverriddenMethods().includeHiddenMethods())
-
-        then:
-        allMethods.size() == 19
-        allMethods*.name == [
+        expected = [
                 "interfaceMethod1",
                 "interfaceMethod2",
                 "instanceMethod3",
@@ -1237,6 +1237,12 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
                 "interfaceMethod2",
                 "interfaceMethod3"
         ]
+
+        then:
+        for (String name : allMethods*.name) {
+            assert expected.contains(name)
+        }
+        expected.size() == allMethods.size()
 
         when:
         Collection<MethodElement> interfaceStaticMethod1 = collectMethods(allMethods, "interfaceStaticMethod1")
