@@ -354,6 +354,9 @@ public class ClassUtils {
         }
     }
 
+    /**
+     * Optimizations for computing missing types.
+     */
     @Internal
     public static final class Optimizations {
         private final Set<String> missingTypes;
