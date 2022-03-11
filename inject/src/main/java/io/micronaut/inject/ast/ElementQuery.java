@@ -131,11 +131,11 @@ public interface ElementQuery<T extends Element> {
     ElementQuery<T> includeOverriddenMethods();
 
     /**
-     * Indicates to include hidden methods, only applicable for methods query.
+     * Indicates to include hidden methods/fields, only applicable for methods/fields query.
      * @since 3.4.0
      * @return The query
      */
-    ElementQuery<T> includeHiddenMethods();
+    ElementQuery<T> includeHiddenElements();
 
     /**
      * Allows filtering elements by name.
@@ -245,16 +245,16 @@ public interface ElementQuery<T extends Element> {
         boolean isIncludeEnumConstants();
 
         /**
-         * @return Whether to include overriden methods
+         * @return Whether to include overridden methods
          * @since 3.4.0
          */
         boolean isIncludeOverriddenMethods();
 
         /**
-         * @return Whether to include hidden methods
+         * @return Whether to include hidden methods/fields
          * @since 3.4.0
          */
-        boolean isIncludeHiddenMethods();
+        boolean isIncludeHiddenElements();
 
         /**
          * @return The name predicates

@@ -537,7 +537,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         boolean onlyInstance = result.isOnlyInstance();
         boolean includeEnumConstants = result.isIncludeEnumConstants();
         boolean includeOverriddenMethods = result.isIncludeOverriddenMethods();
-        boolean includeHiddenMethods = result.isIncludeHiddenMethods();
+        boolean includeHiddenElements = result.isIncludeHiddenElements();
 
         if (!onlyDeclared) {
             Elements elements = visitorContext.getElements();
@@ -559,7 +559,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                     ElementKind superKind = superElement.getKind();
                     if (superKind == kind) {
                         for (Element enclosedElement : enclosedElements) {
-                            if (!includeHiddenMethods && elements.hides(enclosedElement, superElement)) {
+                            if (!includeHiddenElements && elements.hides(enclosedElement, superElement)) {
                                 continue superElements;
                             } else if (enclosedElement.getKind() == ElementKind.METHOD && superElement.getKind() == ElementKind.METHOD) {
                                 final ExecutableElement methodCandidate = (ExecutableElement) superElement;
