@@ -840,7 +840,11 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
             visitorContext.fail("Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + classElement.name, classElement);
             return
         }
-        aopProxyWriter = createProxyWriter(annotationMetadata, beanDefinitionVisitor)
+        aopProxyWriter = if (beanDefinitionVisitor is AopProxyWriter) {
+            beanDefinitionVisitor
+        } else {
+            createProxyWriter(annotationMetadata, beanDefinitionVisitor)
+        }
         visitConstructor(aopProxyWriter!!, classElement)
     }
 
@@ -864,7 +868,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         }
 
         if (beanDefinitionVisitor !is BeanDefinitionWriter) {
-            throw IllegalStateException("Internal Error: bean writer not an instance of BeanDefinitionWriter")
+            throw IllegalStateException("Internal Error: bean writer not an instance of BeanDefinitionWriter. Actual type [${beanDefinitionVisitor.javaClass.name}]. Current element: [${classElement.name}]")
         }
         val aopProxyWriter = AopProxyWriter(
             beanDefinitionVisitor,
