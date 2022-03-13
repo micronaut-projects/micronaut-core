@@ -1215,7 +1215,7 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
         expected.size() == methods.size()
 
         when:
-        List<MethodElement> allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.includeOverriddenMethods().includeHiddenMethods())
+        List<MethodElement> allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.includeOverriddenMethods().includeHiddenElements())
         expected = [
                 "interfaceMethod1",
                 "interfaceMethod2",
