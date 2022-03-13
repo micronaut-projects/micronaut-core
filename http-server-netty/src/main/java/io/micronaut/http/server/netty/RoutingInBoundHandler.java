@@ -25,6 +25,7 @@ import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
@@ -148,7 +149,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
      * Also present in {@link RouteExecutor}.
      */
     private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
-            "^.*(?:connection.*(?:reset|closed|abort|broken)|broken.*pipe).*$", Pattern.CASE_INSENSITIVE);
+            "^.*(?:connection (?:reset|closed|abort|broken)|broken pipe).*$", Pattern.CASE_INSENSITIVE);
     private static final Argument ARGUMENT_PART_DATA = Argument.of(PartData.class);
     private final Router router;
     private final StaticResourceResolver staticResourceResolver;
@@ -613,6 +614,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             @Override
             protected void doOnComplete() {
+                // assume exactly one message has been sent (onNext)
             }
         });
     }
@@ -968,6 +970,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         toNettyResponse(response),
                         mapToHttpContent(nettyRequest, response, body, context)
                 );
+                nettyRequest.prepareHttp2ResponseIfNecessary(streamedResponse);
                 context.writeAndFlush(streamedResponse);
                 context.read();
             } else {
@@ -987,7 +990,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             }
         } else {
             response.body(null);
-            response.contentType(null);
             writeFinalNettyResponse(
                     response,
                     nettyRequest,
@@ -1102,7 +1104,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         } else {
             MediaType mediaType = message.getContentType().orElse(null);
             if (mediaType == null) {
-                mediaType = message.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).map(routeInfo -> routeExecutor.resolveDefaultResponseContentType(request, routeInfo)).orElse(null);
+                mediaType = message.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class)
+                        .map(routeInfo -> routeExecutor.resolveDefaultResponseContentType(request, routeInfo))
+                        // RouteExecutor will pick json by default, so we do too
+                        .orElse(MediaType.APPLICATION_JSON_TYPE);
                 message.contentType(mediaType);
             }
             if (body instanceof CharSequence) {
@@ -1142,12 +1147,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         final io.micronaut.http.HttpVersion httpVersion = request.getHttpVersion();
         final boolean isHttp2 = httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0;
 
+        boolean decodeError = request instanceof NettyHttpRequest &&
+                ((NettyHttpRequest<?>) request).getNativeRequest().decoderResult().isFailure();
+
         final Object body = message.body();
         if (body instanceof NettyCustomizableResponseTypeHandlerInvoker) {
             // default Connection header if not set explicitly
             if (!isHttp2) {
                 if (!message.getHeaders().contains(HttpHeaders.CONNECTION)) {
-                    if (httpStatus.getCode() < 500 || serverConfiguration.isKeepAliveOnServerError()) {
+                    if (!decodeError && (httpStatus.getCode() < 500 || serverConfiguration.isKeepAliveOnServerError())) {
                         message.getHeaders().set(HttpHeaders.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
                     } else {
                         message.getHeaders().set(HttpHeaders.CONNECTION, HttpHeaderValues.CLOSE);
@@ -1165,7 +1173,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (!isHttp2) {
                 if (!nettyHeaders.contains(HttpHeaderNames.CONNECTION)) {
                     boolean expectKeepAlive = nettyResponse.protocolVersion().isKeepAliveDefault() || request.getHeaders().isKeepAlive();
-                    if (expectKeepAlive || httpStatus.getCode() < 500 || serverConfiguration.isKeepAliveOnServerError()) {
+                    if (!decodeError && (expectKeepAlive || httpStatus.getCode() < 500 || serverConfiguration.isKeepAliveOnServerError())) {
                         nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
                     } else {
                         nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
@@ -1366,10 +1374,17 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Encoding emitted response object [{}] using codec: {}", body, codec);
             }
+            ByteBuffer<ByteBuf> wrapped;
             if (bodyType != null && bodyType.isInstance(body)) {
-                byteBuf = codec.encode(bodyType, body, new NettyByteBufferFactory(context.alloc())).asNativeBuffer();
+                wrapped = codec.encode(bodyType, body, new NettyByteBufferFactory(context.alloc()));
             } else {
-                byteBuf = codec.encode(body, new NettyByteBufferFactory(context.alloc())).asNativeBuffer();
+                wrapped = codec.encode(body, new NettyByteBufferFactory(context.alloc()));
+            }
+            // keep the ByteBuf, release the wrapper
+            // this is probably a no-op, but it's the right thing to do anyway
+            byteBuf = wrapped.asNativeBuffer().retain();
+            if (wrapped instanceof ReferenceCounted) {
+                ((ReferenceCounted) wrapped).release();
             }
         }
         return byteBuf;

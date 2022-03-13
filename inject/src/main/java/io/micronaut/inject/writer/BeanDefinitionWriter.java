@@ -1871,7 +1871,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 pushCastToType(injectMethodVisitor, paramType);
             }
 
-            boolean isInterface = currentConfigBuilderState.isInterface();
+            boolean anInterface = currentConfigBuilderState.isInterface();
 
             if (isDurationWithTimeUnit) {
                 injectMethodVisitor.invokeVirtual(Type.getType(Duration.class), org.objectweb.asm.commons.Method.getMethod(
@@ -1881,7 +1881,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 injectMethodVisitor.getStatic(tu, "MILLISECONDS", tu);
             }
 
-            if (isInterface) {
+            if (anInterface) {
                 injectMethodVisitor.invokeInterface(builderType,
                         new org.objectweb.asm.commons.Method(methodName, methodDescriptor));
             } else {

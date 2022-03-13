@@ -143,6 +143,8 @@ class NameUtilsSpec extends Specification {
         "ABC"   | "ABC"
         "AB"    | "AB"
         "ABc"   | "aBc"
+        "S3abc" | "s3abc"
+        "S3a"   | "s3a"
     }
 
     void "test decapitalize returns same ref"() {
@@ -282,4 +284,120 @@ class NameUtilsSpec extends Specification {
         "Foo_BAR"     | false
         "FOO-BAR"     | false
     }
+
+    void "test isReaderName (#name, #prefixes)"() {
+        expect:
+        NameUtils.isReaderName(name, prefixes as String[]) == isValid
+
+        where:
+        name      | prefixes        | isValid
+        "foo"     | ["get"]         | false
+        "isFoo"   | ["get"]         | true
+        "isfoo"   | ["get"]         | false
+        "getFoo"  | ["get"]         | true
+        "getfoo"  | ["get"]         | false
+        "a"       | ["get"]         | false
+        "foo"     | ["with"]        | false
+        "withFoo" | ["with"]        | true
+        "withfoo" | ["with"]        | false
+        "isfoo"   | ["with"]        | false
+        "isFoo"   | ["with"]        | false
+        "foo"     | [""]            | true
+        "isfoo"   | [""]            | true
+        "isFoo"   | [""]            | true
+        "is"      | [""]            | true
+        "getFoo"  | ["get", "with"] | true
+        "getfoo"  | ["get", "with"] | false
+        "withFoo" | ["get", "with"] | true
+        "withfoo" | ["get", "with"] | false
+    }
+
+    void "test isWriterName (#name, #prefixes)"() {
+        expect:
+        NameUtils.isWriterName(name, prefixes as String[]) == isValid
+
+        where:
+        name      | prefixes        | isValid
+        "foo"     | ["set"]         | false
+        "setFoo"  | ["set"]         | true
+        "setfoo"  | ["set"]         | false
+        "a"       | ["set"]         | false
+        "foo"     | ["with"]        | false
+        "withFoo" | ["with"]        | true
+        "withfoo" | ["with"]        | false
+        "foo"     | [""]            | true
+        "fooBar"  | [""]            | true
+        "isfoo"   | [""]            | true
+        "isFoo"   | [""]            | true
+        "is"      | [""]            | true
+        "setFoo"  | ["set", "with"] | true
+        "setfoo"  | ["set", "with"] | false
+        "withFoo" | ["set", "with"] | true
+        "withfoo" | ["set", "with"] | false
+    }
+
+    void "test getPropertyNameForGetter (#getter, #prefixes)"() {
+        expect:
+        NameUtils.getPropertyNameForGetter(getter, prefixes as String[]) == propertyName
+
+        where:
+        getter    | prefixes        | propertyName
+        "getFoo"  | ["get"]         | "foo"
+        "isFoo"   | ["get"]         | "foo"
+        "withFoo" | ["with"]        | "foo"
+        "foo"     | [""]            | "foo"
+        "isfoo"   | [""]            | "isfoo"
+        "isFoo"   | [""]            | "isFoo"
+        "is"      | [""]            | "is"
+        "getFoo"  | ["get", "with"] | "foo"
+        "withFoo" | ["get", "with"] | "foo"
+    }
+
+    void "test getPropertyNameForSetter (#setter, #prefixes)"() {
+        expect:
+        NameUtils.getPropertyNameForSetter(setter, prefixes as String[]) == propertyName
+
+        where:
+        setter    | prefixes        | propertyName
+        "setFoo"  | ["set"]         | "foo"
+        "isFoo"   | ["set"]         | "isFoo"
+        "withFoo" | ["with"]        | "foo"
+        "foo"     | [""]            | "foo"
+        "isfoo"   | [""]            | "isfoo"
+        "isFoo"   | [""]            | "isFoo"
+        "is"      | [""]            | "is"
+        "setFoo"  | ["set", "with"] | "foo"
+        "withFoo" | ["set", "with"] | "foo"
+    }
+
+    void "test getterNameFor (#name, #prefixes)"() {
+        expect:
+        NameUtils.getterNameFor(name, prefixes as String[]) == getterName
+
+        where:
+        name     | prefixes        | getterName
+        "foo"    | ["get"]         | "getFoo"
+        "fooBar" | ["get"]         | "getFooBar"
+        "fooBar" | [""]            | "fooBar"
+        "fooBar" | ["is"]          | "isFooBar"
+        "fooBar" | ["with"]        | "withFooBar"
+        "fooBar" | ["set", "with"] | "setFooBar"
+        "fooBar" | ["with", "set"] | "withFooBar"
+    }
+
+    void "test setterNameFor (#name, #prefixes)"() {
+        expect:
+        NameUtils.setterNameFor(name, prefixes as String[]) == setterName
+
+        where:
+        name     | prefixes        | setterName
+        "foo"    | ["set"]         | "setFoo"
+        "fooBar" | ["set"]         | "setFooBar"
+        "fooBar" | [""]            | "fooBar"
+        "fooBar" | ["is"]          | "isFooBar"
+        "fooBar" | ["with"]        | "withFooBar"
+        "fooBar" | ["set", "with"] | "setFooBar"
+        "fooBar" | ["with", "set"] | "withFooBar"
+    }
+
 }

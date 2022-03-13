@@ -1,19 +1,68 @@
-The environment endpoint returns information about the link:{api}/io/micronaut/context/env/Environment.html[Environment] and its link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource]s.
-
-NOTE: Properties that may contain sensitive data are masked.
+The environment endpoint returns information about the api:context.env.Environment[] and its api:context.env.PropertySource[]s.
 
 == Configuration
 
-To configure the environment endpoint, supply configuration through `endpoints.env`.
+To enable and configure the environment endpoint, supply configuration through `endpoints.env`.
 
 .Environment Endpoint Configuration Example
 [source,yaml]
 ----
 endpoints:
   env:
-    enabled: Boolean    # default: true
+    enabled: Boolean    # default: false
     sensitive: Boolean  # default: true
 ----
+
+By default the endpoint will mask all values.
+To customize this masking you need to supply a Bean that implements api:management.endpoint.env.EnvironmentEndpointFilter[].
+
+This first example will mask all values except for those that are prefixed by `safe`
+
+.First example of environment masking
+[source,java]
+----
+@Singleton
+public class OnlySafePrefixedEnvFilter implements EnvironmentEndpointFilter {
+    private static final Pattern SAFE_PREFIX_PATTERN = Pattern.compile("safe.*", Pattern.CASE_INSENSITIVE);
+
+    @Override
+    public void specifyFiltering(@NotNull EnvironmentFilterSpecification specification) {
+        specification
+                .maskAll() // All values will be masked apart from the supplied patterns
+                .exclude(SAFE_PREFIX_PATTERN);
+    }
+}
+----
+
+It is also possible to allow all values in plain text using api:management.endpoint.env.EnvironmentFilterSpecification#maskNone--[`maskNone()`], and then specify name patterns that will be masked, ie:
+
+.Deny instead of allow
+[source,java]
+----
+@Singleton
+public class AllPlainExceptSecretOrMatchEnvFilter implements EnvironmentEndpointFilter {
+    // Mask anything starting with `sekrt`
+    private static final Pattern SECRET_PREFIX_PATTERN = Pattern.compile("sekrt.*", Pattern.CASE_INSENSITIVE);
+
+    // Mask anything exactly matching `exact-match`
+    private static final String EXACT_MATCH = "exact-match";
+
+    // Mask anything that starts with `private.`
+    private static final Predicate<String> PREDICATE_MATCH = name -> name.startsWith("private.");
+
+    @Override
+    public void specifyFiltering(@NotNull EnvironmentFilterSpecification specification) {
+        specification
+                .maskNone() // All values will be in plain-text apart from the supplied patterns
+                .exclude(SECRET_PREFIX_PATTERN)
+                .exclude(EXACT_MATCH)
+                .exclude(PREDICATE_MATCH);
+    }
+}
+----
+
+Sensible defaults can be applied by calling the api:management.endpoint.env.EnvironmentFilterSpecification#legacyMasking--[`legacyMasking()`] method.
+This will show all values apart from those that contain the words `password`, `credential`, `certificate`, `key`, `secret` or `token` anywhere in their name.
 
 == Getting information about the environment
 

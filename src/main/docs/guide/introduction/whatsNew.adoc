@@ -1,5 +1,96 @@
 //Micronaut {version} includes the following changes:
 
+== 3.4.0
+
+=== Micronaut Azure 3.1.0
+
+Refreshed dependencies and BOM module
+
+=== Micronaut Servlet 3.2.0
+
+Refreshed dependencies and the embedded Tomcat server now supports Java 17.
+
+=== Other Module Upgrades
+
+- Micronaut GCP 4.1.0
+- Micronaut RxJava2 1.2.0
+- Micronaut Rxjava3 2.2.0
+- Micronaut Reactor 2.2.0
+
+== 3.3.0
+
+=== GraalVM 22.0.0.2
+
+Micronaut now supports the latest GraalVM 22.0.0.2 release.
+
+=== Environment Endpoint
+
+A new API api:management.endpoint.env.EnvironmentEndpointFilter[] has been created to allow applications to customize which keys should have their values masked and which keys should not have their values masked. See the <<environmentEndpoint, documentation>> for full details.
+
+=== AOP Interceptor Binding
+
+When binding an AOP annotation to an interceptor, only the presence of the annotation is used to determine if the interceptor should be applied. Now it's possible to also bind based on the values of the annotation. To enable this feature, set the `bindMembers` member of the ann:aop.InterceptorBinding[] annotation to `true`.
+
+=== Netty Buffer Allocation
+
+It is now possible to configure the default Netty buffer allocator. See the https://docs.micronaut.io/3.3.x/guide/configurationreference.html#io.micronaut.buffer.netty.DefaultByteBufAllocatorConfiguration[configuration reference].
+
+=== Improved Flexibility in Class Style
+
+Many features of the Micronaut framework rely on the convention of getters and setters. Due to things like records and builders, the method names we look for are now configurable with the ann:core.annotation.AccessorStyle[] annotation. For example, the annotation can be placed on ann:context.annotation.ConfigurationProperties[] beans to allow for binding configuration to methods that do not begin with `set`. It can also be used with classes annotated with ann:core.annotation.Introspected[].
+
+=== Access Log Exclusions
+
+The Netty access logger now supports excluding requests based on a set of regular expression patterns that match against the URI. See the <<accessLogger,AccessLogger documentation>>.
+
+=== New Serialization/Deserialization Module
+
+https://micronaut-projects.github.io/micronaut-serialization/1.0.x/guide/[Micronaut Serialization] is a new module created as an alternative to Jackson. It supports serializing and deserializing Java types (including Java 17 records) to and from JSON and other formats.
+
+Users now have the choice of an alternative implementation that's largely compatible with existing Jackson annotations but contains many benefits, including the elimination of reflection, compile-time validation, greater security because only explicit types are serializable, and reduction of native image build sizes, build times, and memory usage.
+
+=== New Email Module
+
+https://micronaut-projects.github.io/micronaut-email/latest/guide/[Micronaut Email] is a new module to ease sending emails from a Micronaut application. It provides integration with transactional email providers such as Amazon Simple Email Service, Postmark, Mailjet or SendGrid.
+
+=== Micronaut AOT
+
+During this minor cycle, we released a milestone release of a new module Micronaut AOT. You can use Micronaut AOT and use the build-time optimizations provided by the module to achieve faster startup times via the Micronaut Gradle Plugin. Please, read more about it in the https://micronaut.io/2021/12/20/micronaut-aot-build-time-optimizations-for-micronaut-applications/[announcement blog post].
+
+=== Micronaut Kubernetes 3.3.0
+
+Micronaut Kubernetes 3.3 adds support to easily create the Kubernetes Operator. The Kubernetes Operator is a known pattern used to extend the capabilities of Kubernetes by creating application specific controllers for both native and custom resources. See more on https://micronaut-projects.github.io/micronaut-kubernetes/latest/guide/#kubernetes-operator[Kubernetes Operator].
+
+The version of Micronaut Kubernetes 3.3.0 also adds new Kubernetes reactive client for RxJava3.
+
+=== Other Module Upgrades
+
+- Micronaut Cache 3.1.0
+- Micronaut Discovery Client 3.1.0
+- Micronaut Elasticsearch 4.2.0
+- Micronaut Flyway 5.1.1
+- Micronaut Kafka 4.1.1
+- Micronaut Kotlin 3.1.0
+- Micronaut Liquibase 5.1.1
+- Micronaut Openapi 4.0.0
+- Micronaut Picocli 4.1.0
+- Micronaut Problem 2.2.0
+- Micronaut Security 3.3.0
+- Micronaut Sql 4.1.1
+- Micronaut Toml 1.0.0-M2
+- Micronaut Views 3.1.2
+
+=== Other Dependency Upgrades
+
+- Apache Commons DBCP 2.9.0
+- Elasticsearch 7.16.3
+- Flyway 8.4.2
+- Hibernate 5.5.9.Final
+- Kotlin 1.6.10
+- Liquibase 4.7.1
+- Logback 1.2.10
+- Swagger 2.1.12
+
 == 3.2.0
 
 === GraalVM 21.3.0
@@ -272,13 +363,13 @@ For the performance reasons it's advised to inject an instance of `ApplicationEv
 
 It is now possible to intercept bean construction invocations through the api:aop.ConstructorInterceptor[] interface and ann:aop.AroundConstruct[] annotation.
 
-See the section on <<lifecycleAdvise, Bean Life Cycle Advice>> for more information.
+See the section on <<lifecycleAdvice, Bean Life Cycle Advice>> for more information.
 
 ==== Support for `@PostConstruct` & `@PreDestroy` Interception
 
 It is now possible to intercept `@PostConstruct` and `@PreDestroy` method invocations through the api:aop.MethodInterceptor[] interface and ann:aop.InterceptorBinding[] annotation.
 
-See the section on <<lifecycleAdvise, Bean Life Cycle Advice>> for more information.
+See the section on <<lifecycleAdvice, Bean Life Cycle Advice>> for more information.
 
 
 ==== Random Configuration Values
@@ -301,7 +392,7 @@ Micronaut 3 to simplify instrumentation, thanks to https://projectreactor.io/doc
 
 ==== Micronaut Micrometer 4.0.0
 
-The https://micronaut-projects.github.io/micronaut-micrometer/latest/guide/[Micrometer module] has been upgraded and now supports repeated definitions of the https://micrometer.io/docs/concepts#_the_timed_annotation[@Timed] annotation as well as also supporting the `@Counted` annotation for counters when you add the `micronaut-micrometer-annotation` dependency to your annotation processor classpath.
+The https://micronaut-projects.github.io/micronaut-micrometer/latest/guide/[Micrometer module] has been upgraded and now supports repeated definitions of the https://micrometer.io/?/docs/concepts#_the_timed_annotation[@Timed] annotation as well as also supporting the `@Counted` annotation for counters when you add the `micronaut-micrometer-annotation` dependency to your annotation processor classpath.
 
 ==== Micronaut Oracle Cloud 2.0.0
 

@@ -17,6 +17,9 @@ package io.micronaut.http.server.netty.handler.accesslog.element;
 
 import io.micronaut.core.order.Ordered;
 
+/**
+ * Builder for not implemented tokens.
+ */
 public class NotImplementedElementBuilder implements LogElementBuilder {
 
     private static final String[] NOT_IMPLEMENTED = new String[] { "l", "u" };

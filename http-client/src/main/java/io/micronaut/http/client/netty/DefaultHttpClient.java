@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -149,6 +149,7 @@ import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.netty.resolver.NoopAddressResolverGroup;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import io.netty.util.CharsetUtil;
@@ -217,7 +218,10 @@ public class DefaultHttpClient implements
         Closeable,
         AutoCloseable {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
+    /**
+     * Default logger, use {@link #log} where possible.
+     */
+    private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
     private static final AttributeKey<Http2Stream> STREAM_KEY = AttributeKey.valueOf("micronaut.http2.stream");
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
@@ -382,6 +386,7 @@ public class DefaultHttpClient implements
                     @Override
                     protected ChannelPool newPool(RequestKey key) {
                         Bootstrap newBootstrap = bootstrap.clone(group);
+                        initBootstrapForProxy(newBootstrap, key.isSecure(), key.getHost(), key.getPort());
                         newBootstrap.remoteAddress(key.getRemoteAddress());
 
                         AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
@@ -403,6 +408,7 @@ public class DefaultHttpClient implements
                     @Override
                     protected ChannelPool newPool(RequestKey key) {
                         Bootstrap newBootstrap = bootstrap.clone(group);
+                        initBootstrapForProxy(newBootstrap, key.isSecure(), key.getHost(), key.getPort());
                         newBootstrap.remoteAddress(key.getRemoteAddress());
 
                         AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
@@ -431,7 +437,7 @@ public class DefaultHttpClient implements
             }
         }
         this.mediaTypeCodecRegistry = codecRegistry;
-        this.log = configuration.getLoggerName().map(LoggerFactory::getLogger).orElse(LOG);
+        this.log = configuration.getLoggerName().map(LoggerFactory::getLogger).orElse(DEFAULT_LOG);
         this.filterResolver = filterResolver;
         if (clientFilterEntries != null) {
             this.clientFilterEntries = clientFilterEntries;
@@ -885,10 +891,12 @@ public class DefaultHttpClient implements
             }
 
             bootstrap.remoteAddress(requestKey.getHost(), requestKey.getPort());
+            initBootstrapForProxy(bootstrap, sslContext != null, requestKey.getHost(), requestKey.getPort());
             bootstrap.handler(new HttpClientInitializer(
                     sslContext,
                     requestKey.getHost(),
                     requestKey.getPort(),
+                    false,
                     false,
                     false,
                     null
@@ -1404,6 +1412,13 @@ public class DefaultHttpClient implements
         return null;
     }
 
+    private void initBootstrapForProxy(Bootstrap bootstrap, boolean ssl, String host, int port) {
+        Proxy proxy = configuration.resolveProxy(ssl, host, port);
+        if (proxy.type() != Type.DIRECT) {
+            bootstrap.resolver(NoopAddressResolverGroup.INSTANCE);
+        }
+    }
+
     /**
      * Creates an initial connection to the given remote host.
      *
@@ -1421,9 +1436,31 @@ public class DefaultHttpClient implements
             @Nullable SslContext sslCtx,
             boolean isStream,
             Consumer<ChannelHandlerContext> contextConsumer) throws HttpClientException {
+        return doConnect(request, uri, sslCtx, isStream, false, contextConsumer);
+    }
+
+    /**
+     * Creates an initial connection to the given remote host.
+     *
+     * @param request         The request
+     * @param uri             The URI to connect to
+     * @param sslCtx          The SslContext instance
+     * @param isStream        Is the connection a stream connection
+     * @param isProxy         Is this a streaming proxy
+     * @param contextConsumer The logic to run once the channel is configured correctly
+     * @return A ChannelFuture
+     * @throws HttpClientException If the URI is invalid
+     */
+    protected ChannelFuture doConnect(
+            io.micronaut.http.HttpRequest<?> request,
+            URI uri,
+            @Nullable SslContext sslCtx,
+            boolean isStream,
+            boolean isProxy,
+            Consumer<ChannelHandlerContext> contextConsumer) throws HttpClientException {
 
         RequestKey requestKey = new RequestKey(uri);
-        return doConnect(request, requestKey.getHost(), requestKey.getPort(), sslCtx, isStream, contextConsumer);
+        return doConnect(request, requestKey.getHost(), requestKey.getPort(), sslCtx, isStream, isProxy, contextConsumer);
     }
 
     /**
@@ -1444,13 +1481,38 @@ public class DefaultHttpClient implements
             @Nullable SslContext sslCtx,
             boolean isStream,
             Consumer<ChannelHandlerContext> contextConsumer) {
+        return doConnect(request, host, port, sslCtx, isStream, false, contextConsumer);
+    }
+
+    /**
+     * Creates an initial connection to the given remote host.
+     *
+     * @param request         The request
+     * @param host            The host
+     * @param port            The port
+     * @param sslCtx          The SslContext instance
+     * @param isStream        Is the connection a stream connection
+     * @param isProxy         Is this a streaming proxy
+     * @param contextConsumer The logic to run once the channel is configured correctly
+     * @return A ChannelFuture
+     */
+    protected ChannelFuture doConnect(
+            io.micronaut.http.HttpRequest<?> request,
+            String host,
+            int port,
+            @Nullable SslContext sslCtx,
+            boolean isStream,
+            boolean isProxy,
+            Consumer<ChannelHandlerContext> contextConsumer) {
         Bootstrap localBootstrap = this.bootstrap.clone();
+        initBootstrapForProxy(localBootstrap, sslCtx != null, host, port);
         String acceptHeader = request.getHeaders().get(io.micronaut.http.HttpHeaders.ACCEPT);
         localBootstrap.handler(new HttpClientInitializer(
                 sslCtx,
                 host,
                 port,
                 isStream,
+                isProxy,
                 acceptHeader != null && acceptHeader.equalsIgnoreCase(MediaType.TEXT_EVENT_STREAM), contextConsumer)
         );
         return doConnect(localBootstrap, host, port);
@@ -2118,8 +2180,13 @@ public class DefaultHttpClient implements
                         log.trace("HTTP Client Streaming Response Received ({}) for Request: {} {}", msg.status(), nettyRequest.method().name(), nettyRequest.uri());
                         traceHeaders(headers);
                     }
-                    emitter.next(response);
-                    emitter.complete();
+                    boolean errorStatus = statusCode >= 400;
+                    if (errorStatus && failOnError) {
+                        emitter.error(new HttpClientResponseException(response.getStatus().getReason(), response));
+                    } else {
+                        emitter.next(response);
+                        emitter.complete();
+                    }
                 }
             }
         });
@@ -2343,8 +2410,8 @@ public class DefaultHttpClient implements
                             if (!emitter.isCancelled()) {
                                 emitter.error(e);
                             }
-                        } else if (LOG.isWarnEnabled()) {
-                            LOG.warn("Unsupported http status after handler completed: " + e.getMessage(), e);
+                        } else if (log.isWarnEnabled()) {
+                            log.warn("Unsupported http status after handler completed: " + e.getMessage(), e);
                         }
                         return;
                     }
@@ -2496,8 +2563,8 @@ public class DefaultHttpClient implements
                                 }
                             }
                         } else {
-                            if (LOG.isWarnEnabled()) {
-                                LOG.warn("Exception fired after handler completed: " + t.getMessage(), t);
+                            if (log.isWarnEnabled()) {
+                                log.warn("Exception fired after handler completed: " + t.getMessage(), t);
                             }
                         }
                     }
@@ -2506,8 +2573,8 @@ public class DefaultHttpClient implements
                         try {
                             ReferenceCountUtil.release(fullResponse);
                         } catch (Throwable e) {
-                            if (LOG.isDebugEnabled()) {
-                                LOG.debug("Failed to release response: {}", fullResponse);
+                            if (log.isDebugEnabled()) {
+                                log.debug("Failed to release response: {}", fullResponse);
                             }
                         }
                     }
@@ -2867,6 +2934,7 @@ public class DefaultHttpClient implements
                         key.getPort(),
                         false,
                         false,
+                        false,
                         null
                 ) {
                     @Override
@@ -2945,7 +3013,7 @@ public class DefaultHttpClient implements
                         try {
                             if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
 
-                                channelFuture = doConnect(request, requestURI, sslContext, true, channelHandlerContext -> {
+                                channelFuture = doConnect(request, requestURI, sslContext, true, true, channelHandlerContext -> {
                                     try {
                                         final Channel channel = channelHandlerContext.channel();
                                         request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
@@ -2961,7 +3029,7 @@ public class DefaultHttpClient implements
                                     }
                                 });
                             } else {
-                                channelFuture = doConnect(request, requestURI, sslContext, true, null);
+                                channelFuture = doConnect(request, requestURI, sslContext, true, true, null);
                                 addInstrumentedListener(channelFuture,
                                         (ChannelFutureListener) f -> {
                                             if (f.isSuccess()) {
@@ -3089,6 +3157,7 @@ public class DefaultHttpClient implements
         final String host;
         final int port;
         final boolean stream;
+        final boolean proxy;
         final boolean acceptsEvents;
         Http2SettingsHandler settingsHandler;
         private final Consumer<ChannelHandlerContext> contextConsumer;
@@ -3098,6 +3167,7 @@ public class DefaultHttpClient implements
          * @param host            The host
          * @param port            The port
          * @param stream          Whether is stream
+         * @param proxy           Is this a streaming proxy
          * @param acceptsEvents   Whether an event stream is accepted
          * @param contextConsumer The context consumer
          */
@@ -3106,12 +3176,14 @@ public class DefaultHttpClient implements
                 String host,
                 int port,
                 boolean stream,
+                boolean proxy,
                 boolean acceptsEvents,
                 Consumer<ChannelHandlerContext> contextConsumer) {
             this.sslContext = sslContext;
             this.stream = stream;
             this.host = host;
             this.port = port;
+            this.proxy = proxy;
             this.acceptsEvents = acceptsEvents;
             this.contextConsumer = contextConsumer;
         }
@@ -3226,8 +3298,8 @@ public class DefaultHttpClient implements
 
         private void addEventStreamHandlerIfNecessary(ChannelPipeline p) {
             // if the content type is a SSE event stream we add a decoder
-            // to delimit the content by lines
-            if (acceptsEventStream()) {
+            // to delimit the content by lines (unless we are proxying the stream)
+            if (acceptsEventStream() && !proxy) {
                 p.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_EVENT_STREAM, new LineBasedFrameDecoder(configuration.getMaxContentLength(), true, true) {
 
                     @Override

@@ -28,6 +28,9 @@ import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * A {@link TypedAnnotationMapper} for the {@link InterceptorBean} annotation.
+ */
 @Internal
 public class InterceptorBeanMapper implements TypedAnnotationMapper<InterceptorBean> {
 
@@ -40,7 +43,7 @@ public class InterceptorBeanMapper implements TypedAnnotationMapper<InterceptorB
     public List<AnnotationValue<?>> map(AnnotationValue<InterceptorBean> annotation, VisitorContext visitorContext) {
         final AnnotationValueBuilder<Annotation> builder = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
         final AnnotationClassValue<?>[] values = annotation.annotationClassValues("value");
-        AnnotationValue[] bindings = new AnnotationValue[values.length];
+        AnnotationValue<?>[] bindings = new AnnotationValue[values.length];
         for (int i = 0; i < values.length; i++) {
             bindings[i] = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDING).value(values[i].getName()).build();
         }

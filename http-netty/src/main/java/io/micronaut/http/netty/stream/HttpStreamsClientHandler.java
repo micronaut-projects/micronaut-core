@@ -32,7 +32,7 @@ import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
+import reactor.core.publisher.Flux;
 
 /**
  * Handler that converts written {@link StreamedHttpRequest} messages into {@link HttpRequest} messages
@@ -166,16 +166,7 @@ public class HttpStreamsClientHandler extends HttpStreamsHandler<HttpResponse, H
             } else {
                 awaiting100ContinueMessage.subscribe(new CancelledSubscriber<>());
                 awaiting100ContinueMessage = null;
-                awaiting100Continue.onSubscribe(new Subscription() {
-                    @Override
-                    public void request(long n) {
-                    }
-
-                    @Override
-                    public void cancel() {
-                    }
-                });
-                awaiting100Continue.onComplete();
+                Flux.<HttpContent>empty().subscribe(awaiting100Continue);
                 awaiting100Continue = null;
                 super.channelRead(ctx, msg);
             }

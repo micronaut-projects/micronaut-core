@@ -24,11 +24,13 @@ import io.micronaut.inject.ast.ConstructorElement
 import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.EnumElement
+import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PackageElement
 import jakarta.inject.Singleton
 import spock.lang.IgnoreIf
 import spock.lang.Issue
+import spock.lang.Requires
 import spock.lang.Unroll
 import spock.util.environment.Jvm
 
@@ -932,4 +934,344 @@ interface MyDto<ID> {
         beanProperties.size() == 2
         beanProperties*.declaringType*.name.every { it == 'test.MyDtoImpl' }
     }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-openapi/issues/593')
+    void 'test bean properties defined with accessors style none'() {
+        given: 'a POJO with Lombok accessors annotated with @AccessorsStyle NONE'
+        def element = buildClassElement('''
+package test;
+
+import io.micronaut.core.annotation.AccessorsStyle;
+
+@AccessorsStyle(readPrefixes = "", writePrefixes = "")
+class Person {
+
+    private String name;
+    private Integer debtValue;
+    private Integer totalGoals;
+
+    public Person(String name, Integer debtValue, Integer totalGoals) {
+        this.name = name;
+        this.debtValue = debtValue;
+        this.totalGoals = totalGoals;
+    }
+
+    public String name() {
+        return name;
+    }
+    public Integer debtValue() {
+        return debtValue;
+    }
+    public Integer totalGoals() {
+        return totalGoals;
+    }
+
+    public void name(String name) {
+        this.name = name;
+    }
+    public void debtValue(Integer debtValue) {
+        this.debtValue = debtValue;
+    }
+    public void totalGoals(Integer totalGoals) {
+        this.totalGoals = totalGoals;
+    }
+}
+''')
+
+        when: 'getting the bean properties'
+        def beanProperties = element.getBeanProperties()
+
+        then: 'the bean properties are found'
+        beanProperties
+        beanProperties.size() == 3
+
+        when: 'defining the class without @AccessorsStyle annotation'
+        element = buildClassElement('''
+package test;
+
+class Person {
+
+    private String name;
+    private Integer debtValue;
+    private Integer totalGoals;
+
+    public Person(String name, Integer debtValue, Integer totalGoals) {
+        this.name = name;
+        this.debtValue = debtValue;
+        this.totalGoals = totalGoals;
+    }
+
+    public String name() {
+        return name;
+    }
+    public Integer debtValue() {
+        return debtValue;
+    }
+    public Integer totalGoals() {
+        return totalGoals;
+    }
+
+    public void name(String name) {
+        this.name = name;
+    }
+    public void debtValue(Integer debtValue) {
+        this.debtValue = debtValue;
+    }
+    public void totalGoals(Integer totalGoals) {
+        this.totalGoals = totalGoals;
+    }
+}
+''')
+
+        then: 'no bean properties are found'
+        !element.getBeanProperties()
+    }
+
+    void "test find enum fields using ElementQuery"() {
+        given:
+            ClassElement classElement = buildClassElement('''
+package elementquery;
+
+enum Test {
+
+    A, B, C;
+
+    public static final String publicStaticFinalField = "";
+    public static String publicStaticField;
+    public final String publicFinalField = "";
+    public String publicField;
+
+    protected static final String protectedStaticFinalField = "";
+    protected static String protectedStaticField;
+    protected final String protectedFinalField = "";
+    protected String protectedField;
+
+    static final String packagePrivateStaticFinalField = "";
+    static String packagePrivateStaticField;
+    final String packagePrivateFinalField = "";
+    String packagePrivateField;
+
+    private static final String privateStaticFinalField = "";
+    private static String privateStaticField;
+    private final String privateFinalField = "";
+    private String privateField;
+}
+''')
+        when:
+        List<FieldElement>  allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
+
+        List<String> expected = [
+                'publicStaticFinalField',
+                'publicStaticField',
+                'publicFinalField',
+                'publicField',
+                'protectedStaticFinalField',
+                'protectedStaticField',
+                'protectedFinalField',
+                'protectedField',
+                'packagePrivateStaticFinalField',
+                'packagePrivateStaticField',
+                'packagePrivateFinalField',
+                'packagePrivateField',
+                'privateStaticFinalField',
+                'privateStaticField',
+                'privateFinalField',
+                'privateField',
+        ]
+
+        then:
+        for (String name : allFields*.name) {
+            assert expected.contains(name)
+        }
+        allFields.size() == expected.size()
+
+        when:
+        allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.includeEnumConstants())
+        expected = ['A', 'B', 'C'] + expected
+
+        then:
+        for (String name : allFields*.name) {
+            assert expected.contains(name)
+        }
+        allFields.size() == expected.size()
+    }
+
+    @Issue("https://github.com/eclipse-ee4j/cdi-tck/blob/master/lang-model/src/main/java/org/jboss/cdi/lang/model/tck/InheritedMethods.java")
+    @Requires({ jvm.isJava9Compatible() }) // private static Since Java 9
+    void "test inherited methods using ElementQuery"() {
+        given:
+            ClassElement classElement = buildClassElement('''
+package elementquery;
+
+class InheritedMethods extends SuperClassWithMethods implements SuperInterfaceWithMethods {
+    @Override
+    public String interfaceMethod1() {
+        return null;
+    }
+
+    @Override
+    public String interfaceMethod2() {
+        return null;
+    }
+
+    public String instanceMethod3() {
+        return null;
+    }
+    
+}
+
+interface SuperSuperInterfaceWithMethods {
+    static String interfaceStaticMethod1() {
+        return null;
+    }
+
+    private static String interfaceStaticMethod2() {
+        return null;
+    }
+
+    String interfaceMethod1();
+
+    default String interfaceMethod2() {
+        return null;
+    }
+
+    private String interfaceMethod3() {
+        return null;
+    }
+}
+
+interface SuperInterfaceWithMethods extends SuperSuperInterfaceWithMethods {
+    static String interfaceStaticMethod1() {
+        return null;
+    }
+
+    private static String interfaceStaticMethod2() {
+        return null;
+    }
+
+    @Override
+    String interfaceMethod1();
+
+    @Override
+    default String interfaceMethod2() {
+        return null;
+    }
+
+    private String interfaceMethod3() {
+        return null;
+    }
+}
+
+class SuperSuperClassWithMethods {
+    public static void staticMethod() {
+    }
+
+    private String instanceMethod1() {
+        return null;
+    }
+
+    public String instanceMethod2() {
+        return null;
+    }
+}
+
+abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implements SuperSuperInterfaceWithMethods {
+    public static void staticMethod() {
+    }
+
+    private String instanceMethod1() {
+        return null;
+    }
+
+    @Override
+    public String instanceMethod2() {
+        return null;
+    }
+}
+
+''')
+        when:
+        List<MethodElement> methods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
+        List<String> expected = [
+                "interfaceMethod1",
+                "interfaceMethod2",
+                "instanceMethod3",
+                "staticMethod",
+                "instanceMethod1",
+                "instanceMethod2",
+                "instanceMethod1",
+                "interfaceStaticMethod1",
+                "interfaceStaticMethod2",
+                "interfaceMethod3",
+                "interfaceStaticMethod1",
+                "interfaceStaticMethod2",
+                "interfaceMethod3"
+        ]
+
+        then:
+        for (String name : methods*.name) {
+            assert expected.contains(name)
+        }
+        expected.size() == methods.size()
+
+        when:
+        List<MethodElement> allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.includeOverriddenMethods().includeHiddenElements())
+        expected = [
+                "interfaceMethod1",
+                "interfaceMethod2",
+                "instanceMethod3",
+                "staticMethod",
+                "instanceMethod1",
+                "instanceMethod2",
+                "staticMethod",
+                "instanceMethod1",
+                "instanceMethod2",
+                "interfaceStaticMethod1",
+                "interfaceStaticMethod2",
+                "interfaceMethod1",
+                "interfaceMethod2",
+                "interfaceMethod3",
+                "interfaceStaticMethod1",
+                "interfaceStaticMethod2",
+                "interfaceMethod1",
+                "interfaceMethod2",
+                "interfaceMethod3"
+        ]
+
+        then:
+        for (String name : allMethods*.name) {
+            assert expected.contains(name)
+        }
+        expected.size() == allMethods.size()
+
+        and:
+        assertMethodsByName(allMethods, "interfaceStaticMethod1", ["SuperSuperInterfaceWithMethods", "SuperInterfaceWithMethods"])
+        assertMethodsByName(allMethods, "interfaceStaticMethod2", ["SuperSuperInterfaceWithMethods", "SuperInterfaceWithMethods"])
+        assertMethodsByName(allMethods, "interfaceMethod1", ["SuperSuperInterfaceWithMethods", "SuperInterfaceWithMethods", "InheritedMethods"])
+        assertMethodsByName(allMethods, "interfaceMethod2", ["SuperSuperInterfaceWithMethods", "SuperInterfaceWithMethods", "InheritedMethods"])
+        assertMethodsByName(allMethods, "interfaceMethod3", ["SuperSuperInterfaceWithMethods", "SuperInterfaceWithMethods"])
+        assertMethodsByName(allMethods, "staticMethod", ["SuperSuperClassWithMethods", "SuperClassWithMethods"])
+        assertMethodsByName(allMethods, "instanceMethod1", ["SuperSuperClassWithMethods", "SuperClassWithMethods"])
+        assertMethodsByName(allMethods, "instanceMethod2", ["SuperSuperClassWithMethods", "SuperClassWithMethods"])
+        assertMethodsByName(allMethods, "instanceMethod3", ["InheritedMethods"])
+    }
+
+    private void assertMethodsByName(List<MethodElement> allMethods, String name, List<String> expectedDeclaringTypeSimpleNames) {
+        Collection<MethodElement> methods = collectMethods(allMethods, name)
+        assert expectedDeclaringTypeSimpleNames.size() == methods.size()
+        for (String expectedDeclaringTypeSimpleName : expectedDeclaringTypeSimpleNames) {
+            assert oneMethodPresentWithDeclaringType(methods, expectedDeclaringTypeSimpleName)
+        }
+    }
+
+    private boolean oneMethodPresentWithDeclaringType(Collection<MethodElement> methods, String declaringTypeSimpleName) {
+        methods.stream()
+                .filter { it -> it.getDeclaringType().getSimpleName() == declaringTypeSimpleName}
+                .count() == 1
+    }
+
+    static Collection<MethodElement> collectMethods(List<MethodElement> allMethods, String name) {
+        return allMethods.findAll { it.name == name }
+    }
+
 }

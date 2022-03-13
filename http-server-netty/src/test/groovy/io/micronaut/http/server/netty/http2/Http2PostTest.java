@@ -120,7 +120,8 @@ public class Http2PostTest implements TestPropertyProvider {
     public Map<String, String> getProperties() {
         return CollectionUtils.mapOf(
                 "micronaut.ssl.enabled", true,
-                "micronaut.ssl.buildSelfSigned", true,
+                "micronaut.server.ssl.buildSelfSigned", true,
+                "micronaut.server.ssl.port", -1,
                 "micronaut.http.client.ssl.insecure-trust-all-certificates", true
         );
     }

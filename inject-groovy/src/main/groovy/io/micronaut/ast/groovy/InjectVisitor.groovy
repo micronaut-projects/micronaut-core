@@ -43,6 +43,7 @@ import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Value
+import io.micronaut.core.annotation.AccessorsStyle
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
@@ -337,7 +338,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             void accept(ClassNode classNode, MethodNode methodNode) {
                 AnnotationMetadata annotationMetadata
                 if (AstAnnotationUtils.isAnnotated(node.name, methodNode) || AstAnnotationUtils.hasAnnotation(methodNode, Override)) {
-                    annotationMetadata = AstAnnotationUtils.newBuilder(source, unit).buildForParent(node.name, node, methodNode)
+                    // Class annotations are referenced by concreteClassAnnotationMetadata
+                    annotationMetadata = AstAnnotationUtils.newBuilder(source, unit).buildForParent(node.name, null, methodNode)
                     annotationMetadata = new AnnotationMetadataHierarchy(concreteClassAnnotationMetadata, annotationMetadata)
                 } else {
                     annotationMetadata = new AnnotationMetadataReference(
@@ -382,13 +384,16 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     }
                 }
 
+                final String[] readPrefixes = annotationMetadata.getValue(AccessorsStyle.class, "readPrefixes", String[].class)
+                    .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX})
+
                 if (isConfigurationProperties && methodNode.isAbstract()) {
                     if (!aopProxyWriter.isValidated()) {
                         aopProxyWriter.setValidated(InjectTransform.IS_CONSTRAINT.test(annotationMetadata))
                     }
 
-                    if (!NameUtils.isGetterName(methodNode.name)) {
-                        error("Only getter methods are allowed on @ConfigurationProperties interfaces: " + methodNode.name, classNode)
+                    if (!NameUtils.isReaderName(methodNode.name, readPrefixes)) {
+                        error("Only getter methods are allowed on @ConfigurationProperties interfaces: " + methodNode.name + ". You can change the accessors using @AccessorsStyle annotation)", classNode)
                         return
                     }
 
@@ -396,7 +401,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                         error("Only zero argument getter methods are allowed on @ConfigurationProperties interfaces: " + methodNode.name, classNode)
                         return
                     }
-                    String propertyName = NameUtils.getPropertyNameForGetter(methodNode.name)
+                    String propertyName = NameUtils.getPropertyNameForGetter(methodNode.name, readPrefixes)
                     String propertyType = methodNode.returnType.name
 
                     if ("void".equals(propertyType)) {
@@ -590,8 +595,14 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 }
             } else if (isConfigurationProperties && isPublic) {
                 methodAnnotationMetadata = AstAnnotationUtils.newBuilder(sourceUnit, compilationUnit).buildDeclared(methodNode)
-                if (NameUtils.isSetterName(methodNode.name) && methodNode.parameters.length == 1) {
-                    String propertyName = NameUtils.getPropertyNameForSetter(methodNode.name)
+
+                final String[] readPrefixes = declaringElement.getValue(AccessorsStyle.class, "readPrefixes", String[].class)
+                    .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX})
+                final String[] writePrefixes = declaringElement.getValue(AccessorsStyle.class, "writePrefixes", String[].class)
+                    .orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX})
+
+                if (NameUtils.isWriterName(methodNode.name, writePrefixes) && methodNode.parameters.length == 1) {
+                    String propertyName = NameUtils.getPropertyNameForSetter(methodNode.name, writePrefixes)
                     MethodElement groovyMethodElement = elementFactory.newMethodElement(
                             declaringElement,
                             methodNode,
@@ -602,7 +613,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                     if (methodAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
                         getBeanWriter().visitConfigBuilderMethod(
                                 parameterElement.type,
-                                NameUtils.getterNameFor(propertyName),
+                                NameUtils.getterNameFor(propertyName, readPrefixes),
                                 methodAnnotationMetadata,
                                 configurationMetadataBuilder,
                                 parameterElement.type.interface
@@ -639,7 +650,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                                 true
                         )
                     }
-                } else if (NameUtils.isGetterName(methodNode.name)) {
+                } else if (NameUtils.isReaderName(methodNode.name, readPrefixes)) {
                     if (!getBeanWriter().isValidated()) {
                         getBeanWriter().setValidated(InjectTransform.IS_CONSTRAINT.test(methodAnnotationMetadata))
                     }
@@ -1624,7 +1635,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                                            ClassElement classNode,
                                            BeanDefinitionVisitor writer) {
         Boolean allowZeroArgs = annotationMetadata.getValue(ConfigurationBuilder.class, "allowZeroArgs", Boolean.class).orElse(false)
-        List<String> prefixes = Arrays.asList(annotationMetadata.getValue(ConfigurationBuilder.class, "prefixes", String[].class).orElse(["set"] as String[]))
+        List<String> prefixes = Arrays.asList(annotationMetadata.getValue(AccessorsStyle.class, "writePrefixes", String[].class).orElse(["set"] as String[]))
         String configurationPrefix = annotationMetadata.getValue(ConfigurationBuilder.class, String.class)
                 .map({ value -> value + "."}).orElse("")
         Set<String> includes = annotationMetadata.getValue(ConfigurationBuilder.class, "includes", Set.class).orElse(Collections.emptySet())

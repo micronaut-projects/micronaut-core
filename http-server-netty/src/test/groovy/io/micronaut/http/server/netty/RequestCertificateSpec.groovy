@@ -24,9 +24,10 @@ class RequestCertificateSpec extends AbstractMicronautSpec {
     @Override
     Map<String, Object> getConfiguration() {
         super.getConfiguration() << [
-                'micronaut.ssl.enabled': true,
+                'micronaut.server.ssl.enabled': true,
+                'micronaut.server.ssl.port': -1,
                 // Cannot be true!
-                'micronaut.ssl.buildSelfSigned': false,
+                'micronaut.server.ssl.buildSelfSigned': false,
                 'micronaut.ssl.clientAuthentication': "need",
                 'micronaut.ssl.key-store.path': 'classpath:KeyStore.pkcs12',
                 'micronaut.ssl.key-store.type': 'PKCS12',

@@ -17,19 +17,16 @@ package io.micronaut.management.endpoint.env;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
 import io.micronaut.management.endpoint.annotation.Selector;
-
+import jakarta.inject.Inject;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * {@link Endpoint} that displays information about the environment and its property sources.
@@ -37,7 +34,10 @@ import java.util.stream.Collectors;
  * @author Álvaro Sánchez-Mariscal
  * @since 1.2.0
  */
-@Endpoint(EnvironmentEndpoint.NAME)
+@Endpoint(
+        id = EnvironmentEndpoint.NAME,
+        defaultEnabled = false
+)
 public class EnvironmentEndpoint {
 
     /**
@@ -45,21 +45,26 @@ public class EnvironmentEndpoint {
      */
     public static final String NAME = "env";
 
-    public static final String[] PROPERTY_NAMES_TO_MASK = new String[] {
-            "password", "credential", "certificate", "key", "secret", "token"
-    };
+    private static final String MASK_VALUE = "*****";
 
     private final Environment environment;
-    private final List<Pattern> maskPatterns;
+    private final EnvironmentEndpointFilter environmentFilter;
 
     /**
      * @param environment The {@link Environment}
      */
     public EnvironmentEndpoint(Environment environment) {
+        this(environment, null);
+    }
+
+    /**
+     * @param environment The {@link Environment}
+     * @param environmentFilter The registered {@link EnvironmentEndpointFilter} bean if one is registered
+     */
+    @Inject
+    public EnvironmentEndpoint(Environment environment, @Nullable EnvironmentEndpointFilter environmentFilter) {
         this.environment = environment;
-        this.maskPatterns = Arrays.stream(PROPERTY_NAMES_TO_MASK)
-                .map(s -> Pattern.compile(".*" + s + ".*", Pattern.CASE_INSENSITIVE))
-                .collect(Collectors.toList());
+        this.environmentFilter = environmentFilter;
     }
 
     /**
@@ -68,6 +73,8 @@ public class EnvironmentEndpoint {
      */
     @Read
     public Map<String, Object> getEnvironmentInfo() {
+        EnvironmentFilterSpecification filter = createFilterSpecification();
+
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("activeEnvironments", environment.getActiveNames());
         result.put("packages", environment.getPackages());
@@ -75,7 +82,8 @@ public class EnvironmentEndpoint {
         environment.getPropertySources()
                 .stream()
                 .sorted(Comparator.comparing(PropertySource::getOrder))
-                .forEach(ps -> propertySources.add(buildPropertySourceInfo(ps)));
+                .map(ps -> buildPropertySourceInfo(ps, filter))
+                .forEach(propertySources::add);
         result.put("propertySources", propertySources);
         return result;
     }
@@ -86,35 +94,41 @@ public class EnvironmentEndpoint {
      */
     @Read
     public Map<String, Object> getProperties(@Selector String propertySourceName) {
+        EnvironmentFilterSpecification filter = createFilterSpecification();
+
         return environment.getPropertySources()
                 .stream()
                 .filter(ps -> ps.getName().equals(propertySourceName))
                 .findFirst()
-                .map(this::buildPropertySourceInfo)
+                .map(ps -> buildPropertySourceInfo(ps, filter))
                 .orElse(null);
     }
 
-    private Map<String, Object> getAllProperties(PropertySource propertySource) {
+    private EnvironmentFilterSpecification createFilterSpecification() {
+        EnvironmentFilterSpecification filter = new EnvironmentFilterSpecification();
+        if (environmentFilter != null) {
+            environmentFilter.specifyFiltering(filter);
+        }
+        return filter;
+    }
+
+    private Map<String, Object> getAllProperties(PropertySource propertySource, EnvironmentFilterSpecification filter) {
         Map<String, Object> properties = new LinkedHashMap<>();
-        propertySource.forEach(k -> properties.put(k, maskProperty(k, propertySource.get(k))));
+        propertySource.forEach(k -> {
+            EnvironmentFilterSpecification.FilterResult test = filter.test(k);
+            if (test != EnvironmentFilterSpecification.FilterResult.HIDE) {
+                properties.put(k, test == EnvironmentFilterSpecification.FilterResult.MASK ? MASK_VALUE : propertySource.get(k));
+            }
+        });
         return properties;
     }
 
-    private Map<String, Object> buildPropertySourceInfo(PropertySource propertySource) {
+    private Map<String, Object> buildPropertySourceInfo(PropertySource propertySource, EnvironmentFilterSpecification filter) {
         Map<String, Object> propertySourceInfo = new LinkedHashMap<>();
         propertySourceInfo.put("name", propertySource.getName());
         propertySourceInfo.put("order", propertySource.getOrder());
         propertySourceInfo.put("convention", propertySource.getConvention().name());
-        propertySourceInfo.put("properties", getAllProperties(propertySource));
+        propertySourceInfo.put("properties", getAllProperties(propertySource, filter));
         return propertySourceInfo;
-    }
-
-    private Object maskProperty(String key, Object value) {
-        for (Pattern pattern : this.maskPatterns) {
-            if (pattern.matcher(key).matches()) {
-                return "*****";
-            }
-        }
-        return value;
     }
 }

@@ -15,10 +15,11 @@
  */
 package io.micronaut.core.naming;
 
+import io.micronaut.core.annotation.AccessorsStyle;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 
-import io.micronaut.core.annotation.NonNull;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -31,15 +32,15 @@ import java.util.regex.Pattern;
  */
 public class NameUtils {
 
-    private static final int PREFIX_LENGTH = 3;
     private static final int IS_LENGTH = 2;
 
     private static final Pattern DOT_UPPER = Pattern.compile("\\.[A-Z\\$]");
     private static final Pattern SERVICE_ID_REGEX = Pattern.compile("[\\p{javaLowerCase}\\d-]+");
     private static final String PREFIX_GET = "get";
     private static final String PREFIX_SET = "set";
+    private static final String PREFIX_IS = "is";
     private static final Pattern ENVIRONMENT_VAR_SEQUENCE = Pattern.compile("^[\\p{Lu}_{0-9}]+");
-    private static final Pattern KEBAB_CASE_SEQUENCE = Pattern.compile("^(([a-z0-9])+(\\-|\\.|:)?)*([a-z0-9])+$");
+    private static final Pattern KEBAB_CASE_SEQUENCE = Pattern.compile("^(([a-z0-9])+([-.:])?)*([a-z0-9])+$");
     private static final Pattern KEBAB_REPLACEMENTS = Pattern.compile("[_ ]");
 
     /**
@@ -202,11 +203,47 @@ public class NameUtils {
      * @return True if it is a valid setter name
      */
     public static boolean isSetterName(String methodName) {
-        int len = methodName.length();
-        if (len > PREFIX_LENGTH && methodName.startsWith(PREFIX_SET)) {
-            return Character.isUpperCase(methodName.charAt(PREFIX_LENGTH));
+        return isWriterName(methodName, AccessorsStyle.DEFAULT_WRITE_PREFIX);
+    }
+
+    /**
+     * Is the given method name a valid writer name for the prefix.
+     *
+     * @param methodName  The method name
+     * @param writePrefix The write prefix
+     * @return True if it is a valid writer name
+     * @since 3.3.0
+     */
+    public static boolean isWriterName(@NonNull String methodName, @NonNull String writePrefix) {
+        return isWriterName(methodName, new String[]{writePrefix});
+    }
+
+    /**
+     * Is the given method name a valid writer name for any of the prefixes.
+     *
+     * @param methodName    The method name
+     * @param writePrefixes The write prefixes
+     * @return True if it is a valid writer name
+     * @since 3.3.0
+     */
+    public static boolean isWriterName(@NonNull String methodName, @NonNull String[] writePrefixes) {
+        boolean isValid = false;
+        for (String writePrefix : writePrefixes) {
+            if (writePrefix.length() == 0) {
+                return true;
+            }
+            int len = methodName.length();
+            int prefixLength = writePrefix.length();
+            if (len > prefixLength && methodName.startsWith(writePrefix)) {
+                isValid = Character.isUpperCase(methodName.charAt(prefixLength));
+            }
+
+            if (isValid) {
+                break;
+            }
         }
-        return false;
+
+        return isValid;
     }
 
     /**
@@ -216,9 +253,36 @@ public class NameUtils {
      * @return The property name
      */
     public static String getPropertyNameForSetter(String setterName) {
-        if (isSetterName(setterName)) {
-            return decapitalize(setterName.substring(PREFIX_LENGTH));
+        return getPropertyNameForSetter(setterName, AccessorsStyle.DEFAULT_WRITE_PREFIX);
+    }
+
+    /**
+     * Get the equivalent property name for the given setter and write prefix.
+     *
+     * @param setterName  The setter name
+     * @param writePrefix The write prefix
+     * @return The property name
+     * @since 3.3.0
+     */
+    public static @NonNull String getPropertyNameForSetter(@NonNull String setterName, @NonNull String writePrefix) {
+        return getPropertyNameForSetter(setterName, new String[]{writePrefix});
+    }
+
+    /**
+     * Get the equivalent property name for the given setter and write prefixes.
+     *
+     * @param setterName    The setter name
+     * @param writePrefixes The write prefixes
+     * @return The property name
+     * @since 3.3.0
+     */
+    public static @NonNull String getPropertyNameForSetter(@NonNull String setterName, @NonNull String[] writePrefixes) {
+        for (String writePrefix : writePrefixes) {
+            if (isWriterName(setterName, writePrefix)) {
+                return decapitalize(setterName.substring(writePrefix.length()));
+            }
         }
+
         return setterName;
     }
 
@@ -229,8 +293,37 @@ public class NameUtils {
      * @return The setter name
      */
     public static @NonNull String setterNameFor(@NonNull String propertyName) {
+        return setterNameFor(propertyName, PREFIX_SET);
+    }
+
+    /**
+     * Get the equivalent setter name for the given property and a the first prefix.
+     *
+     * @param propertyName The property name
+     * @param prefixes     The prefixes
+     * @return The setter name for the first prefix
+     * @since 3.3.0
+     */
+    public static @NonNull String setterNameFor(@NonNull String propertyName, @NonNull String[] prefixes) {
+        if (prefixes.length == 0) {
+            return setterNameFor(propertyName, StringUtils.EMPTY_STRING);
+        } else {
+            return setterNameFor(propertyName, prefixes[0]);
+        }
+    }
+
+    /**
+     * Get the equivalent setter name for the given property and a prefix.
+     *
+     * @param propertyName The property name
+     * @param prefix       The prefix
+     * @return The setter name
+     * @since 3.3.0
+     */
+    public static @NonNull String setterNameFor(@NonNull String propertyName, @NonNull String prefix) {
         ArgumentUtils.requireNonNull("propertyName", propertyName);
-        return nameFor(PREFIX_SET, propertyName);
+        ArgumentUtils.requireNonNull("prefix", prefix);
+        return nameFor(prefix, propertyName);
     }
 
     /**
@@ -240,19 +333,51 @@ public class NameUtils {
      * @return True if it is a valid getter name
      */
     public static boolean isGetterName(String methodName) {
-        int prefixLength = 0;
-        if (methodName.startsWith(PREFIX_GET)) {
-            prefixLength = PREFIX_LENGTH;
-        } else if (methodName.startsWith("is")) {
-            prefixLength = IS_LENGTH;
-        } else {
-            return false;
+        return isReaderName(methodName, AccessorsStyle.DEFAULT_READ_PREFIX);
+    }
+
+    /**
+     * Is the given method name a valid reader name.
+     *
+     * @param methodName The method name
+     * @param readPrefix The read prefix
+     * @return True if it is a valid read name
+     * @since 3.3.0
+     */
+    public static boolean isReaderName(@NonNull String methodName, @NonNull String readPrefix) {
+        return isReaderName(methodName, new String[]{readPrefix});
+    }
+
+    /**
+     * Is the given method name a valid reader name.
+     *
+     * @param methodName   The method name
+     * @param readPrefixes The valid read prefixes
+     * @return True if it is a valid reader name
+     * @since 3.3.0
+     */
+    public static boolean isReaderName(@NonNull String methodName, @NonNull String[] readPrefixes) {
+        boolean isValid = false;
+        for (String readPrefix : readPrefixes) {
+            int prefixLength = 0;
+            if (readPrefix.length() == 0) {
+                return true;
+            } else if (methodName.startsWith(readPrefix)) {
+                prefixLength = readPrefix.length();
+            } else if (methodName.startsWith(PREFIX_IS) && readPrefix.equals(PREFIX_GET)) {
+                prefixLength = IS_LENGTH;
+            }
+            int len = methodName.length();
+            if (len > prefixLength) {
+                isValid = Character.isUpperCase(methodName.charAt(prefixLength));
+            }
+
+            if (isValid) {
+                break;
+            }
         }
-        int len = methodName.length();
-        if (len > prefixLength) {
-            return Character.isUpperCase(methodName.charAt(prefixLength));
-        }
-        return false;
+
+        return isValid;
     }
 
     /**
@@ -262,15 +387,41 @@ public class NameUtils {
      * @return The property name
      */
     public static String getPropertyNameForGetter(String getterName) {
-        if (isGetterName(getterName)) {
-            int prefixLength = 0;
-            if (getterName.startsWith(PREFIX_GET)) {
-                prefixLength = PREFIX_LENGTH;
+        return getPropertyNameForGetter(getterName, AccessorsStyle.DEFAULT_READ_PREFIX);
+    }
+
+    /**
+     * Get the equivalent property name for the given getter and read prefix.
+     *
+     * @param getterName The getter
+     * @param readPrefix The read prefix
+     * @return The property name
+     * @since 3.3.0
+     */
+    public static @NonNull String getPropertyNameForGetter(@NonNull String getterName, @NonNull String readPrefix) {
+        return getPropertyNameForGetter(getterName, new String[]{readPrefix});
+    }
+
+    /**
+     * Get the equivalent property name for the given getter and read prefixes.
+     *
+     * @param getterName   The getter
+     * @param readPrefixes The read prefixes
+     * @return The property name
+     * @since 3.3.0
+     */
+    public static @NonNull String getPropertyNameForGetter(@NonNull String getterName, @NonNull String[] readPrefixes) {
+        for (String readPrefix: readPrefixes) {
+            if (isReaderName(getterName, readPrefix)) {
+                int prefixLength = 0;
+                if (getterName.startsWith(readPrefix)) {
+                    prefixLength = readPrefix.length();
+                }
+                if (getterName.startsWith(PREFIX_IS) && readPrefix.equals(PREFIX_GET)) {
+                    prefixLength = IS_LENGTH;
+                }
+                return decapitalize(getterName.substring(prefixLength));
             }
-            if (getterName.startsWith("is")) {
-                prefixLength = IS_LENGTH;
-            }
-            return decapitalize(getterName.substring(prefixLength));
         }
         return getterName;
     }
@@ -282,8 +433,37 @@ public class NameUtils {
      * @return The getter name
      */
     public static @NonNull String getterNameFor(@NonNull String propertyName) {
+        return getterNameFor(propertyName, PREFIX_GET);
+    }
+
+    /**
+     * Get the equivalent getter name for the given property and a the first prefix.
+     *
+     * @param propertyName The property name
+     * @param prefixes     The prefixes
+     * @return The getter name for the first prefix
+     * @since 3.3.0
+     */
+    public static @NonNull String getterNameFor(@NonNull String propertyName, @NonNull String[] prefixes) {
+        if (prefixes.length == 0) {
+            return getterNameFor(propertyName, StringUtils.EMPTY_STRING);
+        } else {
+            return getterNameFor(propertyName, prefixes[0]);
+        }
+    }
+
+    /**
+     * Get the equivalent getter name for the given property and a prefix.
+     *
+     * @param propertyName The property name
+     * @param prefix       The prefix
+     * @return The getter name for the prefix
+     * @since 3.3.0
+     */
+    public static @NonNull String getterNameFor(@NonNull String propertyName, @NonNull String prefix) {
         ArgumentUtils.requireNonNull("propertyName", propertyName);
-        return nameFor(PREFIX_GET, propertyName);
+        ArgumentUtils.requireNonNull("prefix", prefix);
+        return nameFor(prefix, propertyName);
     }
 
     /**
@@ -307,10 +487,14 @@ public class NameUtils {
      * @return The getter name
      */
     public static String getterNameFor(@NonNull String propertyName, boolean isBoolean) {
-        return nameFor(isBoolean ? "is" : PREFIX_GET, propertyName);
+        return nameFor(isBoolean ? PREFIX_IS : PREFIX_GET, propertyName);
     }
 
     private static String nameFor(String prefix, @NonNull String propertyName) {
+        if (prefix.length() == 0) {
+            return propertyName;
+        }
+
         final int len = propertyName.length();
         switch (len) {
             case 0:
@@ -353,7 +537,7 @@ public class NameUtils {
                 return Character.toString(Character.toLowerCase(name.charAt(0)));
             }
             for (int i = 1; i < Math.min(length, 3); i++) {
-                if (Character.isLowerCase(name.charAt(i))) {
+                if (!Character.isUpperCase(name.charAt(i))) {
                     char[] chars = name.toCharArray();
                     chars[0] = Character.toLowerCase(chars[0]);
                     return new String(chars);

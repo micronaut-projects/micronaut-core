@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,6 @@
 package io.micronaut.http
 
 import ch.qos.logback.classic.Logger
-import ch.qos.logback.classic.spi.ILoggingEvent
-import ch.qos.logback.core.AppenderBase
 import io.micronaut.context.annotation.Property
 import io.micronaut.core.type.Argument
 import io.micronaut.http.annotation.Controller
@@ -33,9 +31,6 @@ import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 import jakarta.inject.Inject
-import java.util.concurrent.BlockingQueue
-import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.TimeUnit
 
 /**
  * @author Christophe Roudet
@@ -170,22 +165,4 @@ class HttpAccessLoggerSpec extends Specification {
         }
 
     }
-
-    private static class MemoryAppender extends AppenderBase<ILoggingEvent> {
-        private final BlockingQueue<String> events = new LinkedBlockingQueue<>()
-
-        @Override
-        protected void append(ILoggingEvent e) {
-            events.add(e.formattedMessage)
-        }
-
-        public Queue<String> getEvents() {
-            return events
-        }
-
-        public String headLog(long timeout) {
-            return events.poll(timeout, TimeUnit.SECONDS)
-        }
-    }
-
 }

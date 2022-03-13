@@ -183,6 +183,7 @@ subprojects { Project subproject ->
 }
 apply plugin: "io.micronaut.build.internal.docs"
 apply plugin: "io.micronaut.build.internal.version-catalog-updates"
+apply plugin: "io.micronaut.build.internal.quality-reporting"
 
 allprojects {
 
@@ -199,7 +200,7 @@ allprojects {
 }
 
 htmlSanityCheck {
-    sourceDir = new File("${rootProject.buildDir}/docs/")
+    sourceDir = new File("${rootProject.buildDir}/docs/guide/")
     sourceDocuments = fileTree(sourceDir) {
         include "index.html"
     }
@@ -217,4 +218,11 @@ tasks.named("updateVersionCatalogs") {
     ignoredModules.add("io.micronaut.ignite:micronaut-ignite-cache")
     // workaround Gradle variant selection problem
     ignoredModules.add("com.github.ben-manes.caffeine:caffeine")
+}
+
+allprojects {
+    tasks.withType(JavaCompile).configureEach {
+        options.fork = true
+        options.forkOptions.memoryMaximumSize = "1048m"
+    }
 }

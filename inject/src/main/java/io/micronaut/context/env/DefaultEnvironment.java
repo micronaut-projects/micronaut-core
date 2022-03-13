@@ -163,7 +163,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         // Search config locations in reverse order
         Collections.reverse(configLocations);
         this.configLocations = configLocations;
-        CONSTANT_PROPERTY_SOURCES.forEach(p -> propertySources.put(p.getName(), p));
     }
 
     @Override
@@ -417,6 +416,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             propertySources.addAll(readPropertySourceListFromFiles(propertySourcesEnv));
         }
         refreshablePropertySources.addAll(propertySources);
+        readConstantPropertySources(name, propertySources);
 
         propertySources.addAll(this.propertySources.values());
         OrderUtil.sort(propertySources);
@@ -426,6 +426,21 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
             processPropertySource(propertySource, propertySource.getConvention());
         }
+    }
+
+    private void readConstantPropertySources(String name, List<PropertySource> propertySources) {
+        Set<String> propertySourceNames = Stream.concat(Stream.of(name), getActiveNames().stream().map(env -> name + "-" + env))
+                .collect(Collectors.toSet());
+        getConstantPropertySources().stream()
+                .filter(p -> propertySourceNames.contains(p.getName()))
+                .forEach(propertySources::add);
+    }
+
+    /**
+     * @return Property sources created at build time
+     */
+    protected List<PropertySource> getConstantPropertySources() {
+        return CONSTANT_PROPERTY_SOURCES;
     }
 
     /**

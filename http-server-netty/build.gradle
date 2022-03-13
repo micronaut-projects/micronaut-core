@@ -2,7 +2,13 @@ import org.apache.tools.ant.taskdefs.condition.Os
 
 internalSanityChecks {
     expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 24)
-}           
+}
+
+test {
+    systemProperty("io.netty.leakDetection.level", "paranoid")
+    systemProperty("io.netty.customResourceLeakDetector", "io.micronaut.http.server.netty.fuzzing.BufferLeakDetection")
+    maxHeapSize("1G")
+}
 
 dependencies {
     annotationProcessor project(":inject-java")

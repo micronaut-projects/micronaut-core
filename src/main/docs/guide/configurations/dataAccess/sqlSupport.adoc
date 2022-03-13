@@ -21,7 +21,7 @@ dependency:micronaut-jdbc-dbcp[groupId="io.micronaut.sql",scope="runtime"]
 
 dependency:micronaut-jdbc-ucp[groupId="io.micronaut.sql",scope="runtime"]
 
-Also, add a JDBC driver dependency to your build. For example to add the http://www.h2database.com[H2 In-Memory Database]:
+Also, add a JDBC driver dependency to your build. For example to add the https://www.h2database.com[H2 In-Memory Database]:
 
 dependency:h2[groupId="com.h2database",scope="runtime"]
 

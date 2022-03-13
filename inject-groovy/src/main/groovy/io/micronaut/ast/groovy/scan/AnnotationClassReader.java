@@ -711,6 +711,7 @@ class AnnotationClassReader {
                     default:
                         v = readAnnotationValues(v - 3, buf, false, av.visitArray(name));
                 }
+                break;
             default:
                 // no-op
         }

@@ -22,7 +22,6 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.FieldElement;
 import org.codehaus.groovy.ast.*;
-import org.codehaus.groovy.control.SourceUnit;
 
 import io.micronaut.core.annotation.NonNull;
 
@@ -40,7 +39,6 @@ import java.util.Set;
 public class GroovyFieldElement extends AbstractGroovyElement implements FieldElement {
 
     private final Variable variable;
-    private final SourceUnit sourceUnit;
 
     /**
      * @param visitorContext     The visitor context
@@ -53,7 +51,6 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
             Variable variable, AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata) {
         super(visitorContext, annotatedNode, annotationMetadata);
         this.variable = variable;
-        this.sourceUnit = visitorContext.getSourceUnit();
     }
 
     @Override

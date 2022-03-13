@@ -166,6 +166,10 @@ dependency:io.micronaut.rxjava2:micronaut-rxjava2-http-server-netty[gradleScope=
 
 NOTE: We recommend switching to Project Reactor as that is the implementation used internally by Micronaut. Adding a dependency to RxJava2 will result in both implementations in the runtime classpath of your application.
 
+=== Environment endpoint
+
+As of 3.3.0, the <<environmentEndpoint, environmental endpoint>> is now disabled by default, please see the <<breaks, breaking changes>> for how to restore functionality.
+
 === Breaking Changes
 
 Review the section on <<breaks, Breaking Changes>> and update your affected application code.
