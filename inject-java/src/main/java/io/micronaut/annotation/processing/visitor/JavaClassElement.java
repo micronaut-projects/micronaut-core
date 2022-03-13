@@ -371,9 +371,13 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         ExecutableElement executableElement = (ExecutableElement) element;
                         String methodName = executableElement.getSimpleName().toString();
                         final TypeElement declaringTypeElement = (TypeElement) executableElement.getEnclosingElement();
-
                         if (NameUtils.isReaderName(methodName, readPrefixes) && executableElement.getParameters().isEmpty()) {
-                            String propertyName = NameUtils.getPropertyNameForGetter(methodName, readPrefixes);
+                            String propertyName;
+                            if (fields.containsKey(methodName)) {
+                                propertyName = methodName;
+                            } else {
+                                propertyName = NameUtils.getPropertyNameForGetter(methodName, readPrefixes);
+                            }
                             TypeMirror returnType = executableElement.getReturnType();
                             ClassElement getterReturnType;
                             if (returnType instanceof TypeVariable) {
