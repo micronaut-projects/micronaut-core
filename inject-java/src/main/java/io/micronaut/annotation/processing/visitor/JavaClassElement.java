@@ -371,8 +371,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         ExecutableElement executableElement = (ExecutableElement) element;
                         String methodName = executableElement.getSimpleName().toString();
                         final TypeElement declaringTypeElement = (TypeElement) executableElement.getEnclosingElement();
-                        if (NameUtils.isReaderName(methodName, readPrefixes) && executableElement.getParameters().isEmpty()) {
 
+                        if (NameUtils.isReaderName(methodName, readPrefixes) && executableElement.getParameters().isEmpty()) {
                             String propertyName;
                             if (fields.containsKey(methodName)) {
                                 propertyName = methodName;
