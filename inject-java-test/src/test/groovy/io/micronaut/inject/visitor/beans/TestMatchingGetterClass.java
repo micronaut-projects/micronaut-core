@@ -29,4 +29,9 @@ public abstract class TestMatchingGetterClass {
     public void setAuthor(String author) {
         this.author = author;
     }
+
+    // out of order test
+    public Integer getGetTest() { return getTest; }
+
+    private Integer getTest;
 }
