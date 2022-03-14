@@ -132,6 +132,24 @@ class PckElementTest {
 
         expect:
         pe.name == 'pkgeltest'
+        pe.simpleName == 'pkgeltest'
+        pe.getClass().name.contains("GroovyPackageElement")
+    }
+
+    void "test get full package element"() {
+        given:
+        def element = buildClassElement('''
+package abc.my.pkgeltest;
+
+class PckElementTest {
+
+}
+''')
+        PackageElement pe = element.getPackage()
+
+        expect:
+        pe.name == 'abc.my.pkgeltest'
+        pe.simpleName == 'pkgeltest'
         pe.getClass().name.contains("GroovyPackageElement")
     }
 

@@ -197,6 +197,23 @@ class PckElementTest {
         pe.getClass().name.contains("JavaPackageElement")
     }
 
+    void "test get full package element"() {
+        given:
+        def element = buildClassElement('''
+package abc.my.pkgeltest;
+
+class PckElementTest {
+
+}
+''')
+        PackageElement pe = element.getPackage()
+
+        expect:
+        pe.name == 'abc.my.pkgeltest'
+        pe.simpleName == 'pkgeltest'
+        pe.getClass().name.contains("JavaPackageElement")
+    }
+
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/5611')
     void 'test visit enum with custom annotation'() {
         when: "An enum has an annotation that is visited by CustomAnnVisitor"
