@@ -3745,6 +3745,33 @@ class MyConfig {
         beanIntrospection.getBeanProperties().size() == 2
     }
 
+    void "test targeting abstract class with @Introspected(classes = ) with getter matching field name"() {
+        ClassLoader classLoader = buildClassLoader("test.Test", """
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(classes = {io.micronaut.inject.visitor.beans.TestMatchingGetterClass.class})
+class MyConfig {
+
+}
+""")
+
+        when:
+        BeanIntrospector beanIntrospector = BeanIntrospector.forClassLoader(classLoader)
+
+        then:
+        BeanIntrospection beanIntrospection = beanIntrospector.getIntrospection(TestMatchingGetterClass)
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 3
+        String[] propertyNames = beanIntrospection.getPropertyNames()
+        propertyNames.contains("getName")
+        !propertyNames.contains("name")
+        propertyNames.contains("isDeleted")
+        !propertyNames.contains("deleted")
+        propertyNames.contains("author")
+    }
+
     void "test targeting abstract class with @Introspected(classes = ) with custom getter"() {
         ClassLoader classLoader = buildClassLoader("test.Test", """
 package test;
