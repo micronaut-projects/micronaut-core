@@ -15,6 +15,10 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
+import io.micronaut.context.RequiresCondition;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.annotation.processing.visitor.JavaElementFactory;
 import io.micronaut.annotation.processing.visitor.JavaMethodElement;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
@@ -23,7 +27,6 @@ import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.Introduction;
-import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.aop.writer.AopProxyWriter;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationBuilder;
@@ -35,14 +38,13 @@ import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Property;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
-import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -500,6 +502,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     aopProxyWriter.visitDefaultConstructor(concreteClassMetadata, javaVisitorContext);
                 }
                 beanDefinitionWriters.put(classElementQualifiedName, aopProxyWriter);
+                visitAnnotationMetadata(aopProxyWriter, this.currentClassMetadata);
                 visitIntroductionAdviceInterface(classElement, typeAnnotationMetadata, aopProxyWriter);
 
                 if (!isInterface) {
@@ -525,6 +528,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 return null;
                             }
                             BeanDefinitionVisitor beanDefinitionWriter = getOrCreateBeanDefinitionWriter(classElement, qualifiedName);
+                            visitAnnotationMetadata(beanDefinitionWriter, this.currentClassMetadata);
 
                             if (isAopProxyType) {
 
@@ -662,6 +666,22 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
             }
             return beanDefinitionWriter;
+        }
+
+        private void visitAnnotationMetadata(BeanDefinitionVisitor writer, AnnotationMetadata annotationMetadata) {
+            for (io.micronaut.core.annotation.AnnotationValue<Requires> annotation: annotationMetadata.getAnnotationValuesByType(Requires.class)) {
+                annotation.stringValue(RequiresCondition.MEMBER_BEAN_PROPERTY)
+                    .ifPresent(beanProperty -> {
+                        annotation.stringValue(RequiresCondition.MEMBER_BEAN)
+                            .map(className -> elementUtils.getTypeElement(className.replace('$', '.')))
+                            .map(element -> elementFactory.newClassElement(element, annotationUtils.getAnnotationMetadata(element)))
+                            .ifPresent(classElement -> {
+                                String requiredValue = annotation.stringValue().orElse(null);
+                                String notEqualsValue = annotation.stringValue(RequiresCondition.MEMBER_NOT_EQUALS).orElse(null);
+                                writer.visitAnnotationMemberPropertyInjectionPoint(classElement, beanProperty, requiredValue, notEqualsValue);
+                            });
+                    });
+            }
         }
 
         private void visitIntroductionAdviceInterface(TypeElement classElement, AnnotationMetadata typeAnnotationMetadata, AopProxyWriter aopProxyWriter) {
@@ -1109,6 +1129,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             BeanDefinitionWriter beanMethodWriter = createFactoryBeanMethodWriterFor(element, producedTypeElement);
             Map<String, Map<String, ClassElement>> allTypeArguments = producedClassElement.getAllTypeArguments();
+            visitAnnotationMetadata(beanMethodWriter, methodAnnotationMetadata);
             beanMethodWriter.visitTypeArguments(allTypeArguments);
 
             beanDefinitionWriters.put(new DynamicName(beanProducingElement.getDescription(false)), beanMethodWriter);
@@ -1123,7 +1144,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         (FieldElement) beanProducingElement
                 );
             }
-
 
             if (methodAnnotationMetadata.hasStereotype(AROUND_TYPE) && !modelUtils.isAbstract(concreteClass)) {
                 if (isPrimitive) {
