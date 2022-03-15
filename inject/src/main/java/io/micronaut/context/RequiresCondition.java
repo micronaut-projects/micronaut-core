@@ -417,14 +417,20 @@ public class RequiresCondition implements Condition {
                             }
                             return result;
                         } catch (Exception e) {
-                            // non-semantic versioning in play
-                            int majorVersion = resolveJavaMajorVersion(javaVersion);
-                            int requiredVersion = resolveJavaMajorVersion(version);
+                            if (javaVersion != null) {
 
-                            if (majorVersion >= requiredVersion) {
-                                return true;
+                                // non-semantic versioning in play
+                                int majorVersion = resolveJavaMajorVersion(javaVersion);
+                                int requiredVersion = resolveJavaMajorVersion(version);
+
+                                if (majorVersion >= requiredVersion) {
+                                    return true;
+                                } else {
+                                    context.fail("Java major version [" + majorVersion + "] must be at least " + requiredVersion);
+                                }
                             } else {
-                                context.fail("Java major version [" + majorVersion + "] must be at least " + requiredVersion);
+                                int requiredVersion = resolveJavaMajorVersion(version);
+                                context.fail("Java major version must be at least " + requiredVersion);
                             }
                         }
 

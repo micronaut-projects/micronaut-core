@@ -127,12 +127,11 @@ class DefaultFieldInjectionPoint<B, T> implements FieldInjectionPoint<B, T>, Env
     @Override
     public void set(T instance, Object object) {
         Field field = getField();
-        try {
-            field.setAccessible(true);
-            field.set(instance, object);
-        } catch (Throwable e) {
-            e.printStackTrace();
-        }
+        ReflectionUtils.setField(
+            field,
+            instance,
+            object
+        );
     }
 
     @Override

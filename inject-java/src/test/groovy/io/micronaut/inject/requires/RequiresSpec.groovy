@@ -6,12 +6,54 @@ import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.condition.OperatingSystem
 import io.micronaut.context.env.PropertySource
+import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import spock.util.environment.RestoreSystemProperties
 
 class RequiresSpec extends AbstractTypeElementSpec{
+
+    void "test requires java sdk - success"() {
+        given:
+        ApplicationContext context = buildContext( '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(sdk=Requires.Sdk.JAVA, value="8")
+@jakarta.inject.Singleton
+class MyBean {
+}
+''')
+        expect:"the bean exists"
+        getBean(context, 'test.MyBean')
+
+        cleanup:
+        context.close()
+    }
+
+    void "test requires java sdk - failure"() {
+        given:
+        ApplicationContext context = buildContext( '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(sdk=Requires.Sdk.JAVA, version="800")
+@jakarta.inject.Singleton
+class MyBean {
+}
+''')
+        when:"the bean doesn't exist"
+        getBean(context, 'test.MyBean')
+
+        then:
+        thrown(NoSuchBeanException)
+
+        cleanup:
+        context.close()
+    }
 
     void "test requires property not equals"() {
         when:
