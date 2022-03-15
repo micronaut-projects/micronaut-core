@@ -50,7 +50,9 @@ public interface BeanMethodElement extends MethodElement {
      */
     default @NonNull
     BeanMethodElement executable(boolean processOnStartup) {
-        annotate(Executable.class, builder -> builder.member("processOnStartup", processOnStartup));
+        annotate(Executable.class, (builder) ->
+            builder.member("processOnStartup", processOnStartup)
+        );
         return this;
     }
 
