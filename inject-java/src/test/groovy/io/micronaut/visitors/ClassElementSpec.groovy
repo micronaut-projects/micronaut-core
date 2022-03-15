@@ -1307,13 +1307,18 @@ abstract class SuperClassWithFields extends SuperSuperClassWithFields implements
 ''')
         when:
         List<FieldElement> fields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.includeHiddenElements())
+        Map<String, List<String>> expected = [
+                "instanceField1": ["SuperClassWithFields", "SuperSuperClassWithFields"],
+                "instanceField2": ["SuperClassWithFields", "SuperSuperClassWithFields"],
+                "instanceField3": ["InheritedFields"],
+                "interfaceField": ["SuperInterfaceWithFields", "SuperSuperInterfaceWithFields"]
+        ]
 
         then:
-        fields.size() == 7
-        assertFieldsByName(fields, "instanceField1", ["SuperClassWithFields", "SuperSuperClassWithFields"])
-        assertFieldsByName(fields, "instanceField2", ["SuperClassWithFields", "SuperSuperClassWithFields"])
-        assertFieldsByName(fields, "instanceField3", ["InheritedFields"])
-        assertFieldsByName(fields, "interfaceField", ["SuperInterfaceWithFields", "SuperSuperInterfaceWithFields"])
+        fields.size() == expected.collect { k, v -> v.size() }.sum()
+        expected.each { k, v ->
+            assertFieldsByName(fields, k, v)
+        }
     }
 
     private void assertMethodsByName(List<MethodElement> allMethods, String name, List<String> expectedDeclaringTypeSimpleNames) {
