@@ -121,6 +121,15 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
     Optional<AnnotationClassValue<?>> annotationClassValue(@NonNull String member);
 
     /**
+     * The {@link AnnotationPropertyReference} instance for the given member.
+     *
+     * @param member The annotation member
+     * @return An annotation property reference
+     * @since 3.4.0
+     */
+    Optional<AnnotationPropertyReference<?, ?>> annotationPropertyReference(@NonNull String member);
+
+    /**
      * The integer value of the given member.
      *
      * @param member The annotation member

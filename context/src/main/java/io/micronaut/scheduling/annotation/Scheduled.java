@@ -74,4 +74,55 @@ public @interface Scheduled {
      * {@link java.util.concurrent.ScheduledExecutorService} to use to schedule the task
      */
     String scheduler() default TaskExecutors.SCHEDULED;
+
+    /**
+     * The type of bean which properties can be referenced
+     * in other annotation members like {@link #cronProperty()}.
+     * The bean owning specified properties should be present within context for
+     * the property value to be resolved
+     *
+     * @since 3.4.0
+     * @return the bean to be used for property resolving
+     */
+    Class<?> bean() default void.class;
+
+    /**
+     * The property of {@link #bean()} containing CRON expression.
+     * Only to be used in conjunction with {@link #bean()}.
+     *
+     * @since 3.4.0
+     * @return name of bean property containing CRON expression
+     */
+    String cronProperty() default "";
+
+    /**
+     * The property of {@link #bean()} containing a {@link java.time.Duration} or a
+     * String representation of duration between the time of the last execution and the
+     * beginning of the next.
+     * Only to be used in conjunction with {@link #bean()}
+     *
+     * @since 3.4.0
+     * @return name of bean property containing fixed delay
+     */
+    String fixedDelayProperty() default "";
+
+    /**
+     * The property of {@link #bean()} containing a {@link java.time.Duration} or a
+     * String representation of duration before starting executions.
+     * Only to be used in conjunction with {@link #bean()}
+     *
+     * @since 3.4.0
+     * @return name of bean property containing initial delay
+     */
+    String initialDelayProperty() default "";
+
+    /**
+     * The property of {@link #bean()} containing a {@link java.time.Duration} or a
+     * String representation of duration between executions.
+     * Only to be used in conjunction with {@link #bean()}
+     *
+     * @since 3.4.0
+     * @return name of bean property containing fixed rate
+     */
+    String fixedRateProperty() default "";
 }

@@ -17,6 +17,7 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationPropertyReference;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -24,12 +25,15 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.writer.AbstractAnnotationMetadataWriter;
 import io.micronaut.inject.writer.AbstractClassFileWriter;
 import io.micronaut.inject.writer.ClassGenerationException;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -39,6 +43,10 @@ import org.objectweb.asm.commons.Method;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.invoke.LambdaMetafactory;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.Collection;
@@ -49,6 +57,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -63,6 +72,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     private static final Type TYPE_DEFAULT_ANNOTATION_METADATA = Type.getType(DefaultAnnotationMetadata.class);
     private static final Type TYPE_DEFAULT_ANNOTATION_METADATA_HIERARCHY = Type.getType(AnnotationMetadataHierarchy.class);
     private static final Type TYPE_ANNOTATION_CLASS_VALUE = Type.getType(AnnotationClassValue.class);
+    private static final Type TYPE_ANNOTATION_PROPERTY_REFERENCE = Type.getType(AnnotationPropertyReference.class);
 
     private static final org.objectweb.asm.commons.Method METHOD_LIST_OF = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(
@@ -152,6 +162,27 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             ReflectionUtils.getRequiredInternalConstructor(
                     AnnotationClassValue.class,
                     Object.class
+            )
+    );
+
+    private static final org.objectweb.asm.commons.Method LAMBDA_META_FACTORY = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredMethod(LambdaMetafactory.class,
+                "metafactory",
+                MethodHandles.Lookup.class,
+                String.class,
+                MethodType.class,
+                MethodType.class,
+                MethodHandle.class,
+                MethodType.class
+             )
+    );
+
+    private static final org.objectweb.asm.commons.Method CONSTRUCTOR_PROPERTY_REFERENCE_WITH_INSTANCE = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredInternalConstructor(
+                AnnotationPropertyReference.class,
+                AnnotationClassValue.class,
+                String.class,
+                Function.class
             )
     );
 
@@ -562,16 +593,19 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             methodVisitor.push(value.toString());
         } else if (value instanceof AnnotationClassValue) {
             AnnotationClassValue acv = (AnnotationClassValue) value;
-            if (acv.isInstantiated()) {
-                methodVisitor.visitTypeInsn(NEW, TYPE_ANNOTATION_CLASS_VALUE.getInternalName());
-                methodVisitor.visitInsn(DUP);
-                methodVisitor.visitTypeInsn(NEW, getInternalName(acv.getName()));
-                methodVisitor.visitInsn(DUP);
-                methodVisitor.invokeConstructor(getTypeReferenceForName(acv.getName()), new Method(CONSTRUCTOR_NAME, getConstructorDescriptor()));
-                methodVisitor.invokeConstructor(TYPE_ANNOTATION_CLASS_VALUE, CONSTRUCTOR_CLASS_VALUE_WITH_INSTANCE);
-            } else {
-                invokeLoadClassValueMethod(declaringType, declaringClassWriter, methodVisitor, loadTypeMethods, acv);
-            }
+            pushClassValue(declaringType, declaringClassWriter, methodVisitor, loadTypeMethods, acv);
+        } else if (value instanceof AnnotationPropertyElement) {
+            AnnotationPropertyElement annotationPropertyElement = (AnnotationPropertyElement) value;
+
+            methodVisitor.visitTypeInsn(NEW, TYPE_ANNOTATION_PROPERTY_REFERENCE.getInternalName());
+            methodVisitor.visitInsn(DUP);
+
+            AnnotationClassValue acv = annotationPropertyElement.getOwningType();
+            pushClassValue(declaringType, declaringClassWriter, methodVisitor, loadTypeMethods, acv);
+            methodVisitor.push(annotationPropertyElement.getPropertyName());
+            pushPropertyGetterFunction(methodVisitor, annotationPropertyElement.getPropertyGetter());
+
+            methodVisitor.invokeConstructor(TYPE_ANNOTATION_PROPERTY_REFERENCE, CONSTRUCTOR_PROPERTY_REFERENCE_WITH_INSTANCE);
         } else if (value instanceof Enum) {
             Enum enumObject = (Enum) value;
             Class declaringClass = enumObject.getDeclaringClass();
@@ -681,6 +715,25 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         methodVisitor.getStatic(Type.getType(ArrayUtils.class), "EMPTY_OBJECT_ARRAY", Type.getType(Object[].class));
     }
 
+    private static void pushClassValue(
+            Type declaringType,
+            ClassVisitor declaringClassWriter,
+            GeneratorAdapter methodVisitor,
+            Map<String, GeneratorAdapter> loadTypeMethods,
+            AnnotationClassValue acv) {
+        if (acv.isInstantiated()) {
+            methodVisitor.visitTypeInsn(NEW, TYPE_ANNOTATION_CLASS_VALUE.getInternalName());
+            methodVisitor.visitInsn(DUP);
+            methodVisitor.visitTypeInsn(NEW, getInternalName(acv.getName()));
+            methodVisitor.visitInsn(DUP);
+            methodVisitor.invokeConstructor(getTypeReferenceForName(acv.getName()), new Method(CONSTRUCTOR_NAME,
+                getConstructorDescriptor()));
+            methodVisitor.invokeConstructor(TYPE_ANNOTATION_CLASS_VALUE, CONSTRUCTOR_CLASS_VALUE_WITH_INSTANCE);
+        } else {
+            invokeLoadClassValueMethod(declaringType, declaringClassWriter, methodVisitor, loadTypeMethods, acv);
+        }
+    }
+
     private static void invokeLoadClassValueMethod(
             Type declaringType,
             ClassVisitor declaringClassWriter,
@@ -738,5 +791,21 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         });
 
         methodVisitor.visitMethodInsn(Opcodes.INVOKESTATIC, declaringType.getInternalName(), loadTypeGeneratorMethod.getName(), desc, false);
+    }
+
+    private static void pushPropertyGetterFunction(GeneratorAdapter methodVisitor, MethodElement propertyGetter) {
+        Handle lambdaFactoryHandle = new Handle(H_INVOKESTATIC, Type.getInternalName(LambdaMetafactory.class),
+            "metafactory", LAMBDA_META_FACTORY.getDescriptor(), false);
+
+        Method getterMethod = Method.getMethod(propertyGetter.getDescription(false));
+        Type getterOwningType = JavaModelUtils.getTypeReference(propertyGetter.getOwningType());
+        Handle getterMethodHandle = new Handle(propertyGetter.isAbstract() ? H_INVOKEINTERFACE : H_INVOKEVIRTUAL,
+            getterOwningType.getInternalName(), getterMethod.getName(), getterMethod.getDescriptor(),
+            propertyGetter.isAbstract());
+
+        Type objectType = Type.getType(Object.class);
+        methodVisitor.invokeDynamic("apply", getMethodDescriptor(Function.class, Collections.emptyList()),
+            lambdaFactoryHandle,  Type.getMethodType(objectType, objectType),
+            getterMethodHandle, Type.getMethodType(getterMethod.getReturnType(), getterOwningType));
     }
 }

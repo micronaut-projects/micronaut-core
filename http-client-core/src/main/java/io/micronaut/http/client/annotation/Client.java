@@ -82,4 +82,24 @@ public @interface Client {
      * @return The HTTP version of the client.
      */
     HttpVersion httpVersion() default HttpVersion.HTTP_1_1;
+
+    /**
+     * The type of bean which properties can be referenced
+     * in other annotation members like {@link #urlProperty()}.
+     * The bean owning specified properties should be present within context for
+     * the property value to be resolved
+     *
+     * @since 3.4.0
+     * @return the bean to be used for property resolving
+     */
+    Class<?> bean() default void.class;
+
+    /**
+     * The property of {@link #bean()} containing URL
+     * of the remote service. Only to be used in conjunction with {@link #bean()}.
+     *
+     * @since 3.4.0
+     * @return name of bean property containing remote service URL
+     */
+    String urlProperty() default "";
 }

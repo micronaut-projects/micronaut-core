@@ -629,6 +629,17 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         return Optional.empty();
     }
 
+    @Override
+    public Optional<AnnotationPropertyReference<?, ?>> annotationPropertyReference(@NonNull String member) {
+        if (StringUtils.isNotEmpty(member)) {
+            Object o = values.get(member);
+            if (o instanceof AnnotationPropertyReference) {
+                return Optional.of((AnnotationPropertyReference<?, ?>) o);
+            }
+        }
+        return Optional.empty();
+    }
+
     /**
      * The integer value of the given member.
      *

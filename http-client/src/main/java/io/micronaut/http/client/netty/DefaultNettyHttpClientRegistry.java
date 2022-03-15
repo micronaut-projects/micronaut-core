@@ -22,6 +22,7 @@ import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -468,6 +469,20 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         final HttpVersion httpVersion =
                 metadata.enumValue(Client.class, "httpVersion", HttpVersion.class).orElse(null);
         String clientId = metadata.stringValue(Client.class).orElse(null);
+
+        if (clientId == null) {
+            AnnotationValue<Client> annotation = metadata.getAnnotation(Client.class);
+
+            if (annotation != null) {
+                clientId = (String) annotation.annotationPropertyReference("urlProperty")
+                    .flatMap(propertyReference -> propertyReference.getPropertyOwningType().getType()
+                        .flatMap(beanContext::findBean)
+                        .flatMap(propertyReference::getPropertyValue))
+                    .filter(value -> value instanceof String)
+                    .orElse(null);
+            }
+        }
+
         String path = metadata.stringValue(Client.class, "path").orElse(null);
         List<String> filterAnnotation = metadata
                 .getAnnotationNamesByStereotype(FilterMatcher.class);

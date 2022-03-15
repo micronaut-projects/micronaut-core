@@ -15,24 +15,52 @@
  */
 package io.micronaut.inject.annotation;
 
-import io.micronaut.context.annotation.*;
-import io.micronaut.core.annotation.*;
+import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.context.annotation.Aliases;
+import io.micronaut.context.annotation.DefaultScope;
+import io.micronaut.context.annotation.NonBinding;
+import io.micronaut.context.annotation.Type;
+import io.micronaut.core.annotation.AccessorsStyle;
+import io.micronaut.core.annotation.AnnotatedElement;
+import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationValueBuilder;
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.InstantiatedMember;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.visitor.VisitorContext;
-
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import jakarta.inject.Qualifier;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -60,6 +88,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final Map<String, Set<String>> NON_BINDING_CACHE = new HashMap<>(50);
     private static final List<String> DEFAULT_ANNOTATE_EXCLUDES = Arrays.asList(Internal.class.getName(), Experimental.class.getName());
     private static final Map<String, Map<String, Object>> ANNOTATION_DEFAULTS = new HashMap<>(20);
+    private static final Set<AnnotationProperty> ANNOTATION_PROPERTIES_MEMBERS = CollectionUtils.setOf(
+        new AnnotationProperty("bean", "beanProperty"),
+        new AnnotationProperty("bean", "urlProperty"),
+        new AnnotationProperty("bean", "cronProperty"),
+        new AnnotationProperty("bean", "fixedDelayProperty"),
+        new AnnotationProperty("bean", "fixedRateProperty"),
+        new AnnotationProperty("bean", "initialDelayProperty"));
+
 
     static {
         SoftServiceLoader<AnnotationMapper> serviceLoader = SoftServiceLoader.load(AnnotationMapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader());
@@ -813,6 +849,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
             }
         }
+
+        setAnnotationProperties(originatingElement, annotationValues);
+
         List<AnnotationMapper<?>> mappers = getAnnotationMappers(annotationName);
         if (mappers != null) {
             AnnotationValue<?> annotationValue = new AnnotationValue(annotationName, annotationValues);
@@ -899,6 +938,70 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
         }
         return annotationValues;
+    }
+
+    private void setAnnotationProperties(T originatingElement, Map<CharSequence, Object> annotationValues) {
+        Set<CharSequence> annotationMembers = annotationValues.keySet();
+        Set<AnnotationProperty> annotationProperties = ANNOTATION_PROPERTIES_MEMBERS.stream()
+            .filter(property -> annotationMembers.contains(property.typeMember) && annotationMembers.contains(property.propertyMember))
+            .collect(Collectors.toSet());
+
+        if (annotationProperties.size() > 0) {
+            VisitorContext visitorContext = createVisitorContext();
+
+            for (AnnotationProperty annotationProperty: annotationProperties) {
+                Object type = annotationValues.get(annotationProperty.typeMember);
+                if (type instanceof AnnotationClassValue) {
+                    AnnotationClassValue<?> beanPropertyOwningType = (AnnotationClassValue<?>) type;
+                    Object annotationPropertyName = annotationValues.get(annotationProperty.propertyMember);
+                    ClassElement referencedElement = visitorContext.getClassElement(beanPropertyOwningType.getName()).orElse(null);
+
+                    if (referencedElement != null) {
+                        MethodElement propertyGetter = referencedElement.getBeanProperties().stream()
+                            .filter(beanProperty -> annotationPropertyName.equals(beanProperty.getSimpleName()))
+                            .findAny()
+                            .flatMap(PropertyElement::getReadMethod)
+                            .orElse(null);
+
+                        if (propertyGetter == null) {
+                            final String[] readPrefixes = referencedElement.getAnnotationMetadata()
+                                .getValue(AccessorsStyle.class, "readPrefixes", String[].class)
+                                .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
+
+                            propertyGetter = referencedElement.getEnclosedElement(
+                                    ElementQuery.ALL_METHODS
+                                            .onlyAccessible()
+                                            .onlyInstance()
+                                            .named((name) -> name.equals(NameUtils.getterNameFor(annotationPropertyName.toString(), readPrefixes)))
+                                            .filter((e) -> !e.hasParameters())
+                                            .filter(e -> isMethodAccessible(originatingElement, e)))
+                                    .orElse(null);
+                        }
+
+                        if (propertyGetter != null) {
+                            String originalMemberValue = (String) annotationValues.get(annotationProperty.propertyMember);
+                            annotationValues.put(annotationProperty.propertyMember,
+                                new AnnotationPropertyElement(beanPropertyOwningType, originalMemberValue, propertyGetter));
+                        } else {
+                            Object beanProperty = annotationValues.get(annotationProperty.propertyMember);
+                            visitorContext.fail("Bean property " + beanProperty + " is not available on " + beanPropertyOwningType.getName(), null);
+                        }
+                    }
+
+                }
+            }
+        }
+    }
+
+    private boolean isMethodAccessible(T element, MethodElement methodElement) {
+        if (methodElement.isPublic()) {
+            return true;
+        } else if (methodElement.isPrivate()) {
+            return false;
+        } else {
+            return NameUtils.getPackageName(getElementName(element))
+                .equals(NameUtils.getPackageName(methodElement.getDeclaringType().getName()));
+        }
     }
 
     private void handleAnnotationAlias(T originatingElement, DefaultAnnotationMetadata metadata, boolean isDeclared, String annotationName, List<String> parentAnnotations, Map<CharSequence, Object> annotationValues, T member, Object annotationValue) {
@@ -2358,5 +2461,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     private static interface TriConsumer<T, U, V> {
         void accept(T t, U u, V v);
+    }
+
+    private static class AnnotationProperty {
+        final String typeMember;
+        final String propertyMember;
+
+        public AnnotationProperty(String typeMember, String propertyMember) {
+            this.typeMember = typeMember;
+            this.propertyMember = propertyMember;
+        }
     }
 }

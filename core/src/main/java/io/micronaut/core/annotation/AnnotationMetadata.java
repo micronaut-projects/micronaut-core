@@ -27,15 +27,8 @@ import io.micronaut.core.value.OptionalValues;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
 import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.OptionalDouble;
-import java.util.OptionalInt;
-import java.util.OptionalLong;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * <p>An interface implemented at compile time by Micronaut that allows the inspection of annotation metadata and
@@ -1555,4 +1548,15 @@ public interface AnnotationMetadata extends AnnotationSource {
         return this == AnnotationMetadata.EMPTY_METADATA;
     }
 
+    /**
+     * All the annotation values this metadata declares.
+     *
+     * @return All the annotation values this metadata declares
+     * @since 3.4.0
+     */
+    default List<AnnotationValue<?>> getAnnotationValues() {
+        return getAnnotationNames().stream()
+            .map(this::getAnnotation)
+            .collect(Collectors.toList());
+    }
 }

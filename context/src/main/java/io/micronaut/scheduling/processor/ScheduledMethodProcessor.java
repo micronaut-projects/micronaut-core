@@ -22,7 +22,6 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -58,10 +57,15 @@ import java.util.concurrent.ScheduledFuture;
 public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Scheduled>, Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(TaskScheduler.class);
+    private static final String MEMBER_BEAN = "bean";
     private static final String MEMBER_FIXED_RATE = "fixedRate";
+    private static final String MEMBER_FIXED_RATE_PROPERTY = "fixedRateProperty";
     private static final String MEMBER_INITIAL_DELAY = "initialDelay";
+    private static final String MEMBER_INITIAL_DELAY_PROPERTY = "initialDelayProperty";
     private static final String MEMBER_CRON = "cron";
+    private static final String MEMBER_CRON_PROPERTY = "cronProperty";
     private static final String MEMBER_FIXED_DELAY = "fixedDelay";
+    private static final String MEMBER_FIXED_DELAY_PROPERTY = "fixedDelayProperty";
     private static final String MEMBER_SCHEDULER = "scheduler";
 
     private final BeanContext beanContext;
@@ -90,15 +94,6 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
 
         List<AnnotationValue<Scheduled>> scheduledAnnotations = method.getAnnotationValuesByType(Scheduled.class);
         for (AnnotationValue<Scheduled> scheduledAnnotation : scheduledAnnotations) {
-            String fixedRate = scheduledAnnotation.get(MEMBER_FIXED_RATE, String.class).orElse(null);
-
-            String initialDelayStr = scheduledAnnotation.get(MEMBER_INITIAL_DELAY, String.class).orElse(null);
-            Duration initialDelay = null;
-            if (StringUtils.hasText(initialDelayStr)) {
-                initialDelay = conversionService.convert(initialDelayStr, Duration.class).orElseThrow(() ->
-                    new SchedulerConfigurationException(method, "Invalid initial delay definition: " + initialDelayStr)
-                );
-            }
 
             String scheduler = scheduledAnnotation.get(MEMBER_SCHEDULER, String.class).orElse(TaskExecutors.SCHEDULED);
             Optional<TaskScheduler> optionalTaskScheduler = beanContext
@@ -141,47 +136,97 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                 }
             };
 
-            String cronExpr = scheduledAnnotation.get(MEMBER_CRON, String.class, null);
-            String fixedDelay = scheduledAnnotation.get(MEMBER_FIXED_DELAY, String.class).orElse(null);
+            Duration initialDelay = null;
+            if (scheduledAnnotation.contains(MEMBER_INITIAL_DELAY) || containsProperty(scheduledAnnotation,
+                MEMBER_INITIAL_DELAY_PROPERTY)) {
+                initialDelay = getDuration(scheduledAnnotation,
+                    method,
+                    MEMBER_INITIAL_DELAY,
+                    MEMBER_INITIAL_DELAY_PROPERTY,
+                    "Invalid initial delay definition: ");
+            }
 
-            if (StringUtils.isNotEmpty(cronExpr)) {
+            if (scheduledAnnotation.contains(MEMBER_CRON) || containsProperty(scheduledAnnotation, MEMBER_CRON_PROPERTY)) {
+                String cronExpr = scheduledAnnotation.get(MEMBER_CRON, String.class)
+                        .orElse((String) getAnnotationPropertyValue(scheduledAnnotation, MEMBER_CRON_PROPERTY)
+                                .filter(propertyValue -> propertyValue instanceof String).orElse(null));
+
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Scheduling cron task [{}] for method: {}", cronExpr, method);
                 }
                 taskScheduler.schedule(cronExpr, task);
-            } else if (StringUtils.isNotEmpty(fixedRate)) {
-                Optional<Duration> converted = conversionService.convert(fixedRate, Duration.class);
-                Duration duration = converted.orElseThrow(() ->
-                    new SchedulerConfigurationException(method, "Invalid fixed rate definition: " + fixedRate)
-                );
+            } else if (scheduledAnnotation.contains(MEMBER_FIXED_RATE) || containsProperty(scheduledAnnotation, MEMBER_FIXED_RATE_PROPERTY)) {
+
+                Duration fixedRateInterval = getDuration(scheduledAnnotation,
+                    method,
+                    MEMBER_FIXED_RATE,
+                    MEMBER_FIXED_RATE_PROPERTY,
+                    "Invalid fixed delay definition: ");
 
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Scheduling fixed rate task [{}] for method: {}", duration, method);
+                    LOG.debug("Scheduling fixed rate task [{}] for method: {}", fixedRateInterval, method);
                 }
 
-                ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleAtFixedRate(initialDelay, duration, task);
+                ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleAtFixedRate(initialDelay, fixedRateInterval, task);
                 scheduledTasks.add(scheduledFuture);
-            } else if (StringUtils.isNotEmpty(fixedDelay)) {
-                Optional<Duration> converted = conversionService.convert(fixedDelay, Duration.class);
-                Duration duration = converted.orElseThrow(() ->
-                    new SchedulerConfigurationException(method, "Invalid fixed delay definition: " + fixedDelay)
-                );
+            } else if (scheduledAnnotation.contains(MEMBER_FIXED_DELAY) || containsProperty(scheduledAnnotation, MEMBER_FIXED_DELAY_PROPERTY)) {
 
+                Duration fixedDelay = getDuration(scheduledAnnotation,
+                    method,
+                    MEMBER_FIXED_DELAY,
+                    MEMBER_FIXED_DELAY_PROPERTY,
+                    "Invalid fixed delay definition: ");
 
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Scheduling fixed delay task [{}] for method: {}", duration, method);
+                    LOG.debug("Scheduling fixed delay task [{}] for method: {}", fixedDelay, method);
                 }
 
-                ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleWithFixedDelay(initialDelay, duration, task);
+                ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleWithFixedDelay(initialDelay, fixedDelay, task);
                 scheduledTasks.add(scheduledFuture);
             } else if (initialDelay != null) {
                 ScheduledFuture<?> scheduledFuture = taskScheduler.schedule(initialDelay, task);
-
                 scheduledTasks.add(scheduledFuture);
             } else {
                 throw new SchedulerConfigurationException(method, "Failed to schedule task. Invalid definition");
             }
         }
+    }
+
+    private boolean containsProperty(AnnotationValue<Scheduled> annotation, String propertyMember) {
+        return annotation.contains(MEMBER_BEAN) && annotation.contains(propertyMember);
+    }
+
+    private Duration getDuration(AnnotationValue<Scheduled> annotation,
+                                 ExecutableMethod<?, ?> method,
+                                 String durationMember,
+                                 String durationPropertyMember,
+                                 String exceptionMessage) {
+        Duration duration;
+        String durationStr = annotation.get(durationMember, String.class).orElse(null);
+        if (durationStr != null) {
+            duration = conversionService.convert(durationStr, Duration.class)
+                .orElseThrow(() -> new SchedulerConfigurationException(method, exceptionMessage + durationStr));
+        } else {
+            Optional<?> durationProperty = getAnnotationPropertyValue(annotation, durationPropertyMember);
+            duration = durationProperty
+                .flatMap(this::convertToDurationIfNecessary)
+                .orElseThrow(() -> new SchedulerConfigurationException(method, exceptionMessage + durationProperty.orElse(null)));
+        }
+        return duration;
+    }
+
+    private Optional<?> getAnnotationPropertyValue(AnnotationValue<Scheduled> annotation, String member) {
+        return annotation.annotationPropertyReference(member)
+                .flatMap(annotationPropertyValue -> annotationPropertyValue.getPropertyOwningType().getType()
+                        .flatMap(beanContext::findBean)
+                        .flatMap(annotationPropertyValue::getPropertyValue));
+    }
+
+    private Optional<Duration> convertToDurationIfNecessary(Object value) {
+        if (value instanceof Duration) {
+            return Optional.of((Duration) value);
+        }
+        return conversionService.convert(value, Duration.class);
     }
 
     @Override

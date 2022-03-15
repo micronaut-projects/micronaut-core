@@ -41,7 +41,6 @@ import io.micronaut.context.annotation.PropertySource;
 import io.micronaut.context.annotation.Provided;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
-import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -76,6 +75,7 @@ import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
+import io.micronaut.inject.annotation.AnnotationPropertyElement;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
@@ -125,9 +125,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
@@ -529,7 +531,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private final List<MethodVisitData> postConstructMethodVisits = new ArrayList<>(2);
     private final List<MethodVisitData> preDestroyMethodVisits = new ArrayList<>(2);
     private final List<MethodVisitData> allMethodVisits = new ArrayList<>(2);
-    private final Map<Type, List<AnnotationVisitData>> annotationInjectionPoints = new LinkedHashMap<>(2);
+    private final Map<Type, Set<AnnotationVisitData>> annotationInjectionPoints = new LinkedHashMap<>(2);
     private final Map<String, Boolean> isLifeCycleCache = new HashMap<>(2);
     private ExecutableMethodsDefinitionWriter executableMethodsDefinitionWriter;
 
@@ -849,6 +851,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         } else {
             constructor = factoryMethod;
 
+            // collect annotation injections
+            processAnnotationInjections(annotationMetadata);
             // now prepare the implementation of the build method. See BeanFactory interface
             visitBuildFactoryMethodDefinition(factoryClass, factoryMethod);
             // now override the injectBean method
@@ -870,6 +874,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             constructor = factoryField;
 
             autoApplyNamed(factoryField);
+            // collect annotation injections
+            processAnnotationInjections(annotationMetadata);
             // now prepare the implementation of the build method. See BeanFactory interface
             visitBuildFactoryMethodDefinition(factoryClass, factoryField);
             // now override the injectBean method
@@ -893,6 +899,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
             this.constructor = constructor;
             this.constructorRequiresReflection = requiresReflection;
+
+            // collect annotation injections
+            processAnnotationInjections(annotationMetadata);
 
             // now prepare the implementation of the build method. See BeanFactory interface
             visitBuildMethodDefinition(constructor, requiresReflection);
@@ -979,6 +988,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             );
             constructor = defaultConstructor;
 
+            // collect annotation injections
+            processAnnotationInjections(this.annotationMetadata);
             // now prepare the implementation of the build method. See BeanFactory interface
             visitBuildMethodDefinition(defaultConstructor, false);
             // now override the injectBean method
@@ -1130,6 +1141,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             buildMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, 10);
         }
         if (injectMethodVisitor != null) {
+            initAnnotationInjectedBeans(injectMethodVisitor, annotationInjectionPoints);
             if (injectEnd != null) {
                 injectMethodVisitor.visitLabel(injectEnd);
             }
@@ -1155,7 +1167,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             interceptedDisposeMethod.visitEnd();
         }
         if (checkIfShouldLoadMethodVisitor != null) {
-            buildCheckIfShouldLoadMethod(checkIfShouldLoadMethodVisitor, annotationInjectionPoints);
             checkIfShouldLoadMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, 10);
         }
 
@@ -1169,70 +1180,34 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.beanFinalized = true;
     }
 
-    private void buildCheckIfShouldLoadMethod(GeneratorAdapter adapter, Map<Type, List<AnnotationVisitData>> beanPropertyVisitData) {
+    private void initAnnotationInjectedBeans(GeneratorAdapter adapter, Map<Type, Set<AnnotationVisitData>> beanPropertyVisitData) {
         List<Type> injectedTypes = new ArrayList<>(beanPropertyVisitData.keySet());
-
         for (int currentTypeIndex = 0; currentTypeIndex < injectedTypes.size(); currentTypeIndex++) {
             Type injectedType = injectedTypes.get(currentTypeIndex);
-            List<AnnotationVisitData> annotationVisitData = beanPropertyVisitData.get(injectedType);
-            boolean multiplePropertiesFromType = annotationVisitData.size() > 1;
+            List<AnnotationVisitData> annotationVisitData = CollectionUtils.iterableToList(beanPropertyVisitData.get(injectedType));
 
-            Integer injectedBeanIndex = null;
+            // Beans required for conditional loading are instantiated inside checkIfShouldLoad method
+            if (annotationVisitData.stream().anyMatch(visitData -> visitData instanceof ConditionalAnnotationVisitData)) {
+                continue;
+            }
+
             for (int i = 0; i < annotationVisitData.size(); i++) {
                 int currentPropertyIndex = i;
-                boolean isLastProperty = currentTypeIndex == (injectedTypes.size() - 1) && currentPropertyIndex == (annotationVisitData.size() - 1);
 
-                AnnotationVisitData visitData = annotationVisitData.get(currentPropertyIndex);
-                MethodElement propertyGetter = visitData.memberPropertyGetter;
-                // load 'this'
                 adapter.loadThis();
-                // push injected bean property name
-                adapter.push(visitData.memberPropertyName);
-
-                if (injectedBeanIndex != null) {
-                    adapter.loadLocal(injectedBeanIndex);
-                } else {
-                    // load 'this'
-                    adapter.loadThis();
-                    // 1st argument load BeanResolutionContext
-                    adapter.loadArg(0);
-                    // 2nd argument load BeanContext
-                    adapter.loadArg(1);
-                    // 3rd argument the injected bean index
-                    adapter.push(currentTypeIndex);
-                    // push qualifier
-                    pushQualifier(adapter, visitData.memberBeanType, () -> resolveAnnotationArgument(adapter, currentPropertyIndex));
-                    // invoke getBeanForAnnotation
-                    pushInvokeMethodOnSuperClass(adapter, GET_BEAN_FOR_ANNOTATION);
-                    // cast the return value to the correct type
-                    pushCastToType(adapter, visitData.memberBeanType);
-
-                    // if multiple properties from same bean should be checked, saving bean to local variable
-                    if (multiplePropertiesFromType) {
-                        injectedBeanIndex = adapter.newLocal(injectedType);
-                        adapter.storeLocal(injectedBeanIndex);
-                        adapter.loadLocal(injectedBeanIndex);
-                    }
-                }
-
-                org.objectweb.asm.commons.Method propertyGetterMethod = org.objectweb.asm.commons.Method.getMethod(propertyGetter.getDescription(false));
-                // getter might be an interface method
-                if (propertyGetter.isAbstract()) {
-                    adapter.invokeInterface(injectedType, propertyGetterMethod);
-                } else {
-                    adapter.invokeVirtual(injectedType, propertyGetterMethod);
-                }
-                pushBoxPrimitiveIfNecessary(propertyGetterMethod.getReturnType(), adapter);
-                // pushing required arguments and invoking checkBeanPropertyValue
-                adapter.push(visitData.requiredValue);
-                adapter.push(visitData.notEqualsValue);
-                pushInvokeMethodOnSuperClass(adapter, CHECK_INJECTED_BEAN_PROPERTY_VALUE);
-
-                if (isLastProperty) {
-                    adapter.returnValue();
-                }
+                // 1st argument load BeanResolutionContext
+                adapter.loadArg(0);
+                // 2nd argument load BeanContext
+                adapter.loadArg(1);
+                // 3rd argument the injected bean index
+                adapter.push(currentTypeIndex);
+                // push qualifier
+                pushQualifier(adapter, annotationVisitData.get(i).memberBeanType, () -> resolveAnnotationArgument(adapter, currentPropertyIndex));
+                // invoke getBeanForAnnotation
+                pushInvokeMethodOnSuperClass(adapter, GET_BEAN_FOR_ANNOTATION);
             }
         }
+
     }
 
     private void processAllBeanElementVisitors() {
@@ -1553,6 +1528,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                      String interceptedProxyBridgeMethodName) {
 
         AnnotationMetadata annotationMetadata = methodElement.getAnnotationMetadata();
+        findAnnotationPropertyElements(annotationMetadata).values()
+            .forEach(this::addAnnotationInjections);
 
         DefaultAnnotationMetadata.contributeDefaults(
                 this.annotationMetadata,
@@ -1573,6 +1550,39 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             executableMethodsDefinitionWriter = new ExecutableMethodsDefinitionWriter(beanDefinitionName, getBeanDefinitionReferenceClassName(), originatingElements);
         }
         return executableMethodsDefinitionWriter.visitExecutableMethod(declaringType, methodElement, interceptedProxyClassName, interceptedProxyBridgeMethodName);
+    }
+
+    private Map<AnnotationValue<? extends Annotation>, List<AnnotationPropertyElement>> findAnnotationPropertyElements(AnnotationMetadata annotationMetadata) {
+        if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
+            annotationMetadata = annotationMetadata.getDeclaredMetadata();
+        }
+
+        Map<AnnotationValue<? extends Annotation>, List<AnnotationPropertyElement>> propertyElementsByAnnotation = new LinkedHashMap<>();
+        for (AnnotationValue<?> annotationValue: annotationMetadata.getAnnotationValues()) {
+            annotationValue.getAnnotations(VALUE_MEMBER)
+                .forEach(repeatableAnnotation -> extractAnnotationPropertyElements(propertyElementsByAnnotation, repeatableAnnotation));
+            extractAnnotationPropertyElements(propertyElementsByAnnotation, annotationValue);
+        }
+
+        return propertyElementsByAnnotation;
+    }
+
+    private void extractAnnotationPropertyElements(Map<AnnotationValue<? extends Annotation>, List<AnnotationPropertyElement>> annotationPropertyElements, AnnotationValue<? extends Annotation> annotation) {
+        for (CharSequence memberName: annotation.getMemberNames()) {
+            String member = memberName.toString();
+            annotation.get(member, AnnotationPropertyElement.class)
+                .ifPresent(propertyElement -> annotationPropertyElements.computeIfAbsent(annotation, key -> new ArrayList<>(1))
+                    .add(propertyElement));
+        }
+    }
+
+    private void addAnnotationInjections(List<AnnotationPropertyElement> propertyElements) {
+        propertyElements.forEach(propertyElement -> {
+            ClassElement annotationMemberBeanType = propertyElement.getPropertyGetter().getOwningType();
+            Type type = JavaModelUtils.getTypeReference(annotationMemberBeanType);
+            annotationInjectionPoints.computeIfAbsent(type, key -> new LinkedHashSet<>(1))
+                .add(new AnnotationVisitData(annotationMemberBeanType));
+        });
     }
 
     @Override
@@ -1792,43 +1802,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             type = genericType.getName();
         }
         return beanTypeInnerClasses.contains(type);
-    }
-
-    @Override
-    public void visitAnnotationMemberPropertyInjectionPoint(TypedElement annotationMemberBeanType,
-                                                            String annotationMemberProperty,
-                                                            @Nullable String requiredValue,
-                                                            @Nullable String notEqualsValue) {
-        ClassElement annotationMemberClassElement = annotationMemberBeanType.getType();
-        MethodElement memberPropertyGetter = annotationMemberClassElement.getBeanProperties()
-            .stream()
-            .filter(property -> property.getSimpleName().equals(annotationMemberProperty))
-            .findFirst()
-            .flatMap(PropertyElement::getReadMethod)
-            .orElse(null);
-
-        if (memberPropertyGetter == null) {
-            final String[] readPrefixes = annotationMemberBeanType.getAnnotationMetadata()
-                .getValue(AccessorsStyle.class, "readPrefixes", String[].class)
-                .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
-
-            memberPropertyGetter = annotationMemberClassElement.getEnclosedElement(
-                    ElementQuery.ALL_METHODS
-                            .onlyAccessible(beanTypeElement)
-                            .onlyInstance()
-                            .named((name) -> name.equals(NameUtils.getterNameFor(annotationMemberProperty, readPrefixes)))
-                            .filter((e) -> !e.hasParameters())
-            ).orElse(null);
-        }
-
-        if (memberPropertyGetter == null) {
-            visitorContext.fail("Bean property [" + annotationMemberProperty + "] is not available on bean ["
-                                    + annotationMemberBeanType.getName() + "]", annotationMemberBeanType);
-        } else {
-            Type injectedType = JavaModelUtils.getTypeReference(annotationMemberClassElement);
-            annotationInjectionPoints.computeIfAbsent(injectedType, type -> new ArrayList<>(2))
-                                         .add(new AnnotationVisitData(annotationMemberBeanType, annotationMemberProperty, memberPropertyGetter , requiredValue, notEqualsValue));
-        }
     }
 
     @Override
@@ -2763,16 +2736,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 false);
     }
 
-    private void visitCheckIfShouldLoadMethodDefinition() {
-        String desc = getMethodDescriptor("void", BeanResolutionContext.class.getName(), BeanContext.class.getName());
-        this.checkIfShouldLoadMethodVisitor = new GeneratorAdapter(classWriter.visitMethod(
-            ACC_PROTECTED,
-            "checkIfShouldLoad",
-            desc,
-            null,
-            null), ACC_PROTECTED, "checkIfShouldLoad", desc);
-    }
-
     @SuppressWarnings("MagicNumber")
     private void visitInjectMethodDefinition() {
         if (!isPrimitiveBean && !superBeanDefinition && injectMethodVisitor == null) {
@@ -3075,7 +3038,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // load this
 
             GeneratorAdapter buildMethodVisitor = this.buildMethodVisitor;
-            invokeCheckIfShouldLoadIfNecessary(buildMethodVisitor);
+            visitCheckIfShouldLoadMethodDefinition(buildMethodVisitor);
             // for Factory beans first we need to lookup the the factory bean
             // before invoking the method to instantiate
             // the below code looks up the factory bean.
@@ -3153,7 +3116,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // load this
 
             GeneratorAdapter buildMethodVisitor = this.buildMethodVisitor;
-            invokeCheckIfShouldLoadIfNecessary(buildMethodVisitor);
+            visitCheckIfShouldLoadMethodDefinition(buildMethodVisitor);
 
             // if there is constructor interception present then we have to
             // build the parameters into an Object[] and build a constructor invocation
@@ -3211,12 +3174,48 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
     }
 
-    private void invokeCheckIfShouldLoadIfNecessary(GeneratorAdapter buildMethodVisitor) {
-        AnnotationValue<Requires> requiresAnnotation = annotationMetadata.getAnnotation(Requires.class);
-        if (requiresAnnotation != null
-                && requiresAnnotation.stringValue(RequiresCondition.MEMBER_BEAN).isPresent()
-                && requiresAnnotation.stringValue(RequiresCondition.MEMBER_BEAN_PROPERTY).isPresent()) {
-            visitCheckIfShouldLoadMethodDefinition();
+    private void processAnnotationInjections(AnnotationMetadata annotationMetadata) {
+        Map<AnnotationValue<? extends Annotation>, List<AnnotationPropertyElement>> annotationPropertyElements = findAnnotationPropertyElements(annotationMetadata);
+
+        for (Map.Entry<AnnotationValue<? extends Annotation>, List<AnnotationPropertyElement>> entry: annotationPropertyElements.entrySet()) {
+            final AnnotationValue<? extends Annotation> annotationValue = entry.getKey();
+            final List<AnnotationPropertyElement> propertyElements = entry.getValue();
+
+            if (annotationValue.getAnnotationName().equals(Requires.class.getName())) {
+                for (AnnotationPropertyElement propertyElement: propertyElements) {
+                    MethodElement propertyGetter = propertyElement.getPropertyGetter();
+                    ClassElement annotationMemberBeanType = propertyGetter.getOwningType();
+                    String annotationMemberProperty = propertyElement.getPropertyName();
+                    Type injectedType = JavaModelUtils.getTypeReference(annotationMemberBeanType);
+
+                    String requiredValue = annotationValue.stringValue().orElse(null);
+                    String notEqualsValue = annotationValue.stringValue(RequiresCondition.MEMBER_NOT_EQUALS).orElse(null);
+                    annotationInjectionPoints.computeIfAbsent(injectedType, type -> new LinkedHashSet<>(2))
+                        .add(new ConditionalAnnotationVisitData(annotationMemberBeanType, annotationMemberProperty, propertyGetter, requiredValue, notEqualsValue));
+                }
+            } else {
+                for (AnnotationPropertyElement propertyElement: propertyElements) {
+                    ClassElement annotationMemberBeanType = propertyElement.getPropertyGetter().getOwningType();
+                    annotationInjectionPoints.computeIfAbsent(JavaModelUtils.getTypeReference(annotationMemberBeanType), type -> new LinkedHashSet<>(0))
+                        .add(new AnnotationVisitData(annotationMemberBeanType));
+                }
+            }
+        }
+    }
+
+    private void visitCheckIfShouldLoadMethodDefinition(GeneratorAdapter buildMethodVisitor) {
+        boolean checkIfShouldLoadRequired = annotationInjectionPoints.values().stream()
+            .flatMap(Collection::stream)
+            .anyMatch(annotationVisitData -> annotationVisitData instanceof ConditionalAnnotationVisitData);
+
+        if (checkIfShouldLoadRequired) {
+            String desc = getMethodDescriptor("void", BeanResolutionContext.class.getName(), BeanContext.class.getName());
+            this.checkIfShouldLoadMethodVisitor = new GeneratorAdapter(classWriter.visitMethod(
+                ACC_PROTECTED,
+                "checkIfShouldLoad",
+                desc,
+                null,
+                null), ACC_PROTECTED, "checkIfShouldLoad", desc);
 
             buildMethodVisitor.loadThis();
             buildMethodVisitor.loadArg(0);
@@ -3225,6 +3224,79 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 ReflectionUtils.getRequiredMethod(AbstractInitializableBeanDefinition.class, "checkIfShouldLoad",
                     BeanResolutionContext.class,
                     BeanContext.class)));
+
+            buildCheckIfShouldLoadMethod(checkIfShouldLoadMethodVisitor, annotationInjectionPoints);
+        }
+    }
+
+    private void buildCheckIfShouldLoadMethod(GeneratorAdapter adapter, Map<Type, Set<AnnotationVisitData>> beanPropertyVisitData) {
+        List<Type> injectedTypes = new ArrayList<>(beanPropertyVisitData.keySet());
+
+        for (int currentTypeIndex = 0; currentTypeIndex < injectedTypes.size(); currentTypeIndex++) {
+            Type injectedType = injectedTypes.get(currentTypeIndex);
+            List<ConditionalAnnotationVisitData> annotationVisitData = beanPropertyVisitData.get(injectedType).stream()
+                    .filter(visitData -> visitData instanceof ConditionalAnnotationVisitData)
+                    .map(visitData -> (ConditionalAnnotationVisitData) visitData)
+                    .collect(Collectors.toList());
+
+            boolean multiplePropertiesFromType = annotationVisitData.size() > 1;
+
+            Integer injectedBeanIndex = null;
+            for (int i = 0; i < annotationVisitData.size(); i++) {
+
+                int currentPropertyIndex = i;
+                ConditionalAnnotationVisitData visitData = annotationVisitData.get(currentPropertyIndex);
+
+                MethodElement propertyGetter = visitData.memberPropertyGetter;
+                // load 'this'
+                adapter.loadThis();
+                // push injected bean property name
+                adapter.push(visitData.memberPropertyName);
+
+                if (injectedBeanIndex != null) {
+                    adapter.loadLocal(injectedBeanIndex);
+                } else {
+                    // load 'this'
+                    adapter.loadThis();
+                    // 1st argument load BeanResolutionContext
+                    adapter.loadArg(0);
+                    // 2nd argument load BeanContext
+                    adapter.loadArg(1);
+                    // 3rd argument the injected bean index
+                    adapter.push(currentTypeIndex);
+                    // push qualifier
+                    pushQualifier(adapter, visitData.memberBeanType, () -> resolveAnnotationArgument(adapter, currentPropertyIndex));
+                    // invoke getBeanForAnnotation
+                    pushInvokeMethodOnSuperClass(adapter, GET_BEAN_FOR_ANNOTATION);
+                    // cast the return value to the correct type
+                    pushCastToType(adapter, visitData.memberBeanType);
+
+                    // if multiple properties from same bean should be checked, saving bean to local variable
+                    if (multiplePropertiesFromType) {
+                        injectedBeanIndex = adapter.newLocal(injectedType);
+                        adapter.storeLocal(injectedBeanIndex);
+                        adapter.loadLocal(injectedBeanIndex);
+                    }
+                }
+
+                org.objectweb.asm.commons.Method propertyGetterMethod = org.objectweb.asm.commons.Method.getMethod(propertyGetter.getDescription(false));
+                // getter might be an interface method
+                if (propertyGetter.isAbstract()) {
+                    adapter.invokeInterface(injectedType, propertyGetterMethod);
+                } else {
+                    adapter.invokeVirtual(injectedType, propertyGetterMethod);
+                }
+                pushBoxPrimitiveIfNecessary(propertyGetterMethod.getReturnType(), adapter);
+                // pushing required arguments and invoking checkBeanPropertyValue
+                adapter.push(visitData.requiredValue);
+                adapter.push(visitData.notEqualsValue);
+                pushInvokeMethodOnSuperClass(adapter, CHECK_INJECTED_BEAN_PROPERTY_VALUE);
+
+                boolean isLastProperty = currentTypeIndex == (injectedTypes.size() - 1) && currentPropertyIndex == (annotationVisitData.size() - 1);
+                if (isLastProperty) {
+                    adapter.returnValue();
+                }
+            }
         }
     }
 
@@ -4396,24 +4468,78 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         return this.originatingElements.getOriginatingElements();
     }
 
+    /**
+     * Data used when visiting annotation injection points.
+     */
     @Internal
-    private static final class AnnotationVisitData {
+    private static class AnnotationVisitData {
         final TypedElement memberBeanType;
-        final String memberPropertyName;
+
+        public AnnotationVisitData(TypedElement memberBeanType) {
+            this.memberBeanType = memberBeanType;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            AnnotationVisitData that = (AnnotationVisitData) o;
+            return Objects.equals(memberBeanType, that.memberBeanType);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(memberBeanType);
+        }
+    }
+
+    /**
+     * Data used when visiting injection points for annotations required to resolve conditional bean loading.
+     */
+    @Internal
+    private static final class ConditionalAnnotationVisitData extends AnnotationVisitData {
         final MethodElement memberPropertyGetter;
+        final String memberPropertyName;
         final String requiredValue;
         final String notEqualsValue;
 
-        public AnnotationVisitData(TypedElement memberBeanType,
-                                   String memberPropertyName,
-                                   MethodElement memberPropertyGetter,
-                                   @Nullable String requiredValue,
-                                   @Nullable String notEqualsValue) {
-            this.memberBeanType = memberBeanType;
+        public ConditionalAnnotationVisitData(TypedElement memberBeanType,
+                                              String memberPropertyName,
+                                              MethodElement memberPropertyGetter,
+                                              @Nullable String requiredValue,
+                                              @Nullable String notEqualsValue) {
+            super(memberBeanType);
             this.memberPropertyName = memberPropertyName;
             this.memberPropertyGetter = memberPropertyGetter;
             this.requiredValue = requiredValue;
             this.notEqualsValue = notEqualsValue;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            if (!super.equals(o)) {
+                return false;
+            }
+            ConditionalAnnotationVisitData that = (ConditionalAnnotationVisitData) o;
+            return Objects.equals(memberPropertyGetter, that.memberPropertyGetter)
+                       && Objects.equals(memberPropertyName, that.memberPropertyName)
+                       && Objects.equals(requiredValue, that.requiredValue)
+                       && Objects.equals(notEqualsValue, that.notEqualsValue);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(super.hashCode(), memberPropertyGetter, memberPropertyName, requiredValue, notEqualsValue);
         }
     }
 

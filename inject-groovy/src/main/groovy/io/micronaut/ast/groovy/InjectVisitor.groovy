@@ -257,7 +257,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             populateProxyWriterConstructor(groovyClassElement, aopProxyWriter, groovyClassElement.getPrimaryConstructor().orElse(null))
             beanDefinitionWriters.put(node, aopProxyWriter)
             this.aopProxyWriter = aopProxyWriter
-            visitAnnotationMetadata(aopProxyWriter, annotationMetadata)
             visitIntroductionTypePublicMethods(aopProxyWriter, node)
             if (ArrayUtils.isNotEmpty(interfaceTypes)) {
                 List<AnnotationNode> annotationNodes = node.annotations
@@ -300,22 +299,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
                 }
             }
             super.visitClass(node)
-        }
-    }
-
-    private void visitAnnotationMetadata(BeanDefinitionVisitor writer, AnnotationMetadata annotationMetadata) {
-        for (AnnotationValue<Requires> annotation: annotationMetadata.getAnnotationValuesByType(Requires.class)) {
-            annotation.stringValue(RequiresCondition.MEMBER_BEAN_PROPERTY)
-                    .ifPresent((String beanProperty) -> {
-                        annotation.stringValue(RequiresCondition.MEMBER_BEAN)
-                                .map{ String s -> compilationUnit.getAST().classes.find {ClassNode cn -> cn.name == s }}
-                                .map{elementFactory.newClassElement(it, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, it))}
-                                .ifPresent((ClassElement classElement) -> {
-                                    String requiredValue = annotation.stringValue().orElse(null);
-                                    String notEqualsValue = annotation.stringValue(RequiresCondition.MEMBER_NOT_EQUALS).orElse(null);
-                                    writer.visitAnnotationMemberPropertyInjectionPoint(classElement, beanProperty, requiredValue, notEqualsValue)
-                                })
-                    })
         }
     }
 
@@ -737,7 +720,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
             returnType = methodNode.getReturnType()
             allTypeArguments = factoryMethodElement.returnType.allTypeArguments
-            visitAnnotationMetadata(beanMethodWriter, beanFactoryMetadata)
             beanMethodWriter.visitTypeArguments(allTypeArguments)
             beanMethodWriter.visitBeanFactoryMethod(
                     originatingElement,
@@ -766,7 +748,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
             returnType = factoryField.type.nativeType as ClassNode
             allTypeArguments = factoryField.type.allTypeArguments
-            visitAnnotationMetadata(beanMethodWriter, beanFactoryMetadata)
             beanMethodWriter.visitTypeArguments(allTypeArguments)
             beanMethodWriter.visitBeanFactoryField(
                     originatingElement,
@@ -1451,7 +1432,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             beanWriter = new BeanDefinitionWriter(groovyClassElement, configurationMetadataBuilder, groovyVisitorContext)
             beanWriter.visitTypeArguments(groovyClassElement.allTypeArguments)
             beanDefinitionWriters.put(classNode, beanWriter)
-            visitAnnotationMetadata(beanWriter, annotationMetadata)
 
             MethodElement constructor = groovyClassElement.getPrimaryConstructor().orElse(null)
 
