@@ -64,7 +64,6 @@ managed-jna = "5.7.0"
 managed-jsr305 = "3.0.2"
 managed-kafka = "2.8.0"
 managed-ktor = "1.6.1"
-managed-lettuce = "6.1.1.RELEASE"
 managed-liquibase = "4.8.0"
 managed-logback = "1.2.10"
 managed-lombok = "1.18.22"
@@ -259,8 +258,6 @@ managed-jsr305 = { module = "com.google.code.findbugs:jsr305", version.ref = "ma
 managed-kafka = { module = "org.apache.kafka:kafka-clients", version.ref = "managed-kafka" }
 managed-kafka212 = { module = "org.apache.kafka:kafka_2.12", version.ref = "managed-kafka" }
 managed-kafka-streams = { module = "org.apache.kafka:kafka-streams", version.ref = "managed-kafka" }
-
-managed-lettuce = { module = "io.lettuce:lettuce-core", version.ref = "managed-lettuce" }
 
 managed-liquibase = { module = "org.liquibase:liquibase-core", version.ref = "managed-liquibase" }
 
