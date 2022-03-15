@@ -620,7 +620,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 superclass = element.getSuperclass();
             }
 
-            if (kind == ElementKind.METHOD) {
+            if (kind == ElementKind.METHOD || kind == ElementKind.FIELD) {
                 // if the element kind is interfaces then we need to go through interfaces as well
                 Set<TypeElement> allInterfaces = visitorContext.getModelUtils().getAllInterfaces(this.classElement);
                 Collection<TypeElement> interfacesToProcess = new ArrayList<>(allInterfaces.size());
@@ -655,16 +655,13 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                                     }
                                 }
                             }
-                            elementsToAdd.add(interfaceElement);
                         }
+                        elementsToAdd.add(interfaceElement);
                     }
                 }
                 enclosedElements.addAll(elementsToAdd);
                 elementsToAdd.clear();
             }
-        }
-        boolean onlyAccessible = result.isOnlyAccessible();
-        if (kind == ElementKind.METHOD) {
             if (onlyAbstract) {
                 if (isInterface()) {
                     enclosedElements.removeIf((e) -> e.getModifiers().contains(Modifier.DEFAULT));
@@ -690,6 +687,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         boolean hasModifierPredicates = !modifierPredicates.isEmpty();
         boolean hasAnnotationPredicates = !annotationPredicates.isEmpty();
         boolean hasTypePredicates = !typePredicates.isEmpty();
+        boolean onlyAccessible = result.isOnlyAccessible();
         final JavaElementFactory elementFactory = visitorContext.getElementFactory();
 
         elementLoop:

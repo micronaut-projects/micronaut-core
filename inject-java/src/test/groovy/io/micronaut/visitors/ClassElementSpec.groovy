@@ -21,10 +21,12 @@ import io.micronaut.context.exceptions.BeanContextException
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ConstructorElement
+import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.EnumElement
 import io.micronaut.inject.ast.FieldElement
+import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PackageElement
 import jakarta.inject.Singleton
@@ -1273,22 +1275,71 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
         assertMethodsByName(allMethods, "instanceMethod3", ["InheritedMethods"])
     }
 
+    void "test fields using ElementQuery"() {
+        given:
+            ClassElement classElement = buildClassElement('''
+package elementquery;
+
+class InheritedFields extends SuperClassWithFields implements SuperInterfaceWithFields {
+    String instanceField3 = "";
+}
+
+interface SuperSuperInterfaceWithFields {
+    String interfaceField = "";
+}
+
+interface SuperInterfaceWithFields extends SuperSuperInterfaceWithFields {
+    String interfaceField = "";
+}
+
+class SuperSuperClassWithFields {
+    static String instanceField1 = "";
+
+    String instanceField2 = "";
+}
+
+abstract class SuperClassWithFields extends SuperSuperClassWithFields implements SuperSuperInterfaceWithFields {
+    static String instanceField1 = "";
+
+    String instanceField2 = "";
+}
+
+''')
+        when:
+        List<FieldElement> fields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.includeHiddenElements())
+
+        then:
+        fields.size() == 7
+        assertFieldsByName(fields, "instanceField1", ["SuperClassWithFields", "SuperSuperClassWithFields"])
+        assertFieldsByName(fields, "instanceField2", ["SuperClassWithFields", "SuperSuperClassWithFields"])
+        assertFieldsByName(fields, "instanceField3", ["InheritedFields"])
+        assertFieldsByName(fields, "interfaceField", ["SuperInterfaceWithFields", "SuperSuperInterfaceWithFields"])
+    }
+
     private void assertMethodsByName(List<MethodElement> allMethods, String name, List<String> expectedDeclaringTypeSimpleNames) {
-        Collection<MethodElement> methods = collectMethods(allMethods, name)
+        Collection<MethodElement> methods = collectElements(allMethods, name)
         assert expectedDeclaringTypeSimpleNames.size() == methods.size()
         for (String expectedDeclaringTypeSimpleName : expectedDeclaringTypeSimpleNames) {
-            assert oneMethodPresentWithDeclaringType(methods, expectedDeclaringTypeSimpleName)
+            assert oneElementPresentWithDeclaringType(methods, expectedDeclaringTypeSimpleName)
         }
     }
 
-    private boolean oneMethodPresentWithDeclaringType(Collection<MethodElement> methods, String declaringTypeSimpleName) {
-        methods.stream()
+    private void assertFieldsByName(List<FieldElement> allFields, String name, List<String> expectedDeclaringTypeSimpleNames) {
+        Collection<FieldElement> fields = collectElements(allFields, name)
+        assert expectedDeclaringTypeSimpleNames.size() == fields.size()
+        for (String expectedDeclaringTypeSimpleName : expectedDeclaringTypeSimpleNames) {
+            assert oneElementPresentWithDeclaringType(fields, expectedDeclaringTypeSimpleName)
+        }
+    }
+
+    private boolean oneElementPresentWithDeclaringType(Collection<MemberElement> elements, String declaringTypeSimpleName) {
+        elements.stream()
                 .filter { it -> it.getDeclaringType().getSimpleName() == declaringTypeSimpleName}
                 .count() == 1
     }
 
-    static Collection<MethodElement> collectMethods(List<MethodElement> allMethods, String name) {
-        return allMethods.findAll { it.name == name }
+    static <T extends Element> Collection<T> collectElements(List<T> allElements, String name) {
+        return allElements.findAll { it.name == name }
     }
 
 }
