@@ -1,18 +1,15 @@
 package io.micronaut.inject.beanbuilder
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-import io.micronaut.context.annotation.Prototype
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementQuery
-import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.beans.BeanElementBuilder
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
-import jakarta.inject.Singleton
 
-class BuildElementBuilderScheduledSpec extends AbstractTypeElementSpec {
+class BuildElementBuilderProcessedMethodsSpec extends AbstractTypeElementSpec {
 
     void "test that bean definitions can be processed on startup"() {
         given:
@@ -26,8 +23,21 @@ class Foo {
     
 }
 ''')
-        expect:
-        context.getBeanDefinition(TestBeanScheduled).requiresMethodProcessing()
+
+        when:
+        def definition = context.getBeanDefinition(TestBeanScheduled)
+        def method = definition.getRequiredMethod("scheduleMe")
+
+        then:
+        definition.requiresMethodProcessing()
+        method != null
+
+        when:
+        def testBean = context.getBean(TestBeanScheduled)
+        def result = method.invoke(testBean)
+
+        then:
+        result == 'good'
 
         cleanup:
         context.close()
@@ -63,8 +73,8 @@ class Foo {
     }
 
     static class TestBeanScheduled {
-        void scheduleMe() {
-            println "running"
+        String scheduleMe() {
+            "good"
         }
     }
 }
