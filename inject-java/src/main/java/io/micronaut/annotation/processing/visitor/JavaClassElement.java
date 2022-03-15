@@ -374,7 +374,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
                         if (NameUtils.isReaderName(methodName, readPrefixes) && executableElement.getParameters().isEmpty()) {
                             String propertyName;
-                            if (fields.containsKey(methodName)) {
+                            if (methodName.startsWith(NameUtils.PREFIX_IS) && fields.containsKey(methodName)) {
                                 propertyName = methodName;
                             } else {
                                 propertyName = NameUtils.getPropertyNameForGetter(methodName, readPrefixes);

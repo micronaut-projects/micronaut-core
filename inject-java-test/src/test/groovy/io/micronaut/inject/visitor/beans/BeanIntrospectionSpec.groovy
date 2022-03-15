@@ -3763,15 +3763,12 @@ class MyConfig {
         then:
         BeanIntrospection beanIntrospection = beanIntrospector.getIntrospection(TestMatchingGetterClass)
         beanIntrospection != null
-        beanIntrospection.getBeanProperties().size() == 4
+        beanIntrospection.getBeanProperties().size() == 2
         String[] propertyNames = beanIntrospection.getPropertyNames()
-        propertyNames.contains("getName")
-        !propertyNames.contains("name")
+        propertyNames.contains("name")
+        !propertyNames.contains("getName")
         propertyNames.contains("isDeleted")
         !propertyNames.contains("deleted")
-        propertyNames.contains("author")
-        propertyNames.contains("getTest")
-        !propertyNames.contains("test")
     }
 
     void "test targeting abstract class with @Introspected(classes = ) with custom getter"() {

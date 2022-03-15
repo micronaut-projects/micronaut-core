@@ -3,8 +3,7 @@ package io.micronaut.inject.visitor.beans;
 public abstract class TestMatchingGetterClass {
 
     private Boolean isDeleted;
-    private String getName;
-    private String author;
+    private String name;
 
     public Boolean isDeleted() {
         return isDeleted;
@@ -15,23 +14,10 @@ public abstract class TestMatchingGetterClass {
     }
 
     public String getName() {
-        return getName;
+        return name;
     }
 
-    public void setGetName(String getName) {
-        this.getName = getName;
+    public void setName(String name) {
+        this.name = name;
     }
-
-    public String getAuthor() {
-        return author;
-    }
-
-    public void setAuthor(String author) {
-        this.author = author;
-    }
-
-    // out of order test
-    public Integer getGetTest() { return getTest; }
-
-    private Integer getTest;
 }

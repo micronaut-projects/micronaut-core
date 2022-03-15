@@ -38,7 +38,7 @@ public class NameUtils {
     private static final Pattern SERVICE_ID_REGEX = Pattern.compile("[\\p{javaLowerCase}\\d-]+");
     private static final String PREFIX_GET = "get";
     private static final String PREFIX_SET = "set";
-    private static final String PREFIX_IS = "is";
+    public static final String PREFIX_IS = "is";
     private static final Pattern ENVIRONMENT_VAR_SEQUENCE = Pattern.compile("^[\\p{Lu}_{0-9}]+");
     private static final Pattern KEBAB_CASE_SEQUENCE = Pattern.compile("^(([a-z0-9])+([-.:])?)*([a-z0-9])+$");
     private static final Pattern KEBAB_REPLACEMENTS = Pattern.compile("[_ ]");
