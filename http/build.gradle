@@ -3,7 +3,7 @@ plugins {
 }
 
 internalSanityChecks {
-    expectedServiceCount.put('io.micronaut.core.beans.BeanIntrospectionReference', 4)
+    expectedServiceCount.put('io.micronaut.core.beans.BeanIntrospectionReference', 6)
     expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 21)
 }
 
