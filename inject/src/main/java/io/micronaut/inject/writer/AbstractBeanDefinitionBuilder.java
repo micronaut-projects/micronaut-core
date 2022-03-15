@@ -16,6 +16,7 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationClassValue;
@@ -583,6 +584,9 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                     executableMethod,
                     visitorContext
             );
+            if (executableMethod.getAnnotationMetadata().isTrue(Executable.class, "processOnStartup")) {
+                beanDefinitionWriter.setRequiresMethodProcessing(true);
+            }
         }
 
         for (BeanMethodElement postConstructMethod : postConstructMethods) {
@@ -848,6 +852,14 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                 AbstractBeanDefinitionBuilder.this.executableMethods.add(this);
             }
             return BeanMethodElement.super.executable();
+        }
+
+        @Override
+        public BeanMethodElement executable(boolean processOnStartup) {
+            if (!AbstractBeanDefinitionBuilder.this.executableMethods.contains(this)) {
+                AbstractBeanDefinitionBuilder.this.executableMethods.add(this);
+            }
+            return BeanMethodElement.super.executable(processOnStartup);
         }
 
         @NonNull
