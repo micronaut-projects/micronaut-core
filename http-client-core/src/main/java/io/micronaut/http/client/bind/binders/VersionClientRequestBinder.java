@@ -33,6 +33,9 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * An {@link AnnotatedClientRequestBinder} implementation for {@link Version}.
+ */
 public class VersionClientRequestBinder implements AnnotatedClientRequestBinder<Version> {
     private final Map<String, ClientVersioningConfiguration> versioningConfigurations =
             new ConcurrentHashMap<>(5);

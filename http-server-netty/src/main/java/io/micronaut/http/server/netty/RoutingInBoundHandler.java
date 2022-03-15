@@ -614,6 +614,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             @Override
             protected void doOnComplete() {
+                // assume exactly one message has been sent (onNext)
             }
         });
     }

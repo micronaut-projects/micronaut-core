@@ -15,9 +15,9 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.PackageElement;
 import org.codehaus.groovy.ast.PackageNode;
 
@@ -51,6 +51,16 @@ public class GroovyPackageElement extends AbstractGroovyElement implements Packa
             return n.substring(0, n.length() - 1);
         }
         return n;
+    }
+
+    @Override
+    public String getSimpleName() {
+        String name = getName();
+        int index = name.lastIndexOf(".");
+        if (index > -1) {
+            return name.substring(index + 1);
+        }
+        return name;
     }
 
     @Override

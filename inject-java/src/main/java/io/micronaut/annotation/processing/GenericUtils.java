@@ -230,6 +230,7 @@ public class GenericUtils {
                         } else {
                             resolvedParameters.put(parameterName, elementUtils.getTypeElement(Object.class.getName()).asType());
                         }
+                        break;
                     default:
                         // no-op
                 }
