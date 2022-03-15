@@ -19,4 +19,5 @@ micronautBom {
             'graal.sdk': 'graalSdk',
             'neo4j.java.driver': 'neo4j.bolt',
     ]
+    propertyName = 'core'
 }

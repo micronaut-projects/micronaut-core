@@ -540,6 +540,9 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         boolean onlyAbstract = result.isOnlyAbstract();
         boolean onlyConcrete = result.isOnlyConcrete();
         boolean onlyInstance = result.isOnlyInstance();
+        boolean includeEnumConstants = result.isIncludeEnumConstants();
+        boolean includeOverriddenMethods = result.isIncludeOverriddenMethods();
+        boolean includeHiddenElements = result.isIncludeHiddenElements();
 
         if (!onlyDeclared) {
             Elements elements = visitorContext.getElements();
@@ -561,11 +564,11 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                     ElementKind superKind = superElement.getKind();
                     if (superKind == kind) {
                         for (Element enclosedElement : enclosedElements) {
-                            if (elements.hides(enclosedElement, superElement)) {
+                            if (!includeHiddenElements && elements.hides(enclosedElement, superElement)) {
                                 continue superElements;
                             } else if (enclosedElement.getKind() == ElementKind.METHOD && superElement.getKind() == ElementKind.METHOD) {
                                 final ExecutableElement methodCandidate = (ExecutableElement) superElement;
-                                if (elements.overrides((ExecutableElement) enclosedElement, methodCandidate, this.classElement)) {
+                                if (!includeOverriddenMethods && elements.overrides((ExecutableElement) enclosedElement, methodCandidate, this.classElement)) {
                                     continue superElements;
                                 }
                             }
@@ -625,8 +628,20 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             if (kind == ElementKind.METHOD) {
                 // if the element kind is interfaces then we need to go through interfaces as well
                 Set<TypeElement> allInterfaces = visitorContext.getModelUtils().getAllInterfaces(this.classElement);
+                Collection<TypeElement> interfacesToProcess = new ArrayList<>(allInterfaces.size());
+                // Remove duplicates
+                outer:
+                for (TypeElement el : allInterfaces) {
+                    for (TypeElement existingEl : interfacesToProcess) {
+                        Name qualifiedName = existingEl.getQualifiedName();
+                        if (qualifiedName.equals(el.getQualifiedName())) {
+                            continue outer;
+                        }
+                    }
+                    interfacesToProcess.add(el);
+                }
                 List<Element> elementsToAdd = new ArrayList<>(allInterfaces.size());
-                for (TypeElement itfe : allInterfaces) {
+                for (TypeElement itfe : interfacesToProcess) {
                     List<? extends Element> interfaceElements = itfe.getEnclosedElements();
                     interfaceElements:
                     for (Element interfaceElement : interfaceElements) {
@@ -640,7 +655,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
                             for (Element enclosedElement : enclosedElements) {
                                 if (enclosedElement.getKind() == ElementKind.METHOD) {
-                                    if (elements.overrides((ExecutableElement) enclosedElement, ee, this.classElement)) {
+                                    if (!includeOverriddenMethods && elements.overrides((ExecutableElement) enclosedElement, ee, this.classElement)) {
                                         continue interfaceElements;
                                     }
                                 }
@@ -685,7 +700,9 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         elementLoop:
         for (Element enclosedElement : enclosedElements) {
             ElementKind enclosedElementKind = enclosedElement.getKind();
-            if (enclosedElementKind == kind || (enclosedElementKind == ElementKind.ENUM && kind == ElementKind.CLASS)) {
+            if (enclosedElementKind == kind
+                    || includeEnumConstants && kind == ElementKind.FIELD && enclosedElementKind == ElementKind.ENUM_CONSTANT
+                    || (enclosedElementKind == ElementKind.ENUM && kind == ElementKind.CLASS)) {
                 String elementName = enclosedElement.getSimpleName().toString();
                 if (onlyAccessible) {
                     // exclude private members
@@ -754,6 +771,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         );
                     break;
                     case FIELD:
+                    case ENUM_CONSTANT:
                         //noinspection unchecked
                         element = (T) elementFactory.newFieldElement(
                                 this,

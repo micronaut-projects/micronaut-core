@@ -15,6 +15,7 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
@@ -89,4 +90,8 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
         return fold.apply(this);
     }
 
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return super.getAnnotationMetadata();
+    }
 }

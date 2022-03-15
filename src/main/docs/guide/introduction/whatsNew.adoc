@@ -1,5 +1,22 @@
 //Micronaut {version} includes the following changes:
 
+== 3.4.0
+
+=== Micronaut Azure 3.1.0
+
+Refreshed dependencies and BOM module
+
+=== Micronaut Servlet 3.2.0
+
+Refreshed dependencies and the embedded Tomcat server now supports Java 17.
+
+=== Other Module Upgrades
+
+- Micronaut GCP 4.1.0
+- Micronaut RxJava2 1.2.0
+- Micronaut Rxjava3 2.2.0
+- Micronaut Reactor 2.2.0
+
 == 3.3.0
 
 === GraalVM 22.0.0.2
