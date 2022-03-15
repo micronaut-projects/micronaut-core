@@ -10,14 +10,14 @@ import java.nio.charset.StandardCharsets
 class GenericResourceSpec extends Specification {
     def 'deserialization'() {
         given:
-        def mapper = ApplicationContext.run().getBean(JsonMapper)
-        def original = new JsonError('foo')
+        JsonMapper mapper = ApplicationContext.run().getBean(JsonMapper)
+        JsonError original = new JsonError('foo')
                 .path('/p')
                 .embedded('bar', new JsonError('baz').path('/q'))
-        def json = new String(mapper.writeValueAsBytes(original), StandardCharsets.UTF_8)
+        String json = new String(mapper.writeValueAsBytes(original), StandardCharsets.UTF_8)
 
         when:
-        def parsed = mapper.readValue(json, Argument.of(Resource))
+        Resource parsed = mapper.readValue(json, Argument.of(Resource))
         then:
         parsed.additionalProperties == ['path': '/p', 'message': 'foo']
         parsed.embedded.size() == 1
@@ -25,8 +25,9 @@ class GenericResourceSpec extends Specification {
         parsed.embedded.get('bar').get()[0].additionalProperties == ['path': '/q', 'message': 'baz']
 
         when:
-        def reserialized = new String(mapper.writeValueAsBytes(parsed), StandardCharsets.UTF_8)
-        def reparsed = mapper.readValue(reserialized, Argument.of(Resource))
+        String reserialized = new String(mapper.writeValueAsBytes(parsed), StandardCharsets.UTF_8)
+        Resource reparsed = mapper.readValue(reserialized, Argument.of(Resource))
+
         then:
         reparsed == parsed
     }
