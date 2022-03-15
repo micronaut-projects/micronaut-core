@@ -124,8 +124,6 @@ managed-micronaut-tracing = "4.1.0"
 managed-micronaut-tracing-legacy = "3.2.7"
 managed-micronaut-views = "3.2.0"
 managed-micronaut-xml = "3.0.1"
-managed-mongo = ""
-managed-mongo-reactive = ""
 managed-neo4j = "3.5.29"
 managed-neo4j-java-driver = "4.2.7"
 managed-netty = "4.1.73.Final"
@@ -161,6 +159,7 @@ boms-micronaut-groovy = { module = "io.micronaut.groovy:micronaut-groovy-bom", v
 boms-micronaut-kotlin = { module = "io.micronaut.kotlin:micronaut-kotlin-bom", version.ref = "managed-micronaut-kotlin" }
 boms-micronaut-kubernetes = { module = "io.micronaut.kubernetes:micronaut-kubernetes-bom", version.ref = "managed-micronaut-kubernetes" }
 boms-micronaut-micrometer = { module = "io.micronaut.micrometer:micronaut-micrometer-bom", version.ref = "managed-micronaut-micrometer" }
+boms-micronaut-mongo = { module = "io.micronaut.mongodb:micronaut-mongo-bom", version.ref = "managed-micronaut-mongo" }
 boms-micronaut-mqtt = { module = "io.micronaut.mqtt:micronaut-mqtt-bom", version.ref = "managed-micronaut-mqtt" }
 boms-micronaut-oraclecloud = { module = "io.micronaut.oraclecloud:micronaut-oraclecloud-bom", version.ref = "managed-micronaut-oraclecloud" }
 boms-micronaut-problem-json = { module = "io.micronaut.problem:micronaut-problem-json-bom", version.ref = "managed-micronaut-problem" }
@@ -269,10 +268,6 @@ managed-methvin-directoryWatcher = { module = "io.methvin:directory-watcher", ve
 
 managed-micrometer-core = { module = "io.micrometer:micrometer-core", version.ref = "managed-micrometer" }
 
-managed-mongodb-driver-sync = { module = "org.mongodb:mongodb-driver-sync", version.ref = "managed-mongo" }
-managed-mongodb-driver-core = { module = "org.mongodb:mongodb-driver-core", version.ref = "managed-mongo" }
-managed-mongo-reactive = { module = "org.mongodb:mongodb-driver-reactivestreams", version.ref = "managed-mongo-reactive" }
-
 managed-neo4j = { module = "org.neo4j.test:neo4j-harness", version.ref = "managed-neo4j" }
 managed-neo4j-bolt = { module = "org.neo4j.driver:neo4j-java-driver", version.ref = "managed-neo4j-java-driver" }
 
@@ -308,9 +303,6 @@ managed-micronaut-jmx = { module = "io.micronaut.jmx:micronaut-jmx", version.ref
 managed-micronaut-kafka = { module = "io.micronaut.kafka:micronaut-kafka", version.ref = "managed-micronaut-kafka" }
 managed-micronaut-kafka-streams = { module = "io.micronaut.kafka:micronaut-kafka-streams", version.ref = "managed-micronaut-kafka" }
 managed-micronaut-liquibase = { module = "io.micronaut.liquibase:micronaut-liquibase", version.ref = "managed-micronaut-liquibase" }
-managed-micronaut-mongo = { module = "io.micronaut.mongodb:micronaut-mongo-reactive", version.ref = "managed-micronaut-mongo" }
-managed-micronaut-mongo-core = { module = "io.micronaut.mongodb:micronaut-mongo-core", version.ref = "managed-micronaut-mongo" }
-managed-micronaut-mongo-sync = { module = "io.micronaut.mongodb:micronaut-mongo-sync", version.ref = "managed-micronaut-mongo" }
 managed-micronaut-multitenancy = { module = "io.micronaut.multitenancy:micronaut-multitenancy", version.ref = "managed-micronaut-multitenancy" }
 managed-micronaut-nats = { module = "io.micronaut.nats:micronaut-nats", version.ref = "managed-micronaut-nats" }
 managed-micronaut-neo4j = { module = "io.micronaut.neo4j:micronaut-neo4j-bolt", version.ref = "managed-micronaut-neo4j" }
