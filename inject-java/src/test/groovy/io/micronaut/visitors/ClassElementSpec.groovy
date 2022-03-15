@@ -1274,8 +1274,7 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
         assertMethodsByName(allMethods, "instanceMethod2", ["SuperSuperClassWithMethods", "SuperClassWithMethods"])
         assertMethodsByName(allMethods, "instanceMethod3", ["InheritedMethods"])
     }
-
-
+    
     private final static String FIELDS_SCENARIO = '''\
 package elementquery;
 
@@ -1368,5 +1367,4 @@ abstract class SuperClassWithFields extends SuperSuperClassWithFields implements
     static <T extends Element> Collection<T> collectElements(List<T> allElements, String name) {
         return allElements.findAll { it.name == name }
     }
-
 }
