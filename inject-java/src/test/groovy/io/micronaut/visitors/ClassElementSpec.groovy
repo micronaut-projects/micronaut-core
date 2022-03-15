@@ -21,10 +21,12 @@ import io.micronaut.context.exceptions.BeanContextException
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ConstructorElement
+import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.EnumElement
 import io.micronaut.inject.ast.FieldElement
+import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PackageElement
 import jakarta.inject.Singleton
@@ -1291,4 +1293,67 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
         return allMethods.findAll { it.name == name }
     }
 
+    private final static String FIELDS_SCENARIO = '''\
+package elementquery;
+
+class InheritedFields extends SuperClassWithFields implements SuperInterfaceWithFields {
+    String instanceField3 = "";
+}
+
+interface SuperSuperInterfaceWithFields {
+    String interfaceField = "";
+}
+
+interface SuperInterfaceWithFields extends SuperSuperInterfaceWithFields {
+    String interfaceField = "";
+}
+
+class SuperSuperClassWithFields {
+    static String instanceField1 = "";
+
+    String instanceField2 = "";
+}
+
+abstract class SuperClassWithFields extends SuperSuperClassWithFields implements SuperSuperInterfaceWithFields {
+    static String instanceField1 = "";
+
+    String instanceField2 = "";
+}
+'''
+
+    void "verify getEnclosedElements with ElementQuery.ALL_FIELDS"() {
+        given:
+        ClassElement classElement = buildClassElement(FIELDS_SCENARIO)
+        when:
+        List<FieldElement> fields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
+        Map<String, List<String>> expected = [
+                "instanceField1": ["SuperClassWithFields"],
+                "instanceField2": ["SuperClassWithFields"],
+                "instanceField3": ["InheritedFields"],
+        ]
+
+        then:
+        fields.size() == expected.collect { k, v -> v.size() }.sum()
+        expected.each { k, v ->
+            assertFieldsByName(fields, k, v)
+        }
+    }
+
+    private void assertFieldsByName(List<FieldElement> allFields, String name, List<String> expectedDeclaringTypeSimpleNames) {
+        Collection<FieldElement> fields = collectElements(allFields, name)
+        assert expectedDeclaringTypeSimpleNames.size() == fields.size()
+        for (String expectedDeclaringTypeSimpleName : expectedDeclaringTypeSimpleNames) {
+            assert oneElementPresentWithDeclaringType(fields, expectedDeclaringTypeSimpleName)
+        }
+    }
+
+    private boolean oneElementPresentWithDeclaringType(Collection<MemberElement> elements, String declaringTypeSimpleName) {
+        elements.stream()
+                .filter { it -> it.getDeclaringType().getSimpleName() == declaringTypeSimpleName}
+                .count() == 1
+    }
+
+    static <T extends Element> Collection<T> collectElements(List<T> allElements, String name) {
+        return allElements.findAll { it.name == name }
+    }
 }
