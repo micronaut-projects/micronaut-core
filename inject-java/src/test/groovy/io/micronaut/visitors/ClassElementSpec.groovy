@@ -1275,9 +1275,8 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
         assertMethodsByName(allMethods, "instanceMethod3", ["InheritedMethods"])
     }
 
-    void "test fields using ElementQuery"() {
-        given:
-            ClassElement classElement = buildClassElement('''
+
+    private final static String FIELDS_SCENARIO = '''\
 package elementquery;
 
 class InheritedFields extends SuperClassWithFields implements SuperInterfaceWithFields {
@@ -1303,8 +1302,31 @@ abstract class SuperClassWithFields extends SuperSuperClassWithFields implements
 
     String instanceField2 = "";
 }
+'''
 
-''')
+    void "verify getEnclosedElements with ElementQuery.ALL_FIELDS"() {
+        given:
+        ClassElement classElement = buildClassElement(FIELDS_SCENARIO)
+        when:
+        List<FieldElement> fields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
+        Map<String, List<String>> expected = [
+                "instanceField1": ["SuperClassWithFields"],
+                "instanceField2": ["SuperClassWithFields"],
+                "instanceField3": ["InheritedFields"],
+                "interfaceField": ["SuperInterfaceWithFields", "SuperSuperInterfaceWithFields"]
+        ]
+
+        then:
+        fields.size() == expected.collect { k, v -> v.size() }.sum()
+        expected.each { k, v ->
+            assertFieldsByName(fields, k, v)
+        }
+    }
+
+    void "verify getEnclosedElements with ElementQuery.ALL_FIELDS.includeHiddenElements"() {
+        given:
+        ClassElement classElement = buildClassElement(FIELDS_SCENARIO)
+
         when:
         List<FieldElement> fields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.includeHiddenElements())
         Map<String, List<String>> expected = [
