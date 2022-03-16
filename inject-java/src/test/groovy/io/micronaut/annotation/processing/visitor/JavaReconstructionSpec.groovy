@@ -423,8 +423,14 @@ class Test<T> {
 }
 """)
         def fieldType = classElement.fields[0].type
+        def placeholders = fieldType.getDeclaredGenericPlaceholders()
 
         expect:
+        if (placeholders.size() > 0) {
+            placeholders.each {
+                assert it.nativeType.class.simpleName == "TypeVar"
+            }
+        }
         reconstructTypeSignature(fieldType.foldBoundGenericTypes {
             if (it.isGenericPlaceholder() && ((GenericPlaceholderElement) it).variableName == 'T') {
                 return ClassElement.of(String)
