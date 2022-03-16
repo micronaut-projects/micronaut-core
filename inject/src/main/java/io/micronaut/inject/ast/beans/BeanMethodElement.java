@@ -42,6 +42,19 @@ public interface BeanMethodElement extends MethodElement {
     }
 
     /**
+     * Make the method executable.
+     *
+     * @param processOnStartup Whether to process on startup
+     * @return This bean method
+     * @since 3.4.0
+     */
+    default @NonNull
+    BeanMethodElement executable(boolean processOnStartup) {
+        annotate(Executable.class, builder -> builder.member("processOnStartup", processOnStartup));
+        return this;
+    }
+
+    /**
      * Make the method injected.
      *
      * @return This bean method
