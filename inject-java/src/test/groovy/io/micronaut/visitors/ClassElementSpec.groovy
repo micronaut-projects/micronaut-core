@@ -1274,25 +1274,7 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
         assertMethodsByName(allMethods, "instanceMethod2", ["SuperSuperClassWithMethods", "SuperClassWithMethods"])
         assertMethodsByName(allMethods, "instanceMethod3", ["InheritedMethods"])
     }
-
-    private void assertMethodsByName(List<MethodElement> allMethods, String name, List<String> expectedDeclaringTypeSimpleNames) {
-        Collection<MethodElement> methods = collectMethods(allMethods, name)
-        assert expectedDeclaringTypeSimpleNames.size() == methods.size()
-        for (String expectedDeclaringTypeSimpleName : expectedDeclaringTypeSimpleNames) {
-            assert oneMethodPresentWithDeclaringType(methods, expectedDeclaringTypeSimpleName)
-        }
-    }
-
-    private boolean oneMethodPresentWithDeclaringType(Collection<MethodElement> methods, String declaringTypeSimpleName) {
-        methods.stream()
-                .filter { it -> it.getDeclaringType().getSimpleName() == declaringTypeSimpleName}
-                .count() == 1
-    }
-
-    static Collection<MethodElement> collectMethods(List<MethodElement> allMethods, String name) {
-        return allMethods.findAll { it.name == name }
-    }
-
+    
     private final static String FIELDS_SCENARIO = '''\
 package elementquery;
 
@@ -1330,12 +1312,41 @@ abstract class SuperClassWithFields extends SuperSuperClassWithFields implements
                 "instanceField1": ["SuperClassWithFields"],
                 "instanceField2": ["SuperClassWithFields"],
                 "instanceField3": ["InheritedFields"],
+                "interfaceField": ["SuperInterfaceWithFields", "SuperSuperInterfaceWithFields"]
         ]
 
         then:
         fields.size() == expected.collect { k, v -> v.size() }.sum()
         expected.each { k, v ->
             assertFieldsByName(fields, k, v)
+        }
+    }
+
+    void "verify getEnclosedElements with ElementQuery.ALL_FIELDS.includeHiddenElements"() {
+        given:
+        ClassElement classElement = buildClassElement(FIELDS_SCENARIO)
+
+        when:
+        List<FieldElement> fields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.includeHiddenElements())
+        Map<String, List<String>> expected = [
+                "instanceField1": ["SuperClassWithFields", "SuperSuperClassWithFields"],
+                "instanceField2": ["SuperClassWithFields", "SuperSuperClassWithFields"],
+                "instanceField3": ["InheritedFields"],
+                "interfaceField": ["SuperInterfaceWithFields", "SuperSuperInterfaceWithFields"]
+        ]
+
+        then:
+        fields.size() == expected.collect { k, v -> v.size() }.sum()
+        expected.each { k, v ->
+            assertFieldsByName(fields, k, v)
+        }
+    }
+
+    private void assertMethodsByName(List<MethodElement> allMethods, String name, List<String> expectedDeclaringTypeSimpleNames) {
+        Collection<MethodElement> methods = collectElements(allMethods, name)
+        assert expectedDeclaringTypeSimpleNames.size() == methods.size()
+        for (String expectedDeclaringTypeSimpleName : expectedDeclaringTypeSimpleNames) {
+            assert oneElementPresentWithDeclaringType(methods, expectedDeclaringTypeSimpleName)
         }
     }
 
