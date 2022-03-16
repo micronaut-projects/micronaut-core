@@ -426,7 +426,7 @@ class Test<T> {
         List<? extends GenericPlaceholderElement> placeholders = fieldType.getDeclaredGenericPlaceholders()
 
         expect:
-        assert placeholders.every { it.nativeType.class.simpleName == "TypeVar" }
+        placeholders.every { it.nativeType.class.simpleName == "TypeVar" }
         reconstructTypeSignature(fieldType.foldBoundGenericTypes {
             if (it.isGenericPlaceholder() && ((GenericPlaceholderElement) it).variableName == 'T') {
                 return ClassElement.of(String)
