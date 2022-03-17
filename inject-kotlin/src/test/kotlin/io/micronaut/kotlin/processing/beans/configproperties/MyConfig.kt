@@ -24,7 +24,6 @@ import java.util.*
 open class MyConfig {
     var port = 0
     var defaultValue = 9999
-    var primitiveDefaultValue = 9999
     var stringList: List<String>? = null
     var intList: List<Int>? = null
     var urlList: List<URL>? = null

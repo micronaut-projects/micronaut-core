@@ -1,19 +1,4 @@
-/*
- * Copyright 2017-2019 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-package io.micronaut.kotlin.processing.beans.configproperties
+package io.micronaut.kotlin.processing.inject.configproperties
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
@@ -120,12 +105,12 @@ class ConfigurationPropertiesSpec extends Specification {
         config.inner.enabled
     }
 
-    void "test binding to a map setter"() {
-        ApplicationContext context = ApplicationContext.run(CollectionUtils.mapOf("map.setter.yyy.zzz", 3, "map.setter.yyy.xxx", 2, "map.setter.yyy.yyy", 3))
+    void "test binding to a map property"() {
+        ApplicationContext context = ApplicationContext.run(CollectionUtils.mapOf("map.property.yyy.zzz", 3, "map.property.yyy.xxx", 2, "map.property.yyy.yyy", 3))
         MapProperties config = context.getBean(MapProperties.class)
 
         expect:
-        config.setter.containsKey('yyy')
+        config.property.containsKey('yyy')
 
         cleanup:
         context.close()

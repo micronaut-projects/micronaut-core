@@ -51,7 +51,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         if (isConfigurationProperties) {
             this.configurationMetadata = configurationMetadataBuilder.visitProperties(
                 classElement,
-                null
+                classElement.documentation.orElse(null)
             )
         }
         this.isFactoryClass = classElement.hasStereotype(Factory::class.java)
@@ -80,7 +80,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
     companion object {
         private const val ANN_CONSTRAINT = "javax.validation.Constraint"
         private const val ANN_VALID = "javax.validation.Valid"
-        private val IS_CONSTRAINT: (AnnotationMetadata) -> Boolean = { am: AnnotationMetadata ->
+        val IS_CONSTRAINT: (AnnotationMetadata) -> Boolean = { am: AnnotationMetadata ->
             am.hasStereotype(ANN_CONSTRAINT) || am.hasStereotype(ANN_VALID)
         }
         const val ANN_VALIDATED = "io.micronaut.validation.Validated"
@@ -222,7 +222,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
                 false,
                 visitorContext
             )
-        } else if (methodElement.hasStereotype(AnnotationUtil.INJECT)) {
+        } else if (methodElement.hasStereotype(AnnotationUtil.INJECT) || methodElement.hasDeclaredStereotype(ConfigurationInject::class.java)) {
             beanWriter!!.visitMethodInjectionPoint(
                 methodElement.declaringType,
                 methodElement,
@@ -825,10 +825,10 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         aopProxyWriter.visitTypeArguments(classElement.allTypeArguments)
 
         if (classElement.isAbstract) {
-            KotlinIntroductionInterfaceVisitor(classElement, classElement, aopProxyWriter, visitorContext).visit()
+            KotlinIntroductionInterfaceVisitor(classElement, classElement, aopProxyWriter, visitorContext, configurationMetadataBuilder).visit()
         }
         for (interfaceType in interfaceTypes) {
-            KotlinIntroductionInterfaceVisitor(interfaceType, classElement, aopProxyWriter, visitorContext).visit()
+            KotlinIntroductionInterfaceVisitor(interfaceType, classElement, aopProxyWriter, visitorContext, configurationMetadataBuilder).visit()
         }
 
         return aopProxyWriter

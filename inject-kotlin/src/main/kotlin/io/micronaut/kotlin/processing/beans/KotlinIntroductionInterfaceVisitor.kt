@@ -3,20 +3,34 @@ package io.micronaut.kotlin.processing.beans
 import io.micronaut.aop.InterceptorKind
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil
 import io.micronaut.aop.writer.AopProxyWriter
+import io.micronaut.context.annotation.ConfigurationReader
+import io.micronaut.context.annotation.EachProperty
+import io.micronaut.context.annotation.Property
+import io.micronaut.core.annotation.AccessorsStyle
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.core.annotation.AnnotationValueBuilder
+import io.micronaut.core.bind.annotation.Bindable
+import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.annotation.AnnotationMetadataReference
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
+import io.micronaut.kotlin.processing.beans.BeanDefinitionProcessorVisitor.Companion.ANN_CONFIGURATION_ADVICE
+import java.util.function.Consumer
 
 class KotlinIntroductionInterfaceVisitor(private val classElement: ClassElement,
                                          private val annotationMetadata: AnnotationMetadata,
                                          private val aopProxyWriter: AopProxyWriter,
-                                         private val visitorContext: VisitorContext) {
+                                         private val visitorContext: VisitorContext,
+                                         private val metadataBuilder: KotlinConfigurationMetadataBuilder) {
+
+    private val isConfigurationProperties = classElement.hasDeclaredStereotype(ConfigurationReader::class.java)
+    private val readPrefixes = classElement.getValue(AccessorsStyle::class.java, "readPrefixes", Array<String>::class.java).orElse(arrayOf(AccessorsStyle.DEFAULT_READ_PREFIX))
 
     fun visit() {
         classElement.getEnclosedElements(
@@ -26,13 +40,18 @@ class KotlinIntroductionInterfaceVisitor(private val classElement: ClassElement,
     }
 
     private fun visitMethod(methodElement: MethodElement) {
+
+        if (isConfigurationProperties) {
+            visitConfigPropsMethod(methodElement)
+        }
+
         val annotationMetadata = if (methodElement.annotationMetadata.isEmpty) {
             AnnotationMetadataReference(
                 aopProxyWriter.beanDefinitionName + BeanDefinitionReferenceWriter.REF_SUFFIX,
                 annotationMetadata
             )
         } else {
-           AnnotationMetadataHierarchy(annotationMetadata, methodElement.annotationMetadata)
+            AnnotationMetadataHierarchy(annotationMetadata, methodElement.annotationMetadata)
         }
 
         if (annotationMetadata.hasStereotype(AnnotationUtil.ANN_AROUND) || annotationMetadata.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
@@ -78,6 +97,58 @@ class KotlinIntroductionInterfaceVisitor(private val classElement: ClassElement,
                     methodElement,
                     visitorContext
                 )
+            }
+        }
+    }
+
+    private fun visitConfigPropsMethod(methodElement: MethodElement) {
+
+        if (methodElement.isAbstract) {
+            if (!aopProxyWriter.isValidated) {
+                aopProxyWriter.isValidated = BeanDefinitionProcessorVisitor.IS_CONSTRAINT.invoke(methodElement)
+            }
+
+            if (!NameUtils.isReaderName(methodElement.name, readPrefixes)) {
+                visitorContext.fail("Only getter methods are allowed on @ConfigurationProperties interfaces: $methodElement. You can change the accessors using @AccessorsStyle annotation", methodElement)
+                return
+            }
+
+            if (methodElement.hasParameters()) {
+                visitorContext.fail("Only zero argument getter methods are allowed on @ConfigurationProperties interfaces: $methodElement", methodElement)
+                return
+            }
+            val docComment = methodElement.documentation.orElse(null)
+            val propertyName = NameUtils.getPropertyNameForGetter(methodElement.name, readPrefixes);
+            val propertyType = methodElement.returnType.name
+
+            if (methodElement.returnType == PrimitiveElement.VOID) {
+                visitorContext.fail("Getter methods must return a value @ConfigurationProperties interfaces: $methodElement", methodElement)
+                return
+            }
+
+            val propertyMetadata = metadataBuilder.visitProperty(
+                classElement,
+                classElement,
+                propertyType,
+                propertyName,
+                docComment,
+                methodElement.stringValue(Bindable::class.java, "defaultValue").orElse(null)
+            )
+
+            methodElement.annotate(Property::class.java) { builder: AnnotationValueBuilder<Property> ->
+                builder.member(
+                    "name",
+                    propertyMetadata.path
+                )
+            }
+
+            methodElement.annotate(ANN_CONFIGURATION_ADVICE) { annBuilder: AnnotationValueBuilder<Annotation> ->
+                if (!methodElement.returnType.isPrimitive && methodElement.returnType.hasStereotype(AnnotationUtil.SCOPE)) {
+                    annBuilder.member("bean", true)
+                }
+                if (classElement.hasStereotype(EachProperty::class.java)) {
+                    annBuilder.member("iterable", true)
+                }
             }
         }
     }

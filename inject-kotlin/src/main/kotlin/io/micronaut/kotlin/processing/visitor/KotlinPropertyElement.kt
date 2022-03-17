@@ -4,6 +4,7 @@ import com.google.devtools.ksp.isAbstract
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSNode
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
+import com.google.devtools.ksp.symbol.Modifier
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.ast.ClassElement
@@ -31,7 +32,11 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
         this.classElement = classElement
         this.setter = Optional.ofNullable(property.setter)
             .map { method ->
-                return@map visitorContext.elementFactory.newMethodElement(classElement, method, type, annotationMetadata)
+                return@map if (method.modifiers.contains(Modifier.PRIVATE)) {
+                    null
+                } else {
+                    visitorContext.elementFactory.newMethodElement(classElement, method, type, annotationMetadata)
+                }
             }
         this.getter = Optional.ofNullable(property.getter)
             .map { method ->

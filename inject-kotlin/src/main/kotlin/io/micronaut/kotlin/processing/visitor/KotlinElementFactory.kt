@@ -2,7 +2,9 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
+import io.micronaut.inject.annotation.MutableAnnotationMetadata
 import io.micronaut.inject.ast.*
 import io.micronaut.kotlin.processing.isTypeReference
 
@@ -156,6 +158,10 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         allTypeArguments.putAll(typeArguments)
         method.typeParameters.forEach {
             allTypeArguments[it.name.asString()] = KotlinGenericPlaceholderElement(it, annotationUtils.getAnnotationMetadata(it), visitorContext)
+        }
+
+        if (returnType.isMarkedNullable && annotationMetadata is MutableAnnotationMetadata) {
+            annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, emptyMap())
         }
 
         val returnTypeElement = newClassElement(returnType, annotationUtils.getAnnotationMetadata(returnType.declaration))

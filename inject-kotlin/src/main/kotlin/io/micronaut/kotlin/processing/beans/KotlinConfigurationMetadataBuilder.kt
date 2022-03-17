@@ -77,6 +77,10 @@ class KotlinConfigurationMetadataBuilder: ConfigurationMetadataBuilder<ClassElem
                 path.insert(0, parentConfig.get() + '.')
                 superType = getSuperClass(superType)
             } else {
+                val parentPrefix = superType.stringValue(ConfigurationReader::class.java, "prefix")
+                if (parentPrefix.isPresent) {
+                    path.insert(0, parentPrefix.get() + '.')
+                }
                 break
             }
         }
