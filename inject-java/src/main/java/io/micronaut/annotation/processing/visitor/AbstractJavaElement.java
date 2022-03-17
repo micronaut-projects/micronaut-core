@@ -403,6 +403,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 upperBounds = Stream.of(extendsBound);
             }
             return new JavaWildcardElement(
+                    wt,
                     upperBounds
                             .map(tm -> (JavaClassElement) mirrorToClassElement(tm, visitorContext, finalGenericsInfo, includeTypeAnnotations))
                             .collect(Collectors.toList()),

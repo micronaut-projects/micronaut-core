@@ -499,6 +499,7 @@ class Test {
 
         wildcardType.boundGenericTypes.size() == 1
         wildcardType.boundGenericTypes[0].isWildcard()
+        wildcardType.boundGenericTypes[0].getNativeType().class.name == 'com.sun.tools.javac.code.Type$WildcardType'
 
         objectType.boundGenericTypes.size() == 1
         !objectType.boundGenericTypes[0].isWildcard()
