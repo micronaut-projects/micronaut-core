@@ -4097,6 +4097,35 @@ public class Test {
         beanIntrospection.getBeanProperties()[0].annotationMetadata.getAnnotation(JsonProperty).stringValue().get() == 'field'
     }
 
+    void "test getter/setter type"() {
+        when:
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+public class Test {
+    private final java.util.ArrayList<String> foo;
+    
+    public Test(java.util.List<String> foo) {
+        this.foo = null;
+    }
+    
+    public java.util.List<String> getFoo() {
+        return null;
+    }
+    
+}
+""")
+
+        then:
+        noExceptionThrown()
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 1
+        beanIntrospection.getBeanProperties()[0].type == List.class
+    }
+
     void "test field annotation overrides setter with custom setter"() {
         when:
         BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """

@@ -472,14 +472,20 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                             @Override
                             public ClassElement getGenericType() {
                                 TypeMirror propertyType = value.getter.getReturnType();
-                                if (fieldElement != null) {
+                                Map<String, Map<String, TypeMirror>> declaredGenericInfo = getGenericTypeInfo();
+                                ClassElement typeElement = parameterizedClassElement(propertyType, visitorContext, declaredGenericInfo);
+                                if (typeElement instanceof JavaClassElement && fieldElement != null) {
                                     TypeMirror fieldType = fieldElement.asType();
                                     if (visitorContext.getTypes().isAssignable(fieldType, propertyType)) {
-                                        propertyType = fieldType;
+                                        ClassElement fieldElement = parameterizedClassElement(fieldType, visitorContext, declaredGenericInfo);
+                                        int typeGenericsSize = typeElement.getBoundGenericTypes().size();
+                                        if (fieldElement instanceof JavaClassElement
+                                                && typeGenericsSize > 0 && typeGenericsSize == fieldElement.getBoundGenericTypes().size()) {
+                                            return ((JavaClassElement) typeElement).withBoundGenericTypeMirrors(((JavaClassElement) fieldElement).typeArguments);
+                                        }
                                     }
                                 }
-                                Map<String, Map<String, TypeMirror>> declaredGenericInfo = getGenericTypeInfo();
-                                return parameterizedClassElement(propertyType, visitorContext, declaredGenericInfo);
+                                return typeElement;
                             }
 
                             @Override
@@ -1062,13 +1068,17 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         List<TypeMirror> typeMirrors = typeArguments.stream()
                 .map(ce -> toTypeMirror(visitorContext, ce))
                 .collect(Collectors.toList());
+        return withBoundGenericTypeMirrors(typeMirrors);
+    }
+
+    private ClassElement withBoundGenericTypeMirrors(@NonNull List<? extends TypeMirror> typeMirrors) {
         if (typeMirrors.equals(this.typeArguments)) {
             return this;
         }
 
         Map<String, TypeMirror> boundByName = new LinkedHashMap<>();
         Iterator<? extends TypeParameterElement> tpes = classElement.getTypeParameters().iterator();
-        Iterator<TypeMirror> args = typeMirrors.iterator();
+        Iterator<? extends TypeMirror> args = typeMirrors.iterator();
         while (tpes.hasNext() && args.hasNext()) {
             boundByName.put(tpes.next().getSimpleName().toString(), args.next());
         }
