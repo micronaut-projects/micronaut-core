@@ -4099,7 +4099,7 @@ public class Test {
 
     void "verify the type of the bean property should be the getter/setter/constructor type, not the private field type."() {
         when:
-        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", '''\
 package test;
 
 import io.micronaut.core.annotation.Introspected;
@@ -4117,7 +4117,7 @@ public class Test {
     }
     
 }
-""")
+''')
 
         then:
         noExceptionThrown()
