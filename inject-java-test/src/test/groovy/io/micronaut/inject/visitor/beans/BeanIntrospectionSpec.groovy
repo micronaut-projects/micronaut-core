@@ -4166,28 +4166,26 @@ class AImpl implements A {
     }
 
     void "test targeting abstract class with @Introspected(classes = ) with getter matching field name"() {
-        ClassLoader classLoader = buildClassLoader("test.Test", """
+        ClassLoader classLoader = buildClassLoader("test.MyConfig", '''\
 package test;
 import io.micronaut.core.annotation.Introspected;
 @Introspected(classes = {io.micronaut.inject.visitor.beans.TestMatchingGetterClass.class})
 class MyConfig {
-}
-""")
-
+}''')
         when:
-            BeanIntrospector beanIntrospector = BeanIntrospector.forClassLoader(classLoader)
+        BeanIntrospector beanIntrospector = BeanIntrospector.forClassLoader(classLoader)
+        BeanIntrospection beanIntrospection = beanIntrospector.getIntrospection(TestMatchingGetterClass)
 
         then:
-            BeanIntrospection beanIntrospection = beanIntrospector.getIntrospection(TestMatchingGetterClass)
-            beanIntrospection != null
-            beanIntrospection.getBeanProperties().size() == 3
-            beanIntrospection.getPropertyNames() == ["deleted", "updated", "name"]
+        beanIntrospection
+        beanIntrospection.beanProperties.size() == 3
+        beanIntrospection.propertyNames as List<String> == ["deleted", "updated", "name"]
     }
 
     @Requires({ jvm.isJava14Compatible() })
     void "test records with is in the property name"() {
         given:
-            BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''\
 package test;
 
 import io.micronaut.core.annotation.Creator;
@@ -4198,10 +4196,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 @io.micronaut.core.annotation.Introspected
 public record Foo(String name, String isSurname, boolean contains, Boolean purged, boolean isUpdated, Boolean isDeleted) {
-}
-''')
+}''')
         expect:
-            introspection.getPropertyNames() == ["name", "isSurname", "contains", "purged", "isUpdated", "isDeleted"]
+        introspection.propertyNames as List<String> == ["name", "isSurname", "contains", "purged", "isUpdated", "isDeleted"]
     }
 
     @Override
