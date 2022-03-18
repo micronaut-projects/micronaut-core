@@ -4097,7 +4097,7 @@ public class Test {
         beanIntrospection.getBeanProperties()[0].annotationMetadata.getAnnotation(JsonProperty).stringValue().get() == 'field'
     }
 
-    void "test getter/setter type"() {
+    void "verify the type of the bean property should be the getter/setter/constructor type, not the private field type."() {
         when:
         BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
 package test;
