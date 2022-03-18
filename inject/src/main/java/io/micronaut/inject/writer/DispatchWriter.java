@@ -46,6 +46,7 @@ import java.util.List;
  * @author Denis Stepanov
  * @since 3.1
  */
+@Internal
 public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
 
     private static final Method DISPATCH_METHOD = new Method("dispatch", getMethodDescriptor(Object.class, Arrays.asList(int.class, Object.class, Object[].class)));
@@ -117,7 +118,7 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
      * @return the target index
      */
     public int addMethod(TypedElement declaringType, MethodElement methodElement, boolean useOneDispatch) {
-        return addDispatchTarget(new MethodDispatchTarget(declaringType, methodElement, useOneDispatch, !useOneDispatch, dispatchTargets.size()));
+        return addDispatchTarget(new MethodDispatchTarget(declaringType, methodElement, useOneDispatch, !useOneDispatch));
     }
 
     /**
@@ -139,8 +140,7 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
                 methodElement,
                 interceptedProxyClassName,
                 interceptedProxyBridgeMethodName,
-                thisType,
-                dispatchTargets.size())
+                thisType)
         );
     }
 
@@ -183,7 +183,7 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
             @Override
             public void generateCase(int key, Label end) {
                 DispatchTarget method = dispatchTargets.get(key);
-                method.writeDispatchMulti(dispatchMethod);
+                method.writeDispatchMulti(dispatchMethod, key);
                 dispatchMethod.returnValue();
             }
 
@@ -261,7 +261,7 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
         );
         getTargetMethodByIndex.loadArg(0);
         int[] cases = dispatchTargets.stream()
-                .filter(dispatchTarget -> dispatchTarget instanceof MethodDispatchTarget)
+                .filter(MethodDispatchTarget.class::isInstance)
                 .mapToInt(dispatchTargets::indexOf)
                 .toArray();
         getTargetMethodByIndex.tableSwitch(cases, new TableSwitchGenerator() {
@@ -328,6 +328,7 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
     /**
      * Dispatch target implementation writer.
      */
+    @Internal
     public interface DispatchTarget {
 
         /**
@@ -357,8 +358,9 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
          * Generate dispatch multi.
          *
          * @param writer The writer
+         * @param methodIndex The method index
          */
-        default void writeDispatchMulti(GeneratorAdapter writer) {
+        default void writeDispatchMulti(GeneratorAdapter writer, int methodIndex) {
             throw new IllegalStateException("Not supported");
         }
 
@@ -462,18 +464,15 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
         final MethodElement methodElement;
         final boolean oneDispatch;
         final boolean multiDispatch;
-        private final int methodIndex;
 
         private MethodDispatchTarget(TypedElement declaringType,
                                      MethodElement methodElement,
                                      boolean oneDispatch,
-                                     boolean multiDispatch,
-                                     int index) {
+                                     boolean multiDispatch) {
             this.declaringType = declaringType;
             this.methodElement = methodElement;
             this.oneDispatch = oneDispatch;
             this.multiDispatch = multiDispatch;
-            this.methodIndex = index;
         }
 
         public MethodElement getMethodElement() {
@@ -491,7 +490,7 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
         }
 
         @Override
-        public void writeDispatchMulti(GeneratorAdapter writer) {
+        public void writeDispatchMulti(GeneratorAdapter writer, int methodIndex) {
             String methodName = methodElement.getName();
 
             List<ParameterElement> argumentTypes = Arrays.asList(methodElement.getSuspendParameters());
@@ -600,14 +599,15 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
                                                   MethodElement methodElement,
                                                   String interceptedProxyClassName,
                                                   String interceptedProxyBridgeMethodName,
-                                                  Type thisType, int methodIndex) {
-            super(declaringType, methodElement, false, true, methodIndex);
+                                                  Type thisType) {
+            super(declaringType, methodElement, false, true);
             this.interceptedProxyClassName = interceptedProxyClassName;
             this.interceptedProxyBridgeMethodName = interceptedProxyBridgeMethodName;
             this.thisType = thisType;
         }
 
-        public void writeDispatchMulti(GeneratorAdapter writer) {
+        @Override
+        public void writeDispatchMulti(GeneratorAdapter writer, int methodIndex) {
             String methodName = methodElement.getName();
 
             List<ParameterElement> argumentTypes = Arrays.asList(methodElement.getSuspendParameters());
