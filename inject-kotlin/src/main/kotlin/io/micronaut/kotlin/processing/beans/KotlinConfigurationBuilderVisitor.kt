@@ -16,7 +16,7 @@ class KotlinConfigurationBuilderVisitor(
 
     private val allowZeroArgs: Boolean =
         propertyElement.booleanValue(ConfigurationBuilder::class.java, "allowZeroArgs").orElse(false)
-    private val configurationPrefix = propertyElement.stringValue(ConfigurationBuilder::class.java, "configurationPrefix")
+    private val configurationPrefix = propertyElement.stringValue(ConfigurationBuilder::class.java)
         .filter(String::isNotEmpty)
         .map { value -> "$value." }
         .orElse("")

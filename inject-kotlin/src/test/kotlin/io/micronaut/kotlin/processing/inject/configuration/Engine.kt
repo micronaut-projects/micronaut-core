@@ -9,7 +9,7 @@ class Engine private constructor(val manufacturer: String) {
     }
 
      class Builder {
-        var manufacturer = "Ford";
+        private var manufacturer = "Ford";
 
         fun withManufacturer(manufacturer: String): Builder {
             this.manufacturer = manufacturer

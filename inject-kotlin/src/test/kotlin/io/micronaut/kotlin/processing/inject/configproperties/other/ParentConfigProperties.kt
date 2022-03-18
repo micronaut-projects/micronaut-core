@@ -27,7 +27,7 @@ open class ParentConfigProperties {
 
     protected var nationality: String? = null
 
-    @ConfigurationBuilder(configurationPrefix = "engine", prefixes = ["with"])
+    @ConfigurationBuilder(value = "engine", prefixes = ["with"])
     val builder = Engine.builder()
 
 }

@@ -1,15 +1,14 @@
 package io.micronaut.kotlin.processing.visitor
 
-import com.google.devtools.ksp.KspExperimental
-import com.google.devtools.ksp.isAbstract
+import com.google.devtools.ksp.*
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.ParameterElement
 import io.micronaut.inject.ast.PrimitiveElement
+import io.micronaut.kotlin.processing.getVisibility
 
 @OptIn(KspExperimental::class)
 open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElement {
@@ -20,6 +19,10 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
     private val returnType: ClassElement
     private val genericReturnType: ClassElement
     private val abstract: Boolean
+    private val public: Boolean
+    private val private: Boolean
+    private val protected: Boolean
+    private val internal: Boolean
 
     constructor(method: KSPropertySetter,
                 declaringType: ClassElement,
@@ -32,7 +35,12 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
         this.parameters = listOf(parameter)
         this.returnType = PrimitiveElement.VOID
         this.genericReturnType = PrimitiveElement.VOID
-        this.abstract = method.modifiers.contains(Modifier.ABSTRACT)
+        this.abstract = method.receiver.isAbstract()
+        val visibility = method.getVisibility()
+        this.public = visibility == Visibility.PUBLIC
+        this.private = visibility == Visibility.PRIVATE
+        this.protected = visibility == Visibility.PROTECTED
+        this.internal = visibility == Visibility.INTERNAL
     }
 
     constructor(method: KSPropertyGetter,
@@ -46,7 +54,11 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
         this.parameters = emptyList()
         this.returnType = returnType
         this.genericReturnType = returnType
-        this.abstract = method.modifiers.contains(Modifier.ABSTRACT)
+        this.abstract = method.receiver.isAbstract()
+        this.public = method.receiver.isPublic()
+        this.private = method.receiver.isPrivate()
+        this.protected = method.receiver.isProtected()
+        this.internal = method.receiver.isInternal()
     }
 
     constructor(method: KSFunctionDeclaration,
@@ -63,6 +75,10 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
         this.returnType = returnType
         this.genericReturnType = genericReturnType
         this.abstract = method.isAbstract
+        this.public = method.isPublic()
+        this.private = method.isPrivate()
+        this.protected = method.isProtected()
+        this.internal = method.isInternal()
     }
 
     protected constructor(method: KSDeclaration,
@@ -73,7 +89,11 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
                           returnType: ClassElement,
                           genericReturnType: ClassElement,
                           parameters: List<ParameterElement>,
-                          abstract: Boolean
+                          abstract: Boolean,
+                          public: Boolean,
+                          private: Boolean,
+                          protected: Boolean,
+                          internal: Boolean
     ) : super(method, annotationMetadata, visitorContext) {
         this.name = name
         this.declaringType = declaringType
@@ -81,6 +101,10 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
         this.returnType = returnType
         this.genericReturnType = genericReturnType
         this.abstract = abstract
+        this.public = public
+        this.private = private
+        this.protected = protected
+        this.internal = internal
     }
 
     override fun getName(): String {
@@ -105,6 +129,16 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
 
     override fun isAbstract(): Boolean = abstract
 
+    override fun isPublic(): Boolean = public
+
+    override fun isProtected(): Boolean = protected
+
+    override fun isPrivate(): Boolean = private
+
+    override fun isVisibleInPackage(): Boolean {
+        return super.isVisibleInPackage() || internal
+    }
+
     override fun toString(): String {
         return "$simpleName(" + parameters.joinToString(",") {
             if (it.type.isGenericPlaceholder) {
@@ -116,11 +150,11 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
     }
 
     override fun withNewParameters(vararg newParameters: ParameterElement): MethodElement {
-        return KotlinMethodElement(declaration, name, declaringType, annotationMetadata, visitorContext, returnType, genericReturnType, newParameters.toList(), abstract)
+        return KotlinMethodElement(declaration, name, declaringType, annotationMetadata, visitorContext, returnType, genericReturnType, newParameters.toList(), abstract, public, private, protected, internal)
     }
 
     override fun withNewMetadata(annotationMetadata: AnnotationMetadata): MethodElement {
-        return KotlinMethodElement(declaration, name, declaringType, annotationMetadata, visitorContext, returnType, genericReturnType, parameters, abstract)
+        return KotlinMethodElement(declaration, name, declaringType, annotationMetadata, visitorContext, returnType, genericReturnType, parameters, abstract, public, private, protected, internal)
     }
 
 }

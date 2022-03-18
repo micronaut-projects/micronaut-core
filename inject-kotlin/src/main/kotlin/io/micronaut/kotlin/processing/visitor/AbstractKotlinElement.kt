@@ -1,6 +1,7 @@
 package io.micronaut.kotlin.processing.visitor;
 
 import com.google.devtools.ksp.getVisibility
+import com.google.devtools.ksp.isJavaPackagePrivate
 import com.google.devtools.ksp.isOpen
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationMetadata
@@ -64,8 +65,8 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
     }
 
     override fun isPackagePrivate(): Boolean {
-        return if (declaration is KSModifierListOwner) {
-            declaration.modifiers.contains(Modifier.INTERNAL)
+        return if (declaration is KSDeclaration) {
+            declaration.isJavaPackagePrivate()
         } else {
             false
         }

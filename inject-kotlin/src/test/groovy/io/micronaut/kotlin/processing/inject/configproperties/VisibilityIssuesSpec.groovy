@@ -30,11 +30,10 @@ class ChildConfigProperties: ParentConfigProperties() {
         def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
 
         then:
-        beanDefinition.injectedMethods.size() == 2
-        beanDefinition.injectedMethods[0].name == "setName"
-        beanDefinition.injectedMethods[1].name == "setAge"
-        beanDefinition.injectedFields.size() == 1
-        beanDefinition.injectedFields[0].name == "nationality"
+        beanDefinition.injectedMethods.size() == 3
+        beanDefinition.injectedMethods[0].name == "setAge"
+        beanDefinition.injectedMethods[1].name == "setName"
+        beanDefinition.injectedMethods[2].name == "setNationality"
         instance.getName() == null //methods that require reflection are not injected
         instance.getAge() == 22
         instance.getBuilder().build().getManufacturer() == 'Chevy'
@@ -62,12 +61,11 @@ open class ChildConfigProperties: ParentConfigProperties() {
         def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
 
         then:
-        beanDefinition.injectedMethods.size() == 1
+        beanDefinition.injectedMethods.size() == 2
         beanDefinition.injectedMethods[0].name == "setName"
-        beanDefinition.injectedFields.size() == 1
-        beanDefinition.injectedFields[0].name == "nationality"
-        instance.nationality == "Italian" //fields that require reflection are injected
+        beanDefinition.injectedMethods[1].name == "setNationality"
         instance.getName() == "Sally"
+        instance.getNationality() == null //methods that require reflection are not injected
 
         cleanup:
         context.close()

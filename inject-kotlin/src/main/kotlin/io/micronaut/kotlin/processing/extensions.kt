@@ -1,9 +1,8 @@
 package io.micronaut.kotlin.processing
 
-import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.google.devtools.ksp.symbol.KSPropertyDeclaration
-import com.google.devtools.ksp.symbol.KSTypeParameter
-import com.google.devtools.ksp.symbol.KSTypeReference
+import com.google.devtools.ksp.getVisibility
+import com.google.devtools.ksp.isLocal
+import com.google.devtools.ksp.symbol.*
 import java.lang.StringBuilder
 
 fun KSClassDeclaration.toClassName(): String {
@@ -27,4 +26,16 @@ fun KSPropertyDeclaration.isTypeReference(): Boolean {
         property = property.findOverridee()
     }
     return false
+}
+
+fun KSPropertySetter.getVisibility(): Visibility {
+    return when {
+        this.modifiers.contains(Modifier.PUBLIC) -> Visibility.PUBLIC
+        this.modifiers.contains(Modifier.PRIVATE) -> Visibility.PRIVATE
+        this.modifiers.contains(Modifier.PROTECTED) ||
+                this.modifiers.contains(Modifier.OVERRIDE) -> Visibility.PROTECTED
+        this.modifiers.contains(Modifier.INTERNAL) -> Visibility.INTERNAL
+        else -> if (this.origin != Origin.JAVA && this.origin != Origin.JAVA_LIB)
+            Visibility.PUBLIC else Visibility.JAVA_PACKAGE
+    }
 }

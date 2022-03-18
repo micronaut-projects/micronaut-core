@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 import org.neo4j.driver.v1.Config
+import spock.lang.PendingFeature
 import spock.lang.Specification
 import static io.micronaut.kotlin.processing.KotlinCompiler.*
 
@@ -28,6 +29,7 @@ class Test private constructor() {
     var foo: String? = null
     
     companion object {
+        @JvmStatic
         fun build(): Test {
             return Test()
         }
@@ -66,6 +68,7 @@ class Test private constructor() {
     var bar: String? = null
     
     companion object {
+        @JvmStatic
         fun build(): Test {
             return Test()
         }
@@ -204,6 +207,7 @@ class Neo4jProperties {
         config.logLeakedSessions()
     }
 
+    @PendingFeature(reason = "annotation defaults")
     void "test specifying a configuration prefix"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.Neo4jProperties', '''

@@ -3,10 +3,12 @@ package io.micronaut.kotlin.processing.inject.configproperties.itfce
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.inject.qualifiers.Qualifiers
+import spock.lang.PendingFeature
 import spock.lang.Specification
 
 class ValidatedInterfaceConfigPropsSpec extends Specification {
 
+    @PendingFeature(reason = "annotation defaults")
     void 'test validated interface config with invalid config'() {
         given:
         ApplicationContext context = ApplicationContext.run(

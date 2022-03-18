@@ -139,6 +139,10 @@ public interface MethodElement extends MemberElement {
         return false;
     }
 
+    default boolean isVisibleInPackage() {
+        return isPackagePrivate() || isPublic();
+    }
+
     /**
      * The generic return type of the method.
      *
