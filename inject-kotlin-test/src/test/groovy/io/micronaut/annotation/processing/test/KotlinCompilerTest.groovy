@@ -1,5 +1,6 @@
 package io.micronaut.annotation.processing.test
 
+import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.version.SemanticVersion
 import spock.lang.Requires
 import spock.util.environment.Jvm
@@ -78,7 +79,7 @@ class Test {
 
     void "introspection with 'is' properties"() {
         given:
-            def introspection = buildBeanIntrospection('example.Test', '''
+        BeanIntrospection introspection = buildBeanIntrospection('example.Test', '''\
 package example
 
 import io.micronaut.core.annotation.Introspected
@@ -107,6 +108,6 @@ class Test(
 }
 ''')
         expect:
-            introspection.propertyNames.toList() == ['id', 'name', 'getSurname', 'isDeleted', 'isImportant', 'corrected', 'upgraded', 'isMyBool', 'isMyBool2', 'myBool3', 'myBool4', 'myBool5']
+        introspection.propertyNames.toList() == ['id', 'name', 'getSurname', 'isDeleted', 'isImportant', 'corrected', 'upgraded', 'isMyBool', 'isMyBool2', 'myBool3', 'myBool4', 'myBool5']
     }
 }
