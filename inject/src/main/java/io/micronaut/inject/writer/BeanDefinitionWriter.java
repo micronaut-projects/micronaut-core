@@ -1395,13 +1395,16 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (!requiresReflection) {
 
             ParameterElement parameter = methodElement.getParameters()[0];
-            AnnotationMetadataHierarchy annotationMetadata = new AnnotationMetadataHierarchy(parameter.getAnnotationMetadata(), methodElement.getAnnotationMetadata());
+            AnnotationMetadataHierarchy hierarchy = new AnnotationMetadataHierarchy(
+                    parameter.getAnnotationMetadata(),
+                    methodElement.getAnnotationMetadata()
+            );
 
             Label falseCondition = isOptional ? pushPropertyContainsCheck(
                     injectMethodVisitor,
                     parameter.getType(),
                     parameter.getName(),
-                    annotationMetadata
+                    hierarchy
             ) : null;
 
             AnnotationMetadata currentAnnotationMetadata = methodElement.getAnnotationMetadata();
@@ -1528,7 +1531,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public int visitExecutableMethod(TypedElement declaringBean,
-                                     MethodElement methodElement, VisitorContext visitorContext) {
+                                     MethodElement methodElement,
+                                     VisitorContext visitorContext) {
         return visitExecutableMethod(
                 declaringBean,
                 methodElement,
@@ -1733,8 +1737,20 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             TypedElement declaringType,
             FieldElement fieldElement,
             boolean requiresReflection) {
+        visitFieldInjectionPointInternal(
+                declaringType,
+                fieldElement,
+                requiresReflection
+        );
+    }
 
-        visitFieldInjectionPointInternal(declaringType, fieldElement, requiresReflection);
+    @Override
+    public void visitFieldInjectionPoint(TypedElement declaringType, FieldElement fieldElement) {
+        visitFieldInjectionPointInternal(
+                declaringType,
+                fieldElement,
+                fieldElement.isReflectionRequired()
+        );
     }
 
     private void visitFieldInjectionPointInternal(
@@ -1832,6 +1848,17 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
+    public void visitFieldValue(TypedElement declaringType, FieldElement fieldElement) {
+        final ClassElement owningType = fieldElement.getOwningType();
+        visitFieldValue(
+                declaringType,
+                fieldElement,
+                fieldElement.isReflectionRequired(),
+                owningType.hasDeclaredStereotype(ConfigurationReader.class) || owningType.hasDeclaredStereotype(EachProperty.class) || fieldElement.isNullable()
+        );
+    }
+
+    @Override
     public void visitFieldValue(
             TypedElement declaringType,
             FieldElement fieldElement,
@@ -1849,7 +1876,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     requiresReflection,
                     GET_VALUE_FOR_FIELD,
                     isOptional,
-                    false);
+                    false
+            );
         } else {
             injectMethodVisitor.loadLocal(injectInstanceLocalVarIndex, beanType);
 
@@ -1858,9 +1886,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 pushInvokeGetPropertyValueForField(injectMethodVisitor, fieldElement, property.get());
             } else {
                 Optional<String> valueValue = fieldElement.stringValue(Value.class);
-                if (valueValue.isPresent()) {
-                    pushInvokeGetPropertyPlaceholderValueForField(injectMethodVisitor, fieldElement, valueValue.get());
-                }
+                valueValue.ifPresent(s -> pushInvokeGetPropertyPlaceholderValueForField(injectMethodVisitor, fieldElement, s));
             }
             putField(injectMethodVisitor, fieldElement, requiresReflection, declaringType);
 
@@ -2157,7 +2183,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private Label pushPropertyContainsCheck(GeneratorAdapter injectMethodVisitor, ClassElement propertyType, String propertyName, AnnotationMetadata annotationMetadata) {
-        Optional<String> propertyValue = annotationMetadata.stringValue(Property.class, "name");
+        String propertyValue = annotationMetadata.stringValue(Property.class, "name").orElse(null);
+        if (propertyValue == null) {
+            return null;
+        }
 
         Label trueCondition = new Label();
         Label falseCondition = new Label();
@@ -2167,7 +2196,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         // 2nd argument load BeanContext
         injectMethodVisitor.loadArg(1);
         // 3rd argument push property name
-        injectMethodVisitor.push(propertyValue.get());
+        injectMethodVisitor.push(propertyValue);
         if (isMultiValueProperty(propertyType)) {
             injectMethodVisitor.invokeVirtual(beanDefinitionType, CONTAINS_PROPERTIES_VALUE_METHOD);
         } else {

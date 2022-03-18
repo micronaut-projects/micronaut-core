@@ -1265,6 +1265,16 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
+    public void visitFieldInjectionPoint(TypedElement declaringType, FieldElement fieldElement) {
+        deferredInjectionPoints.add(() ->
+            proxyBeanDefinitionWriter.visitFieldInjectionPoint(
+                    declaringType,
+                    fieldElement
+            )
+        );
+    }
+
+    @Override
     public void visitAnnotationMemberPropertyInjectionPoint(TypedElement annotationMemberBeanType,
                                                             String annotationMemberProperty,
                                                             String requiredValue,
@@ -1290,6 +1300,16 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                         requiresReflection,
                         isOptional
                 )
+        );
+    }
+
+    @Override
+    public void visitFieldValue(TypedElement declaringType, FieldElement fieldElement) {
+        deferredInjectionPoints.add(() ->
+            proxyBeanDefinitionWriter.visitFieldValue(
+                declaringType,
+                fieldElement
+            )
         );
     }
 

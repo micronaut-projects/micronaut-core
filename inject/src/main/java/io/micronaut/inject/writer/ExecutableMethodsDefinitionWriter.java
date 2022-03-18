@@ -59,24 +59,24 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
     public static final String CLASS_SUFFIX = "$Exec";
 
     public static final Method GET_EXECUTABLE_AT_INDEX_METHOD = Method.getMethod(
-            ReflectionUtils.findMethod(AbstractExecutableMethodsDefinition.class, "getExecutableMethodByIndex", int.class).get()
+            ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethodsDefinition.class, "getExecutableMethodByIndex", int.class)
     );
 
-    private static final Type SUPER_TYPE = Type.getType(AbstractExecutableMethodsDefinition.class);
+    public static final Type SUPER_TYPE = Type.getType(AbstractExecutableMethodsDefinition.class);
 
-    private static final Method SUPER_CONSTRUCTOR = Method.getMethod(ReflectionUtils.findConstructor(
+    private static final Method SUPER_CONSTRUCTOR = Method.getMethod(ReflectionUtils.getRequiredInternalConstructor(
                     AbstractExecutableMethodsDefinition.class,
                     AbstractExecutableMethodsDefinition.MethodReference[].class)
-            .get());
+            );
 
     private static final Method WITH_INTERCEPTED_CONSTRUCTOR = new Method(CONSTRUCTOR_NAME, getConstructorDescriptor(boolean.class));
 
     private static final Method GET_METHOD = Method.getMethod(
-            ReflectionUtils.findMethod(AbstractExecutableMethodsDefinition.class, "getMethod", String.class, Class[].class).get()
+            ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethodsDefinition.class, "getMethod", String.class, Class[].class)
     );
 
     private static final Method AT_INDEX_MATCHED_METHOD = Method.getMethod(
-            ReflectionUtils.findMethod(AbstractExecutableMethodsDefinition.class, "methodAtIndexMatches", int.class, String.class, Class[].class).get()
+            ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethodsDefinition.class, "methodAtIndexMatches", int.class, String.class, Class[].class)
     );
 
     private static final String FIELD_METHODS_REFERENCES = "$METHODS_REFERENCES";

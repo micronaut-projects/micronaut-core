@@ -17,6 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.*;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArgumentUtils;
@@ -43,6 +44,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     private final DispatchedExecutableMethod<T, ?>[] executableMethods;
     private Environment environment;
     private List<DispatchedExecutableMethod<T, ?>> executableMethodsList;
+    private Method[] reflectiveMethods;
 
     protected AbstractExecutableMethodsDefinition(MethodReference[] methodsReferences) {
         this.methodsReferences = methodsReferences;
@@ -147,6 +149,31 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
      */
     @UsedByGeneratedCode
     protected abstract Method getTargetMethodByIndex(int index);
+
+    /**
+     * Find {@link Method} representation at the method by index. Used by {@link ExecutableMethod#getTargetMethod()}.
+     *
+     * @param index The index
+     * @return The method
+     * @since 3.5.0
+     */
+    @UsedByGeneratedCode
+    // this logic must allow reflection
+    @SuppressWarnings("java:S3011")
+    protected final Method getAccessibleTargetMethodByIndex(int index) {
+        if (reflectiveMethods == null) {
+            reflectiveMethods = new Method[methodsReferences.length];
+        }
+        Method method = reflectiveMethods[index];
+        if (method == null) {
+            method = getTargetMethodByIndex(index);
+            if (ClassUtils.REFLECTION_LOGGER.isDebugEnabled()) {
+                ClassUtils.REFLECTION_LOGGER.debug("Reflectively accessing method {} of type {}", method, method.getDeclaringClass());
+            }
+            method.setAccessible(true);
+        }
+        return method;
+    }
 
     /**
      * Creates a new exception when the method at index is not found.
