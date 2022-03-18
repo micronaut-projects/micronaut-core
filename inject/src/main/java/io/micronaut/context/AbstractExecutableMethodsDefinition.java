@@ -155,7 +155,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
      *
      * @param index The index
      * @return The method
-     * @since 3.5.0
+     * @since 3.4.0
      */
     @UsedByGeneratedCode
     // this logic must allow reflection
