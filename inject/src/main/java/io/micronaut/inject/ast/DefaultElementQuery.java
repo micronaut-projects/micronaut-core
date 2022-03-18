@@ -54,6 +54,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         this(elementType, null, false, false, false, false, false, false, false, false, null, null, null, null, null);
     }
 
+    @SuppressWarnings("checkstyle:ParameterNumber")
     DefaultElementQuery(
             Class<T> elementType,
             ClassElement onlyAccessibleType,

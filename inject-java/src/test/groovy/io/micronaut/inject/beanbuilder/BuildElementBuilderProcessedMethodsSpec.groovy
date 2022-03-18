@@ -1,5 +1,6 @@
 package io.micronaut.inject.beanbuilder
 
+import groovy.transform.PackageScope
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.ast.ClassElement
@@ -27,17 +28,19 @@ class Foo {
         when:
         def definition = context.getBeanDefinition(TestBeanScheduled)
         def method = definition.getRequiredMethod("scheduleMe")
+        def methodWithArgs = definition.getRequiredMethod("scheduleAnother", String, String)
 
         then:
         definition.requiresMethodProcessing()
         method != null
+        methodWithArgs != null
 
         when:
         def testBean = context.getBean(TestBeanScheduled)
-        def result = method.invoke(testBean)
 
         then:
-        result == 'good'
+        method.invoke(testBean) == 'good'
+        methodWithArgs.invoke(testBean, "1", "2") == "good 1 2"
 
         cleanup:
         context.close()
@@ -73,8 +76,19 @@ class Foo {
     }
 
     static class TestBeanScheduled {
+        @PackageScope
         String scheduleMe() {
             "good"
+        }
+
+        @PackageScope
+        String scheduleOne(String one) {
+            "good $one"
+        }
+
+        @PackageScope
+        String scheduleAnother(String one, String two) {
+            "good $one $two"
         }
     }
 }
