@@ -4184,6 +4184,26 @@ class MyConfig {
             beanIntrospection.getPropertyNames() == ["deleted", "updated", "name"]
     }
 
+    @Requires({ jvm.isJava14Compatible() })
+    void "test records with is in the property name"() {
+        given:
+            BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+import java.util.List;
+import javax.validation.constraints.Min;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+@io.micronaut.core.annotation.Introspected
+public record Foo(String name, String isSurname, boolean contains, Boolean purged, boolean isUpdated, Boolean isDeleted) {
+}
+''')
+        expect:
+            introspection.getPropertyNames() == ["name", "isSurname", "contains", "purged", "isUpdated", "isDeleted"]
+    }
+
     @Override
     protected JavaParser newJavaParser() {
         return new JavaParser() {
