@@ -540,13 +540,13 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param defaults             The annotation defaults
      * @param loadTypeMethods      The load type methods
      */
-    protected void pushArgument(Type owningType,
-                              ClassWriter classWriter,
-                              GeneratorAdapter generatorAdapter,
-                              String declaringTypeName,
-                              ClassElement argument,
-                              Map<String, Integer> defaults,
-                              Map<String, GeneratorAdapter> loadTypeMethods) {
+    protected void pushReturnTypeArgument(Type owningType,
+                                          ClassWriter classWriter,
+                                          GeneratorAdapter generatorAdapter,
+                                          String declaringTypeName,
+                                          ClassElement argument,
+                                          Map<String, Integer> defaults,
+                                          Map<String, GeneratorAdapter> loadTypeMethods) {
         Type type = Type.getType(Argument.class);
         if (argument.isPrimitive() && !argument.isArray()) {
             String constantName = argument.getName().toUpperCase(Locale.ENGLISH);
@@ -567,7 +567,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                     generatorAdapter,
                     argument.getName(),
                     argument,
-                    argument.getAnnotationMetadata(),
+                    AnnotationMetadata.EMPTY_METADATA, // Don't store return type annotations, method annotations are returned
                     argument.getTypeArguments(),
                     defaults,
                     loadTypeMethods

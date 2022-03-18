@@ -40,7 +40,7 @@ public class NameUtils {
     private static final String PREFIX_SET = "set";
     private static final String PREFIX_IS = "is";
     private static final Pattern ENVIRONMENT_VAR_SEQUENCE = Pattern.compile("^[\\p{Lu}_{0-9}]+");
-    private static final Pattern KEBAB_CASE_SEQUENCE = Pattern.compile("^(([a-z0-9])+(\\-|\\.|:)?)*([a-z0-9])+$");
+    private static final Pattern KEBAB_CASE_SEQUENCE = Pattern.compile("^(([a-z0-9])+([-.:])?)*([a-z0-9])+$");
     private static final Pattern KEBAB_REPLACEMENTS = Pattern.compile("[_ ]");
 
     /**
@@ -537,7 +537,7 @@ public class NameUtils {
                 return Character.toString(Character.toLowerCase(name.charAt(0)));
             }
             for (int i = 1; i < Math.min(length, 3); i++) {
-                if (Character.isLowerCase(name.charAt(i))) {
+                if (!Character.isUpperCase(name.charAt(i))) {
                     char[] chars = name.toCharArray();
                     chars[0] = Character.toLowerCase(chars[0]);
                     return new String(chars);

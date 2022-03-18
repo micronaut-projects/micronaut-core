@@ -96,7 +96,7 @@ public final class RouteExecutor {
      * Also present in netty RoutingInBoundHandler.
      */
     private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
-            "^.*(?:connection.*(?:reset|closed|abort|broken)|broken.*pipe).*$", Pattern.CASE_INSENSITIVE);
+            "^.*(?:connection (?:reset|closed|abort|broken)|broken pipe).*$", Pattern.CASE_INSENSITIVE);
 
     private final Router router;
     private final BeanContext beanContext;
@@ -305,7 +305,7 @@ public final class RouteExecutor {
                         .errorMessage("Internal Server Error: " + cause.getMessage())
                         .build(), response);
         applyConfiguredHeaders(mutableHttpResponse.getHeaders());
-        if (!mutableHttpResponse.getContentType().isPresent()) {
+        if (!mutableHttpResponse.getContentType().isPresent() && httpRequest.getMethod() != HttpMethod.HEAD) {
             return mutableHttpResponse.contentType(MediaType.APPLICATION_JSON_TYPE);
         }
         return mutableHttpResponse;
@@ -425,7 +425,7 @@ public final class RouteExecutor {
                 ErrorContext.builder(request)
                         .errorMessage("Page Not Found")
                         .build(), HttpResponse.notFound());
-        if (!response.getContentType().isPresent()) {
+        if (!response.getContentType().isPresent() && request.getMethod() != HttpMethod.HEAD) {
             return response.contentType(MediaType.APPLICATION_JSON_TYPE);
         }
         return response;

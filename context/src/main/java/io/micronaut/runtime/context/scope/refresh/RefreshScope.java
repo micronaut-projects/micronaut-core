@@ -207,20 +207,19 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
     }
 
     private void disposeOfBeanSubset(Collection<String> keys) {
-        for (BeanIdentifier beanKey : refreshableBeans.keySet()) {
-            CreatedBean<?> createdBean = refreshableBeans.get(beanKey);
-            BeanDefinition<?> definition = createdBean.definition();
+        for (Map.Entry<BeanIdentifier, CreatedBean<?>> entry : refreshableBeans.entrySet()) {
+            BeanDefinition<?> definition = entry.getValue().definition();
             String[] strings = definition.stringValues(Refreshable.class);
             if (!ArrayUtils.isEmpty(strings)) {
                 for (String prefix : strings) {
                     for (String k : keys) {
                         if (k.startsWith(prefix)) {
-                            disposeOfBean(beanKey);
+                            disposeOfBean(entry.getKey());
                         }
                     }
                 }
             } else {
-                disposeOfBean(beanKey);
+                disposeOfBean(entry.getKey());
             }
         }
     }

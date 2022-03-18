@@ -1,0 +1,1 @@
+api:context.LocalizedMessageSource[] is a `@RequestScope` bean which you can inject in your Controllers and which uses <<localeResolution, Micronaut Locale Resolution>> to resolve the localized message for the current HTTP request.

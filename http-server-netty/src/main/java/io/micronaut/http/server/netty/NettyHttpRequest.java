@@ -568,18 +568,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     }
 
     /**
-     * Lookup the current request from the context.
-     *
-     * @param ctx The context
-     * @return The request or null if it is not present
-     */
-    static NettyHttpRequest get(ChannelHandlerContext ctx) {
-        Channel channel = ctx.channel();
-        io.netty.util.Attribute<NettyHttpRequest> attr = channel.attr(ServerAttributeKeys.REQUEST_KEY);
-        return attr.get();
-    }
-
-    /**
      * Remove the current request from the context.
      *
      * @param ctx The context

@@ -98,6 +98,7 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
                         }
                     }
                 }
+                break;
             default:
                 // no-op
         }

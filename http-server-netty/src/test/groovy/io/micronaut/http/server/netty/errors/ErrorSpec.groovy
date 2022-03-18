@@ -28,12 +28,31 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.server.exceptions.ExceptionHandler
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import io.netty.bootstrap.Bootstrap
+import io.netty.buffer.ByteBuf
+import io.netty.buffer.CompositeByteBuf
+import io.netty.buffer.Unpooled
+import io.netty.channel.Channel
+import io.netty.channel.ChannelHandlerContext
+import io.netty.channel.ChannelInboundHandlerAdapter
+import io.netty.channel.ChannelInitializer
+import io.netty.channel.nio.NioEventLoopGroup
+import io.netty.channel.socket.nio.NioSocketChannel
+import io.netty.handler.codec.http.FullHttpResponse
+import io.netty.handler.codec.http.HttpClientCodec
+import io.netty.handler.codec.http.HttpObjectAggregator
+import io.netty.handler.codec.http.HttpResponseDecoder
 import jakarta.inject.Singleton
+import org.jetbrains.annotations.NotNull
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import io.micronaut.core.async.annotation.SingleResult
 import spock.lang.Issue
+import spock.lang.Timeout
+
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Tests for different kinds of errors and the expected responses
@@ -200,6 +219,49 @@ class ErrorSpec extends AbstractMicronautSpec {
         then:
         def e = thrown HttpClientResponseException
         e.status == HttpStatus.BAD_REQUEST
+    }
+
+    @Timeout(5)
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6925')
+    void "test error for invalid headers with body"() {
+        given:
+        def eventLoopGroup = new NioEventLoopGroup(1)
+        FullHttpResponse response = null
+        Bootstrap bootstrap = new Bootstrap()
+                .group(eventLoopGroup)
+                .channel(NioSocketChannel)
+                .handler(new ChannelInitializer<Channel>() {
+                    @Override
+                    protected void initChannel(@NotNull Channel ch) throws Exception {
+                        ch.pipeline()
+                                .addLast(new HttpResponseDecoder())
+                                .addLast(new HttpObjectAggregator(8192))
+                                .addLast(new ChannelInboundHandlerAdapter() {
+                                    @Override
+                                    void channelRead(@NotNull ChannelHandlerContext ctx, @NotNull Object msg) throws Exception {
+                                        response = msg
+                                    }
+                                })
+                    }
+                })
+                .remoteAddress(embeddedServer.host, embeddedServer.port)
+        def longString = 'a' * 9000
+
+        when:
+        def channel = bootstrap.connect().sync().channel()
+        channel.writeAndFlush(Unpooled.wrappedBuffer("""POST /test HTTP/1.0\r
+Host: localhost\r
+Connection: close\r
+Content-Length: 26\r
+Accept: */*\r
+X-Long-Header: $longString\r
+\r
+{"message":"Hello World!"}""".getBytes(StandardCharsets.UTF_8)))
+        channel.read()
+        channel.closeFuture().await()
+
+        then:
+        response.status().code() == 413
     }
 
     @Controller('/errors')

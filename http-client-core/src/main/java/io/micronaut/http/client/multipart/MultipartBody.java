@@ -190,7 +190,7 @@ public final class MultipartBody {
          * @param filePart Any file part, such as {@link FilePart}, {@link InputStreamPart}, {@link BytePart} etc
          * @return A {@link MultipartBody.Builder} to build MultipartBody
          */
-        private Builder addFilePart(AbstractFilePart filePart) {
+        private Builder addFilePart(AbstractFilePart<?> filePart) {
             parts.add(filePart);
             return this;
         }

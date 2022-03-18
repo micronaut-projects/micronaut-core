@@ -41,9 +41,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -380,7 +378,7 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
         staticInit.push(methodElement.getName());
         // 4: return argument
         ClassElement genericReturnType = methodElement.getGenericReturnType();
-        pushArgument(thisType, classWriter, staticInit, declaringType.getName(), genericReturnType, defaultsStorage, loadTypeMethods);
+        pushReturnTypeArgument(thisType, classWriter, staticInit, declaringType.getName(), genericReturnType, defaultsStorage, loadTypeMethods);
         // 5: arguments
         ParameterElement[] parameters = methodElement.getSuspendParameters();
         if (parameters.length == 0) {
@@ -438,112 +436,6 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
                     loadTypeMethods);
         } else {
             staticInit.push((String) null);
-        }
-    }
-
-    private void buildInvokeMethod(
-            Type declaringTypeObject,
-            String methodName,
-            boolean isInterface,
-            ClassElement returnType,
-            Collection<ParameterElement> argumentTypes,
-            GeneratorAdapter invokeMethodVisitor,
-            String interceptedProxyClassName,
-            String interceptedProxyBridgeMethodName
-    ) {
-        Type returnTypeObject = JavaModelUtils.getTypeReference(returnType);
-
-        // load this
-        invokeMethodVisitor.loadArg(1);
-        // duplicate target
-        invokeMethodVisitor.dup();
-
-        String methodDescriptor = getMethodDescriptor(returnType, argumentTypes);
-        if (interceptedProxyClassName != null) {
-            Label invokeTargetBlock = new Label();
-
-            Type interceptedProxyType = getObjectType(interceptedProxyClassName);
-
-            // load this.$interceptable field value
-            invokeMethodVisitor.loadThis();
-            invokeMethodVisitor.getField(Type.getObjectType(internalName), FIELD_INTERCEPTABLE, Type.getType(boolean.class));
-            // check if it equals true
-            invokeMethodVisitor.push(true);
-            invokeMethodVisitor.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.NE, invokeTargetBlock);
-
-            // target instanceOf intercepted proxy
-            invokeMethodVisitor.loadArg(1);
-            invokeMethodVisitor.instanceOf(interceptedProxyType);
-            // check if instanceOf
-            invokeMethodVisitor.push(true);
-            invokeMethodVisitor.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.NE, invokeTargetBlock);
-
-            pushCastToType(invokeMethodVisitor, interceptedProxyType);
-
-            // load arguments
-            Iterator<ParameterElement> iterator = argumentTypes.iterator();
-            for (int i = 0; i < argumentTypes.size(); i++) {
-                invokeMethodVisitor.loadArg(2);
-                invokeMethodVisitor.push(i);
-                invokeMethodVisitor.visitInsn(AALOAD);
-
-                pushCastToType(invokeMethodVisitor, iterator.next());
-            }
-
-            invokeMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
-                    interceptedProxyType.getInternalName(), interceptedProxyBridgeMethodName,
-                    methodDescriptor, false);
-
-            if (returnTypeObject.equals(Type.VOID_TYPE)) {
-                invokeMethodVisitor.visitInsn(ACONST_NULL);
-            } else {
-                pushBoxPrimitiveIfNecessary(returnType, invokeMethodVisitor);
-            }
-            invokeMethodVisitor.returnValue();
-
-            invokeMethodVisitor.visitLabel(invokeTargetBlock);
-
-            // remove parent
-            invokeMethodVisitor.pop();
-        }
-
-        pushCastToType(invokeMethodVisitor, declaringTypeObject);
-        boolean hasArgs = !argumentTypes.isEmpty();
-        if (hasArgs) {
-            int argCount = argumentTypes.size();
-            Iterator<ParameterElement> argIterator = argumentTypes.iterator();
-            for (int i = 0; i < argCount; i++) {
-                invokeMethodVisitor.loadArg(2);
-                invokeMethodVisitor.push(i);
-                invokeMethodVisitor.visitInsn(AALOAD);
-                // cast the return value to the correct type
-                pushCastToType(invokeMethodVisitor, argIterator.next());
-            }
-        }
-
-        invokeMethodVisitor.visitMethodInsn(isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL,
-                declaringTypeObject.getInternalName(), methodName,
-                methodDescriptor, isInterface);
-
-        if (returnTypeObject.equals(Type.VOID_TYPE)) {
-            invokeMethodVisitor.visitInsn(ACONST_NULL);
-        } else {
-            pushBoxPrimitiveIfNecessary(returnType, invokeMethodVisitor);
-        }
-    }
-
-    @Internal
-    private static final class ExecutableMethodVisitData {
-        final TypedElement declaringType;
-        final MethodElement methodElement;
-        final String interceptedProxyClassName;
-        final String interceptedProxyBridgeMethodName;
-
-        private ExecutableMethodVisitData(TypedElement declaringType, MethodElement methodElement, String interceptedProxyClassName, String interceptedProxyBridgeMethodName) {
-            this.declaringType = declaringType;
-            this.methodElement = methodElement;
-            this.interceptedProxyClassName = interceptedProxyClassName;
-            this.interceptedProxyBridgeMethodName = interceptedProxyBridgeMethodName;
         }
     }
 }

@@ -350,12 +350,20 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (existing instanceof DefaultAnnotationMetadata) {
             // ugly, but will have to do
             annotationMetadata = ((DefaultAnnotationMetadata) existing).clone();
+            if (parents.isEmpty()) {
+                // Don't need to do anything with existing
+                return annotationMetadata;
+            }
         } else if (existing instanceof AnnotationMetadataHierarchy) {
             final AnnotationMetadata declaredMetadata = ((AnnotationMetadataHierarchy) existing).getDeclaredMetadata();
             if (declaredMetadata instanceof DefaultAnnotationMetadata) {
                 annotationMetadata = ((DefaultAnnotationMetadata) declaredMetadata).clone();
             } else {
                 annotationMetadata = new MutableAnnotationMetadata();
+            }
+            if (parents.isEmpty()) {
+                // Don't need to do anything with existing
+                return annotationMetadata;
             }
         } else {
             annotationMetadata = new MutableAnnotationMetadata();
@@ -1429,6 +1437,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             handleMemberBinding(metadata, lastParent, data);
             interceptorBindings.getLast().members(data);
             return;
+        }
+        // special case: don't add stereotype for @Nonnull when it's marked as UNKNOWN/MAYBE/NEVER.
+        // https://github.com/micronaut-projects/micronaut-core/issues/6795
+        if (annotationName.equals("javax.annotation.Nonnull")) {
+            String when = Objects.toString(data.get("when"));
+            if (when.equals("UNKNOWN") || when.equals("MAYBE") || when.equals("NEVER")) {
+                return;
+            }
         }
         if (hasInterceptorBinding && Type.class.getName().equals(annotationName)) {
             final Object o = data.get(AnnotationMetadata.VALUE_MEMBER);
