@@ -75,7 +75,8 @@ import java.util.stream.Collectors;
  */
 @Internal
 public class JavaClassElement extends AbstractJavaElement implements ArrayableClassElement {
-
+    private static final String KOTLIN_METADATA = "kotlin.Metadata";
+    private static final String PREFIX_IS = "is";
     protected final TypeElement classElement;
     protected final JavaVisitorContext visitorContext;
     final List<? extends TypeMirror> typeArguments;
@@ -373,7 +374,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         final TypeElement declaringTypeElement = (TypeElement) executableElement.getEnclosingElement();
 
                         if (NameUtils.isReaderName(methodName, readPrefixes) && executableElement.getParameters().isEmpty()) {
-                            String propertyName = NameUtils.getPropertyNameForGetter(methodName, readPrefixes);
+                            String propertyName = isKotlinClass(element.getEnclosingElement()) && methodName.startsWith(PREFIX_IS) ?
+                                methodName : NameUtils.getPropertyNameForGetter(methodName, readPrefixes);
                             TypeMirror returnType = executableElement.getReturnType();
                             ClassElement getterReturnType;
                             if (returnType instanceof TypeVariable) {
@@ -521,6 +523,10 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             }
         }
         return Collections.unmodifiableList(beanProperties);
+    }
+
+    private boolean isKotlinClass(Element element) {
+        return element.getAnnotationMirrors().stream().anyMatch(am -> am.getAnnotationType().asElement().toString().equals(KOTLIN_METADATA));
     }
 
     @Override
