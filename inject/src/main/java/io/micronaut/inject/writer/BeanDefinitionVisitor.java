@@ -15,8 +15,6 @@
  */
 package io.micronaut.inject.writer;
 
-import io.micronaut.context.annotation.ConfigurationReader;
-import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.inject.BeanDefinition;
@@ -239,8 +237,8 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * @return The index of a new method
      */
     int visitExecutableMethod(TypedElement declaringBean,
-                              MethodElement methodElement,
-                              VisitorContext visitorContext);
+                                                 MethodElement methodElement,
+                                                 VisitorContext visitorContext);
 
     /**
      * Visits a field injection point.
@@ -248,24 +246,10 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * @param declaringType      The declaring type. Either a Class or a string representing the name of the type
      * @param fieldElement       The field element
      * @param requiresReflection Whether accessing the field requires reflection
-     * @deprecated Use {@link #visitFieldInjectionPoint(io.micronaut.inject.ast.TypedElement, io.micronaut.inject.ast.FieldElement)}
      */
-    @Deprecated
     void visitFieldInjectionPoint(TypedElement declaringType,
                                   FieldElement fieldElement,
                                   boolean requiresReflection);
-
-    /**
-     * Visits a field injection point.
-     *
-     * @param declaringType      The declaring type. Either a Class or a string representing the name of the type
-     * @param fieldElement       The field element
-     * @since 3.5.0
-     */
-    default void visitFieldInjectionPoint(@NonNull TypedElement declaringType,
-                                          @NonNull FieldElement fieldElement) {
-        visitFieldInjectionPoint(declaringType, fieldElement, fieldElement.isReflectionRequired());
-    }
 
     /**
      * Visits an annotation injection point.
@@ -288,31 +272,11 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * @param fieldElement       The field element
      * @param requiresReflection Whether accessing the field requires reflection
      * @param isOptional         Is the value optional
-     * @deprecated Use {@link #visitFieldValue(io.micronaut.inject.ast.TypedElement, io.micronaut.inject.ast.FieldElement)} instead
      */
-    @Deprecated
     void visitFieldValue(TypedElement declaringType,
                          FieldElement fieldElement,
                          boolean requiresReflection,
                          boolean isOptional);
-
-    /**
-     * Visits a field injection point.
-     *
-     * @param declaringType      The declaring type. Either a Class or a string representing the name of the type
-     * @param fieldElement       The field element
-     * @since 3.5.0
-     */
-    default void visitFieldValue(TypedElement declaringType,
-                                 FieldElement fieldElement) {
-        final ClassElement owningType = fieldElement.getOwningType();
-        visitFieldValue(
-                declaringType,
-                fieldElement,
-                fieldElement.isReflectionRequired(),
-                owningType.hasDeclaredStereotype(ConfigurationReader.class) || owningType.hasDeclaredStereotype(EachProperty.class) || fieldElement.isNullable()
-        );
-    }
 
     /**
      * @return The package name of the bean

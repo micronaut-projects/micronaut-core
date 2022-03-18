@@ -640,12 +640,15 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         if (injectedField.hasAnnotation(Value.class) || injectedField.hasAnnotation(Property.class)) {
             beanDefinitionWriter.visitFieldValue(
                     injectedField.getDeclaringType(),
-                    injectedField
+                    injectedField,
+                    ibf.isReflectionRequired(),
+                    ibf.isDeclaredNullable()
             );
         } else {
             beanDefinitionWriter.visitFieldInjectionPoint(
                     injectedField.getDeclaringType(),
-                    injectedField
+                    ibf,
+                    ibf.isReflectionRequired()
             );
         }
     }
