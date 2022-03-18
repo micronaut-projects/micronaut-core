@@ -373,7 +373,12 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         final TypeElement declaringTypeElement = (TypeElement) executableElement.getEnclosingElement();
 
                         if (NameUtils.isReaderName(methodName, readPrefixes) && executableElement.getParameters().isEmpty()) {
-                            String propertyName = NameUtils.getPropertyNameForGetter(methodName, readPrefixes);
+                            String propertyName;
+                            if (isKotlinClass(element.getEnclosingElement()) && methodName.startsWith("is")) {
+                                propertyName = methodName;
+                            } else {
+                                propertyName = NameUtils.getPropertyNameForGetter(methodName, readPrefixes);
+                            }
                             TypeMirror returnType = executableElement.getReturnType();
                             ClassElement getterReturnType;
                             if (returnType instanceof TypeVariable) {
@@ -521,6 +526,10 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             }
         }
         return Collections.unmodifiableList(beanProperties);
+    }
+
+    private boolean isKotlinClass(Element element) {
+        return element.getAnnotationMirrors().stream().anyMatch(am -> am.getAnnotationType().asElement().toString().equals("kotlin.Metadata"));
     }
 
     @Override
