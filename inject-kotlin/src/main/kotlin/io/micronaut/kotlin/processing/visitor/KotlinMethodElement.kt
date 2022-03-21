@@ -135,8 +135,8 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
 
     override fun isPrivate(): Boolean = private
 
-    override fun isVisibleInPackage(): Boolean {
-        return super.isVisibleInPackage() || internal
+    override fun isVisibleInPackage(packageName: String): Boolean {
+        return super.isVisibleInPackage(packageName) || internal
     }
 
     override fun toString(): String {

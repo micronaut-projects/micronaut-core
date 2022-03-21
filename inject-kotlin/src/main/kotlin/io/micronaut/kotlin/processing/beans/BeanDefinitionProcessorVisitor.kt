@@ -268,7 +268,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
                 val declaredAround =
                     hasAround && !classElement.isAbstract && !classElement.isAssignable(Interceptor::class.java)
                 val inheritedAround =
-                    isAopProxyType && methodElement.isVisibleInPackage && !declaredAround
+                    isAopProxyType && methodElement.isVisibleInPackage(classElement.packageName) && !methodElement.isProtected && !declaredAround
 
                 if (inheritedAround || declaredAround) {
                     visitAroundMethod(methodElement, inheritedAround)
@@ -363,14 +363,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
             builder.member("name", propertyMetadata.path)
         }
 
-        var requiresReflection = true
-        if (methodElement.isPublic) {
-            requiresReflection = false
-        } else if (methodElement.isPackagePrivate || methodElement.isProtected) {
-            val declaringPackage: String = declaringType.packageName
-            val concretePackage: String = classElement.packageName
-            requiresReflection = declaringPackage != concretePackage
-        }
+        val requiresReflection = !methodElement.isVisibleInPackage(classElement.packageName)
 
         beanWriter!!.visitSetterValue(
             declaringType,

@@ -139,8 +139,14 @@ public interface MethodElement extends MemberElement {
         return false;
     }
 
-    default boolean isVisibleInPackage() {
-        return isPackagePrivate() || isPublic();
+    default boolean isVisibleInPackage(String packageName) {
+        if (isPublic()) {
+            return true;
+        } else if (isPackagePrivate() || isProtected()) {
+            return getDeclaringType().getPackageName().equals(packageName);
+        } else {
+            return false;
+        }
     }
 
     /**
