@@ -63,6 +63,7 @@ jobs:
         with:
           check_name: Java CI / Test Report (${{ matrix.java }})
           report_paths: '**/build/test-results/test/TEST-*.xml'
+          check_retries: 'true'
       - name: Publish to Sonatype Snapshots
         if: success() && github.event_name == 'push' && matrix.java == '8'
         env:
