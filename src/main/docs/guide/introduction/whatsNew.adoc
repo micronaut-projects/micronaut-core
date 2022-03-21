@@ -2,20 +2,47 @@
 
 == 3.4.0
 
-=== Micronaut Azure 3.1.0
+=== Localized Message Source
 
-Refreshed dependencies and BOM module
+You can now inject <<localizedMessageSource, `LocalizedMessageSource`>>, a `@RequestScope` bean, in your controllers to resolve localized messages for the current HTTP Request. It works in combination with <<localeResolution, Micronaut Locale Resolution>> capabilities.
 
-=== Micronaut Servlet 3.2.0
+=== Micronaut Data MongoDB
 
-Refreshed dependencies and the embedded Tomcat server now supports Java 17.
+https://github.com/micronaut-projects/micronaut-data/releases/tag/v3.3.0-RC1[Micronaut Data 3.3.0 RC1] includes https://micronaut-projects.github.io/micronaut-data/snapshot/guide/index.html#mongo[Micronaut Data MongoDB].
+
+=== Micronaut AOT and Maven
+
+You can now use https://micronaut-projects.github.io/micronaut-maven-plugin/latest/examples/aot.html[Micronaut AOT with the Micronaut Maven Plugin].
+
+=== Micronaut TOML 
+
+https://micronaut-projects.github.io/micronaut-toml/latest/guide/[Micronaut TOML] allows you to write your application configuration with https://toml.io/en/[TOML] in addition to `Properties`, `YAML`, `Groovy` or `Config4k`. 
+
+=== Micronaut Security
+
+https://github.com/micronaut-projects/micronaut-security/releases/tag/v3.4.0[Micronaut Security 3.4.1] responds with an error when an authenticated user visits a sensitive endpoint. This forces the developer to define how they want their application to behave in that scenario. Read the https://github.com/micronaut-projects/micronaut-security/releases/tag/v3.4.0[release notes] and the https://micronaut-projects.github.io/micronaut-security/latest/guide/#builtInEndpointsAccess[documentation] to learn more. 
+
+=== BOM Modules
+
+Several projects include a BOM (Bills of Materials) module: 
+
+- https://github.com/micronaut-projects/micronaut-azure/releases/tag/v3.1.0[Micronaut Azure 3.1.0]
+- https://github.com/micronaut-projects/micronaut-gcp/releases/tag/v4.1.0[Micronaut GCP 4.1.0]. It includes updates to the latest versions of Google Cloud dependencies. 
+- https://github.com/micronaut-projects/micronaut-kotlin/releases/tag/v3.2.0[Micronaut Kotlin 3.2.0]
+- https://github.com/micronaut-projects/micronaut-mongodb/releases/tag/v4.1.0[Micronaut MongoDB 4.1.0]
+- https://github.com/micronaut-projects/micronaut-mqtt/releases/tag/v2.1.0[Micronaut MQTT 2.1.0]
+- https://github.com/micronaut-projects/micronaut-reactor/releases/tag/v2.2.1[Micronaut Reactor 2.2.1]. It includes updates to the Project Reactor dependencies.
+- https://github.com/micronaut-projects/micronaut-redis/releases/tag/v5.2.0[Micronaut Redis 5.2.0]
+- https://github.com/micronaut-projects/micronaut-rxjava2/releases/tag/v1.2.0[Micronaut RxJava2 1.2.0]
+- https://github.com/micronaut-projects/micronaut-rxjava3/releases/tag/v2.2.0[Micronaut RxJava3 2.2.0]
+- https://github.com/micronaut-projects/micronaut-security/releases/tag/v3.4.0[Micronaut Security 3.4.1]
+- https://github.com/micronaut-projects/micronaut-servlet/releases/tag/v3.2.0[Micronaut Servlet 3.2.0]. It includes updates to Tomcat and Undertow dependencies. 
 
 === Other Module Upgrades
 
-- Micronaut GCP 4.1.0
-- Micronaut RxJava2 1.2.0
-- Micronaut Rxjava3 2.2.0
-- Micronaut Reactor 2.2.0
+- https://github.com/micronaut-projects/micronaut-aws/releases/tag/v3.2.0[Micronaut AWS 3.2.0] updates to the latest version of AWS SDK, ASK SDK and AWS Serverless Java Container. 
+- https://github.com/micronaut-projects/micronaut-email/releases/tag/v1.1.0[Micronaut Email 1.1.0] updates to the Sendgrid 4.8.3 and contains improvements for `javamail` module users.
+- https://github.com/micronaut-projects/micronaut-test/releases/tag/v3.1.0[Micronaut Test 3.1.0] updates the underlying testing dependencies.  
 
 == 3.3.0
 
