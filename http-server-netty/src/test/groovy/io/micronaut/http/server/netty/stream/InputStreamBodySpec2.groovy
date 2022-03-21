@@ -43,7 +43,7 @@ class InputStreamBodySpec2 extends Specification {
 
     @Retry
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6100')
-    @Ignore // this test is super flakey and I'm not sure why
+    @Ignore('this test is super flakey and I'm not sure why')
     void "test apply load to InputStream read"() {
         given:
         HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURI())
