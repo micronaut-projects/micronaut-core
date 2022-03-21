@@ -126,7 +126,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
      * @param eventLoopGroupFactory           The event loop group factory
      * @param beanContext                     The bean context
      * @param invocationInstrumenterFactories The invocation instrumenter factories
-     * @param jsonMapper
+     * @param jsonMapper                      JSON Mapper
      */
     public DefaultNettyHttpClientRegistry(
             HttpClientConfiguration defaultHttpClientConfiguration,
