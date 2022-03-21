@@ -12,7 +12,9 @@ https://github.com/micronaut-projects/micronaut-data/releases/tag/v3.3.0-RC1[Mic
 
 === Micronaut AOT and Maven
 
-You can now use https://micronaut-projects.github.io/micronaut-maven-plugin/latest/examples/aot.html[Micronaut AOT with the Micronaut Maven Plugin].
+https://micronaut-projects.github.io/micronaut-aot/latest/guide/[Micronaut AOT] is now fully supported for Maven users. Enabling AOT is as simply as passing `-Dmicronaut.aot.enabled` when running, testing or packaging your application.
+
+For more details, check the https://micronaut-projects.github.io/micronaut-maven-plugin/latest/examples/aot.html[Micronaut Maven Plugin documentation].
 
 === Micronaut TOML 
 
