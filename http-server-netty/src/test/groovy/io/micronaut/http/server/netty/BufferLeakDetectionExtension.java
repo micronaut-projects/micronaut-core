@@ -9,7 +9,7 @@ public class BufferLeakDetectionExtension implements IGlobalExtension {
     @Override
     public void visitSpec(SpecInfo spec) {
         spec.addSetupInterceptor(invocation -> {
-            BufferLeakDetection.startTracking();
+            BufferLeakDetection.startTracking(invocation.getFeature().getName());
             invocation.proceed();
         });
         spec.addCleanupInterceptor(invocation -> {
