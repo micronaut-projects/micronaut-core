@@ -129,6 +129,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     }
 
+    private AnnotationMetadata metadataForError(RuntimeException e) {
+        if ("org.eclipse.jdt.internal.compiler.problem.AbortCompilation".equals(e.getClass().getName())) {
+            // workaround for a bug in the Eclipse APT implementation. See bug 541466 on their Bugzilla.
+            return AnnotationMetadata.EMPTY_METADATA;
+        } else {
+            throw e;
+        }
+    }
+
     /**
      * Build only metadata for declared annotations.
      *
@@ -145,12 +154,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
             return metadata;
         } catch (RuntimeException e) {
-            if ("org.eclipse.jdt.internal.compiler.problem.AbortCompilation".equals(e.getClass().getName())) {
-                // workaround for a bug in the Eclipse APT implementation. See bug 541466 on their Bugzilla.
-                return AnnotationMetadata.EMPTY_METADATA;
-            } else {
-                throw e;
-            }
+            return metadataForError(e);
         }
     }
 
@@ -179,12 +183,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
             return annotationMetadata;
         } catch (RuntimeException e) {
-            if ("org.eclipse.jdt.internal.compiler.problem.AbortCompilation".equals(e.getClass().getName())) {
-                // workaround for a bug in the Eclipse APT implementation. See bug 541466 on their Bugzilla.
-                return AnnotationMetadata.EMPTY_METADATA;
-            } else {
-                throw e;
-            }
+            return metadataForError(e);
         }
     }
 
@@ -209,12 +208,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
                 return metadata;
             } catch (RuntimeException e) {
-                if ("org.eclipse.jdt.internal.compiler.problem.AbortCompilation".equals(e.getClass().getName())) {
-                    // workaround for a bug in the Eclipse APT implementation. See bug 541466 on their Bugzilla.
-                    return AnnotationMetadata.EMPTY_METADATA;
-                } else {
-                    throw e;
-                }
+                return metadataForError(e);
             }
         }
     }
@@ -252,12 +246,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
                 return metadata;
             } catch (RuntimeException e) {
-                if ("org.eclipse.jdt.internal.compiler.problem.AbortCompilation".equals(e.getClass().getName())) {
-                    // workaround for a bug in the Eclipse APT implementation. See bug 541466 on their Bugzilla.
-                    return AnnotationMetadata.EMPTY_METADATA;
-                } else {
-                    throw e;
-                }
+                return metadataForError(e);
             }
         }
     }
