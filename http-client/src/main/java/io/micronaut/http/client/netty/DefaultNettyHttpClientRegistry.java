@@ -115,7 +115,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
 
     /**
      * Default constructor.
-     *  @param defaultHttpClientConfiguration  The default HTTP client configuration
+     *
+     * @param defaultHttpClientConfiguration  The default HTTP client configuration
      * @param httpClientFilterResolver        The HTTP client filter resolver
      * @param loadBalancerResolver            The load balancer resolver
      * @param nettyClientSslBuilder           The client SSL builder
