@@ -8,7 +8,7 @@ You can now inject <<localizedMessageSource, `LocalizedMessageSource`>>, a `@Req
 
 === Micronaut Data MongoDB
 
-https://github.com/micronaut-projects/micronaut-data/releases/tag/v3.3.0-RC1[Micronaut Data 3.3.0 RC1] includes https://micronaut-projects.github.io/micronaut-data/snapshot/guide/index.html#mongo[Micronaut Data MongoDB].
+https://github.com/micronaut-projects/micronaut-data/releases/tag/v3.3.0[Micronaut Data 3.3.0] includes https://micronaut-projects.github.io/micronaut-data/latest/guide/index.html#mongo[Micronaut Data MongoDB].
 
 === Micronaut AOT and Maven
 
