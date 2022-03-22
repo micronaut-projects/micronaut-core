@@ -1,0 +1,128 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>${title.encodeAsHtml()}</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <link rel="stylesheet" href="${resourcesPath}/css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8" />
+    <link rel="stylesheet" href="${resourcesPath}/css/custom.css" type="text/css" media="screen, print" title="Style" charset="utf-8" />
+    <link rel="stylesheet" href="${resourcesPath}/css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8" />
+    <link rel="stylesheet" href="${resourcesPath}/css/highlight/agate.css">
+    <script src="${resourcesPath}/js/highlight.pack.js"></script>
+    <script src="${resourcesPath}/js/guide.js"></script>
+    <script src="${resourcesPath}/js/multi-language-sample.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+    <link rel="stylesheet" href="${resourcesPath}/css/multi-language-sample.css"/>
+    <script src="${resourcesPath}/js/docs.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/1.5.13/clipboard.min.js"></script>
+    <script type="text/javascript">
+        function addJsClass(el) {
+            var classes = document.body.className.split(" ");
+            classes.push("js");
+            document.body.className = classes.join(" ");
+        }
+    </script>
+
+</head>
+
+<body class="body" id="docs" onload="addJsClass();" onhashchange="highlightMenu()">
+
+<div id="table-of-content-nav-link" class="desktop">
+    <a id="theme-switcher" title="Switch to dark theme" href="javascript:switchTheme(true)"><i class="fa fa-moon-o"></i></a>
+    <a title="Collapse/Open Table of contents" title="Hide Table of Contents" href="javascript:hideTableOfContents();" class="button">[ + ]</a>
+</div>
+
+<div id="main">
+    <div id="navigation" class="no-print">
+        <div class="navTitle">
+            <span id="logo"><a href="http://micronaut.io" title="Go to Micronaut Website"><img src="${resourcesPath}/img/micronaut-logo-white.svg" alt="Micronaut"/></a></span>
+        </div>
+        <div class="navLinks">
+            <ul>
+                    <li><div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)" class="desktop">
+                            <a href="${path}/guide/index.html" class="button">Table of contents</a>
+                            <div id="nav-summary-childs" style="display:none;">
+                                <%
+                                toc.children.eachWithIndex { ch, i ->
+                                if (single) {
+                                %>
+                                <div class="toc-item" style="margin-left:0"><a href="#${ ch.name.encodeAsUrlFragment().encodeAsHtml() }"><strong>${i + 1}</strong><span>${ch.title?.encodeAsHtml()}</span></a></div>
+                                <%
+                                }
+                                else {
+                                %>
+                                <div class="toc-item" style="margin-left:0"><a href="${path}/guide/${ch.name.encodeAsUrlPath().encodeAsHtml()}.html"><strong>${i + 1}</strong><span>${ch.title?.encodeAsHtml()}</span></a></div>
+                                <%
+                                }
+                                }
+                                %>
+                            </div>
+                        </div>
+                    </li>
+
+                <li id="table-of-content-nav-link-mobile" class="mobile">
+                    <a title="Scroll to Table of contents" href="javascript:scrollToTop();" class="button">Toc</a>
+                </li>
+                <li class="desktop">
+                    <a title="Go to API documentation" href="${path}/api/index.html" class="button">API Reference</a>
+                </li>
+                <li class="mobile">
+                    <a title="Go to API documentation" href="${path}/api/index.html" class="button">API</a>
+                </li>
+                <li class="desktop">
+                    <a title="Go to Configuration Reference documentation" href="${path}/guide/configurationreference.html" class="button">Configuration Reference</a>
+                </li>
+                <li class="mobile">
+                    <a title="Go to Configuration Reference documentation" href="${path}/guide/configurationreference.html" class="button">Conf</a>
+                </li>
+            </ul>
+
+        </div>
+    </div>
+    <% if(toc){ %>
+    <div id="table-of-content">
+        <div class="toc-content">
+
+        <h2>Table of Contents</h2>
+        <%
+        sectionWriter = { lvl, section, topSection, prefix ->
+        if (single) {
+        %>
+        <div class="toc-item" style="margin-left:${lvl * 10}px" id="toc-item-${ section.name.encodeAsUrlFragment().encodeAsHtml() }"><a href="#${ section.name.encodeAsUrlFragment().encodeAsHtml() }"><strong>$prefix</strong><span>${section.title?.encodeAsHtml()}</span></a></div>
+        <%
+        }
+        else {
+        %>
+        <div class="toc-item" style="margin-left:${lvl * 10}px"><a href="${path}/guide/${topSection.name.encodeAsUrlPath().encodeAsHtml()}.html${ lvl == 0 ? '' : '#' + section.name.encodeAsUrlFragment().encodeAsHtml() }"><strong>$prefix</strong><span>${section.title?.encodeAsHtml()}</span></a></div>
+        <%
+        }
+
+        lvl++
+        section.children.eachWithIndex { s, j ->
+        sectionWriter.call(lvl, s, topSection, prefix + '.' + (j + 1))
+        }
+        }
+
+        toc.children.eachWithIndex { topSection, i ->
+        sectionWriter.call(0, topSection, topSection, i + 1)
+        }
+        %>
+        </div>
+    </div>
+    <% } %>
+    <div class="docs-content">
+    <div class="project">
+        <h1>${title.encodeAsHtml()}</h1>
+        <p></p>
+        <p>${subtitle?.encodeAsHtml()}</p>
+        <p><strong>Version:</strong> ${version}</p>
+    </div>
+    ${content}
+    </div>
+</div>
+
+<script type="text/javascript">
+
+</script>
+</body>
+</html>
