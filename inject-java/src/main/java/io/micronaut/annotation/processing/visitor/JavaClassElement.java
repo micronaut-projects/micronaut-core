@@ -75,7 +75,8 @@ import java.util.stream.Collectors;
  */
 @Internal
 public class JavaClassElement extends AbstractJavaElement implements ArrayableClassElement {
-
+    private static final String KOTLIN_METADATA = "kotlin.Metadata";
+    private static final String PREFIX_IS = "is";
     protected final TypeElement classElement;
     protected final JavaVisitorContext visitorContext;
     final List<? extends TypeMirror> typeArguments;
@@ -373,7 +374,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         final TypeElement declaringTypeElement = (TypeElement) executableElement.getEnclosingElement();
 
                         if (NameUtils.isReaderName(methodName, readPrefixes) && executableElement.getParameters().isEmpty()) {
-                            String propertyName = NameUtils.getPropertyNameForGetter(methodName, readPrefixes);
+                            String propertyName = isKotlinClass(element.getEnclosingElement()) && methodName.startsWith(PREFIX_IS) ?
+                                methodName : NameUtils.getPropertyNameForGetter(methodName, readPrefixes);
                             TypeMirror returnType = executableElement.getReturnType();
                             ClassElement getterReturnType;
                             if (returnType instanceof TypeVariable) {
@@ -472,14 +474,20 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                             @Override
                             public ClassElement getGenericType() {
                                 TypeMirror propertyType = value.getter.getReturnType();
-                                if (fieldElement != null) {
+                                Map<String, Map<String, TypeMirror>> declaredGenericInfo = getGenericTypeInfo();
+                                ClassElement typeElement = parameterizedClassElement(propertyType, visitorContext, declaredGenericInfo);
+                                if (typeElement instanceof JavaClassElement && fieldElement != null) {
                                     TypeMirror fieldType = fieldElement.asType();
                                     if (visitorContext.getTypes().isAssignable(fieldType, propertyType)) {
-                                        propertyType = fieldType;
+                                        ClassElement fieldElement = parameterizedClassElement(fieldType, visitorContext, declaredGenericInfo);
+                                        int typeGenericsSize = typeElement.getBoundGenericTypes().size();
+                                        if (fieldElement instanceof JavaClassElement
+                                                && typeGenericsSize > 0 && typeGenericsSize == fieldElement.getBoundGenericTypes().size()) {
+                                            return ((JavaClassElement) typeElement).withBoundGenericTypeMirrors(((JavaClassElement) fieldElement).typeArguments);
+                                        }
                                     }
                                 }
-                                Map<String, Map<String, TypeMirror>> declaredGenericInfo = getGenericTypeInfo();
-                                return parameterizedClassElement(propertyType, visitorContext, declaredGenericInfo);
+                                return typeElement;
                             }
 
                             @Override
@@ -523,6 +531,10 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         return Collections.unmodifiableList(beanProperties);
     }
 
+    private boolean isKotlinClass(Element element) {
+        return element.getAnnotationMirrors().stream().anyMatch(am -> am.getAnnotationType().asElement().toString().equals(KOTLIN_METADATA));
+    }
+
     @Override
     public <T extends io.micronaut.inject.ast.Element> List<T> getEnclosedElements(@NonNull ElementQuery<T> query) {
         Objects.requireNonNull(query, "Query cannot be null");
@@ -537,7 +549,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         boolean onlyInstance = result.isOnlyInstance();
         boolean includeEnumConstants = result.isIncludeEnumConstants();
         boolean includeOverriddenMethods = result.isIncludeOverriddenMethods();
-        boolean includeHiddenMethods = result.isIncludeHiddenMethods();
+        boolean includeHiddenElements = result.isIncludeHiddenElements();
 
         if (!onlyDeclared) {
             Elements elements = visitorContext.getElements();
@@ -559,7 +571,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                     ElementKind superKind = superElement.getKind();
                     if (superKind == kind) {
                         for (Element enclosedElement : enclosedElements) {
-                            if (!includeHiddenMethods && elements.hides(enclosedElement, superElement)) {
+                            if (!includeHiddenElements && elements.hides(enclosedElement, superElement)) {
                                 continue superElements;
                             } else if (enclosedElement.getKind() == ElementKind.METHOD && superElement.getKind() == ElementKind.METHOD) {
                                 final ExecutableElement methodCandidate = (ExecutableElement) superElement;
@@ -620,7 +632,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 superclass = element.getSuperclass();
             }
 
-            if (kind == ElementKind.METHOD) {
+            if (kind == ElementKind.METHOD || kind == ElementKind.FIELD) {
                 // if the element kind is interfaces then we need to go through interfaces as well
                 Set<TypeElement> allInterfaces = visitorContext.getModelUtils().getAllInterfaces(this.classElement);
                 Collection<TypeElement> interfacesToProcess = new ArrayList<>(allInterfaces.size());
@@ -655,16 +667,13 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                                     }
                                 }
                             }
-                            elementsToAdd.add(interfaceElement);
                         }
+                        elementsToAdd.add(interfaceElement);
                     }
                 }
                 enclosedElements.addAll(elementsToAdd);
                 elementsToAdd.clear();
             }
-        }
-        boolean onlyAccessible = result.isOnlyAccessible();
-        if (kind == ElementKind.METHOD) {
             if (onlyAbstract) {
                 if (isInterface()) {
                     enclosedElements.removeIf((e) -> e.getModifiers().contains(Modifier.DEFAULT));
@@ -690,6 +699,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         boolean hasModifierPredicates = !modifierPredicates.isEmpty();
         boolean hasAnnotationPredicates = !annotationPredicates.isEmpty();
         boolean hasTypePredicates = !typePredicates.isEmpty();
+        boolean onlyAccessible = result.isOnlyAccessible();
         final JavaElementFactory elementFactory = visitorContext.getElementFactory();
 
         elementLoop:
@@ -1064,13 +1074,17 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         List<TypeMirror> typeMirrors = typeArguments.stream()
                 .map(ce -> toTypeMirror(visitorContext, ce))
                 .collect(Collectors.toList());
+        return withBoundGenericTypeMirrors(typeMirrors);
+    }
+
+    private ClassElement withBoundGenericTypeMirrors(@NonNull List<? extends TypeMirror> typeMirrors) {
         if (typeMirrors.equals(this.typeArguments)) {
             return this;
         }
 
         Map<String, TypeMirror> boundByName = new LinkedHashMap<>();
         Iterator<? extends TypeParameterElement> tpes = classElement.getTypeParameters().iterator();
-        Iterator<TypeMirror> args = typeMirrors.iterator();
+        Iterator<? extends TypeMirror> args = typeMirrors.iterator();
         while (tpes.hasNext() && args.hasNext()) {
             boundByName.put(tpes.next().getSimpleName().toString(), args.next());
         }

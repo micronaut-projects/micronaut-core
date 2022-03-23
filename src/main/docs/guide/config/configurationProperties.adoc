@@ -26,6 +26,8 @@ snippet::io.micronaut.docs.config.properties.VehicleSpec[tags="start",indent=0,t
 
 The above example prints: `"Ford Engine Starting V8 [rodLength=6.0]"`
 
+You can directly reference configuration properties in `@Requires` annotation to conditionally load beans using the following syntax: `@Requires(bean=Config.class, beanProperty="property", value="true")`
+
 Note for more complex configurations you can structure ann:context.annotation.ConfigurationProperties[] beans through inheritance.
 
 For example creating a subclass of `EngineConfig` with `@ConfigurationProperties('bar')` will resolve all properties under the path `my.engine.bar`.

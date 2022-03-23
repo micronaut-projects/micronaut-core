@@ -10,7 +10,7 @@ dependency::micronaut-inject-java[scope="annotationProcessor", version="{version
 
 NOTE: For Kotlin, add the `micronaut-inject-java` dependency in `kapt` scope, and for Groovy add `micronaut-inject-groovy` in `compileOnly` scope.
 
-dependency::micronaut-core[scope="runtime", version="{version}"]
+dependency::micronaut-core[scope="runtimeOnly", version="{version}"]
 
 Once your build is configured you have a few ways to generate introspection data.
 

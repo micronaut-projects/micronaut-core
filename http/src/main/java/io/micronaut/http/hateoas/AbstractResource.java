@@ -160,11 +160,11 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
      *
      * @param embedded The links
      */
-    @SuppressWarnings("unchecked")
     @Internal
     @ReflectiveAccess
     @JsonProperty(EMBEDDED)
-    public final void setEmbedded(Map<String, Object> embedded) {
+    public final void setEmbedded(Map<String, List<Resource>> embedded) {
+        this.embeddedMap.putAll(embedded);
     }
 
     private void link(String name, Map<String, Object> linkMap) {

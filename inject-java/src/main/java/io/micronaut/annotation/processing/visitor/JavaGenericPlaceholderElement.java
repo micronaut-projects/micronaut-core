@@ -58,6 +58,11 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
         this.bounds = bounds;
     }
 
+    @Override
+    public Object getNativeType() {
+        return realTypeVariable;
+    }
+
     @NonNull
     @Override
     public List<? extends ClassElement> getBounds() {

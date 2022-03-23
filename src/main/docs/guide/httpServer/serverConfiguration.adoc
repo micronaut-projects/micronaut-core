@@ -31,19 +31,19 @@ To enable native transports, first add a dependency:
 
 For macOS on x86:
 
-dependency:netty-transport-native-kqueue[groupId="io.netty",scope="runtime",classifier="osx-x86_64"]
+dependency:netty-transport-native-kqueue[groupId="io.netty",scope="runtimeOnly",classifier="osx-x86_64"]
 
 For macOS on M1:
 
-dependency:netty-transport-native-kqueue[groupId="io.netty",scope="runtime",classifier="osx-aarch_64"]
+dependency:netty-transport-native-kqueue[groupId="io.netty",scope="runtimeOnly",classifier="osx-aarch_64"]
 
 For Linux on x86:
 
-dependency:netty-transport-native-epoll[groupId="io.netty",scope="runtime",classifier="linux-x86_64"]
+dependency:netty-transport-native-epoll[groupId="io.netty",scope="runtimeOnly",classifier="linux-x86_64"]
 
 For Linux on ARM64:
 
-dependency:netty-transport-native-epoll[groupId="io.netty",scope="runtime",classifier="linux-aarch_64"]
+dependency:netty-transport-native-epoll[groupId="io.netty",scope="runtimeOnly",classifier="linux-aarch_64"]
 
 Then configure the default event loop group to prefer native transports:
 
