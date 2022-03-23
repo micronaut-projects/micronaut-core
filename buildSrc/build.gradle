@@ -9,6 +9,6 @@ repositories {
 dependencies {
     implementation "gradle.plugin.com.github.johnrengelman:shadow:7.1.2"
     implementation "org.aim42:htmlSanityCheck:1.1.6"
-    implementation "io.micronaut.build.internal:micronaut-gradle-plugins:5.2.3"
+    implementation "io.micronaut.build.internal:micronaut-gradle-plugins:5.3.0"
     implementation "org.tomlj:tomlj:1.0.0"
 }
